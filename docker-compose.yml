@@ -68,6 +68,44 @@ services:
       - ./certbot/www:/var/www/certbot
     entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
+  # Accounting Service
+  accounting-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: accounting_user
+      POSTGRES_PASSWORD: Acc0unt1ng_Pr0d_2024!
+      POSTGRES_DB: accounting_db
+    volumes:
+      - accounting_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U accounting_user -d accounting_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    profiles:
+      - accounting
+
+  accounting-app:
+    build: ./accounting
+    volumes:
+      - ./accounting/src:/app/src
+      - ./accounting/logs:/app/logs
+    env_file:
+      - ./accounting/.env
+    environment:
+      - DATABASE_URL=postgresql://accounting_user:Acc0unt1ng_Pr0d_2024!@accounting-db:5432/accounting_db
+      - INVENTORY_API_URL=http://app:8000/api
+    depends_on:
+      accounting-db:
+        condition: service_healthy
+      app:
+        condition: service_started
+    restart: unless-stopped
+    profiles:
+      - accounting
+
 volumes:
   postgres_data:
   redis_data:
+  accounting_data:
