@@ -48,10 +48,8 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_count_template_items_id'), 'count_template_items', ['id'], unique=False)
 
-    # Create count status enum
-    op.execute("CREATE TYPE countstatus AS ENUM ('IN_PROGRESS', 'COMPLETED', 'APPROVED', 'CANCELLED')")
-
     # Create count_sessions table
+    # Note: countstatus enum will be created automatically by SQLAlchemy
     op.create_table('count_sessions',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('storage_area_id', sa.Integer(), nullable=False),
