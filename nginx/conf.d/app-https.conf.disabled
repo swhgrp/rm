@@ -1,11 +1,11 @@
 # HTTPS server
 server {
     listen 443 ssl http2;
-    server_name inventory.swhgrp.com _;
+    server_name restaurantsystem.swhgrp.com;
 
     # SSL certificate paths
-    ssl_certificate /etc/letsencrypt/live/inventory.swhgrp.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/inventory.swhgrp.com/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/restaurantsystem.swhgrp.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/restaurantsystem.swhgrp.com/privkey.pem;
 
     # SSL configuration
     ssl_protocols TLSv1.2 TLSv1.3;
