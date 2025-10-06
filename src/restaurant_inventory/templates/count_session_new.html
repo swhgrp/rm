@@ -1,0 +1,1337 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory Count - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div id="startScreen">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="bi bi-clipboard-check"></i> Start Inventory Count</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="selectLocation" class="form-label">Location *</label>
+                        <select class="form-select form-select-lg" id="selectLocation" required>
+                            <option value="">Select Location</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Inventory Type *</label>
+                        <div class="card border-primary">
+                            <div class="card-body">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="radio" name="inventoryType" id="typePartial" value="PARTIAL" checked>
+                                    <label class="form-check-label" for="typePartial">
+                                        <strong>Partial Inventory</strong>
+                                        <br><small class="text-muted">Only counted items will be updated. Uncounted items keep their current values.</small>
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="inventoryType" id="typeFull" value="FULL">
+                                    <label class="form-check-label" for="typeFull">
+                                        <strong>Full Inventory</strong>
+                                        <br><small class="text-muted">All items must be counted. Uncounted items will be set to 0.</small>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="countDate" class="form-label">Count Date *</label>
+                        <input type="date" class="form-control form-control-lg" id="countDate" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="countNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="countNotes" rows="2" placeholder="Optional notes"></textarea>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-primary btn-lg w-100" onclick="startCount()">
+                        <i class="bi bi-play-circle"></i> Start Count
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="countScreen" style="display: none;">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1><i class="bi bi-clipboard-check"></i> <span id="countTitle">Inventory Count</span></h1>
+            <p class="text-muted mb-0">
+                <i class="bi bi-geo-alt"></i> <span id="locationName"></span>
+                <span id="statusBadge" class="badge ms-2"></span>
+            </p>
+        </div>
+        <button class="btn btn-outline-danger" onclick="exitCount()">
+            <i class="bi bi-x-circle"></i> Exit
+        </button>
+    </div>
+
+    <!-- Storage Area Selector -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <label class="form-label fw-bold mb-0">Storage Area</label>
+                <button id="finishAreaBtn" class="btn btn-success btn-sm" onclick="toggleAreaFinished()" style="display: none;">
+                    <i class="bi bi-check-circle"></i> <span id="finishBtnText">Mark as Finished</span>
+                </button>
+            </div>
+            <select class="form-select form-select-lg" id="storageAreaSelector" onchange="switchStorageArea()">
+                <option value="">Select storage area to count...</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="countingArea" style="display: none;">
+        <!-- Progress -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h3 id="itemsCounted">0</h3>
+                        <p class="mb-0">Items Counted</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-warning text-dark">
+                    <div class="card-body text-center">
+                        <h3 id="itemsFlagged">0</h3>
+                        <p class="mb-0">Flagged Items</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h3 id="totalValue">$0</h3>
+                        <p class="mb-0">Total Value</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barcode Scanner -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <label class="form-label"><i class="bi bi-upc-scan"></i> Barcode / Search</label>
+                <div class="input-group input-group-lg">
+                    <input type="text" class="form-control" id="barcodeInput"
+                           placeholder="Scan barcode or search items..."
+                           oninput="handleBarcodeSearch(event)" onkeyup="handleBarcodeSearch(event)">
+                    <button class="btn btn-outline-secondary" onclick="clearSearch()">Clear</button>
+                </div>
+                <div id="searchResults" class="mt-2"></div>
+            </div>
+        </div>
+
+        <!-- Items Table -->
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Items in <span id="currentAreaName">this area</span></h5>
+            </div>
+            <div class="card-body">
+                <div id="itemsTable">
+                    <p class="text-muted text-center py-4">Search or scan items to add them to this count</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <div class="d-grid gap-2 d-md-flex">
+                <button class="btn btn-info btn-lg" id="reviewBtn" onclick="showReviewScreen()">
+                    <i class="bi bi-eye"></i> Review All Counts
+                </button>
+                <button class="btn btn-success btn-lg" id="completeBtn" onclick="completeCount()">
+                    <i class="bi bi-check-circle"></i> Complete Count
+                </button>
+                <button class="btn btn-primary btn-lg" id="approveBtn" onclick="approveCount()" style="display: none;">
+                    <i class="bi bi-check2-all"></i> Approve & Update Inventory
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Review Screen -->
+<div id="reviewScreen" style="display: none;">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-clipboard-check"></i> Review Count Session</h2>
+            <p class="text-muted mb-0">
+                <strong id="reviewLocationName"></strong> - <span id="reviewCountName"></span>
+                <span class="badge ms-2" id="reviewStatusBadge"></span>
+            </p>
+        </div>
+        <button class="btn btn-secondary" onclick="backToCount()">
+            <i class="bi bi-arrow-left"></i> Back to Counting
+        </button>
+    </div>
+
+    <!-- Summary Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body text-center">
+                    <h3 id="totalAreas">0</h3>
+                    <p class="mb-0">Storage Areas</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3 id="totalCounted">0</h3>
+                    <p class="mb-0">Items Counted</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body text-center">
+                    <h3 id="totalUncounted">0</h3>
+                    <p class="mb-0">Not Counted</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body text-center">
+                    <h3 id="totalVariances">0</h3>
+                    <p class="mb-0">Large Variances</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Storage Areas Review -->
+    <div id="reviewAreasContainer"></div>
+
+    <!-- Action Buttons -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <div class="d-grid gap-2 d-md-flex justify-content-end">
+                <button class="btn btn-secondary btn-lg" onclick="backToCount()">
+                    <i class="bi bi-arrow-left"></i> Back to Counting
+                </button>
+                <button class="btn btn-success btn-lg" id="completeFromReviewBtn" onclick="completeCount()">
+                    <i class="bi bi-check-circle"></i> Complete Count
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Count Modal -->
+<div class="modal fade" id="countModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Count Item</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="itemDetails" class="mb-3"></div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Quantity *</label>
+                    <div class="d-flex gap-2 mb-2">
+                        <button type="button" class="btn btn-outline-secondary" onclick="setQty(0.10)">0.10</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="setQty(0.25)">0.25</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="setQty(0.50)">0.50</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="setQty(0.75)">0.75</button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="setQty(1.00)">1.00</button>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-8">
+                            <input type="number" class="form-control form-control-lg text-center" id="qtyInput"
+                                   step="0.01" min="0" inputmode="decimal" onchange="calcVariance()">
+                        </div>
+                        <div class="col-4">
+                            <select class="form-select form-select-lg" id="unitSelect" onchange="updateUnitDisplay()">
+                                <!-- Units will be populated dynamically -->
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div id="varianceAlert" class="alert" style="display: none;"></div>
+                <div class="mb-3">
+                    <label class="form-label">Notes</label>
+                    <textarea class="form-control" id="itemNotesInput" rows="2"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success btn-lg" onclick="saveItemCount()">
+                    <i class="bi bi-check-lg"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create New Item Modal -->
+<div class="modal fade" id="createItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">Create New Item</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createItemForm">
+                    <div class="mb-3">
+                        <label for="newItemName" class="form-label">Item Name *</label>
+                        <input type="text" class="form-control" id="newItemName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newItemCategory" class="form-label">Category *</label>
+                        <select class="form-select" id="newItemCategory" required>
+                            <option value="">Select category...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newItemUnit" class="form-label">Unit of Measure *</label>
+                        <select class="form-select" id="newItemUnit" required>
+                            <option value="">Select unit...</option>
+                            <option value="bottle">Bottle</option>
+                            <option value="case">Case</option>
+                            <option value="each">Each</option>
+                            <option value="kg">Kilogram (kg)</option>
+                            <option value="lb">Pound (lb)</option>
+                            <option value="oz">Ounce (oz)</option>
+                            <option value="L">Liter (L)</option>
+                            <option value="gal">Gallon (gal)</option>
+                            <option value="qt">Quart (qt)</option>
+                            <option value="pt">Pint (pt)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newItemBarcode" class="form-label">Barcode (Optional)</label>
+                        <input type="text" class="form-control" id="newItemBarcode">
+                    </div>
+                    <div class="mb-3">
+                        <label for="newItemSKU" class="form-label">SKU (Optional)</label>
+                        <input type="text" class="form-control" id="newItemSKU">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="createNewItem()">
+                    <i class="bi bi-plus-circle"></i> Create & Add to Count
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let session = null;
+let locations = [];
+let storageAreas = [];
+let categories = [];
+let allItems = [];
+let sessionItems = {}; // Keyed by storage_area_id
+let currentStorageAreaId = null;
+let currentItem = null;
+let countModal = null;
+let createItemModal = null;
+let searchTimeout = null;
+let areaStatuses = {}; // Track finished status for each storage area
+
+// Unit conversion map - converts TO base unit
+const unitConversions = {
+    // Weight conversions (base: lbs)
+    'lbs': { 'lbs': 1, 'oz': 16, 'kg': 0.453592, 'g': 453.592 },
+    'oz': { 'lbs': 0.0625, 'oz': 1, 'kg': 0.0283495, 'g': 28.3495 },
+    'kg': { 'lbs': 2.20462, 'oz': 35.274, 'kg': 1, 'g': 1000 },
+    'g': { 'lbs': 0.00220462, 'oz': 0.035274, 'kg': 0.001, 'g': 1 },
+
+    // Volume conversions (base: gallons)
+    'gal': { 'gal': 1, 'qt': 4, 'pt': 8, 'oz': 128, 'ml': 3785.41, 'l': 3.78541 },
+    'qt': { 'gal': 0.25, 'qt': 1, 'pt': 2, 'oz': 32, 'ml': 946.353, 'l': 0.946353 },
+    'pt': { 'gal': 0.125, 'qt': 0.5, 'pt': 1, 'oz': 16, 'ml': 473.176, 'l': 0.473176 },
+    'l': { 'gal': 0.264172, 'qt': 1.05669, 'pt': 2.11338, 'oz': 33.814, 'ml': 1000, 'l': 1 },
+    'ml': { 'gal': 0.000264172, 'qt': 0.00105669, 'pt': 0.00211338, 'oz': 0.033814, 'ml': 1, 'l': 0.001 },
+
+    // Count items (no conversion)
+    'each': { 'each': 1, 'ea': 1, 'unit': 1 },
+    'ea': { 'each': 1, 'ea': 1, 'unit': 1 },
+    'unit': { 'each': 1, 'ea': 1, 'unit': 1 },
+    'bottle': { 'bottle': 1, 'case': 0.0833 }, // Assuming 12 bottles per case
+    'case': { 'bottle': 12, 'case': 1 }
+};
+
+function getCompatibleUnits(baseUnit) {
+    if (!baseUnit) {
+        return ['Each'];
+    }
+    const normalized = baseUnit.toLowerCase().trim();
+
+    // Check if the unit exists in our conversion map
+    if (unitConversions[normalized]) {
+        return Object.keys(unitConversions[normalized]);
+    }
+
+    // Check for common variations
+    const variations = {
+        'pound': 'lbs',
+        'pounds': 'lbs',
+        'lb': 'lbs',
+        'ounce': 'oz',
+        'ounces': 'oz',
+        'gallon': 'gal',
+        'gallons': 'gal',
+        'quart': 'qt',
+        'quarts': 'qt',
+        'pint': 'pt',
+        'pints': 'pt',
+        'liter': 'l',
+        'liters': 'l',
+        'milliliter': 'ml',
+        'milliliters': 'ml',
+        'kilogram': 'kg',
+        'kilograms': 'kg',
+        'gram': 'g',
+        'grams': 'g',
+        'bottles': 'bottle',
+        'cases': 'case'
+    };
+
+    if (variations[normalized] && unitConversions[variations[normalized]]) {
+        return Object.keys(unitConversions[variations[normalized]]);
+    }
+
+    console.log('No unit conversions found for:', baseUnit);
+    return [baseUnit]; // If no conversions available, just return the base unit
+}
+
+function convertUnit(value, fromUnit, toUnit) {
+    let from = fromUnit.toLowerCase().trim();
+    let to = toUnit.toLowerCase().trim();
+
+    // Map variations to standard units
+    const variations = {
+        'pound': 'lbs', 'pounds': 'lbs', 'lb': 'lbs',
+        'ounce': 'oz', 'ounces': 'oz',
+        'gallon': 'gal', 'gallons': 'gal',
+        'quart': 'qt', 'quarts': 'qt',
+        'pint': 'pt', 'pints': 'pt',
+        'liter': 'l', 'liters': 'l',
+        'milliliter': 'ml', 'milliliters': 'ml',
+        'kilogram': 'kg', 'kilograms': 'kg',
+        'gram': 'g', 'grams': 'g',
+        'bottles': 'bottle', 'cases': 'case'
+    };
+
+    from = variations[from] || from;
+    to = variations[to] || to;
+
+    if (from === to) return value;
+
+    if (unitConversions[from] && unitConversions[from][to]) {
+        return value * unitConversions[from][to];
+    }
+
+    console.log('No conversion found from', fromUnit, 'to', toUnit);
+    return value; // No conversion available, return original value
+}
+
+async function init() {
+    try {
+        [locations, storageAreas, categories, allItems] = await Promise.all([
+            apiRequest('/api/locations/'),
+            apiRequest('/api/storage-areas/'),
+            apiRequest('/api/categories/'),
+            apiRequest('/api/items/')
+        ]);
+
+        const select = document.getElementById('selectLocation');
+        locations.forEach(loc => {
+            select.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+        });
+
+        // Set default date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('countDate').value = today;
+
+        // Check if resuming an existing session
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session');
+        if (sessionId) {
+            await resumeSession(sessionId);
+        }
+    } catch (error) {
+        showAlert('Error loading data: ' + error.message, 'danger');
+    }
+}
+
+async function resumeSession(sessionId) {
+    try {
+        // Load the existing session (includes items)
+        session = await apiRequest(`/api/count-sessions/${sessionId}`);
+
+        // Group items by storage area
+        sessionItems = {};
+        if (session.items && session.items.length > 0) {
+            session.items.forEach(item => {
+                if (!sessionItems[item.storage_area_id]) {
+                    sessionItems[item.storage_area_id] = [];
+                }
+
+                sessionItems[item.storage_area_id].push({
+                    id: item.id,
+                    master_item_id: item.master_item_id,
+                    expected_quantity: item.expected_quantity,
+                    counted_quantity: item.counted_quantity,
+                    item_name: item.item_name,
+                    item_category: item.item_category,
+                    item_unit: item.item_unit
+                });
+            });
+        }
+
+        // Show count screen
+        await showCountScreen();
+        showAlert('Session resumed successfully', 'success');
+    } catch (error) {
+        showAlert('Error resuming session: ' + error.message, 'danger');
+        console.error('Resume error:', error);
+    }
+}
+
+async function startCount() {
+    const locationId = document.getElementById('selectLocation').value;
+    const inventoryType = document.querySelector('input[name="inventoryType"]:checked').value;
+    const countDate = document.getElementById('countDate').value;
+    const notes = document.getElementById('countNotes').value;
+
+    if (!locationId) {
+        showAlert('Please select a location', 'warning');
+        return;
+    }
+
+    if (!countDate) {
+        showAlert('Please select a count date', 'warning');
+        return;
+    }
+
+    // Generate name from location and date
+    const location = locations.find(l => l.id === parseInt(locationId));
+    const name = `${location?.name || 'Inventory'} - ${countDate}`;
+
+    try {
+        session = await apiRequest('/api/count-sessions/', {
+            method: 'POST',
+            body: JSON.stringify({
+                location_id: parseInt(locationId),
+                inventory_type: inventoryType,
+                name: name,
+                notes: notes || null
+            })
+        });
+
+        showCountScreen();
+    } catch (error) {
+        showAlert('Error starting count: ' + error.message, 'danger');
+    }
+}
+
+async function showCountScreen() {
+    document.getElementById('startScreen').style.display = 'none';
+    document.getElementById('countScreen').style.display = 'block';
+
+    const loc = locations.find(l => l.id === session.location_id);
+    document.getElementById('locationName').textContent = loc ? loc.name : '';
+    document.getElementById('countTitle').textContent = session.name || 'Inventory Count';
+
+    const badge = document.getElementById('statusBadge');
+    badge.textContent = session.status;
+    badge.className = 'badge ms-2 ' + (session.status === 'IN_PROGRESS' ? 'bg-info' : 'bg-success');
+
+    // Load area statuses first
+    await loadAreaStatuses();
+
+    // Show/hide buttons based on status
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+    if (session.status === 'COMPLETED') {
+        document.getElementById('reviewBtn').style.display = 'none';
+        document.getElementById('completeBtn').style.display = 'none';
+
+        const reviewBtn = document.getElementById('completeFromReviewBtn');
+        if (reviewBtn) reviewBtn.style.display = 'none';
+
+        const userRole = (user.role || '').toUpperCase();
+        if (userRole === 'MANAGER' || userRole === 'ADMIN') {
+            document.getElementById('approveBtn').style.display = 'inline-block';
+        }
+    } else {
+        document.getElementById('reviewBtn').style.display = 'inline-block';
+        document.getElementById('completeBtn').style.display = 'inline-block';
+
+        const reviewBtn = document.getElementById('completeFromReviewBtn');
+        if (reviewBtn) reviewBtn.style.display = 'inline-block';
+
+        document.getElementById('approveBtn').style.display = 'none';
+    }
+}
+
+async function switchStorageArea() {
+    const areaId = parseInt(document.getElementById('storageAreaSelector').value);
+    if (!areaId) {
+        document.getElementById('countingArea').style.display = 'none';
+        document.getElementById('finishAreaBtn').style.display = 'none';
+        return;
+    }
+
+    currentStorageAreaId = areaId;
+    const area = storageAreas.find(a => a.id === areaId);
+    document.getElementById('currentAreaName').textContent = area ? area.name : '';
+    document.getElementById('countingArea').style.display = 'block';
+
+    // Update finish button for this area
+    updateFinishButton();
+
+    if (!sessionItems[areaId]) {
+        sessionItems[areaId] = [];
+
+        // Pre-load items from storage area's default item list
+        try {
+            const storageAreaItems = await apiRequest(`/api/storage-areas/${areaId}/items`);
+            const inventoryItems = await apiRequest(`/api/inventory/?storage_area_id=${areaId}`);
+
+            // Create inventory lookup
+            const inventoryMap = {};
+            inventoryItems.forEach(inv => {
+                inventoryMap[inv.master_item_id] = inv.current_quantity;
+            });
+
+            // Add pre-configured items in order
+            for (const areaItem of storageAreaItems) {
+                const expectedQty = inventoryMap[areaItem.master_item_id] || 0;
+
+                // Add to session with expected quantity
+                const newItem = await apiRequest(`/api/count-sessions/${session.id}/items?master_item_id=${areaItem.master_item_id}&storage_area_id=${areaId}`, {
+                    method: 'POST'
+                });
+
+                sessionItems[areaId].push({
+                    id: newItem.id,
+                    master_item_id: areaItem.master_item_id,
+                    expected_quantity: expectedQty,
+                    counted_quantity: null,
+                    item_name: areaItem.item_name,
+                    item_category: areaItem.item_category,
+                    item_unit: areaItem.item_unit
+                });
+            }
+        } catch (error) {
+            console.error('Error loading expected items:', error);
+            showAlert('Error loading expected items: ' + error.message, 'warning');
+        }
+    }
+
+    displayItems();
+    document.getElementById('barcodeInput').focus();
+}
+
+function handleBarcodeSearch(event) {
+    const query = document.getElementById('barcodeInput').value.trim();
+
+    // Clear previous timeout
+    if (searchTimeout) {
+        clearTimeout(searchTimeout);
+    }
+
+    // If Enter key, search immediately
+    if (event.key === 'Enter' && query) {
+        searchItem(query);
+        return;
+    }
+
+    // Otherwise, debounce search for 300ms
+    if (query) {
+        searchTimeout = setTimeout(() => {
+            searchItem(query);
+        }, 300);
+    } else {
+        // Clear results if search is empty
+        document.getElementById('searchResults').innerHTML = '';
+    }
+}
+
+function searchItem(query) {
+    const results = document.getElementById('searchResults');
+
+    // Search by barcode first
+    let item = allItems.find(i => i.barcode === query);
+
+    // Search by name if not found
+    if (!item) {
+        const matches = allItems.filter(i =>
+            i.name.toLowerCase().includes(query.toLowerCase())
+        );
+
+        if (matches.length === 0) {
+            results.innerHTML = `
+                <div class="alert alert-warning">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>No items found for "${query}"</span>
+                        <button class="btn btn-sm btn-primary" onclick="showCreateItemForm('${query.replace(/'/g, "\\'")}')">
+                            <i class="bi bi-plus-circle"></i> Create New Item
+                        </button>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        if (matches.length === 1) {
+            item = matches[0];
+        } else {
+            // Show multiple results
+            results.innerHTML = '<div class="list-group">' + matches.slice(0, 10).map(i => `
+                <button class="list-group-item list-group-item-action" onclick="openCountModal(${i.id})">
+                    <strong>${i.name}</strong><br>
+                    <small>${i.category} - ${i.unit_of_measure}</small>
+                </button>
+            `).join('') + '</div>';
+            return;
+        }
+    }
+
+    if (item) {
+        openCountModal(item.id);
+    }
+}
+
+function clearSearch() {
+    document.getElementById('barcodeInput').value = '';
+    document.getElementById('searchResults').innerHTML = '';
+    document.getElementById('barcodeInput').focus();
+}
+
+function openCountModal(itemId) {
+    const item = allItems.find(i => i.id === itemId);
+    if (!item) return;
+
+    currentItem = item;
+
+    // Check if already counted in this area
+    const existing = sessionItems[currentStorageAreaId]?.find(si => si.master_item_id === itemId);
+
+    const expectedQty = existing?.expected_quantity ? parseFloat(existing.expected_quantity) : 0;
+    const itemUnit = item.unit_of_measure || 'Each';
+    const expectedHtml = expectedQty > 0 ? `
+        <div class="alert alert-info mb-3">
+            <i class="bi bi-info-circle"></i> Expected Quantity: <strong>${expectedQty.toFixed(2)} ${itemUnit}</strong>
+        </div>
+    ` : '';
+
+    document.getElementById('itemDetails').innerHTML = `
+        <h5>${item.name}</h5>
+        <p class="mb-1"><strong>Category:</strong> ${item.category || 'N/A'}</p>
+        <p class="mb-0"><strong>Base Unit:</strong> ${itemUnit}</p>
+        ${expectedHtml}
+    `;
+
+    // Populate unit selector with compatible units
+    const unitSelect = document.getElementById('unitSelect');
+    let compatibleUnits = [itemUnit]; // Always include primary unit
+
+    // Add item-specific secondary unit if defined
+    if (item.secondary_unit && item.units_per_secondary) {
+        compatibleUnits.push(item.secondary_unit);
+        console.log(`Item has custom conversion: ${item.units_per_secondary} ${itemUnit} = 1 ${item.secondary_unit}`);
+    } else {
+        // Fall back to standard conversions if no custom conversion defined
+        const standardUnits = getCompatibleUnits(itemUnit);
+        compatibleUnits = [...new Set([...compatibleUnits, ...standardUnits])]; // Remove duplicates
+    }
+
+    console.log('Item unit:', item.unit_of_measure, 'Compatible units:', compatibleUnits);
+
+    unitSelect.innerHTML = compatibleUnits.map(unit =>
+        `<option value="${unit}" ${unit && itemUnit && unit.toLowerCase() === itemUnit.toLowerCase() ? 'selected' : ''}>${unit ? unit.toUpperCase() : 'EACH'}</option>`
+    ).join('');
+
+    document.getElementById('qtyInput').value = existing?.counted_quantity !== null && existing?.counted_quantity !== undefined ? existing.counted_quantity : '';
+    document.getElementById('itemNotesInput').value = existing ? (existing.notes || '') : '';
+
+    if (!countModal) {
+        countModal = new bootstrap.Modal(document.getElementById('countModal'));
+    }
+    countModal.show();
+
+    setTimeout(() => document.getElementById('qtyInput').focus(), 300);
+}
+
+function updateUnitDisplay() {
+    // This function is called when the user changes the unit
+    // The actual conversion happens when saving
+    calcVariance();
+}
+
+function adjustQty(delta) {
+    const input = document.getElementById('qtyInput');
+    const current = parseFloat(input.value) || 0;
+    input.value = (current + delta).toFixed(2);
+    calcVariance();
+}
+
+function setQty(value) {
+    document.getElementById('qtyInput').value = value.toFixed(2);
+    calcVariance();
+}
+
+function calcVariance() {
+    // Validate the input
+    const input = document.getElementById('qtyInput');
+    const qty = parseFloat(input.value);
+    const alert = document.getElementById('varianceAlert');
+
+    if (qty < 0) {
+        alert.style.display = 'block';
+        alert.className = 'alert alert-danger';
+        alert.textContent = 'Quantity cannot be negative';
+        input.value = 0;
+    } else {
+        alert.style.display = 'none';
+    }
+}
+
+async function saveItemCount() {
+    const qty = parseFloat(document.getElementById('qtyInput').value);
+    const selectedUnit = document.getElementById('unitSelect').value;
+    const notes = document.getElementById('itemNotesInput').value;
+
+    if (isNaN(qty) || qty < 0) {
+        showAlert('Please enter a valid quantity', 'warning');
+        return;
+    }
+
+    // Convert quantity to base unit
+    const baseUnit = currentItem.unit_of_measure;
+    let convertedQty;
+
+    // Check if using item-specific conversion
+    if (currentItem.secondary_unit && currentItem.units_per_secondary &&
+        selectedUnit.toLowerCase() === currentItem.secondary_unit.toLowerCase()) {
+        // Convert from secondary to primary using item-specific ratio
+        convertedQty = qty * parseFloat(currentItem.units_per_secondary);
+        console.log(`Custom conversion: ${qty} ${selectedUnit} × ${currentItem.units_per_secondary} = ${convertedQty} ${baseUnit}`);
+    } else if (currentItem.secondary_unit && currentItem.units_per_secondary &&
+               selectedUnit.toLowerCase() === currentItem.unit_of_measure.toLowerCase()) {
+        // Already in base unit
+        convertedQty = qty;
+    } else {
+        // Use standard conversion
+        convertedQty = convertUnit(qty, selectedUnit, baseUnit);
+    }
+
+    try {
+        // Check if item already exists in this session for this storage area
+        const existing = sessionItems[currentStorageAreaId]?.find(si => si.master_item_id === currentItem.id);
+
+        if (existing) {
+            // Update existing
+            await apiRequest(`/api/count-sessions/${session.id}/items/${existing.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ counted_quantity: convertedQty, notes: notes || null })
+            });
+            existing.counted_quantity = convertedQty;
+            existing.notes = notes;
+        } else {
+            // Add new
+            const newItem = await apiRequest(`/api/count-sessions/${session.id}/items?master_item_id=${currentItem.id}&storage_area_id=${currentStorageAreaId}`, {
+                method: 'POST'
+            });
+
+            // Update the count
+            await apiRequest(`/api/count-sessions/${session.id}/items/${newItem.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ counted_quantity: convertedQty, notes: notes || null })
+            });
+
+            if (!sessionItems[currentStorageAreaId]) {
+                sessionItems[currentStorageAreaId] = [];
+            }
+            sessionItems[currentStorageAreaId].push({
+                id: newItem.id,
+                master_item_id: currentItem.id,
+                counted_quantity: convertedQty,
+                notes: notes,
+                item_name: currentItem.name,
+                item_category: currentItem.category,
+                item_unit: currentItem.unit_of_measure
+            });
+        }
+
+        countModal.hide();
+        displayItems();
+        clearSearch();
+        showAlert(`Count saved (${qty} ${selectedUnit} = ${convertedQty.toFixed(2)} ${baseUnit})`, 'success');
+    } catch (error) {
+        showAlert('Error saving count: ' + error.message, 'danger');
+    }
+}
+
+function displayItems() {
+    const items = sessionItems[currentStorageAreaId] || [];
+    const container = document.getElementById('itemsTable');
+
+    if (items.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center py-4">No items expected in this area. Search or scan to add items.</p>';
+        return;
+    }
+
+    const countedItems = items.filter(i => i.counted_quantity !== null && i.counted_quantity !== undefined);
+    const uncountedItems = items.filter(i => i.counted_quantity === null || i.counted_quantity === undefined);
+
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Item</th>
+                        <th class="text-end">Counted</th>
+                        <th>Unit</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${items.map(item => {
+                        const counted = item.counted_quantity !== null && item.counted_quantity !== undefined ? parseFloat(item.counted_quantity) : null;
+                        const isCounted = counted !== null;
+                        const rowClass = !isCounted ? 'table-warning' : '';
+
+                        return `
+                        <tr class="${rowClass}">
+                            <td>
+                                <strong>${item.item_name}</strong>
+                                ${!isCounted ? '<span class="badge bg-warning text-dark ms-2">Not Counted</span>' : ''}
+                            </td>
+                            <td class="text-end">${counted !== null ? counted.toFixed(2) : '<span class="text-muted">-</span>'}</td>
+                            <td>${item.item_unit}</td>
+                            <td>
+                                <button class="btn btn-sm ${isCounted ? 'btn-primary' : 'btn-success'}" onclick="openCountModal(${item.master_item_id})">
+                                    <i class="bi bi-${isCounted ? 'pencil' : 'plus-circle'}"></i> ${isCounted ? 'Edit' : 'Count'}
+                                </button>
+                            </td>
+                        </tr>
+                    `}).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    // Update stats
+    document.getElementById('itemsCounted').textContent = `${countedItems.length} / ${items.length}`;
+}
+
+function showCreateItemForm(suggestedName = '') {
+    document.getElementById('createItemForm').reset();
+    document.getElementById('newItemName').value = suggestedName;
+
+    // Populate category dropdown
+    const categorySelect = document.getElementById('newItemCategory');
+    categorySelect.innerHTML = '<option value="">Select category...</option>' +
+        categories.filter(c => c.is_active).map(cat =>
+            `<option value="${cat.name}">${cat.name}</option>`
+        ).join('');
+
+    if (!createItemModal) {
+        createItemModal = new bootstrap.Modal(document.getElementById('createItemModal'));
+    }
+    createItemModal.show();
+
+    setTimeout(() => document.getElementById('newItemName').focus(), 300);
+}
+
+async function createNewItem() {
+    const name = document.getElementById('newItemName').value.trim();
+    const category = document.getElementById('newItemCategory').value.trim();
+    const unit = document.getElementById('newItemUnit').value;
+    const barcode = document.getElementById('newItemBarcode').value.trim();
+    const sku = document.getElementById('newItemSKU').value.trim();
+
+    if (!name || !category || !unit) {
+        showAlert('Please fill in all required fields', 'warning');
+        return;
+    }
+
+    try {
+        // Create the new master item
+        const newItem = await apiRequest('/api/items/', {
+            method: 'POST',
+            body: JSON.stringify({
+                name: name,
+                category: category,
+                unit_of_measure: unit,
+                barcode: barcode || null,
+                sku: sku || null,
+                is_active: true
+            })
+        });
+
+        showAlert(`Item "${name}" created successfully!`, 'success');
+
+        // Add to allItems array
+        allItems.push(newItem);
+
+        // Close the create modal
+        createItemModal.hide();
+
+        // Clear search results
+        document.getElementById('searchResults').innerHTML = '';
+        document.getElementById('barcodeInput').value = '';
+
+        // Automatically open count modal for the new item
+        openCountModal(newItem.id);
+    } catch (error) {
+        showAlert('Error creating item: ' + error.message, 'danger');
+    }
+}
+
+async function completeCount() {
+    // Calculate uncounted items
+    let totalItems = 0;
+    let countedItems = 0;
+
+    Object.keys(sessionItems).forEach(areaId => {
+        const items = sessionItems[areaId];
+        totalItems += items.length;
+        countedItems += items.filter(i => i.counted_quantity !== null && i.counted_quantity !== undefined).length;
+    });
+
+    const uncountedItems = totalItems - countedItems;
+
+    // Build confirmation message
+    let message = 'Complete this count session?\n\n';
+
+    if (uncountedItems > 0) {
+        message += `⚠️ Warning: ${uncountedItems} item(s) have not been counted yet.\n\n`;
+        message += 'You can still approve the count later, but uncounted items will show as missing inventory.\n\n';
+    }
+
+    message += 'After completing, you will need to review and approve the count to update inventory levels.';
+
+    if (!confirm(message)) return;
+
+    try {
+        await apiRequest(`/api/count-sessions/${session.id}/complete`, { method: 'POST' });
+        session.status = 'COMPLETED';
+        showAlert('Count session completed! Click "Review All Counts" to review before approving.', 'success');
+        showCountScreen(); // Refresh to show approve button
+    } catch (error) {
+        showAlert('Error completing count: ' + error.message, 'danger');
+    }
+}
+
+async function approveCount() {
+    // Get inventory type from session
+    const inventoryType = session.inventory_type || 'PARTIAL';
+
+    // Build confirmation message
+    let message = 'Approve this count and update inventory?\n\n';
+    if (inventoryType === 'FULL') {
+        message += '⚠️ FULL INVENTORY: All uncounted items will be set to 0.\n';
+    } else {
+        message += 'ℹ️ PARTIAL INVENTORY: Only counted items will be updated.\n';
+    }
+    message += '\nThis action cannot be undone.';
+
+    if (!confirm(message)) return;
+
+    try {
+        const response = await apiRequest(`/api/count-sessions/${session.id}/approve`, { method: 'POST' });
+        showAlert(`Count approved! ${response.items_updated} inventory records updated.`, 'success');
+        setTimeout(() => window.location.href = '/inventory', 2000);
+    } catch (error) {
+        showAlert('Error approving count: ' + error.message, 'danger');
+    }
+}
+
+function exitCount() {
+    // Build confirmation message based on count status
+    let message = 'Exit this count session?\n\n';
+
+    if (session.status === 'IN_PROGRESS') {
+        message += '✓ All counted items are automatically saved.\n\n';
+        message += 'You can resume counting at any time from the Count History page.\n\n';
+        message += 'Remember to complete and approve the count when finished to update inventory levels.';
+    } else if (session.status === 'COMPLETED') {
+        message += '✓ This count is completed but not yet approved.\n\n';
+        message += 'You can review and approve it from the Count History page.';
+    } else if (session.status === 'APPROVED') {
+        message += 'This count has been approved and inventory has been updated.';
+    }
+
+    if (confirm(message)) {
+        window.location.href = '/inventory';
+    }
+}
+
+function showReviewScreen() {
+    // Hide count screen, show review screen
+    document.getElementById('countScreen').style.display = 'none';
+    document.getElementById('reviewScreen').style.display = 'block';
+
+    // Populate review data
+    const loc = locations.find(l => l.id === session.location_id);
+    document.getElementById('reviewLocationName').textContent = loc ? loc.name : '';
+    document.getElementById('reviewCountName').textContent = session.name || 'Inventory Count';
+
+    const badge = document.getElementById('reviewStatusBadge');
+    badge.textContent = session.status;
+    badge.className = 'badge ms-2 ' + (session.status === 'IN_PROGRESS' ? 'bg-info' : 'bg-success');
+
+    // Calculate statistics
+    let totalCounted = 0;
+    let totalUncounted = 0;
+    let totalVariances = 0;
+    const areasWithItems = Object.keys(sessionItems).filter(areaId => sessionItems[areaId].length > 0);
+
+    areasWithItems.forEach(areaId => {
+        const items = sessionItems[areaId];
+        items.forEach(item => {
+            if (item.counted_quantity !== null && item.counted_quantity !== undefined) {
+                totalCounted++;
+
+                // Check for large variance (>10% or >10 units)
+                if (item.expected_quantity) {
+                    const variance = item.counted_quantity - item.expected_quantity;
+                    const variancePercent = Math.abs((variance / item.expected_quantity) * 100);
+                    if (variancePercent > 10 || Math.abs(variance) > 10) {
+                        totalVariances++;
+                    }
+                }
+            } else {
+                totalUncounted++;
+            }
+        });
+    });
+
+    document.getElementById('totalAreas').textContent = areasWithItems.length;
+    document.getElementById('totalCounted').textContent = totalCounted;
+    document.getElementById('totalUncounted').textContent = totalUncounted;
+    document.getElementById('totalVariances').textContent = totalVariances;
+
+    // Display areas
+    displayReviewAreas();
+}
+
+function displayReviewAreas() {
+    const container = document.getElementById('reviewAreasContainer');
+    const areasWithItems = Object.keys(sessionItems).filter(areaId => sessionItems[areaId].length > 0);
+
+    if (areasWithItems.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">No items have been counted yet.</div>';
+        return;
+    }
+
+    container.innerHTML = areasWithItems.map(areaId => {
+        const area = storageAreas.find(a => a.id == areaId);
+        const items = sessionItems[areaId];
+        const countedItems = items.filter(i => i.counted_quantity !== null && i.counted_quantity !== undefined);
+        const uncountedItems = items.filter(i => i.counted_quantity === null || i.counted_quantity === undefined);
+        const isFinished = areaStatuses[areaId] || false;
+
+        return `
+            <div class="card mb-3">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            ${isFinished ? '<i class="bi bi-check-circle-fill text-success"></i>' : '<i class="bi bi-circle text-muted"></i>'}
+                            ${area ? area.name : 'Unknown Area'}
+                        </h5>
+                        <div>
+                            <span class="badge bg-success">${countedItems.length} counted</span>
+                            ${uncountedItems.length > 0 ? `<span class="badge bg-warning">${uncountedItems.length} uncounted</span>` : ''}
+                            <button class="btn btn-sm btn-primary ms-2" onclick="jumpToArea(${areaId})">
+                                <i class="bi bi-pencil"></i> Edit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Category</th>
+                                    <th class="text-end">Expected</th>
+                                    <th class="text-end">Counted</th>
+                                    <th class="text-end">Variance</th>
+                                    <th>Unit</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${items.map(item => {
+                                    const expected = parseFloat(item.expected_quantity || 0);
+                                    const counted = item.counted_quantity !== null ? parseFloat(item.counted_quantity) : null;
+                                    const variance = counted !== null ? (counted - expected) : null;
+                                    const isCounted = counted !== null;
+
+                                    let rowClass = '';
+                                    if (!isCounted) {
+                                        rowClass = 'table-warning';
+                                    } else if (variance !== null && expected > 0) {
+                                        const variancePercent = Math.abs((variance / expected) * 100);
+                                        if (variancePercent > 10 || Math.abs(variance) > 10) {
+                                            rowClass = 'table-danger';
+                                        }
+                                    }
+
+                                    return `
+                                        <tr class="${rowClass}">
+                                            <td><strong>${item.item_name}</strong></td>
+                                            <td>${item.item_category || '-'}</td>
+                                            <td class="text-end">${expected.toFixed(2)}</td>
+                                            <td class="text-end">${isCounted ? counted.toFixed(2) : '<span class="text-muted">-</span>'}</td>
+                                            <td class="text-end">
+                                                ${variance !== null ?
+                                                    `<span class="${variance < 0 ? 'text-danger' : variance > 0 ? 'text-success' : ''}">${variance > 0 ? '+' : ''}${variance.toFixed(2)}</span>` :
+                                                    '<span class="text-muted">-</span>'
+                                                }
+                                            </td>
+                                            <td>${item.item_unit}</td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline-primary" onclick="quickEditItem(${areaId}, ${item.master_item_id})">
+                                                    <i class="bi bi-pencil"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function backToCount() {
+    document.getElementById('reviewScreen').style.display = 'none';
+    document.getElementById('countScreen').style.display = 'block';
+}
+
+function jumpToArea(areaId) {
+    // Switch to the specified storage area and return to count screen
+    backToCount();
+    document.getElementById('storageAreaSelector').value = areaId;
+    switchStorageArea();
+}
+
+function quickEditItem(areaId, masterItemId) {
+    // Jump to the area and open the count modal for this item
+    jumpToArea(areaId);
+    setTimeout(() => {
+        openCountModal(masterItemId);
+    }, 300);
+}
+
+async function loadAreaStatuses() {
+    if (!session) return;
+
+    try {
+        const statuses = await apiRequest(`/api/count-sessions/${session.id}/storage-areas/status`);
+        areaStatuses = {};
+        statuses.forEach(s => {
+            areaStatuses[s.storage_area_id] = s.is_finished;
+        });
+        updateStorageAreaSelector();
+        updateFinishButton();
+    } catch (error) {
+        console.error('Error loading area statuses:', error);
+    }
+}
+
+function updateStorageAreaSelector() {
+    const selector = document.getElementById('storageAreaSelector');
+    const currentValue = selector.value;
+
+    // Rebuild selector with finished badges
+    const areas = storageAreas.filter(a => a.location_id === session.location_id);
+    selector.innerHTML = '<option value="">Select storage area to count...</option>';
+
+    areas.forEach(area => {
+        const isFinished = areaStatuses[area.id] || false;
+        const finishedBadge = isFinished ? ' ✓' : '';
+        const option = document.createElement('option');
+        option.value = area.id;
+        option.textContent = area.name + finishedBadge;
+        if (isFinished) {
+            option.style.color = 'green';
+            option.style.fontWeight = 'bold';
+        }
+        selector.appendChild(option);
+    });
+
+    // Restore selection
+    if (currentValue) {
+        selector.value = currentValue;
+    }
+}
+
+function updateFinishButton() {
+    const finishBtn = document.getElementById('finishAreaBtn');
+    const btnText = document.getElementById('finishBtnText');
+
+    if (!currentStorageAreaId) {
+        finishBtn.style.display = 'none';
+        return;
+    }
+
+    finishBtn.style.display = 'inline-block';
+    const isFinished = areaStatuses[currentStorageAreaId] || false;
+
+    if (isFinished) {
+        finishBtn.className = 'btn btn-warning btn-sm';
+        btnText.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Reopen Area';
+    } else {
+        finishBtn.className = 'btn btn-success btn-sm';
+        btnText.innerHTML = 'Mark as Finished';
+    }
+}
+
+async function toggleAreaFinished() {
+    if (!currentStorageAreaId) return;
+
+    const isFinished = areaStatuses[currentStorageAreaId] || false;
+    const endpoint = isFinished ? 'unfinish' : 'finish';
+
+    try {
+        await apiRequest(`/api/count-sessions/${session.id}/storage-area/${currentStorageAreaId}/${endpoint}`, {
+            method: 'POST'
+        });
+
+        areaStatuses[currentStorageAreaId] = !isFinished;
+        updateStorageAreaSelector();
+        updateFinishButton();
+
+        showAlert(isFinished ? 'Area reopened for editing' : 'Area marked as finished!', 'success');
+    } catch (error) {
+        showAlert('Error updating area status: ' + error.message, 'danger');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

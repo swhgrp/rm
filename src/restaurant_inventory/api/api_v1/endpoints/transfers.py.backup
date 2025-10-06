@@ -1,0 +1,31 @@
+"""
+Simple Transfer endpoints - working version
+"""
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from restaurant_inventory.core.deps import get_db, get_current_user
+from restaurant_inventory.models.user import User
+
+router = APIRouter()
+
+@router.get("/")
+async def get_transfers(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get transfers - returns empty list for now"""
+    return {
+        "success": True,
+        "transfers": []
+    }
+
+@router.post("/")
+async def create_transfer(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Create transfer - placeholder"""
+    return {
+        "success": True,
+        "message": "Transfer created (development version)"
+    }

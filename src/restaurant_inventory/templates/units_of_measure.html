@@ -1,0 +1,770 @@
+{% extends "base.html" %}
+
+{% block title %}Units of Measure - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-rulers"></i> Units of Measure</h1>
+</div>
+
+<div class="alert alert-info mb-3">
+    <i class="bi bi-info-circle"></i> <strong>Units of Measure</strong> – Create and manage base units and conversion rules for inventory tracking.
+</div>
+
+<div class="row">
+    <!-- Left Column: Categories List -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-folder"></i> Unit Categories</h5>
+                <button class="btn btn-sm btn-primary" onclick="showAddCategoryModal()">
+                    <i class="bi bi-plus"></i> Add
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush" id="unitCategoriesList">
+                    <div class="text-center p-3">
+                        <div class="spinner-border spinner-border-sm" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Units in Selected Category -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0" id="selectedCategoryName">Select a Category</h5>
+                    <small class="text-muted" id="selectedCategoryDesc"></small>
+                </div>
+                <button class="btn btn-sm btn-success" id="addUnitBtn" onclick="showAddUnitModal()" disabled>
+                    <i class="bi bi-plus-circle"></i> Add Unit
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="unitsListContainer">
+                    <p class="text-muted text-center">Select a category to view its units of measure</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Conversion Calculator Card -->
+        <div class="card mt-3" id="conversionCard" style="display: none;">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-calculator"></i> Unit Converter</h6>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">From</label>
+                        <select class="form-select" id="convertFromUnit">
+                            <option value="">Select unit...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Quantity</label>
+                        <input type="number" class="form-control" id="convertQuantity" step="0.01" value="1">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">To</label>
+                        <select class="form-select" id="convertToUnit">
+                            <option value="">Select unit...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <button class="btn btn-primary btn-sm" onclick="convertUnits()">Convert</button>
+                    <div id="conversionResult" class="mt-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalTitle">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="confirmModalBody">
+                Are you sure?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmModalBtn" onclick="confirmAction()">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Category Modal -->
+<div class="modal fade" id="categoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="categoryModalTitle">Add Category</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="categoryForm">
+                    <div class="mb-3">
+                        <label for="categoryName" class="form-label">Category Name *</label>
+                        <input type="text" class="form-control" id="categoryName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="categoryDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="categoryDescription" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="categoryOrder" class="form-label">Display Order</label>
+                        <input type="number" class="form-control" id="categoryOrder" value="0" min="0">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveCategory()">Save Category</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Unit Edit Modal -->
+<div class="modal fade" id="unitEditModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="unitEditModalTitle">Add Unit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="unitEditForm">
+                    <div class="mb-3">
+                        <label for="editUnitName" class="form-label">Unit Name *</label>
+                        <input type="text" class="form-control" id="editUnitName" required placeholder="e.g., Case - 6, Dozen, Each">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editUnitAbbr" class="form-label">Abbreviation *</label>
+                        <input type="text" class="form-control" id="editUnitAbbr" required placeholder="e.g., cs, dz, ea">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editReferenceUnit" class="form-label">Reference Unit</label>
+                        <select class="form-select" id="editReferenceUnit">
+                            <option value="">None (standalone unit)</option>
+                        </select>
+                        <small class="form-text text-muted">Select the unit this one contains</small>
+                    </div>
+                    <div class="mb-3" id="editContainsGroup">
+                        <label for="editContainsQty" class="form-label">Contains Quantity</label>
+                        <input type="number" class="form-control" id="editContainsQty" step="0.001" min="0" placeholder="e.g., 6, 12, 24">
+                        <small class="form-text text-muted">How many of the reference unit this contains</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveUnitEdit()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let unitCategories = [];
+    let currentCategoryUnits = [];
+    let selectedCategoryId = null;
+    let currentEditUnitId = null;
+    let currentEditCategoryId = null;
+    let unitEditModal;
+    let categoryModal;
+    let confirmCallback = null;
+
+    // Confirmation modal helpers
+    function showConfirmation(title, message, callback) {
+        document.getElementById('confirmModalTitle').textContent = title;
+        document.getElementById('confirmModalBody').textContent = message;
+        confirmCallback = callback;
+        const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        modal.show();
+    }
+
+    function confirmAction() {
+        if (confirmCallback) {
+            confirmCallback();
+            confirmCallback = null;
+        }
+        const modalElement = document.getElementById('confirmModal');
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+            modal.hide();
+        }
+    }
+
+    // Show alert
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+        alertDiv.style.zIndex = '9999';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+
+        setTimeout(() => alertDiv.remove(), 5000);
+    }
+
+    // API helper
+    async function apiRequest(url, options = {}) {
+        const token = localStorage.getItem('access_token');
+        const defaultOptions = {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        const response = await fetch(url, { ...defaultOptions, ...options });
+
+        if (response.status === 401) {
+            localStorage.clear();
+            window.location.href = '/login';
+            throw new Error('Unauthorized');
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Request failed');
+        }
+
+        return response.json();
+    }
+
+    // ==================== UNITS OF MEASURE ====================
+
+    // Load unit categories
+    async function loadUnitCategories() {
+        try {
+            const response = await fetch('/api/units/categories', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+            });
+            unitCategories = await response.json();
+            displayUnitCategories();
+        } catch (error) {
+            console.error('Error loading unit categories:', error);
+            showAlert('Failed to load unit categories', 'danger');
+        }
+    }
+
+    // Display unit categories list
+    function displayUnitCategories() {
+        const list = document.getElementById('unitCategoriesList');
+        if (unitCategories.length === 0) {
+            list.innerHTML = '<div class="p-3 text-muted">No categories found</div>';
+            return;
+        }
+
+        list.innerHTML = unitCategories.map(cat => `
+            <a href="#" class="list-group-item list-group-item-action ${cat.id === selectedCategoryId ? 'active' : ''}"
+               onclick="selectCategory(${cat.id}); return false;">
+                <div class="d-flex w-100 justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">${cat.name}</h6>
+                        ${cat.description ? `<small>${cat.description}</small>` : ''}
+                    </div>
+                    <span class="badge bg-primary rounded-pill">${cat.units ? cat.units.length : 0}</span>
+                </div>
+            </a>
+        `).join('');
+    }
+
+    // Select a category to view its units
+    async function selectCategory(categoryId) {
+        selectedCategoryId = categoryId;
+        const category = unitCategories.find(c => c.id === categoryId);
+
+        document.getElementById('selectedCategoryName').textContent = category.name;
+        document.getElementById('selectedCategoryDesc').textContent = category.description || '';
+        document.getElementById('addUnitBtn').disabled = false;
+
+        displayUnitCategories(); // Refresh to show active state
+
+        await loadCategoryUnits(categoryId);
+    }
+
+    // Load units for a category
+    async function loadCategoryUnits(categoryId) {
+        try {
+            const response = await fetch(`/api/units/?category_id=${categoryId}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+            });
+            currentCategoryUnits = await response.json();
+            displayCategoryUnits();
+            updateConversionSelects();
+        } catch (error) {
+            console.error('Error loading units:', error);
+            showAlert('Failed to load units', 'danger');
+        }
+    }
+
+    // Display units for selected category
+    function displayCategoryUnits() {
+        const container = document.getElementById('unitsListContainer');
+
+        if (currentCategoryUnits.length === 0) {
+            container.innerHTML = '<p class="text-muted">No units defined for this category. Click "Add Unit" to create one.</p>';
+            document.getElementById('conversionCard').style.display = 'none';
+            return;
+        }
+
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Unit Name</th>
+                            <th>Abbreviation</th>
+                            <th>Contains</th>
+                            <th>Reference Unit</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        currentCategoryUnits.forEach(unit => {
+            const containsText = unit.contains_quantity
+                ? parseFloat(unit.contains_quantity).toFixed(3)
+                : '-';
+            const referenceText = unit.reference_unit_name || '-';
+
+            html += `
+                <tr>
+                    <td>${unit.name}</td>
+                    <td><code>${unit.abbreviation}</code></td>
+                    <td>${containsText}</td>
+                    <td>${referenceText}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="editUnit(${unit.id})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteUnit(${unit.id})" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        container.innerHTML = html;
+        document.getElementById('conversionCard').style.display = currentCategoryUnits.length > 0 ? 'block' : 'none';
+    }
+
+    // Update conversion calculator selects
+    function updateConversionSelects() {
+        const fromSelect = document.getElementById('convertFromUnit');
+        const toSelect = document.getElementById('convertToUnit');
+
+        const options = currentCategoryUnits.map(u =>
+            `<option value="${u.id}">${u.name} (${u.abbreviation})</option>`
+        ).join('');
+
+        fromSelect.innerHTML = '<option value="">Select unit...</option>' + options;
+        toSelect.innerHTML = '<option value="">Select unit...</option>' + options;
+    }
+
+    // Convert units
+    async function convertUnits() {
+        const fromUnitId = parseInt(document.getElementById('convertFromUnit').value);
+        const toUnitId = parseInt(document.getElementById('convertToUnit').value);
+        const quantity = parseFloat(document.getElementById('convertQuantity').value);
+
+        if (!fromUnitId || !toUnitId || !quantity) {
+            showAlert('Please select both units and enter a quantity', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/units/convert', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    from_unit_id: fromUnitId,
+                    to_unit_id: toUnitId,
+                    quantity: quantity
+                })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                document.getElementById('conversionResult').innerHTML = `
+                    <div class="alert alert-success">
+                        <strong>${result.input_quantity} ${result.from_unit}</strong> =
+                        <strong>${parseFloat(result.converted_quantity).toFixed(2)} ${result.to_unit}</strong>
+                    </div>
+                `;
+            } else {
+                const error = await response.json();
+                showAlert(error.detail || 'Conversion failed', 'danger');
+            }
+        } catch (error) {
+            console.error('Error converting units:', error);
+            showAlert('Failed to convert units', 'danger');
+        }
+    }
+
+    // Show add category modal
+    function showAddCategoryModal() {
+        currentEditCategoryId = null;
+        document.getElementById('categoryModalTitle').textContent = 'Add Category';
+        document.getElementById('categoryForm').reset();
+        categoryModal.show();
+    }
+
+    // Edit category
+    function editCategory(categoryId) {
+        const category = unitCategories.find(c => c.id === categoryId);
+        if (!category) return;
+
+        currentEditCategoryId = categoryId;
+        document.getElementById('categoryModalTitle').textContent = 'Edit Category';
+        document.getElementById('categoryName').value = category.name;
+        document.getElementById('categoryDescription').value = category.description || '';
+        document.getElementById('categoryOrder').value = category.display_order || 0;
+        categoryModal.show();
+    }
+
+    // Save category
+    async function saveCategory() {
+        const name = document.getElementById('categoryName').value.trim();
+        const description = document.getElementById('categoryDescription').value.trim();
+        const displayOrder = parseInt(document.getElementById('categoryOrder').value) || 0;
+
+        if (!name) {
+            showAlert('Please enter a category name', 'warning');
+            return;
+        }
+
+        try {
+            if (currentEditCategoryId) {
+                // Update existing category
+                await updateCategory(currentEditCategoryId, name, description, displayOrder);
+            } else {
+                // Create new category
+                await createCategory(name, description, displayOrder);
+            }
+            categoryModal.hide();
+        } catch (error) {
+            console.error('Error saving category:', error);
+            showAlert('Failed to save category', 'danger');
+        }
+    }
+
+    // Create category
+    async function createCategory(name, description, displayOrder = 0) {
+        try {
+            const response = await fetch('/api/units/categories', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: name,
+                    description: description || null,
+                    display_order: displayOrder
+                })
+            });
+
+            if (response.ok) {
+                showAlert('Category created successfully', 'success');
+                loadUnitCategories();
+            } else {
+                const error = await response.json();
+                showAlert(error.detail || 'Failed to create category', 'danger');
+            }
+        } catch (error) {
+            console.error('Error creating category:', error);
+            showAlert('Failed to create category', 'danger');
+        }
+    }
+
+    // Update category
+    async function updateCategory(categoryId, name, description, displayOrder) {
+        try {
+            const response = await fetch(`/api/units/categories/${categoryId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: name,
+                    description: description || null,
+                    display_order: displayOrder
+                })
+            });
+
+            if (response.ok) {
+                showAlert('Category updated successfully', 'success');
+                loadUnitCategories();
+            } else {
+                const error = await response.json();
+                showAlert(error.detail || 'Failed to update category', 'danger');
+            }
+        } catch (error) {
+            console.error('Error updating category:', error);
+            showAlert('Failed to update category', 'danger');
+        }
+    }
+
+    // Delete category
+    async function deleteCategory(categoryId) {
+        const category = unitCategories.find(c => c.id === categoryId);
+        if (!category) return;
+
+        showConfirmation(
+            'Delete Category',
+            `Are you sure you want to delete the category "${category.name}"? This will also delete all units in this category.`,
+            async () => {
+                try {
+                    const response = await fetch(`/api/units/categories/${categoryId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+                    });
+
+                    if (response.ok) {
+                        showAlert('Category deleted successfully', 'success');
+                        selectedCategoryId = null;
+                        document.getElementById('selectedCategoryName').textContent = 'Select a Category';
+                        document.getElementById('selectedCategoryDesc').textContent = '';
+                        document.getElementById('addUnitBtn').disabled = true;
+                        document.getElementById('unitsListContainer').innerHTML = '<p class="text-muted text-center">Select a category to view its units of measure</p>';
+                        loadUnitCategories();
+                    } else {
+                        const error = await response.json();
+                        showAlert(error.detail || 'Failed to delete category', 'danger');
+                    }
+                } catch (error) {
+                    console.error('Error deleting category:', error);
+                    showAlert('Failed to delete category', 'danger');
+                }
+            }
+        );
+    }
+
+    // Show add unit modal
+    function showAddUnitModal() {
+        if (!selectedCategoryId) return;
+
+        currentEditUnitId = null;
+        document.getElementById('unitEditModalTitle').textContent = 'Add Unit';
+        document.getElementById('editUnitName').value = '';
+        document.getElementById('editUnitAbbr').value = '';
+        document.getElementById('editReferenceUnit').value = '';
+        document.getElementById('editContainsQty').value = '';
+
+        // Populate reference unit dropdown
+        const referenceSelect = document.getElementById('editReferenceUnit');
+        referenceSelect.innerHTML = '<option value="">None (standalone unit)</option>';
+        currentCategoryUnits.forEach(unit => {
+            referenceSelect.innerHTML += `<option value="${unit.id}">${unit.name} (${unit.abbreviation})</option>`;
+        });
+
+        unitEditModal.show();
+    }
+
+    // Create unit (called from saveUnitEdit)
+    async function createUnit(name, abbreviation, referenceUnitId, containsQuantity) {
+        try {
+            const body = {
+                category_id: selectedCategoryId,
+                name: name,
+                abbreviation: abbreviation,
+                reference_unit_id: referenceUnitId || null,
+                contains_quantity: containsQuantity || null
+            };
+
+            console.log('Creating unit with body:', body);
+
+            const response = await fetch('/api/units/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (response.ok) {
+                showAlert('Unit created successfully', 'success');
+                loadCategoryUnits(selectedCategoryId);
+                loadUnitCategories(); // Refresh counts
+            } else {
+                const errorText = await response.text();
+                console.error('Error response:', errorText);
+                try {
+                    const error = JSON.parse(errorText);
+                    const errorMsg = typeof error.detail === 'string' ? error.detail :
+                                    error.detail?.message ||
+                                    JSON.stringify(error.detail) ||
+                                    'Failed to create unit';
+                    showAlert(errorMsg, 'danger');
+                } catch {
+                    showAlert(`Failed to create unit: ${errorText}`, 'danger');
+                }
+            }
+        } catch (error) {
+            console.error('Error creating unit:', error);
+            showAlert(`Failed to create unit: ${error.message}`, 'danger');
+        }
+    }
+
+    // Edit unit
+    function editUnit(unitId) {
+        const unit = currentCategoryUnits.find(u => u.id === unitId);
+        if (!unit) return;
+
+        currentEditUnitId = unitId;
+        document.getElementById('unitEditModalTitle').textContent = 'Edit Unit';
+
+        // Populate form
+        document.getElementById('editUnitName').value = unit.name;
+        document.getElementById('editUnitAbbr').value = unit.abbreviation;
+        document.getElementById('editContainsQty').value = unit.contains_quantity || '';
+
+        // Populate reference unit dropdown
+        const referenceSelect = document.getElementById('editReferenceUnit');
+        referenceSelect.innerHTML = '<option value="">None (standalone unit)</option>';
+        currentCategoryUnits.forEach(u => {
+            if (u.id !== unitId) {  // Don't allow self-reference
+                const selected = unit.reference_unit_id === u.id ? 'selected' : '';
+                referenceSelect.innerHTML += `<option value="${u.id}" ${selected}>${u.name} (${u.abbreviation})</option>`;
+            }
+        });
+
+        unitEditModal.show();
+    }
+
+    function saveUnitEdit() {
+        const name = document.getElementById('editUnitName').value.trim();
+        const abbreviation = document.getElementById('editUnitAbbr').value.trim();
+        const referenceUnitId = document.getElementById('editReferenceUnit').value;
+        const containsQty = document.getElementById('editContainsQty').value;
+
+        if (!name || !abbreviation) {
+            showAlert('Please fill in name and abbreviation', 'warning');
+            return;
+        }
+
+        if (referenceUnitId && !containsQty) {
+            showAlert('Please specify contains quantity when selecting a reference unit', 'warning');
+            return;
+        }
+
+        if (currentEditUnitId) {
+            updateUnit(currentEditUnitId, name, abbreviation, referenceUnitId || null, containsQty ? parseFloat(containsQty) : null);
+        } else {
+            createUnit(name, abbreviation, referenceUnitId || null, containsQty ? parseFloat(containsQty) : null);
+        }
+        unitEditModal.hide();
+    }
+
+    // Update unit
+    async function updateUnit(unitId, name, abbreviation, referenceUnitId, containsQuantity) {
+        try {
+            const body = {
+                name: name,
+                abbreviation: abbreviation,
+                reference_unit_id: referenceUnitId,
+                contains_quantity: containsQuantity
+            };
+
+            const response = await fetch(`/api/units/${unitId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (response.ok) {
+                showAlert('Unit updated successfully', 'success');
+                loadCategoryUnits(selectedCategoryId);
+                loadUnitCategories();
+            } else {
+                const error = await response.json();
+                showAlert(error.detail || 'Failed to update unit', 'danger');
+            }
+        } catch (error) {
+            console.error('Error updating unit:', error);
+            showAlert('Failed to update unit', 'danger');
+        }
+    }
+
+    // Delete unit
+    async function deleteUnit(unitId) {
+        const unit = currentCategoryUnits.find(u => u.id === unitId);
+        if (!unit) return;
+
+        showConfirmation(
+            'Delete Unit',
+            `Are you sure you want to delete the unit "${unit.name}"?`,
+            async () => {
+                try {
+                    const response = await fetch(`/api/units/${unitId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+                    });
+
+                    if (response.ok) {
+                        showAlert('Unit deleted successfully', 'success');
+                        loadCategoryUnits(selectedCategoryId);
+                        loadUnitCategories(); // Refresh counts
+                    } else {
+                        const error = await response.json();
+                        showAlert(error.detail || 'Failed to delete unit', 'danger');
+                    }
+                } catch (error) {
+                    console.error('Error deleting unit:', error);
+                    showAlert('Failed to delete unit', 'danger');
+                }
+            }
+        );
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Check authentication
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+
+        // Initialize modals
+        unitEditModal = new bootstrap.Modal(document.getElementById('unitEditModal'));
+        categoryModal = new bootstrap.Modal(document.getElementById('categoryModal'));
+
+        // Load data
+        await loadUnitCategories();
+    });
+</script>
+{% endblock %}

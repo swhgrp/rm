@@ -1,0 +1,230 @@
+"""
+Vendor management endpoints
+"""
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy.orm import Session
+from typing import List, Optional
+from pydantic import BaseModel, EmailStr
+
+from restaurant_inventory.core.deps import get_db, get_current_user
+from restaurant_inventory.models.vendor import Vendor
+from restaurant_inventory.models.user import User
+from restaurant_inventory.core.audit import log_audit_event, create_change_dict
+
+router = APIRouter()
+
+
+# Pydantic schemas
+class VendorBase(BaseModel):
+    name: str
+    contact_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: bool = True
+
+
+class VendorCreate(VendorBase):
+    pass
+
+
+class VendorUpdate(BaseModel):
+    name: Optional[str] = None
+    contact_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class VendorResponse(VendorBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/", response_model=List[VendorResponse])
+async def list_vendors(
+    active_only: bool = True,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """List all vendors"""
+    query = db.query(Vendor)
+
+    if active_only:
+        query = query.filter(Vendor.is_active == True)
+
+    vendors = query.order_by(Vendor.name).all()
+    return vendors
+
+
+@router.get("/{vendor_id}", response_model=VendorResponse)
+async def get_vendor(
+    vendor_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get specific vendor"""
+    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+
+    if not vendor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vendor not found"
+        )
+
+    return vendor
+
+
+@router.post("/", response_model=VendorResponse, status_code=status.HTTP_201_CREATED)
+async def create_vendor(
+    vendor_data: VendorCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Create new vendor"""
+
+    # Check if vendor name already exists
+    existing = db.query(Vendor).filter(Vendor.name == vendor_data.name).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vendor with this name already exists"
+        )
+
+    # Create vendor
+    vendor = Vendor(**vendor_data.model_dump())
+    db.add(vendor)
+    db.commit()
+    db.refresh(vendor)
+
+    # Log audit event
+    log_audit_event(
+        db=db,
+        action="CREATE",
+        entity_type="vendor",
+        entity_id=vendor.id,
+        user=current_user,
+        changes={"new": vendor_data.model_dump()},
+        request=request
+    )
+
+    return vendor
+
+
+@router.put("/{vendor_id}", response_model=VendorResponse)
+async def update_vendor(
+    vendor_id: int,
+    vendor_data: VendorUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update vendor"""
+
+    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vendor not found"
+        )
+
+    # Track changes
+    old_data = {
+        "name": vendor.name,
+        "contact_name": vendor.contact_name,
+        "email": vendor.email,
+        "phone": vendor.phone,
+        "address": vendor.address,
+        "notes": vendor.notes,
+        "is_active": vendor.is_active
+    }
+
+    # Update fields
+    update_data = vendor_data.model_dump(exclude_unset=True)
+
+    # Check if name is being changed and if it conflicts
+    if 'name' in update_data and update_data['name'] != vendor.name:
+        existing = db.query(Vendor).filter(
+            Vendor.name == update_data['name'],
+            Vendor.id != vendor_id
+        ).first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Another vendor with this name already exists"
+            )
+
+    for key, value in update_data.items():
+        setattr(vendor, key, value)
+
+    db.commit()
+    db.refresh(vendor)
+
+    # Track new values
+    new_data = {
+        "name": vendor.name,
+        "contact_name": vendor.contact_name,
+        "email": vendor.email,
+        "phone": vendor.phone,
+        "address": vendor.address,
+        "notes": vendor.notes,
+        "is_active": vendor.is_active
+    }
+
+    # Log audit event
+    changes = create_change_dict(old_data, new_data)
+    if changes:
+        log_audit_event(
+            db=db,
+            action="UPDATE",
+            entity_type="vendor",
+            entity_id=vendor.id,
+            user=current_user,
+            changes=changes,
+            request=request
+        )
+
+    return vendor
+
+
+@router.delete("/{vendor_id}")
+async def delete_vendor(
+    vendor_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Delete vendor"""
+
+    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vendor not found"
+        )
+
+    # Log before deletion
+    log_audit_event(
+        db=db,
+        action="DELETE",
+        entity_type="vendor",
+        entity_id=vendor.id,
+        user=current_user,
+        changes={"old": {
+            "name": vendor.name,
+            "contact_name": vendor.contact_name,
+            "email": vendor.email
+        }},
+        request=request
+    )
+
+    db.delete(vendor)
+    db.commit()
+
+    return {"message": "Vendor deleted successfully"}

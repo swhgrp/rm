@@ -1,0 +1,429 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-speedometer2"></i> Dashboard</h1>
+    <select class="form-select" id="locationFilter" style="width: 250px;">
+        <option value="">All Locations</option>
+    </select>
+</div>
+
+<!-- KPI Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="mb-1">Total Sales</h6>
+                        <h3 id="totalSales">$0.00</h3>
+                        <small>Last 7 Days</small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-cash-stack fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="mb-1">COGS</h6>
+                        <h3 id="totalCOGS">$0.00</h3>
+                        <small>Last 7 Days</small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-receipt fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="mb-1">Gross Margin</h6>
+                        <h3 id="grossMargin">0%</h3>
+                        <small>Profit Percentage</small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-graph-up fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="mb-1">Inventory Value</h6>
+                        <h3 id="inventoryValue">$0.00</h3>
+                        <small>Current On-Hand</small>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="bi bi-box-seam fs-1"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sales & COGS Trend Chart -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-bar-chart"></i> Sales vs COGS Trend (Last 7 Days)</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="salesCOGSChart" height="80"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Top Selling Items & Recent Activity -->
+<div class="row mb-4">
+    <!-- Top Selling Items -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-trophy"></i> Top Selling Items</h5>
+            </div>
+            <div class="card-body">
+                <div id="topItemsList">
+                    <div class="text-center text-muted py-3">
+                        <div class="spinner-border spinner-border-sm"></div> Loading...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Invoices -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-file-earmark-text"></i> Recent Invoices</h5>
+            </div>
+            <div class="card-body">
+                <div id="recentInvoicesList">
+                    <div class="text-center text-muted py-3">
+                        <div class="spinner-border spinner-border-sm"></div> Loading...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Transfers & Waste -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-arrow-left-right"></i> Recent Transfers</h5>
+            </div>
+            <div class="card-body">
+                <div id="recentTransfersList">
+                    <div class="text-center text-muted py-3">
+                        <div class="spinner-border spinner-border-sm"></div> Loading...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-trash"></i> Recent Waste</h5>
+            </div>
+            <div class="card-body">
+                <div id="recentWasteList">
+                    <div class="text-center text-muted py-3">
+                        <div class="spinner-border spinner-border-sm"></div> Loading...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+let salesCOGSChart = null;
+let locations = [];
+
+async function loadLocations() {
+    try {
+        const token = localStorage.getItem('access_token');
+        const response = await fetch('/api/locations/', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        locations = await response.json();
+
+        const select = document.getElementById('locationFilter');
+        select.innerHTML = '<option value="">All Locations</option>';
+        locations.forEach(loc => {
+            const option = document.createElement('option');
+            option.value = loc.id;
+            option.textContent = loc.name;
+            select.appendChild(option);
+        });
+
+        // Add change listener
+        select.addEventListener('change', () => loadDashboardData());
+    } catch (error) {
+        console.error('Error loading locations:', error);
+    }
+}
+
+async function loadDashboardData() {
+    try {
+        const token = localStorage.getItem('access_token');
+        const locationFilter = document.getElementById('locationFilter');
+        const locationId = locationFilter ? locationFilter.value : '';
+        const url = locationId ? `/api/dashboard/analytics?location_id=${locationId}` : '/api/dashboard/analytics';
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Dashboard API error:', response.status, errorText);
+            throw new Error(`Failed to load dashboard data: ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        // Update KPIs
+        document.getElementById('totalSales').textContent = '$' + data.kpis.total_sales.toFixed(2);
+        document.getElementById('totalCOGS').textContent = '$' + data.kpis.total_cogs.toFixed(2);
+        document.getElementById('grossMargin').textContent = data.kpis.gross_margin.toFixed(1) + '%';
+        document.getElementById('inventoryValue').textContent = '$' + data.kpis.inventory_value.toFixed(2);
+
+        // Render Sales vs COGS Chart
+        renderSalesCOGSChart(data.daily_trend);
+
+        // Render Top Items
+        renderTopItems(data.top_items);
+
+        // Render Recent Invoices
+        renderRecentInvoices(data.recent_invoices);
+
+        // Render Recent Transfers
+        renderRecentTransfers(data.recent_transfers);
+
+        // Render Recent Waste
+        renderRecentWaste(data.recent_waste);
+
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+        showAlert('Error loading dashboard data', 'danger');
+    }
+}
+
+function renderSalesCOGSChart(dailyData) {
+    const ctx = document.getElementById('salesCOGSChart');
+
+    if (salesCOGSChart) {
+        salesCOGSChart.destroy();
+    }
+
+    salesCOGSChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: dailyData.map(d => d.day_name),
+            datasets: [
+                {
+                    label: 'Sales',
+                    data: dailyData.map(d => d.sales),
+                    backgroundColor: 'rgba(13, 110, 253, 0.7)',
+                    borderColor: 'rgba(13, 110, 253, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'COGS',
+                    data: dailyData.map(d => d.cogs),
+                    backgroundColor: 'rgba(255, 193, 7, 0.7)',
+                    borderColor: 'rgba(255, 193, 7, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return '$' + value.toFixed(0);
+                        }
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': $' + context.parsed.y.toFixed(2);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderTopItems(items) {
+    const container = document.getElementById('topItemsList');
+
+    if (!items || items.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">No sales data available</p>';
+        return;
+    }
+
+    let html = '<div class="list-group list-group-flush">';
+    items.forEach((item, index) => {
+        html += `
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="fw-bold">#${index + 1} ${item.item_name}</div>
+                    <small class="text-muted">${item.quantity_sold.toFixed(0)} sold</small>
+                </div>
+                <span class="badge bg-primary rounded-pill">$${item.revenue.toFixed(2)}</span>
+            </div>
+        `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function renderRecentInvoices(invoices) {
+    const container = document.getElementById('recentInvoicesList');
+
+    if (!invoices || invoices.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">No recent invoices</p>';
+        return;
+    }
+
+    let html = '<div class="list-group list-group-flush">';
+    invoices.forEach(invoice => {
+        const statusColor = invoice.status === 'APPROVED' ? 'success' :
+                          invoice.status === 'REJECTED' ? 'danger' : 'warning';
+        const date = new Date(invoice.uploaded_at).toLocaleDateString();
+
+        html += `
+            <a href="/invoices?id=${invoice.id}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <div>
+                    <div><strong>${invoice.location_name}</strong> - ${invoice.invoice_number || 'Invoice #' + invoice.id}</div>
+                    <small class="text-muted">${date}</small>
+                </div>
+                <div class="text-end">
+                    <div class="fw-bold">$${invoice.total.toFixed(2)}</div>
+                    <span class="badge bg-${statusColor}">${invoice.status}</span>
+                </div>
+            </a>
+        `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function renderRecentTransfers(transfers) {
+    const container = document.getElementById('recentTransfersList');
+
+    if (!transfers || transfers.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">No recent transfers</p>';
+        return;
+    }
+
+    let html = '<div class="list-group list-group-flush">';
+    transfers.forEach(transfer => {
+        const statusColor = transfer.status === 'COMPLETED' ? 'success' :
+                          transfer.status === 'CANCELLED' ? 'danger' : 'warning';
+        const date = new Date(transfer.created_at).toLocaleDateString();
+
+        html += `
+            <a href="/transfers?id=${transfer.id}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <div>
+                    <div><strong>${transfer.from_location_name}</strong> → <strong>${transfer.to_location_name}</strong></div>
+                    <small class="text-muted">Transfer #${transfer.id} - ${date}</small>
+                </div>
+                <span class="badge bg-${statusColor}">${transfer.status}</span>
+            </a>
+        `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function renderRecentWaste(waste) {
+    const container = document.getElementById('recentWasteList');
+
+    if (!waste || waste.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center">No recent waste</p>';
+        return;
+    }
+
+    let html = '<div class="list-group list-group-flush">';
+    waste.forEach(item => {
+        const date = new Date(item.recorded_at).toLocaleDateString();
+        const cost = item.total_cost ? `$${item.total_cost.toFixed(2)}` : '-';
+
+        html += `
+            <a href="/waste?id=${item.id}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <div>
+                    <div><strong>${item.location_name}</strong> - ${item.item_name}</div>
+                    <small class="text-muted">${item.quantity_wasted} units - ${item.reason_code} - ${date}</small>
+                </div>
+                <span class="badge bg-danger">${cost}</span>
+            </a>
+        `;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function showAlert(message, type) {
+    // Simple alert implementation
+    alert(message);
+}
+
+// Load data when page loads
+document.addEventListener('DOMContentLoaded', async function() {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+        window.location.href = '/login';
+        return;
+    }
+
+    await loadLocations();
+    await loadDashboardData();
+
+    // Refresh every 5 minutes
+    setInterval(loadDashboardData, 5 * 60 * 1000);
+});
+</script>
+{% endblock %}

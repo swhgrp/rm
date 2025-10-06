@@ -1,0 +1,361 @@
+{% extends "base.html" %}
+
+{% block title %}POS Configuration - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4">POS Integration Configuration</h2>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Clover POS Settings</h5>
+                </div>
+                <div class="card-body">
+                    <div id="alertContainer"></div>
+
+                    <form id="posConfigForm">
+                        <div class="mb-3">
+                            <label class="form-label">Location</label>
+                            <select class="form-select" id="locationId" required>
+                                <option value="">Select Location</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Merchant ID</label>
+                            <input type="text" class="form-control" id="merchantId" placeholder="Your Clover Merchant ID" required>
+                            <small class="text-muted">Find this in your Clover dashboard</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Access Token</label>
+                            <input type="password" class="form-control" id="accessToken" placeholder="API Access Token" required>
+                            <small class="text-muted">Generate this in Clover Developer Portal</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Environment</label>
+                            <select class="form-select" id="apiEnvironment">
+                                <option value="production">Production</option>
+                                <option value="sandbox">Sandbox (Testing)</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="autoSync">
+                            <label class="form-check-label" for="autoSync">
+                                Enable Automatic Sync
+                            </label>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Sync Frequency (minutes)</label>
+                            <input type="number" class="form-control" id="syncFrequency" value="60" min="15">
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="autoDeduct">
+                            <label class="form-check-label" for="autoDeduct">
+                                Auto-deduct inventory from sales
+                            </label>
+                            <small class="form-text text-muted d-block">Requires menu items to be mapped to recipes</small>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-primary" onclick="saveConfiguration()">
+                                <i class="bi bi-save"></i> Save Configuration
+                            </button>
+                            <button type="button" class="btn btn-success" onclick="testConnection()">
+                                <i class="bi bi-check-circle"></i> Test Connection
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="loadConfiguration()">
+                                <i class="bi bi-arrow-clockwise"></i> Reload
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h6 class="mb-0">Setup Instructions</h6>
+                </div>
+                <div class="card-body">
+                    <h6>Getting your Clover credentials:</h6>
+                    <ol style="font-size: 13px;">
+                        <li>Log in to your <a href="https://www.clover.com/dashboard" target="_blank">Clover Dashboard</a></li>
+                        <li>Go to Account & Setup → API Tokens</li>
+                        <li>Create a new API Token with these permissions:
+                            <ul>
+                                <li>Read Orders</li>
+                                <li>Read Inventory</li>
+                            </ul>
+                        </li>
+                        <li>Copy your Merchant ID and Access Token</li>
+                        <li>Paste them in the form and click "Test Connection"</li>
+                    </ol>
+
+                    <div class="alert alert-warning mt-3" style="font-size: 12px;">
+                        <strong>Security Note:</strong> Your API credentials are stored securely and encrypted. Never share your access token with anyone.
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0">Connection Status</h6>
+                </div>
+                <div class="card-body">
+                    <div id="connectionStatus">
+                        <p class="text-muted">Not configured yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let locations = [];
+let currentConfig = null;
+
+function getToken() {
+    return localStorage.getItem('access_token');
+}
+
+async function init() {
+    // Check if user is logged in
+    if (!getToken()) {
+        window.location.href = '/login';
+        return;
+    }
+
+    await loadLocations();
+    await loadConfiguration();
+}
+
+async function loadLocations() {
+    try {
+        console.log('Loading locations...');
+        locations = await apiRequest('/api/locations/');
+        console.log('Locations loaded:', locations);
+        const select = document.getElementById('locationId');
+
+        if (!locations || locations.length === 0) {
+            console.warn('No locations found');
+            showAlert('No locations found. Please create a location first.', 'warning');
+            return;
+        }
+
+        locations.forEach(loc => {
+            select.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+        });
+        console.log('Location dropdown populated');
+    } catch (error) {
+        console.error('Error loading locations:', error);
+        showAlert('Failed to load locations: ' + error.message, 'danger');
+    }
+}
+
+async function loadConfiguration() {
+    const locationId = document.getElementById('locationId').value;
+    if (!locationId) {
+        return;
+    }
+
+    try {
+        const config = await apiRequest(`/api/pos/configurations/${locationId}`);
+        currentConfig = config;
+
+        // Populate form
+        document.getElementById('merchantId').value = config.merchant_id || '';
+        document.getElementById('apiEnvironment').value = config.api_environment || 'production';
+        document.getElementById('autoSync').checked = config.auto_sync_enabled || false;
+        document.getElementById('syncFrequency').value = config.sync_frequency_minutes || 60;
+        document.getElementById('autoDeduct').checked = config.auto_deduct_inventory || false;
+
+        // Don't show masked token - leave field empty so user can optionally update it
+        document.getElementById('accessToken').value = '';
+        document.getElementById('accessToken').placeholder = '******* (enter new token to update)';
+        document.getElementById('accessToken').removeAttribute('required');
+
+        showAlert('Configuration loaded - you can update fields as needed', 'info');
+    } catch (error) {
+        if (error.message.includes('404') || error.message.includes('not found')) {
+            console.log('No existing configuration - ready to create new one');
+            currentConfig = null;
+            // Clear form for new configuration
+            document.getElementById('merchantId').value = '';
+            document.getElementById('accessToken').value = '';
+            document.getElementById('apiEnvironment').value = 'production';
+            document.getElementById('autoSync').checked = false;
+            document.getElementById('syncFrequency').value = 60;
+            document.getElementById('autoDeduct').checked = false;
+        } else {
+            console.error('Error loading config:', error);
+            showAlert('Error loading configuration: ' + error.message, 'danger');
+        }
+    }
+}
+
+async function saveConfiguration() {
+    const locationId = document.getElementById('locationId').value;
+    const merchantId = document.getElementById('merchantId').value;
+    const accessToken = document.getElementById('accessToken').value;
+
+    if (!locationId || !merchantId) {
+        showAlert('Please fill in Location and Merchant ID', 'warning');
+        return;
+    }
+
+    // For new configs, require access token
+    if (!currentConfig && !accessToken) {
+        showAlert('Please enter Access Token for new configuration', 'warning');
+        return;
+    }
+
+    const configData = {
+        provider: 'clover',
+        merchant_id: merchantId,
+        api_environment: document.getElementById('apiEnvironment').value,
+        auto_sync_enabled: document.getElementById('autoSync').checked,
+        sync_frequency_minutes: parseInt(document.getElementById('syncFrequency').value),
+        auto_deduct_inventory: document.getElementById('autoDeduct').checked,
+        is_active: true
+    };
+
+    // Only include location_id for create
+    if (!currentConfig) {
+        configData.location_id = parseInt(locationId);
+    }
+
+    // Only include access_token if user entered a new one
+    if (accessToken) {
+        configData.access_token = accessToken;
+    }
+
+    try {
+        let config;
+        console.log('Current config state:', currentConfig);
+        console.log('Saving with data:', configData);
+
+        if (currentConfig) {
+            // Update existing
+            console.log('Updating existing configuration');
+            config = await apiRequest(`/api/pos/configurations/${locationId}`, {
+                method: 'PUT',
+                body: JSON.stringify(configData)
+            });
+            showAlert('Configuration updated successfully', 'success');
+        } else {
+            // Create new
+            console.log('Creating new configuration');
+            config = await apiRequest('/api/pos/configurations', {
+                method: 'POST',
+                body: JSON.stringify(configData)
+            });
+            showAlert('Configuration created successfully', 'success');
+        }
+
+        currentConfig = config;
+    } catch (error) {
+        console.error('Error saving config:', error);
+        showAlert('Failed to save configuration: ' + error.message, 'danger');
+    }
+}
+
+async function testConnection() {
+    const locationId = document.getElementById('locationId').value;
+    if (!locationId) {
+        showAlert('Please select a location first', 'warning');
+        return;
+    }
+
+    // Save first if needed
+    if (!currentConfig) {
+        showAlert('Saving configuration first...', 'info');
+        await saveConfiguration();
+        await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    const statusDiv = document.getElementById('connectionStatus');
+    statusDiv.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Testing connection...';
+
+    try {
+        const result = await apiRequest(`/api/pos/configurations/${locationId}/test`, {
+            method: 'POST'
+        });
+
+        if (result.success) {
+            statusDiv.innerHTML = `
+                <div class="alert alert-success mb-0">
+                    <i class="bi bi-check-circle-fill"></i> <strong>Connected!</strong><br>
+                    <small>Merchant ID: ${result.merchant_id}</small>
+                </div>
+            `;
+            showAlert('Successfully connected to Clover POS!', 'success');
+        } else {
+            statusDiv.innerHTML = `
+                <div class="alert alert-danger mb-0">
+                    <i class="bi bi-x-circle-fill"></i> <strong>Connection Failed</strong><br>
+                    <small>${result.message}</small>
+                </div>
+            `;
+            showAlert('Connection test failed: ' + result.message, 'danger');
+        }
+    } catch (error) {
+        console.error('Connection test error:', error);
+        statusDiv.innerHTML = `
+            <div class="alert alert-danger mb-0">
+                <i class="bi bi-x-circle-fill"></i> <strong>Error</strong><br>
+                <small>${error.message}</small>
+            </div>
+        `;
+        showAlert('Connection test failed: ' + error.message, 'danger');
+    }
+}
+
+function showAlert(message, type) {
+    const container = document.getElementById('alertContainer');
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    container.appendChild(alert);
+
+    setTimeout(() => {
+        alert.remove();
+    }, 5000);
+}
+
+async function apiRequest(url, options = {}) {
+    const token = getToken();
+    const defaultOptions = {
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        }
+    };
+
+    const response = await fetch(url, { ...defaultOptions, ...options });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Request failed');
+    }
+
+    return response.json();
+}
+
+document.addEventListener('DOMContentLoaded', init);
+document.getElementById('locationId').addEventListener('change', loadConfiguration);
+</script>
+{% endblock %}

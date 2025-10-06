@@ -1,0 +1,882 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory Count - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-clipboard-check"></i> Inventory Count Session</h1>
+    <div>
+        <span id="autoSaveStatus" class="badge bg-secondary me-2">
+            <i class="bi bi-clock-history"></i> <span id="saveStatusText">Ready</span>
+        </span>
+        <a href="/inventory" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Inventory
+        </a>
+    </div>
+</div>
+
+<!-- Session Selection (shown initially) -->
+<div id="sessionSelection" class="card mb-4">
+    <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-play-circle"></i> Start New Count Session</h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-5">
+                <label for="countLocation" class="form-label fw-bold">Location *</label>
+                <select class="form-select form-select-lg" id="countLocation" required onchange="onCountLocationChange()">
+                    <option value="">Select Location</option>
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label for="countStorageArea" class="form-label fw-bold">Storage Area</label>
+                <select class="form-select form-select-lg" id="countStorageArea">
+                    <option value="">All Areas (Location Level)</option>
+                </select>
+                <div class="form-text">Select specific area or count entire location</div>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button class="btn btn-success btn-lg w-100" onclick="startCountSession()">
+                    <i class="bi bi-play-fill"></i> Start
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Active Count Session (hidden initially) -->
+<div id="activeSession" style="display: none;">
+    <!-- Session Info Banner -->
+    <div class="alert alert-info d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <strong class="fs-5">Counting:</strong>
+            <span id="sessionLocationName" class="fs-5"></span>
+            <span id="sessionStorageAreaBadge"></span>
+        </div>
+        <div>
+            <span class="text-muted me-3">Started: <span id="sessionStartTime"></span></span>
+            <button class="btn btn-warning me-2" onclick="pauseSession()">
+                <i class="bi bi-pause-fill"></i> Pause
+            </button>
+            <button class="btn btn-danger me-2" onclick="cancelSession()">
+                <i class="bi bi-x-circle"></i> Cancel
+            </button>
+            <button class="btn btn-success btn-lg" onclick="submitSession()">
+                <i class="bi bi-check-circle-fill"></i> Submit & Lock Count
+            </button>
+        </div>
+    </div>
+
+    <!-- Progress Summary -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h4 id="countedItems">0</h4>
+                    <p class="mb-0">Items Counted</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h4 id="totalItems">0</h4>
+                    <p class="mb-0">Total Items</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning">
+                <div class="card-body text-center">
+                    <h4 id="largeVariances">0</h4>
+                    <p class="mb-0">Large Variances</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h4 id="totalValue">$0</h4>
+                    <p class="mb-0">Total Value</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Entry Table -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Quick Entry - Preloaded Items</h5>
+            <div>
+                <button class="btn btn-sm btn-success me-2" onclick="showAddItemModal()">
+                    <i class="bi bi-plus-circle"></i> Add Item to This Area
+                </button>
+                <button class="btn btn-sm btn-outline-secondary me-2" onclick="clearAllCounts()">
+                    <i class="bi bi-eraser"></i> Clear All
+                </button>
+                <button class="btn btn-sm btn-outline-primary" onclick="fillLastCounts()">
+                    <i class="bi bi-arrow-clockwise"></i> Fill Last Counts
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="countTable">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th style="width: 30px;">#</th>
+                            <th>Item Name</th>
+                            <th>Category</th>
+                            <th style="width: 120px;">Last Count</th>
+                            <th style="width: 180px;">New Count *</th>
+                            <th style="width: 100px;">Unit</th>
+                            <th style="width: 120px;">Variance</th>
+                            <th style="width: 120px;">Value</th>
+                        </tr>
+                    </thead>
+                    <tbody id="countTableBody">
+                        <tr>
+                            <td colspan="8" class="text-center p-4">
+                                <div class="spinner-border text-primary" role="status"></div>
+                                <p class="mt-2 text-muted">Loading items...</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add Item to Storage Area</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Search Master Inventory</label>
+                    <input type="text" class="form-control form-control-lg" id="itemSearchInput"
+                           placeholder="Search by name, SKU, or category..."
+                           oninput="filterMasterItems()">
+                </div>
+
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Select an item below to add it to this storage area.
+                    If the item doesn't exist, <a href="#" onclick="showCreateNewItemForm()">create a new item</a>.
+                </div>
+
+                <div id="masterItemsList" style="max-height: 400px; overflow-y: auto;">
+                    <div class="text-center p-4">
+                        <div class="spinner-border" role="status"></div>
+                        <p class="mt-2">Loading master items...</p>
+                    </div>
+                </div>
+
+                <!-- Create New Item Form (hidden initially) -->
+                <div id="createNewItemForm" style="display: none;">
+                    <hr>
+                    <h6 class="fw-bold">Create New Master Item</h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Item Name *</label>
+                                <input type="text" class="form-control" id="newItemName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Category *</label>
+                                <input type="text" class="form-control" id="newItemCategory"
+                                       list="categoryList" required>
+                                <datalist id="categoryList">
+                                    <option value="Liquor">
+                                    <option value="Beer">
+                                    <option value="Wine">
+                                    <option value="Dry Goods">
+                                    <option value="Meat">
+                                    <option value="Produce">
+                                    <option value="Dairy">
+                                    <option value="Supplies">
+                                </datalist>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Unit of Measure *</label>
+                                <select class="form-select" id="newItemUnit" required>
+                                    <option value="">Select...</option>
+                                    <option value="bottle">Bottle</option>
+                                    <option value="case">Case</option>
+                                    <option value="lb">Pound (lb)</option>
+                                    <option value="kg">Kilogram (kg)</option>
+                                    <option value="oz">Ounce (oz)</option>
+                                    <option value="gal">Gallon (gal)</option>
+                                    <option value="L">Liter (L)</option>
+                                    <option value="unit">Unit/Each</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Vendor/Supplier</label>
+                                <input type="text" class="form-control" id="newItemVendor">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Unit Cost</label>
+                                <input type="number" class="form-control" id="newItemCost" step="0.01" min="0">
+                            </div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="createAndAddNewItem()">
+                        <i class="bi bi-check-circle"></i> Create & Add to Count
+                    </button>
+                    <button class="btn btn-secondary" onclick="hideCreateNewItemForm()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let locations = [];
+let storageAreas = [];
+let items = [];
+let inventory = [];
+let sessionData = {
+    locationId: null,
+    locationName: null,
+    storageAreaId: null,
+    storageAreaName: null,
+    startTime: null,
+    counts: {}, // { inventory_id: newCount }
+    lastSaved: null
+};
+let autoSaveInterval = null;
+let hasUnsavedChanges = false;
+
+async function apiRequest(url, options = {}) {
+    const token = localStorage.getItem('access_token');
+    const defaultOptions = {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    };
+
+    const response = await fetch(url, { ...defaultOptions, ...options });
+
+    if (response.status === 401) {
+        window.location.href = '/login';
+        throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Request failed');
+    }
+
+    return response.json();
+}
+
+function showAlert(message, type = 'info') {
+    // Create alert element
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+
+async function loadInitialData() {
+    try {
+        const [locationsResponse, storageAreasResponse, itemsResponse, inventoryResponse] = await Promise.all([
+            apiRequest('/api/locations/'),
+            apiRequest('/api/storage-areas/'),
+            apiRequest('/api/items/'),
+            apiRequest('/api/inventory/')
+        ]);
+
+        locations = locationsResponse;
+        storageAreas = Array.isArray(storageAreasResponse) ? storageAreasResponse : [];
+        items = itemsResponse;
+        inventory = inventoryResponse;
+
+        populateLocationSelect();
+    } catch (error) {
+        console.error('Error loading data:', error);
+        showAlert('Error loading data: ' + error.message, 'danger');
+    }
+}
+
+function populateLocationSelect() {
+    const select = document.getElementById('countLocation');
+    select.innerHTML = '<option value="">Select Location</option>';
+
+    locations.forEach(loc => {
+        const option = document.createElement('option');
+        option.value = loc.id;
+        option.textContent = loc.name;
+        select.appendChild(option);
+    });
+}
+
+function onCountLocationChange() {
+    const locationId = document.getElementById('countLocation').value;
+    const select = document.getElementById('countStorageArea');
+
+    select.innerHTML = '<option value="">All Areas (Location Level)</option>';
+
+    if (!locationId) return;
+
+    const filteredAreas = storageAreas.filter(area => area.location_id == locationId);
+    filteredAreas.forEach(area => {
+        const option = document.createElement('option');
+        option.value = area.id;
+        option.textContent = area.name;
+        select.appendChild(option);
+    });
+}
+
+function startCountSession() {
+    const locationId = document.getElementById('countLocation').value;
+    const storageAreaId = document.getElementById('countStorageArea').value;
+
+    if (!locationId) {
+        showAlert('Please select a location', 'warning');
+        return;
+    }
+
+    const location = locations.find(l => l.id == locationId);
+    const storageArea = storageAreaId ? storageAreas.find(a => a.id == storageAreaId) : null;
+
+    sessionData = {
+        locationId: parseInt(locationId),
+        locationName: location.name,
+        storageAreaId: storageAreaId ? parseInt(storageAreaId) : null,
+        storageAreaName: storageArea ? storageArea.name : null,
+        startTime: new Date(),
+        counts: {},
+        lastSaved: null
+    };
+
+    // Hide selection, show active session
+    document.getElementById('sessionSelection').style.display = 'none';
+    document.getElementById('activeSession').style.display = 'block';
+
+    // Update session info
+    document.getElementById('sessionLocationName').textContent = sessionData.locationName;
+    const badge = sessionData.storageAreaName
+        ? `<span class="badge bg-info text-dark ms-2"><i class="bi bi-archive"></i> ${sessionData.storageAreaName}</span>`
+        : '<span class="badge bg-secondary ms-2">All Areas</span>';
+    document.getElementById('sessionStorageAreaBadge').innerHTML = badge;
+    document.getElementById('sessionStartTime').textContent = sessionData.startTime.toLocaleTimeString();
+
+    loadCountItems();
+    startAutoSave();
+}
+
+function loadCountItems() {
+    // Filter inventory for this location/storage area
+    let filteredInventory = inventory.filter(record => {
+        if (record.location_id != sessionData.locationId) return false;
+        if (sessionData.storageAreaId && record.storage_area_id != sessionData.storageAreaId) return false;
+        return true;
+    });
+
+    // If no inventory exists yet, show all items for selection
+    const existingItemIds = new Set(filteredInventory.map(inv => inv.master_item_id));
+    const availableItems = items.filter(item => !existingItemIds.has(item.id));
+
+    displayCountTable(filteredInventory, availableItems);
+    updateProgressSummary();
+}
+
+function displayCountTable(existingInventory, newItems) {
+    const tbody = document.getElementById('countTableBody');
+
+    if (existingInventory.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center p-4">
+                    <div class="alert alert-warning mb-0">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>No items preloaded for this storage area yet.</strong>
+                        <br>Click the <strong>"Add Item to This Area"</strong> button above to add items from your master inventory list.
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    let html = '';
+    let rowNum = 1;
+
+    // Existing inventory items
+    existingInventory.forEach(record => {
+        const variance = sessionData.counts[record.id] !== undefined
+            ? (parseFloat(sessionData.counts[record.id]) - parseFloat(record.current_quantity))
+            : 0;
+        const varianceClass = Math.abs(variance) > 5 ? 'text-danger fw-bold' : variance !== 0 ? 'text-warning' : '';
+        const currentCount = sessionData.counts[record.id] !== undefined ? sessionData.counts[record.id] : '';
+
+        html += `
+            <tr data-inventory-id="${record.id}">
+                <td class="text-center text-muted">${rowNum++}</td>
+                <td><strong>${record.item_name}</strong></td>
+                <td><span class="badge bg-light text-dark">${record.item_category}</span></td>
+                <td class="text-center"><strong>${parseFloat(record.current_quantity).toFixed(3)}</strong></td>
+                <td>
+                    <input type="number"
+                           class="form-control form-control-lg text-center count-input"
+                           data-inventory-id="${record.id}"
+                           data-last-count="${record.current_quantity}"
+                           step="0.001"
+                           min="0"
+                           inputmode="decimal"
+                           value="${currentCount}"
+                           placeholder="0.000"
+                           onchange="onCountChange(${record.id})">
+                </td>
+                <td class="text-center"><span class="badge bg-secondary">${record.item_unit}</span></td>
+                <td class="text-center ${varianceClass}" id="variance-${record.id}">
+                    ${variance !== 0 ? (variance > 0 ? '+' : '') + variance.toFixed(3) : '-'}
+                </td>
+                <td class="text-end" id="value-${record.id}">
+                    ${record.unit_cost && currentCount ? '$' + (parseFloat(currentCount) * parseFloat(record.unit_cost)).toFixed(2) : '-'}
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+
+    // Focus first input
+    setTimeout(() => {
+        const firstInput = tbody.querySelector('.count-input');
+        if (firstInput) firstInput.focus();
+    }, 100);
+}
+
+function onCountChange(inventoryId) {
+    const input = document.querySelector(`input[data-inventory-id="${inventoryId}"]`);
+    const newCount = parseFloat(input.value) || 0;
+    const lastCount = parseFloat(input.dataset.lastCount) || 0;
+
+    sessionData.counts[inventoryId] = newCount;
+    hasUnsavedChanges = true;
+
+    // Calculate variance
+    const variance = newCount - lastCount;
+    const varianceCell = document.getElementById(`variance-${inventoryId}`);
+
+    if (varianceCell) {
+        varianceCell.textContent = variance !== 0 ? (variance > 0 ? '+' : '') + variance.toFixed(3) : '-';
+        varianceCell.className = 'text-center';
+        if (Math.abs(variance) > 5) {
+            varianceCell.classList.add('text-danger', 'fw-bold');
+        } else if (variance !== 0) {
+            varianceCell.classList.add('text-warning');
+        }
+    }
+
+    // Update value
+    const record = inventory.find(inv => inv.id === inventoryId);
+    if (record && record.unit_cost) {
+        const value = newCount * parseFloat(record.unit_cost);
+        document.getElementById(`value-${inventoryId}`).textContent = '$' + value.toFixed(2);
+    }
+
+    updateProgressSummary();
+
+    // Move to next input on Enter
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const inputs = Array.from(document.querySelectorAll('.count-input'));
+            const currentIndex = inputs.indexOf(input);
+            if (currentIndex < inputs.length - 1) {
+                inputs[currentIndex + 1].focus();
+            }
+        }
+    });
+}
+
+function updateProgressSummary() {
+    const countedItems = Object.keys(sessionData.counts).filter(id => sessionData.counts[id] !== '' && sessionData.counts[id] !== null).length;
+    const totalItems = inventory.filter(inv => {
+        if (inv.location_id != sessionData.locationId) return false;
+        if (sessionData.storageAreaId && inv.storage_area_id != sessionData.storageAreaId) return false;
+        return true;
+    }).length;
+
+    let largeVariances = 0;
+    let totalValue = 0;
+
+    Object.keys(sessionData.counts).forEach(invId => {
+        const record = inventory.find(inv => inv.id == invId);
+        if (record) {
+            const newCount = parseFloat(sessionData.counts[invId]) || 0;
+            const variance = newCount - parseFloat(record.current_quantity);
+            if (Math.abs(variance) > 5) largeVariances++;
+            if (record.unit_cost) {
+                totalValue += newCount * parseFloat(record.unit_cost);
+            }
+        }
+    });
+
+    document.getElementById('countedItems').textContent = countedItems;
+    document.getElementById('totalItems').textContent = totalItems;
+    document.getElementById('largeVariances').textContent = largeVariances;
+    document.getElementById('totalValue').textContent = '$' + totalValue.toFixed(2);
+}
+
+function startAutoSave() {
+    // Auto-save every 5 seconds
+    autoSaveInterval = setInterval(() => {
+        if (hasUnsavedChanges) {
+            autoSave();
+        }
+    }, 5000);
+}
+
+async function autoSave() {
+    if (!hasUnsavedChanges) return;
+
+    const statusBadge = document.getElementById('autoSaveStatus');
+    const statusText = document.getElementById('saveStatusText');
+
+    statusBadge.className = 'badge bg-warning me-2';
+    statusText.textContent = 'Saving...';
+
+    try {
+        // Save counts to localStorage as backup
+        localStorage.setItem('countSession', JSON.stringify(sessionData));
+
+        hasUnsavedChanges = false;
+        sessionData.lastSaved = new Date();
+
+        statusBadge.className = 'badge bg-success me-2';
+        statusText.innerHTML = '<i class="bi bi-check-circle"></i> Saved';
+
+        setTimeout(() => {
+            statusBadge.className = 'badge bg-secondary me-2';
+            statusText.innerHTML = '<i class="bi bi-clock-history"></i> ' + sessionData.lastSaved.toLocaleTimeString();
+        }, 2000);
+    } catch (error) {
+        console.error('Auto-save failed:', error);
+        statusBadge.className = 'badge bg-danger me-2';
+        statusText.textContent = 'Save failed';
+    }
+}
+
+async function submitSession() {
+    if (Object.keys(sessionData.counts).length === 0) {
+        showAlert('Please enter at least one count before submitting', 'warning');
+        return;
+    }
+
+    if (!confirm('Submit and lock this count? This will update all inventory records and cannot be undone.')) {
+        return;
+    }
+
+    try {
+        // Update each inventory record
+        const updates = [];
+        for (const [invId, newCount] of Object.entries(sessionData.counts)) {
+            if (newCount !== '' && newCount !== null) {
+                updates.push(
+                    apiRequest(`/api/inventory/${invId}/count`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ new_quantity: parseFloat(newCount) })
+                    })
+                );
+            }
+        }
+
+        await Promise.all(updates);
+
+        clearInterval(autoSaveInterval);
+        localStorage.removeItem('countSession');
+
+        showAlert(`Count submitted successfully! Updated ${updates.length} items.`, 'success');
+
+        // Redirect back to inventory after 2 seconds
+        setTimeout(() => {
+            window.location.href = '/inventory';
+        }, 2000);
+
+    } catch (error) {
+        console.error('Error submitting count:', error);
+        showAlert('Error submitting count: ' + error.message, 'danger');
+    }
+}
+
+function pauseSession() {
+    clearInterval(autoSaveInterval);
+    autoSave(); // Save before pausing
+    showAlert('Session paused. Data saved locally.', 'info');
+}
+
+function cancelSession() {
+    if (!confirm('Cancel this count session? All unsaved data will be lost.')) {
+        return;
+    }
+
+    clearInterval(autoSaveInterval);
+    localStorage.removeItem('countSession');
+    window.location.reload();
+}
+
+function clearAllCounts() {
+    if (!confirm('Clear all entered counts?')) return;
+
+    sessionData.counts = {};
+    hasUnsavedChanges = true;
+    loadCountItems();
+}
+
+function fillLastCounts() {
+    // Fill in current quantities as the new counts
+    inventory.filter(inv => {
+        if (inv.location_id != sessionData.locationId) return false;
+        if (sessionData.storageAreaId && inv.storage_area_id != sessionData.storageAreaId) return false;
+        return true;
+    }).forEach(record => {
+        sessionData.counts[record.id] = record.current_quantity;
+    });
+
+    hasUnsavedChanges = true;
+    loadCountItems();
+    showAlert('Filled all fields with last counts', 'info');
+}
+
+// ========== ADD ITEM DURING COUNT ==========
+let addItemModal;
+let filteredMasterItems = [];
+
+function showAddItemModal() {
+    if (!addItemModal) {
+        addItemModal = new bootstrap.Modal(document.getElementById('addItemModal'));
+    }
+
+    // Filter out items already in THIS SPECIFIC storage area
+    // Allow items that exist in OTHER storage areas at this location
+    const existingItemIds = new Set(inventory.filter(inv => {
+        // Must match location
+        if (inv.location_id != sessionData.locationId) return false;
+
+        // Must match the EXACT storage area (or both be null for location-level)
+        if (sessionData.storageAreaId) {
+            // We're in a specific storage area - only exclude if item is in THIS area
+            return inv.storage_area_id == sessionData.storageAreaId;
+        } else {
+            // We're at location level - only exclude if item is at location level (no storage area)
+            return inv.storage_area_id == null;
+        }
+    }).map(inv => inv.master_item_id));
+
+    filteredMasterItems = items.filter(item => !existingItemIds.has(item.id));
+
+    displayMasterItemsList();
+    addItemModal.show();
+}
+
+function displayMasterItemsList() {
+    const container = document.getElementById('masterItemsList');
+
+    if (filteredMasterItems.length === 0) {
+        container.innerHTML = '<p class="text-center text-muted p-4">No available items. All items from master list are already added.</p>';
+        return;
+    }
+
+    const html = filteredMasterItems.map(item => `
+        <div class="card mb-2">
+            <div class="card-body d-flex justify-content-between align-items-center p-3">
+                <div>
+                    <strong>${item.name}</strong>
+                    <br><small class="text-muted">
+                        ${item.category} • ${item.unit_of_measure}
+                        ${item.vendor ? ' • ' + item.vendor : ''}
+                    </small>
+                </div>
+                <button class="btn btn-sm btn-success" onclick="addItemToCount(${item.id})">
+                    <i class="bi bi-plus"></i> Add
+                </button>
+            </div>
+        </div>
+    `).join('');
+
+    container.innerHTML = html;
+}
+
+function filterMasterItems() {
+    const searchTerm = document.getElementById('itemSearchInput').value.toLowerCase();
+
+    if (!searchTerm) {
+        displayMasterItemsList();
+        return;
+    }
+
+    // Same logic as showAddItemModal - only exclude items in THIS EXACT storage area
+    const existingItemIds = new Set(inventory.filter(inv => {
+        if (inv.location_id != sessionData.locationId) return false;
+
+        if (sessionData.storageAreaId) {
+            return inv.storage_area_id == sessionData.storageAreaId;
+        } else {
+            return inv.storage_area_id == null;
+        }
+    }).map(inv => inv.master_item_id));
+
+    filteredMasterItems = items.filter(item => {
+        if (existingItemIds.has(item.id)) return false;
+
+        const matchesName = item.name.toLowerCase().includes(searchTerm);
+        const matchesSku = item.sku && item.sku.toLowerCase().includes(searchTerm);
+        const matchesCategory = item.category.toLowerCase().includes(searchTerm);
+
+        return matchesName || matchesSku || matchesCategory;
+    });
+
+    displayMasterItemsList();
+}
+
+async function addItemToCount(itemId) {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    try {
+        // Create inventory record for this item at this storage area
+        // location_id is now automatically inferred from storage_area_id on the backend
+        const invData = {
+            storage_area_id: sessionData.storageAreaId,
+            master_item_id: itemId,
+            current_quantity: 0,
+            unit_cost: item.current_cost || null,
+            reorder_level: null,
+            max_level: null
+        };
+
+        const newInvRecord = await apiRequest('/api/inventory/', {
+            method: 'POST',
+            body: JSON.stringify(invData)
+        });
+
+        // Enrich the record with display fields from our local data
+        const location = locations.find(l => l.id === sessionData.locationId);
+        const storageArea = sessionData.storageAreaId
+            ? storageAreas.find(a => a.id === sessionData.storageAreaId)
+            : null;
+
+        newInvRecord.location_name = location ? location.name : '';
+        newInvRecord.storage_area_name = storageArea ? storageArea.name : null;
+        newInvRecord.item_name = item.name;
+        newInvRecord.item_category = item.category;
+        newInvRecord.item_unit = item.unit_of_measure;
+
+        // Add to local inventory array
+        inventory.push(newInvRecord);
+
+        // Close modal and reload count table
+        addItemModal.hide();
+        loadCountItems();
+        showAlert(`Added "${item.name}" to count session`, 'success');
+
+    } catch (error) {
+        console.error('Error adding item:', error);
+        showAlert('Error adding item: ' + error.message, 'danger');
+    }
+}
+
+function showCreateNewItemForm() {
+    document.getElementById('masterItemsList').style.display = 'none';
+    document.getElementById('createNewItemForm').style.display = 'block';
+}
+
+function hideCreateNewItemForm() {
+    document.getElementById('masterItemsList').style.display = 'block';
+    document.getElementById('createNewItemForm').style.display = 'none';
+
+    // Clear form
+    document.getElementById('newItemName').value = '';
+    document.getElementById('newItemCategory').value = '';
+    document.getElementById('newItemUnit').value = '';
+    document.getElementById('newItemVendor').value = '';
+    document.getElementById('newItemCost').value = '';
+}
+
+async function createAndAddNewItem() {
+    const name = document.getElementById('newItemName').value;
+    const category = document.getElementById('newItemCategory').value;
+    const unit_of_measure = document.getElementById('newItemUnit').value;
+    const vendor = document.getElementById('newItemVendor').value;
+    const current_cost = document.getElementById('newItemCost').value;
+
+    if (!name || !category || !unit_of_measure) {
+        showAlert('Please fill in all required fields', 'warning');
+        return;
+    }
+
+    try {
+        // Create new master item
+        const itemData = {
+            name,
+            category,
+            unit_of_measure,
+            vendor: vendor || null,
+            current_cost: current_cost ? parseFloat(current_cost) : null,
+            description: '',
+            sku: '',
+            is_active: true
+        };
+
+        const newItem = await apiRequest('/api/items/', {
+            method: 'POST',
+            body: JSON.stringify(itemData)
+        });
+
+        // Add to local items array
+        items.push(newItem);
+
+        // Now add it to the count
+        await addItemToCount(newItem.id);
+
+        // Hide form
+        hideCreateNewItemForm();
+
+    } catch (error) {
+        console.error('Error creating item:', error);
+        showAlert('Error creating item: ' + error.message, 'danger');
+    }
+}
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', loadInitialData);
+
+// Warn before leaving if unsaved changes
+window.addEventListener('beforeunload', (e) => {
+    if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
+</script>
+{% endblock %}

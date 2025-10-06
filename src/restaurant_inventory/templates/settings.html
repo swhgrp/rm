@@ -1,0 +1,2753 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-gear"></i> Settings</h1>
+</div>
+
+<!-- Settings Tabs (Admin Only) -->
+<ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">
+            <i class="bi bi-people"></i> Users
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="locations-tab" data-bs-toggle="tab" data-bs-target="#locations" type="button" role="tab">
+            <i class="bi bi-geo-alt"></i> Locations
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories" type="button" role="tab">
+            <i class="bi bi-tags"></i> Categories
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="audit-tab" data-bs-toggle="tab" data-bs-target="#audit" type="button" role="tab">
+            <i class="bi bi-shield-check"></i> Audit Log
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="roles-tab" data-bs-toggle="tab" data-bs-target="#roles" type="button" role="tab">
+            <i class="bi bi-shield-lock"></i> Roles
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="pos-tab" data-bs-toggle="tab" data-bs-target="#pos" type="button" role="tab">
+            <i class="bi bi-shop"></i> POS Integration
+        </button>
+    </li>
+</ul>
+
+<!-- Tab Content -->
+<div class="tab-content" id="settingsTabContent">
+
+    <!-- Users Tab -->
+    <div class="tab-pane fade show active" id="users" role="tabpanel">
+        <div class="alert alert-info mb-3">
+            <i class="bi bi-info-circle"></i> <strong>Users</strong> – Manage system users, their roles, and permissions.
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="input-group" style="max-width: 400px;">
+                <input type="text" class="form-control" id="userSearch" placeholder="Search users of this organization">
+                <button class="btn btn-outline-secondary" onclick="clearUserSearch()">Clear</button>
+            </div>
+            <button class="btn btn-primary" onclick="showCreateUserModal()">
+                <i class="bi bi-plus-circle"></i> Invite new users
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Name</th>
+                            <th>Email address</th>
+                            <th>Location access</th>
+                            <th>Role</th>
+                            <th style="width: 100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <tr>
+                            <td colspan="5" class="text-center">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Locations Tab -->
+    <div class="tab-pane fade" id="locations" role="tabpanel">
+        <div class="alert alert-info mb-3">
+            <i class="bi bi-info-circle"></i> <strong>Locations</strong> – Define and track your physical restaurant or store locations.
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="input-group" style="max-width: 400px;">
+                <input type="text" class="form-control" id="locationSearch" placeholder="Search locations">
+                <button class="btn btn-outline-secondary" onclick="clearLocationSearch()">Clear</button>
+            </div>
+            <button class="btn btn-primary" onclick="showCreateLocationModal()">
+                <i class="bi bi-plus-circle"></i> Add Location
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Name</th>
+                            <th>Address</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th style="width: 100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="locationsTableBody">
+                        <tr>
+                            <td colspan="5" class="text-center">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Categories Tab -->
+    <div class="tab-pane fade" id="categories" role="tabpanel">
+        <div class="alert alert-info mb-3">
+            <i class="bi bi-info-circle"></i> <strong>Categories</strong> – Group items into logical categories (e.g., produce, meats, beverages).
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="input-group" style="max-width: 400px;">
+                <input type="text" class="form-control" id="categorySearch" placeholder="Search categories">
+                <button class="btn btn-outline-secondary" onclick="clearCategorySearch()">Clear</button>
+            </div>
+            <button class="btn btn-primary" onclick="showCreateCategoryModal()">
+                <i class="bi bi-plus-circle"></i> Add Category
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Name</th>
+                            <th>Description</th>
+                            <th>Display Order</th>
+                            <th>Status</th>
+                            <th style="width: 100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="categoriesTableBody">
+                        <tr>
+                            <td colspan="5" class="text-center">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Roles Tab -->
+    <div class="tab-pane fade" id="roles" role="tabpanel">
+        <div class="alert alert-info mb-3">
+            <i class="bi bi-info-circle"></i> <strong>Roles</strong> – Define custom roles and their permissions for granular access control.
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div class="input-group" style="max-width: 400px;">
+                <input type="text" class="form-control" id="roleSearch" placeholder="Search roles">
+                <button class="btn btn-outline-secondary" onclick="clearRoleSearch()">Clear</button>
+            </div>
+            <button class="btn btn-primary" onclick="showCreateRoleModal()">
+                <i class="bi bi-plus-circle"></i> Add Role
+            </button>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-hover mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Role Name</th>
+                            <th>Description</th>
+                            <th>Permissions</th>
+                            <th style="width: 100px;">Type</th>
+                            <th style="width: 100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rolesTableBody">
+                        <tr>
+                            <td colspan="5" class="text-center">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Audit Log Tab -->
+    <div class="tab-pane fade" id="audit" role="tabpanel">
+        <div class="alert alert-info mb-3">
+            <i class="bi bi-info-circle"></i> <strong>Audit Log</strong> – Record of all changes and actions taken in the system for accountability.
+        </div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h5 class="mb-2">Audit Trail</h5>
+                <p class="text-muted small mb-0">Track all changes and actions in the system</p>
+            </div>
+            <div class="d-flex gap-2">
+                <select class="form-select form-select-sm" id="auditEntityFilter" style="width: 150px;" onchange="filterAuditLogs()">
+                    <option value="">All Entities</option>
+                    <option value="user">Users</option>
+                    <option value="location">Locations</option>
+                    <option value="item">Items</option>
+                    <option value="inventory">Inventory</option>
+                    <option value="transfer">Transfers</option>
+                </select>
+                <select class="form-select form-select-sm" id="auditActionFilter" style="width: 150px;" onchange="filterAuditLogs()">
+                    <option value="">All Actions</option>
+                    <option value="CREATE">Create</option>
+                    <option value="UPDATE">Update</option>
+                    <option value="DELETE">Delete</option>
+                    <option value="LOGIN">Login</option>
+                    <option value="LOGOUT">Logout</option>
+                </select>
+                <button class="btn btn-sm btn-outline-secondary" onclick="clearAuditFilters()">Clear Filters</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th style="width: 160px;">Timestamp</th>
+                            <th style="width: 120px;">User</th>
+                            <th style="width: 100px;">Action</th>
+                            <th style="width: 120px;">Entity Type</th>
+                            <th style="width: 80px;">Entity ID</th>
+                            <th>Changes</th>
+                            <th style="width: 120px;">IP Address</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditTableBody">
+                        <tr>
+                            <td colspan="7" class="text-center">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div class="text-muted small">
+                Showing <span id="auditShowingCount">0</span> entries
+            </div>
+            <div>
+                <button class="btn btn-sm btn-outline-secondary" id="auditPrevBtn" onclick="loadAuditLogs(auditCurrentPage - 1)" disabled>
+                    <i class="bi bi-chevron-left"></i> Previous
+                </button>
+                <span class="mx-2 text-muted">Page <span id="auditPageNum">1</span></span>
+                <button class="btn btn-sm btn-outline-secondary" id="auditNextBtn" onclick="loadAuditLogs(auditCurrentPage + 1)">
+                    Next <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- POS Integration Tab -->
+    <div class="tab-pane fade" id="pos" role="tabpanel">
+        <div class="alert alert-info mb-3">
+            <i class="bi bi-info-circle"></i> <strong>POS Integration</strong> – Configure integration with your Point of Sale system for automated inventory tracking.
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-plug"></i> Connection Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="posSettingsForm">
+                            <div class="mb-3">
+                                <label class="form-label">POS System Type</label>
+                                <select class="form-select" id="posSystemType">
+                                    <option value="">Select POS System...</option>
+                                    <option value="toast">Toast</option>
+                                    <option value="square">Square</option>
+                                    <option value="clover">Clover</option>
+                                    <option value="lightspeed">Lightspeed</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">API Endpoint URL</label>
+                                <input type="url" class="form-control" id="posApiUrl" placeholder="https://api.example.com">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">API Key</label>
+                                <input type="password" class="form-control" id="posApiKey" placeholder="Enter API key">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Location Mapping</label>
+                                <select class="form-select" id="posLocationMapping">
+                                    <option value="">Select default location...</option>
+                                </select>
+                                <small class="form-text text-muted">Map POS location to inventory location</small>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" id="posAutoSync">
+                                <label class="form-check-label" for="posAutoSync">
+                                    Enable automatic inventory sync
+                                </label>
+                            </div>
+
+                            <button type="button" class="btn btn-primary" onclick="testPOSConnection()">
+                                <i class="bi bi-check-circle"></i> Test Connection
+                            </button>
+                            <button type="button" class="btn btn-success" onclick="savePOSSettings()">
+                                <i class="bi bi-save"></i> Save Settings
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-info-circle"></i> Integration Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <strong>Connection Status:</strong>
+                            <span class="badge bg-secondary ms-2" id="posConnectionStatus">Not Configured</span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Last Sync:</strong>
+                            <span id="posLastSync">Never</span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Items Synced:</strong>
+                            <span id="posItemsSynced">0</span>
+                        </div>
+                        <hr>
+                        <h6>Recent Sync Activity</h6>
+                        <div id="posSyncActivity" class="small text-muted">
+                            No recent activity
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> Manual Sync</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">Manually trigger a sync with your POS system to update inventory levels.</p>
+                        <button type="button" class="btn btn-outline-primary" onclick="syncPOSInventory()">
+                            <i class="bi bi-arrow-repeat"></i> Sync Now
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-journal-text"></i> Sync History</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-hover table-sm mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Timestamp</th>
+                            <th>Type</th>
+                            <th>Items Updated</th>
+                            <th>Status</th>
+                            <th>Details</th>
+                        </tr>
+                    </thead>
+                    <tbody id="posSyncHistoryBody">
+                        <tr>
+                            <td colspan="5" class="text-center text-muted">No sync history available</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalTitle">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="confirmModalBody">
+                Are you sure?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmModalBtn" onclick="confirmAction()">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Modal -->
+<div class="modal fade" id="userModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userModalTitle">Invite New User</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username *</label>
+                        <input type="text" class="form-control" id="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email *</label>
+                        <input type="email" class="form-control" id="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="fullName" class="form-label">Full Name *</label>
+                        <input type="text" class="form-control" id="fullName" required>
+                    </div>
+                    <div class="mb-3" id="passwordField">
+                        <label for="password" class="form-label">Password <span id="passwordRequired">*</span></label>
+                        <input type="password" class="form-control" id="password">
+                        <small class="text-muted" id="passwordHint" style="display: none;">Leave blank to keep current password</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="role" class="form-label">Role *</label>
+                        <select class="form-select" id="role" required>
+                            <option value="">Select role...</option>
+                            <option value="STAFF">User</option>
+                            <option value="MANAGER">Manager</option>
+                            <option value="ADMIN">Admin</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveUser()">Save User</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Role Modal -->
+<div class="modal fade" id="roleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="roleModalTitle">Add Role</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="roleForm">
+                    <div class="mb-3">
+                        <label for="roleName" class="form-label">Role Name *</label>
+                        <input type="text" class="form-control" id="roleName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="roleDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="roleDescription" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Permissions</label>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <h6 class="mb-3">Inventory Management</h6>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="perm_inventory_view">
+                                            <label class="form-check-label" for="perm_inventory_view">View Inventory</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="perm_inventory_edit">
+                                            <label class="form-check-label" for="perm_inventory_edit">Edit Inventory</label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="perm_inventory_count">
+                                            <label class="form-check-label" for="perm_inventory_count">Take Inventory Count</label>
+                                        </div>
+
+                                        <h6 class="mb-3">Purchasing</h6>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="perm_invoices_view">
+                                            <label class="form-check-label" for="perm_invoices_view">View Invoices</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="perm_invoices_create">
+                                            <label class="form-check-label" for="perm_invoices_create">Create/Edit Invoices</label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="perm_vendors_manage">
+                                            <label class="form-check-label" for="perm_vendors_manage">Manage Vendors</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h6 class="mb-3">Reports & Analytics</h6>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="perm_reports_view">
+                                            <label class="form-check-label" for="perm_reports_view">View Reports</label>
+                                        </div>
+                                        <div class="form-check mb-3">
+                                            <input class="form-check-input" type="checkbox" id="perm_dashboard_view">
+                                            <label class="form-check-label" for="perm_dashboard_view">View Dashboard</label>
+                                        </div>
+
+                                        <h6 class="mb-3">Administration</h6>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="perm_users_manage">
+                                            <label class="form-check-label" for="perm_users_manage">Manage Users</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="perm_roles_manage">
+                                            <label class="form-check-label" for="perm_roles_manage">Manage Roles</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="perm_settings_manage">
+                                            <label class="form-check-label" for="perm_settings_manage">Manage Settings</label>
+                                        </div>
+                                        <div class="form-check mb-2">
+                                            <input class="form-check-input" type="checkbox" id="perm_audit_view">
+                                            <label class="form-check-label" for="perm_audit_view">View Audit Log</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveRoleBtn" onclick="saveRole()">Save Role</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Location Modal -->
+<div class="modal fade" id="locationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="locationModalTitle">Add Location</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="locationForm">
+                    <div class="mb-3">
+                        <label for="locationName" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="locationName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="locationAddress" class="form-label">Address</label>
+                        <input type="text" class="form-control" id="locationAddress">
+                    </div>
+                    <div class="mb-3">
+                        <label for="locationType" class="form-label">Type *</label>
+                        <select class="form-select" id="locationType" required>
+                            <option value="">Select type...</option>
+                            <option value="Restaurant">Restaurant</option>
+                            <option value="Warehouse">Warehouse</option>
+                            <option value="Kitchen">Kitchen</option>
+                            <option value="Storage">Storage</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveLocation()">Save Location</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Vendor Modal -->
+<div class="modal fade" id="vendorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="vendorModalTitle">Add Vendor</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="vendorForm">
+                    <div class="mb-3">
+                        <label for="vendorName" class="form-label">Vendor Name *</label>
+                        <input type="text" class="form-control" id="vendorName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="vendorContactName" class="form-label">Contact Name</label>
+                        <input type="text" class="form-control" id="vendorContactName">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="vendorEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="vendorEmail">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="vendorPhone" class="form-label">Phone</label>
+                            <input type="tel" class="form-control" id="vendorPhone">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="vendorAddress" class="form-label">Address</label>
+                        <textarea class="form-control" id="vendorAddress" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="vendorNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="vendorNotes" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="vendorIsActive" checked>
+                        <label class="form-check-label" for="vendorIsActive">Active</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveVendor()">Save Vendor</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Vendor Item Modal -->
+<div class="modal fade" id="vendorItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="vendorItemModalTitle">Add Vendor Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="vendorItemForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="viVendorId" class="form-label">Vendor *</label>
+                            <select class="form-select" id="viVendorId" required>
+                                <option value="">Select vendor...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="viMasterItemId" class="form-label">Master Item *</label>
+                            <select class="form-select" id="viMasterItemId" required>
+                                <option value="">Select master item...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="viVendorSku" class="form-label">Vendor SKU</label>
+                            <input type="text" class="form-control" id="viVendorSku">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="viVendorProductName" class="form-label">Vendor Product Name *</label>
+                            <input type="text" class="form-control" id="viVendorProductName" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="viPurchaseUnitId" class="form-label">Purchase Unit *</label>
+                            <select class="form-select" id="viPurchaseUnitId" required>
+                                <option value="">Select unit...</option>
+                            </select>
+                            <small class="form-text text-muted">Select the unit the vendor sells in (conversion built-in to unit)</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="viUnitPrice" class="form-label">Last Price Paid</label>
+                            <input type="number" step="0.01" class="form-control bg-secondary" id="viUnitPrice" readonly>
+                            <small class="form-text text-muted">Auto-updated from invoices (read-only)</small>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="viMinOrderQty" class="form-label">Min Order Qty</label>
+                            <input type="number" step="0.001" class="form-control" id="viMinOrderQty">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="viLeadTimeDays" class="form-label">Lead Time (days)</label>
+                            <input type="number" class="form-control" id="viLeadTimeDays">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" class="form-check-input" id="viIsPreferred">
+                                <label class="form-check-label" for="viIsPreferred">Preferred Vendor</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="viNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="viNotes" rows="2"></textarea>
+                    </div>
+
+                    <div class="alert alert-info" id="viCostCalculation" style="display: none;">
+                        <strong>Cost per Master Unit:</strong> <span id="viCostPerMaster">$0.00</span>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveVendorItem()">Save Vendor Item</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Category Modal -->
+<div class="modal fade" id="categoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="categoryModalTitle">Add Category</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="categoryForm">
+                    <div class="mb-3">
+                        <label for="categoryName" class="form-label">Category Name *</label>
+                        <input type="text" class="form-control" id="categoryName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="categoryDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="categoryDescription" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="categoryOrder" class="form-label">Display Order</label>
+                        <input type="number" class="form-control" id="categoryOrder" value="0" min="0">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveCategory()">Save Category</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Item Modal -->
+<div class="modal fade" id="itemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="itemModalTitle">Add Master Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="itemForm">
+                    <div class="mb-3">
+                        <label for="itemName" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="itemName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="itemDescription" rows="2"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="itemCategory" class="form-label">Category *</label>
+                            <select class="form-select" id="itemCategory" required>
+                                <option value="">Select category...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="itemVendor" class="form-label">Vendor</label>
+                            <select class="form-select" id="itemVendor">
+                                <option value="">Select vendor...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemUnitId" class="form-label">Primary Unit *</label>
+                        <select class="form-select" id="itemUnitId" required>
+                            <option value="">Select unit...</option>
+                        </select>
+                        <small class="form-text text-muted">The unit you'll count in</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="itemSecondaryUnitId" class="form-label">Secondary Unit</label>
+                                <select class="form-select" id="itemSecondaryUnitId">
+                                    <option value="">None</option>
+                                </select>
+                                <small class="form-text text-muted">Larger unit for conversion (e.g., Case - 6 contains 6 Each)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemSku" class="form-label">SKU</label>
+                        <input type="text" class="form-control" id="itemSku">
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemParLevel" class="form-label">Par Level</label>
+                        <input type="number" step="0.001" class="form-control" id="itemParLevel" placeholder="Default par level for all locations">
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemCost" class="form-label">Current Cost</label>
+                        <input type="number" step="0.01" class="form-control" id="itemCost">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveItem()">Save Item</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Unit Edit Modal -->
+<div class="modal fade" id="unitEditModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="unitEditModalTitle">Add Unit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="unitEditForm">
+                    <div class="mb-3">
+                        <label for="editUnitName" class="form-label">Unit Name *</label>
+                        <input type="text" class="form-control" id="editUnitName" required placeholder="e.g., Case - 6, Dozen, Each">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editUnitAbbr" class="form-label">Abbreviation *</label>
+                        <input type="text" class="form-control" id="editUnitAbbr" required placeholder="e.g., cs, dz, ea">
+                    </div>
+                    <div class="mb-3">
+                        <label for="editReferenceUnit" class="form-label">Reference Unit</label>
+                        <select class="form-select" id="editReferenceUnit">
+                            <option value="">None (standalone unit)</option>
+                        </select>
+                        <small class="form-text text-muted">Select the unit this one contains</small>
+                    </div>
+                    <div class="mb-3" id="editContainsGroup">
+                        <label for="editContainsQty" class="form-label">Contains Quantity</label>
+                        <input type="number" class="form-control" id="editContainsQty" step="0.001" min="0" placeholder="e.g., 6, 12, 24">
+                        <small class="form-text text-muted">How many of the reference unit this contains</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveUnitEdit()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let users = [];
+    let locations = [];
+    let categories = [];
+    let items = [];
+    let auditLogs = [];
+    let roles = [];
+    let userModal, locationModal, categoryModal, itemModal, unitEditModal, roleModal;
+    let currentEditUserId = null;
+    let currentEditLocationId = null;
+    let currentEditCategoryId = null;
+    let currentEditItemId = null;
+    let currentEditUnitId = null;
+    let currentEditRoleId = null;
+    let auditCurrentPage = 0;
+    let auditPageSize = 50;
+    let confirmCallback = null;
+
+    // Confirmation modal helpers
+    function showConfirmation(title, message, callback) {
+        document.getElementById('confirmModalTitle').textContent = title;
+        document.getElementById('confirmModalBody').textContent = message;
+        confirmCallback = callback;
+        const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        modal.show();
+    }
+
+    function confirmAction() {
+        if (confirmCallback) {
+            confirmCallback();
+            confirmCallback = null;
+        }
+        const modalElement = document.getElementById('confirmModal');
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+            modal.hide();
+        }
+    }
+
+    // Check admin access
+    async function checkAdminAccess() {
+        const token = localStorage.getItem('access_token');
+        const userData = localStorage.getItem('user');
+
+        if (!token || !userData) {
+            window.location.href = '/login';
+            return false;
+        }
+
+        const user = JSON.parse(userData);
+
+        // Settings page is now accessible to all authenticated users
+        // Admin-only tabs will be hidden via CSS for non-admin users
+        return true;
+    }
+
+    // Check if user is admin
+    function isUserAdmin() {
+        const userData = localStorage.getItem('user');
+        if (!userData) return false;
+        const user = JSON.parse(userData);
+        return user.role === 'ADMIN' || user.role === 'admin';
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async function() {
+        const hasAccess = await checkAdminAccess();
+        if (!hasAccess) return;
+
+        userModal = new bootstrap.Modal(document.getElementById('userModal'));
+        locationModal = new bootstrap.Modal(document.getElementById('locationModal'));
+        categoryModal = new bootstrap.Modal(document.getElementById('categoryModal'));
+        roleModal = new bootstrap.Modal(document.getElementById('roleModal'));
+
+        await loadUsers();
+        await loadLocations();
+        await loadCategories();
+        await loadRoles();
+        await loadAuditLogs();
+
+        // Setup search listeners
+        document.getElementById('userSearch')?.addEventListener('input', filterUsers);
+        document.getElementById('locationSearch')?.addEventListener('input', filterLocations);
+        document.getElementById('categorySearch')?.addEventListener('input', filterCategories);
+        document.getElementById('roleSearch')?.addEventListener('input', filterRoles);
+    });
+
+    // API helper
+    async function apiRequest(url, options = {}) {
+        const token = localStorage.getItem('access_token');
+        const defaultOptions = {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        const response = await fetch(url, { ...defaultOptions, ...options });
+
+        if (response.status === 401) {
+            localStorage.clear();
+            window.location.href = '/login';
+            throw new Error('Unauthorized');
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Request failed');
+        }
+
+        return response.json();
+    }
+
+    // ========== USERS ==========
+    async function loadUsers() {
+        try {
+            users = await apiRequest('/api/users/');
+            displayUsers();
+        } catch (error) {
+            console.error('Error loading users:', error);
+            showAlert('Error loading users: ' + error.message, 'danger');
+        }
+    }
+
+    function displayUsers(filteredUsers = null) {
+        const tbody = document.getElementById('usersTableBody');
+        const displayList = filteredUsers || users;
+
+        if (displayList.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No users found</td></tr>';
+            return;
+        }
+
+        const currentUser = JSON.parse(localStorage.getItem('user'));
+
+        tbody.innerHTML = displayList.map(user => {
+            // Find role details from roles array
+            const roleDetails = roles.find(r => r.name === user.role);
+            const roleName = roleDetails ? roleDetails.name : user.role;
+
+            // Badge color based on role name
+            const badgeClass = roleName === 'Admin' ? 'bg-danger' :
+                              roleName === 'Manager' ? 'bg-warning text-dark' :
+                              roleName === 'Staff' ? 'bg-info' : 'bg-secondary';
+
+            const roleBadge = `<span class="badge ${badgeClass}">${roleName}</span>`;
+
+            const isSelf = currentUser.id === user.id;
+            const locationAccess = roleName === 'Admin' ? 'All locations' :
+                                  roleName === 'Manager' ? 'Multiple locations' :
+                                  'Single location';
+
+            return `
+                <tr>
+                    <td>${user.full_name}</td>
+                    <td>${user.email}</td>
+                    <td>${locationAccess}</td>
+                    <td>${roleBadge}</td>
+                    <td class="text-end">
+                        ${!isSelf ? `
+                            <button class="btn btn-sm btn-link p-0 me-2" onclick="editUser(${user.id})" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-sm btn-link p-0 text-danger" onclick="deleteUser(${user.id})" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        ` : '<span class="text-muted small">Current user</span>'}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function filterUsers() {
+        const search = document.getElementById('userSearch').value.toLowerCase();
+        const filtered = users.filter(u =>
+            u.full_name.toLowerCase().includes(search) ||
+            u.email.toLowerCase().includes(search) ||
+            u.username.toLowerCase().includes(search)
+        );
+        displayUsers(filtered);
+    }
+
+    function clearUserSearch() {
+        document.getElementById('userSearch').value = '';
+        displayUsers();
+    }
+
+    function showCreateUserModal() {
+        currentEditUserId = null;
+        document.getElementById('userModalTitle').textContent = 'Invite New User';
+        document.getElementById('userForm').reset();
+        document.getElementById('passwordRequired').style.display = 'inline';
+        document.getElementById('passwordHint').style.display = 'none';
+        document.getElementById('username').disabled = false;
+        populateRoleSelect();
+        userModal.show();
+    }
+
+    function populateRoleSelect() {
+        const roleSelect = document.getElementById('role');
+        roleSelect.innerHTML = '<option value="">Select role...</option>' +
+            roles.map(role => `<option value="${role.name}">${role.name}</option>`).join('');
+    }
+
+    function editUser(userId) {
+        const user = users.find(u => u.id === userId);
+        if (!user) return;
+
+        currentEditUserId = userId;
+        document.getElementById('userModalTitle').textContent = 'Edit User';
+        document.getElementById('username').value = user.username;
+        document.getElementById('username').disabled = true; // Can't change username
+        document.getElementById('email').value = user.email;
+        document.getElementById('fullName').value = user.full_name;
+        document.getElementById('password').value = '';
+        populateRoleSelect();
+        document.getElementById('role').value = user.role;
+        document.getElementById('passwordRequired').style.display = 'none';
+        document.getElementById('passwordHint').style.display = 'block';
+        userModal.show();
+    }
+
+    async function saveUser() {
+        const username = document.getElementById('username').value;
+        const email = document.getElementById('email').value;
+        const fullName = document.getElementById('fullName').value;
+        const password = document.getElementById('password').value;
+        const role = document.getElementById('role').value;
+
+        if (!username || !email || !fullName || !role) {
+            showAlert('Please fill in all required fields', 'warning');
+            return;
+        }
+
+        if (!currentEditUserId && !password) {
+            showAlert('Password is required for new users', 'warning');
+            return;
+        }
+
+        try {
+            if (currentEditUserId) {
+                // Update existing user
+                const updateData = { email, full_name: fullName, role };
+                if (password) {
+                    updateData.password = password;
+                }
+                await apiRequest(`/api/users/${currentEditUserId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(updateData)
+                });
+                showAlert('User updated successfully!', 'success');
+            } else {
+                // Create new user
+                await apiRequest('/api/users/', {
+                    method: 'POST',
+                    body: JSON.stringify({ username, email, full_name: fullName, password, role })
+                });
+                showAlert('User created successfully!', 'success');
+            }
+
+            userModal.hide();
+            await loadUsers();
+        } catch (error) {
+            showAlert('Error saving user: ' + error.message, 'danger');
+        }
+    }
+
+    async function deleteUser(userId) {
+        showConfirmation(
+            'Delete User',
+            'Are you sure you want to delete this user?',
+            async () => {
+                try {
+                    await apiRequest(`/api/users/${userId}`, { method: 'DELETE' });
+                    showAlert('User deleted successfully!', 'success');
+                    await loadUsers();
+                } catch (error) {
+                    showAlert('Error deleting user: ' + error.message, 'danger');
+                }
+            }
+        );
+    }
+
+    // ========== ROLES ==========
+    async function loadRoles() {
+        try {
+            const response = await apiRequest('/api/roles/');
+            roles = Array.isArray(response) ? response : [];
+            displayRoles();
+        } catch (error) {
+            console.error('Error loading roles:', error);
+            showAlert('Error loading roles', 'danger');
+        }
+    }
+
+    function displayRoles() {
+        const tbody = document.getElementById('rolesTableBody');
+        const searchTerm = document.getElementById('roleSearch')?.value.toLowerCase() || '';
+
+        const filtered = roles.filter(role =>
+            role.name.toLowerCase().includes(searchTerm) ||
+            (role.description && role.description.toLowerCase().includes(searchTerm))
+        );
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No roles found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(role => {
+            const permissionCount = Object.keys(role.permissions || {}).filter(k => role.permissions[k]).length;
+            const roleType = role.is_system ? '<span class="badge bg-secondary">System</span>' : '<span class="badge bg-primary">Custom</span>';
+
+            return `
+                <tr>
+                    <td><strong>${role.name}</strong></td>
+                    <td>${role.description || '-'}</td>
+                    <td><span class="badge bg-info">${permissionCount} permissions</span></td>
+                    <td>${roleType}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="editRole(${role.id})">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        ${!role.is_system ? `
+                        <button class="btn btn-sm btn-danger" onclick="deleteRole(${role.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        ` : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function filterRoles() {
+        displayRoles();
+    }
+
+    function clearRoleSearch() {
+        document.getElementById('roleSearch').value = '';
+        displayRoles();
+    }
+
+    function showCreateRoleModal() {
+        currentEditRoleId = null;
+        document.getElementById('roleModalTitle').textContent = 'Add Role';
+        document.getElementById('roleForm').reset();
+
+        // Clear all permission checkboxes and enable them
+        document.querySelectorAll('[id^="perm_"]').forEach(cb => {
+            cb.checked = false;
+            cb.disabled = false;
+        });
+
+        // Enable form fields
+        document.getElementById('roleName').disabled = false;
+        document.getElementById('roleDescription').disabled = false;
+
+        // Show save button
+        const saveButton = document.getElementById('saveRoleBtn');
+        if (saveButton) {
+            saveButton.style.display = 'inline-block';
+        }
+
+        roleModal.show();
+    }
+
+    async function editRole(id) {
+        currentEditRoleId = id;
+        const role = roles.find(r => r.id === id);
+        if (!role) return;
+
+        document.getElementById('roleModalTitle').textContent = role.is_system ? 'Edit System Role' : 'Edit Role';
+        document.getElementById('roleName').value = role.name;
+        document.getElementById('roleDescription').value = role.description || '';
+
+        // Set permission checkboxes - allow editing for all roles
+        document.querySelectorAll('[id^="perm_"]').forEach(cb => {
+            const permKey = cb.id.replace('perm_', '');
+            cb.checked = role.permissions && role.permissions[permKey] === true;
+            cb.disabled = false; // Enable permissions editing for all roles
+        });
+
+        // For system roles, disable name editing but allow description and permissions
+        document.getElementById('roleName').disabled = role.is_system;
+        document.getElementById('roleDescription').disabled = false;
+
+        // Always show save button
+        const saveButton = document.getElementById('saveRoleBtn');
+        if (saveButton) {
+            saveButton.style.display = 'inline-block';
+        }
+
+        roleModal.show();
+    }
+
+    async function saveRole() {
+        const name = document.getElementById('roleName').value.trim();
+        const description = document.getElementById('roleDescription').value.trim();
+
+        if (!name) {
+            showAlert('Please enter a role name', 'warning');
+            return;
+        }
+
+        // Collect permissions
+        const permissions = {};
+        document.querySelectorAll('[id^="perm_"]').forEach(cb => {
+            const permKey = cb.id.replace('perm_', '');
+            permissions[permKey] = cb.checked;
+        });
+
+        const roleData = { name, description, permissions };
+
+        try {
+            if (currentEditRoleId) {
+                await apiRequest(`/api/roles/${currentEditRoleId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(roleData)
+                });
+                showAlert('Role updated successfully', 'success');
+            } else {
+                await apiRequest('/api/roles/', {
+                    method: 'POST',
+                    body: JSON.stringify(roleData)
+                });
+                showAlert('Role created successfully', 'success');
+            }
+
+            roleModal.hide();
+            await loadRoles();
+
+            // Re-enable fields
+            document.getElementById('roleName').disabled = false;
+            document.getElementById('roleDescription').disabled = false;
+            document.querySelectorAll('[id^="perm_"]').forEach(cb => cb.disabled = false);
+        } catch (error) {
+            showAlert(error.message || 'Error saving role', 'danger');
+        }
+    }
+
+    async function deleteRole(id) {
+        const role = roles.find(r => r.id === id);
+        if (!role) return;
+
+        showConfirmation(
+            'Delete Role',
+            `Are you sure you want to delete the role "${role.name}"? This cannot be undone.`,
+            async () => {
+                try {
+                    await apiRequest(`/api/roles/${id}`, { method: 'DELETE' });
+                    showAlert('Role deleted successfully', 'success');
+                    await loadRoles();
+                } catch (error) {
+                    showAlert(error.message || 'Error deleting role', 'danger');
+                }
+            }
+        );
+    }
+
+    // ========== LOCATIONS ==========
+    async function loadLocations() {
+        try {
+            const response = await apiRequest('/api/locations/');
+            locations = Array.isArray(response) ? response : [];
+            displayLocations();
+        } catch (error) {
+            console.error('Error loading locations:', error);
+            showAlert('Error loading locations: ' + error.message, 'danger');
+        }
+    }
+
+    function displayLocations(filteredLocations = null) {
+        const tbody = document.getElementById('locationsTableBody');
+        const displayList = filteredLocations || locations;
+
+        if (displayList.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No locations found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = displayList.map(location => {
+            const statusBadge = location.is_active
+                ? '<span class="badge bg-success">Active</span>'
+                : '<span class="badge bg-secondary">Inactive</span>';
+
+            return `
+                <tr>
+                    <td>${location.name}</td>
+                    <td>${location.address || '-'}</td>
+                    <td>${location.location_type || '-'}</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-link p-0 me-2" onclick="editLocation(${location.id})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-link p-0 text-danger" onclick="deleteLocation(${location.id})" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function filterLocations() {
+        const search = document.getElementById('locationSearch').value.toLowerCase();
+        const filtered = locations.filter(l =>
+            l.name.toLowerCase().includes(search) ||
+            (l.address && l.address.toLowerCase().includes(search))
+        );
+        displayLocations(filtered);
+    }
+
+    function clearLocationSearch() {
+        document.getElementById('locationSearch').value = '';
+        displayLocations();
+    }
+
+    function showCreateLocationModal() {
+        currentEditLocationId = null;
+        document.getElementById('locationModalTitle').textContent = 'Add Location';
+        document.getElementById('locationForm').reset();
+        locationModal.show();
+    }
+
+    function editLocation(locationId) {
+        const location = locations.find(l => l.id === locationId);
+        if (!location) return;
+
+        currentEditLocationId = locationId;
+        document.getElementById('locationModalTitle').textContent = 'Edit Location';
+        document.getElementById('locationName').value = location.name;
+        document.getElementById('locationAddress').value = location.address || '';
+        document.getElementById('locationType').value = location.location_type || '';
+        locationModal.show();
+    }
+
+    async function saveLocation() {
+        const name = document.getElementById('locationName').value;
+        const address = document.getElementById('locationAddress').value;
+        const location_type = document.getElementById('locationType').value;
+
+        if (!name || !location_type) {
+            showAlert('Please fill in all required fields', 'warning');
+            return;
+        }
+
+        try {
+            if (currentEditLocationId) {
+                // Update existing location
+                await apiRequest(`/api/locations/${currentEditLocationId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ name, address, location_type })
+                });
+                showAlert('Location updated successfully!', 'success');
+            } else {
+                // Create new location
+                await apiRequest('/api/locations/', {
+                    method: 'POST',
+                    body: JSON.stringify({ name, address, location_type })
+                });
+                showAlert('Location created successfully!', 'success');
+            }
+
+            locationModal.hide();
+            await loadLocations();
+        } catch (error) {
+            showAlert('Error saving location: ' + error.message, 'danger');
+        }
+    }
+
+    async function deleteLocation(locationId) {
+        showConfirmation(
+            'Delete Location',
+            'Are you sure you want to delete this location?',
+            async () => {
+                try {
+                    await apiRequest(`/api/locations/${locationId}`, { method: 'DELETE' });
+                    showAlert('Location deleted successfully!', 'success');
+                    await loadLocations();
+                } catch (error) {
+                    showAlert('Error deleting location: ' + error.message, 'danger');
+                }
+            }
+        );
+    }
+
+    // ========== VENDORS ==========
+    let vendors = [];
+    let currentVendorId = null;
+
+    async function loadVendors() {
+        try {
+            vendors = await apiRequest('/api/vendors/?active_only=false');
+            displayVendors();
+        } catch (error) {
+            console.error('Error loading vendors:', error);
+            showAlert('Error loading vendors: ' + error.message, 'danger');
+        }
+    }
+
+    function displayVendors() {
+        const tbody = document.getElementById('vendorsTableBody');
+        const searchTerm = (document.getElementById('vendorSearch')?.value || '').toLowerCase();
+
+        const filteredVendors = vendors.filter(v =>
+            v.name.toLowerCase().includes(searchTerm) ||
+            (v.contact_name && v.contact_name.toLowerCase().includes(searchTerm)) ||
+            (v.email && v.email.toLowerCase().includes(searchTerm))
+        );
+
+        if (filteredVendors.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No vendors found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = filteredVendors.map(vendor => `
+            <tr>
+                <td><strong>${vendor.name}</strong></td>
+                <td>${vendor.contact_name || '-'}</td>
+                <td>${vendor.email || '-'}</td>
+                <td>${vendor.phone || '-'}</td>
+                <td>
+                    <span class="badge ${vendor.is_active ? 'bg-success' : 'bg-secondary'}">
+                        ${vendor.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="editVendor(${vendor.id})" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteVendor(${vendor.id}, '${vendor.name.replace(/'/g, "\\'")}'))" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function showVendorModal(vendorId = null) {
+        currentVendorId = vendorId;
+        const modal = new bootstrap.Modal(document.getElementById('vendorModal'));
+        const title = document.getElementById('vendorModalTitle');
+
+        if (vendorId) {
+            title.textContent = 'Edit Vendor';
+            const vendor = vendors.find(v => v.id === vendorId);
+            if (vendor) {
+                document.getElementById('vendorName').value = vendor.name;
+                document.getElementById('vendorContactName').value = vendor.contact_name || '';
+                document.getElementById('vendorEmail').value = vendor.email || '';
+                document.getElementById('vendorPhone').value = vendor.phone || '';
+                document.getElementById('vendorAddress').value = vendor.address || '';
+                document.getElementById('vendorNotes').value = vendor.notes || '';
+                document.getElementById('vendorIsActive').checked = vendor.is_active;
+            }
+        } else {
+            title.textContent = 'Add Vendor';
+            document.getElementById('vendorForm').reset();
+            document.getElementById('vendorIsActive').checked = true;
+        }
+
+        modal.show();
+    }
+
+    function editVendor(id) {
+        showVendorModal(id);
+    }
+
+    async function saveVendor() {
+        const name = document.getElementById('vendorName').value.trim();
+        if (!name) {
+            showAlert('Vendor name is required', 'warning');
+            return;
+        }
+
+        const vendorData = {
+            name: name,
+            contact_name: document.getElementById('vendorContactName').value.trim() || null,
+            email: document.getElementById('vendorEmail').value.trim() || null,
+            phone: document.getElementById('vendorPhone').value.trim() || null,
+            address: document.getElementById('vendorAddress').value.trim() || null,
+            notes: document.getElementById('vendorNotes').value.trim() || null,
+            is_active: document.getElementById('vendorIsActive').checked
+        };
+
+        try {
+            if (currentVendorId) {
+                await apiRequest(`/api/vendors/${currentVendorId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(vendorData)
+                });
+                showAlert('Vendor updated successfully', 'success');
+            } else {
+                await apiRequest('/api/vendors/', {
+                    method: 'POST',
+                    body: JSON.stringify(vendorData)
+                });
+                showAlert('Vendor created successfully', 'success');
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('vendorModal')).hide();
+            await loadVendors();
+        } catch (error) {
+            console.error('Error saving vendor:', error);
+            showAlert('Error saving vendor: ' + error.message, 'danger');
+        }
+    }
+
+    async function deleteVendor(id, name) {
+        showConfirmation(
+            'Delete Vendor',
+            `Are you sure you want to delete vendor "${name}"?`,
+            async () => {
+                try {
+                    await apiRequest(`/api/vendors/${id}`, { method: 'DELETE' });
+                    showAlert('Vendor deleted successfully', 'success');
+                    await loadVendors();
+                } catch (error) {
+                    console.error('Error deleting vendor:', error);
+                    showAlert('Error deleting vendor: ' + error.message, 'danger');
+                }
+            }
+        );
+    }
+
+    function clearVendorSearch() {
+        document.getElementById('vendorSearch').value = '';
+        displayVendors();
+    }
+
+    // ========== VENDOR ITEMS ==========
+    let vendorItems = [];
+    let currentEditVendorItemId = null;
+    let vendorItemModal = null;
+
+    async function loadVendorItems() {
+        try {
+            const vendorFilter = document.getElementById('vendorItemFilterVendor').value;
+            const masterFilter = document.getElementById('vendorItemFilterMaster').value;
+
+            let url = '/api/vendor-items/';
+            const params = new URLSearchParams();
+            if (vendorFilter) params.append('vendor_id', vendorFilter);
+            if (masterFilter) params.append('master_item_id', masterFilter);
+            if (params.toString()) url += `?${params.toString()}`;
+
+            const response = await apiRequest(url);
+            vendorItems = Array.isArray(response) ? response : [];
+            displayVendorItems();
+        } catch (error) {
+            console.error('Error loading vendor items:', error);
+            showAlert('Failed to load vendor items', 'danger');
+        }
+    }
+
+    function displayVendorItems() {
+        const tbody = document.getElementById('vendorItemsTableBody');
+
+        if (!vendorItems || vendorItems.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center">No vendor items found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = vendorItems.map(vi => {
+            const costPerMaster = vi.unit_price && vi.conversion_factor ?
+                (vi.unit_price / vi.conversion_factor).toFixed(2) : '-';
+            const statusBadge = vi.is_active ?
+                '<span class="badge bg-success">Active</span>' :
+                '<span class="badge bg-secondary">Inactive</span>';
+            const preferredBadge = vi.is_preferred ?
+                '<span class="badge bg-primary ms-1">Preferred</span>' : '';
+
+            return `
+                <tr>
+                    <td>${vi.vendor_name || '-'}</td>
+                    <td>${vi.master_item_name || '-'}</td>
+                    <td>${vi.vendor_sku || '-'}</td>
+                    <td>${vi.vendor_product_name}</td>
+                    <td>${vi.purchase_unit_name || '-'} ${vi.pack_size ? `(${vi.pack_size})` : ''}</td>
+                    <td>${vi.conversion_factor} ${vi.purchase_unit_abbr || ''} = 1 master unit</td>
+                    <td>${vi.unit_price ? '$' + parseFloat(vi.unit_price).toFixed(2) : '-'}</td>
+                    <td>${costPerMaster !== '-' ? '$' + costPerMaster : '-'}</td>
+                    <td>${statusBadge}${preferredBadge}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="editVendorItem(${vi.id})">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteVendorItem(${vi.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async function showVendorItemModal(vendorItemId = null) {
+        currentEditVendorItemId = vendorItemId;
+
+        // Load dropdowns
+        await Promise.all([
+            loadVendorItemDropdowns(),
+            loadUnitsOfMeasure()
+        ]);
+
+        if (vendorItemId) {
+            document.getElementById('vendorItemModalTitle').textContent = 'Edit Vendor Item';
+            const vendorItem = vendorItems.find(vi => vi.id === vendorItemId);
+            if (vendorItem) {
+                document.getElementById('viVendorId').value = vendorItem.vendor_id;
+                document.getElementById('viMasterItemId').value = vendorItem.master_item_id;
+                document.getElementById('viVendorSku').value = vendorItem.vendor_sku || '';
+                document.getElementById('viVendorProductName').value = vendorItem.vendor_product_name;
+                document.getElementById('viPurchaseUnitId').value = vendorItem.purchase_unit_id;
+                document.getElementById('viUnitPrice').value = vendorItem.unit_price || '';
+                document.getElementById('viMinOrderQty').value = vendorItem.minimum_order_quantity || '';
+                document.getElementById('viLeadTimeDays').value = vendorItem.lead_time_days || '';
+                document.getElementById('viIsPreferred').checked = vendorItem.is_preferred;
+                document.getElementById('viNotes').value = vendorItem.notes || '';
+            }
+        } else {
+            document.getElementById('vendorItemModalTitle').textContent = 'Add Vendor Item';
+            document.getElementById('vendorItemForm').reset();
+        }
+
+        if (!vendorItemModal) {
+            vendorItemModal = new bootstrap.Modal(document.getElementById('vendorItemModal'));
+        }
+        vendorItemModal.show();
+    }
+
+    async function loadVendorItemDropdowns() {
+        // Load vendors
+        const vendorsResp = await apiRequest('/api/vendors/');
+        const vendorSelect = document.getElementById('viVendorId');
+        const vendorFilter = document.getElementById('vendorItemFilterVendor');
+
+        vendorSelect.innerHTML = '<option value="">Select vendor...</option>';
+        vendorFilter.innerHTML = '<option value="">All Vendors</option>';
+
+        if (Array.isArray(vendorsResp)) {
+            vendorsResp.forEach(v => {
+                vendorSelect.innerHTML += `<option value="${v.id}">${v.name}</option>`;
+                vendorFilter.innerHTML += `<option value="${v.id}">${v.name}</option>`;
+            });
+        }
+
+        // Load master items
+        const itemsResp = await apiRequest('/api/items/');
+        const itemSelect = document.getElementById('viMasterItemId');
+        const itemFilter = document.getElementById('vendorItemFilterMaster');
+
+        itemSelect.innerHTML = '<option value="">Select master item...</option>';
+        itemFilter.innerHTML = '<option value="">All Master Items</option>';
+
+        if (Array.isArray(itemsResp)) {
+            itemsResp.forEach(item => {
+                itemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+                itemFilter.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+            });
+        }
+
+        // Load units
+        const unitsResp = await apiRequest('/api/units/');
+        const unitSelect = document.getElementById('viPurchaseUnitId');
+        unitSelect.innerHTML = '<option value="">Select unit...</option>';
+
+        if (Array.isArray(unitsResp)) {
+            unitsResp.forEach(u => {
+                unitSelect.innerHTML += `<option value="${u.id}">${u.name} (${u.abbreviation})</option>`;
+            });
+        }
+    }
+
+
+    async function saveVendorItem() {
+        const vendorId = document.getElementById('viVendorId').value;
+        const masterItemId = document.getElementById('viMasterItemId').value;
+        const vendorProductName = document.getElementById('viVendorProductName').value;
+        const purchaseUnitId = document.getElementById('viPurchaseUnitId').value;
+
+        if (!vendorId || !masterItemId || !vendorProductName || !purchaseUnitId) {
+            showAlert('Please fill in all required fields', 'warning');
+            return;
+        }
+
+        const data = {
+            vendor_id: parseInt(vendorId),
+            master_item_id: parseInt(masterItemId),
+            vendor_sku: document.getElementById('viVendorSku').value || null,
+            vendor_product_name: vendorProductName,
+            purchase_unit_id: parseInt(purchaseUnitId),
+            conversion_factor: 1.0,  // Default value - conversion is built into the UOM
+            minimum_order_quantity: document.getElementById('viMinOrderQty').value ? parseFloat(document.getElementById('viMinOrderQty').value) : null,
+            lead_time_days: document.getElementById('viLeadTimeDays').value ? parseInt(document.getElementById('viLeadTimeDays').value) : null,
+            is_preferred: document.getElementById('viIsPreferred').checked,
+            notes: document.getElementById('viNotes').value || null,
+            is_active: true
+        };
+
+        try {
+            if (currentEditVendorItemId) {
+                await apiRequest(`/api/vendor-items/${currentEditVendorItemId}`, 'PUT', data);
+                showAlert('Vendor item updated successfully', 'success');
+            } else {
+                await apiRequest('/api/vendor-items/', 'POST', data);
+                showAlert('Vendor item created successfully', 'success');
+            }
+
+            vendorItemModal.hide();
+            loadVendorItems();
+        } catch (error) {
+            console.error('Error saving vendor item:', error);
+            showAlert('Failed to save vendor item', 'danger');
+        }
+    }
+
+    async function editVendorItem(vendorItemId) {
+        await showVendorItemModal(vendorItemId);
+    }
+
+    async function deleteVendorItem(vendorItemId) {
+        const vendorItem = vendorItems.find(vi => vi.id === vendorItemId);
+        if (!vendorItem) return;
+
+        showConfirmation(
+            'Delete Vendor Item',
+            `Are you sure you want to delete vendor item "${vendorItem.vendor_product_name}"?`,
+            async () => {
+                try {
+                    await apiRequest(`/api/vendor-items/${vendorItemId}`, 'DELETE');
+                    showAlert('Vendor item deleted successfully', 'success');
+                    loadVendorItems();
+                } catch (error) {
+                    console.error('Error deleting vendor item:', error);
+                    showAlert('Failed to delete vendor item', 'danger');
+                }
+            }
+        );
+    }
+
+    // ========== CATEGORIES ==========
+    async function loadCategories() {
+        try {
+            const response = await apiRequest('/api/categories/');
+            categories = Array.isArray(response) ? response : [];
+            displayCategories();
+        } catch (error) {
+            console.error('Error loading categories:', error);
+            showAlert('Error loading categories: ' + error.message, 'danger');
+        }
+    }
+
+    function displayCategories() {
+        const tbody = document.getElementById('categoriesTableBody');
+
+        if (categories.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No categories found</td></tr>';
+            return;
+        }
+
+        const filteredCategories = filterCategoriesList();
+
+        tbody.innerHTML = filteredCategories.map(cat => `
+            <tr>
+                <td><strong>${cat.name}</strong></td>
+                <td>${cat.description || '-'}</td>
+                <td>${cat.display_order}</td>
+                <td>
+                    <span class="badge ${cat.is_active ? 'bg-success' : 'bg-secondary'}">
+                        ${cat.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="editCategory(${cat.id})" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteCategory(${cat.id})" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function filterCategoriesList() {
+        const searchTerm = document.getElementById('categorySearch').value.toLowerCase();
+        return categories.filter(cat =>
+            cat.name.toLowerCase().includes(searchTerm) ||
+            (cat.description && cat.description.toLowerCase().includes(searchTerm))
+        );
+    }
+
+    function filterCategories() {
+        displayCategories();
+    }
+
+    function clearCategorySearch() {
+        document.getElementById('categorySearch').value = '';
+        displayCategories();
+    }
+
+    function showCreateCategoryModal() {
+        currentEditCategoryId = null;
+        document.getElementById('categoryModalTitle').textContent = 'Add Category';
+        document.getElementById('categoryForm').reset();
+        categoryModal.show();
+    }
+
+    function editCategory(id) {
+        const category = categories.find(c => c.id === id);
+        if (!category) return;
+
+        currentEditCategoryId = id;
+        document.getElementById('categoryModalTitle').textContent = 'Edit Category';
+        document.getElementById('categoryName').value = category.name;
+        document.getElementById('categoryDescription').value = category.description || '';
+        document.getElementById('categoryOrder').value = category.display_order;
+        categoryModal.show();
+    }
+
+    async function saveCategory() {
+        const name = document.getElementById('categoryName').value.trim();
+        const description = document.getElementById('categoryDescription').value.trim();
+        const display_order = parseInt(document.getElementById('categoryOrder').value);
+
+        if (!name) {
+            showAlert('Please enter a category name', 'warning');
+            return;
+        }
+
+        const categoryData = {
+            name,
+            description,
+            display_order
+        };
+
+        try {
+            if (currentEditCategoryId) {
+                await apiRequest(`/api/categories/${currentEditCategoryId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(categoryData)
+                });
+                showAlert('Category updated successfully', 'success');
+            } else {
+                await apiRequest('/api/categories/', {
+                    method: 'POST',
+                    body: JSON.stringify(categoryData)
+                });
+                showAlert('Category created successfully', 'success');
+            }
+
+            categoryModal.hide();
+            await loadCategories();
+        } catch (error) {
+            showAlert('Error saving category: ' + error.message, 'danger');
+        }
+    }
+
+    async function deleteCategory(id) {
+        showConfirmation(
+            'Delete Category',
+            'Are you sure you want to delete this category?',
+            async () => {
+                try {
+                    await apiRequest(`/api/categories/${id}`, {
+                        method: 'DELETE'
+                    });
+                    showAlert('Category deleted successfully', 'success');
+                    await loadCategories();
+                } catch (error) {
+                    showAlert('Error deleting category: ' + error.message, 'danger');
+                }
+            }
+        );
+    }
+
+    // ========== ITEMS ==========
+    async function loadItems() {
+        try {
+            const response = await apiRequest('/api/items/');
+            items = Array.isArray(response) ? response : [];
+            displayItems();
+        } catch (error) {
+            console.error('Error loading items:', error);
+            showAlert('Error loading items: ' + error.message, 'danger');
+        }
+    }
+
+    function displayItems(filteredItems = null) {
+        const tbody = document.getElementById('itemsTableBody');
+        const displayList = filteredItems || items;
+
+        if (displayList.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center">No items found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = displayList.map(item => {
+            const statusBadge = item.is_active
+                ? '<span class="badge bg-success">Active</span>'
+                : '<span class="badge bg-secondary">Inactive</span>';
+
+            const cost = item.current_cost ? `$${parseFloat(item.current_cost).toFixed(2)}` : '-';
+            const parLevel = item.par_level ? parseFloat(item.par_level).toFixed(2) : '-';
+
+            return `
+                <tr>
+                    <td>${item.name}</td>
+                    <td>${item.category || '-'}</td>
+                    <td>${item.unit_of_measure}</td>
+                    <td>${item.vendor || '-'}</td>
+                    <td>${parLevel}</td>
+                    <td>${item.sku || '-'}</td>
+                    <td>${cost}</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-link p-0 me-2" onclick="editItem(${item.id})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-link p-0 text-danger" onclick="deleteItem(${item.id})" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function filterItems() {
+        const search = document.getElementById('itemSearch').value.toLowerCase();
+        const filtered = items.filter(i =>
+            i.name.toLowerCase().includes(search) ||
+            (i.category && i.category.toLowerCase().includes(search)) ||
+            (i.sku && i.sku.toLowerCase().includes(search))
+        );
+        displayItems(filtered);
+    }
+
+    function clearItemSearch() {
+        document.getElementById('itemSearch').value = '';
+        displayItems();
+    }
+
+    // Unit conversion suggestions based on primary unit
+    const unitSuggestions = {
+        'bottle': ['case', 'box', 'pallet'],
+        'kg': ['g', 'lb', 'oz'],
+        'g': ['kg', 'lb', 'oz'],
+        'lb': ['oz', 'kg', 'g'],
+        'oz': ['lb', 'kg', 'g'],
+        'L': ['ml', 'gal', 'qt', 'pt'],
+        'ml': ['L', 'gal', 'qt', 'pt'],
+        'gal': ['qt', 'pt', 'L', 'ml'],
+        'unit': ['dozen', 'case', 'box'],
+        'case': ['pallet'],
+        'box': ['case', 'pallet']
+    };
+
+    function updateSecondaryUnitOptions() {
+        const primaryUnit = document.getElementById('itemUnit').value;
+        const secondarySelect = document.getElementById('itemSecondaryUnit');
+        const currentValue = secondarySelect.value;
+
+        // Clear and add default option
+        secondarySelect.innerHTML = '<option value="">None</option>';
+
+        // Add compatible units
+        const suggestions = unitSuggestions[primaryUnit] || ['case', 'box', 'pallet', 'dozen'];
+        suggestions.forEach(unit => {
+            const option = document.createElement('option');
+            option.value = unit;
+            option.textContent = unit.charAt(0).toUpperCase() + unit.slice(1);
+            secondarySelect.appendChild(option);
+        });
+
+        // Restore previous value if it still exists
+        if (currentValue && suggestions.includes(currentValue)) {
+            secondarySelect.value = currentValue;
+        }
+    }
+
+    let unitsOfMeasure = [];
+
+    async function loadUnitsOfMeasure() {
+        try {
+            const response = await apiRequest('/api/units/');
+            unitsOfMeasure = response;
+        } catch (error) {
+            console.error('Error loading units:', error);
+        }
+    }
+
+    function populateUnitDropdowns() {
+        const primarySelect = document.getElementById('itemUnitId');
+        const secondarySelect = document.getElementById('itemSecondaryUnitId');
+
+        if (!primarySelect || !secondarySelect) return;
+
+        // Populate primary unit dropdown with all units
+        primarySelect.innerHTML = '<option value="">Select unit...</option>';
+        unitsOfMeasure.forEach(unit => {
+            const option = document.createElement('option');
+            option.value = unit.id;
+            option.textContent = unit.name;
+            option.dataset.categoryId = unit.category_id;
+            primarySelect.appendChild(option);
+        });
+
+        // Update secondary units based on primary selection
+        updateSecondaryUnitsForCategory();
+    }
+
+    function updateSecondaryUnitsForCategory() {
+        const primarySelect = document.getElementById('itemUnitId');
+        const secondarySelect = document.getElementById('itemSecondaryUnitId');
+
+        if (!primarySelect || !secondarySelect) return;
+
+        const selectedPrimaryId = parseInt(primarySelect.value);
+        const selectedPrimaryUnit = unitsOfMeasure.find(u => u.id === selectedPrimaryId);
+
+        // Clear secondary dropdown
+        secondarySelect.innerHTML = '<option value="">None</option>';
+
+        if (!selectedPrimaryUnit) return;
+
+        // Populate secondary dropdown with units from same category
+        unitsOfMeasure
+            .filter(unit => unit.category_id === selectedPrimaryUnit.category_id)
+            .forEach(unit => {
+                const option = document.createElement('option');
+                option.value = unit.id;
+                option.textContent = unit.name;
+                secondarySelect.appendChild(option);
+            });
+    }
+
+    function showCreateItemModal() {
+        currentEditItemId = null;
+        document.getElementById('itemModalTitle').textContent = 'Add Master Item';
+        document.getElementById('itemForm').reset();
+        populateCategoryDropdown();
+        populateVendorDropdown();
+        populateUnitDropdowns();
+        itemModal.show();
+    }
+
+    function populateCategoryDropdown() {
+        const select = document.getElementById('itemCategory');
+        select.innerHTML = '<option value="">Select category...</option>' +
+            categories.filter(c => c.is_active).map(cat =>
+                `<option value="${cat.name}">${cat.name}</option>`
+            ).join('');
+    }
+
+    function populateVendorDropdown() {
+        const select = document.getElementById('itemVendor');
+        select.innerHTML = '<option value="">Select vendor...</option>' +
+            vendors.filter(v => v.is_active).map(vendor =>
+                `<option value="${vendor.id}">${vendor.name}</option>`
+            ).join('');
+    }
+
+    function editItem(itemId) {
+        const item = items.find(i => i.id === itemId);
+        if (!item) return;
+
+        currentEditItemId = itemId;
+        document.getElementById('itemModalTitle').textContent = 'Edit Master Item';
+        populateCategoryDropdown();
+        populateVendorDropdown();
+        populateUnitDropdowns();
+
+        document.getElementById('itemName').value = item.name;
+        document.getElementById('itemDescription').value = item.description || '';
+        document.getElementById('itemCategory').value = item.category || '';
+        document.getElementById('itemVendor').value = item.vendor_id || '';
+        document.getElementById('itemUnitId').value = item.unit_of_measure_id || '';
+        document.getElementById('itemSecondaryUnitId').value = item.secondary_unit_id || '';
+        document.getElementById('itemSku').value = item.sku || '';
+        document.getElementById('itemParLevel').value = item.par_level || '';
+        document.getElementById('itemCost').value = item.current_cost || '';
+        itemModal.show();
+    }
+
+    async function saveItem() {
+        const name = document.getElementById('itemName').value;
+        const description = document.getElementById('itemDescription').value;
+        const category = document.getElementById('itemCategory').value;
+        const unit_of_measure_id = document.getElementById('itemUnitId').value;
+        const secondary_unit_id = document.getElementById('itemSecondaryUnitId').value;
+        const sku = document.getElementById('itemSku').value;
+        const vendor = document.getElementById('itemVendor').value;
+        const par_level = document.getElementById('itemParLevel').value;
+        const current_cost = document.getElementById('itemCost').value;
+
+        if (!name || !category || !unit_of_measure_id) {
+            showAlert('Please fill in all required fields', 'warning');
+            return;
+        }
+
+        try {
+            const itemData = {
+                name, description, category,
+                unit_of_measure_id: unit_of_measure_id ? parseInt(unit_of_measure_id) : null,
+                secondary_unit_id: secondary_unit_id ? parseInt(secondary_unit_id) : null,
+                sku,
+                vendor_id: vendor ? parseInt(vendor) : null,
+                par_level: par_level ? parseFloat(par_level) : null,
+                current_cost: current_cost ? parseFloat(current_cost) : null
+            };
+
+            if (currentEditItemId) {
+                // Update existing item
+                await apiRequest(`/api/items/${currentEditItemId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(itemData)
+                });
+                showAlert('Item updated successfully!', 'success');
+            } else {
+                // Create new item
+                await apiRequest('/api/items/', {
+                    method: 'POST',
+                    body: JSON.stringify(itemData)
+                });
+                showAlert('Item created successfully!', 'success');
+            }
+
+            itemModal.hide();
+            await loadItems();
+        } catch (error) {
+            showAlert('Error saving item: ' + error.message, 'danger');
+        }
+    }
+
+    async function deleteItem(itemId) {
+        showConfirmation(
+            'Delete Item',
+            'Are you sure you want to delete this item?',
+            async () => {
+                try {
+                    await apiRequest(`/api/items/${itemId}`, { method: 'DELETE' });
+                    showAlert('Item deleted successfully!', 'success');
+                    await loadItems();
+                } catch (error) {
+                    showAlert('Error deleting item: ' + error.message, 'danger');
+                }
+            }
+        );
+    }
+
+    // ========== AUDIT LOG ==========
+    async function loadAuditLogs(page = 0) {
+        auditCurrentPage = page;
+        const skip = page * auditPageSize;
+
+        try {
+            const entityFilter = document.getElementById('auditEntityFilter').value;
+            const actionFilter = document.getElementById('auditActionFilter').value;
+
+            let url = `/api/audit-log/?skip=${skip}&limit=${auditPageSize}`;
+            if (entityFilter) url += `&entity_type=${entityFilter}`;
+            if (actionFilter) url += `&action=${actionFilter}`;
+
+            const response = await apiRequest(url);
+            auditLogs = Array.isArray(response) ? response : [];
+            displayAuditLogs();
+
+            // Update pagination
+            document.getElementById('auditPageNum').textContent = page + 1;
+            document.getElementById('auditPrevBtn').disabled = page === 0;
+            document.getElementById('auditNextBtn').disabled = auditLogs.length < auditPageSize;
+            document.getElementById('auditShowingCount').textContent = auditLogs.length;
+        } catch (error) {
+            console.error('Error loading audit logs:', error);
+            showAlert('Error loading audit logs: ' + error.message, 'danger');
+        }
+    }
+
+    function displayAuditLogs() {
+        const tbody = document.getElementById('auditTableBody');
+
+        if (auditLogs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No audit logs found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = auditLogs.map(log => {
+            const timestamp = new Date(log.timestamp).toLocaleString();
+            const actionBadge = {
+                'CREATE': '<span class="badge bg-success">CREATE</span>',
+                'UPDATE': '<span class="badge bg-primary">UPDATE</span>',
+                'DELETE': '<span class="badge bg-danger">DELETE</span>',
+                'LOGIN': '<span class="badge bg-info">LOGIN</span>',
+                'LOGOUT': '<span class="badge bg-secondary">LOGOUT</span>'
+            }[log.action] || `<span class="badge bg-secondary">${log.action}</span>`;
+
+            const changesPreview = log.changes ?
+                `<small class="text-muted">${JSON.stringify(log.changes).substring(0, 100)}...</small>` :
+                '<span class="text-muted">-</span>';
+
+            return `
+                <tr>
+                    <td><small>${timestamp}</small></td>
+                    <td><small>${log.username || 'System'}</small></td>
+                    <td>${actionBadge}</td>
+                    <td><span class="badge bg-secondary">${log.entity_type}</span></td>
+                    <td><small>${log.entity_id || '-'}</small></td>
+                    <td>${changesPreview}</td>
+                    <td><small class="text-muted">${log.ip_address || '-'}</small></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function filterAuditLogs() {
+        loadAuditLogs(0);
+    }
+
+    function clearAuditFilters() {
+        document.getElementById('auditEntityFilter').value = '';
+        document.getElementById('auditActionFilter').value = '';
+        loadAuditLogs(0);
+    }
+
+    // Show alert
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+        alertDiv.style.zIndex = '9999';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+
+        setTimeout(() => alertDiv.remove(), 5000);
+    }
+
+    // ==================== UNITS OF MEASURE ====================
+    let unitCategories = [];
+    let currentCategoryUnits = [];
+    let selectedCategoryId = null;
+
+    // Load unit categories
+    async function loadUnitCategories() {
+        try {
+            const response = await fetch('/api/units/categories', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+            });
+            unitCategories = await response.json();
+            displayUnitCategories();
+        } catch (error) {
+            console.error('Error loading unit categories:', error);
+            showAlert('Failed to load unit categories', 'danger');
+        }
+    }
+
+    // Display unit categories list
+    function displayUnitCategories() {
+        const list = document.getElementById('unitCategoriesList');
+        if (unitCategories.length === 0) {
+            list.innerHTML = '<div class="p-3 text-muted">No categories found</div>';
+            return;
+        }
+
+        list.innerHTML = unitCategories.map(cat => `
+            <a href="#" class="list-group-item list-group-item-action ${cat.id === selectedCategoryId ? 'active' : ''}"
+               onclick="selectCategory(${cat.id}); return false;">
+                <div class="d-flex w-100 justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-1">${cat.name}</h6>
+                        ${cat.description ? `<small>${cat.description}</small>` : ''}
+                    </div>
+                    <span class="badge bg-primary rounded-pill">${cat.units ? cat.units.length : 0}</span>
+                </div>
+            </a>
+        `).join('');
+    }
+
+    // Select a category to view its units
+    async function selectCategory(categoryId) {
+        selectedCategoryId = categoryId;
+        const category = unitCategories.find(c => c.id === categoryId);
+
+        document.getElementById('selectedCategoryName').textContent = category.name;
+        document.getElementById('selectedCategoryDesc').textContent = category.description || '';
+        document.getElementById('addUnitBtn').disabled = false;
+
+        displayUnitCategories(); // Refresh to show active state
+
+        await loadCategoryUnits(categoryId);
+    }
+
+    // Load units for a category
+    async function loadCategoryUnits(categoryId) {
+        try {
+            const response = await fetch(`/api/units/?category_id=${categoryId}`, {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+            });
+            currentCategoryUnits = await response.json();
+            displayCategoryUnits();
+            updateConversionSelects();
+        } catch (error) {
+            console.error('Error loading units:', error);
+            showAlert('Failed to load units', 'danger');
+        }
+    }
+
+    // Display units for selected category
+    function displayCategoryUnits() {
+        const container = document.getElementById('unitsListContainer');
+
+        if (currentCategoryUnits.length === 0) {
+            container.innerHTML = '<p class="text-muted">No units defined for this category. Click "Add Unit" to create one.</p>';
+            document.getElementById('conversionCard').style.display = 'none';
+            return;
+        }
+
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Unit Name</th>
+                            <th>Abbreviation</th>
+                            <th>Contains</th>
+                            <th>Reference Unit</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        currentCategoryUnits.forEach(unit => {
+            const containsText = unit.contains_quantity
+                ? parseFloat(unit.contains_quantity).toFixed(3)
+                : '-';
+            const referenceText = unit.reference_unit_name || '-';
+
+            html += `
+                <tr>
+                    <td>${unit.name}</td>
+                    <td><code>${unit.abbreviation}</code></td>
+                    <td>${containsText}</td>
+                    <td>${referenceText}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="editUnit(${unit.id})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteUnit(${unit.id})" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        container.innerHTML = html;
+        document.getElementById('conversionCard').style.display = currentCategoryUnits.length > 0 ? 'block' : 'none';
+    }
+
+    // Update conversion calculator selects
+    function updateConversionSelects() {
+        const fromSelect = document.getElementById('convertFromUnit');
+        const toSelect = document.getElementById('convertToUnit');
+
+        const options = currentCategoryUnits.map(u =>
+            `<option value="${u.id}">${u.name} (${u.abbreviation})</option>`
+        ).join('');
+
+        fromSelect.innerHTML = '<option value="">Select unit...</option>' + options;
+        toSelect.innerHTML = '<option value="">Select unit...</option>' + options;
+    }
+
+    // Convert units
+    async function convertUnits() {
+        const fromUnitId = parseInt(document.getElementById('convertFromUnit').value);
+        const toUnitId = parseInt(document.getElementById('convertToUnit').value);
+        const quantity = parseFloat(document.getElementById('convertQuantity').value);
+
+        if (!fromUnitId || !toUnitId || !quantity) {
+            showAlert('Please select both units and enter a quantity', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/units/convert', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    from_unit_id: fromUnitId,
+                    to_unit_id: toUnitId,
+                    quantity: quantity
+                })
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                document.getElementById('conversionResult').innerHTML = `
+                    <div class="alert alert-success">
+                        <strong>${result.input_quantity} ${result.from_unit}</strong> =
+                        <strong>${parseFloat(result.converted_quantity).toFixed(2)} ${result.to_unit}</strong>
+                    </div>
+                `;
+            } else {
+                const error = await response.json();
+                showAlert(error.detail || 'Conversion failed', 'danger');
+            }
+        } catch (error) {
+            console.error('Error converting units:', error);
+            showAlert('Failed to convert units', 'danger');
+        }
+    }
+
+    // Show add category modal
+    function showAddCategoryModal() {
+        // TODO: Implement modal
+        const name = prompt('Enter category name (e.g., Weight, Volume, Length):');
+        if (!name) return;
+
+        const description = prompt('Enter description (optional):');
+
+        createCategory(name, description);
+    }
+
+    // Create category
+    async function createCategory(name, description) {
+        try {
+            const response = await fetch('/api/units/categories', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: name,
+                    description: description || null
+                })
+            });
+
+            if (response.ok) {
+                showAlert('Category created successfully', 'success');
+                loadUnitCategories();
+            } else {
+                const error = await response.json();
+                showAlert(error.detail || 'Failed to create category', 'danger');
+            }
+        } catch (error) {
+            console.error('Error creating category:', error);
+            showAlert('Failed to create category', 'danger');
+        }
+    }
+
+    // Show add unit modal
+    function showAddUnitModal() {
+        if (!selectedCategoryId) return;
+
+        currentEditUnitId = null;
+        document.getElementById('unitEditModalTitle').textContent = 'Add Unit';
+        document.getElementById('editUnitName').value = '';
+        document.getElementById('editUnitAbbr').value = '';
+        document.getElementById('editReferenceUnit').value = '';
+        document.getElementById('editContainsQty').value = '';
+
+        // Populate reference unit dropdown
+        const referenceSelect = document.getElementById('editReferenceUnit');
+        referenceSelect.innerHTML = '<option value="">None (standalone unit)</option>';
+        currentCategoryUnits.forEach(unit => {
+            referenceSelect.innerHTML += `<option value="${unit.id}">${unit.name} (${unit.abbreviation})</option>`;
+        });
+
+        unitEditModal.show();
+    }
+
+    // Create unit (called from saveUnitEdit)
+    async function createUnit(name, abbreviation, referenceUnitId, containsQuantity) {
+        try {
+            const body = {
+                category_id: selectedCategoryId,
+                name: name,
+                abbreviation: abbreviation,
+                reference_unit_id: referenceUnitId || null,
+                contains_quantity: containsQuantity || null
+            };
+
+            console.log('Creating unit with body:', body);
+
+            const response = await fetch('/api/units/', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (response.ok) {
+                showAlert('Unit created successfully', 'success');
+                loadCategoryUnits(selectedCategoryId);
+                loadUnitCategories(); // Refresh counts
+            } else {
+                const errorText = await response.text();
+                console.error('Error response:', errorText);
+                try {
+                    const error = JSON.parse(errorText);
+                    const errorMsg = typeof error.detail === 'string' ? error.detail :
+                                    error.detail?.message ||
+                                    JSON.stringify(error.detail) ||
+                                    'Failed to create unit';
+                    showAlert(errorMsg, 'danger');
+                } catch {
+                    showAlert(`Failed to create unit: ${errorText}`, 'danger');
+                }
+            }
+        } catch (error) {
+            console.error('Error creating unit:', error);
+            showAlert(`Failed to create unit: ${error.message}`, 'danger');
+        }
+    }
+
+    // Edit unit
+    function editUnit(unitId) {
+        const unit = currentCategoryUnits.find(u => u.id === unitId);
+        if (!unit) return;
+
+        currentEditUnitId = unitId;
+        document.getElementById('unitEditModalTitle').textContent = 'Edit Unit';
+
+        // Populate form
+        document.getElementById('editUnitName').value = unit.name;
+        document.getElementById('editUnitAbbr').value = unit.abbreviation;
+        document.getElementById('editContainsQty').value = unit.contains_quantity || '';
+
+        // Populate reference unit dropdown
+        const referenceSelect = document.getElementById('editReferenceUnit');
+        referenceSelect.innerHTML = '<option value="">None (standalone unit)</option>';
+        currentCategoryUnits.forEach(u => {
+            if (u.id !== unitId) {  // Don't allow self-reference
+                const selected = unit.reference_unit_id === u.id ? 'selected' : '';
+                referenceSelect.innerHTML += `<option value="${u.id}" ${selected}>${u.name} (${u.abbreviation})</option>`;
+            }
+        });
+
+        unitEditModal.show();
+    }
+
+    function saveUnitEdit() {
+        const name = document.getElementById('editUnitName').value.trim();
+        const abbreviation = document.getElementById('editUnitAbbr').value.trim();
+        const referenceUnitId = document.getElementById('editReferenceUnit').value;
+        const containsQty = document.getElementById('editContainsQty').value;
+
+        if (!name || !abbreviation) {
+            showAlert('Please fill in name and abbreviation', 'warning');
+            return;
+        }
+
+        if (referenceUnitId && !containsQty) {
+            showAlert('Please specify contains quantity when selecting a reference unit', 'warning');
+            return;
+        }
+
+        if (currentEditUnitId) {
+            updateUnit(currentEditUnitId, name, abbreviation, referenceUnitId || null, containsQty ? parseFloat(containsQty) : null);
+        } else {
+            createUnit(name, abbreviation, referenceUnitId || null, containsQty ? parseFloat(containsQty) : null);
+        }
+        unitEditModal.hide();
+    }
+
+    // Update unit
+    async function updateUnit(unitId, name, abbreviation, referenceUnitId, containsQuantity) {
+        try {
+            const body = {
+                name: name,
+                abbreviation: abbreviation,
+                reference_unit_id: referenceUnitId,
+                contains_quantity: containsQuantity
+            };
+
+            const response = await fetch(`/api/units/${unitId}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(body)
+            });
+
+            if (response.ok) {
+                showAlert('Unit updated successfully', 'success');
+                loadCategoryUnits(selectedCategoryId);
+                loadUnitCategories();
+            } else {
+                const error = await response.json();
+                showAlert(error.detail || 'Failed to update unit', 'danger');
+            }
+        } catch (error) {
+            console.error('Error updating unit:', error);
+            showAlert('Failed to update unit', 'danger');
+        }
+    }
+
+    // Delete unit
+    async function deleteUnit(unitId) {
+        const unit = currentCategoryUnits.find(u => u.id === unitId);
+        if (!unit) return;
+
+        showConfirmation(
+            'Delete Unit',
+            `Are you sure you want to delete the unit "${unit.name}"?`,
+            async () => {
+                try {
+                    const response = await fetch(`/api/units/${unitId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+                    });
+
+                    if (response.ok) {
+                        showAlert('Unit deleted successfully', 'success');
+                        loadCategoryUnits(selectedCategoryId);
+                        loadUnitCategories(); // Refresh counts
+                    } else {
+                        const error = await response.json();
+                        showAlert(error.detail || 'Failed to delete unit', 'danger');
+                    }
+                } catch (error) {
+                    console.error('Error deleting unit:', error);
+                    showAlert('Failed to delete unit', 'danger');
+                }
+            }
+        );
+    }
+
+    // POS Integration Functions
+    function testPOSConnection() {
+        showAlert('POS connection testing is not yet implemented. This feature will be available in a future update.', 'info');
+    }
+
+    function savePOSSettings() {
+        showAlert('POS settings save is not yet implemented. This feature will be available in a future update.', 'info');
+    }
+
+    function syncPOSInventory() {
+        showAlert('POS inventory sync is not yet implemented. This feature will be available in a future update.', 'info');
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,75 @@
+/* Custom styles for Restaurant Inventory Management */
+
+body {
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    margin-bottom: 1rem;
+}
+
+.card-header {
+    border-radius: 10px 10px 0 0 !important;
+    font-weight: 600;
+}
+
+.btn {
+    border-radius: 5px;
+    font-weight: 500;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    background-color: #f8f9fa;
+}
+
+.badge {
+    font-size: 0.8em;
+}
+
+/* Loading spinner */
+.loading {
+    text-align: center;
+    padding: 2rem;
+}
+
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding: 0 15px;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+}
+
+/* Status badges */
+.status-active {
+    background-color: #198754 !important;
+}
+
+.status-inactive {
+    background-color: #6c757d !important;
+}
+
+.status-low-stock {
+    background-color: #fd7e14 !important;
+}
+
+.status-out-of-stock {
+    background-color: #dc3545 !important;
+}

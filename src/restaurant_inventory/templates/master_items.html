@@ -1,0 +1,520 @@
+{% extends "base.html" %}
+
+{% block title %}Master Items - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1 class="h2 mb-4">Master Items</h1>
+
+    <div class="alert alert-info mb-3">
+        <i class="bi bi-info-circle"></i> <strong>Master Items</strong> – Generic items for inventory counting. Link to vendor-specific products via Vendor Items.
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="input-group" style="max-width: 400px;">
+            <input type="text" class="form-control" id="itemSearch" placeholder="Search master items">
+            <button class="btn btn-outline-secondary" onclick="clearItemSearch()">Clear</button>
+        </div>
+        <button class="btn btn-primary" onclick="showCreateItemModal()">
+            <i class="bi bi-plus-circle"></i> Add Item
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-hover mb-0">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Unit</th>
+                        <th>Description</th>
+                        <th>Last Price Paid</th>
+                        <th>Status</th>
+                        <th style="width: 100px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="itemsTableBody">
+                    <tr>
+                        <td colspan="7" class="text-center">
+                            <div class="spinner-border spinner-border-sm" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalTitle">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="confirmModalBody">
+                Are you sure?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmModalBtn" onclick="confirmAction()">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Vendor Items Modal -->
+<div class="modal fade" id="vendorItemsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="vendorItemsModalTitle">Vendor Items</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="vendorItemsLoading" class="text-center py-3">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                    <p class="mt-2">Loading vendor items...</p>
+                </div>
+                <div id="vendorItemsContent" style="display: none;">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Vendor</th>
+                                <th>Vendor SKU</th>
+                                <th>Purchase Unit</th>
+                                <th>Unit Price</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vendorItemsTableBody"></tbody>
+                    </table>
+                </div>
+                <div id="vendorItemsEmpty" style="display: none;" class="alert alert-info">
+                    No vendors are selling this item yet. Add vendor items from the Vendor Items page.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <a href="/vendor-items" class="btn btn-primary">Go to Vendor Items</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Item Modal -->
+<div class="modal fade" id="itemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="itemModalTitle">Add Master Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="itemForm">
+                    <div class="mb-3">
+                        <label for="itemName" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="itemName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="itemDescription" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemCategory" class="form-label">Category *</label>
+                        <select class="form-select" id="itemCategory" required>
+                            <option value="">Select category...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemUnitId" class="form-label">Unit of Measure *</label>
+                        <select class="form-select" id="itemUnitId" required>
+                            <option value="">Select unit...</option>
+                        </select>
+                        <small class="form-text text-muted">The unit you'll count inventory in (e.g., lbs, each, gallons)</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveItem()">Save Item</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Global variables
+    let categories = [];
+    let items = [];
+    let vendors = [];
+    let unitsOfMeasure = [];
+    let currentEditItemId = null;
+    let itemModal = null;
+    let confirmCallback = null;
+
+    // API helper
+    async function apiRequest(url, options = {}) {
+        const token = localStorage.getItem('access_token');
+        const defaultOptions = {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        const response = await fetch(url, { ...defaultOptions, ...options });
+
+        if (response.status === 401) {
+            localStorage.clear();
+            window.location.href = '/login';
+            throw new Error('Unauthorized');
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Request failed');
+        }
+
+        return response.json();
+    }
+
+    // Show alert
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+        alertDiv.style.zIndex = '9999';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+
+        setTimeout(() => alertDiv.remove(), 5000);
+    }
+
+    // Show confirmation dialog
+    function showConfirmation(title, message, callback) {
+        document.getElementById('confirmModalTitle').textContent = title;
+        document.getElementById('confirmModalBody').textContent = message;
+        confirmCallback = callback;
+        const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        modal.show();
+    }
+
+    function confirmAction() {
+        if (confirmCallback) {
+            confirmCallback();
+            confirmCallback = null;
+        }
+        const modalElement = document.getElementById('confirmModal');
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+            modal.hide();
+        }
+    }
+
+    // ========== ITEMS ==========
+    async function loadItems() {
+        try {
+            const response = await apiRequest('/api/items/');
+            items = Array.isArray(response) ? response : [];
+            displayItems();
+        } catch (error) {
+            console.error('Error loading items:', error);
+            showAlert('Error loading items: ' + error.message, 'danger');
+        }
+    }
+
+    function displayItems(filteredItems = null) {
+        const tbody = document.getElementById('itemsTableBody');
+        const displayList = filteredItems || items;
+
+        if (displayList.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No items found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = displayList.map(item => {
+            const statusBadge = item.is_active
+                ? '<span class="badge bg-success">Active</span>'
+                : '<span class="badge bg-secondary">Inactive</span>';
+
+            // Calculate last price paid (from preferred vendor item or most recent)
+            let lastPrice = '-';
+            if (item.last_price_paid) {
+                lastPrice = '$' + parseFloat(item.last_price_paid).toFixed(2);
+                if (item.last_price_unit) {
+                    lastPrice += ' / ' + item.last_price_unit;
+                }
+            }
+
+            return `
+                <tr>
+                    <td>${item.name}</td>
+                    <td>${item.category || '-'}</td>
+                    <td>${item.unit_of_measure || '-'}</td>
+                    <td>${item.description || '-'}</td>
+                    <td>${lastPrice}</td>
+                    <td>${statusBadge}</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-link p-0 me-2" onclick="viewVendorItems(${item.id})" title="View Vendors">
+                            <i class="bi bi-shop"></i>
+                        </button>
+                        <button class="btn btn-sm btn-link p-0 me-2" onclick="editItem(${item.id})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-link p-0 text-danger" onclick="deleteItem(${item.id})" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function filterItems() {
+        const search = document.getElementById('itemSearch').value.toLowerCase();
+        const filtered = items.filter(i =>
+            i.name.toLowerCase().includes(search) ||
+            (i.category && i.category.toLowerCase().includes(search)) ||
+            (i.description && i.description.toLowerCase().includes(search))
+        );
+        displayItems(filtered);
+    }
+
+    function clearItemSearch() {
+        document.getElementById('itemSearch').value = '';
+        displayItems();
+    }
+
+    async function loadUnitsOfMeasure() {
+        try {
+            const response = await apiRequest('/api/units/');
+            unitsOfMeasure = response;
+        } catch (error) {
+            console.error('Error loading units:', error);
+        }
+    }
+
+    function populateUnitDropdowns() {
+        const primarySelect = document.getElementById('itemUnitId');
+
+        if (!primarySelect) return;
+
+        // Populate unit dropdown
+        primarySelect.innerHTML = '<option value="">Select unit...</option>';
+        unitsOfMeasure.forEach(unit => {
+            const option = document.createElement('option');
+            option.value = unit.id;
+            option.textContent = unit.name;
+            primarySelect.appendChild(option);
+        });
+    }
+
+    function showCreateItemModal() {
+        currentEditItemId = null;
+        document.getElementById('itemModalTitle').textContent = 'Add Master Item';
+        document.getElementById('itemForm').reset();
+        populateCategoryDropdown();
+        populateUnitDropdowns();
+        itemModal.show();
+    }
+
+    function populateCategoryDropdown() {
+        const select = document.getElementById('itemCategory');
+        select.innerHTML = '<option value="">Select category...</option>' +
+            categories.filter(c => c.is_active).map(cat =>
+                `<option value="${cat.name}">${cat.name}</option>`
+            ).join('');
+    }
+
+    function editItem(itemId) {
+        const item = items.find(i => i.id === itemId);
+        if (!item) return;
+
+        currentEditItemId = itemId;
+        document.getElementById('itemModalTitle').textContent = 'Edit Master Item';
+        populateCategoryDropdown();
+        populateUnitDropdowns();
+
+        document.getElementById('itemName').value = item.name;
+        document.getElementById('itemDescription').value = item.description || '';
+        document.getElementById('itemCategory').value = item.category || '';
+        document.getElementById('itemUnitId').value = item.unit_of_measure_id || '';
+        itemModal.show();
+    }
+
+    async function saveItem() {
+        const name = document.getElementById('itemName').value;
+        const description = document.getElementById('itemDescription').value;
+        const category = document.getElementById('itemCategory').value;
+        const unit_of_measure_id = document.getElementById('itemUnitId').value;
+
+        if (!name || !category || !unit_of_measure_id) {
+            showAlert('Please fill in all required fields', 'warning');
+            return;
+        }
+
+        try {
+            const itemData = {
+                name,
+                description,
+                category,
+                unit_of_measure_id: parseInt(unit_of_measure_id)
+            };
+
+            if (currentEditItemId) {
+                // Update existing item
+                await apiRequest(`/api/items/${currentEditItemId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(itemData)
+                });
+                showAlert('Item updated successfully!', 'success');
+            } else {
+                // Create new item
+                await apiRequest('/api/items/', {
+                    method: 'POST',
+                    body: JSON.stringify(itemData)
+                });
+                showAlert('Item created successfully!', 'success');
+            }
+
+            itemModal.hide();
+            await loadItems();
+        } catch (error) {
+            showAlert('Error saving item: ' + error.message, 'danger');
+        }
+    }
+
+    async function deleteItem(itemId) {
+        showConfirmation(
+            'Delete Item',
+            'Are you sure you want to delete this item?',
+            async () => {
+                try {
+                    await apiRequest(`/api/items/${itemId}`, { method: 'DELETE' });
+                    showAlert('Item deleted successfully!', 'success');
+                    await loadItems();
+                } catch (error) {
+                    showAlert('Error deleting item: ' + error.message, 'danger');
+                }
+            }
+        );
+    }
+
+    async function viewVendorItems(masterItemId) {
+        const item = items.find(i => i.id === masterItemId);
+        if (!item) return;
+
+        // Update modal title
+        document.getElementById('vendorItemsModalTitle').textContent = `Vendors for ${item.name}`;
+
+        // Show loading, hide content
+        document.getElementById('vendorItemsLoading').style.display = 'block';
+        document.getElementById('vendorItemsContent').style.display = 'none';
+        document.getElementById('vendorItemsEmpty').style.display = 'none';
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('vendorItemsModal'));
+        modal.show();
+
+        try {
+            // Fetch vendor items for this master item
+            const response = await apiRequest(`/api/vendor-items/?master_item_id=${masterItemId}`);
+
+            document.getElementById('vendorItemsLoading').style.display = 'none';
+
+            if (!response || response.length === 0) {
+                document.getElementById('vendorItemsEmpty').style.display = 'block';
+                return;
+            }
+
+            // Display vendor items
+            const tbody = document.getElementById('vendorItemsTableBody');
+            tbody.innerHTML = response.map(vi => {
+                const statusBadge = vi.is_active
+                    ? '<span class="badge bg-success">Active</span>'
+                    : '<span class="badge bg-secondary">Inactive</span>';
+                const preferredBadge = vi.is_preferred
+                    ? '<span class="badge bg-primary ms-1">Preferred</span>'
+                    : '';
+
+                return `
+                    <tr>
+                        <td>${vi.vendor_name || '-'}</td>
+                        <td>${vi.vendor_sku || '-'}</td>
+                        <td>${vi.purchase_unit_name || '-'} ${vi.pack_size ? `(${vi.pack_size})` : ''}</td>
+                        <td>${vi.unit_price ? '$' + parseFloat(vi.unit_price).toFixed(2) : '-'}</td>
+                        <td>${statusBadge}${preferredBadge}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('vendorItemsContent').style.display = 'block';
+        } catch (error) {
+            document.getElementById('vendorItemsLoading').style.display = 'none';
+            document.getElementById('vendorItemsEmpty').innerHTML = `
+                <div class="alert alert-danger">Error loading vendor items: ${error.message}</div>
+            `;
+            document.getElementById('vendorItemsEmpty').style.display = 'block';
+        }
+    }
+
+    // ========== CATEGORIES ==========
+    async function loadCategories() {
+        try {
+            const response = await apiRequest('/api/categories/');
+            categories = Array.isArray(response) ? response : [];
+        } catch (error) {
+            console.error('Error loading categories:', error);
+            showAlert('Error loading categories: ' + error.message, 'danger');
+        }
+    }
+
+    // ========== VENDORS ==========
+    async function loadVendors() {
+        try {
+            vendors = await apiRequest('/api/vendors/?active_only=false');
+        } catch (error) {
+            console.error('Error loading vendors:', error);
+            showAlert('Error loading vendors: ' + error.message, 'danger');
+        }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Check authentication
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+
+        // Initialize modal
+        itemModal = new bootstrap.Modal(document.getElementById('itemModal'));
+
+        // Load data
+        await loadCategories();
+        await loadVendors();
+        await loadUnitsOfMeasure();
+        await loadItems();
+
+        // Setup search listener
+        document.getElementById('itemSearch')?.addEventListener('input', filterItems);
+
+        // Setup primary unit change listener to update secondary unit options based on category
+        document.addEventListener('change', function(e) {
+            if (e.target && e.target.id === 'itemUnitId') {
+                updateSecondaryUnitsForCategory();
+            }
+        });
+    });
+</script>
+{% endblock %}
