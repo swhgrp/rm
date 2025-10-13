@@ -36,5 +36,20 @@ class Settings:
         "http://localhost:8000,http://localhost:3000"
     ).split(",")
 
+    # Email Configuration
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.swhgrp.com")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "admin@swhgrp.com")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_FROM_EMAIL: str = os.getenv("SMTP_FROM_EMAIL", "admin@swhgrp.com")
+    SMTP_FROM_NAME: str = os.getenv("SMTP_FROM_NAME", "SW Hospitality Group")
+    SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+
+    # Application URL (for email links)
+    APP_URL: str = os.getenv("APP_URL", "https://restaurantsystem.swhgrp.com")
+
+    # Password Reset Token
+    PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 24
+
 # Create global settings instance
 settings = Settings()

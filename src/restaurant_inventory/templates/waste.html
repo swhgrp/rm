@@ -282,10 +282,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const checkAuthAndLoad = () => {
         const token = localStorage.getItem('access_token');
         if (token) {
-            console.log('Auth token found, loading data...');
             loadData();
         } else {
-            console.log('No auth token yet, waiting...');
             setTimeout(checkAuthAndLoad, 500);
         }
     };
@@ -297,9 +295,6 @@ async function loadData() {
         await loadLocations();
         await loadMasterItems();
         await loadWasteRecords();
-        console.log('All data loaded successfully');
-        console.log('Locations:', locations.length);
-        console.log('Master Items:', masterItems.length);
     } catch (error) {
         console.error('Error loading data:', error);
     }
@@ -317,7 +312,6 @@ async function loadLocations() {
 
         const data = await response.json();
         locations = data.locations || [];
-        console.log('Loaded locations:', locations);
 
         // Populate filter dropdown
         const filterSelect = document.getElementById('filterLocation');
@@ -338,7 +332,6 @@ async function loadLocations() {
             option.textContent = loc.name;
             modalSelect.appendChild(option);
         });
-        console.log('Location dropdown populated with', locations.length, 'locations');
     } catch (error) {
         console.error('Error loading locations:', error);
         showToast('Error', 'Failed to load locations', 'danger');
@@ -357,14 +350,12 @@ async function loadMasterItems() {
 
         const data = await response.json();
         masterItems = data.items || [];
-        console.log('Loaded master items:', masterItems);
 
         // Populate modal dropdown
         const itemSelect = document.getElementById('wasteItem');
         itemSelect.innerHTML = '<option value="">Select Item...</option>';
 
         const activeItems = masterItems.filter(item => item.is_active);
-        console.log('Active items:', activeItems.length);
 
         activeItems.forEach(item => {
             const option = document.createElement('option');
@@ -375,7 +366,6 @@ async function loadMasterItems() {
             itemSelect.appendChild(option);
         });
 
-        console.log('Item dropdown populated with', activeItems.length, 'items');
 
         // Destroy existing Select2 if it exists
         if ($('#wasteItem').hasClass('select2-hidden-accessible')) {
@@ -391,7 +381,6 @@ async function loadMasterItems() {
             allowClear: true
         });
 
-        console.log('Select2 initialized on item dropdown');
 
         // Handle Select2 change event
         $('#wasteItem').on('select2:select', function(e) {
@@ -558,7 +547,6 @@ async function submitWaste() {
         description: document.getElementById('wasteDescription').value || null
     };
 
-    console.log('Submitting waste data:', data);
 
     try {
         const response = await fetch('/api/waste/', {
@@ -570,9 +558,7 @@ async function submitWaste() {
             body: JSON.stringify(data)
         });
 
-        console.log('Response status:', response.status);
         const responseText = await response.text();
-        console.log('Response text:', responseText);
 
         if (!response.ok) {
             let errorMessage = 'Failed to log waste';

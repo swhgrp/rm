@@ -71,8 +71,7 @@ async def create_location(
         user=current_user,
         changes={"new": {
             "name": location.name,
-            "address": location.address,
-            "location_type": location.location_type
+            "address": location.address
         }},
         request=request
     )
@@ -99,8 +98,7 @@ async def update_location(
     # Track old values
     old_data = {
         "name": location.name,
-        "address": location.address,
-        "location_type": location.location_type
+        "address": location.address
     }
 
     # Update fields that were provided
@@ -114,8 +112,7 @@ async def update_location(
     # Track new values
     new_data = {
         "name": location.name,
-        "address": location.address,
-        "location_type": location.location_type
+        "address": location.address
     }
 
     # Log audit event
@@ -168,8 +165,7 @@ async def delete_location(
         user=current_user,
         changes={"old": {
             "name": location.name,
-            "address": location.address,
-            "location_type": location.location_type
+            "address": location.address
         }},
         request=request
     )

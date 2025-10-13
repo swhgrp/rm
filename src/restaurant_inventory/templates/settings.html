@@ -132,9 +132,17 @@
             <i class="bi bi-info-circle"></i> <strong>Categories</strong> – Group items into logical categories (e.g., produce, meats, beverages).
         </div>
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <div class="input-group" style="max-width: 400px;">
-                <input type="text" class="form-control" id="categorySearch" placeholder="Search categories">
-                <button class="btn btn-outline-secondary" onclick="clearCategorySearch()">Clear</button>
+            <div class="d-flex gap-3">
+                <div class="input-group" style="max-width: 400px;">
+                    <input type="text" class="form-control" id="categorySearch" placeholder="Search categories">
+                    <button class="btn btn-outline-secondary" onclick="clearCategorySearch()">Clear</button>
+                </div>
+                <div class="form-check d-flex align-items-center">
+                    <input class="form-check-input" type="checkbox" id="showInactiveCategories" onchange="loadCategories()">
+                    <label class="form-check-label ms-2" for="showInactiveCategories">
+                        Show Inactive
+                    </label>
+                </div>
             </div>
             <button class="btn btn-primary" onclick="showCreateCategoryModal()">
                 <i class="bi bi-plus-circle"></i> Add Category
@@ -289,6 +297,32 @@
             <i class="bi bi-info-circle"></i> <strong>POS Integration</strong> – Configure integration with your Point of Sale system for automated inventory tracking.
         </div>
 
+        <!-- Configured Integrations Summary -->
+        <div class="card mb-3" id="posConfigSummaryCard" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-list-check"></i> Configured Integrations</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Location</th>
+                                <th>POS System</th>
+                                <th>Last Sync</th>
+                                <th>Orders Synced</th>
+                                <th>Auto-Sync</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="posConfigSummaryBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <div class="row">
             <div class="col-md-6">
                 <div class="card mb-3">
@@ -310,13 +344,24 @@
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label">API Endpoint URL</label>
-                                <input type="url" class="form-control" id="posApiUrl" placeholder="https://api.example.com">
+                                <label class="form-label">Merchant ID *</label>
+                                <input type="text" class="form-control" id="posMerchantId" placeholder="Your Clover Merchant ID" required>
+                                <small class="text-muted">Find this in your Clover Dashboard URL or Account settings</small>
                             </div>
 
                             <div class="mb-3">
-                                <label class="form-label">API Key</label>
-                                <input type="password" class="form-control" id="posApiKey" placeholder="Enter API key">
+                                <label class="form-label">Access Token (API Key) *</label>
+                                <input type="password" class="form-control" id="posAccessToken" placeholder="Generate from Clover API Tokens" required>
+                                <small class="text-muted">Create this in Account & Setup → API Tokens</small>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Environment</label>
+                                <select class="form-select" id="posEnvironment">
+                                    <option value="production">Production (Live Data)</option>
+                                    <option value="sandbox">Sandbox (Testing)</option>
+                                </select>
+                                <small class="text-muted">API Endpoint URL is auto-configured based on environment</small>
                             </div>
 
                             <div class="mb-3">
@@ -332,6 +377,20 @@
                                 <label class="form-check-label" for="posAutoSync">
                                     Enable automatic inventory sync
                                 </label>
+                            </div>
+
+                            <div class="mb-3" id="syncFrequencyContainer" style="display: none;">
+                                <label class="form-label">Sync Frequency</label>
+                                <select class="form-select" id="posSyncFrequency">
+                                    <option value="15">Every 15 minutes</option>
+                                    <option value="30">Every 30 minutes</option>
+                                    <option value="60" selected>Every hour</option>
+                                    <option value="120">Every 2 hours</option>
+                                    <option value="240">Every 4 hours</option>
+                                    <option value="480">Every 8 hours</option>
+                                    <option value="1440">Once per day</option>
+                                </select>
+                                <small class="text-muted">How often to automatically sync sales from POS</small>
                             </div>
 
                             <button type="button" class="btn btn-primary" onclick="testPOSConnection()">
@@ -377,9 +436,47 @@
                     </div>
                     <div class="card-body">
                         <p class="text-muted small">Manually trigger a sync with your POS system to update inventory levels.</p>
+                        <div class="mb-3">
+                            <label for="manualSyncLocation" class="form-label">Location *</label>
+                            <select class="form-select" id="manualSyncLocation" required>
+                                <option value="">Select location to sync...</option>
+                            </select>
+                            <small class="form-text text-muted">Choose which location's POS data to sync</small>
+                        </div>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="syncStartDate" class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="syncStartDate">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="syncEndDate" class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="syncEndDate">
+                            </div>
+                        </div>
                         <button type="button" class="btn btn-outline-primary" onclick="syncPOSInventory()">
                             <i class="bi bi-arrow-repeat"></i> Sync Now
                         </button>
+                        <small class="d-block mt-2 text-muted">Leave dates empty to sync today's orders only</small>
+                    </div>
+                </div>
+
+                <!-- Process Inventory Deductions -->
+                <div class="card mt-3">
+                    <div class="card-header bg-warning bg-opacity-10">
+                        <h5 class="mb-0"><i class="bi bi-box-seam"></i> Process Inventory Deductions</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">Process inventory deductions for sales that were synced before the deduction feature was enabled. This will retroactively deduct inventory for all unprocessed sales.</p>
+                        <div class="mb-3">
+                            <label for="deductionLocation" class="form-label">Location *</label>
+                            <select class="form-select" id="deductionLocation" required>
+                                <option value="">Select location...</option>
+                            </select>
+                        </div>
+                        <button type="button" class="btn btn-warning" onclick="processInventoryDeductions()">
+                            <i class="bi bi-box-seam"></i> Process Deductions
+                        </button>
+                        <small class="d-block mt-2 text-muted">Only use this for sales that haven't been processed yet</small>
                     </div>
                 </div>
             </div>
@@ -453,9 +550,16 @@
                         <input type="text" class="form-control" id="fullName" required>
                     </div>
                     <div class="mb-3" id="passwordField">
-                        <label for="password" class="form-label">Password <span id="passwordRequired">*</span></label>
+                        <label for="password" class="form-label">Password <span id="passwordRequired"></span></label>
                         <input type="password" class="form-control" id="password">
-                        <small class="text-muted" id="passwordHint" style="display: none;">Leave blank to keep current password</small>
+                        <small class="text-muted" id="passwordHint">
+                            <span id="passwordHintNew" style="display: none;">
+                                <i class="bi bi-info-circle"></i> Leave blank to send invitation email (recommended)
+                            </span>
+                            <span id="passwordHintEdit" style="display: none;">
+                                Leave blank to keep current password
+                            </span>
+                        </small>
                     </div>
                     <div class="mb-3">
                         <label for="role" class="form-label">Role *</label>
@@ -471,6 +575,36 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" onclick="saveUser()">Save User</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- User Locations Modal -->
+<div class="modal fade" id="userLocationsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manage Location Access</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Admin users</strong> always have access to all locations.
+                    <strong>Other users</strong>: Select specific locations or leave empty for access to all locations.
+                </div>
+                <p class="mb-3">
+                    <strong id="selectedUserName"></strong> (<span id="selectedUserRole"></span>)
+                </p>
+
+                <div id="locationCheckboxes">
+                    <!-- Will be populated dynamically -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveUserLocations()">Save Changes</button>
             </div>
         </div>
     </div>
@@ -586,18 +720,30 @@
                         <input type="text" class="form-control" id="locationName" required>
                     </div>
                     <div class="mb-3">
-                        <label for="locationAddress" class="form-label">Address</label>
-                        <input type="text" class="form-control" id="locationAddress">
+                        <label for="locationAddress" class="form-label">Street Address</label>
+                        <input type="text" class="form-control" id="locationAddress" placeholder="123 Main St">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="locationCity" class="form-label">City</label>
+                            <input type="text" class="form-control" id="locationCity">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="locationState" class="form-label">State</label>
+                            <input type="text" class="form-control" id="locationState" maxlength="2" placeholder="FL">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label for="locationZip" class="form-label">ZIP</label>
+                            <input type="text" class="form-control" id="locationZip" maxlength="10" placeholder="12345">
+                        </div>
                     </div>
                     <div class="mb-3">
-                        <label for="locationType" class="form-label">Type *</label>
-                        <select class="form-select" id="locationType" required>
-                            <option value="">Select type...</option>
-                            <option value="Restaurant">Restaurant</option>
-                            <option value="Warehouse">Warehouse</option>
-                            <option value="Kitchen">Kitchen</option>
-                            <option value="Storage">Storage</option>
-                        </select>
+                        <label for="locationPhone" class="form-label">Phone</label>
+                        <input type="tel" class="form-control" id="locationPhone" placeholder="(555) 123-4567">
+                    </div>
+                    <div class="mb-3">
+                        <label for="locationManager" class="form-label">Manager Name</label>
+                        <input type="text" class="form-control" id="locationManager">
                     </div>
                 </form>
             </div>
@@ -756,6 +902,13 @@
             <div class="modal-body">
                 <form id="categoryForm">
                     <div class="mb-3">
+                        <label for="categoryParent" class="form-label">Parent Category</label>
+                        <select class="form-select" id="categoryParent">
+                            <option value="">None (Main Category)</option>
+                        </select>
+                        <small class="text-muted">Leave empty to create a main category, or select a parent to create a subcategory</small>
+                    </div>
+                    <div class="mb-3">
                         <label for="categoryName" class="form-label">Category Name *</label>
                         <input type="text" class="form-control" id="categoryName" required>
                     </div>
@@ -906,12 +1059,19 @@
     let auditCurrentPage = 0;
     let auditPageSize = 50;
     let confirmCallback = null;
+    let expandedCategories = new Set(); // Track which categories are expanded
 
     // Confirmation modal helpers
-    function showConfirmation(title, message, callback) {
+    function showConfirmation(title, message, callback, buttonText = 'Confirm', buttonClass = 'btn-primary') {
         document.getElementById('confirmModalTitle').textContent = title;
         document.getElementById('confirmModalBody').textContent = message;
         confirmCallback = callback;
+
+        // Update button text and style
+        const btn = document.getElementById('confirmModalBtn');
+        btn.textContent = buttonText;
+        btn.className = `btn ${buttonClass}`;
+
         const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
         modal.show();
     }
@@ -974,6 +1134,16 @@
         document.getElementById('locationSearch')?.addEventListener('input', filterLocations);
         document.getElementById('categorySearch')?.addEventListener('input', filterCategories);
         document.getElementById('roleSearch')?.addEventListener('input', filterRoles);
+
+        // Setup POS tab event - load locations when tab is shown
+        const posTab = document.getElementById('pos-tab');
+        posTab?.addEventListener('shown.bs.tab', async function() {
+            console.log('POS tab shown, loading locations and configuration...');
+            await loadPOSConfigurationSummary();
+            await loadPOSLocations();
+            await loadPOSConfiguration();
+            await loadSyncHistory();
+        });
     });
 
     // API helper
@@ -995,8 +1165,17 @@
         }
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Request failed');
+            let errorMessage = `HTTP error! status: ${response.status}`;
+            try {
+                const errorData = await response.json();
+                if (errorData.detail) {
+                    errorMessage = errorData.detail;
+                }
+            } catch (jsonError) {
+                // If we can't parse JSON, use the default error message
+                console.error('Error parsing error response:', jsonError);
+            }
+            throw new Error(errorMessage);
         }
 
         return response.json();
@@ -1037,15 +1216,16 @@
             const roleBadge = `<span class="badge ${badgeClass}">${roleName}</span>`;
 
             const isSelf = currentUser.id === user.id;
-            const locationAccess = roleName === 'Admin' ? 'All locations' :
-                                  roleName === 'Manager' ? 'Multiple locations' :
-                                  'Single location';
 
             return `
                 <tr>
                     <td>${user.full_name}</td>
                     <td>${user.email}</td>
-                    <td>${locationAccess}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="manageUserLocations(${user.id})">
+                            <i class="bi bi-geo-alt"></i> Manage Locations
+                        </button>
+                    </td>
                     <td>${roleBadge}</td>
                     <td class="text-end">
                         ${!isSelf ? `
@@ -1081,8 +1261,9 @@
         currentEditUserId = null;
         document.getElementById('userModalTitle').textContent = 'Invite New User';
         document.getElementById('userForm').reset();
-        document.getElementById('passwordRequired').style.display = 'inline';
-        document.getElementById('passwordHint').style.display = 'none';
+        document.getElementById('passwordRequired').style.display = 'none';
+        document.getElementById('passwordHintNew').style.display = 'inline';
+        document.getElementById('passwordHintEdit').style.display = 'none';
         document.getElementById('username').disabled = false;
         populateRoleSelect();
         userModal.show();
@@ -1108,7 +1289,8 @@
         populateRoleSelect();
         document.getElementById('role').value = user.role;
         document.getElementById('passwordRequired').style.display = 'none';
-        document.getElementById('passwordHint').style.display = 'block';
+        document.getElementById('passwordHintNew').style.display = 'none';
+        document.getElementById('passwordHintEdit').style.display = 'inline';
         userModal.show();
     }
 
@@ -1121,11 +1303,6 @@
 
         if (!username || !email || !fullName || !role) {
             showAlert('Please fill in all required fields', 'warning');
-            return;
-        }
-
-        if (!currentEditUserId && !password) {
-            showAlert('Password is required for new users', 'warning');
             return;
         }
 
@@ -1143,11 +1320,21 @@
                 showAlert('User updated successfully!', 'success');
             } else {
                 // Create new user
+                const userData = { username, email, full_name: fullName, role };
+                // Only include password if provided
+                if (password) {
+                    userData.password = password;
+                }
                 await apiRequest('/api/users/', {
                     method: 'POST',
-                    body: JSON.stringify({ username, email, full_name: fullName, password, role })
+                    body: JSON.stringify(userData)
                 });
-                showAlert('User created successfully!', 'success');
+
+                if (password) {
+                    showAlert('User created successfully!', 'success');
+                } else {
+                    showAlert('User invited successfully! An invitation email has been sent.', 'success');
+                }
             }
 
             userModal.hide();
@@ -1171,6 +1358,93 @@
                 }
             }
         );
+    }
+
+    // ========== USER LOCATIONS ==========
+    let currentUserLocationId = null;
+
+    async function manageUserLocations(userId) {
+        try {
+            currentUserLocationId = userId;
+
+            // Get user details and assigned locations
+            const userLocationData = await apiRequest(`/api/users/${userId}/locations`);
+            const user = users.find(u => u.id === userId);
+
+            if (!user) {
+                showAlert('User not found', 'danger');
+                return;
+            }
+
+            // Update modal with user info
+            document.getElementById('selectedUserName').textContent = user.full_name;
+            document.getElementById('selectedUserRole').textContent = user.role;
+
+            // Populate location checkboxes
+            const container = document.getElementById('locationCheckboxes');
+            const assignedLocationIds = userLocationData.assigned_locations.map(loc => loc.id);
+
+            if (locations.length === 0) {
+                container.innerHTML = '<p class="text-muted">No locations available</p>';
+            } else {
+                container.innerHTML = locations.map(location => `
+                    <div class="form-check mb-2">
+                        <input
+                            class="form-check-input"
+                            type="checkbox"
+                            id="loc_${location.id}"
+                            value="${location.id}"
+                            ${assignedLocationIds.includes(location.id) ? 'checked' : ''}
+                            ${user.role === 'Admin' ? 'disabled' : ''}
+                        >
+                        <label class="form-check-label" for="loc_${location.id}">
+                            ${location.name}
+                            ${location.address ? `<br><small class="text-muted">${location.address}</small>` : ''}
+                        </label>
+                    </div>
+                `).join('');
+            }
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('userLocationsModal'));
+            modal.show();
+
+        } catch (error) {
+            console.error('Error loading user locations:', error);
+            showAlert('Error loading user locations: ' + error.message, 'danger');
+        }
+    }
+
+    async function saveUserLocations() {
+        if (!currentUserLocationId) return;
+
+        try {
+            // Get selected location IDs
+            const checkboxes = document.querySelectorAll('#locationCheckboxes input[type="checkbox"]:not(:disabled)');
+            const selectedLocationIds = Array.from(checkboxes)
+                .filter(cb => cb.checked)
+                .map(cb => parseInt(cb.value));
+
+            // Save to server
+            await apiRequest(`/api/users/${currentUserLocationId}/locations`, {
+                method: 'POST',
+                body: JSON.stringify({ location_ids: selectedLocationIds })
+            });
+
+            showAlert('Location access updated successfully!', 'success');
+
+            // Close modal
+            const modalElement = document.getElementById('userLocationsModal');
+            const modal = bootstrap.Modal.getInstance(modalElement);
+            modal.hide();
+
+            // Reload users to refresh the display
+            await loadUsers();
+
+        } catch (error) {
+            console.error('Error saving user locations:', error);
+            showAlert('Error saving locations: ' + error.message, 'danger');
+        }
     }
 
     // ========== ROLES ==========
@@ -1424,33 +1698,51 @@
         document.getElementById('locationModalTitle').textContent = 'Edit Location';
         document.getElementById('locationName').value = location.name;
         document.getElementById('locationAddress').value = location.address || '';
-        document.getElementById('locationType').value = location.location_type || '';
+        document.getElementById('locationCity').value = location.city || '';
+        document.getElementById('locationState').value = location.state || '';
+        document.getElementById('locationZip').value = location.zip_code || '';
+        document.getElementById('locationPhone').value = location.phone || '';
+        document.getElementById('locationManager').value = location.manager_name || '';
         locationModal.show();
     }
 
     async function saveLocation() {
         const name = document.getElementById('locationName').value;
         const address = document.getElementById('locationAddress').value;
-        const location_type = document.getElementById('locationType').value;
+        const city = document.getElementById('locationCity').value;
+        const state = document.getElementById('locationState').value;
+        const zip_code = document.getElementById('locationZip').value;
+        const phone = document.getElementById('locationPhone').value;
+        const manager_name = document.getElementById('locationManager').value;
 
-        if (!name || !location_type) {
-            showAlert('Please fill in all required fields', 'warning');
+        if (!name) {
+            showAlert('Please enter a location name', 'warning');
             return;
         }
+
+        const locationData = {
+            name,
+            address,
+            city,
+            state,
+            zip_code,
+            phone,
+            manager_name
+        };
 
         try {
             if (currentEditLocationId) {
                 // Update existing location
                 await apiRequest(`/api/locations/${currentEditLocationId}`, {
                     method: 'PUT',
-                    body: JSON.stringify({ name, address, location_type })
+                    body: JSON.stringify(locationData)
                 });
                 showAlert('Location updated successfully!', 'success');
             } else {
                 // Create new location
                 await apiRequest('/api/locations/', {
                     method: 'POST',
-                    body: JSON.stringify({ name, address, location_type })
+                    body: JSON.stringify(locationData)
                 });
                 showAlert('Location created successfully!', 'success');
             }
@@ -1836,7 +2128,8 @@
     // ========== CATEGORIES ==========
     async function loadCategories() {
         try {
-            const response = await apiRequest('/api/categories/');
+            const includeInactive = document.getElementById('showInactiveCategories')?.checked || false;
+            const response = await apiRequest(`/api/categories/?include_inactive=${includeInactive}`);
             categories = Array.isArray(response) ? response : [];
             displayCategories();
         } catch (error) {
@@ -1855,34 +2148,101 @@
 
         const filteredCategories = filterCategoriesList();
 
-        tbody.innerHTML = filteredCategories.map(cat => `
-            <tr>
-                <td><strong>${cat.name}</strong></td>
-                <td>${cat.description || '-'}</td>
-                <td>${cat.display_order}</td>
-                <td>
-                    <span class="badge ${cat.is_active ? 'bg-success' : 'bg-secondary'}">
-                        ${cat.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                </td>
-                <td>
-                    <button class="btn btn-sm btn-primary" onclick="editCategory(${cat.id})" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteCategory(${cat.id})" title="Delete">
-                        <i class="bi bi-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `).join('');
+        // Build HTML with hierarchy
+        let html = '';
+
+        filteredCategories.forEach(cat => {
+            const hasSubcategories = cat.subcategories && cat.subcategories.length > 0;
+            const isExpanded = expandedCategories.has(cat.id);
+
+            // Main category row
+            html += `
+                <tr>
+                    <td>
+                        ${hasSubcategories ? `
+                            <i class="bi bi-chevron-${isExpanded ? 'down' : 'right'}"
+                               onclick="toggleCategoryExpand(${cat.id})"
+                               style="cursor: pointer; margin-right: 0.5rem;"
+                               title="Click to ${isExpanded ? 'collapse' : 'expand'}">
+                            </i>
+                        ` : '<span style="margin-left: 1.25rem;"></span>'}
+                        <strong>📁 ${cat.name}</strong>
+                        ${hasSubcategories ? `<span class="badge bg-info ms-2">${cat.subcategories.length}</span>` : ''}
+                    </td>
+                    <td>${cat.description || '-'}</td>
+                    <td>${cat.display_order}</td>
+                    <td>
+                        <span class="badge ${cat.is_active ? 'bg-success' : 'bg-secondary'}">
+                            ${cat.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="editCategory(${cat.id})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm ${cat.is_active ? 'btn-warning' : 'btn-success'}" onclick="toggleCategoryStatus(${cat.id}, ${!cat.is_active})" title="${cat.is_active ? 'Deactivate' : 'Activate'}">
+                            <i class="bi bi-${cat.is_active ? 'eye-slash' : 'eye'}"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteCategory(${cat.id})" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+
+            // Subcategory rows (if any and expanded)
+            if (hasSubcategories && isExpanded) {
+                cat.subcategories.forEach(subcat => {
+                    html += `
+                        <tr class="subcategory-row" style="background-color: #f8f9fa;">
+                            <td style="padding-left: 3rem;">└─ ${subcat.name}</td>
+                            <td>${subcat.description || '-'}</td>
+                            <td>${subcat.display_order}</td>
+                            <td>
+                                <span class="badge ${subcat.is_active ? 'bg-success' : 'bg-secondary'}">
+                                    ${subcat.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-primary" onclick="editCategory(${subcat.id})" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-sm ${subcat.is_active ? 'btn-warning' : 'btn-success'}" onclick="toggleCategoryStatus(${subcat.id}, ${!subcat.is_active})" title="${subcat.is_active ? 'Deactivate' : 'Activate'}">
+                                    <i class="bi bi-${subcat.is_active ? 'eye-slash' : 'eye'}"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteCategory(${subcat.id})" title="Delete">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+        });
+
+        tbody.innerHTML = html;
     }
 
     function filterCategoriesList() {
         const searchTerm = document.getElementById('categorySearch').value.toLowerCase();
-        return categories.filter(cat =>
-            cat.name.toLowerCase().includes(searchTerm) ||
-            (cat.description && cat.description.toLowerCase().includes(searchTerm))
-        );
+
+        if (!searchTerm) {
+            return categories;
+        }
+
+        return categories.filter(cat => {
+            // Check if main category matches
+            const mainMatches = cat.name.toLowerCase().includes(searchTerm) ||
+                (cat.description && cat.description.toLowerCase().includes(searchTerm));
+
+            // Check if any subcategory matches
+            const subcatMatches = cat.subcategories && cat.subcategories.some(subcat =>
+                subcat.name.toLowerCase().includes(searchTerm) ||
+                (subcat.description && subcat.description.toLowerCase().includes(searchTerm))
+            );
+
+            return mainMatches || subcatMatches;
+        });
     }
 
     function filterCategories() {
@@ -1898,18 +2258,59 @@
         currentEditCategoryId = null;
         document.getElementById('categoryModalTitle').textContent = 'Add Category';
         document.getElementById('categoryForm').reset();
+
+        // Populate parent category dropdown with main categories only
+        populateParentCategoryDropdown();
+
         categoryModal.show();
     }
 
+    function populateParentCategoryDropdown(excludeId = null) {
+        const select = document.getElementById('categoryParent');
+
+        // Get only main categories (no parent)
+        const mainCategories = categories.filter(cat => !cat.parent_id && cat.id !== excludeId);
+
+        // Build dropdown options
+        let options = '<option value="">None (Main Category)</option>';
+        mainCategories.forEach(cat => {
+            options += `<option value="${cat.id}">${cat.name}</option>`;
+        });
+
+        select.innerHTML = options;
+    }
+
+    function findCategoryById(id) {
+        // First check main categories
+        let category = categories.find(c => c.id === id);
+        if (category) return category;
+
+        // Check subcategories
+        for (let mainCat of categories) {
+            if (mainCat.subcategories) {
+                category = mainCat.subcategories.find(c => c.id === id);
+                if (category) return category;
+            }
+        }
+        return null;
+    }
+
     function editCategory(id) {
-        const category = categories.find(c => c.id === id);
+        const category = findCategoryById(id);
         if (!category) return;
 
         currentEditCategoryId = id;
         document.getElementById('categoryModalTitle').textContent = 'Edit Category';
+
+        // Populate parent dropdown (exclude current category from options)
+        populateParentCategoryDropdown(id);
+
+        // Set form values
         document.getElementById('categoryName').value = category.name;
         document.getElementById('categoryDescription').value = category.description || '';
         document.getElementById('categoryOrder').value = category.display_order;
+        document.getElementById('categoryParent').value = category.parent_id || '';
+
         categoryModal.show();
     }
 
@@ -1917,6 +2318,7 @@
         const name = document.getElementById('categoryName').value.trim();
         const description = document.getElementById('categoryDescription').value.trim();
         const display_order = parseInt(document.getElementById('categoryOrder').value);
+        const parent_id = document.getElementById('categoryParent').value;
 
         if (!name) {
             showAlert('Please enter a category name', 'warning');
@@ -1925,8 +2327,9 @@
 
         const categoryData = {
             name,
-            description,
-            display_order
+            description: description || null,
+            display_order,
+            parent_id: parent_id ? parseInt(parent_id) : null
         };
 
         try {
@@ -1952,9 +2355,18 @@
     }
 
     async function deleteCategory(id) {
+        const category = findCategoryById(id);
+        if (!category) return;
+
+        // Check if this is a main category with subcategories
+        let confirmMessage = 'Are you sure you want to delete this category?';
+        if (category.subcategories && category.subcategories.length > 0) {
+            confirmMessage = `This category has ${category.subcategories.length} subcategories. Deleting it will also delete all subcategories. Are you sure?`;
+        }
+
         showConfirmation(
             'Delete Category',
-            'Are you sure you want to delete this category?',
+            confirmMessage,
             async () => {
                 try {
                     await apiRequest(`/api/categories/${id}`, {
@@ -1967,6 +2379,28 @@
                 }
             }
         );
+    }
+
+    async function toggleCategoryStatus(id, newStatus) {
+        try {
+            await apiRequest(`/api/categories/${id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ is_active: newStatus })
+            });
+            showAlert(`Category ${newStatus ? 'activated' : 'deactivated'} successfully`, 'success');
+            await loadCategories();
+        } catch (error) {
+            showAlert('Error updating category status: ' + error.message, 'danger');
+        }
+    }
+
+    function toggleCategoryExpand(categoryId) {
+        if (expandedCategories.has(categoryId)) {
+            expandedCategories.delete(categoryId);
+        } else {
+            expandedCategories.add(categoryId);
+        }
+        displayCategories();
     }
 
     // ========== ITEMS ==========
@@ -2738,16 +3172,541 @@
     }
 
     // POS Integration Functions
-    function testPOSConnection() {
-        showAlert('POS connection testing is not yet implemented. This feature will be available in a future update.', 'info');
+    async function testPOSConnection() {
+        const locationId = document.getElementById('posLocationMapping').value;
+
+        if (!locationId) {
+            showAlert('Please select a location first', 'warning');
+            return;
+        }
+
+        // Update connection status to show testing
+        const statusEl = document.getElementById('posConnectionStatus');
+        statusEl.innerHTML = '<span class="badge bg-warning">Testing...</span>';
+
+        try {
+            const response = await fetch(`/api/pos/configurations/${locationId}/test`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getToken()}`
+                }
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Connection test failed');
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                statusEl.innerHTML = '<span class="badge bg-success">Connected</span>';
+                showAlert(`Successfully connected to Clover POS! Merchant ID: ${result.merchant_id}`, 'success');
+            } else {
+                statusEl.innerHTML = '<span class="badge bg-danger">Not Configured</span>';
+                showAlert(`Connection failed: ${result.message}`, 'danger');
+            }
+
+        } catch (error) {
+            console.error('Connection test error:', error);
+            statusEl.innerHTML = '<span class="badge bg-danger">Not Configured</span>';
+            showAlert('Connection test failed: ' + error.message, 'danger');
+        }
     }
 
-    function savePOSSettings() {
-        showAlert('POS settings save is not yet implemented. This feature will be available in a future update.', 'info');
+    async function savePOSSettings() {
+        const locationId = document.getElementById('posLocationMapping').value;
+        const merchantId = document.getElementById('posMerchantId').value;
+        const accessToken = document.getElementById('posAccessToken').value;
+        const environment = document.getElementById('posEnvironment').value;
+        const autoSync = document.getElementById('posAutoSync').checked;
+        const syncFrequency = parseInt(document.getElementById('posSyncFrequency').value);
+
+        if (!locationId) {
+            showAlert('Please select a location', 'warning');
+            return;
+        }
+
+        if (!merchantId || !accessToken) {
+            showAlert('Please enter Merchant ID and Access Token', 'warning');
+            return;
+        }
+
+        const configData = {
+            location_id: parseInt(locationId),
+            provider: 'clover',
+            merchant_id: merchantId,
+            access_token: accessToken,
+            api_environment: environment,
+            auto_sync_enabled: autoSync,
+            sync_frequency_minutes: autoSync ? syncFrequency : 60,
+            is_active: true
+        };
+
+        try {
+            // Check if config exists for this location
+            let config;
+            try {
+                config = await apiRequest(`/api/pos/configurations/${locationId}`);
+            } catch (e) {
+                // Config doesn't exist, will create new one
+                config = null;
+            }
+
+            if (config) {
+                // Update existing
+                await apiRequest(`/api/pos/configurations/${locationId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        merchant_id: merchantId,
+                        access_token: accessToken,
+                        api_environment: environment,
+                        auto_sync_enabled: autoSync,
+                        sync_frequency_minutes: autoSync ? syncFrequency : 60
+                    })
+                });
+                showAlert('POS configuration updated successfully!', 'success');
+            } else {
+                // Create new
+                await apiRequest('/api/pos/configurations', {
+                    method: 'POST',
+                    body: JSON.stringify(configData)
+                });
+                showAlert('POS configuration created successfully!', 'success');
+            }
+
+            // Update connection status
+            document.getElementById('posConnectionStatus').innerHTML = '<span class="badge bg-success">Configured</span>';
+
+            // Refresh the summary table
+            await loadPOSConfigurationSummary();
+
+        } catch (error) {
+            console.error('Error saving POS settings:', error);
+            showAlert('Failed to save POS settings: ' + error.message, 'danger');
+        }
     }
 
-    function syncPOSInventory() {
-        showAlert('POS inventory sync is not yet implemented. This feature will be available in a future update.', 'info');
+    async function editPOSConfiguration(locationId) {
+        // Set the location in dropdown
+        document.getElementById('posLocationMapping').value = locationId;
+
+        // Load the configuration for this location
+        await loadConfigForLocation(locationId);
+
+        // Scroll to the configuration form
+        document.getElementById('posSettingsForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        // Highlight the configuration card briefly
+        const card = document.getElementById('posSettingsForm').closest('.card');
+        card.style.boxShadow = '0 0 20px rgba(0, 123, 255, 0.5)';
+        setTimeout(() => {
+            card.style.boxShadow = '';
+        }, 2000);
+    }
+
+    async function loadSyncHistory() {
+        try {
+            // Get audit logs for POS sync actions (entity_type is "pos_sales" with action "sync")
+            const auditLogs = await apiRequest('/api/audit-log/?entity_type=pos_sales&limit=10');
+            const tbody = document.getElementById('posSyncHistoryBody');
+
+            // Filter to only sync actions
+            const syncLogs = auditLogs.filter(log => log.action === 'sync');
+
+            if (!syncLogs || syncLogs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No sync history available</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = syncLogs.map(log => {
+                const date = new Date(log.timestamp);
+                const changes = log.changes || {};
+                const synced = changes.synced || 0;
+                const skipped = changes.skipped || 0;
+                const errors = changes.errors || 0;
+
+                const statusBadge = errors > 0
+                    ? '<span class="badge bg-warning">Completed with errors</span>'
+                    : '<span class="badge bg-success">Success</span>';
+
+                const details = `${synced} synced, ${skipped} skipped${errors > 0 ? `, ${errors} errors` : ''}`;
+
+                return `
+                    <tr>
+                        <td>${date.toLocaleString()}</td>
+                        <td><span class="badge bg-info">Manual Sync</span></td>
+                        <td>${synced}</td>
+                        <td>${statusBadge}</td>
+                        <td><small>${details}</small></td>
+                    </tr>
+                `;
+            }).join('');
+
+        } catch (error) {
+            console.error('Error loading sync history:', error);
+            document.getElementById('posSyncHistoryBody').innerHTML =
+                '<tr><td colspan="5" class="text-center text-danger">Error loading sync history</td></tr>';
+        }
+    }
+
+    async function loadPOSConfigurationSummary() {
+        try {
+            const configs = await apiRequest('/api/pos/configurations');
+            const locations = await apiRequest('/api/locations/');
+
+            // Populate manual sync location dropdown with configured locations
+            const manualSyncSelect = document.getElementById('manualSyncLocation');
+            if (manualSyncSelect) {
+                manualSyncSelect.innerHTML = '<option value="">Select location to sync...</option>';
+
+                // Only show locations that have POS configurations
+                const configuredLocationIds = configs.map(c => c.location_id);
+                locations.forEach(loc => {
+                    if (configuredLocationIds.includes(loc.id)) {
+                        const option = document.createElement('option');
+                        option.value = loc.id;
+                        option.textContent = loc.name;
+                        manualSyncSelect.appendChild(option);
+                    }
+                });
+            }
+
+            // Also populate deduction location dropdown
+            const deductionSelect = document.getElementById('deductionLocation');
+            if (deductionSelect) {
+                deductionSelect.innerHTML = '<option value="">Select location...</option>';
+
+                const configuredLocationIds = configs.map(c => c.location_id);
+                locations.forEach(loc => {
+                    if (configuredLocationIds.includes(loc.id)) {
+                        const option = document.createElement('option');
+                        option.value = loc.id;
+                        option.textContent = loc.name;
+                        deductionSelect.appendChild(option);
+                    }
+                });
+            }
+
+            if (!Array.isArray(configs) || configs.length === 0) {
+                document.getElementById('posConfigSummaryCard').style.display = 'none';
+                return;
+            }
+
+            // Create location lookup
+            const locationMap = {};
+            locations.forEach(loc => {
+                locationMap[loc.id] = loc.name;
+            });
+
+            // Build summary table
+            const tbody = document.getElementById('posConfigSummaryBody');
+            tbody.innerHTML = '';
+
+            for (const config of configs) {
+                const row = document.createElement('tr');
+
+                // Get sales count for this location
+                let salesCount = 0;
+                try {
+                    const sales = await apiRequest(`/api/pos/sales?location_id=${config.location_id}&limit=1000`);
+                    salesCount = Array.isArray(sales) ? sales.length : 0;
+                } catch (e) {
+                    console.error('Error fetching sales count:', e);
+                }
+
+                const lastSync = config.last_sync_date
+                    ? new Date(config.last_sync_date).toLocaleString()
+                    : 'Never';
+
+                const autoSyncBadge = config.auto_sync_enabled
+                    ? `<span class="badge bg-success">Enabled (${config.sync_frequency_minutes || 60} min)</span>`
+                    : '<span class="badge bg-secondary">Disabled</span>';
+
+                const statusBadge = config.is_active
+                    ? '<span class="badge bg-success">Active</span>'
+                    : '<span class="badge bg-secondary">Inactive</span>';
+
+                row.innerHTML = `
+                    <td>${locationMap[config.location_id] || 'Unknown'}</td>
+                    <td>${config.provider.charAt(0).toUpperCase() + config.provider.slice(1)}</td>
+                    <td><small>${lastSync}</small></td>
+                    <td>${salesCount}</td>
+                    <td>${autoSyncBadge}</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="editPOSConfiguration(${config.location_id})">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                    </td>
+                `;
+
+                // Make row clickable
+                row.style.cursor = 'pointer';
+                row.setAttribute('data-location-id', config.location_id);
+                row.addEventListener('click', function(e) {
+                    // Don't trigger if clicking the button directly
+                    if (!e.target.closest('button')) {
+                        editPOSConfiguration(config.location_id);
+                    }
+                });
+
+                tbody.appendChild(row);
+            }
+
+            document.getElementById('posConfigSummaryCard').style.display = 'block';
+
+        } catch (error) {
+            console.error('Error loading POS configuration summary:', error);
+            document.getElementById('posConfigSummaryCard').style.display = 'none';
+        }
+    }
+
+    async function loadPOSLocations() {
+        try {
+            const response = await apiRequest('/api/locations/');
+            const locationsList = Array.isArray(response) ? response : [];
+
+            // Get all POS configurations to check which locations are configured
+            let configuredLocations = new Set();
+            try {
+                const configs = await apiRequest('/api/pos/configurations');
+                if (Array.isArray(configs)) {
+                    configs.forEach(config => configuredLocations.add(config.location_id));
+                }
+            } catch (e) {
+                console.log('No POS configurations found');
+            }
+
+            const select = document.getElementById('posLocationMapping');
+            select.innerHTML = '<option value="">Select default location...</option>';
+
+            locationsList.forEach(loc => {
+                const option = document.createElement('option');
+                option.value = loc.id;
+                // Add checkmark if location has POS configured
+                option.textContent = configuredLocations.has(loc.id)
+                    ? `✓ ${loc.name} (Configured)`
+                    : loc.name;
+                select.appendChild(option);
+            });
+
+            console.log('POS locations loaded:', locationsList.length);
+        } catch (error) {
+            console.error('Error loading POS locations:', error);
+            showAlert('Error loading locations: ' + error.message, 'danger');
+        }
+    }
+
+    async function loadPOSConfiguration() {
+        try {
+            const locationId = document.getElementById('posLocationMapping').value;
+
+            // If no location selected yet, try to load the first configuration
+            if (!locationId) {
+                const configs = await apiRequest('/api/pos/configurations');
+                if (configs && configs.length > 0) {
+                    const config = configs[0];
+                    document.getElementById('posLocationMapping').value = config.location_id;
+                    await loadConfigForLocation(config.location_id);
+                }
+            } else {
+                await loadConfigForLocation(locationId);
+            }
+        } catch (error) {
+            console.error('Error loading POS configuration:', error);
+        }
+    }
+
+    async function loadConfigForLocation(locationId) {
+        try {
+            const config = await apiRequest(`/api/pos/configurations/${locationId}`);
+
+            // Populate form fields
+            document.getElementById('posSystemType').value = config.provider || 'clover';
+            document.getElementById('posMerchantId').value = config.merchant_id || '';
+            document.getElementById('posEnvironment').value = config.api_environment || 'production';
+            document.getElementById('posAutoSync').checked = config.auto_sync_enabled || false;
+            document.getElementById('posSyncFrequency').value = config.sync_frequency_minutes || 60;
+
+            // Show/hide frequency field
+            const frequencyContainer = document.getElementById('syncFrequencyContainer');
+            if (config.auto_sync_enabled) {
+                frequencyContainer.style.display = 'block';
+            } else {
+                frequencyContainer.style.display = 'none';
+            }
+
+            // Update status
+            document.getElementById('posConnectionStatus').innerHTML =
+                config.is_active ? '<span class="badge bg-success">Configured</span>' : '<span class="badge bg-secondary">Not Configured</span>';
+
+            // Update last sync
+            if (config.last_sync_date) {
+                const lastSync = new Date(config.last_sync_date);
+                document.getElementById('posLastSync').textContent = lastSync.toLocaleString();
+            } else {
+                document.getElementById('posLastSync').textContent = 'Never';
+            }
+
+            // Update items synced count - get total count from database
+            const salesResponse = await apiRequest(`/api/pos/sales?location_id=${locationId}&limit=1000`);
+            const totalSales = Array.isArray(salesResponse) ? salesResponse.length : 0;
+            document.getElementById('posItemsSynced').textContent = totalSales;
+
+        } catch (error) {
+            console.error('No configuration found for location:', locationId);
+            // Reset form if no config found
+            document.getElementById('posSystemType').value = 'clover';
+            document.getElementById('posMerchantId').value = '';
+            document.getElementById('posEnvironment').value = 'production';
+            document.getElementById('posAutoSync').checked = false;
+            document.getElementById('posConnectionStatus').innerHTML = '<span class="badge bg-secondary">Not Configured</span>';
+            document.getElementById('posLastSync').textContent = 'Never';
+            document.getElementById('posItemsSynced').textContent = '0';
+        }
+    }
+
+    // Add event listener for location change
+    document.getElementById('posLocationMapping')?.addEventListener('change', async function() {
+        const locationId = this.value;
+        if (locationId) {
+            await loadConfigForLocation(locationId);
+        }
+    });
+
+    // Show/hide sync frequency based on auto-sync checkbox
+    document.getElementById('posAutoSync')?.addEventListener('change', function() {
+        const frequencyContainer = document.getElementById('syncFrequencyContainer');
+        if (this.checked) {
+            frequencyContainer.style.display = 'block';
+        } else {
+            frequencyContainer.style.display = 'none';
+        }
+    });
+
+    async function syncPOSInventory() {
+        const locationId = document.getElementById('manualSyncLocation').value;
+
+        if (!locationId) {
+            showAlert('Please select a location to sync', 'warning');
+            return;
+        }
+
+        // Show loading state
+        const syncButton = event.target;
+        const originalHtml = syncButton.innerHTML;
+        syncButton.disabled = true;
+        syncButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Syncing...';
+
+        try {
+            // Get date range from inputs, or default to today
+            const startDate = document.getElementById('syncStartDate').value;
+            const endDate = document.getElementById('syncEndDate').value;
+            const today = new Date().toISOString().split('T')[0];
+
+            const response = await fetch(`/api/pos/sync/${locationId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${getToken()}`
+                },
+                body: JSON.stringify({
+                    start_date: startDate || today,
+                    end_date: endDate || today,
+                    limit: 2000
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Sync failed');
+            }
+
+            const result = await response.json();
+
+            if (result.success) {
+                showAlert(`Successfully synced ${result.orders_synced} orders! (${result.orders_skipped} already existed)`, 'success');
+
+                // Reload the configuration to get updated stats
+                await loadConfigForLocation(locationId);
+
+                // Add to sync activity
+                const activity = document.getElementById('posSyncActivity');
+                const activityHtml = `
+                    <div class="alert alert-success alert-sm mb-2">
+                        <strong>${new Date().toLocaleString()}</strong><br>
+                        Synced ${result.orders_synced} orders
+                    </div>
+                `;
+                activity.innerHTML = activityHtml + activity.innerHTML;
+            } else {
+                showAlert(`Sync completed with errors: ${result.message}`, 'warning');
+            }
+
+            // Reload sync history to show the new sync
+            await loadSyncHistory();
+
+        } catch (error) {
+            console.error('Sync error:', error);
+            showAlert('Failed to sync POS data: ' + error.message, 'danger');
+        } finally {
+            syncButton.disabled = false;
+            syncButton.innerHTML = originalHtml;
+        }
+    }
+
+    async function processInventoryDeductions() {
+        const locationId = document.getElementById('deductionLocation').value;
+
+        if (!locationId) {
+            showAlert('Please select a location', 'warning');
+            return;
+        }
+
+        // Use custom confirmation modal
+        showConfirmation(
+            'Process Inventory Deductions',
+            'Process inventory deductions for all unprocessed sales?\n\nThis will automatically deduct inventory based on mapped POS items. This operation may take a moment to complete.',
+            async () => {
+                await executeDeductionProcess(locationId);
+            },
+            'Process',
+            'btn-warning'
+        );
+    }
+
+    async function executeDeductionProcess(locationId) {
+        // Show loading state
+        const button = document.querySelector('[onclick="processInventoryDeductions()"]');
+        const originalHtml = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...';
+
+        try {
+            const result = await apiRequest(`/api/pos/process-deductions/${locationId}`, {
+                method: 'POST'
+            });
+
+            if (result.success) {
+                showAlert(
+                    `Successfully processed ${result.sales_processed} sales!\n` +
+                    `${result.items_deducted} items deducted, ${result.items_skipped} items skipped (no mapping), ` +
+                    `${result.transactions_created} transactions created`,
+                    'success'
+                );
+            } else {
+                showAlert(`Processing failed: ${result.message}`, 'danger');
+            }
+
+        } catch (error) {
+            console.error('Processing error:', error);
+            showAlert('Failed to process deductions: ' + error.message, 'danger');
+        } finally {
+            button.disabled = false;
+            button.innerHTML = originalHtml;
+        }
     }
 </script>
 {% endblock %}

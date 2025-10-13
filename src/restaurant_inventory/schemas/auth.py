@@ -33,7 +33,7 @@ class UserResponse(BaseModel):
 class UserCreate(BaseModel):
     username: str
     email: EmailStr
-    password: str
+    password: Optional[str] = None  # Optional - if not provided, invitation email will be sent
     full_name: str
     role: str = "Staff"
 

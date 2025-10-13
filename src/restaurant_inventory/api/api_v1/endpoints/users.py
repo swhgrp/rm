@@ -3,16 +3,23 @@ User management endpoints (Admin only)
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import secrets
+import logging
 
 from restaurant_inventory.core.deps import get_db, get_current_user, require_admin
 from restaurant_inventory.models.user import User
+from restaurant_inventory.models.password_reset_token import PasswordResetToken
 from restaurant_inventory.core.security import get_password_hash
+from restaurant_inventory.core.config import settings
 from restaurant_inventory.schemas.auth import UserCreate, UserResponse, UserUpdate
 from restaurant_inventory.core.audit import log_audit_event, create_change_dict
+from restaurant_inventory.services.email import EmailService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 @router.get("/", response_model=List[UserResponse])
 async def list_users(
@@ -80,7 +87,12 @@ async def create_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin)
 ):
-    """Create new user (Admin only)"""
+    """
+    Create new user (Admin only)
+
+    If password is not provided, an invitation email will be sent to the user
+    with a secure link to set up their account.
+    """
 
     # Check if username already exists
     existing_user = db.query(User).filter(User.username == user_data.username).first()
@@ -98,20 +110,75 @@ async def create_user(
             detail="Email already registered"
         )
 
+    # Determine if we're using invitation flow or direct password
+    using_invitation = user_data.password is None
+
     # Create new user
-    new_user = User(
-        username=user_data.username,
-        email=user_data.email,
-        full_name=user_data.full_name,
-        hashed_password=get_password_hash(user_data.password),
-        role=user_data.role,
-        is_active=True,
-        is_verified=True
-    )
+    if using_invitation:
+        # Generate a temporary placeholder password (user will set their own via invitation)
+        temp_password = secrets.token_urlsafe(32)
+        new_user = User(
+            username=user_data.username,
+            email=user_data.email,
+            full_name=user_data.full_name,
+            hashed_password=get_password_hash(temp_password),
+            role=user_data.role,
+            is_active=False,  # Inactive until they set their password
+            is_verified=False
+        )
+    else:
+        # Direct password provided
+        new_user = User(
+            username=user_data.username,
+            email=user_data.email,
+            full_name=user_data.full_name,
+            hashed_password=get_password_hash(user_data.password),
+            role=user_data.role,
+            is_active=True,
+            is_verified=True
+        )
 
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
+    # If using invitation flow, create token and send email
+    if using_invitation:
+        try:
+            # Generate secure token
+            token = secrets.token_urlsafe(32)
+            expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS)
+
+            # Create token record
+            reset_token = PasswordResetToken(
+                user_id=new_user.id,
+                token=token,
+                token_type="invitation",
+                expires_at=expires_at
+            )
+            db.add(reset_token)
+            db.commit()
+
+            # Build setup URL
+            setup_url = f"{settings.APP_URL}/setup-password?token={token}"
+
+            # Send invitation email
+            email_sent = EmailService.send_user_invitation(
+                to_email=new_user.email,
+                full_name=new_user.full_name,
+                username=new_user.username,
+                setup_url=setup_url
+            )
+
+            if not email_sent:
+                logger.warning(f"Failed to send invitation email to {new_user.email}")
+                # Don't fail the user creation, just log the warning
+
+            logger.info(f"Invitation email sent to {new_user.email} for user {new_user.username}")
+
+        except Exception as e:
+            logger.error(f"Error sending invitation email: {str(e)}", exc_info=True)
+            # Don't fail the user creation, admin can resend invitation
 
     # Log audit event
     log_audit_event(
@@ -124,7 +191,8 @@ async def create_user(
             "username": new_user.username,
             "email": new_user.email,
             "full_name": new_user.full_name,
-            "role": new_user.role
+            "role": new_user.role,
+            "invitation_sent": using_invitation
         }},
         request=request
     )
@@ -311,6 +379,36 @@ async def delete_user(
             detail="Cannot delete your own account"
         )
 
+    # Nullify all foreign key references to this user in other tables
+    # This preserves the data but removes the foreign key constraints
+
+    # Audit logs
+    from restaurant_inventory.models.audit_log import AuditLog
+    db.query(AuditLog).filter(AuditLog.user_id == user_id).update(
+        {AuditLog.user_id: None}, synchronize_session=False
+    )
+
+    # Use raw SQL for tables that might not have models yet
+    db.execute(text("UPDATE inventory_transactions SET created_by_id = NULL WHERE created_by_id = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE invoices SET uploaded_by_id = NULL WHERE uploaded_by_id = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE invoices SET reviewed_by_id = NULL WHERE reviewed_by_id = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE invoices SET approved_by_id = NULL WHERE approved_by_id = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE recipes SET created_by_id = NULL WHERE created_by_id = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE count_templates SET created_by = NULL WHERE created_by = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE transfers SET requested_by = NULL WHERE requested_by = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE transfers SET approved_by = NULL WHERE approved_by = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE count_sessions SET started_by = NULL WHERE started_by = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE count_sessions SET completed_by = NULL WHERE completed_by = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE count_sessions SET approved_by = NULL WHERE approved_by = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE waste_records SET recorded_by = NULL WHERE recorded_by = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE invoice_items SET mapped_by_id = NULL WHERE mapped_by_id = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE count_session_items SET counted_by = NULL WHERE counted_by = :user_id"), {"user_id": user_id})
+    db.execute(text("UPDATE count_session_storage_areas SET finished_by = NULL WHERE finished_by = :user_id"), {"user_id": user_id})
+
+    # Delete related records that should be removed with the user
+    db.execute(text("DELETE FROM user_locations WHERE user_id = :user_id"), {"user_id": user_id})
+    db.execute(text("DELETE FROM password_reset_tokens WHERE user_id = :user_id"), {"user_id": user_id})
+
     # Log before deletion
     log_audit_event(
         db=db,
@@ -402,3 +500,100 @@ async def change_password(
     )
 
     return {"message": "Password changed successfully"}
+
+
+@router.get("/{user_id}/locations")
+async def get_user_locations(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Get assigned locations for a user (Admin only)"""
+    from sqlalchemy.orm import joinedload
+
+    user = db.query(User).options(
+        joinedload(User.assigned_locations)
+    ).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    return {
+        "user_id": user.id,
+        "username": user.username,
+        "assigned_locations": [
+            {"id": loc.id, "name": loc.name, "address": loc.address}
+            for loc in user.assigned_locations
+        ]
+    }
+
+
+@router.post("/{user_id}/locations")
+async def assign_user_locations(
+    user_id: int,
+    location_data: dict,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Assign locations to a user (Admin only)
+
+    Body should be: {"location_ids": [1, 2, 3]}
+    Empty array means user has access to all locations (no restrictions)
+    """
+    from restaurant_inventory.models.location import Location
+    from sqlalchemy.orm import joinedload
+
+    user = db.query(User).options(
+        joinedload(User.assigned_locations)
+    ).filter(User.id == user_id).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    location_ids = location_data.get('location_ids', [])
+
+    # Validate all location IDs exist
+    if location_ids:
+        locations = db.query(Location).filter(Location.id.in_(location_ids)).all()
+        if len(locations) != len(location_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="One or more location IDs are invalid"
+            )
+    else:
+        locations = []
+
+    # Store old assignments for audit log
+    old_location_ids = [loc.id for loc in user.assigned_locations]
+
+    # Update assignments - replace all
+    user.assigned_locations = locations
+    db.commit()
+
+    # Log audit event
+    log_audit_event(
+        db=db,
+        action="UPDATE",
+        entity_type="user_locations",
+        entity_id=user.id,
+        user=current_user,
+        changes={
+            "old_locations": old_location_ids,
+            "new_locations": location_ids
+        },
+        request=request
+    )
+
+    return {
+        "message": "User locations updated successfully",
+        "user_id": user.id,
+        "assigned_location_count": len(locations),
+        "has_restrictions": len(locations) > 0
+    }

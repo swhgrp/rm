@@ -38,7 +38,6 @@ class CloverAPIClient:
             self.base_url = "https://api.clover.com"  # North America
 
         self.headers = {
-            "Authorization": f"Bearer {self.access_token}",
             "Accept": "application/json"
         }
 
@@ -51,6 +50,15 @@ class CloverAPIClient:
     ) -> Dict[str, Any]:
         """Make HTTP request to Clover API"""
         url = f"{self.base_url}/v3/merchants/{self.merchant_id}/{endpoint}"
+
+        # Add access token to params (Clover uses token query param, not Bearer header)
+        if params is None:
+            params = {}
+        params['access_token'] = self.access_token
+
+        logger.debug(f"Making Clover API request: {method} {url}")
+        logger.debug(f"Token length: {len(self.access_token)}")
+        logger.debug(f"Params: {params}")
 
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
@@ -65,6 +73,7 @@ class CloverAPIClient:
                 return response.json()
         except httpx.HTTPStatusError as e:
             logger.error(f"Clover API error: {e.response.status_code} - {e.response.text}")
+            logger.error(f"Request URL: {e.request.url}")
             raise Exception(f"Clover API error: {e.response.status_code}")
         except Exception as e:
             logger.error(f"Error making Clover API request: {str(e)}")
@@ -92,21 +101,32 @@ class CloverAPIClient:
         params = {
             "limit": limit,
             "offset": offset,
-            "expand": "lineItems"  # Include line items in response
+            "expand": "lineItems,payments,discounts,refunds"  # Include all order details
         }
 
         # Add date filters if provided
-        if start_date:
-            # Clover uses milliseconds since epoch
+        # Clover API doesn't support AND operator, so we can only filter by start OR end
+        # When both dates are provided and the range is small (<=7 days), use end_date filter
+        # to get older orders, then filter by start_date manually in calling code
+        if start_date and end_date:
+            # Calculate day difference
+            day_diff = (end_date - start_date).days
+            if day_diff <= 7:
+                # Short date range - use end_date filter to get older orders
+                end_ms = int(datetime.combine(end_date, datetime.max.time()).timestamp() * 1000)
+                params["filter"] = f"createdTime<={end_ms}"
+            else:
+                # Long date range - use start_date filter
+                start_ms = int(datetime.combine(start_date, datetime.min.time()).timestamp() * 1000)
+                params["filter"] = f"createdTime>={start_ms}"
+        elif start_date:
+            # Only start date provided
             start_ms = int(datetime.combine(start_date, datetime.min.time()).timestamp() * 1000)
             params["filter"] = f"createdTime>={start_ms}"
-
-        if end_date:
+        elif end_date:
+            # Only end date provided
             end_ms = int(datetime.combine(end_date, datetime.max.time()).timestamp() * 1000)
-            if "filter" in params:
-                params["filter"] += f" AND createdTime<={end_ms}"
-            else:
-                params["filter"] = f"createdTime<={end_ms}"
+            params["filter"] = f"createdTime<={end_ms}"
 
         return await self._make_request("GET", "orders", params=params)
 
@@ -115,7 +135,7 @@ class CloverAPIClient:
         return await self._make_request(
             "GET",
             f"orders/{order_id}",
-            params={"expand": "lineItems,payments"}
+            params={"expand": "lineItems"}
         )
 
     async def get_order_line_items(self, order_id: str) -> Dict[str, Any]:
@@ -139,6 +159,40 @@ class CloverAPIClient:
         """Get a single inventory item by ID"""
         return await self._make_request("GET", f"items/{item_id}")
 
+    async def get_payments(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        limit: int = 1000
+    ) -> Dict[str, Any]:
+        """
+        Get payments from Clover (actual completed sales)
+
+        This is different from orders - payments represent actual money collected
+
+        Args:
+            start_date: Filter payments from this date
+            end_date: Filter payments until this date
+            limit: Maximum number of payments to return (capped at 1000 by Clover)
+
+        Returns:
+            Dictionary with 'elements' list of payments
+        """
+        # Clover API has a maximum limit of 1000
+        limit = min(limit, 1000)
+
+        params = {
+            "limit": limit,
+            "expand": "lineItems,order"  # Include line items and order info
+        }
+
+        # Add date filters if provided
+        if start_date:
+            start_ms = int(datetime.combine(start_date, datetime.min.time()).timestamp() * 1000)
+            params["filter"] = f"createdTime>={start_ms}"
+
+        return await self._make_request("GET", "payments", params=params)
+
     async def test_connection(self) -> bool:
         """
         Test if API credentials are valid
@@ -149,13 +203,67 @@ class CloverAPIClient:
         try:
             # Try to get merchant properties - this is a simple endpoint that verifies auth
             url = f"{self.base_url}/v3/merchants/{self.merchant_id}"
+            params = {'access_token': self.access_token}
             async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(url, headers=self.headers)
+                response = await client.get(url, headers=self.headers, params=params)
                 response.raise_for_status()
                 return True
         except Exception as e:
             logger.error(f"Clover connection test failed: {str(e)}")
             return False
+
+
+def parse_clover_payment(clover_payment: Dict) -> Dict[str, Any]:
+    """
+    Parse Clover payment data into our sales schema format
+
+    Payments represent actual completed transactions with real money collected,
+    including tax, tips, and discounts already calculated by Clover.
+
+    Args:
+        clover_payment: Raw payment data from Clover API
+
+    Returns:
+        Parsed payment data ready for database insertion
+    """
+    # Convert Clover timestamp (milliseconds) to datetime
+    payment_date = datetime.fromtimestamp(clover_payment.get("createdTime", 0) / 1000)
+
+    # Parse amounts (Clover uses cents, convert to dollars)
+    # Payment amount is the total actually collected
+    amount = float(clover_payment.get("amount", 0)) / 100
+    tax = float(clover_payment.get("taxAmount", 0)) / 100 if clover_payment.get("taxAmount") else 0
+    tip = float(clover_payment.get("tipAmount", 0)) / 100 if clover_payment.get("tipAmount") else 0
+
+    # Calculate subtotal (net sales = amount - tax - tip)
+    subtotal = amount - tax - tip
+
+    # Check if payment was successful
+    result = clover_payment.get("result", "").upper()
+    status = "completed" if result == "SUCCESS" else "failed"
+
+    # Get order ID for reference
+    order_id = None
+    if clover_payment.get("order") and clover_payment["order"].get("id"):
+        order_id = clover_payment["order"]["id"]
+
+    parsed = {
+        "pos_order_id": clover_payment["id"],  # Use payment ID as order ID
+        "order_number": order_id[-8:] if order_id else clover_payment["id"][-8:],
+        "order_date": payment_date,
+        "subtotal": subtotal,
+        "tax": tax,
+        "tip": tip,
+        "discount": 0,  # Discounts are already applied to the amount
+        "total": amount,
+        "customer_name": None,
+        "status": status,
+        "order_type": None,
+        "raw_data": str(clover_payment),
+        "synced_at": datetime.utcnow()
+    }
+
+    return parsed
 
 
 def parse_clover_order(clover_order: Dict) -> Dict[str, Any]:
@@ -172,17 +280,53 @@ def parse_clover_order(clover_order: Dict) -> Dict[str, Any]:
     order_date = datetime.fromtimestamp(clover_order.get("createdTime", 0) / 1000)
 
     # Parse amounts (Clover uses cents, convert to dollars)
-    total = float(clover_order.get("total", 0)) / 100
-    tax = float(clover_order.get("taxAmount", 0)) / 100 if clover_order.get("taxAmount") else 0
-    tip = float(clover_order.get("tipAmount", 0)) / 100 if clover_order.get("tipAmount") else 0
-    discount = float(clover_order.get("discountAmount", 0)) / 100 if clover_order.get("discountAmount") else 0
+    # NOTE: Clover's order.total INCLUDES tax but NOT tip
+    order_total = float(clover_order.get("total", 0)) / 100
 
-    # Calculate subtotal
-    subtotal = total - tax - tip + discount
+    # Extract tax, tip, and discounts from payments (if available)
+    tax = 0
+    tip = 0
+    total_paid = 0
+    discount = 0
+
+    if clover_order.get("payments") and clover_order["payments"].get("elements"):
+        for payment in clover_order["payments"]["elements"]:
+            # Skip refunded/voided payments
+            if payment.get("result") == "SUCCESS":
+                # Sum up all successful payments
+                total_paid += float(payment.get("amount", 0)) / 100
+                tax += float(payment.get("taxAmount", 0)) / 100 if payment.get("taxAmount") else 0
+                tip += float(payment.get("tipAmount", 0)) / 100 if payment.get("tipAmount") else 0
+
+                # Check for cashDiscount (this is the discount amount)
+                if payment.get("cashDiscountAmount"):
+                    discount += float(payment.get("cashDiscountAmount", 0)) / 100
+
+    # Use total_paid if available (actual amount paid), otherwise use order total
+    total = total_paid if total_paid > 0 else order_total
+
+    # If no payments yet, check order-level discount
+    if discount == 0 and clover_order.get("discounts") and clover_order["discounts"].get("elements"):
+        for disc in clover_order["discounts"]["elements"]:
+            discount += float(disc.get("amount", 0)) / 100
+
+    # Calculate subtotal (pre-tax sales before discounts)
+    # Clover's order.total = subtotal + tax + discount (discount is negative)
+    # Therefore: subtotal = order.total - tax - discount
+    # Since discount is negative (e.g., -$5), subtracting it adds it back
+    subtotal = order_total - tax - discount
 
     # Parse order state
     state = clover_order.get("state", "").lower()
-    status = "completed" if state == "locked" else state
+
+    # Check if order has refunds
+    has_refunds = False
+    if clover_order.get("refunds") and clover_order["refunds"].get("elements"):
+        has_refunds = True
+        # Mark as refunded if there are refunds
+        status = "refunded"
+    else:
+        status = "completed" if state == "locked" else state
 
     # Customer info
     customer_name = None
@@ -234,9 +378,9 @@ def parse_clover_line_items(clover_order: Dict) -> List[Dict[str, Any]]:
         parsed_item = {
             "pos_item_id": item.get("item", {}).get("id") if item.get("item") else None,
             "item_name": item.get("name", "Unknown Item"),
-            "quantity": float(item.get("unitQty", 1)) / 1000,  # Clover uses thousandths
+            "quantity": float(item.get("unitQty", 1)),  # Clover quantity is already in units
             "unit_price": float(item.get("price", 0)) / 100,  # Convert cents to dollars
-            "total_price": (float(item.get("price", 0)) / 100) * (float(item.get("unitQty", 1)) / 1000),
+            "total_price": (float(item.get("price", 0)) / 100) * float(item.get("unitQty", 1)),
             "notes": item.get("note")
         }
 

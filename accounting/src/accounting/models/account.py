@@ -30,7 +30,7 @@ class Account(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Relationships
+    # Relationships (using lazy loading to avoid circular imports)
     parent_account = relationship("Account", remote_side=[id], backref="sub_accounts")
-    journal_entry_lines = relationship("JournalEntryLine", back_populates="account")
-    balances = relationship("AccountBalance", back_populates="account")
+    journal_entry_lines = relationship("JournalEntryLine", back_populates="account", lazy="dynamic")
+    balances = relationship("AccountBalance", back_populates="account", lazy="dynamic")

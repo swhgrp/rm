@@ -207,8 +207,13 @@ async def get_usage_report(
         beginning_session = sessions[0]
         ending_session = sessions[-1]
 
-    # Get items from both sessions
-    beginning_items_query = db.query(CountSessionItem).filter(
+    # Get items from both sessions with relationships eagerly loaded
+    from sqlalchemy.orm import joinedload
+
+    beginning_items_query = db.query(CountSessionItem).options(
+        joinedload(CountSessionItem.master_item),
+        joinedload(CountSessionItem.storage_area)
+    ).filter(
         CountSessionItem.session_id == beginning_session.id
     )
     ending_items_query = db.query(CountSessionItem).filter(
@@ -253,7 +258,7 @@ async def get_usage_report(
                 beginning_quantity=beginning_qty,
                 ending_quantity=ending_qty,
                 usage=usage,
-                unit=begin_item.master_item.unit_of_measure if begin_item.master_item else "",
+                unit=(begin_item.master_item.unit_of_measure or "") if begin_item.master_item else "",
                 unit_cost=unit_cost,
                 total_usage_cost=total_cost
             ))

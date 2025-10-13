@@ -153,7 +153,7 @@ class POSConfiguration(Base):
 
 
 class POSItemMapping(Base):
-    """Maps POS menu items to recipes for cost tracking"""
+    """Maps POS menu items to recipes or master items for cost tracking"""
     __tablename__ = "pos_item_mappings"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -163,8 +163,9 @@ class POSItemMapping(Base):
     pos_item_id = Column(String(255), nullable=False)  # Clover item ID
     pos_item_name = Column(String(200), nullable=False)
 
-    # Our Recipe
-    recipe_id = Column(Integer, ForeignKey("recipes.id"), nullable=False)
+    # Mapping Options (must have at least one)
+    recipe_id = Column(Integer, ForeignKey("recipes.id"), nullable=True)  # Map to recipe (for complex items)
+    master_item_id = Column(Integer, ForeignKey("master_items.id"), nullable=True)  # Map to inventory item (for simple items)
 
     # Portion Multiplier (if POS portion differs from recipe yield)
     portion_multiplier = Column(Numeric(10, 3), default=1.0)  # e.g., 0.5 for half portion
@@ -181,7 +182,9 @@ class POSItemMapping(Base):
 
     # Relationships
     recipe = relationship("Recipe")
+    master_item = relationship("MasterItem")
     location = relationship("Location", foreign_keys=[location_id])
 
     def __repr__(self):
-        return f"<POSItemMapping(pos_item='{self.pos_item_name}', recipe_id={self.recipe_id})>"
+        target = f"recipe={self.recipe_id}" if self.recipe_id else f"item={self.master_item_id}"
+        return f"<POSItemMapping(pos_item='{self.pos_item_name}', {target})>"

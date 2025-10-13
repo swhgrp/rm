@@ -78,3 +78,16 @@ migrations/
 # Temporary files
 *.tmp
 *.bak
+
+# Debugging and testing scripts (keep in root to avoid accidental commits)
+check_*.py
+test_*.py
+debug_*.py
+analyze_*.py
+investigate_*.py
+sync_*_manual.py
+clear_*.py
+delete_*.py
+manual_*.py
+resync_*.py
+fix_*.py

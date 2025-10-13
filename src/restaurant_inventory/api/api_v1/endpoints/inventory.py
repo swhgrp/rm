@@ -5,17 +5,19 @@ Inventory CRUD endpoints
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from decimal import Decimal
 
 from restaurant_inventory.core.deps import get_db, get_current_user, require_manager_or_admin
 from restaurant_inventory.models.inventory import Inventory
+from restaurant_inventory.models.inventory_transaction import InventoryTransaction, TransactionType
 from restaurant_inventory.models.location import Location
 from restaurant_inventory.models.item import MasterItem
 from restaurant_inventory.models.user import User
 from restaurant_inventory.models.storage_area import StorageArea
 from restaurant_inventory.core.audit import log_audit_event
 from restaurant_inventory.schemas.inventory import InventoryCreate, InventoryUpdate, InventoryResponse
+from datetime import datetime, date
 
 class InventoryCountUpdate(BaseModel):
     new_quantity: float
@@ -103,6 +105,48 @@ async def get_location_inventory(
         db=db, 
         current_user=current_user
     )
+
+# Transactions endpoint - MUST be before /{inventory_id} to avoid path conflicts
+@router.get("/transactions")
+async def get_inventory_transactions(
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get inventory transactions with filtering"""
+    # Query transactions
+    query = db.query(InventoryTransaction).options(
+        joinedload(InventoryTransaction.master_item),
+        joinedload(InventoryTransaction.location)
+    )
+
+    query = query.order_by(InventoryTransaction.transaction_date.desc())
+    transactions = query.offset(skip).limit(limit).all()
+
+    # Return as plain dicts
+    result = []
+    for txn in transactions:
+        result.append({
+            "id": txn.id,
+            "master_item_id": txn.master_item_id,
+            "master_item_name": txn.master_item.name if txn.master_item else "Unknown",
+            "location_id": txn.location_id,
+            "location_name": txn.location.name if txn.location else None,
+            "transaction_type": txn.transaction_type,
+            "transaction_date": txn.transaction_date.isoformat() if txn.transaction_date else None,
+            "quantity_change": float(txn.quantity_change),
+            "unit_of_measure": txn.unit_of_measure,
+            "quantity_before": float(txn.quantity_before) if txn.quantity_before else None,
+            "quantity_after": float(txn.quantity_after) if txn.quantity_after else None,
+            "unit_cost": float(txn.unit_cost) if txn.unit_cost else None,
+            "total_cost": float(txn.total_cost) if txn.total_cost else None,
+            "pos_sale_id": txn.pos_sale_id,
+            "reason": txn.reason,
+            "notes": txn.notes
+        })
+
+    return result
 
 @router.get("/{inventory_id}", response_model=InventoryResponse)
 async def get_inventory_record(
@@ -322,3 +366,50 @@ async def update_inventory_count(
         "new_quantity": float(new_quantity),
         "difference": float(new_quantity) - old_quantity
     }
+
+
+# Inventory Transaction Endpoints
+
+class InventoryTransactionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    master_item_id: int
+    master_item_name: str
+    location_id: Optional[int] = None
+    location_name: Optional[str] = None
+    transaction_type: str
+    transaction_date: datetime
+    quantity_change: float
+    unit_of_measure: Optional[str] = None
+    quantity_before: Optional[float] = None
+    quantity_after: Optional[float] = None
+    unit_cost: Optional[float] = None
+    total_cost: Optional[float] = None
+    pos_sale_id: Optional[int] = None
+    reason: Optional[str] = None
+    notes: Optional[str] = None
+
+
+# Temporarily disabled
+# @router.get("/transactions/item/{master_item_id}", response_model=List[InventoryTransactionResponse])
+# async def get_item_transaction_history(
+#     master_item_id: int,
+#     skip: int = 0,
+#     limit: int = 100,
+#     location_id: Optional[int] = Query(None, description="Filter by location ID"),
+#     db: Session = Depends(get_db),
+#     current_user: User = Depends(get_current_user)
+# ):
+#     """Get transaction history for a specific item"""
+#     return await get_inventory_transactions(
+#         skip=skip,
+#         limit=limit,
+#         location_id=location_id,
+#         master_item_id=master_item_id,
+#         transaction_type=None,
+#         start_date=None,
+#         end_date=None,
+#         db=db,
+#         current_user=current_user
+#     )

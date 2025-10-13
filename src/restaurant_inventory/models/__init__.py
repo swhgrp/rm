@@ -4,6 +4,8 @@ from .user import User
 from .item import MasterItem
 from .vendor_item import VendorItem
 from .inventory import Inventory
+from .pos_sale import POSSale, POSSaleItem
+from .inventory_transaction import InventoryTransaction, TransactionType
 from .transfer import Transfer
 from .waste import WasteRecord
 from .audit_log import AuditLog
@@ -17,7 +19,8 @@ from .unit_of_measure import UnitCategory, UnitOfMeasure
 from .role import Role
 
 __all__ = [
-    "Location", "StorageArea", "User", "MasterItem", "VendorItem", "Inventory", "Transfer",
+    "Location", "StorageArea", "User", "MasterItem", "VendorItem", "Inventory", "POSSale", "POSSaleItem",
+    "InventoryTransaction", "TransactionType", "Transfer",
     "WasteRecord", "AuditLog", "Vendor", "Invoice", "InvoiceItem", "InvoiceStatus",
     "Recipe", "RecipeIngredient", "RecipeCategory", "Category", "CountTemplate", "CountSession",
     "UnitCategory", "UnitOfMeasure", "Role"

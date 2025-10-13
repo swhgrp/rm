@@ -2,10 +2,10 @@
 Dashboard Analytics API endpoints
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional
 
 from restaurant_inventory.core.deps import get_db, get_current_user
@@ -21,15 +21,33 @@ router = APIRouter()
 
 @router.get("/analytics")
 async def get_dashboard_analytics(
+    response: Response,
     location_id: Optional[int] = Query(None, description="Filter by location ID"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ) -> Dict[str, Any]:
     """Get dashboard analytics including KPIs and trends"""
 
-    # Date range: last 7 days
-    end_date = datetime.now()
-    start_date = end_date - timedelta(days=7)
+    # Prevent browser caching of analytics data
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
+    # Date range: previous 7 complete days (NOT including today)
+    # Use business timezone (America/New_York) to determine "today"
+    import pytz
+    local_tz = pytz.timezone('America/New_York')  # EDT/EST
+
+    # Get current time in business timezone
+    now_local = datetime.now(local_tz)
+    today_local = now_local.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Convert to UTC for database queries
+    today_midnight_utc = today_local.astimezone(timezone.utc)
+
+    # Get previous 7 days: today midnight UTC (excluded) back to 7 days ago
+    end_date = today_midnight_utc  # Start of today in UTC (excluded with <)
+    start_date = end_date - timedelta(days=7)  # 7 days before today
 
     # Build base query filters
     def apply_location_filter(query, model):
@@ -37,22 +55,45 @@ async def get_dashboard_analytics(
             return query.filter(model.location_id == location_id)
         return query
 
-    # Total Sales (Last 7 Days)
-    sales_query = db.query(func.sum(POSSale.total)).filter(
+    # Total Sales (Previous 7 Complete Days)
+    # Use subtotal (net sales before tax/tip) for consistency with Clover "Gross Sales"
+    # Exclude zero-dollar orders (voids, cancellations)
+    sales_query = db.query(func.sum(POSSale.subtotal)).filter(
         POSSale.order_date >= start_date,
-        POSSale.order_date <= end_date
+        POSSale.order_date < end_date,  # Exclude today
+        POSSale.total > 0  # Exclude zero-dollar orders
     )
     sales_query = apply_location_filter(sales_query, POSSale)
-    total_sales = sales_query.scalar() or 0.0
+    total_sales = float(sales_query.scalar() or 0.0)
 
-    # COGS (Last 7 Days) - Sum of approved invoices
+    # Previous Week Sales (for week-over-week comparison)
+    prev_week_end = start_date  # End of previous week = start of current week
+    prev_week_start = prev_week_end - timedelta(days=7)  # 7 days before that
+
+    prev_sales_query = db.query(func.sum(POSSale.subtotal)).filter(
+        POSSale.order_date >= prev_week_start,
+        POSSale.order_date < prev_week_end,
+        POSSale.total > 0  # Exclude zero-dollar orders
+    )
+    prev_sales_query = apply_location_filter(prev_sales_query, POSSale)
+    prev_week_sales = float(prev_sales_query.scalar() or 0.0)
+
+    # Calculate week-over-week percentage change
+    wow_change = None
+    if prev_week_sales > 0:
+        wow_change = ((total_sales - prev_week_sales) / prev_week_sales) * 100
+    elif total_sales > 0:
+        # Previous week had zero sales but current week has sales
+        wow_change = 100.0  # 100% increase from zero
+
+    # COGS (Previous 7 Complete Days) - Sum of approved invoices
     cogs_query = db.query(func.sum(Invoice.total)).filter(
         Invoice.invoice_date >= start_date,
-        Invoice.invoice_date <= end_date,
+        Invoice.invoice_date < end_date,  # Exclude today
         Invoice.status == 'APPROVED'
     )
     cogs_query = apply_location_filter(cogs_query, Invoice)
-    total_cogs = cogs_query.scalar() or 0.0
+    total_cogs = float(cogs_query.scalar() or 0.0)
 
     # Gross Margin %
     gross_margin = ((total_sales - total_cogs) / total_sales * 100) if total_sales > 0 else 0.0
@@ -62,7 +103,7 @@ async def get_dashboard_analytics(
         func.sum(Inventory.current_quantity * Inventory.unit_cost)
     )
     inv_query = apply_location_filter(inv_query, Inventory)
-    inventory_value = inv_query.scalar() or 0.0
+    inventory_value = float(inv_query.scalar() or 0.0)
 
     # Daily Sales & COGS for trend chart (last 7 days)
     daily_data = []
@@ -70,9 +111,10 @@ async def get_dashboard_analytics(
         day = start_date + timedelta(days=i)
         day_end = day + timedelta(days=1)
 
-        day_sales_query = db.query(func.sum(POSSale.total)).filter(
+        day_sales_query = db.query(func.sum(POSSale.subtotal)).filter(
             POSSale.order_date >= day,
-            POSSale.order_date < day_end
+            POSSale.order_date < day_end,
+            POSSale.total > 0  # Exclude zero-dollar orders
         )
         day_sales_query = apply_location_filter(day_sales_query, POSSale)
         day_sales = day_sales_query.scalar() or 0.0
@@ -199,7 +241,9 @@ async def get_dashboard_analytics(
             'total_sales': float(total_sales),
             'total_cogs': float(total_cogs),
             'gross_margin': float(gross_margin),
-            'inventory_value': float(inventory_value)
+            'inventory_value': float(inventory_value),
+            'wow_sales_change': wow_change,  # Week-over-week sales change percentage
+            'prev_week_sales': float(prev_week_sales)  # Previous week sales amount
         },
         'daily_trend': daily_data,
         'top_items': top_items,

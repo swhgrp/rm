@@ -287,17 +287,13 @@ function isAuthenticated() {
 }
 
 async function loadUnitsOfMeasure() {
-    console.log('[DEBUG] Loading units of measure from API...');
     try {
         const response = await apiRequest('/api/units/');
-        console.log('[DEBUG] Units API response:', response);
-        console.log('[DEBUG] Number of units:', response.length);
-        console.log('[DEBUG] Unit names:', response.map(u => u.name));
         unitsOfMeasure = response;
         // Don't populate dropdowns here - they don't exist yet
         // They will be populated when modal opens
     } catch (error) {
-        console.error('[ERROR] Error loading units of measure:', error);
+        console.error('Error loading units of measure:', error);
         showAlert('Error loading units of measure', 'danger');
     }
 }

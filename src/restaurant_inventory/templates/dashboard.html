@@ -86,7 +86,10 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h5><i class="bi bi-bar-chart"></i> Sales vs COGS Trend (Last 7 Days)</h5>
+                <h5>
+                    <i class="bi bi-bar-chart"></i> Sales vs COGS Trend (Last 7 Days)
+                    <span id="wowBadge"></span>
+                </h5>
             </div>
             <div class="card-body">
                 <canvas id="salesCOGSChart" height="80"></canvas>
@@ -173,11 +176,8 @@ let locations = [];
 
 async function loadLocations() {
     try {
-        const token = localStorage.getItem('access_token');
-        const response = await fetch('/api/locations/', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        locations = await response.json();
+        locations = await apiRequest('/api/locations/');
+        if (!locations) return; // Redirecting to login
 
         const select = document.getElementById('locationFilter');
         select.innerHTML = '<option value="">All Locations</option>';
@@ -197,29 +197,35 @@ async function loadLocations() {
 
 async function loadDashboardData() {
     try {
-        const token = localStorage.getItem('access_token');
         const locationFilter = document.getElementById('locationFilter');
         const locationId = locationFilter ? locationFilter.value : '';
         const url = locationId ? `/api/dashboard/analytics?location_id=${locationId}` : '/api/dashboard/analytics';
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Dashboard API error:', response.status, errorText);
-            throw new Error(`Failed to load dashboard data: ${response.status}`);
-        }
+        const data = await apiRequest(url);
 
-        const data = await response.json();
+        // If null returned, means we're redirecting to login
+        if (!data) return;
 
         // Update KPIs
         document.getElementById('totalSales').textContent = '$' + data.kpis.total_sales.toFixed(2);
         document.getElementById('totalCOGS').textContent = '$' + data.kpis.total_cogs.toFixed(2);
         document.getElementById('grossMargin').textContent = data.kpis.gross_margin.toFixed(1) + '%';
         document.getElementById('inventoryValue').textContent = '$' + data.kpis.inventory_value.toFixed(2);
+
+        // Update Week-over-Week badge
+        const wowBadge = document.getElementById('wowBadge');
+        if (data.kpis.wow_sales_change !== null && data.kpis.wow_sales_change !== undefined) {
+            const change = data.kpis.wow_sales_change;
+            const currentSales = data.kpis.total_sales;
+            const prevSales = data.kpis.prev_week_sales;
+            const isPositive = change >= 0;
+            const arrow = isPositive ? '↑' : '↓';
+            const badgeClass = isPositive ? 'bg-success' : 'bg-danger';
+            wowBadge.innerHTML = `<span class="badge ${badgeClass} ms-2">${arrow} ${Math.abs(change).toFixed(1)}% ($${currentSales.toFixed(2)} vs $${prevSales.toFixed(2)})</span>`;
+        } else {
+            // No previous data available
+            wowBadge.innerHTML = '<span class="badge bg-secondary ms-2">N/A</span>';
+        }
 
         // Render Sales vs COGS Chart
         renderSalesCOGSChart(data.daily_trend);
@@ -419,11 +425,20 @@ document.addEventListener('DOMContentLoaded', async function() {
         return;
     }
 
-    await loadLocations();
-    await loadDashboardData();
+    try {
+        await loadLocations();
+        await loadDashboardData();
 
-    // Refresh every 5 minutes
-    setInterval(loadDashboardData, 5 * 60 * 1000);
+        // Refresh every 5 minutes
+        setInterval(loadDashboardData, 5 * 60 * 1000);
+    } catch (error) {
+        // If we get an authentication error, redirect to login
+        if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+            localStorage.removeItem('access_token');
+            localStorage.setItem('login_message', 'Your session has expired. Please log in again.');
+            window.location.href = '/login';
+        }
+    }
 });
 </script>
 {% endblock %}

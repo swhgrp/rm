@@ -183,7 +183,7 @@
     <!-- Variance Report -->
     <div class="tab-pane fade show active" id="variance" role="tabpanel">
         <div class="card">
-            <div class="card-header bg-light">
+            <div class="card-header" style="background-color: #2c3e50; color: white;">
                 <h5 class="mb-0">Variance Report - Expected vs Actual</h5>
             </div>
             <div class="card-body">
@@ -201,7 +201,7 @@
     <!-- Usage Report -->
     <div class="tab-pane fade" id="usage" role="tabpanel">
         <div class="card">
-            <div class="card-header bg-light">
+            <div class="card-header" style="background-color: #2c3e50; color: white;">
                 <h5 class="mb-0">Usage Report - Consumption Analysis</h5>
             </div>
             <div class="card-body">
@@ -219,7 +219,7 @@
     <!-- Cost Report -->
     <div class="tab-pane fade" id="cost" role="tabpanel">
         <div class="card">
-            <div class="card-header bg-light">
+            <div class="card-header" style="background-color: #2c3e50; color: white;">
                 <h5 class="mb-0">Cost Report - By Storage Area</h5>
             </div>
             <div class="card-body">
@@ -237,9 +237,9 @@
     <!-- Cost Variance Tab -->
     <div class="tab-pane fade" id="costVariance" role="tabpanel">
         <div class="card">
-            <div class="card-header bg-light">
+            <div class="card-header" style="background-color: #2c3e50; color: white;">
                 <h5 class="mb-0">Cost Variance Tracker</h5>
-                <small class="text-muted">Tracks cost changes over time to inform menu pricing decisions</small>
+                <small style="color: #ecf0f1;">Tracks cost changes over time to inform menu pricing decisions</small>
             </div>
             <div class="card-body">
                 <div class="row mb-3">
@@ -272,9 +272,9 @@
     <!-- Vendor Spend Tab -->
     <div class="tab-pane fade" id="vendorSpend" role="tabpanel">
         <div class="card">
-            <div class="card-header bg-light">
+            <div class="card-header" style="background-color: #2c3e50; color: white;">
                 <h5 class="mb-0">Spend by Vendor</h5>
-                <small class="text-muted">Amount spent by vendor within selected date range</small>
+                <small style="color: #ecf0f1;">Amount spent by vendor within selected date range</small>
             </div>
             <div class="card-body">
                 <div class="row mb-3">
@@ -303,9 +303,9 @@
     <!-- Transfers Report Tab -->
     <div class="tab-pane fade" id="transfersReport" role="tabpanel">
         <div class="card">
-            <div class="card-header bg-light">
+            <div class="card-header" style="background-color: #2c3e50; color: white;">
                 <h5 class="mb-0">Transfer History</h5>
-                <small class="text-muted">Inventory transfers between locations</small>
+                <small style="color: #ecf0f1;">Inventory transfers between locations</small>
             </div>
             <div class="card-body">
                 <div class="row mb-3">
@@ -358,11 +358,16 @@ let costReportData = null;
 
 async function init() {
     try {
-        [locations, storageAreas, countSessions] = await Promise.all([
+        const results = await Promise.all([
             apiRequest('/api/locations/'),
             apiRequest('/api/storage-areas/'),
             apiRequest('/api/count-sessions/')
         ]);
+
+        // Check if any request returned null (redirecting to login)
+        if (results.some(r => r === null)) return;
+
+        [locations, storageAreas, countSessions] = results;
 
         // Populate location filter
         const locationFilter = document.getElementById('locationFilter');
@@ -498,11 +503,16 @@ async function loadReportData() {
         if (locationId) costParams.append('location_id', locationId);
 
         // Load all report data from API
-        [currentReportData, usageReportData, costReportData] = await Promise.all([
+        const results = await Promise.all([
             apiRequest(`/api/reports/variance?${varianceParams.toString()}`),
             apiRequest(`/api/reports/usage?${usageParams.toString()}`),
             apiRequest(`/api/reports/cost?${costParams.toString()}`)
         ]);
+
+        // Check if any request returned null (redirecting to login)
+        if (results.some(r => r === null)) return;
+
+        [currentReportData, usageReportData, costReportData] = results;
 
         displayVarianceReport();
         displayUsageReport();

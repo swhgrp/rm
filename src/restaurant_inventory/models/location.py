@@ -12,7 +12,10 @@ class Location(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False, index=True)
-    address = Column(Text, nullable=False)
+    address = Column(Text, nullable=True)  # Street address
+    city = Column(String, nullable=True)
+    state = Column(String(2), nullable=True)  # Two-letter state code
+    zip_code = Column(String(10), nullable=True)
     phone = Column(String, nullable=True)
     manager_name = Column(String, nullable=True)
     is_active = Column(Boolean, default=True)

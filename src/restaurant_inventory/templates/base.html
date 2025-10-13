@@ -12,6 +12,23 @@
     <!-- Custom CSS -->
     <link href="/static/css/style.css" rel="stylesheet">
 
+    <!-- Auth check - runs immediately in HEAD before page renders -->
+    <script>
+        // Check authentication synchronously before page loads
+        (function() {
+            const currentPath = window.location.pathname;
+            if (currentPath !== '/login') {
+                const token = localStorage.getItem('access_token');
+                if (!token) {
+                    // Redirect immediately, stop page rendering
+                    window.location.replace('/login');
+                    // Stop script execution
+                    throw new Error('Redirecting to login');
+                }
+            }
+        })();
+    </script>
+
     {% block head %}{% endblock %}
 
     <style>
@@ -339,6 +356,7 @@
                 <li><a href="/storage-areas"><i class="bi bi-grid"></i> Storage Areas</a></li>
                 <li><a href="/master-items"><i class="bi bi-box"></i> Master Items</a></li>
                 <li><a href="/vendor-items"><i class="bi bi-truck"></i> Vendor Items</a></li>
+                <li><a href="/inventory-movements"><i class="bi bi-arrow-left-right"></i> Inventory Movements</a></li>
             </ul>
 
             <!-- Purchasing Section -->
@@ -358,6 +376,7 @@
             <li><a href="/recipes"><i class="bi bi-journal-text"></i> Recipes</a></li>
             <li><a href="/transfers"><i class="bi bi-arrow-left-right"></i> Transfers</a></li>
             <li><a href="/waste"><i class="bi bi-trash"></i> Waste Log</a></li>
+            <li><a href="/pos-item-mapping"><i class="bi bi-diagram-3"></i> POS Item Mapping</a></li>
 
             <!-- Admin Settings (only visible to admins) -->
             <li id="adminSettingsLink" style="display: none;">
@@ -425,7 +444,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 
     <!-- Custom JavaScript -->
-    <script src="/static/js/auth.js?v=2"></script>
+    <script src="/static/js/auth.js?v=3"></script>
     <script src="/static/js/main.js"></script>
 
     <!-- Sidebar Toggle Script -->
@@ -462,11 +481,39 @@
             const currentPath = window.location.pathname;
             const currentHash = window.location.hash;
 
+            // Auth check already done in HEAD, no need to check again here
+
+            // Show/hide login button and user menu based on auth status
+            const token = localStorage.getItem('access_token');
+            const loginButton = document.getElementById('loginButton');
+            const userMenu = document.getElementById('userMenu');
+
+            if (currentPath === '/login') {
+                // On login page, hide both
+                if (loginButton) loginButton.style.display = 'none';
+                if (userMenu) userMenu.style.display = 'none';
+            } else if (token) {
+                // Logged in, show user menu, hide login button
+                if (loginButton) loginButton.style.display = 'none';
+                if (userMenu) userMenu.style.display = 'block';
+            } else {
+                // Not logged in, show login button, hide user menu
+                if (loginButton) loginButton.style.display = 'block';
+                if (userMenu) userMenu.style.display = 'none';
+            }
+
             // Show Settings link for Admin users
             const userData = localStorage.getItem('user');
             if (userData) {
                 try {
                     const user = JSON.parse(userData);
+
+                    // Populate user info in dropdown
+                    const userFullNameEl = document.getElementById('userFullName');
+                    const userRoleEl = document.getElementById('userRole');
+                    if (userFullNameEl) userFullNameEl.textContent = user.full_name || user.username;
+                    if (userRoleEl) userRoleEl.textContent = user.role || 'User';
+
                     if (user.role === 'Admin') {
                         const settingsLink = document.getElementById('adminSettingsLink');
                         if (settingsLink) {

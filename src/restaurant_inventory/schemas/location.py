@@ -8,7 +8,10 @@ from datetime import datetime
 
 class LocationBase(BaseModel):
     name: str
-    address: str
+    address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[str] = None
     phone: Optional[str] = None
     manager_name: Optional[str] = None
     is_active: bool = True
@@ -19,6 +22,9 @@ class LocationCreate(LocationBase):
 class LocationUpdate(BaseModel):
     name: Optional[str] = None
     address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[str] = None
     phone: Optional[str] = None
     manager_name: Optional[str] = None
     is_active: Optional[bool] = None

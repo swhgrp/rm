@@ -3,6 +3,7 @@ Restaurant Inventory Management System
 Main FastAPI application with complete endpoints and web interface
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -13,6 +14,7 @@ from sqlalchemy import text
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+import logging
 
 from restaurant_inventory.core.config import settings
 from restaurant_inventory.db.database import get_db
@@ -39,6 +41,38 @@ from restaurant_inventory.api.api_v1.endpoints import pos
 from restaurant_inventory.api.api_v1.endpoints import units
 from restaurant_inventory.api.api_v1.endpoints import dashboard
 from restaurant_inventory.api.api_v1.endpoints import vendor_items
+from restaurant_inventory.api.api_v1.endpoints import test_endpoint
+from restaurant_inventory.services.scheduler import start_scheduler, stop_scheduler
+
+logger = logging.getLogger(__name__)
+
+# Startup and shutdown events
+def startup_event_handler():
+    """Handle application startup"""
+    logger.warning("=" * 60)
+    logger.warning("🚀 APPLICATION STARTING UP")
+    logger.warning("=" * 60)
+    try:
+        start_scheduler()
+        logger.warning("✓ Background scheduler initialized successfully")
+        logger.warning("✓ Auto-sync will run every 10 minutes")
+        logger.warning("=" * 60)
+    except Exception as e:
+        logger.error(f"✗ Error starting scheduler: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+def shutdown_event_handler():
+    """Handle application shutdown"""
+    logger.warning("=" * 60)
+    logger.warning("🛑 APPLICATION SHUTTING DOWN")
+    logger.warning("=" * 60)
+    try:
+        stop_scheduler()
+        logger.warning("✓ Background scheduler stopped successfully")
+    except Exception as e:
+        logger.error(f"✗ Error stopping scheduler: {str(e)}")
+
 
 # Initialize rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -46,8 +80,12 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.APP_VERSION,
-    description="Multi-location restaurant inventory management system",
+    description="Multi-location restaurant inventory management system"
 )
+
+# Register startup and shutdown events
+app.add_event_handler("startup", startup_event_handler)
+app.add_event_handler("shutdown", shutdown_event_handler)
 
 # Add rate limiter to app state
 app.state.limiter = limiter
@@ -88,6 +126,7 @@ app.include_router(pos.router, prefix="/api/pos", tags=["pos"])
 app.include_router(units.router, prefix="/api/units", tags=["units"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(vendor_items.router, prefix="/api/vendor-items", tags=["vendor-items"])
+app.include_router(test_endpoint.router, prefix="/api/test", tags=["test"])
 
 
 # Health check endpoint
@@ -205,6 +244,11 @@ async def login_page(request: Request):
     """Login page"""
     return templates.TemplateResponse("login.html", {"request": request})
 
+@app.get("/setup-password", response_class=HTMLResponse)
+async def setup_password_page(request: Request):
+    """Password setup page for new user invitations"""
+    return templates.TemplateResponse("setup_password.html", {"request": request})
+
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_page(request: Request):
     """Dashboard page"""
@@ -265,6 +309,16 @@ async def settings_page(request: Request):
     """Settings page with Users, Locations, and Items (Admin only)"""
     return templates.TemplateResponse("settings.html", {"request": request})
 
+@app.get("/pos-item-mapping", response_class=HTMLResponse)
+async def pos_item_mapping_page(request: Request):
+    """POS Item Mapping page"""
+    return templates.TemplateResponse("pos_item_mapping.html", {"request": request})
+
+@app.get("/inventory-movements", response_class=HTMLResponse)
+async def inventory_movements_page(request: Request):
+    """Inventory Movements/Transactions page"""
+    return templates.TemplateResponse("inventory_movements.html", {"request": request})
+
 @app.get("/master-items", response_class=HTMLResponse)
 async def master_items_page(request: Request):
     """Master Items management page"""
@@ -305,11 +359,6 @@ async def recipes_page(request: Request):
 async def pos_config_page(request: Request):
     """POS Configuration page"""
     return templates.TemplateResponse("pos_config.html", {"request": request})
-
-@app.get("/test-api", response_class=HTMLResponse)
-async def test_api_page(request: Request):
-    """API test page"""
-    return templates.TemplateResponse("test_api.html", {"request": request})
 
 if __name__ == "__main__":
     import uvicorn

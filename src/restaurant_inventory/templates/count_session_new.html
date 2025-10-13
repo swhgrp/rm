@@ -22,17 +22,17 @@
                         <div class="card border-primary">
                             <div class="card-body">
                                 <div class="form-check mb-3">
-                                    <input class="form-check-input" type="radio" name="inventoryType" id="typePartial" value="PARTIAL" checked>
-                                    <label class="form-check-label" for="typePartial">
-                                        <strong>Partial Inventory</strong>
-                                        <br><small class="text-muted">Only counted items will be updated. Uncounted items keep their current values.</small>
-                                    </label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="inventoryType" id="typeFull" value="FULL">
+                                    <input class="form-check-input" type="radio" name="inventoryType" id="typeFull" value="FULL" checked>
                                     <label class="form-check-label" for="typeFull">
                                         <strong>Full Inventory</strong>
                                         <br><small class="text-muted">All items must be counted. Uncounted items will be set to 0.</small>
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="inventoryType" id="typePartial" value="PARTIAL">
+                                    <label class="form-check-label" for="typePartial">
+                                        <strong>Partial Inventory</strong>
+                                        <br><small class="text-muted">Only counted items will be updated. Uncounted items keep their current values.</small>
                                     </label>
                                 </div>
                             </div>
@@ -418,6 +418,12 @@ function getCompatibleUnits(baseUnit) {
 }
 
 function convertUnit(value, fromUnit, toUnit) {
+    // Handle null/undefined units - default to 'each'
+    if (!fromUnit || !toUnit) {
+        console.log('Missing unit, defaulting to no conversion');
+        return value;
+    }
+
     let from = fromUnit.toLowerCase().trim();
     let to = toUnit.toLowerCase().trim();
 
@@ -823,11 +829,15 @@ async function saveItemCount() {
     }
 
     // Convert quantity to base unit
-    const baseUnit = currentItem.unit_of_measure;
+    const baseUnit = currentItem.unit_of_measure || 'Each';
     let convertedQty;
 
+    // If no base unit, just use the quantity as-is
+    if (!baseUnit || !selectedUnit) {
+        convertedQty = qty;
+    }
     // Check if using item-specific conversion
-    if (currentItem.secondary_unit && currentItem.units_per_secondary &&
+    else if (currentItem.secondary_unit && currentItem.units_per_secondary &&
         selectedUnit.toLowerCase() === currentItem.secondary_unit.toLowerCase()) {
         // Convert from secondary to primary using item-specific ratio
         convertedQty = qty * parseFloat(currentItem.units_per_secondary);
@@ -1058,7 +1068,7 @@ async function approveCount() {
     try {
         const response = await apiRequest(`/api/count-sessions/${session.id}/approve`, { method: 'POST' });
         showAlert(`Count approved! ${response.items_updated} inventory records updated.`, 'success');
-        setTimeout(() => window.location.href = '/inventory', 2000);
+        setTimeout(() => window.location.href = '/inventory/count/history', 2000);
     } catch (error) {
         showAlert('Error approving count: ' + error.message, 'danger');
     }
@@ -1080,7 +1090,7 @@ function exitCount() {
     }
 
     if (confirm(message)) {
-        window.location.href = '/inventory';
+        window.location.href = '/inventory/count/history';
     }
 }
 

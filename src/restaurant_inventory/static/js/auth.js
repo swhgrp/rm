@@ -22,17 +22,17 @@ function logout() {
 // API request helper with authentication
 async function apiRequest(url, options = {}) {
     const token = getToken();
-    
+
     const defaultOptions = {
         headers: {
             'Content-Type': 'application/json',
         }
     };
-    
+
     if (token) {
         defaultOptions.headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     const mergedOptions = {
         ...defaultOptions,
         ...options,
@@ -41,19 +41,30 @@ async function apiRequest(url, options = {}) {
             ...options.headers
         }
     };
-    
+
     const response = await fetch(url, mergedOptions);
-    
-    if (response.status === 401) {
-        // Token expired or invalid
-        logout();
-        return;
+
+    // Handle authentication errors - redirect to login
+    if (response.status === 401 || response.status === 403) {
+        console.warn('Authentication error, redirecting to login...');
+        // Clear stored credentials
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('user_name');
+        localStorage.removeItem('user_role');
+        // Redirect to login
+        window.location.href = '/login';
+        // Return null to prevent further processing
+        return null;
     }
-    
+
     if (!response.ok) {
+        // Log the response body for debugging
+        const errorText = await response.text();
+        console.error(`API Error ${response.status}:`, errorText);
         throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     return response.json();
 }
 

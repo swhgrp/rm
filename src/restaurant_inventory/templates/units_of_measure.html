@@ -5,10 +5,13 @@
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h1><i class="bi bi-rulers"></i> Units of Measure</h1>
+    <button class="btn btn-success" onclick="seedStandardUnits()" id="seedBtn">
+        <i class="bi bi-download"></i> Seed Standard Units
+    </button>
 </div>
 
 <div class="alert alert-info mb-3">
-    <i class="bi bi-info-circle"></i> <strong>Units of Measure</strong> – Create and manage base units and conversion rules for inventory tracking.
+    <i class="bi bi-info-circle"></i> <strong>Units of Measure</strong> – Create and manage base units and conversion rules for inventory tracking. Click "Seed Standard Units" to add common restaurant measurement categories and units.
 </div>
 
 <div class="row">
@@ -271,6 +274,10 @@
             return;
         }
 
+        // Check if user is admin
+        const userRole = localStorage.getItem('user_role');
+        const isAdmin = userRole && userRole.toLowerCase() === 'admin';
+
         list.innerHTML = unitCategories.map(cat => `
             <a href="#" class="list-group-item list-group-item-action ${cat.id === selectedCategoryId ? 'active' : ''}"
                onclick="selectCategory(${cat.id}); return false;">
@@ -279,7 +286,14 @@
                         <h6 class="mb-1">${cat.name}</h6>
                         ${cat.description ? `<small>${cat.description}</small>` : ''}
                     </div>
-                    <span class="badge bg-primary rounded-pill">${cat.units ? cat.units.length : 0}</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-primary rounded-pill">${cat.units ? cat.units.length : 0}</span>
+                        ${isAdmin ? `
+                        <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); deleteCategory(${cat.id}); return false;" title="Delete Category">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        ` : ''}
+                    </div>
                 </div>
             </a>
         `).join('');
@@ -324,6 +338,10 @@
             return;
         }
 
+        // Check if user is admin
+        const userRole = localStorage.getItem('user_role');
+        const isAdmin = userRole && userRole.toLowerCase() === 'admin';
+
         let html = `
             <div class="table-responsive">
                 <table class="table table-sm">
@@ -352,12 +370,14 @@
                     <td>${containsText}</td>
                     <td>${referenceText}</td>
                     <td>
+                        ${isAdmin ? `
                         <button class="btn btn-sm btn-outline-primary" onclick="editUnit(${unit.id})" title="Edit">
                             <i class="bi bi-pencil"></i>
                         </button>
                         <button class="btn btn-sm btn-outline-danger" onclick="deleteUnit(${unit.id})" title="Delete">
                             <i class="bi bi-trash"></i>
                         </button>
+                        ` : '-'}
                     </td>
                 </tr>
             `;
@@ -750,6 +770,159 @@
         );
     }
 
+    // Seed standard restaurant units
+    async function seedStandardUnits() {
+        const seedBtn = document.getElementById('seedBtn');
+        seedBtn.disabled = true;
+        seedBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Seeding...';
+
+        const standardUnits = {
+            "Weight": {
+                description: "Weight measurements",
+                units: [
+                    { name: "Pound", abbr: "lb", ref: null, qty: null },
+                    { name: "Ounce", abbr: "oz", ref: "Pound", qty: 0.0625 },
+                    { name: "Kilogram", abbr: "kg", ref: "Pound", qty: 2.20462 },
+                    { name: "Gram", abbr: "g", ref: "Kilogram", qty: 0.001 }
+                ]
+            },
+            "Volume - Liquid": {
+                description: "Liquid volume measurements",
+                units: [
+                    { name: "Gallon", abbr: "gal", ref: null, qty: null },
+                    { name: "Quart", abbr: "qt", ref: "Gallon", qty: 0.25 },
+                    { name: "Pint", abbr: "pt", ref: "Quart", qty: 0.5 },
+                    { name: "Cup", abbr: "c", ref: "Pint", qty: 0.5 },
+                    { name: "Fluid Ounce", abbr: "fl oz", ref: "Cup", qty: 0.125 },
+                    { name: "Tablespoon", abbr: "tbsp", ref: "Fluid Ounce", qty: 0.5 },
+                    { name: "Teaspoon", abbr: "tsp", ref: "Tablespoon", qty: 0.333 },
+                    { name: "Liter", abbr: "L", ref: "Gallon", qty: 0.264172 },
+                    { name: "Milliliter", abbr: "mL", ref: "Liter", qty: 0.001 }
+                ]
+            },
+            "Count": {
+                description: "Counting units",
+                units: [
+                    { name: "Each", abbr: "ea", ref: null, qty: null },
+                    { name: "Dozen", abbr: "dz", ref: "Each", qty: 12 },
+                    { name: "Case - 6", abbr: "cs-6", ref: "Each", qty: 6 },
+                    { name: "Case - 12", abbr: "cs-12", ref: "Each", qty: 12 },
+                    { name: "Case - 24", abbr: "cs-24", ref: "Each", qty: 24 }
+                ]
+            }
+        };
+
+        try {
+            let categoriesCreated = 0;
+            let unitsCreated = 0;
+
+            for (const [categoryName, categoryData] of Object.entries(standardUnits)) {
+                // Check if category already exists
+                const existingCategory = unitCategories.find(c => c.name === categoryName);
+                let categoryId;
+
+                if (existingCategory) {
+                    categoryId = existingCategory.id;
+                    console.log(`Category "${categoryName}" already exists`);
+                } else {
+                    // Create category
+                    const catResponse = await fetch('/api/units/categories', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            name: categoryName,
+                            description: categoryData.description,
+                            display_order: categoriesCreated
+                        })
+                    });
+
+                    if (catResponse.ok) {
+                        const newCategory = await catResponse.json();
+                        categoryId = newCategory.id;
+                        categoriesCreated++;
+                        console.log(`Created category: ${categoryName}`);
+                    } else {
+                        console.error(`Failed to create category: ${categoryName}`);
+                        continue;
+                    }
+                }
+
+                // Reload categories to get updated list
+                await loadUnitCategories();
+                await loadCategoryUnits(categoryId);
+
+                // Create units for this category
+                const createdUnits = new Map(); // Track created units by name for reference lookup
+
+                for (const unitData of categoryData.units) {
+                    // Check if unit already exists
+                    const existingUnit = currentCategoryUnits.find(u => u.abbreviation === unitData.abbr);
+                    if (existingUnit) {
+                        createdUnits.set(unitData.name, existingUnit.id);
+                        console.log(`Unit "${unitData.name}" already exists`);
+                        continue;
+                    }
+
+                    // Determine reference unit ID
+                    let referenceUnitId = null;
+                    if (unitData.ref) {
+                        // Look up reference unit by name
+                        referenceUnitId = createdUnits.get(unitData.ref);
+                        if (!referenceUnitId) {
+                            // Try to find in existing units
+                            const refUnit = currentCategoryUnits.find(u => u.name === unitData.ref);
+                            if (refUnit) {
+                                referenceUnitId = refUnit.id;
+                            }
+                        }
+                    }
+
+                    // Create unit
+                    const unitResponse = await fetch('/api/units/', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            category_id: categoryId,
+                            name: unitData.name,
+                            abbreviation: unitData.abbr,
+                            reference_unit_id: referenceUnitId,
+                            contains_quantity: unitData.qty
+                        })
+                    });
+
+                    if (unitResponse.ok) {
+                        const newUnit = await unitResponse.json();
+                        createdUnits.set(unitData.name, newUnit.id);
+                        unitsCreated++;
+                        console.log(`Created unit: ${unitData.name}`);
+                    } else {
+                        const error = await unitResponse.json();
+                        console.error(`Failed to create unit ${unitData.name}:`, error.detail);
+                    }
+
+                    // Reload units after each creation to keep reference lookups working
+                    await loadCategoryUnits(categoryId);
+                }
+            }
+
+            showAlert(`Seeding complete! Created ${categoriesCreated} categories and ${unitsCreated} units.`, 'success');
+            await loadUnitCategories();
+
+        } catch (error) {
+            console.error('Error seeding units:', error);
+            showAlert('Failed to seed standard units: ' + error.message, 'danger');
+        } finally {
+            seedBtn.disabled = false;
+            seedBtn.innerHTML = '<i class="bi bi-download"></i> Seed Standard Units';
+        }
+    }
+
     // Initialize
     document.addEventListener('DOMContentLoaded', async function() {
         // Check authentication
@@ -757,6 +930,16 @@
         if (!token) {
             window.location.href = '/login';
             return;
+        }
+
+        // Ensure user_role is set in localStorage
+        const userRole = localStorage.getItem('user_role');
+        const userObj = localStorage.getItem('user');
+        if (userObj && !userRole) {
+            const parsed = JSON.parse(userObj);
+            if (parsed.role) {
+                localStorage.setItem('user_role', parsed.role);
+            }
         }
 
         // Initialize modals

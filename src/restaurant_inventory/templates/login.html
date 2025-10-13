@@ -14,6 +14,8 @@
                 <h4><i class="bi bi-box-arrow-in-right"></i> Login</h4>
             </div>
             <div class="card-body">
+                <div id="sessionMessage" class="alert alert-warning" style="display: none;"></div>
+
                 <form id="loginForm">
                     <div class="mb-3">
                         <label for="username" class="form-label">Username</label>
@@ -29,13 +31,8 @@
                         </button>
                     </div>
                 </form>
-                
+
                 <div id="loginError" class="alert alert-danger mt-3" style="display: none;"></div>
-            </div>
-            <div class="card-footer text-center">
-                <small class="text-muted">
-                    Demo credentials: admin/admin123, manager1/manager123, staff1/staff123
-                </small>
             </div>
         </div>
     </div>
@@ -44,13 +41,22 @@
 
 {% block scripts %}
 <script>
+// Check for session expiration message
+const loginMessage = localStorage.getItem('login_message');
+if (loginMessage) {
+    const messageDiv = document.getElementById('sessionMessage');
+    messageDiv.textContent = loginMessage;
+    messageDiv.style.display = 'block';
+    localStorage.removeItem('login_message');
+}
+
 document.getElementById('loginForm').addEventListener('submit', async function(e) {
     e.preventDefault();
-    
+
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
     const errorDiv = document.getElementById('loginError');
-    
+
     try {
         const response = await fetch('/api/auth/login', {
             method: 'POST',
@@ -59,11 +65,12 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
             },
             body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
         });
-        
+
         if (response.ok) {
             const data = await response.json();
             localStorage.setItem('access_token', data.access_token);
             localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('user_role', data.user.role);
             window.location.href = '/dashboard';
         } else {
             const error = await response.json();

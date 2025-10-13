@@ -548,8 +548,6 @@ async function saveRecipe() {
         ingredients: ingredients
     };
 
-    console.log('Sending recipe data:', JSON.stringify(recipeData, null, 2));
-
     // Show loading
     document.getElementById('saveBtnText').classList.add('d-none');
     document.getElementById('saveSpinner').classList.remove('d-none');
@@ -567,7 +565,6 @@ async function saveRecipe() {
             body: JSON.stringify(recipeData)
         });
 
-        console.log('Response status:', response.status);
         if (response.ok) {
             const successMsg = currentRecipeId ? 'Recipe updated successfully' : 'Recipe created successfully';
             showAlert(successMsg, 'success');
@@ -977,12 +974,6 @@ async function uploadAndParseRecipe() {
 
         const result = await response.json();
 
-        console.log('Parsed recipe data (stringified):', JSON.stringify(result, null, 2));
-        console.log('Result keys:', Object.keys(result));
-        console.log('Result type:', typeof result);
-        console.log('Result.name:', result.name);
-        console.log('Result.category:', result.category);
-
         // Close upload modal
         bootstrap.Modal.getInstance(document.getElementById('uploadRecipeModal')).hide();
 
@@ -1001,44 +992,32 @@ async function uploadAndParseRecipe() {
 
         // Wait for modal to be fully shown, then populate fields
         setTimeout(() => {
-            console.log('Populating form fields with:', result);
-
             // Populate basic fields
             if (result.name) {
                 document.getElementById('recipeName').value = result.name;
-                console.log('Set name:', result.name);
             }
             if (result.category) {
                 document.getElementById('recipeCategory').value = result.category;
-                console.log('Set category:', result.category);
             }
             if (result.yield_amount) {
                 document.getElementById('recipeYieldQty').value = result.yield_amount;
-                console.log('Set yield qty:', result.yield_amount);
             }
             if (result.yield_unit) {
                 document.getElementById('recipeYieldUnit').value = result.yield_unit;
-                console.log('Set yield unit:', result.yield_unit);
             }
             if (result.prep_time) {
                 document.getElementById('recipePrepTime').value = result.prep_time;
-                console.log('Set prep time:', result.prep_time);
             }
             if (result.cook_time) {
                 document.getElementById('recipeCookTime').value = result.cook_time;
-                console.log('Set cook time:', result.cook_time);
             }
             if (result.instructions) {
                 document.getElementById('recipeInstructions').value = result.instructions;
-                console.log('Set instructions');
             }
 
             // Add ingredients if provided
             if (result.ingredients && result.ingredients.length > 0) {
-                console.log('Adding', result.ingredients.length, 'ingredients');
-
                 result.ingredients.forEach((ing, index) => {
-                    console.log(`Adding ingredient ${index + 1}:`, ing);
                     addIngredientRow();
 
                     // Use setTimeout to ensure the row is fully rendered
@@ -1049,14 +1028,12 @@ async function uploadAndParseRecipe() {
                                 const qtyInput = lastRow.querySelector('input[placeholder="Quantity"]');
                                 if (qtyInput) {
                                     qtyInput.value = ing.quantity;
-                                    console.log(`  Set quantity: ${ing.quantity}`);
                                 }
                             }
                             if (ing.unit) {
                                 const unitInput = lastRow.querySelector('input[placeholder="Unit"]');
                                 if (unitInput) {
                                     unitInput.value = ing.unit;
-                                    console.log(`  Set unit: ${ing.unit}`);
                                 }
                             }
                             if (ing.description) {
@@ -1067,7 +1044,6 @@ async function uploadAndParseRecipe() {
                                     option.text = `Select item (AI found: "${ing.description}")`;
                                     option.selected = true;
                                     selectInput.insertBefore(option, selectInput.firstChild);
-                                    console.log(`  Added placeholder: ${ing.description}`);
                                 }
                             }
                         }

@@ -62,7 +62,7 @@ class CountSessionResponse(CountSessionBase):
     status: str
     inventory_type: str
     locked: bool = False
-    started_by: int
+    started_by: Optional[int] = None
     started_at: datetime
     completed_by: Optional[int] = None
     completed_at: Optional[datetime] = None
