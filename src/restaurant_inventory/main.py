@@ -41,7 +41,6 @@ from restaurant_inventory.api.api_v1.endpoints import pos
 from restaurant_inventory.api.api_v1.endpoints import units
 from restaurant_inventory.api.api_v1.endpoints import dashboard
 from restaurant_inventory.api.api_v1.endpoints import vendor_items
-from restaurant_inventory.api.api_v1.endpoints import test_endpoint
 from restaurant_inventory.services.scheduler import start_scheduler, stop_scheduler
 
 logger = logging.getLogger(__name__)
@@ -126,7 +125,6 @@ app.include_router(pos.router, prefix="/api/pos", tags=["pos"])
 app.include_router(units.router, prefix="/api/units", tags=["units"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(vendor_items.router, prefix="/api/vendor-items", tags=["vendor-items"])
-app.include_router(test_endpoint.router, prefix="/api/test", tags=["test"])
 
 
 # Health check endpoint
