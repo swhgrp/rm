@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Locations - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-geo-alt"></i> Restaurant Locations</h1>
+    <button class="btn btn-primary" onclick="showAddLocationModal()">
+        <i class="bi bi-plus-circle"></i> Add Location
+    </button>
+</div>
+
+<!-- Locations Table -->
+<div class="card">
+    <div class="card-header">
+        <h5>All Locations</h5>
+    </div>
+    <div class="card-body">
+        <div id="locationsTable">
+            <div class="loading">
+                <div class="spinner-border" role="status"></div>
+                <p>Loading locations...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Location Modal -->
+<div class="modal fade" id="locationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="locationModalTitle">Add Location</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="locationForm">
+                    <input type="hidden" id="locationId">
+                    <div class="mb-3">
+                        <label for="locationName" class="form-label">Location Name *</label>
+                        <input type="text" class="form-control" id="locationName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="locationAddress" class="form-label">Address *</label>
+                        <textarea class="form-control" id="locationAddress" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="locationPhone" class="form-label">Phone</label>
+                        <input type="tel" class="form-control" id="locationPhone">
+                    </div>
+                    <div class="mb-3">
+                        <label for="managerName" class="form-label">Manager Name</label>
+                        <input type="text" class="form-control" id="managerName">
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="locationActive" checked>
+                        <label class="form-check-label" for="locationActive">Active Location</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveLocation()">Save Location</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let locations = [];
+let editingLocationId = null;
+
+async function loadLocations() {
+    try {
+        const response = await apiRequest('api/locations/');
+        locations = response;
+        displayLocations();
+    } catch (error) {
+        console.error('Error loading locations:', error);
+        showAlert('Error loading locations', 'danger');
+        document.getElementById('locationsTable').innerHTML = '<p class="text-danger">Error loading locations</p>';
+    }
+}
+
+function displayLocations() {
+    const container = document.getElementById('locationsTable');
+    
+    if (locations.length === 0) {
+        container.innerHTML = '<p class="text-muted">No locations found. Add your first location to get started.</p>';
+        return;
+    }
+    
+    const html = `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Name</th>
+                        <th>Address</th>
+                        <th>Manager</th>
+                        <th>Phone</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${locations.map(location => `
+                        <tr>
+                            <td><strong>${location.name}</strong></td>
+                            <td>${location.address}</td>
+                            <td>${location.manager_name || '<em class="text-muted">Not set</em>'}</td>
+                            <td>${location.phone || '<em class="text-muted">Not set</em>'}</td>
+                            <td>
+                                <span class="badge ${location.is_active ? 'bg-success' : 'bg-secondary'}">
+                                    ${location.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" onclick="editLocation(${location.id})" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-outline-info" onclick="viewInventory(${location.id})" title="View Inventory">
+                                        <i class="bi bi-clipboard-data"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" onclick="deleteLocation(${location.id})" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function showAddLocationModal() {
+    editingLocationId = null;
+    document.getElementById('locationModalTitle').textContent = 'Add New Location';
+    document.getElementById('locationForm').reset();
+    document.getElementById('locationActive').checked = true;
+    new bootstrap.Modal(document.getElementById('locationModal')).show();
+}
+
+function editLocation(locationId) {
+    const location = locations.find(loc => loc.id === locationId);
+    if (!location) return;
+    
+    editingLocationId = locationId;
+    document.getElementById('locationModalTitle').textContent = 'Edit Location';
+    document.getElementById('locationId').value = location.id;
+    document.getElementById('locationName').value = location.name;
+    document.getElementById('locationAddress').value = location.address;
+    document.getElementById('locationPhone').value = location.phone || '';
+    document.getElementById('managerName').value = location.manager_name || '';
+    document.getElementById('locationActive').checked = location.is_active;
+    
+    new bootstrap.Modal(document.getElementById('locationModal')).show();
+}
+
+async function saveLocation() {
+    const formData = {
+        name: document.getElementById('locationName').value,
+        address: document.getElementById('locationAddress').value,
+        phone: document.getElementById('locationPhone').value || null,
+        manager_name: document.getElementById('managerName').value || null,
+        is_active: document.getElementById('locationActive').checked
+    };
+    
+    try {
+        let response;
+        if (editingLocationId) {
+            // Update existing location
+            response = await apiRequest(`api/locations/${editingLocationId}`, {
+                method: 'PUT',
+                body: JSON.stringify(formData)
+            });
+        } else {
+            // Create new location
+            response = await apiRequest('api/locations/', {
+                method: 'POST',
+                body: JSON.stringify(formData)
+            });
+        }
+        
+        showAlert(`Location ${editingLocationId ? 'updated' : 'created'} successfully!`, 'success');
+        bootstrap.Modal.getInstance(document.getElementById('locationModal')).hide();
+        loadLocations(); // Reload the list
+        
+    } catch (error) {
+        console.error('Error saving location:', error);
+        showAlert('Error saving location', 'danger');
+    }
+}
+
+async function deleteLocation(locationId) {
+    const location = locations.find(loc => loc.id === locationId);
+    if (!location) return;
+    
+    if (!confirm(`Are you sure you want to delete "${location.name}"? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        await apiRequest(`api/locations/${locationId}`, {
+            method: 'DELETE'
+        });
+        
+        showAlert('Location deleted successfully!', 'success');
+        loadLocations(); // Reload the list
+        
+    } catch (error) {
+        console.error('Error deleting location:', error);
+        showAlert('Error deleting location. It may have inventory records.', 'danger');
+    }
+}
+
+function viewInventory(locationId) {
+    window.location.href = `/inventory?location=${locationId}`;
+}
+
+// Load locations when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    if (!isAuthenticated()) {
+        window.location.href = '/login';
+        return;
+    }
+    
+    loadLocations();
+});
+</script>
+{% endblock %}

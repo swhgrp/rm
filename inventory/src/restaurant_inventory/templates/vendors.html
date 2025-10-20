@@ -1,0 +1,664 @@
+{% extends "base.html" %}
+
+{% block title %}Vendors - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4">Vendors</h2>
+
+    <div class="alert alert-info mb-3">
+        <i class="bi bi-info-circle"></i> <strong>Vendors</strong> – Maintain a list of suppliers and vendor contact details.
+    </div>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="input-group" style="max-width: 400px;">
+            <input type="text" class="form-control" id="vendorSearch" placeholder="Search vendors">
+            <button class="btn btn-outline-secondary" onclick="clearVendorSearch()">Clear</button>
+        </div>
+        <div>
+            <button class="btn btn-outline-primary me-2" onclick="showVendorItemUploadModal()">
+                <i class="bi bi-upload"></i> Import Vendor Items
+            </button>
+            <button class="btn btn-primary" onclick="showVendorModal()">
+                <i class="bi bi-plus-circle"></i> Add Vendor
+            </button>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Name</th>
+                    <th>Contact Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="vendorsTableBody">
+                <tr>
+                    <td colspan="6" class="text-center">Loading vendors...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Vendor Modal -->
+<div class="modal fade" id="vendorModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="vendorModalTitle">Add Vendor</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="vendorForm">
+                    <div class="mb-3">
+                        <label for="vendorName" class="form-label">Vendor Name *</label>
+                        <input type="text" class="form-control" id="vendorName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="vendorContactName" class="form-label">Contact Name</label>
+                        <input type="text" class="form-control" id="vendorContactName">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="vendorEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="vendorEmail">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="vendorPhone" class="form-label">Phone</label>
+                            <input type="tel" class="form-control" id="vendorPhone">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="vendorAddress" class="form-label">Address</label>
+                        <textarea class="form-control" id="vendorAddress" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="vendorNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="vendorNotes" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="vendorIsActive" checked>
+                        <label class="form-check-label" for="vendorIsActive">Active</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveVendor()">Save Vendor</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Vendor Item Upload Modal -->
+<div class="modal fade" id="vendorItemUploadModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Import Vendor Item List</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Step 1: File Upload -->
+                <div id="uploadStep">
+                    <h6>Step 1: Upload File</h6>
+                    <p class="text-muted">Upload a CSV or Excel file containing your vendor's item list.</p>
+                    <div class="mb-3">
+                        <label for="vendorFileInput" class="form-label">Select File (CSV, XLS, XLSX)</label>
+                        <input type="file" class="form-control" id="vendorFileInput" accept=".csv,.xlsx,.xls">
+                    </div>
+                    <button class="btn btn-primary" onclick="uploadVendorFile()">
+                        <i class="bi bi-upload"></i> Upload & Parse
+                    </button>
+                </div>
+
+                <!-- Step 2: Column Mapping -->
+                <div id="mappingStep" style="display: none;">
+                    <h6>Step 2: Map Columns</h6>
+                    <p class="text-muted">Map the vendor file columns to our system fields. We've suggested mappings based on column names.</p>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>Vendor Column</strong>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Maps To</strong>
+                        </div>
+                    </div>
+
+                    <div id="columnMappingList"></div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="updateExisting" checked>
+                        <label class="form-check-label" for="updateExisting">
+                            Update existing items (matches by vendor item code)
+                        </label>
+                    </div>
+
+                    <button class="btn btn-secondary me-2" onclick="backToUpload()">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </button>
+                    <button class="btn btn-primary" onclick="showPreview()">
+                        Preview Import <i class="bi bi-arrow-right"></i>
+                    </button>
+                </div>
+
+                <!-- Step 3: Preview & Import -->
+                <div id="previewStep" style="display: none;">
+                    <h6>Step 3: Preview & Import</h6>
+                    <p class="text-muted">Review the items that will be imported.</p>
+
+                    <div class="alert alert-info">
+                        <strong id="previewSummary"></strong>
+                    </div>
+
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Vendor Code</th>
+                                    <th>Name</th>
+                                    <th>Pack Size</th>
+                                    <th>Unit Cost</th>
+                                    <th>Category</th>
+                                    <th>Unit</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewTableBody"></tbody>
+                        </table>
+                    </div>
+
+                    <button class="btn btn-secondary me-2" onclick="backToMapping()">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </button>
+                    <button class="btn btn-success" onclick="importVendorItems()">
+                        <i class="bi bi-check-circle"></i> Import Items
+                    </button>
+                </div>
+
+                <!-- Import Progress -->
+                <div id="importingStep" style="display: none;">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary mb-3" role="status"></div>
+                        <p>Importing items...</p>
+                    </div>
+                </div>
+
+                <!-- Import Complete -->
+                <div id="completeStep" style="display: none;">
+                    <div class="alert alert-success">
+                        <h5><i class="bi bi-check-circle"></i> Import Complete!</h5>
+                        <div id="importResults"></div>
+                    </div>
+                    <button class="btn btn-primary" onclick="closeVendorItemUploadModal()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalTitle">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="confirmModalBody">
+                Are you sure?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmModalBtn" onclick="confirmAction()">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Global variables
+    let vendors = [];
+    let currentVendorId = null;
+    let confirmCallback = null;
+
+    // API helper
+    async function apiRequest(url, options = {}) {
+        const token = localStorage.getItem('access_token');
+        const defaultOptions = {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        const response = await fetch(url, { ...defaultOptions, ...options });
+
+        if (response.status === 401) {
+            localStorage.clear();
+            window.location.href = '/login';
+            throw new Error('Unauthorized');
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Request failed');
+        }
+
+        return response.json();
+    }
+
+    // Show alert message
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+        alertDiv.style.zIndex = '9999';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+
+        setTimeout(() => alertDiv.remove(), 5000);
+    }
+
+    // Show confirmation dialog
+    function showConfirmation(title, message, callback) {
+        document.getElementById('confirmModalTitle').textContent = title;
+        document.getElementById('confirmModalBody').textContent = message;
+        confirmCallback = callback;
+        const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        modal.show();
+    }
+
+    function confirmAction() {
+        if (confirmCallback) {
+            confirmCallback();
+            confirmCallback = null;
+        }
+        const modalElement = document.getElementById('confirmModal');
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+            modal.hide();
+        }
+    }
+
+    // ========== VENDORS ==========
+    async function loadVendors() {
+        try {
+            vendors = await apiRequest('api/vendors/?active_only=false');
+            displayVendors();
+        } catch (error) {
+            console.error('Error loading vendors:', error);
+            showAlert('Error loading vendors: ' + error.message, 'danger');
+        }
+    }
+
+    function displayVendors() {
+        const tbody = document.getElementById('vendorsTableBody');
+        const searchTerm = (document.getElementById('vendorSearch')?.value || '').toLowerCase();
+
+        const filteredVendors = vendors.filter(v =>
+            v.name.toLowerCase().includes(searchTerm) ||
+            (v.contact_name && v.contact_name.toLowerCase().includes(searchTerm)) ||
+            (v.email && v.email.toLowerCase().includes(searchTerm))
+        );
+
+        if (filteredVendors.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No vendors found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = filteredVendors.map(vendor => `
+            <tr>
+                <td><strong>${vendor.name}</strong></td>
+                <td>${vendor.contact_name || '-'}</td>
+                <td>${vendor.email || '-'}</td>
+                <td>${vendor.phone || '-'}</td>
+                <td>
+                    <span class="badge ${vendor.is_active ? 'bg-success' : 'bg-secondary'}">
+                        ${vendor.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="editVendor(${vendor.id})" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteVendor(${vendor.id}, '${vendor.name.replace(/'/g, "\\'")}'))" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function showVendorModal(vendorId = null) {
+        currentVendorId = vendorId;
+        const modal = new bootstrap.Modal(document.getElementById('vendorModal'));
+        const title = document.getElementById('vendorModalTitle');
+
+        if (vendorId) {
+            title.textContent = 'Edit Vendor';
+            const vendor = vendors.find(v => v.id === vendorId);
+            if (vendor) {
+                document.getElementById('vendorName').value = vendor.name;
+                document.getElementById('vendorContactName').value = vendor.contact_name || '';
+                document.getElementById('vendorEmail').value = vendor.email || '';
+                document.getElementById('vendorPhone').value = vendor.phone || '';
+                document.getElementById('vendorAddress').value = vendor.address || '';
+                document.getElementById('vendorNotes').value = vendor.notes || '';
+                document.getElementById('vendorIsActive').checked = vendor.is_active;
+            }
+        } else {
+            title.textContent = 'Add Vendor';
+            document.getElementById('vendorForm').reset();
+            document.getElementById('vendorIsActive').checked = true;
+        }
+
+        modal.show();
+    }
+
+    function editVendor(id) {
+        showVendorModal(id);
+    }
+
+    async function saveVendor() {
+        const name = document.getElementById('vendorName').value.trim();
+        if (!name) {
+            showAlert('Vendor name is required', 'warning');
+            return;
+        }
+
+        const vendorData = {
+            name: name,
+            contact_name: document.getElementById('vendorContactName').value.trim() || null,
+            email: document.getElementById('vendorEmail').value.trim() || null,
+            phone: document.getElementById('vendorPhone').value.trim() || null,
+            address: document.getElementById('vendorAddress').value.trim() || null,
+            notes: document.getElementById('vendorNotes').value.trim() || null,
+            is_active: document.getElementById('vendorIsActive').checked
+        };
+
+        try {
+            if (currentVendorId) {
+                await apiRequest(`api/vendors/${currentVendorId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(vendorData)
+                });
+                showAlert('Vendor updated successfully', 'success');
+            } else {
+                await apiRequest('api/vendors/', {
+                    method: 'POST',
+                    body: JSON.stringify(vendorData)
+                });
+                showAlert('Vendor created successfully', 'success');
+            }
+
+            bootstrap.Modal.getInstance(document.getElementById('vendorModal')).hide();
+            await loadVendors();
+        } catch (error) {
+            console.error('Error saving vendor:', error);
+            showAlert('Error saving vendor: ' + error.message, 'danger');
+        }
+    }
+
+    async function deleteVendor(id, name) {
+        showConfirmation(
+            'Delete Vendor',
+            `Are you sure you want to delete vendor "${name}"?`,
+            async () => {
+                try {
+                    await apiRequest(`api/vendors/${id}`, { method: 'DELETE' });
+                    showAlert('Vendor deleted successfully', 'success');
+                    await loadVendors();
+                } catch (error) {
+                    console.error('Error deleting vendor:', error);
+                    showAlert('Error deleting vendor: ' + error.message, 'danger');
+                }
+            }
+        );
+    }
+
+    function clearVendorSearch() {
+        document.getElementById('vendorSearch').value = '';
+        displayVendors();
+    }
+
+    // Vendor Item Upload Functions
+    let vendorUploadData = {
+        columns: [],
+        sampleRows: [],
+        totalRows: 0,
+        suggestedMapping: {},
+        columnMapping: {},
+        parsedItems: []
+    };
+
+    function showVendorItemUploadModal() {
+        // Reset to step 1
+        document.getElementById('uploadStep').style.display = 'block';
+        document.getElementById('mappingStep').style.display = 'none';
+        document.getElementById('previewStep').style.display = 'none';
+        document.getElementById('importingStep').style.display = 'none';
+        document.getElementById('completeStep').style.display = 'none';
+        document.getElementById('vendorFileInput').value = '';
+
+        const modal = new bootstrap.Modal(document.getElementById('vendorItemUploadModal'));
+        modal.show();
+    }
+
+    async function uploadVendorFile() {
+        const fileInput = document.getElementById('vendorFileInput');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            showAlert('Please select a file', 'warning');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch('api/items/parse-vendor-upload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Upload failed');
+            }
+
+            const result = await response.json();
+
+            vendorUploadData.columns = result.columns;
+            vendorUploadData.sampleRows = result.sample_rows;
+            vendorUploadData.totalRows = result.total_rows;
+            vendorUploadData.suggestedMapping = result.suggested_mapping;
+            vendorUploadData.columnMapping = {...result.suggested_mapping};
+
+            // Show mapping step
+            buildColumnMapping();
+            document.getElementById('uploadStep').style.display = 'none';
+            document.getElementById('mappingStep').style.display = 'block';
+
+        } catch (error) {
+            showAlert('Error uploading file: ' + error.message, 'danger');
+        }
+    }
+
+    function buildColumnMapping() {
+        const container = document.getElementById('columnMappingList');
+        container.innerHTML = '';
+
+        const ourFields = [
+            { value: '', label: '(Skip this column)' },
+            { value: 'vendor_item_code', label: 'Vendor Item Code' },
+            { value: 'name', label: 'Item Name' },
+            { value: 'pack_size', label: 'Pack Size' },
+            { value: 'unit_cost', label: 'Unit Cost' },
+            { value: 'category', label: 'Category' },
+            { value: 'unit', label: 'Unit' }
+        ];
+
+        vendorUploadData.columns.forEach(col => {
+            const row = document.createElement('div');
+            row.className = 'row mb-2 align-items-center';
+
+            const suggested = vendorUploadData.suggestedMapping[col] || '';
+
+            row.innerHTML = `
+                <div class="col-md-6">
+                    <input type="text" class="form-control" value="${col}" readonly>
+                </div>
+                <div class="col-md-6">
+                    <select class="form-select" data-vendor-col="${col}">
+                        ${ourFields.map(f => `
+                            <option value="${f.value}" ${f.value === suggested ? 'selected' : ''}>
+                                ${f.label}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+            `;
+
+            container.appendChild(row);
+        });
+
+        // Add change listeners
+        container.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const vendorCol = e.target.dataset.vendorCol;
+                const ourField = e.target.value;
+
+                if (ourField) {
+                    vendorUploadData.columnMapping[vendorCol] = ourField;
+                } else {
+                    delete vendorUploadData.columnMapping[vendorCol];
+                }
+            });
+        });
+    }
+
+    function backToUpload() {
+        document.getElementById('mappingStep').style.display = 'none';
+        document.getElementById('uploadStep').style.display = 'block';
+    }
+
+    async function showPreview() {
+        // Build preview from sample rows
+        const previewItems = vendorUploadData.sampleRows.map(row => {
+            const item = {};
+            for (const [vendorCol, ourField] of Object.entries(vendorUploadData.columnMapping)) {
+                item[ourField] = row[vendorCol];
+            }
+            return item;
+        });
+
+        const tbody = document.getElementById('previewTableBody');
+        tbody.innerHTML = '';
+
+        previewItems.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.vendor_item_code || ''}</td>
+                <td>${item.name || ''}</td>
+                <td>${item.pack_size || ''}</td>
+                <td>${item.unit_cost ? '$' + parseFloat(item.unit_cost).toFixed(2) : ''}</td>
+                <td>${item.category || ''}</td>
+                <td>${item.unit || ''}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        document.getElementById('previewSummary').textContent =
+            `Ready to import ${vendorUploadData.totalRows} items (showing first ${previewItems.length})`;
+
+        document.getElementById('mappingStep').style.display = 'none';
+        document.getElementById('previewStep').style.display = 'block';
+    }
+
+    function backToMapping() {
+        document.getElementById('previewStep').style.display = 'none';
+        document.getElementById('mappingStep').style.display = 'block';
+    }
+
+    async function importVendorItems() {
+        document.getElementById('previewStep').style.display = 'none';
+        document.getElementById('importingStep').style.display = 'block';
+
+        const fileInput = document.getElementById('vendorFileInput');
+        const file = fileInput.files[0];
+        const updateExisting = document.getElementById('updateExisting').checked;
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('column_mapping', JSON.stringify(vendorUploadData.columnMapping));
+        formData.append('update_existing', updateExisting);
+
+        try {
+            const response = await fetch('api/items/import-vendor-items', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Import failed');
+            }
+
+            const result = await response.json();
+
+            document.getElementById('importingStep').style.display = 'none';
+            document.getElementById('completeStep').style.display = 'block';
+
+            document.getElementById('importResults').innerHTML = `
+                <p><strong>Created:</strong> ${result.created} items</p>
+                <p><strong>Updated:</strong> ${result.updated} items</p>
+                <p><strong>Skipped:</strong> ${result.skipped} items</p>
+                <p><strong>Total Processed:</strong> ${result.total} rows</p>
+            `;
+
+        } catch (error) {
+            document.getElementById('importingStep').style.display = 'none';
+            document.getElementById('previewStep').style.display = 'block';
+            showAlert('Error importing items: ' + error.message, 'danger');
+        }
+    }
+
+    function closeVendorItemUploadModal() {
+        bootstrap.Modal.getInstance(document.getElementById('vendorItemUploadModal')).hide();
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Check authentication
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+
+        // Load vendors
+        await loadVendors();
+
+        // Setup search listener
+        document.getElementById('vendorSearch')?.addEventListener('input', displayVendors);
+    });
+</script>
+{% endblock %}

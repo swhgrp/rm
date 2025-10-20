@@ -1,0 +1,1062 @@
+{% extends "base.html" %}
+
+{% block title %}Recipes - SW Hospitality Group{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3>Recipe Management & Costing</h3>
+        <div class="btn-group">
+            <button class="btn btn-success" onclick="recalculateAllCosts()">
+                <i class="bi bi-calculator"></i> Recalculate All Costs
+            </button>
+            <button class="btn btn-info" onclick="exportCostReport()">
+                <i class="bi bi-download"></i> Export Cost Report
+            </button>
+            <button class="btn btn-warning" onclick="showUploadRecipeModal()">
+                <i class="bi bi-upload"></i> Upload Recipe
+            </button>
+            <button class="btn btn-primary" onclick="showCreateModal()">
+                <i class="bi bi-plus-circle"></i> Create Recipe
+            </button>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size: 13px;">Category</label>
+                    <select class="form-select form-select-sm" id="filterCategory">
+                        <option value="">All Categories</option>
+                        <option value="appetizer">Appetizer</option>
+                        <option value="entree">Entree</option>
+                        <option value="side">Side</option>
+                        <option value="dessert">Dessert</option>
+                        <option value="beverage">Beverage</option>
+                        <option value="sauce">Sauce</option>
+                        <option value="prep">Prep</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size: 13px;">Search</label>
+                    <input type="text" class="form-select-sm" id="filterSearch" placeholder="Recipe name">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size: 13px;">Active Only</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="filterActive" checked>
+                        <label class="form-check-label" for="filterActive">
+                            Show active recipes only
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-3">
+                <button class="btn btn-primary btn-sm" onclick="loadRecipes()">Apply Filters</button>
+                <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recipe List -->
+    <div class="card">
+        <div class="card-body">
+            <div id="recipeList"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Recipe Modal -->
+<div class="modal fade" id="createModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createModalTitle">Create Recipe</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="recipeForm">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Recipe Name *</label>
+                                <input type="text" class="form-control" id="recipeName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Category *</label>
+                                <select class="form-select" id="recipeCategory" required>
+                                    <option value="">Select category...</option>
+                                    <option value="appetizer">Appetizer</option>
+                                    <option value="entree">Entree</option>
+                                    <option value="side">Side</option>
+                                    <option value="dessert">Dessert</option>
+                                    <option value="beverage">Beverage</option>
+                                    <option value="sauce">Sauce</option>
+                                    <option value="prep">Prep</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="recipeDescription" rows="2"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">Yield Quantity *</label>
+                                <input type="number" step="0.01" class="form-control" id="recipeYieldQty" required>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">Yield Unit *</label>
+                                <input type="text" class="form-control" id="recipeYieldUnit" required placeholder="e.g., gallons, servings">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">Portion Size</label>
+                                <input type="number" step="0.01" class="form-control" id="recipePortionSize" placeholder="Optional">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label class="form-label">Portion Unit</label>
+                                <input type="text" class="form-control" id="recipePortionUnit" placeholder="e.g., oz, cups">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Prep Time (minutes)</label>
+                                <input type="number" class="form-control" id="recipePrepTime">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Cook Time (minutes)</label>
+                                <input type="number" class="form-control" id="recipeCookTime">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Selling Price ($)</label>
+                                <input type="number" step="0.01" class="form-control" id="recipeSellingPrice" placeholder="Menu price">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Instructions</label>
+                        <textarea class="form-control" id="recipeInstructions" rows="4"></textarea>
+                    </div>
+
+                    <h5 class="mt-4">Ingredients</h5>
+                    <div id="ingredientsList">
+                        <!-- Ingredients will be added here -->
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary" onclick="addIngredientRow()">
+                        <i class="bi bi-plus"></i> Add Ingredient
+                    </button>
+
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveRecipe()">
+                    <span id="saveBtnText">Save Recipe</span>
+                    <span id="saveSpinner" class="spinner-border spinner-border-sm d-none"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recipe Detail Modal -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="detailModalTitle">Recipe Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="recipeDetail"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Recipe Modal -->
+<div class="modal fade" id="uploadRecipeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Upload Recipe</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Upload a recipe document (PDF, image, or text file) and AI will extract the recipe details including ingredients and instructions.</p>
+                <div class="mb-3">
+                    <label for="recipeFile" class="form-label">Select File</label>
+                    <input type="file" class="form-control" id="recipeFile" accept=".pdf,.png,.jpg,.jpeg,.txt">
+                    <small class="text-muted">Supported formats: PDF, PNG, JPG, JPEG, TXT</small>
+                </div>
+                <div id="uploadProgress" style="display: none;">
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%">
+                            Parsing recipe with AI...
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="uploadAndParseRecipe()">Upload & Parse</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalTitle">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="confirmModalBody">
+                Are you sure?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmModalBtn" onclick="confirmAction()">Confirm</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let recipes = [];
+let masterItems = [];
+let currentRecipeId = null;
+let ingredientCounter = 0;
+let confirmCallback = null;
+
+// Get auth token
+function getToken() {
+    return localStorage.getItem('access_token');
+}
+
+// Confirmation modal helpers
+function showConfirmation(title, message, callback) {
+    document.getElementById('confirmModalTitle').textContent = title;
+    document.getElementById('confirmModalBody').textContent = message;
+    confirmCallback = callback;
+    const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    modal.show();
+}
+
+function confirmAction() {
+    if (confirmCallback) {
+        confirmCallback();
+        confirmCallback = null;
+    }
+    const modalElement = document.getElementById('confirmModal');
+    const modal = bootstrap.Modal.getInstance(modalElement);
+    if (modal) {
+        modal.hide();
+    }
+}
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadMasterItems();
+    loadRecipes();
+});
+
+async function loadMasterItems() {
+    try {
+        const response = await fetch('api/items/?active_only=true', {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        masterItems = await response.json();
+    } catch (error) {
+        console.error('Error loading master items:', error);
+    }
+}
+
+async function loadRecipes() {
+    const category = document.getElementById('filterCategory').value;
+    const search = document.getElementById('filterSearch').value;
+    const activeOnly = document.getElementById('filterActive').checked;
+
+    let url = 'api/recipes/?';
+    if (category) url += `category=${category}&`;
+    if (search) url += `search=${encodeURIComponent(search)}&`;
+    if (activeOnly) url += `active_only=true&`;
+
+    try {
+        const response = await fetch(url, { headers: { 'Authorization': `Bearer ${getToken()}` } });
+        recipes = await response.json();
+        displayRecipes();
+    } catch (error) {
+        console.error('Error loading recipes:', error);
+        showAlert('Failed to load recipes', 'danger');
+    }
+}
+
+function displayRecipes() {
+    const container = document.getElementById('recipeList');
+
+    if (recipes.length === 0) {
+        container.innerHTML = '<p class="text-muted">No recipes found</p>';
+        return;
+    }
+
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-hover" style="font-size: 13px;">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Recipe Name</th>
+                        <th>Category</th>
+                        <th>Yield</th>
+                        <th>Portions</th>
+                        <th>Ingredient Cost</th>
+                        <th>Total Cost</th>
+                        <th>Cost/Portion</th>
+                        <th>Selling Price</th>
+                        <th>Food Cost %</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    recipes.forEach(recipe => {
+        const yield_display = `${recipe.yield_quantity} ${recipe.yield_unit}`;
+
+        // Calculate portions
+        let portions = '-';
+        if (recipe.portion_size && recipe.portion_size > 0) {
+            portions = Math.floor(recipe.yield_quantity / recipe.portion_size);
+        } else if (recipe.yield_unit.toLowerCase().includes('serving') || recipe.yield_unit.toLowerCase().includes('portion')) {
+            portions = Math.floor(recipe.yield_quantity);
+        }
+
+        const ing_cost = recipe.ingredient_cost ? '$' + parseFloat(recipe.ingredient_cost).toFixed(2) : '-';
+        const total_cost = recipe.total_cost ? '$' + parseFloat(recipe.total_cost).toFixed(2) : '-';
+        const portion_cost = recipe.cost_per_portion ? '$' + parseFloat(recipe.cost_per_portion).toFixed(2) : '-';
+        const selling_price = recipe.selling_price ? '$' + parseFloat(recipe.selling_price).toFixed(2) : '-';
+
+        // Format food cost percentage with color coding
+        let food_cost_display = '-';
+        let food_cost_class = '';
+        if (recipe.food_cost_percentage !== null && recipe.food_cost_percentage !== undefined) {
+            const pct = parseFloat(recipe.food_cost_percentage);
+            food_cost_display = pct.toFixed(1) + '%';
+            if (pct <= 30) {
+                food_cost_class = 'text-success fw-bold';  // Green for good
+            } else if (pct <= 35) {
+                food_cost_class = 'text-warning fw-bold';  // Yellow for warning
+            } else {
+                food_cost_class = 'text-danger fw-bold';   // Red for too high
+            }
+        }
+
+        html += `
+            <tr style="cursor: pointer;" onclick="viewRecipe(${recipe.id})">
+                <td>${recipe.name}</td>
+                <td><span class="badge bg-secondary">${recipe.category}</span></td>
+                <td>${yield_display}</td>
+                <td>${portions}</td>
+                <td>${ing_cost}</td>
+                <td>${total_cost}</td>
+                <td>${portion_cost}</td>
+                <td>${selling_price}</td>
+                <td class="${food_cost_class}">${food_cost_display}</td>
+                <td onclick="event.stopPropagation();">
+                    <button class="btn btn-sm btn-outline-primary" onclick="viewRecipe(${recipe.id})" title="View">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="editRecipe(${recipe.id})" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" onclick="calculateCost(${recipe.id})" title="Calculate Cost">
+                        <i class="bi bi-calculator"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteRecipe(${recipe.id})" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function showCreateModal() {
+    currentRecipeId = null;
+    document.getElementById('createModalTitle').textContent = 'Create Recipe';
+    document.getElementById('recipeForm').reset();
+    document.getElementById('ingredientsList').innerHTML = '';
+    ingredientCounter = 0;
+
+    const modal = new bootstrap.Modal(document.getElementById('createModal'));
+    modal.show();
+}
+
+async function editRecipe(recipeId) {
+    currentRecipeId = recipeId;
+    document.getElementById('createModalTitle').textContent = 'Edit Recipe';
+
+    try {
+        const response = await fetch(`api/recipes/${recipeId}`, {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        const recipe = await response.json();
+
+        // Populate form fields
+        document.getElementById('recipeName').value = recipe.name;
+        document.getElementById('recipeCategory').value = recipe.category;
+        document.getElementById('recipeDescription').value = recipe.description || '';
+        document.getElementById('recipeYieldQty').value = recipe.yield_quantity;
+        document.getElementById('recipeYieldUnit').value = recipe.yield_unit;
+        document.getElementById('recipePortionSize').value = recipe.portion_size || '';
+        document.getElementById('recipePortionUnit').value = recipe.portion_unit || '';
+        document.getElementById('recipePrepTime').value = recipe.prep_time_minutes || '';
+        document.getElementById('recipeCookTime').value = recipe.cook_time_minutes || '';
+        document.getElementById('recipeSellingPrice').value = recipe.selling_price || '';
+        document.getElementById('recipeInstructions').value = recipe.instructions || '';
+
+        // Populate ingredients
+        document.getElementById('ingredientsList').innerHTML = '';
+        ingredientCounter = 0;
+        if (recipe.ingredients && recipe.ingredients.length > 0) {
+            recipe.ingredients.forEach(ing => {
+                addIngredientRow();
+                const lastRow = document.getElementById(`ingredient-${ingredientCounter}`);
+                lastRow.querySelector('.ingredient-item').value = ing.master_item_id;
+                lastRow.querySelector('.ingredient-qty').value = ing.quantity;
+                lastRow.querySelector('.ingredient-unit').value = ing.unit;
+            });
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('createModal'));
+        modal.show();
+    } catch (error) {
+        console.error('Error loading recipe:', error);
+        showAlert('Failed to load recipe for editing', 'danger');
+    }
+}
+
+function addIngredientRow() {
+    ingredientCounter++;
+    const container = document.getElementById('ingredientsList');
+
+    const row = document.createElement('div');
+    row.className = 'row mb-2 ingredient-row';
+    row.id = `ingredient-${ingredientCounter}`;
+    row.innerHTML = `
+        <div class="col-md-5">
+            <select class="form-select form-select-sm ingredient-item" required>
+                <option value="">Select ingredient...</option>
+                ${masterItems.map(item => `<option value="${item.id}">${item.name}</option>`).join('')}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <input type="number" step="0.001" class="form-control form-control-sm ingredient-qty" placeholder="Quantity" required>
+        </div>
+        <div class="col-md-3">
+            <input type="text" class="form-control form-control-sm ingredient-unit" placeholder="Unit" required>
+        </div>
+        <div class="col-md-2">
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeIngredientRow(${ingredientCounter})">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    `;
+    container.appendChild(row);
+}
+
+function removeIngredientRow(id) {
+    document.getElementById(`ingredient-${id}`).remove();
+}
+
+async function saveRecipe() {
+    const name = document.getElementById('recipeName').value;
+    const category = document.getElementById('recipeCategory').value;
+    const description = document.getElementById('recipeDescription').value;
+    const yieldQty = document.getElementById('recipeYieldQty').value;
+    const yieldUnit = document.getElementById('recipeYieldUnit').value;
+    const portionSize = document.getElementById('recipePortionSize').value;
+    const portionUnit = document.getElementById('recipePortionUnit').value;
+    const prepTime = document.getElementById('recipePrepTime').value;
+    const cookTime = document.getElementById('recipeCookTime').value;
+    const instructions = document.getElementById('recipeInstructions').value;
+
+    if (!name || !category || !yieldQty || !yieldUnit) {
+        showAlert('Please fill in all required fields', 'warning');
+        return;
+    }
+
+    // Collect ingredients
+    const ingredients = [];
+    document.querySelectorAll('.ingredient-row').forEach(row => {
+        const itemId = row.querySelector('.ingredient-item').value;
+        const qty = row.querySelector('.ingredient-qty').value;
+        const unit = row.querySelector('.ingredient-unit').value;
+
+        if (itemId && qty && unit) {
+            ingredients.push({
+                master_item_id: parseInt(itemId),
+                quantity: parseFloat(qty),
+                unit: unit
+            });
+        }
+    });
+
+    const sellingPrice = document.getElementById('recipeSellingPrice').value;
+
+    const recipeData = {
+        name: name,
+        category: category,
+        description: description || null,
+        yield_quantity: parseFloat(yieldQty),
+        yield_unit: yieldUnit,
+        portion_size: portionSize ? parseFloat(portionSize) : null,
+        portion_unit: portionUnit || null,
+        prep_time_minutes: prepTime ? parseInt(prepTime) : null,
+        cook_time_minutes: cookTime ? parseInt(cookTime) : null,
+        selling_price: sellingPrice ? parseFloat(sellingPrice) : null,
+        instructions: instructions || null,
+        ingredients: ingredients
+    };
+
+    // Show loading
+    document.getElementById('saveBtnText').classList.add('d-none');
+    document.getElementById('saveSpinner').classList.remove('d-none');
+
+    try {
+        const url = currentRecipeId ? `api/recipes/${currentRecipeId}` : 'api/recipes/';
+        const method = currentRecipeId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Authorization': `Bearer ${getToken()}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(recipeData)
+        });
+
+        if (response.ok) {
+            const successMsg = currentRecipeId ? 'Recipe updated successfully' : 'Recipe created successfully';
+            showAlert(successMsg, 'success');
+            bootstrap.Modal.getInstance(document.getElementById('createModal')).hide();
+            loadRecipes();
+        } else {
+            const errorText = await response.text();
+            console.error('Server error response:', errorText);
+            try {
+                const error = JSON.parse(errorText);
+                showAlert(error.detail || 'Failed to create recipe', 'danger');
+            } catch (e) {
+                showAlert('Server error: ' + errorText.substring(0, 100), 'danger');
+            }
+        }
+    } catch (error) {
+        console.error('Save error:', error);
+        showAlert('Failed to save recipe', 'danger');
+    } finally {
+        document.getElementById('saveBtnText').classList.remove('d-none');
+        document.getElementById('saveSpinner').classList.add('d-none');
+    }
+}
+
+async function viewRecipe(recipeId) {
+    currentRecipeId = recipeId;
+
+    try {
+        const response = await fetch(`api/recipes/${recipeId}`, {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        const recipe = await response.json();
+        displayRecipeDetail(recipe);
+
+        const modalElement = document.getElementById('detailModal');
+        let modal = bootstrap.Modal.getInstance(modalElement);
+        if (!modal) {
+            modal = new bootstrap.Modal(modalElement);
+        }
+        modal.show();
+    } catch (error) {
+        console.error('Error loading recipe:', error);
+        showAlert('Failed to load recipe details', 'danger');
+    }
+}
+
+function displayRecipeDetail(recipe) {
+    document.getElementById('detailModalTitle').textContent = `Recipe: ${recipe.name}`;
+
+    // Calculate portions
+    let portions = '-';
+    if (recipe.portion_size && recipe.portion_size > 0) {
+        portions = Math.floor(recipe.yield_quantity / recipe.portion_size);
+    } else if (recipe.yield_unit.toLowerCase().includes('serving') || recipe.yield_unit.toLowerCase().includes('portion')) {
+        portions = Math.floor(recipe.yield_quantity);
+    }
+
+    let html = `
+        <div class="row mb-3">
+            <div class="col-md-6">
+                ${recipe.image_url ?
+                    `<div class="mb-3">
+                        <img src="${recipe.image_url}" alt="${recipe.name}" class="img-fluid rounded" style="max-height: 300px; width: auto;">
+                    </div>` :
+                    `<div class="mb-3">
+                        <div class="border rounded p-3 text-center text-muted" style="min-height: 150px; display: flex; align-items: center; justify-content: center;">
+                            <span>📷 No image uploaded</span>
+                        </div>
+                    </div>`
+                }
+                <div class="mb-2">
+                    <input type="file" id="recipeImageUpload" accept="image/*" class="form-control form-control-sm" onchange="uploadRecipeImage(${recipe.id})">
+                    <small class="text-muted">Upload a recipe image (JPEG, PNG, GIF)</small>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Category:</strong> <span class="badge bg-secondary">${recipe.category}</span></p>
+                <p><strong>Description:</strong> ${recipe.description || '-'}</p>
+                <p><strong>Yield:</strong> ${recipe.yield_quantity} ${recipe.yield_unit}</p>
+                <p><strong>Portion Size:</strong> ${recipe.portion_size ? recipe.portion_size + ' ' + (recipe.portion_unit || '') : '-'}</p>
+                <p><strong>Portions:</strong> ${portions}</p>
+                <p><strong>Prep Time:</strong> ${recipe.prep_time_minutes || '-'} min</p>
+                <p><strong>Cook Time:</strong> ${recipe.cook_time_minutes || '-'} min</p>
+                <p><strong>Selling Price:</strong> ${recipe.selling_price ? '$' + parseFloat(recipe.selling_price).toFixed(2) : '-'}</p>
+                <p><strong>Last Costed:</strong> ${recipe.last_costed ? new Date(recipe.last_costed).toLocaleDateString() : 'Never'}</p>
+            </div>
+        </div>
+
+        <div class="alert alert-info">
+            <div class="row">
+                <div class="col-md-2">
+                    <strong>Ingredient Cost:</strong><br>
+                    ${recipe.ingredient_cost ? '$' + parseFloat(recipe.ingredient_cost).toFixed(2) : '-'}
+                </div>
+                <div class="col-md-2">
+                    <strong>Labor Cost:</strong><br>
+                    ${recipe.labor_cost ? '$' + parseFloat(recipe.labor_cost).toFixed(2) : '-'}
+                </div>
+                <div class="col-md-2">
+                    <strong>Total Cost:</strong><br>
+                    <span style="font-size: 1.2em;">${recipe.total_cost ? '$' + parseFloat(recipe.total_cost).toFixed(2) : '-'}</span>
+                </div>
+                <div class="col-md-2">
+                    <strong>Cost per Portion:</strong><br>
+                    <span style="font-size: 1.2em;">${recipe.cost_per_portion ? '$' + parseFloat(recipe.cost_per_portion).toFixed(2) : '-'}</span>
+                </div>
+                <div class="col-md-2">
+                    <strong>Selling Price:</strong><br>
+                    <span style="font-size: 1.2em;">${recipe.selling_price ? '$' + parseFloat(recipe.selling_price).toFixed(2) : '-'}</span>
+                </div>
+                <div class="col-md-2">
+                    <strong>Food Cost %:</strong><br>
+                    <span style="font-size: 1.2em; ${recipe.food_cost_percentage ? (parseFloat(recipe.food_cost_percentage) <= 30 ? 'color: #28a745;' : parseFloat(recipe.food_cost_percentage) <= 35 ? 'color: #ffc107;' : 'color: #dc3545;') : ''}">${recipe.food_cost_percentage ? parseFloat(recipe.food_cost_percentage).toFixed(1) + '%' : '-'}</span>
+                </div>
+            </div>
+        </div>
+
+        <h5>Ingredients</h5>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm" style="font-size: 12px;">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Ingredient</th>
+                        <th>Quantity</th>
+                        <th>Unit</th>
+                        <th>Unit Cost</th>
+                        <th>Total Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    if (recipe.ingredients && recipe.ingredients.length > 0) {
+        recipe.ingredients.forEach(ing => {
+            html += `
+                <tr>
+                    <td>${ing.master_item_name || 'Unknown'}</td>
+                    <td>${ing.quantity}</td>
+                    <td>${ing.unit}</td>
+                    <td>${ing.unit_cost ? '$' + parseFloat(ing.unit_cost).toFixed(2) : '-'}</td>
+                    <td>${ing.total_cost ? '$' + parseFloat(ing.total_cost).toFixed(2) : '-'}</td>
+                </tr>
+            `;
+        });
+    } else {
+        html += '<tr><td colspan="5" class="text-muted">No ingredients</td></tr>';
+    }
+
+    html += '</tbody></table></div>';
+
+    if (recipe.instructions) {
+        html += `
+            <h5>Instructions</h5>
+            <div class="card bg-dark">
+                <div class="card-body" style="white-space: pre-wrap;">${recipe.instructions}</div>
+            </div>
+        `;
+    }
+
+    // Add export button
+    html += `
+        <div class="mt-4">
+            <button class="btn btn-primary" onclick="exportRecipePDF(${recipe.id})">
+                <i class="bi bi-file-pdf"></i> Export to PDF
+            </button>
+        </div>
+    `;
+
+    document.getElementById('recipeDetail').innerHTML = html;
+}
+
+async function calculateCost(recipeId) {
+    showConfirmation(
+        'Recalculate Cost',
+        'Are you sure you want to recalculate the cost for this recipe?',
+        async () => {
+            try {
+                const response = await fetch(`api/recipes/${recipeId}/calculate-cost`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showAlert(`Cost calculated: $${parseFloat(result.total_cost).toFixed(2)}`, 'success');
+                    loadRecipes();
+                } else {
+                    showAlert('Failed to calculate cost', 'danger');
+                }
+            } catch (error) {
+                console.error('Calculate error:', error);
+                showAlert('Failed to calculate cost', 'danger');
+            }
+        }
+    );
+}
+
+async function deleteRecipe(recipeId) {
+    showConfirmation(
+        'Delete Recipe',
+        'Are you sure you want to delete this recipe?',
+        async () => {
+            try {
+                const response = await fetch(`api/recipes/${recipeId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+
+                if (response.ok) {
+                    showAlert('Recipe deleted', 'success');
+                    loadRecipes();
+                } else {
+                    showAlert('Failed to delete recipe', 'danger');
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                showAlert('Failed to delete recipe', 'danger');
+            }
+        }
+    );
+}
+
+function exportRecipePDF(recipeId) {
+    const url = `api/recipes/${recipeId}/export/pdf`;
+    const token = getToken();
+
+    // Create a temporary link and trigger download
+    fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Export failed');
+        return response.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `recipe_${recipeId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showAlert('Recipe exported to PDF successfully', 'success');
+    })
+    .catch(error => {
+        console.error('Export error:', error);
+        showAlert('Failed to export recipe', 'danger');
+    });
+}
+
+async function uploadRecipeImage(recipeId) {
+    const fileInput = document.getElementById('recipeImageUpload');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+        showAlert('File size must be less than 5MB', 'danger');
+        fileInput.value = '';
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch(`api/recipes/${recipeId}/upload-image`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${getToken()}`
+            },
+            body: formData
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showAlert('Image uploaded successfully', 'success');
+            // Reload recipe details to show new image
+            viewRecipe(recipeId);
+        } else {
+            const error = await response.json();
+            showAlert(error.detail || 'Failed to upload image', 'danger');
+        }
+    } catch (error) {
+        console.error('Upload error:', error);
+        showAlert('Failed to upload image', 'danger');
+    } finally {
+        fileInput.value = '';
+    }
+}
+
+function clearFilters() {
+    document.getElementById('filterCategory').value = '';
+    document.getElementById('filterSearch').value = '';
+    document.getElementById('filterActive').checked = true;
+    loadRecipes();
+}
+
+async function recalculateAllCosts() {
+    showConfirmation(
+        'Recalculate All Costs',
+        'Are you sure you want to recalculate costs for all active recipes? This may take a moment.',
+        async () => {
+            try {
+                const response = await fetch('api/recipes/calculate-all-costs?active_only=true', {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showAlert(`Successfully recalculated ${result.updated} recipes. Failed: ${result.failed}`, 'success');
+                    loadRecipes();
+                } else {
+                    const error = await response.json();
+                    showAlert(error.detail || 'Failed to recalculate costs', 'danger');
+                }
+            } catch (error) {
+                console.error('Recalculate error:', error);
+                showAlert('Failed to recalculate costs', 'danger');
+            }
+        }
+    );
+}
+
+function exportCostReport() {
+    const url = 'api/recipes/export/cost-report?active_only=true';
+    const token = getToken();
+
+    // Create a temporary link and trigger download
+    fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+    })
+    .then(response => {
+        if (!response.ok) throw new Error('Export failed');
+        return response.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `recipe_cost_report_${new Date().toISOString().slice(0,10)}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showAlert('Cost report exported successfully', 'success');
+    })
+    .catch(error => {
+        console.error('Export error:', error);
+        showAlert('Failed to export cost report', 'danger');
+    });
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.querySelector('.container-fluid').prepend(alertDiv);
+    setTimeout(() => alertDiv.remove(), 5000);
+}
+
+// Show upload recipe modal
+function showUploadRecipeModal() {
+    const modal = new bootstrap.Modal(document.getElementById('uploadRecipeModal'));
+    document.getElementById('recipeFile').value = '';
+    document.getElementById('uploadProgress').style.display = 'none';
+    modal.show();
+}
+
+// Upload and parse recipe
+async function uploadAndParseRecipe() {
+    const fileInput = document.getElementById('recipeFile');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        showAlert('Please select a file', 'warning');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        document.getElementById('uploadProgress').style.display = 'block';
+        const token = getToken();
+
+        const response = await fetch('api/recipes/parse-upload', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Upload failed');
+        }
+
+        const result = await response.json();
+
+        // Close upload modal
+        bootstrap.Modal.getInstance(document.getElementById('uploadRecipeModal')).hide();
+
+        // Show success message
+        showAlert('Recipe parsed successfully! Opening edit form...', 'success');
+
+        // Open create modal first
+        currentRecipeId = null;
+        document.getElementById('createModalTitle').textContent = 'Create Recipe (Parsed from Upload)';
+        document.getElementById('recipeForm').reset();
+        document.getElementById('ingredientsList').innerHTML = '';
+        ingredientCounter = 0;
+
+        const modal = new bootstrap.Modal(document.getElementById('createModal'));
+        modal.show();
+
+        // Wait for modal to be fully shown, then populate fields
+        setTimeout(() => {
+            // Populate basic fields
+            if (result.name) {
+                document.getElementById('recipeName').value = result.name;
+            }
+            if (result.category) {
+                document.getElementById('recipeCategory').value = result.category;
+            }
+            if (result.yield_amount) {
+                document.getElementById('recipeYieldQty').value = result.yield_amount;
+            }
+            if (result.yield_unit) {
+                document.getElementById('recipeYieldUnit').value = result.yield_unit;
+            }
+            if (result.prep_time) {
+                document.getElementById('recipePrepTime').value = result.prep_time;
+            }
+            if (result.cook_time) {
+                document.getElementById('recipeCookTime').value = result.cook_time;
+            }
+            if (result.instructions) {
+                document.getElementById('recipeInstructions').value = result.instructions;
+            }
+
+            // Add ingredients if provided
+            if (result.ingredients && result.ingredients.length > 0) {
+                result.ingredients.forEach((ing, index) => {
+                    addIngredientRow();
+
+                    // Use setTimeout to ensure the row is fully rendered
+                    setTimeout(() => {
+                        const lastRow = document.querySelector(`#ingredientsList .ingredient-row:last-child`);
+                        if (lastRow) {
+                            if (ing.quantity) {
+                                const qtyInput = lastRow.querySelector('input[placeholder="Quantity"]');
+                                if (qtyInput) {
+                                    qtyInput.value = ing.quantity;
+                                }
+                            }
+                            if (ing.unit) {
+                                const unitInput = lastRow.querySelector('input[placeholder="Unit"]');
+                                if (unitInput) {
+                                    unitInput.value = ing.unit;
+                                }
+                            }
+                            if (ing.description) {
+                                const selectInput = lastRow.querySelector('select');
+                                if (selectInput) {
+                                    const option = document.createElement('option');
+                                    option.value = '';
+                                    option.text = `Select item (AI found: "${ing.description}")`;
+                                    option.selected = true;
+                                    selectInput.insertBefore(option, selectInput.firstChild);
+                                }
+                            }
+                        }
+                    }, 50 * index); // Stagger each ingredient slightly
+                });
+            }
+        }, 500);
+
+    } catch (error) {
+        showAlert(error.message, 'danger');
+    } finally {
+        document.getElementById('uploadProgress').style.display = 'none';
+    }
+}
+</script>
+{% endblock %}

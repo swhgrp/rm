@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SW Hospitality Group - Portal</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background-color: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .navbar-brand img {
+            height: 40px;
+        }
+
+        .navbar-brand h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #c9d1d9;
+        }
+
+        .navbar-user {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .user-info {
+            text-align: right;
+        }
+
+        .user-name {
+            font-weight: 600;
+            font-size: 14px;
+            color: #c9d1d9;
+        }
+
+        .user-role {
+            font-size: 12px;
+            color: #8b949e;
+        }
+
+        .btn-logout,
+        .btn-settings {
+            padding: 8px 16px;
+            background-color: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-logout:hover,
+        .btn-settings:hover {
+            background-color: #30363d;
+            color: #c9d1d9;
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 992px) {
+            .navbar-user {
+                gap: 10px;
+            }
+
+            .btn-logout,
+            .btn-settings {
+                padding: 8px 12px;
+                font-size: 13px;
+            }
+
+            /* Show only icon on very small screens */
+            @media (max-width: 480px) {
+                .btn-logout .btn-text,
+                .btn-settings .btn-text {
+                    display: none;
+                }
+
+                .btn-logout,
+                .btn-settings {
+                    padding: 10px;
+                    min-width: 40px;
+                    justify-content: center;
+                }
+            }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .welcome-section {
+            margin-bottom: 40px;
+        }
+
+        .welcome-section h2 {
+            color: #c9d1d9;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .welcome-section p {
+            color: #8b949e;
+            font-size: 16px;
+        }
+
+        .systems-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+        }
+
+        .system-card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 30px;
+            transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            color: inherit;
+            display: flex;
+            flex-direction: column;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .system-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: #58a6ff;
+            transform: scaleX(0);
+            transition: transform 0.2s;
+        }
+
+        .system-card:hover {
+            transform: translateY(-4px);
+            border-color: #58a6ff;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .system-card:hover::before {
+            transform: scaleX(1);
+        }
+
+        .system-icon {
+            width: 56px;
+            height: 56px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #21262d;
+            border-radius: 8px;
+            border: 1px solid #30363d;
+        }
+
+        .system-icon i {
+            font-size: 28px;
+            color: #58a6ff;
+        }
+
+        .system-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #c9d1d9;
+            margin-bottom: 8px;
+        }
+
+        .system-description {
+            font-size: 14px;
+            color: #8b949e;
+            line-height: 1.6;
+        }
+
+        .no-systems {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 40px;
+            text-align: center;
+        }
+
+        .no-systems h3 {
+            color: #c9d1d9;
+            margin-bottom: 10px;
+        }
+
+        .no-systems p {
+            color: #8b949e;
+        }
+
+        /* Loading state for cards */
+        .system-card.loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .system-card.loading .system-icon {
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        @media (max-width: 992px) {
+            .systems-grid {
+                grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+                gap: 20px;
+            }
+
+            .system-card {
+                padding: 25px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 12px 15px;
+            }
+
+            .navbar-brand h1 {
+                font-size: 16px;
+            }
+
+            .navbar-brand img {
+                height: 35px;
+            }
+
+            .navbar-user {
+                gap: 10px;
+            }
+
+            .user-info {
+                display: none;
+            }
+
+            .container {
+                padding: 20px 15px;
+            }
+
+            .welcome-section h2 {
+                font-size: 22px;
+            }
+
+            .welcome-section p {
+                font-size: 14px;
+            }
+
+            .systems-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+
+            .system-card {
+                padding: 20px;
+            }
+
+            .system-icon {
+                width: 48px;
+                height: 48px;
+            }
+
+            .system-icon i {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <img src="/portal/static/images/sw-logo.png" alt="Logo">
+            <h1>Restaurant Management Portal</h1>
+        </div>
+        <div class="navbar-user">
+            <div class="user-info">
+                <div class="user-name">{{ user.full_name or user.username }}</div>
+                <div class="user-role">{% if user.is_admin %}Administrator{% else %}User{% endif %}</div>
+            </div>
+            {% if user.is_admin %}
+            <a href="/portal/settings" class="btn-settings">
+                <i class="bi bi-gear"></i>
+                <span class="btn-text">Settings</span>
+            </a>
+            {% endif %}
+            <a href="/portal/logout" class="btn-logout">
+                <i class="bi bi-box-arrow-right"></i>
+                <span class="btn-text">Logout</span>
+            </a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="welcome-section">
+            <h2>Welcome back, {{ user.full_name or user.username }}!</h2>
+            <p>Select a system to get started</p>
+        </div>
+
+        {% if systems %}
+        <div class="systems-grid">
+            {% for system in systems %}
+            <a href="#" class="system-card" onclick="accessSystem('{{ system.system_key }}', '{{ system.url }}'); return false;">
+                <div class="system-icon">
+                    {% if system.system_key == 'inventory' %}
+                        <i class="bi bi-box-seam"></i>
+                    {% elif system.system_key == 'accounting' %}
+                        <i class="bi bi-calculator"></i>
+                    {% elif system.system_key == 'hub' %}
+                        <i class="bi bi-diagram-3"></i>
+                    {% elif system.system_key == 'hr' %}
+                        <i class="bi bi-people"></i>
+                    {% else %}
+                        <i class="bi bi-grid"></i>
+                    {% endif %}
+                </div>
+                <div class="system-name">{{ system.name }}</div>
+                <div class="system-description">{{ system.description }}</div>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-systems">
+            <h3>No Systems Available</h3>
+            <p>You don't have access to any systems. Please contact your administrator.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        // Inactivity timeout - 30 minutes
+        let inactivityTimer;
+        const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimer);
+            inactivityTimer = setTimeout(() => {
+                // Log out user after 30 minutes of inactivity
+                alert('You have been logged out due to inactivity.');
+                window.location.href = '/portal/logout';
+            }, INACTIVITY_TIMEOUT);
+        }
+
+        // Reset timer on user activity
+        ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(event => {
+            document.addEventListener(event, resetInactivityTimer, true);
+        });
+
+        // Initialize timer
+        resetInactivityTimer();
+
+        // Clear loading states when page becomes visible (e.g., back button)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) {
+                document.querySelectorAll('.system-card.loading').forEach(card => {
+                    card.classList.remove('loading');
+                });
+            }
+        });
+
+        // Clear loading states on page load/show
+        window.addEventListener('pageshow', function(event) {
+            document.querySelectorAll('.system-card.loading').forEach(card => {
+                card.classList.remove('loading');
+            });
+        });
+
+        async function accessSystem(systemKey, systemUrl) {
+            // Get the card element
+            const card = event.currentTarget;
+
+            try {
+                // Show loading state
+                card.classList.add('loading');
+
+                // Request token from Portal
+                const response = await fetch(`/portal/api/generate-token/${systemKey}`);
+
+                if (!response.ok) {
+                    throw new Error('Failed to generate access token');
+                }
+
+                const data = await response.json();
+                const token = data.token;
+
+                // Redirect to system with token
+                window.location.href = `${systemUrl}api/auth/sso-login?token=${token}`;
+            } catch (error) {
+                console.error('Error accessing system:', error);
+                alert('Failed to access system. Please try again or contact support.');
+                card.classList.remove('loading');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -10,8 +10,8 @@
         <button class="btn btn-primary" onclick="showCreateModal()">+ New Account</button>
     </div>
 
-    <div style="margin-bottom: 1rem; display: flex; gap: 1rem;">
-        <select id="typeFilter" onchange="filterAccounts()" style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+    <div style="margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center;">
+        <select id="typeFilter" onchange="filterAccounts()" style="padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; background: #0d1117; color: #c9d1d9;">
             <option value="">All Types</option>
             <option value="ASSET">Assets</option>
             <option value="LIABILITY">Liabilities</option>
@@ -23,7 +23,12 @@
 
         <input type="text" id="searchBox" placeholder="Search accounts..."
                onkeyup="filterAccounts()"
-               style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; flex: 1;">
+               style="padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; flex: 1; background: #0d1117; color: #c9d1d9;">
+
+        <label style="display: flex; align-items: center; gap: 0.5rem; color: #c9d1d9; cursor: pointer;">
+            <input type="checkbox" id="showHierarchy" checked onchange="renderAccounts()">
+            Show Hierarchy
+        </label>
     </div>
 
     <table>
@@ -32,13 +37,14 @@
                 <th>Account #</th>
                 <th>Account Name</th>
                 <th>Type</th>
+                <th>Summary</th>
                 <th>Status</th>
                 <th>Actions</th>
             </tr>
         </thead>
         <tbody id="accountsTable">
             <tr>
-                <td colspan="5" style="text-align: center; padding: 2rem;">
+                <td colspan="6" style="text-align: center; padding: 2rem;">
                     Loading accounts...
                 </td>
             </tr>
@@ -47,23 +53,27 @@
 </div>
 
 <!-- Create/Edit Modal -->
-<div id="accountModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
-    <div style="background: white; border-radius: 8px; padding: 2rem; width: 500px; max-width: 90%;">
-        <h3 style="margin-bottom: 1.5rem;">Create New Account</h3>
+<div id="accountModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 2rem; width: 600px; max-width: 90%;">
+        <h3 id="modalTitle" style="margin-bottom: 1.5rem; color: #c9d1d9;">Create New Account</h3>
+        <input type="hidden" id="editingAccountId">
 
         <div style="margin-bottom: 1rem;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Account Number</label>
-            <input type="text" id="accountNumber" placeholder="e.g., 6950" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9;">Account Number <span style="color: #f85149;">*</span></label>
+            <input type="text" id="accountNumber" placeholder="e.g., 6950" required
+                   style="width: 100%; padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; background: #0d1117; color: #c9d1d9;">
         </div>
 
         <div style="margin-bottom: 1rem;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Account Name</label>
-            <input type="text" id="accountName" placeholder="e.g., Office Rent" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9;">Account Name <span style="color: #f85149;">*</span></label>
+            <input type="text" id="accountName" placeholder="e.g., Office Rent" required
+                   style="width: 100%; padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; background: #0d1117; color: #c9d1d9;">
         </div>
 
         <div style="margin-bottom: 1rem;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Account Type</label>
-            <select id="accountType" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9;">Account Type <span style="color: #f85149;">*</span></label>
+            <select id="accountType" onchange="updateParentOptions()" required
+                    style="width: 100%; padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; background: #0d1117; color: #c9d1d9;">
                 <option value="ASSET">Asset</option>
                 <option value="LIABILITY">Liability</option>
                 <option value="EQUITY">Equity</option>
@@ -73,16 +83,33 @@
             </select>
         </div>
 
+        <div style="margin-bottom: 1rem;">
+            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                <input type="checkbox" id="isSummary" onchange="toggleParentField()">
+                <span style="font-weight: 500; color: #c9d1d9;">Summary Account (has child accounts)</span>
+            </label>
+            <small style="color: #8b949e; margin-left: 1.5rem;">Check this if this account will contain sub-accounts</small>
+        </div>
+
+        <div id="parentAccountField" style="margin-bottom: 1rem;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9;">Parent Account (Optional)</label>
+            <select id="parentAccount" style="width: 100%; padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; background: #0d1117; color: #c9d1d9;">
+                <option value="">-- No Parent (Top Level) --</option>
+            </select>
+            <small style="color: #8b949e;">Parent must be a summary account of the same type</small>
+        </div>
+
         <div style="margin-bottom: 1.5rem;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500;">Description (Optional)</label>
-            <textarea id="accountDescription" placeholder="Account description..." rows="3" style="width: 100%; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9;">Description (Optional)</label>
+            <textarea id="accountDescription" placeholder="Account description..." rows="3"
+                      style="width: 100%; padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; background: #0d1117; color: #c9d1d9;"></textarea>
         </div>
 
         <div id="modalError" class="alert alert-error" style="display: none; margin-bottom: 1rem;"></div>
 
         <div style="display: flex; gap: 1rem; justify-content: flex-end;">
-            <button class="btn" onclick="closeModal()" style="background: #95a5a6; color: white;">Cancel</button>
-            <button class="btn btn-primary" onclick="saveAccount()">Create Account</button>
+            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button id="saveButton" class="btn btn-primary" onclick="saveAccount()">Create Account</button>
         </div>
     </div>
 </div>
@@ -92,6 +119,8 @@
 {% block extra_scripts %}
 <script>
 let allAccounts = [];
+let filteredAccounts = [];
+let expandedAccounts = new Set();
 
 async function loadAccounts() {
     try {
@@ -99,54 +128,143 @@ async function loadAccounts() {
         if (!response.ok) throw new Error('Failed to load accounts');
 
         allAccounts = await response.json();
-        displayAccounts(allAccounts);
+        filterAccounts();
     } catch (error) {
-        document.getElementById('accountsTable').innerHTML = `
-            <tr><td colspan="5" style="text-align: center; color: #e74c3c; padding: 2rem;">
-                Error loading accounts: ${error.message}
-            </td></tr>
-        `;
+        console.error('Error loading accounts:', error);
+        document.getElementById('accountsTable').innerHTML =
+            '<tr><td colspan="6" style="text-align: center; color: #f85149;">Error loading accounts</td></tr>';
     }
 }
 
-function displayAccounts(accounts) {
+function buildAccountTree(accounts) {
+    const accountMap = {};
+    const rootAccounts = [];
+
+    // Create a map of all accounts
+    accounts.forEach(account => {
+        accountMap[account.id] = { ...account, children: [] };
+    });
+
+    // Build the tree structure
+    accounts.forEach(account => {
+        if (account.parent_account_id && accountMap[account.parent_account_id]) {
+            accountMap[account.parent_account_id].children.push(accountMap[account.id]);
+        } else {
+            rootAccounts.push(accountMap[account.id]);
+        }
+    });
+
+    // Sort at each level
+    const sortAccounts = (accts) => {
+        accts.sort((a, b) => a.account_number.localeCompare(b.account_number, undefined, { numeric: true }));
+        accts.forEach(acct => {
+            if (acct.children.length > 0) {
+                sortAccounts(acct.children);
+            }
+        });
+    };
+
+    sortAccounts(rootAccounts);
+    return rootAccounts;
+}
+
+function renderAccountRow(account, level = 0) {
+    const hasChildren = account.children && account.children.length > 0;
+    const isExpanded = expandedAccounts.has(account.id);
+    const indent = '&nbsp;&nbsp;&nbsp;&nbsp;'.repeat(level);
+    const expandIcon = hasChildren
+        ? `<i class="bi bi-chevron-${isExpanded ? 'down' : 'right'}" style="cursor: pointer; margin-right: 4px;" onclick="toggleExpand(${account.id})"></i>`
+        : '<span style="margin-left: 16px;"></span>';
+
+    let html = `
+        <tr data-account-id="${account.id}" data-level="${level}" ${level > 0 ? `data-parent="${account.parent_account_id}"` : ''}>
+            <td>${account.account_number}</td>
+            <td>
+                ${indent}${expandIcon}
+                <span style="font-weight: ${account.is_summary ? '600' : '400'};">${account.account_name}</span>
+            </td>
+            <td><span class="badge">${account.account_type}</span></td>
+            <td>${account.is_summary ? '<span class="badge bg-info">Summary</span>' : '-'}</td>
+            <td>
+                ${account.is_active
+                    ? '<span class="badge bg-success">Active</span>'
+                    : '<span class="badge bg-secondary">Inactive</span>'}
+            </td>
+            <td>
+                <button class="btn btn-sm btn-secondary" onclick="editAccount(${account.id})" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                </button>
+            </td>
+        </tr>
+    `;
+
+    // Add children if expanded
+    if (hasChildren && isExpanded) {
+        account.children.forEach(child => {
+            html += renderAccountRow(child, level + 1);
+        });
+    }
+
+    return html;
+}
+
+function renderAccounts() {
+    const showHierarchy = document.getElementById('showHierarchy').checked;
     const tbody = document.getElementById('accountsTable');
 
-    if (accounts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 2rem;">No accounts found</td></tr>';
+    if (filteredAccounts.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 2rem;">No accounts found</td></tr>';
         return;
     }
 
-    tbody.innerHTML = accounts.map(account => `
-        <tr>
-            <td><strong>${account.account_number}</strong></td>
-            <td>${account.account_name}</td>
-            <td><span class="badge badge-${getTypeBadgeClass(account.account_type)}">${account.account_type}</span></td>
-            <td><span class="badge badge-${account.is_active ? 'success' : 'danger'}">${account.is_active ? 'Active' : 'Inactive'}</span></td>
-            <td>
-                <button class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" onclick="viewAccount(${account.id})">View</button>
-            </td>
-        </tr>
-    `).join('');
+    if (showHierarchy) {
+        const tree = buildAccountTree(filteredAccounts);
+        let html = '';
+        tree.forEach(account => {
+            html += renderAccountRow(account);
+        });
+        tbody.innerHTML = html;
+    } else {
+        // Flat list view
+        const sorted = [...filteredAccounts].sort((a, b) =>
+            a.account_number.localeCompare(b.account_number, undefined, { numeric: true })
+        );
+
+        tbody.innerHTML = sorted.map(account => `
+            <tr>
+                <td>${account.account_number}</td>
+                <td>${account.account_name}</td>
+                <td><span class="badge">${account.account_type}</span></td>
+                <td>${account.is_summary ? '<span class="badge bg-info">Summary</span>' : '-'}</td>
+                <td>
+                    ${account.is_active
+                        ? '<span class="badge bg-success">Active</span>'
+                        : '<span class="badge bg-secondary">Inactive</span>'}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="editAccount(${account.id})" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
 }
 
-function getTypeBadgeClass(type) {
-    const colors = {
-        'ASSET': 'success',
-        'REVENUE': 'success',
-        'LIABILITY': 'danger',
-        'EXPENSE': 'danger',
-        'COGS': 'warning',
-        'EQUITY': 'warning'
-    };
-    return colors[type] || 'warning';
+function toggleExpand(accountId) {
+    if (expandedAccounts.has(accountId)) {
+        expandedAccounts.delete(accountId);
+    } else {
+        expandedAccounts.add(accountId);
+    }
+    renderAccounts();
 }
 
 function filterAccounts() {
     const typeFilter = document.getElementById('typeFilter').value;
     const searchText = document.getElementById('searchBox').value.toLowerCase();
 
-    const filtered = allAccounts.filter(account => {
+    filteredAccounts = allAccounts.filter(account => {
         const matchesType = !typeFilter || account.account_type === typeFilter;
         const matchesSearch = !searchText ||
             account.account_number.toLowerCase().includes(searchText) ||
@@ -155,16 +273,83 @@ function filterAccounts() {
         return matchesType && matchesSearch;
     });
 
-    displayAccounts(filtered);
+    renderAccounts();
 }
 
 function showCreateModal() {
-    document.getElementById('accountModal').style.display = 'flex';
+    document.getElementById('modalTitle').textContent = 'Create New Account';
+    document.getElementById('editingAccountId').value = '';
     document.getElementById('accountNumber').value = '';
     document.getElementById('accountName').value = '';
     document.getElementById('accountType').value = 'EXPENSE';
+    document.getElementById('isSummary').checked = false;
+    document.getElementById('parentAccount').value = '';
     document.getElementById('accountDescription').value = '';
     document.getElementById('modalError').style.display = 'none';
+    document.getElementById('saveButton').textContent = 'Create Account';
+    document.getElementById('accountNumber').disabled = false;
+
+    updateParentOptions();
+    toggleParentField();
+    document.getElementById('accountModal').style.display = 'flex';
+}
+
+function editAccount(accountId) {
+    const account = allAccounts.find(a => a.id === accountId);
+    if (!account) return;
+
+    document.getElementById('modalTitle').textContent = 'Edit Account';
+    document.getElementById('editingAccountId').value = account.id;
+    document.getElementById('accountNumber').value = account.account_number;
+    document.getElementById('accountName').value = account.account_name;
+    document.getElementById('accountType').value = account.account_type;
+    document.getElementById('isSummary').checked = account.is_summary;
+    document.getElementById('parentAccount').value = account.parent_account_id || '';
+    document.getElementById('accountDescription').value = account.description || '';
+    document.getElementById('modalError').style.display = 'none';
+    document.getElementById('saveButton').textContent = 'Update Account';
+    document.getElementById('accountNumber').disabled = true; // Can't change account number
+
+    updateParentOptions();
+    toggleParentField();
+    document.getElementById('accountModal').style.display = 'flex';
+}
+
+function updateParentOptions() {
+    const selectedType = document.getElementById('accountType').value;
+    const editingId = document.getElementById('editingAccountId').value;
+    const parentSelect = document.getElementById('parentAccount');
+
+    // Get all summary accounts of the same type
+    const eligibleParents = allAccounts.filter(account =>
+        account.is_summary &&
+        account.account_type === selectedType &&
+        account.id != editingId // Can't be own parent
+    );
+
+    parentSelect.innerHTML = '<option value="">-- No Parent (Top Level) --</option>';
+
+    eligibleParents
+        .sort((a, b) => a.account_number.localeCompare(b.account_number, undefined, { numeric: true }))
+        .forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.id;
+            option.textContent = `${account.account_number} - ${account.account_name}`;
+            parentSelect.appendChild(option);
+        });
+}
+
+function toggleParentField() {
+    const isSummary = document.getElementById('isSummary').checked;
+    const parentField = document.getElementById('parentAccountField');
+
+    if (isSummary) {
+        // Summary accounts typically don't have parents (they ARE parents)
+        // But we allow it for multi-level hierarchies
+        parentField.style.display = 'block';
+    } else {
+        parentField.style.display = 'block';
+    }
 }
 
 function closeModal() {
@@ -172,9 +357,12 @@ function closeModal() {
 }
 
 async function saveAccount() {
+    const editingId = document.getElementById('editingAccountId').value;
     const accountNumber = document.getElementById('accountNumber').value.trim();
     const accountName = document.getElementById('accountName').value.trim();
     const accountType = document.getElementById('accountType').value;
+    const isSummary = document.getElementById('isSummary').checked;
+    const parentAccountId = document.getElementById('parentAccount').value;
     const description = document.getElementById('accountDescription').value.trim();
 
     if (!accountNumber || !accountName) {
@@ -182,26 +370,34 @@ async function saveAccount() {
         return;
     }
 
+    const data = {
+        account_number: accountNumber,
+        account_name: accountName,
+        account_type: accountType,
+        is_summary: isSummary,
+        parent_account_id: parentAccountId ? parseInt(parentAccountId) : null,
+        description: description || null
+    };
+
     try {
-        const response = await fetch('/accounting/api/accounts/', {
-            method: 'POST',
+        const url = editingId
+            ? `/accounting/api/accounts/${editingId}`
+            : '/accounting/api/accounts/';
+        const method = editingId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                account_number: accountNumber,
-                account_name: accountName,
-                account_type: accountType,
-                description: description || null
-            })
+            body: JSON.stringify(data)
         });
 
         if (!response.ok) {
             const error = await response.json();
-            throw new Error(error.detail || 'Failed to create account');
+            throw new Error(error.detail || 'Failed to save account');
         }
 
         closeModal();
         await loadAccounts();
-        alert('Account created successfully!');
     } catch (error) {
         showError(error.message);
     }
@@ -213,12 +409,54 @@ function showError(message) {
     errorDiv.style.display = 'block';
 }
 
-function viewAccount(id) {
-    // Future: Open account detail view
-    alert('Account detail view - Coming soon!');
+// Load accounts on page load
+document.addEventListener('DOMContentLoaded', loadAccounts);
+</script>
+
+<style>
+.badge {
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
 }
 
-// Load accounts on page load
-loadAccounts();
-</script>
+.badge.bg-success {
+    background-color: #238636;
+    color: white;
+}
+
+.badge.bg-secondary {
+    background-color: #6e7681;
+    color: white;
+}
+
+.badge.bg-info {
+    background-color: #1f6feb;
+    color: white;
+}
+
+table tbody tr:hover {
+    background-color: #161b22;
+}
+
+.alert {
+    padding: 0.75rem 1rem;
+    border-radius: 4px;
+    border: 1px solid;
+}
+
+.alert-error {
+    background-color: #1a0a0a;
+    border-color: #f85149;
+    color: #f85149;
+}
+
+#accountModal input:focus,
+#accountModal select:focus,
+#accountModal textarea:focus {
+    outline: none;
+    border-color: #58a6ff;
+}
+</style>
 {% endblock %}

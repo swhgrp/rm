@@ -1,426 +1,336 @@
-# Restaurant Inventory Management System
+# Restaurant Management System
 
-A comprehensive web-based inventory management system built for restaurant operations, supporting multi-location inventory tracking, transfers, and reporting.
+A comprehensive microservices-based restaurant management platform with inventory management, accounting, and future HR capabilities.
 
-## System Overview
+## Architecture
 
-**Technology Stack:**
-- **Backend:** Python 3.11, FastAPI
-- **Database:** PostgreSQL 15
-- **Cache/Session:** Redis 7
-- **Frontend:** HTML5, JavaScript, Bootstrap 5
-- **Web Server:** Nginx (reverse proxy with SSL/TLS)
-- **Containerization:** Docker & Docker Compose
-- **Database Migrations:** Alembic
+This project uses a **microservices architecture** where each business domain is a separate, independently deployable service:
 
-**Deployment:**
-- Production URL: https://inventory.swhgrp.com:8443 (HTTPS)
-- HTTP Access: http://inventory.swhgrp.com:8000
-- SSL Certificate: Let's Encrypt (valid until December 30, 2025)
-
-## Core Features
-
-### 1. Authentication & Authorization
-- Secure user authentication with JWT tokens
-- Role-based access control (Admin/User)
-- Password hashing with bcrypt
-- Session management via Redis
-- Admin-only features:
-  - Settings/configuration access
-  - User management
-  - Inventory record editing/deletion
-
-### 2. Master Item Management
-- Create and manage inventory items
-- Categorization system
-- Vendor/supplier tracking
-- Unit of measure (UOM) configuration
-- Storage area assignment
-- Par level settings
-- Cost tracking
-
-### 3. Multi-Location Inventory
-- Track inventory across multiple locations
-- Location-specific storage areas
-- Real-time inventory counts
-- Low stock alerts (based on par levels)
-- Inventory value calculation
-- Filter by location, storage area, category, and stock status
-
-### 4. Inventory Counting
-- **Live Count Sessions:** Real-time inventory counting with auto-save
-- **Count Templates:** Pre-configured item lists for quick counting
-- **Count History:** Review and reopen previous count sessions
-- Mobile-responsive interface for on-the-go counting
-- Automatic inventory updates upon count completion
-- Support for partial counts and adjustments
-
-### 5. Transfer System
-- Create transfer requests between locations
-- Multi-item transfers with quantities
-- Transfer workflow states:
-  - PENDING: Awaiting approval
-  - IN_TRANSIT: Approved and shipped
-  - RECEIVED: Completed
-  - REJECTED: Denied
-- Transfer actions:
-  - Approve (sends items)
-  - Ship (updates status)
-  - Receive (updates receiving location inventory)
-  - Reject (cancels transfer)
-- Automatic inventory adjustments on transfer completion
-- Transfer history and audit trail
-
-### 6. Reporting
-- **Usage Report:** Detailed usage analysis with:
-  - Starting inventory
-  - Purchases/additions
-  - Adjustments
-  - Ending inventory
-  - Usage calculations
-  - Cost analysis
-  - Value tracking
-  - Collapsible category drill-down
-- **Variance Report:** Compare expected vs actual inventory
-- Date range filtering
-- Location-specific reports
-- Export functionality (planned)
-
-### 7. Dashboard
-- Quick overview of key metrics
-- Recent activity feed
-- Low stock alerts
-- Pending transfer notifications
-- Location selector for filtered views
-
-### 8. User Management (Admin)
-- Create/edit/delete users
-- Assign roles (Admin/User)
-- Password management
-- User activity tracking
-
-### 9. Settings & Configuration (Admin)
-- **Locations:** Manage restaurant locations
-- **Storage Areas:** Define storage locations within each site
-- **Categories:** Organize items by category
-- **Vendors/Suppliers:** Maintain vendor database
-- **Master Items:** Central item catalog management
-- **Count Templates:** Create reusable count session templates
-
-## Database Schema
-
-### Core Models
-
-**User**
-- id, username, email, hashed_password
-- full_name, role (ADMIN/USER)
-- is_active, created_at, updated_at
-
-**Location**
-- id, name, address, is_active
-- created_at, updated_at
-
-**StorageArea**
-- id, name, location_id, is_active
-- created_at, updated_at
-
-**Category**
-- id, name, description
-
-**Vendor**
-- id, name, contact_info, email, phone
-
-**Item** (Master Item List)
-- id, name, category_id, vendor_id
-- unit_of_measure, par_level, cost
-- storage_area_id, location_id
-- is_active, created_at, updated_at
-
-**Inventory**
-- id, item_id, location_id, storage_area_id
-- quantity, last_count_date
-- created_at, updated_at
-
-**CountSession**
-- id, location_id, user_id, template_id
-- status (IN_PROGRESS/COMPLETED)
-- items (JSONB - array of counted items)
-- notes, started_at, completed_at
-
-**CountTemplate**
-- id, name, location_id, created_by_id
-- items (JSONB - array of item configurations)
-- is_active, created_at, updated_at
-
-**Transfer**
-- id, from_location_id, to_location_id
-- requested_by_id, approved_by_id, received_by_id
-- status (PENDING/IN_TRANSIT/RECEIVED/REJECTED)
-- items (JSONB - array of transfer items)
-- notes, requested_at, shipped_at, received_at
-
-**AuditLog**
-- id, user_id, action, entity_type, entity_id
-- changes (JSONB), ip_address, user_agent
-- created_at
-
-**Waste** (planned feature)
-- id, item_id, location_id, quantity
-- reason, recorded_by_id, recorded_at
-
-## API Structure
-
-All API endpoints are prefixed with `/api/v1`:
-
-- **/auth** - Login, logout, token refresh
-- **/users** - User CRUD operations
-- **/locations** - Location management
-- **/storage_areas** - Storage area management
-- **/categories** - Category management
-- **/vendors** - Vendor management
-- **/items** - Master item management
-- **/inventory** - Inventory CRUD and queries
-- **/count_sessions** - Count session management
-- **/count_templates** - Template CRUD
-- **/transfers** - Transfer creation and management
-- **/reports** - Usage and variance reports
-- **/audit_log** - Activity audit trail
-
-## Frontend Pages
-
-- **Login** (`/login`) - User authentication
-- **Dashboard** (`/dashboard`) - Main overview
-- **Inventory** (`/inventory`) - Current inventory view
-- **Take Inventory** (`/inventory/count`) - Live counting interface
-- **Count History** (`/inventory/count/history`) - Previous counts
-- **Reports** (`/reports`) - Usage and variance reports
-- **Transfers** (`/transfers`) - Transfer management
-- **Settings** (`/settings`) - Admin configuration (locations, items, vendors, etc.)
-- **Profile** (`/profile`) - User profile management
-
-## Deployment Architecture
-
-### Network Configuration
-- **VM IP:** 192.168.122.249 (internal)
-- **Host Server IP:** 10.0.0.65 (internal LAN)
-- **Public Domain:** inventory.swhgrp.com
-- **Ports:**
-  - 8000: HTTP (development/internal)
-  - 8443: HTTPS (production with SSL)
-  - 5432: PostgreSQL (internal only)
-
-### Docker Services
-1. **app** - FastAPI application (Python)
-2. **db** - PostgreSQL database
-3. **redis** - Redis cache/session store
-4. **nginx** - Reverse proxy with SSL termination
-5. **certbot** - Let's Encrypt SSL certificate management
-
-### Port Forwarding Chain
 ```
-Internet → Router:8443
-  → Host Server (10.0.0.65):8443
-    → VM (192.168.122.249):8443
-      → Docker nginx:443
-        → FastAPI app:8000
+restaurant-system/
+├── inventory/          # Inventory Management Service
+│   ├── src/            # FastAPI application code
+│   ├── alembic/        # Database migrations
+│   ├── uploads/        # File uploads
+│   └── .env            # Service configuration
+│
+├── accounting/         # Accounting Service
+│   ├── src/            # FastAPI application code
+│   ├── alembic/        # Database migrations
+│   ├── logs/           # Application logs
+│   └── .env            # Service configuration
+│
+├── portal/             # Central Web Portal
+│   ├── index.html      # Landing page
+│   ├── css/            # Portal styles
+│   └── images/         # Portal assets
+│
+├── shared/             # Shared Infrastructure
+│   ├── nginx/          # Reverse proxy configuration
+│   └── certbot/        # SSL certificates
+│
+├── scripts/            # Utility Scripts
+│   ├── backup_databases.sh    # Automated database backups
+│   ├── health_check.sh        # System health monitoring
+│   ├── check_pos_sync.sh      # POS sync monitoring
+│   └── tests/                 # Test scripts
+│
+├── docker-compose.yml  # Multi-service orchestration
+└── README.md          # This file
 ```
 
-## Installation & Setup
+## Services
+
+### 1. Inventory Management Service
+- **Port**: Internal (proxied via nginx)
+- **Database**: PostgreSQL (`inventory_db`)
+- **Features**:
+  - Multi-location inventory tracking
+  - Vendor management
+  - Recipe costing
+  - POS integration (Clover, Square, Toast)
+  - Purchase orders and receiving
+  - Waste tracking
+  - Reports and analytics
+
+### 2. Accounting Service
+- **Port**: Internal (proxied via nginx at `/accounting/`)
+- **Database**: PostgreSQL (`accounting_db`) - Completely isolated
+- **Features**:
+  - Double-entry bookkeeping
+  - Chart of accounts
+  - Journal entries
+  - Cost of Goods Sold (COGS) tracking
+  - Fiscal period management
+  - Financial reporting
+
+### 3. Central Portal
+- **URL**: http://rm.swhgrp.com
+- **Features**:
+  - Unified entry point for all modules
+  - Dark mode design matching inventory system
+  - Path-based routing to each service
+  - Separate authentication per module
+
+### 4. Future Services
+- **HR System** (planned) - Document retention, employee information, personnel records
+- **Analytics Dashboard** (planned) - Advanced reporting and data visualization
+
+## Service Communication
+
+Services communicate via:
+- **REST APIs**: HTTP-based synchronous communication
+- **Database Isolation**: Each service has its own database
+- **Nginx Routing**:
+  - `/` → Portal Landing Page
+  - `/inventory/` → Inventory Service
+  - `/accounting/` → Accounting Service
+
+## Technology Stack
+
+- **Backend**: Python 3.11, FastAPI
+- **Databases**: PostgreSQL 15 (one per service)
+- **Cache/Queue**: Redis 7
+- **Web Server**: Nginx
+- **Container Orchestration**: Docker Compose
+- **SSL**: Let's Encrypt (Certbot)
+
+## Getting Started
 
 ### Prerequisites
 - Docker and Docker Compose installed
-- Domain name with DNS A record configured
-- Ports 8000 and 8443 available
+- Ubuntu Server 20.04+ (production) or any OS with Docker (development)
 
-### Quick Start
+### Starting All Services
+
 ```bash
-# Clone or navigate to project directory
-cd /opt/restaurant-inventory
-
-# Configure environment variables (already set)
-# Edit .env if needed
-
 # Start all services
-docker-compose up -d
+docker compose up -d
+
+# Check service status
+docker compose ps
 
 # View logs
-docker-compose logs -f app
+docker compose logs -f
 
-# Stop services
-docker-compose down
+# View specific service logs
+docker compose logs -f inventory-app
+docker compose logs -f accounting-app
 ```
 
-### Database Migrations
-```bash
-# Run migrations
-docker-compose exec app alembic upgrade head
-
-# Create new migration
-docker-compose exec app alembic revision --autogenerate -m "description"
-```
-
-### SSL Certificate Renewal
-
-The Let's Encrypt certificate expires **December 30, 2025** and requires manual renewal:
+### Stopping Services
 
 ```bash
-# Add DNS TXT record when prompted by certbot
-# Record name: _acme-challenge.inventory.swhgrp.com
-# Then run:
-docker-compose stop certbot
-echo "" | docker-compose run --rm --entrypoint "" certbot certbot certonly --manual --preferred-challenges dns -d inventory.swhgrp.com --email admin@swhgrp.com --agree-tos --no-eff-email
+# Stop all services
+docker compose down
 
-# Restart nginx to load new certificate
-docker-compose restart nginx
+# Stop and remove volumes (WARNING: deletes data)
+docker compose down -v
 ```
 
-### Backup & Restore
+### Accessing Services
 
-**Database Backup:**
-```bash
-docker-compose exec db pg_dump -U inventory_user inventory_db > backup.sql
-```
-
-**Database Restore:**
-```bash
-cat backup.sql | docker-compose exec -T db psql -U inventory_user inventory_db
-```
-
-**Uploads Backup:**
-```bash
-tar -czf uploads-backup.tar.gz uploads/
-```
-
-## Configuration Files
-
-- **docker-compose.yml** - Service orchestration
-- **Dockerfile** - Application container build
-- **.env** - Environment variables and secrets
-- **requirements.txt** - Python dependencies
-- **alembic.ini** - Database migration config
-- **nginx/nginx.conf** - Nginx main config
-- **nginx/conf.d/app-http.conf** - HTTP server config
-- **nginx/conf.d/app-https.conf** - HTTPS server config
-
-## Security Features
-
-- JWT token-based authentication
-- Password hashing with bcrypt
-- HTTPS with TLS 1.2/1.3
-- HSTS (HTTP Strict Transport Security)
-- Role-based access control
-- Audit logging for all actions
-- CORS protection
-- SQL injection prevention (SQLAlchemy ORM)
-- XSS protection headers
-
-## Default Credentials
-
-**Admin User:**
-- Username: `admin`
-- Password: _(should be changed on first login)_
-
-## Troubleshooting
-
-### Application won't start
-```bash
-docker-compose logs app
-# Check for database connection errors
-docker-compose ps
-```
-
-### Database connection issues
-```bash
-# Restart database
-docker-compose restart db
-
-# Check database logs
-docker-compose logs db
-```
-
-### HTTPS not working
-```bash
-# Check nginx logs
-docker logs restaurant-inventory-nginx-1
-
-# Verify certificate files exist
-ls -la certbot/conf/live/inventory.swhgrp.com/
-
-# Restart nginx
-docker-compose restart nginx
-```
-
-### Port conflicts
-```bash
-# Check what's using ports
-ss -tlnp | grep -E ':(8000|8443|5432)'
-
-# Stop conflicting services or change port mappings in docker-compose.yml
-```
-
-## Planned Features
-
-- Invoice parsing with OCR/AI
-- Waste tracking and reporting
-- Purchase order management
-- Recipe/menu item integration
-- Cost analysis and budgeting
-- Mobile app (iOS/Android)
-- Barcode/QR code scanning
-- Automated reorder suggestions
-- Multi-language support
-- Export to Excel/PDF
+- **Portal Home**: http://rm.swhgrp.com
+- **Inventory Management**: http://rm.swhgrp.com/inventory/
+- **Accounting System**: http://rm.swhgrp.com/accounting/
+- **Inventory API Docs**: http://rm.swhgrp.com/inventory/docs
+- **Accounting API Docs**: http://rm.swhgrp.com/accounting/docs
 
 ## Development
 
-### Project Structure
+### Running Individual Services
+
+```bash
+# Start only inventory service
+docker compose up inventory-db inventory-redis inventory-app
+
+# Start only accounting service
+docker compose up accounting-db accounting-app
 ```
-/opt/restaurant-inventory/
-├── src/restaurant_inventory/
-│   ├── api/api_v1/endpoints/    # API routes
-│   ├── core/                     # Config, security, deps
-│   ├── db/                       # Database setup
-│   ├── models/                   # SQLAlchemy models
-│   ├── schemas/                  # Pydantic schemas
-│   ├── static/                   # CSS, JS, images
-│   └── templates/                # HTML templates
-├── alembic/                      # Database migrations
-├── nginx/                        # Nginx configuration
-├── certbot/                      # SSL certificates
-├── uploads/                      # User uploads
-├── docker-compose.yml
+
+### Database Migrations
+
+```bash
+# Inventory service migrations
+docker compose exec inventory-app alembic upgrade head
+
+# Accounting service migrations
+docker compose exec accounting-app alembic upgrade head
+```
+
+### Accessing Databases
+
+```bash
+# Inventory database
+docker compose exec inventory-db psql -U inventory_user -d inventory_db
+
+# Accounting database
+docker compose exec accounting-db psql -U accounting_user -d accounting_db
+```
+
+## Configuration
+
+Each service has its own `.env` file:
+- `inventory/.env` - Inventory service configuration
+- `accounting/.env` - Accounting service configuration
+
+### Environment Variables
+
+See individual service directories for specific configuration options.
+
+## Backup & Recovery
+
+### Automated Backups (Recommended)
+
+Automated daily backups are configured via cron (runs at 2 AM daily):
+
+```bash
+# View backup schedule
+crontab -l
+
+# Run backup manually
+/opt/restaurant-system/scripts/backup_databases.sh
+
+# Backups stored in
+/opt/restaurant-system/backups/
+```
+
+### Manual Backup
+
+```bash
+# Backup inventory database
+docker compose exec inventory-db pg_dump -U inventory_user inventory_db > inventory_backup_$(date +%Y%m%d).sql
+
+# Backup accounting database
+docker compose exec accounting-db pg_dump -U accounting_user accounting_db > accounting_backup_$(date +%Y%m%d).sql
+
+# Backup entire system
+cd /opt
+tar -czf restaurant-system-backup-$(date +%Y%m%d).tar.gz restaurant-system/
+```
+
+### Restore
+
+```bash
+# Restore inventory database
+cat inventory_backup_YYYYMMDD.sql | docker compose exec -T inventory-db psql -U inventory_user -d inventory_db
+
+# Restore accounting database
+cat accounting_backup_YYYYMMDD.sql | docker compose exec -T accounting-db psql -U accounting_user -d accounting_db
+```
+
+## Monitoring
+
+### Automated Health Checks
+
+Health monitoring runs every 5 minutes via cron:
+
+```bash
+# View monitoring schedule
+crontab -l
+
+# Run health check manually
+/opt/restaurant-system/scripts/health_check.sh
+
+# Check POS sync status
+/opt/restaurant-system/scripts/check_pos_sync.sh
+```
+
+### Manual Monitoring
+
+```bash
+# Check service health
+docker compose ps
+
+# View resource usage
+docker stats
+
+# Check logs for errors
+docker compose logs --tail=100 | grep -i error
+
+# Check specific service logs
+docker compose logs -f inventory-app
+docker compose logs -f accounting-app
+```
+
+## Adding New Services
+
+To add a new service (e.g., HR system):
+
+1. Create service directory: `mkdir hr`
+2. Add service code and Dockerfile
+3. Add service to `docker-compose.yml`
+4. Add routing in `shared/nginx/conf.d/app-http.conf`
+5. Update this README
+
+Example structure:
+```
+hr/
+├── src/
+├── alembic/
 ├── Dockerfile
 ├── requirements.txt
 └── .env
 ```
 
-### Adding New Features
+## Security
 
-1. Create database model in `src/restaurant_inventory/models/`
-2. Create Pydantic schema in `src/restaurant_inventory/schemas/`
-3. Create API endpoint in `src/restaurant_inventory/api/api_v1/endpoints/`
-4. Create/update HTML template in `src/restaurant_inventory/templates/`
-5. Generate migration: `alembic revision --autogenerate -m "description"`
-6. Run migration: `alembic upgrade head`
-7. Test and restart application
+- Each service has its own isolated database
+- Services communicate via private Docker network
+- Public access only through Nginx reverse proxy
+- SSL/TLS encryption via Let's Encrypt (ready for setup)
+- Database credentials stored in environment files (not in code)
+- Direct IP address access blocked (must use domain name)
+- Location-based access control for non-admin users
+- Role-based access control (Admin, Manager, Staff)
 
-## Support & Maintenance
+## Documentation
 
-**System Administrator:** Andy Hammond (andy@hammer)
-**VM User:** swh
-**Domain Registrar:** _(wherever swhgrp.com is registered)_
-**DNS Provider:** _(check domain DNS settings)_
+- **[OPERATIONS_GUIDE.md](OPERATIONS_GUIDE.md)** - Complete operations manual for daily use
+- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick reference card (print and keep handy)
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Technical architecture documentation
+- **[MIGRATION_NOTES.md](MIGRATION_NOTES.md)** - Change history and migration details
 
-## Version History
+## Support
 
-- **v1.0.0** - Initial production release
-  - Multi-location inventory management
-  - Transfer system
-  - Count sessions and templates
-  - Usage and variance reports
-  - HTTPS with Let's Encrypt
-  - Mobile-responsive UI
+For issues or questions:
+1. See **[OPERATIONS_GUIDE.md](OPERATIONS_GUIDE.md)** - Comprehensive troubleshooting
+2. See **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Common commands and tasks
+3. Check service logs: `docker compose logs <service-name>`
+4. Run health check: `/opt/restaurant-system/scripts/health_check.sh`
+5. Contact: admin@swhgrp.com
 
 ## License
 
-Proprietary - SW Hospitality Group
+Proprietary - Internal Use Only
+
+## Version History
+
+- **v2.1** (October 14, 2025) - Added central portal, automated backups, health monitoring
+- **v2.0** (October 13, 2025) - Restructured as microservices architecture
+- **v1.0** (October 2025) - Initial monolithic release
+
+## Recent Updates (v2.1)
+
+### Portal Implementation
+- Central landing page at http://rm.swhgrp.com
+- Path-based routing for all modules
+- Dark mode design matching inventory system
+- Separate authentication per module
+
+### Automation & Monitoring
+- Automated daily database backups (2 AM)
+- Health monitoring every 5 minutes
+- POS sync monitoring
+- All scheduled via cron
+
+### Security Enhancements
+- Blocked direct IP address access
+- Enhanced location-based access control
+- Admin users have access to all locations
+
+### Bug Fixes
+- Fixed routing issues with portal integration
+- Converted all API paths from absolute to relative
+- Added HTML base tag for proper URL resolution
+- Fixed settings page and dashboard API calls

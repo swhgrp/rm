@@ -1,0 +1,595 @@
+{% extends "base.html" %}
+
+{% block title %}POS Item Mapping - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<!-- Toast notification container -->
+<div class="position-fixed top-0 end-0 p-3" style="z-index: 9999">
+    <div id="notificationToast" class="toast" role="alert">
+        <div class="toast-header">
+            <i class="bi bi-info-circle me-2" id="toastIcon"></i>
+            <strong class="me-auto" id="toastTitle">Notification</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="toastBody">
+            Message
+        </div>
+    </div>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-diagram-3"></i> POS Item Mapping</h1>
+    <div>
+        <select class="form-select" id="locationFilter" style="width: 250px;">
+            <option value="">All Locations</option>
+        </select>
+    </div>
+</div>
+
+<div class="alert alert-info mb-4">
+    <i class="bi bi-info-circle"></i>
+    Map your POS menu items to recipes or inventory items for automatic cost tracking and inventory deduction.
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <h6>Unmapped Items</h6>
+                <h3 id="unmappedCount">0</h3>
+                <small>Need attention</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <h6>Mapped Items</h6>
+                <h3 id="mappedCount">0</h3>
+                <small>Ready for tracking</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <h6>Mapping Progress</h6>
+                <h3 id="mappingProgress">0%</h3>
+                <small>Items mapped</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-3" id="mappingTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="unmapped-tab" data-bs-toggle="tab" data-bs-target="#unmapped" type="button">
+            <i class="bi bi-exclamation-triangle"></i> Unmapped Items <span class="badge bg-warning" id="unmappedBadge">0</span>
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="mapped-tab" data-bs-toggle="tab" data-bs-target="#mapped" type="button">
+            <i class="bi bi-check-circle"></i> Mapped Items <span class="badge bg-success" id="mappedBadge">0</span>
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- Unmapped Items Tab -->
+    <div class="tab-pane fade show active" id="unmapped" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Items Needing Mapping</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="unmappedTable">
+                        <thead>
+                            <tr>
+                                <th>Item Name</th>
+                                <th>Category</th>
+                                <th>Last Sold</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="unmappedTableBody">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">
+                                    <div class="spinner-border spinner-border-sm"></div> Loading...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mapped Items Tab -->
+    <div class="tab-pane fade" id="mapped" role="tabpanel">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Mapped Items</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="mappedTable">
+                        <thead>
+                            <tr>
+                                <th>POS Item</th>
+                                <th>Mapped To</th>
+                                <th>Type</th>
+                                <th>Portion Multiplier</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mappedTableBody">
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">
+                                    <div class="spinner-border spinner-border-sm"></div> Loading...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Mapping Modal -->
+<div class="modal fade" id="mappingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="mappingModalTitle">Create Item Mapping</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="mappingForm">
+                    <input type="hidden" id="mappingId">
+
+                    <div class="mb-3">
+                        <label class="form-label">POS Item</label>
+                        <input type="text" class="form-control" id="posItemName" readonly>
+                        <input type="hidden" id="posItemId">
+                        <input type="hidden" id="posProvider" value="clover">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Mapping Type *</label>
+                        <select class="form-select" id="mappingType" required>
+                            <option value="">Select mapping type...</option>
+                            <option value="master_item">Inventory Item (for simple items like beverages)</option>
+                            <option value="recipe">Recipe (for prepared items like dishes)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="masterItemSection" style="display: none;">
+                        <label class="form-label">Inventory Item *</label>
+                        <select class="form-select" id="masterItemId">
+                            <option value="">Select inventory item...</option>
+                        </select>
+                        <small class="text-muted">Map this POS item directly to an inventory item</small>
+                    </div>
+
+                    <div class="mb-3" id="recipeSection" style="display: none;">
+                        <label class="form-label">Recipe *</label>
+                        <select class="form-select" id="recipeId">
+                            <option value="">Select recipe...</option>
+                        </select>
+                        <small class="text-muted">Map this POS item to a recipe with ingredients</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Portion Multiplier</label>
+                        <input type="number" step="0.1" class="form-control" id="portionMultiplier" value="1.0">
+                        <small class="text-muted">Use 1.0 for standard portion, 0.5 for half, 2.0 for double, etc.</small>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="isActive" checked>
+                        <label class="form-check-label" for="isActive">
+                            Active (include in inventory deduction)
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveMapping()">Save Mapping</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let unmappedItems = [];
+let mappedItems = [];
+let masterItems = [];
+let recipes = [];
+let currentLocationId = null;
+
+// Toast notification helper
+function showToast(title, message, type = 'info') {
+    const toast = document.getElementById('notificationToast');
+    const toastTitle = document.getElementById('toastTitle');
+    const toastBody = document.getElementById('toastBody');
+    const toastIcon = document.getElementById('toastIcon');
+
+    // Set title and message
+    toastTitle.textContent = title;
+    toastBody.textContent = message;
+
+    // Set icon and color based on type
+    const toastHeader = toast.querySelector('.toast-header');
+    toastHeader.className = 'toast-header';
+
+    if (type === 'success') {
+        toastHeader.classList.add('bg-success', 'text-white');
+        toastIcon.className = 'bi bi-check-circle-fill me-2';
+    } else if (type === 'error') {
+        toastHeader.classList.add('bg-danger', 'text-white');
+        toastIcon.className = 'bi bi-exclamation-triangle-fill me-2';
+    } else if (type === 'warning') {
+        toastHeader.classList.add('bg-warning', 'text-dark');
+        toastIcon.className = 'bi bi-exclamation-circle-fill me-2';
+    } else {
+        toastHeader.classList.add('bg-info', 'text-white');
+        toastIcon.className = 'bi bi-info-circle-fill me-2';
+    }
+
+    // Show toast
+    const bsToast = new bootstrap.Toast(toast, { delay: 5000 });
+    bsToast.show();
+}
+
+// API helper
+function getToken() {
+    return localStorage.getItem('access_token');
+}
+
+async function apiRequest(url, options = {}) {
+    const token = getToken();
+    const defaultOptions = {
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        }
+    };
+
+    const response = await fetch(url, { ...defaultOptions, ...options });
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+        throw new Error(error.detail || `HTTP ${response.status}`);
+    }
+
+    return response.json();
+}
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadLocations();
+    await loadMasterItems();
+    await loadRecipes();
+    await loadData();
+
+    // Add event listener for location filter
+    document.getElementById('locationFilter').addEventListener('change', function() {
+        currentLocationId = this.value || null;
+        loadData();
+    });
+
+    // Add event listener for mapping type
+    document.getElementById('mappingType').addEventListener('change', function() {
+        const masterItemSection = document.getElementById('masterItemSection');
+        const recipeSection = document.getElementById('recipeSection');
+
+        if (this.value === 'master_item') {
+            masterItemSection.style.display = 'block';
+            recipeSection.style.display = 'none';
+            document.getElementById('recipeId').value = '';
+        } else if (this.value === 'recipe') {
+            masterItemSection.style.display = 'none';
+            recipeSection.style.display = 'block';
+            document.getElementById('masterItemId').value = '';
+        } else {
+            masterItemSection.style.display = 'none';
+            recipeSection.style.display = 'none';
+        }
+    });
+});
+
+async function loadLocations() {
+    try {
+        const locations = await apiRequest('api/locations/');
+        const select = document.getElementById('locationFilter');
+
+        locations.forEach(loc => {
+            const option = document.createElement('option');
+            option.value = loc.id;
+            option.textContent = loc.name;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading locations:', error);
+    }
+}
+
+async function loadMasterItems() {
+    try {
+        masterItems = await apiRequest('api/items/');
+        const select = document.getElementById('masterItemId');
+        select.innerHTML = '<option value="">Select inventory item...</option>';
+
+        masterItems.forEach(item => {
+            const option = document.createElement('option');
+            option.value = item.id;
+            option.textContent = `${item.name} (${item.category || 'No category'})`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading master items:', error);
+    }
+}
+
+async function loadRecipes() {
+    try {
+        recipes = await apiRequest('api/recipes/');
+        const select = document.getElementById('recipeId');
+        select.innerHTML = '<option value="">Select recipe...</option>';
+
+        recipes.forEach(recipe => {
+            const option = document.createElement('option');
+            option.value = recipe.id;
+            option.textContent = `${recipe.name} (${recipe.category || 'No category'})`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading recipes:', error);
+        // It's OK if no recipes exist yet
+    }
+}
+
+async function loadData() {
+    await Promise.all([
+        loadUnmappedItems(),
+        loadMappedItems()
+    ]);
+    updateStatistics();
+}
+
+async function loadUnmappedItems() {
+    try {
+        let url = 'api/pos/unmapped-items';
+        if (currentLocationId) {
+            url += `?location_id=${currentLocationId}`;
+        }
+
+        unmappedItems = await apiRequest(url);
+
+        const tbody = document.getElementById('unmappedTableBody');
+
+        if (unmappedItems.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">All items are mapped! 🎉</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = unmappedItems.map(item => `
+            <tr>
+                <td><strong>${item.item_name}</strong></td>
+                <td>${item.category || '-'}</td>
+                <td>${new Date(item.last_sold).toLocaleDateString()}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="showMappingModal('${item.pos_item_id}', '${item.item_name.replace(/'/g, "\\'")}')">
+                        <i class="bi bi-plus-circle"></i> Map
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading unmapped items:', error);
+        document.getElementById('unmappedTableBody').innerHTML =
+            '<tr><td colspan="4" class="text-center text-danger">Error loading unmapped items</td></tr>';
+    }
+}
+
+async function loadMappedItems() {
+    try {
+        let url = 'api/pos/item-mappings';
+        if (currentLocationId) {
+            url += `?location_id=${currentLocationId}`;
+        }
+
+        mappedItems = await apiRequest(url);
+
+        const tbody = document.getElementById('mappedTableBody');
+
+        if (mappedItems.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No items mapped yet</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = mappedItems.map(item => {
+            const mappedTo = item.recipe_name || item.master_item_name || 'Unknown';
+            const mappingType = item.recipe_id ? 'Recipe' : 'Inventory Item';
+            const statusBadge = item.is_active
+                ? '<span class="badge bg-success">Active</span>'
+                : '<span class="badge bg-secondary">Inactive</span>';
+
+            return `
+                <tr>
+                    <td><strong>${item.pos_item_name}</strong></td>
+                    <td>${mappedTo}</td>
+                    <td><span class="badge bg-info">${mappingType}</span></td>
+                    <td>${item.portion_multiplier}x</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="editMapping(${item.id})">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteMapping(${item.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading mapped items:', error);
+        document.getElementById('mappedTableBody').innerHTML =
+            '<tr><td colspan="6" class="text-center text-danger">Error loading mapped items</td></tr>';
+    }
+}
+
+function updateStatistics() {
+    // Update counts
+    document.getElementById('unmappedCount').textContent = unmappedItems.length;
+    document.getElementById('mappedCount').textContent = mappedItems.length;
+    document.getElementById('unmappedBadge').textContent = unmappedItems.length;
+    document.getElementById('mappedBadge').textContent = mappedItems.length;
+
+    // Calculate mapping progress
+    const totalItems = unmappedItems.length + mappedItems.length;
+    const progress = totalItems > 0 ? Math.round((mappedItems.length / totalItems) * 100) : 0;
+    document.getElementById('mappingProgress').textContent = `${progress}%`;
+}
+
+function showMappingModal(posItemId, posItemName) {
+    document.getElementById('mappingModalTitle').textContent = 'Create Item Mapping';
+    document.getElementById('mappingId').value = '';
+    document.getElementById('posItemId').value = posItemId;
+    document.getElementById('posItemName').value = posItemName;
+    document.getElementById('mappingType').value = '';
+    document.getElementById('masterItemId').value = '';
+    document.getElementById('recipeId').value = '';
+    document.getElementById('portionMultiplier').value = '1.0';
+    document.getElementById('isActive').checked = true;
+    document.getElementById('masterItemSection').style.display = 'none';
+    document.getElementById('recipeSection').style.display = 'none';
+
+    const modal = new bootstrap.Modal(document.getElementById('mappingModal'));
+    modal.show();
+}
+
+async function editMapping(mappingId) {
+    const mapping = mappedItems.find(m => m.id === mappingId);
+    if (!mapping) return;
+
+    document.getElementById('mappingModalTitle').textContent = 'Edit Item Mapping';
+    document.getElementById('mappingId').value = mapping.id;
+    document.getElementById('posItemId').value = mapping.pos_item_id;
+    document.getElementById('posItemName').value = mapping.pos_item_name;
+    document.getElementById('portionMultiplier').value = mapping.portion_multiplier;
+    document.getElementById('isActive').checked = mapping.is_active;
+
+    if (mapping.recipe_id) {
+        document.getElementById('mappingType').value = 'recipe';
+        document.getElementById('recipeId').value = mapping.recipe_id;
+        document.getElementById('recipeSection').style.display = 'block';
+        document.getElementById('masterItemSection').style.display = 'none';
+    } else if (mapping.master_item_id) {
+        document.getElementById('mappingType').value = 'master_item';
+        document.getElementById('masterItemId').value = mapping.master_item_id;
+        document.getElementById('masterItemSection').style.display = 'block';
+        document.getElementById('recipeSection').style.display = 'none';
+    }
+
+    const modal = new bootstrap.Modal(document.getElementById('mappingModal'));
+    modal.show();
+}
+
+async function saveMapping() {
+    try {
+        const mappingId = document.getElementById('mappingId').value;
+        const mappingType = document.getElementById('mappingType').value;
+
+        if (!mappingType) {
+            alert('Please select a mapping type');
+            return;
+        }
+
+        const mappingData = {
+            pos_provider: document.getElementById('posProvider').value,
+            pos_item_id: document.getElementById('posItemId').value,
+            pos_item_name: document.getElementById('posItemName').value,
+            portion_multiplier: parseFloat(document.getElementById('portionMultiplier').value),
+            is_active: document.getElementById('isActive').checked,
+            location_id: currentLocationId ? parseInt(currentLocationId) : null
+        };
+
+        if (mappingType === 'master_item') {
+            const masterItemId = document.getElementById('masterItemId').value;
+            if (!masterItemId) {
+                alert('Please select an inventory item');
+                return;
+            }
+            mappingData.master_item_id = parseInt(masterItemId);
+            mappingData.recipe_id = null;
+        } else if (mappingType === 'recipe') {
+            const recipeId = document.getElementById('recipeId').value;
+            if (!recipeId) {
+                alert('Please select a recipe');
+                return;
+            }
+            mappingData.recipe_id = parseInt(recipeId);
+            mappingData.master_item_id = null;
+        }
+
+        let response;
+        if (mappingId) {
+            // Update existing mapping
+            response = await apiRequest(`api/pos/item-mappings/${mappingId}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    recipe_id: mappingData.recipe_id,
+                    master_item_id: mappingData.master_item_id,
+                    portion_multiplier: mappingData.portion_multiplier,
+                    is_active: mappingData.is_active
+                })
+            });
+        } else {
+            // Create new mapping
+            response = await apiRequest('api/pos/item-mappings', {
+                method: 'POST',
+                body: JSON.stringify(mappingData)
+            });
+        }
+
+        // Close modal
+        bootstrap.Modal.getInstance(document.getElementById('mappingModal')).hide();
+
+        // Reload data
+        await loadData();
+
+        showToast('Success', mappingId ? 'Mapping updated successfully!' : 'Mapping created successfully!', 'success');
+    } catch (error) {
+        console.error('Error saving mapping:', error);
+        showToast('Error', 'Error saving mapping: ' + error.message, 'error');
+    }
+}
+
+async function deleteMapping(mappingId) {
+    if (!confirm('Are you sure you want to delete this mapping?')) {
+        return;
+    }
+
+    try {
+        await apiRequest(`api/pos/item-mappings/${mappingId}`, {
+            method: 'DELETE'
+        });
+
+        await loadData();
+        showToast('Success', 'Mapping deleted successfully!', 'success');
+    } catch (error) {
+        console.error('Error deleting mapping:', error);
+        showToast('Error', 'Error deleting mapping: ' + error.message, 'error');
+    }
+}
+</script>
+
+{% endblock %}

@@ -1,0 +1,890 @@
+{% extends "base.html" %}
+
+{% block title %}Vendor Items - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h1 class="mb-4">Vendor Items</h1>
+
+    <div class="alert alert-info mb-3">
+        <i class="bi bi-info-circle"></i> <strong>Vendor Items</strong> – Link vendor products to master items with conversion factors. Each vendor can sell the same master item in different pack sizes.
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div class="d-flex gap-2">
+            <select class="form-select" id="vendorItemFilterVendor" style="width: 200px;" onchange="loadVendorItems()">
+                <option value="">All Vendors</option>
+            </select>
+            <select class="form-select" id="vendorItemFilterMaster" style="width: 200px;" onchange="loadVendorItems()">
+                <option value="">All Master Items</option>
+            </select>
+        </div>
+        <div>
+            <button class="btn btn-outline-primary me-2" onclick="showVendorItemUploadModal()">
+                <i class="bi bi-upload"></i> Import Vendor Items
+            </button>
+            <button class="btn btn-primary" onclick="showVendorItemModal()">
+                <i class="bi bi-plus-circle"></i> Add Vendor Item
+            </button>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Vendor</th>
+                    <th>Master Item</th>
+                    <th>Vendor SKU</th>
+                    <th>Vendor Product Name</th>
+                    <th>Purchase Unit</th>
+                    <th>Unit Price</th>
+                    <th>Cost/Master Unit</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="vendorItemsTableBody">
+                <tr>
+                    <td colspan="9" class="text-center">Loading vendor items...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Vendor Item Upload Modal -->
+<div class="modal fade" id="vendorItemUploadModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Import Vendor Item List</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Step 1: File Upload -->
+                <div id="uploadStep">
+                    <h6>Step 1: Upload File</h6>
+                    <p class="text-muted">Upload a CSV or Excel file containing your vendor's item list.</p>
+                    <div class="mb-3">
+                        <label for="vendorSelect" class="form-label">Select Vendor</label>
+                        <select class="form-select" id="vendorSelect" required>
+                            <option value="">Choose vendor...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="vendorFileInput" class="form-label">Select File (CSV, XLS, XLSX)</label>
+                        <input type="file" class="form-control" id="vendorFileInput" accept=".csv,.xlsx,.xls">
+                    </div>
+                    <button class="btn btn-primary" onclick="uploadVendorFile()">
+                        <i class="bi bi-upload"></i> Upload & Parse
+                    </button>
+                </div>
+
+                <!-- Step 2: Column Mapping -->
+                <div id="mappingStep" style="display: none;">
+                    <h6>Step 2: Map Columns</h6>
+                    <p class="text-muted">Map the vendor file columns to our system fields. We've suggested mappings based on column names.</p>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>Vendor Column</strong>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Maps To</strong>
+                        </div>
+                    </div>
+
+                    <div id="columnMappingList"></div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="updateExisting" checked>
+                        <label class="form-check-label" for="updateExisting">
+                            Update existing items (matches by vendor item code)
+                        </label>
+                    </div>
+
+                    <button class="btn btn-secondary me-2" onclick="backToUpload()">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </button>
+                    <button class="btn btn-primary" onclick="showPreview()">
+                        Preview Import <i class="bi bi-arrow-right"></i>
+                    </button>
+                </div>
+
+                <!-- Step 3: Preview & Import -->
+                <div id="previewStep" style="display: none;">
+                    <h6>Step 3: Preview & Import</h6>
+                    <p class="text-muted">Review the items that will be imported.</p>
+
+                    <div class="alert alert-info">
+                        <strong id="previewSummary"></strong>
+                    </div>
+
+                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th>Vendor Code</th>
+                                    <th>Name</th>
+                                    <th>Pack Size</th>
+                                    <th>Unit Cost</th>
+                                    <th>Category</th>
+                                    <th width="250">Vendor UOM → Our Unit</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewTableBody"></tbody>
+                        </table>
+                    </div>
+
+                    <button class="btn btn-secondary me-2" onclick="backToMapping()">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </button>
+                    <button class="btn btn-success" onclick="importVendorItems()">
+                        <i class="bi bi-check-circle"></i> Import Items
+                    </button>
+                </div>
+
+                <!-- Import Progress -->
+                <div id="importingStep" style="display: none;">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary mb-3" role="status"></div>
+                        <p>Importing items...</p>
+                    </div>
+                </div>
+
+                <!-- Import Complete -->
+                <div id="completeStep" style="display: none;">
+                    <div class="alert alert-success">
+                        <h5><i class="bi bi-check-circle"></i> Import Complete!</h5>
+                        <div id="importResults"></div>
+                    </div>
+                    <button class="btn btn-primary" onclick="closeVendorItemUploadModal()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Vendor Item Modal -->
+<div class="modal fade" id="vendorItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="vendorItemModalTitle">Add Vendor Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="vendorItemForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="viVendorId" class="form-label">Vendor *</label>
+                            <select class="form-select" id="viVendorId" required>
+                                <option value="">Select vendor...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="viMasterItemId" class="form-label">Master Item *</label>
+                            <select class="form-select" id="viMasterItemId" required>
+                                <option value="">Select master item...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="viVendorSku" class="form-label">Vendor SKU</label>
+                            <input type="text" class="form-control" id="viVendorSku">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="viVendorProductName" class="form-label">Vendor Product Name *</label>
+                            <input type="text" class="form-control" id="viVendorProductName" required>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="viPurchaseUnitId" class="form-label">Purchase Unit *</label>
+                            <select class="form-select" id="viPurchaseUnitId" required>
+                                <option value="">Select unit...</option>
+                            </select>
+                            <small class="form-text text-muted">Select the unit the vendor sells in (conversion built-in to unit)</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="viUnitPrice" class="form-label">Last Price Paid</label>
+                            <input type="number" step="0.01" class="form-control bg-secondary" id="viUnitPrice" readonly>
+                            <small class="form-text text-muted">Auto-updated from invoices (read-only)</small>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="viMinOrderQty" class="form-label">Min Order Qty</label>
+                            <input type="number" step="0.001" class="form-control" id="viMinOrderQty">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="viLeadTimeDays" class="form-label">Lead Time (days)</label>
+                            <input type="number" class="form-control" id="viLeadTimeDays">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" class="form-check-input" id="viIsPreferred">
+                                <label class="form-check-label" for="viIsPreferred">Preferred Vendor</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="viNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="viNotes" rows="2"></textarea>
+                    </div>
+
+                    <div class="alert alert-info" id="viCostCalculation" style="display: none;">
+                        <strong>Cost per Master Unit:</strong> <span id="viCostPerMaster">$0.00</span>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveVendorItem()">Save Vendor Item</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalTitle">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="confirmModalBody">
+                Are you sure?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmModalBtn" onclick="confirmAction()">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Global variables
+    let vendorItems = [];
+    let currentEditVendorItemId = null;
+    let vendorItemModal = null;
+    let confirmCallback = null;
+    let unitsOfMeasure = [];
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', async function() {
+        await loadVendorItems();
+    });
+
+    // API helper
+    async function apiRequest(url, method = 'GET', data = null) {
+        const token = localStorage.getItem('access_token');
+        const options = {
+            method: method,
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        if (data && method !== 'GET') {
+            options.body = JSON.stringify(data);
+        }
+
+        const response = await fetch(url, options);
+
+        if (response.status === 401) {
+            localStorage.clear();
+            window.location.href = '/login';
+            throw new Error('Unauthorized');
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Request failed');
+        }
+
+        return response.json();
+    }
+
+    // Show alert
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+        alertDiv.style.zIndex = '9999';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+
+        setTimeout(() => alertDiv.remove(), 5000);
+    }
+
+    // Confirmation modal helpers
+    function showConfirmation(title, message, callback) {
+        document.getElementById('confirmModalTitle').textContent = title;
+        document.getElementById('confirmModalBody').textContent = message;
+        confirmCallback = callback;
+        const modal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        modal.show();
+    }
+
+    function confirmAction() {
+        if (confirmCallback) {
+            confirmCallback();
+            confirmCallback = null;
+        }
+        const modalElement = document.getElementById('confirmModal');
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        if (modal) {
+            modal.hide();
+        }
+    }
+
+    // Load units of measure
+    async function loadUnitsOfMeasure() {
+        try {
+            const response = await apiRequest('api/units/');
+            unitsOfMeasure = response;
+        } catch (error) {
+            console.error('Error loading units:', error);
+        }
+    }
+
+    // ========== VENDOR ITEMS ==========
+    async function loadVendorItems() {
+        try {
+            const vendorFilter = document.getElementById('vendorItemFilterVendor').value;
+            const masterFilter = document.getElementById('vendorItemFilterMaster').value;
+
+            let url = 'api/vendor-items/';
+            const params = new URLSearchParams();
+            if (vendorFilter) params.append('vendor_id', vendorFilter);
+            if (masterFilter) params.append('master_item_id', masterFilter);
+            if (params.toString()) url += `?${params.toString()}`;
+
+            const response = await apiRequest(url);
+            vendorItems = Array.isArray(response) ? response : [];
+            displayVendorItems();
+        } catch (error) {
+            console.error('Error loading vendor items:', error);
+            showAlert('Failed to load vendor items', 'danger');
+        }
+    }
+
+    function displayVendorItems() {
+        const tbody = document.getElementById('vendorItemsTableBody');
+
+        if (!vendorItems || vendorItems.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center">No vendor items found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = vendorItems.map(vi => {
+            const costPerMaster = vi.unit_price && vi.conversion_factor ?
+                (vi.unit_price / vi.conversion_factor).toFixed(2) : '-';
+            const statusBadge = vi.is_active ?
+                '<span class="badge bg-success">Active</span>' :
+                '<span class="badge bg-secondary">Inactive</span>';
+            const preferredBadge = vi.is_preferred ?
+                '<span class="badge bg-primary ms-1">Preferred</span>' : '';
+
+            return `
+                <tr>
+                    <td>${vi.vendor_name || '-'}</td>
+                    <td>${vi.master_item_name || '-'}</td>
+                    <td>${vi.vendor_sku || '-'}</td>
+                    <td>${vi.vendor_product_name}</td>
+                    <td>${vi.purchase_unit_name || '-'} ${vi.pack_size ? `(${vi.pack_size})` : ''}</td>
+                    <td>${vi.unit_price ? '$' + parseFloat(vi.unit_price).toFixed(2) : '-'}</td>
+                    <td>${costPerMaster !== '-' ? '$' + costPerMaster : '-'}</td>
+                    <td>${statusBadge}${preferredBadge}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="editVendorItem(${vi.id})">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteVendorItem(${vi.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async function showVendorItemModal(vendorItemId = null) {
+        currentEditVendorItemId = vendorItemId;
+
+        // Load dropdowns
+        await Promise.all([
+            loadVendorItemDropdowns(),
+            loadUnitsOfMeasure()
+        ]);
+
+        if (vendorItemId) {
+            document.getElementById('vendorItemModalTitle').textContent = 'Edit Vendor Item';
+            const vendorItem = vendorItems.find(vi => vi.id === vendorItemId);
+            if (vendorItem) {
+                document.getElementById('viVendorId').value = vendorItem.vendor_id;
+                document.getElementById('viMasterItemId').value = vendorItem.master_item_id;
+                document.getElementById('viVendorSku').value = vendorItem.vendor_sku || '';
+                document.getElementById('viVendorProductName').value = vendorItem.vendor_product_name;
+                document.getElementById('viPurchaseUnitId').value = vendorItem.purchase_unit_id;
+                document.getElementById('viUnitPrice').value = vendorItem.unit_price || '';
+                document.getElementById('viMinOrderQty').value = vendorItem.minimum_order_quantity || '';
+                document.getElementById('viLeadTimeDays').value = vendorItem.lead_time_days || '';
+                document.getElementById('viIsPreferred').checked = vendorItem.is_preferred;
+                document.getElementById('viNotes').value = vendorItem.notes || '';
+            }
+        } else {
+            document.getElementById('vendorItemModalTitle').textContent = 'Add Vendor Item';
+            document.getElementById('vendorItemForm').reset();
+        }
+
+        if (!vendorItemModal) {
+            vendorItemModal = new bootstrap.Modal(document.getElementById('vendorItemModal'));
+        }
+        vendorItemModal.show();
+    }
+
+    async function loadVendorItemDropdowns() {
+        // Load vendors
+        const vendorsResp = await apiRequest('api/vendors/');
+        const vendorSelect = document.getElementById('viVendorId');
+        const vendorFilter = document.getElementById('vendorItemFilterVendor');
+
+        vendorSelect.innerHTML = '<option value="">Select vendor...</option>';
+        vendorFilter.innerHTML = '<option value="">All Vendors</option>';
+
+        if (Array.isArray(vendorsResp)) {
+            vendorsResp.forEach(v => {
+                vendorSelect.innerHTML += `<option value="${v.id}">${v.name}</option>`;
+                vendorFilter.innerHTML += `<option value="${v.id}">${v.name}</option>`;
+            });
+        }
+
+        // Load master items
+        const itemsResp = await apiRequest('api/items/');
+        const itemSelect = document.getElementById('viMasterItemId');
+        const itemFilter = document.getElementById('vendorItemFilterMaster');
+
+        itemSelect.innerHTML = '<option value="">Select master item...</option>';
+        itemFilter.innerHTML = '<option value="">All Master Items</option>';
+
+        if (Array.isArray(itemsResp)) {
+            itemsResp.forEach(item => {
+                itemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+                itemFilter.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+            });
+        }
+
+        // Load units
+        const unitsResp = await apiRequest('api/units/');
+        const unitSelect = document.getElementById('viPurchaseUnitId');
+        unitSelect.innerHTML = '<option value="">Select unit...</option>';
+
+        if (Array.isArray(unitsResp)) {
+            unitsResp.forEach(u => {
+                unitSelect.innerHTML += `<option value="${u.id}">${u.name} (${u.abbreviation})</option>`;
+            });
+        }
+    }
+
+
+    async function saveVendorItem() {
+        const vendorId = document.getElementById('viVendorId').value;
+        const masterItemId = document.getElementById('viMasterItemId').value;
+        const vendorProductName = document.getElementById('viVendorProductName').value;
+        const purchaseUnitId = document.getElementById('viPurchaseUnitId').value;
+
+        if (!vendorId || !masterItemId || !vendorProductName || !purchaseUnitId) {
+            showAlert('Please fill in all required fields', 'warning');
+            return;
+        }
+
+        const data = {
+            vendor_id: parseInt(vendorId),
+            master_item_id: parseInt(masterItemId),
+            vendor_sku: document.getElementById('viVendorSku').value || null,
+            vendor_product_name: vendorProductName,
+            purchase_unit_id: parseInt(purchaseUnitId),
+            conversion_factor: 1.0,  // Default value - conversion is built into the UOM
+            minimum_order_quantity: document.getElementById('viMinOrderQty').value ? parseFloat(document.getElementById('viMinOrderQty').value) : null,
+            lead_time_days: document.getElementById('viLeadTimeDays').value ? parseInt(document.getElementById('viLeadTimeDays').value) : null,
+            is_preferred: document.getElementById('viIsPreferred').checked,
+            notes: document.getElementById('viNotes').value || null,
+            is_active: true
+        };
+
+        try {
+            if (currentEditVendorItemId) {
+                await apiRequest(`api/vendor-items/${currentEditVendorItemId}`, 'PUT', data);
+                showAlert('Vendor item updated successfully', 'success');
+            } else {
+                await apiRequest('api/vendor-items/', 'POST', data);
+                showAlert('Vendor item created successfully', 'success');
+            }
+
+            vendorItemModal.hide();
+            loadVendorItems();
+        } catch (error) {
+            console.error('Error saving vendor item:', error);
+            showAlert('Failed to save vendor item', 'danger');
+        }
+    }
+
+    async function editVendorItem(vendorItemId) {
+        await showVendorItemModal(vendorItemId);
+    }
+
+    async function deleteVendorItem(vendorItemId) {
+        const vendorItem = vendorItems.find(vi => vi.id === vendorItemId);
+        if (!vendorItem) return;
+
+        showConfirmation(
+            'Delete Vendor Item',
+            `Are you sure you want to delete vendor item "${vendorItem.vendor_product_name}"?`,
+            async () => {
+                try {
+                    await apiRequest(`api/vendor-items/${vendorItemId}`, 'DELETE');
+                    showAlert('Vendor item deleted successfully', 'success');
+                    loadVendorItems();
+                } catch (error) {
+                    console.error('Error deleting vendor item:', error);
+                    showAlert('Failed to delete vendor item', 'danger');
+                }
+            }
+        );
+    }
+
+    // Vendor Item Upload Functions
+    let vendorUploadData = {
+        vendor_id: null,
+        columns: [],
+        sampleRows: [],
+        totalRows: 0,
+        suggestedMapping: {},
+        columnMapping: {},
+        parsedItems: []
+    };
+
+    async function showVendorItemUploadModal() {
+        // Reset to step 1
+        document.getElementById('uploadStep').style.display = 'block';
+        document.getElementById('mappingStep').style.display = 'none';
+        document.getElementById('previewStep').style.display = 'none';
+        document.getElementById('importingStep').style.display = 'none';
+        document.getElementById('completeStep').style.display = 'none';
+        document.getElementById('vendorFileInput').value = '';
+
+        // Load vendors
+        await loadVendors();
+
+        const modal = new bootstrap.Modal(document.getElementById('vendorItemUploadModal'));
+        modal.show();
+    }
+
+    async function loadVendors() {
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch('api/vendors/', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to load vendors');
+            }
+
+            const vendors = await response.json();
+            const select = document.getElementById('vendorSelect');
+            select.innerHTML = '<option value="">Choose vendor...</option>';
+
+            vendors.forEach(vendor => {
+                const option = document.createElement('option');
+                option.value = vendor.id;
+                option.textContent = vendor.name;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            showAlert('Error loading vendors: ' + error.message, 'danger');
+        }
+    }
+
+    async function uploadVendorFile() {
+        const vendorSelect = document.getElementById('vendorSelect');
+        const vendor_id = vendorSelect.value;
+
+        if (!vendor_id) {
+            showAlert('Please select a vendor', 'warning');
+            return;
+        }
+
+        const fileInput = document.getElementById('vendorFileInput');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            showAlert('Please select a file', 'warning');
+            return;
+        }
+
+        // Store vendor_id for later use
+        vendorUploadData.vendor_id = parseInt(vendor_id);
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch('api/items/parse-vendor-upload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Upload failed');
+            }
+
+            const result = await response.json();
+
+            vendorUploadData.columns = result.columns;
+            vendorUploadData.sampleRows = result.sample_rows;
+            vendorUploadData.totalRows = result.total_rows;
+            vendorUploadData.suggestedMapping = result.suggested_mapping;
+            vendorUploadData.columnMapping = {...result.suggested_mapping};
+
+            // Show mapping step
+            buildColumnMapping();
+            document.getElementById('uploadStep').style.display = 'none';
+            document.getElementById('mappingStep').style.display = 'block';
+
+        } catch (error) {
+            showAlert('Error uploading file: ' + error.message, 'danger');
+        }
+    }
+
+    function buildColumnMapping() {
+        const container = document.getElementById('columnMappingList');
+        container.innerHTML = '';
+
+        const ourFields = [
+            { value: '', label: '(Skip this column)' },
+            { value: 'vendor_item_code', label: 'Vendor Item Code' },
+            { value: 'name', label: 'Item Name' },
+            { value: 'pack_size', label: 'Pack Size' },
+            { value: 'unit_cost', label: 'Unit Cost' },
+            { value: 'category', label: 'Category' },
+            { value: 'unit', label: 'Unit' }
+        ];
+
+        vendorUploadData.columns.forEach(col => {
+            const row = document.createElement('div');
+            row.className = 'row mb-2 align-items-center';
+
+            const suggested = vendorUploadData.suggestedMapping[col] || '';
+
+            row.innerHTML = `
+                <div class="col-md-6">
+                    <input type="text" class="form-control" value="${col}" readonly>
+                </div>
+                <div class="col-md-6">
+                    <select class="form-select" data-vendor-col="${col}">
+                        ${ourFields.map(f => `
+                            <option value="${f.value}" ${f.value === suggested ? 'selected' : ''}>
+                                ${f.label}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+            `;
+
+            container.appendChild(row);
+        });
+
+        // Add change listeners
+        container.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const vendorCol = e.target.dataset.vendorCol;
+                const ourField = e.target.value;
+
+                if (ourField) {
+                    vendorUploadData.columnMapping[vendorCol] = ourField;
+                } else {
+                    delete vendorUploadData.columnMapping[vendorCol];
+                }
+            });
+        });
+    }
+
+    function backToUpload() {
+        document.getElementById('mappingStep').style.display = 'none';
+        document.getElementById('uploadStep').style.display = 'block';
+    }
+
+    async function showPreview() {
+        // Show loading
+        document.getElementById('mappingStep').style.display = 'none';
+        document.getElementById('importingStep').style.display = 'block';
+
+        const fileInput = document.getElementById('vendorFileInput');
+        const file = fileInput.files[0];
+
+        console.log('Column mapping:', vendorUploadData.columnMapping);
+        console.log('Column mapping JSON:', JSON.stringify(vendorUploadData.columnMapping));
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('column_mapping', JSON.stringify(vendorUploadData.columnMapping));
+
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch('api/items/preview-vendor-items', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Preview failed');
+            }
+
+            const result = await response.json();
+
+            vendorUploadData.previewItems = result.items;
+            vendorUploadData.unitOptions = result.unit_options;
+            vendorUploadData.unitMappings = {};
+
+            // Build preview table with dropdowns
+            const tbody = document.getElementById('previewTableBody');
+            tbody.innerHTML = '';
+
+            result.items.forEach((item, index) => {
+                const tr = document.createElement('tr');
+
+                // Build unit dropdown options
+                const unitOptions = result.unit_options.map(u =>
+                    `<option value="${u.id}" ${u.id === item.matched_unit_id ? 'selected' : ''}>
+                        ${u.name}${u.abbreviation ? ' (' + u.abbreviation + ')' : ''}
+                    </option>`
+                ).join('');
+
+                tr.innerHTML = `
+                    <td>${item.vendor_item_code || ''}</td>
+                    <td>${item.name || ''}</td>
+                    <td>${item.pack_size || ''}</td>
+                    <td>${item.unit_cost ? '$' + parseFloat(item.unit_cost).toFixed(2) : ''}</td>
+                    <td>${item.category || ''}</td>
+                    <td>
+                        <small class="text-muted">${item.original_unit || 'N/A'}</small>
+                        →
+                        <select class="form-select form-select-sm d-inline-block w-auto"
+                                data-vendor-code="${item.vendor_item_code}"
+                                onchange="updateUnitMapping('${item.vendor_item_code}', this.value)">
+                            <option value="">Select Unit...</option>
+                            ${unitOptions}
+                        </select>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+
+                // Initialize mapping with matched value
+                if (item.matched_unit_id) {
+                    vendorUploadData.unitMappings[item.vendor_item_code] = item.matched_unit_id;
+                }
+            });
+
+            document.getElementById('previewSummary').textContent =
+                `Ready to import ${result.total} items. Review and select units below.`;
+
+            document.getElementById('importingStep').style.display = 'none';
+            document.getElementById('previewStep').style.display = 'block';
+
+        } catch (error) {
+            document.getElementById('importingStep').style.display = 'none';
+            document.getElementById('mappingStep').style.display = 'block';
+            showAlert('Error loading preview: ' + error.message, 'danger');
+        }
+    }
+
+    function updateUnitMapping(vendorCode, unitId) {
+        if (unitId) {
+            vendorUploadData.unitMappings[vendorCode] = parseInt(unitId);
+        } else {
+            delete vendorUploadData.unitMappings[vendorCode];
+        }
+    }
+
+    function backToMapping() {
+        document.getElementById('previewStep').style.display = 'none';
+        document.getElementById('mappingStep').style.display = 'block';
+    }
+
+    async function importVendorItems() {
+        document.getElementById('previewStep').style.display = 'none';
+        document.getElementById('importingStep').style.display = 'block';
+
+        const fileInput = document.getElementById('vendorFileInput');
+        const file = fileInput.files[0];
+        const updateExisting = document.getElementById('updateExisting').checked;
+
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('vendor_id', vendorUploadData.vendor_id);
+        formData.append('column_mapping', JSON.stringify(vendorUploadData.columnMapping));
+        formData.append('unit_mappings', JSON.stringify(vendorUploadData.unitMappings));
+        formData.append('update_existing', updateExisting);
+
+        try {
+            const token = localStorage.getItem('access_token');
+            const response = await fetch('api/items/import-vendor-items', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Import failed');
+            }
+
+            const result = await response.json();
+
+            document.getElementById('importingStep').style.display = 'none';
+            document.getElementById('completeStep').style.display = 'block';
+
+            document.getElementById('importResults').innerHTML = `
+                <p><strong>Created:</strong> ${result.created} vendor items</p>
+                <p><strong>Updated:</strong> ${result.updated} vendor items</p>
+                <p><strong>Skipped:</strong> ${result.skipped} items</p>
+                <p><strong>Total Processed:</strong> ${result.total} rows</p>
+            `;
+
+        } catch (error) {
+            document.getElementById('importingStep').style.display = 'none';
+            document.getElementById('previewStep').style.display = 'block';
+            showAlert('Error importing items: ' + error.message, 'danger');
+        }
+    }
+
+    function closeVendorItemUploadModal() {
+        bootstrap.Modal.getInstance(document.getElementById('vendorItemUploadModal')).hide();
+    }
+</script>
+{% endblock %}

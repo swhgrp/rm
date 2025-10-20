@@ -1,0 +1,510 @@
+{% extends "base.html" %}
+
+{% block title %}Locations - Accounting System{% endblock %}
+{% block nav_locations %}active{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0"><i class="bi bi-geo-alt"></i> Locations / Entities</h2>
+            <p class="text-muted mb-0">Manage your business locations and organizational entities</p>
+        </div>
+        <button class="btn btn-success" onclick="showCreateModal()">
+            <i class="bi bi-plus-circle"></i> Add Location
+        </button>
+    </div>
+
+    <!-- Locations Table -->
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Name</th>
+                        <th>Legal Name</th>
+                        <th>City, State</th>
+                        <th>EIN</th>
+                        <th>Status</th>
+                        <th style="width: 200px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="locationsTable">
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">Loading locations...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+<div class="modal fade" id="locationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="background-color: #161b22; border: 1px solid #30363d;">
+            <div class="modal-header" style="border-bottom: 1px solid #30363d;">
+                <h5 class="modal-title" id="modalTitle">Add Location</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <form id="locationForm">
+                    <input type="hidden" id="locationId">
+
+                    <!-- Basic Information -->
+                    <h6 class="mb-3"><i class="bi bi-info-circle"></i> Basic Information</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="locationCode" class="form-label">
+                                Location Code <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="locationCode"
+                                   placeholder="e.g., MAIN, BAR, CORP"
+                                   maxlength="20" required
+                                   style="text-transform: uppercase;">
+                            <small class="text-muted">Short code (2-20 characters)</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="locationName" class="form-label">
+                                DBA / Operating Name <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="locationName"
+                                   placeholder="e.g., Main Restaurant"
+                                   maxlength="100" required>
+                            <small class="text-muted">Doing Business As name</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="locationDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="locationDescription"
+                                  rows="2"
+                                  placeholder="Optional description..."></textarea>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Legal Entity Information -->
+                    <h6 class="mb-3"><i class="bi bi-briefcase"></i> Legal Entity Information</h6>
+                    <div class="row">
+                        <div class="col-md-12 mb-3">
+                            <label for="legalName" class="form-label">Legal Business Name</label>
+                            <input type="text" class="form-control" id="legalName"
+                                   placeholder="e.g., SW Hospitality Group, LLC"
+                                   maxlength="200">
+                            <small class="text-muted">Full legal name for reports and tax documents</small>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="ein" class="form-label">EIN (Tax ID)</label>
+                            <input type="text" class="form-control" id="ein"
+                                   placeholder="XX-XXXXXXX"
+                                   maxlength="20">
+                            <small class="text-muted">Employer Identification Number</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="entityType" class="form-label">Entity Type</label>
+                            <select class="form-select" id="entityType">
+                                <option value="">Select...</option>
+                                <option value="LLC">LLC (Limited Liability Company)</option>
+                                <option value="Corporation">Corporation</option>
+                                <option value="S-Corp">S-Corporation</option>
+                                <option value="Partnership">Partnership</option>
+                                <option value="Sole Proprietorship">Sole Proprietorship</option>
+                                <option value="Non-Profit">Non-Profit</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Address Information -->
+                    <h6 class="mb-3"><i class="bi bi-map"></i> Address</h6>
+                    <div class="mb-3">
+                        <label for="addressLine1" class="form-label">Street Address</label>
+                        <input type="text" class="form-control" id="addressLine1"
+                               placeholder="123 Main Street"
+                               maxlength="200">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="addressLine2" class="form-label">Address Line 2</label>
+                        <input type="text" class="form-control" id="addressLine2"
+                               placeholder="Suite 100 (optional)"
+                               maxlength="200">
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="city" class="form-label">City</label>
+                            <input type="text" class="form-control" id="city"
+                                   placeholder="City"
+                                   maxlength="100">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="state" class="form-label">State</label>
+                            <input type="text" class="form-control" id="state"
+                                   placeholder="State"
+                                   maxlength="50">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="zipCode" class="form-label">ZIP Code</label>
+                            <input type="text" class="form-control" id="zipCode"
+                                   placeholder="12345"
+                                   maxlength="20">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="country" class="form-label">Country</label>
+                        <input type="text" class="form-control" id="country"
+                               placeholder="United States"
+                               maxlength="100"
+                               value="United States">
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Contact Information -->
+                    <h6 class="mb-3"><i class="bi bi-telephone"></i> Contact Information</h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="phone" class="form-label">Phone</label>
+                            <input type="tel" class="form-control" id="phone"
+                                   placeholder="(555) 123-4567"
+                                   maxlength="20">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email"
+                                   placeholder="contact@example.com"
+                                   maxlength="100">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="website" class="form-label">Website</label>
+                            <input type="url" class="form-control" id="website"
+                                   placeholder="https://example.com"
+                                   maxlength="200">
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Status -->
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="locationActive" checked>
+                            <label class="form-check-label" for="locationActive">
+                                <strong>Active</strong>
+                            </label>
+                            <br>
+                            <small class="text-muted">Inactive locations won't appear in dropdown selections</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #30363d;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="saveLocation()">
+                    <i class="bi bi-save"></i> Save Location
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background-color: #161b22; border: 1px solid #30363d;">
+            <div class="modal-header" style="border-bottom: 1px solid #30363d;">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this location?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This location cannot be deleted if it has associated transactions.
+                </div>
+                <div id="deleteLocationInfo"></div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #30363d;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let locations = [];
+let editingLocationId = null;
+let deletingLocationId = null;
+let locationModal, deleteModal;
+
+document.addEventListener('DOMContentLoaded', function() {
+    locationModal = new bootstrap.Modal(document.getElementById('locationModal'));
+    deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+
+    // Auto-uppercase code input
+    document.getElementById('locationCode').addEventListener('input', function(e) {
+        this.value = this.value.toUpperCase();
+    });
+
+    loadLocations();
+});
+
+async function loadLocations() {
+    try {
+        const response = await fetch('/accounting/api/areas/?include_inactive=true');
+        if (!response.ok) {
+            throw new Error('Failed to load locations');
+        }
+
+        locations = await response.json();
+        renderLocationsTable();
+    } catch (error) {
+        console.error('Error loading locations:', error);
+        showNotification('Error loading locations', 'error');
+    }
+}
+
+function renderLocationsTable() {
+    const tbody = document.getElementById('locationsTable');
+
+    if (locations.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center text-muted">
+                    <i class="bi bi-info-circle"></i> No locations found. Click "Add Location" to create one.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = locations.map(location => {
+        const cityState = [location.city, location.state].filter(Boolean).join(', ') || '-';
+
+        return `
+        <tr>
+            <td><strong>${escapeHtml(location.code)}</strong></td>
+            <td>${escapeHtml(location.name)}</td>
+            <td>${location.legal_name ? escapeHtml(location.legal_name) : '<span class="text-muted">-</span>'}</td>
+            <td>${escapeHtml(cityState)}</td>
+            <td>${location.ein ? escapeHtml(location.ein) : '<span class="text-muted">-</span>'}</td>
+            <td>
+                ${location.is_active
+                    ? '<span class="badge bg-success">Active</span>'
+                    : '<span class="badge bg-secondary">Inactive</span>'}
+            </td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="editLocation(${location.id})" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteLocation(${location.id})" title="Delete">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `}).join('');
+}
+
+function showCreateModal() {
+    editingLocationId = null;
+    document.getElementById('modalTitle').textContent = 'Add Location';
+    document.getElementById('locationForm').reset();
+    document.getElementById('locationId').value = '';
+    document.getElementById('locationActive').checked = true;
+    document.getElementById('country').value = 'United States';
+    locationModal.show();
+}
+
+function editLocation(id) {
+    const location = locations.find(l => l.id === id);
+    if (!location) return;
+
+    editingLocationId = id;
+    document.getElementById('modalTitle').textContent = 'Edit Location';
+    document.getElementById('locationId').value = id;
+    document.getElementById('locationCode').value = location.code;
+    document.getElementById('locationName').value = location.name;
+    document.getElementById('locationDescription').value = location.description || '';
+
+    // Legal entity information
+    document.getElementById('legalName').value = location.legal_name || '';
+    document.getElementById('ein').value = location.ein || '';
+    document.getElementById('entityType').value = location.entity_type || '';
+
+    // Address
+    document.getElementById('addressLine1').value = location.address_line1 || '';
+    document.getElementById('addressLine2').value = location.address_line2 || '';
+    document.getElementById('city').value = location.city || '';
+    document.getElementById('state').value = location.state || '';
+    document.getElementById('zipCode').value = location.zip_code || '';
+    document.getElementById('country').value = location.country || 'United States';
+
+    // Contact
+    document.getElementById('phone').value = location.phone || '';
+    document.getElementById('email').value = location.email || '';
+    document.getElementById('website').value = location.website || '';
+
+    document.getElementById('locationActive').checked = location.is_active;
+
+    locationModal.show();
+}
+
+async function saveLocation() {
+    const code = document.getElementById('locationCode').value.trim();
+    const name = document.getElementById('locationName').value.trim();
+
+    // Validation
+    if (!code) {
+        showNotification('Location code is required', 'error');
+        return;
+    }
+
+    if (code.length < 2 || code.length > 20) {
+        showNotification('Location code must be 2-20 characters', 'error');
+        return;
+    }
+
+    if (!name) {
+        showNotification('Location name is required', 'error');
+        return;
+    }
+
+    const data = {
+        code: code,
+        name: name,
+        description: document.getElementById('locationDescription').value.trim() || null,
+        legal_name: document.getElementById('legalName').value.trim() || null,
+        ein: document.getElementById('ein').value.trim() || null,
+        entity_type: document.getElementById('entityType').value || null,
+        address_line1: document.getElementById('addressLine1').value.trim() || null,
+        address_line2: document.getElementById('addressLine2').value.trim() || null,
+        city: document.getElementById('city').value.trim() || null,
+        state: document.getElementById('state').value.trim() || null,
+        zip_code: document.getElementById('zipCode').value.trim() || null,
+        country: document.getElementById('country').value.trim() || null,
+        phone: document.getElementById('phone').value.trim() || null,
+        email: document.getElementById('email').value.trim() || null,
+        website: document.getElementById('website').value.trim() || null,
+        is_active: document.getElementById('locationActive').checked
+    };
+
+    try {
+        let response;
+
+        if (editingLocationId) {
+            // Update existing location
+            response = await fetch(`/accounting/api/areas/${editingLocationId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+        } else {
+            // Create new location
+            response = await fetch('/accounting/api/areas/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save location');
+        }
+
+        showNotification(
+            editingLocationId ? 'Location updated successfully' : 'Location created successfully',
+            'success'
+        );
+
+        locationModal.hide();
+        await loadLocations();
+
+    } catch (error) {
+        console.error('Error saving location:', error);
+        showNotification(error.message, 'error');
+    }
+}
+
+function deleteLocation(id) {
+    const location = locations.find(l => l.id === id);
+    if (!location) return;
+
+    deletingLocationId = id;
+
+    document.getElementById('deleteLocationInfo').innerHTML = `
+        <p><strong>Code:</strong> ${escapeHtml(location.code)}</p>
+        <p><strong>Name:</strong> ${escapeHtml(location.name)}</p>
+    `;
+
+    deleteModal.show();
+}
+
+async function confirmDelete() {
+    if (!deletingLocationId) return;
+
+    try {
+        const response = await fetch(`/accounting/api/areas/${deletingLocationId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete location');
+        }
+
+        showNotification('Location deleted successfully', 'success');
+        deleteModal.hide();
+        await loadLocations();
+
+    } catch (error) {
+        console.error('Error deleting location:', error);
+        showNotification(error.message, 'error');
+    }
+}
+
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'error' ? 'danger' : 'success'} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

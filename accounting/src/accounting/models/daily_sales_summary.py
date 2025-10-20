@@ -1,0 +1,110 @@
+"""
+Daily Sales Summary models for POS integration
+"""
+from sqlalchemy import Column, Integer, String, Date, DateTime, Numeric, Text, ForeignKey
+from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.sql import func
+from accounting.db.database import Base
+
+
+class DailySalesSummary(Base):
+    """Daily sales summary from POS systems"""
+    __tablename__ = "daily_sales_summaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    business_date = Column(Date, nullable=False, index=True)
+    area_id = Column(Integer, ForeignKey("areas.id", ondelete="RESTRICT"), nullable=False, index=True)
+    pos_system = Column(String(50), nullable=True)  # 'CLOVER', 'SQUARE', etc.
+    pos_location_id = Column(String(100), nullable=True)  # External POS location ID
+
+    # Sales totals
+    gross_sales = Column(Numeric(15, 2), nullable=False, server_default="0.00")
+    discounts = Column(Numeric(15, 2), nullable=False, server_default="0.00")
+    refunds = Column(Numeric(15, 2), nullable=False, server_default="0.00")
+    net_sales = Column(Numeric(15, 2), nullable=False, server_default="0.00")
+    tax_collected = Column(Numeric(15, 2), nullable=False, server_default="0.00")
+    tips = Column(Numeric(15, 2), nullable=False, server_default="0.00")
+    total_collected = Column(Numeric(15, 2), nullable=False, server_default="0.00")
+
+    # Flexible breakdowns stored as JSONB
+    payment_breakdown = Column(JSONB, nullable=True)
+    # Example: {"cash": 500.00, "credit_card": 1200.00, "gift_card": 100.00}
+
+    category_breakdown = Column(JSONB, nullable=True)
+    # Example: {"food": 1200.00, "beverage": 400.00, "alcohol": 200.00}
+
+    # Status workflow: draft -> verified -> posted
+    status = Column(String(20), nullable=False, server_default="draft", index=True)
+
+    journal_entry_id = Column(Integer, ForeignKey("journal_entries.id", ondelete="SET NULL"), nullable=True)
+    notes = Column(Text, nullable=True)
+    imported_from = Column(String(100), nullable=True)  # Source system/file
+    imported_at = Column(DateTime, nullable=True)
+
+    # Audit fields
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_at = Column(DateTime, nullable=False, server_default=func.now())
+    verified_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    verified_at = Column(DateTime, nullable=True)
+    posted_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    posted_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, nullable=True, onupdate=func.now())
+
+    # Relationships
+    area = relationship("Area", back_populates="daily_sales_summaries")
+    journal_entry = relationship("JournalEntry", foreign_keys=[journal_entry_id])
+    line_items = relationship("SalesLineItem", back_populates="dss", cascade="all, delete-orphan")
+    payments = relationship("SalesPayment", back_populates="dss", cascade="all, delete-orphan")
+
+    creator = relationship("User", foreign_keys=[created_by])
+    verifier = relationship("User", foreign_keys=[verified_by])
+    poster = relationship("User", foreign_keys=[posted_by])
+
+    def __repr__(self):
+        return f"<DailySalesSummary {self.business_date} - Area {self.area_id}: ${self.net_sales}>"
+
+
+class SalesLineItem(Base):
+    """Detailed sales breakdown by category/item"""
+    __tablename__ = "sales_line_items"
+
+    id = Column(Integer, primary_key=True)
+    dss_id = Column(Integer, ForeignKey("daily_sales_summaries.id", ondelete="CASCADE"), nullable=False, index=True)
+    category = Column(String(100), nullable=True)  # 'Food', 'Beverage', 'Alcohol'
+    item_name = Column(String(200), nullable=True)
+    quantity = Column(Numeric(10, 2), nullable=True)
+    unit_price = Column(Numeric(15, 2), nullable=True)
+    gross_amount = Column(Numeric(15, 2), nullable=False)
+    discount_amount = Column(Numeric(15, 2), nullable=False, server_default="0.00")
+    net_amount = Column(Numeric(15, 2), nullable=False)
+    tax_amount = Column(Numeric(15, 2), nullable=False, server_default="0.00")
+    revenue_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+
+    # Relationships
+    dss = relationship("DailySalesSummary", back_populates="line_items")
+    revenue_account = relationship("Account", foreign_keys=[revenue_account_id])
+
+    def __repr__(self):
+        return f"<SalesLineItem {self.category}: ${self.net_amount}>"
+
+
+class SalesPayment(Base):
+    """Payment method details for daily sales"""
+    __tablename__ = "sales_payments"
+
+    id = Column(Integer, primary_key=True)
+    dss_id = Column(Integer, ForeignKey("daily_sales_summaries.id", ondelete="CASCADE"), nullable=False, index=True)
+    payment_type = Column(String(50), nullable=False)  # 'CASH', 'CREDIT_CARD', etc.
+    amount = Column(Numeric(15, 2), nullable=False)
+    tips = Column(Numeric(15, 2), nullable=False, server_default="0.00")
+    deposit_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+    processor = Column(String(100), nullable=True)  # 'Visa', 'Mastercard', 'Square'
+    reference_number = Column(String(100), nullable=True)  # Batch number, etc.
+
+    # Relationships
+    dss = relationship("DailySalesSummary", back_populates="payments")
+    deposit_account = relationship("Account", foreign_keys=[deposit_account_id])
+
+    def __repr__(self):
+        return f"<SalesPayment {self.payment_type}: ${self.amount}>"

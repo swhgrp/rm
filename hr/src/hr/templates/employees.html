@@ -1,0 +1,698 @@
+{% extends "base.html" %}
+
+{% block title %}Employees - Restaurant HR Management{% endblock %}
+{% block nav_employees %}active{% endblock %}
+
+{% block extra_styles %}
+<style>
+    @media (max-width: 992px) {
+        /* Reduce page padding */
+        .content-area {
+            padding: 10px !important;
+        }
+
+        /* Card header improvements */
+        .card-header {
+            padding: 15px 12px !important;
+            flex-direction: column !important;
+            gap: 15px !important;
+        }
+
+        .card-header h2 {
+            font-size: 20px !important;
+            margin: 0 !important;
+        }
+
+        /* Header buttons stack vertically */
+        .card-header div[style*="display: flex"] {
+            flex-direction: column !important;
+            gap: 10px !important;
+            width: 100% !important;
+        }
+
+        .card-header button {
+            width: 100% !important;
+            white-space: normal !important;
+        }
+
+        /* Search and filter section */
+        div[style*="padding: 1.5rem"] {
+            padding: 15px 12px !important;
+        }
+
+        /* Search and filter grid becomes single column */
+        div[style*="grid-template-columns: 2fr 1fr 1fr"] {
+            grid-template-columns: 1fr !important;
+            gap: 15px !important;
+        }
+
+        /* All filter inputs full width */
+        #searchInput,
+        #locationFilter,
+        #statusFilter {
+            width: 100% !important;
+        }
+
+        /* Filter labels - centered */
+        label[for="searchInput"],
+        label[for="locationFilter"],
+        label[for="statusFilter"] {
+            font-size: 13px !important;
+            margin-bottom: 6px !important;
+            text-align: center !important;
+            display: block !important;
+        }
+
+        /* Center the filter inputs */
+        #searchInput,
+        #locationFilter,
+        #statusFilter {
+            text-align: center !important;
+        }
+
+        /* Table improvements */
+        .table-wrapper {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+
+        table {
+            font-size: 13px !important;
+        }
+
+        table th,
+        table td {
+            padding: 10px 8px !important;
+        }
+
+        /* View buttons in table */
+        table .btn {
+            font-size: 12px !important;
+            padding: 6px 12px !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>Employees</h2>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <button class="btn btn-secondary" onclick="showUploadModal()" style="white-space: nowrap;">
+                <i class="bi bi-upload"></i> Bulk Upload
+            </button>
+            <button class="btn btn-primary" onclick="window.location='/hr/employees/new'">
+                <i class="bi bi-plus-circle"></i> New Employee
+            </button>
+        </div>
+    </div>
+
+    <!-- Search and Filters -->
+    <div style="padding: 1.5rem; border-bottom: 1px solid #30363d; background: #161b22;">
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; align-items: end;">
+            <div>
+                <label for="searchInput" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9; font-size: 14px;">Search</label>
+                <input type="text" id="searchInput" placeholder="Search by name, email, or phone..."
+                       style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9; font-size: 14px;"
+                       oninput="filterEmployees()">
+            </div>
+            <div>
+                <label for="locationFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9; font-size: 14px;">Location</label>
+                <select id="locationFilter" onchange="filterEmployees()"
+                        style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9; font-size: 14px;">
+                    <option value="all">All Locations</option>
+                </select>
+            </div>
+            <div>
+                <label for="statusFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9; font-size: 14px;">Status</label>
+                <select id="statusFilter" onchange="filterEmployees()"
+                        style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9; font-size: 14px;">
+                    <option value="all">All Statuses</option>
+                    <option value="Active" selected>Active Only</option>
+                    <option value="Terminated">Terminated Only</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table id="employeesTable">
+            <thead>
+                <tr>
+                    <th onclick="sortBy('name')" style="cursor: pointer; user-select: none;">
+                        Name <i class="bi bi-arrow-down-up" style="font-size: 10px; opacity: 0.5;"></i>
+                    </th>
+                    <th class="hide-mobile">Email</th>
+                    <th class="hide-mobile">Phone</th>
+                    <th class="hide-mobile" onclick="sortBy('hire_date')" style="cursor: pointer; user-select: none;">
+                        Hire Date <i class="bi bi-arrow-down-up" style="font-size: 10px; opacity: 0.5;"></i>
+                    </th>
+                    <th class="hide-mobile">Position</th>
+                    <th class="hide-mobile">Certifications</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="employeesBody">
+                <tr>
+                    <td colspan="9" style="text-align: center; padding: 2rem; color: #999;">Loading employees...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Bulk Upload Modal -->
+<div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+        <div style="padding: 20px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0;"><i class="bi bi-upload"></i> Bulk Upload Employees</h2>
+            <button onclick="hideUploadModal()" style="background: none; border: none; color: #8b949e; font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px;">&times;</button>
+        </div>
+
+        <div style="padding: 20px;">
+            <div style="background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: #58a6ff;"><i class="bi bi-info-circle"></i> Instructions</h4>
+                <ol style="margin: 0; padding-left: 20px; color: #c9d1d9; font-size: 14px; line-height: 1.6;">
+                    <li>Download the CSV template below</li>
+                    <li>Fill in your employee data (one row per employee)</li>
+                    <li>For locations, use pipe-separated names (e.g., "Seaside Grill|SW Grill")</li>
+                    <li>Save as CSV and upload below</li>
+                    <li>Existing employees (same employee_number) will be updated</li>
+                </ol>
+                <button onclick="downloadTemplate()" class="btn btn-secondary" style="margin-top: 10px; width: 100%;">
+                    <i class="bi bi-download"></i> Download CSV Template
+                </button>
+            </div>
+
+            <form id="uploadForm" onsubmit="handleBulkUpload(event)">
+                <div class="form-group">
+                    <label for="csvFile" style="display: block; margin-bottom: 8px; font-weight: 600;">
+                        CSV File <span style="color: #f85149;">*</span>
+                    </label>
+                    <input type="file" id="csvFile" accept=".csv" required
+                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                </div>
+
+                <div id="uploadResults"></div>
+
+                <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                    <button type="button" onclick="hideUploadModal()" class="btn btn-secondary">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary" id="uploadBtn">
+                        <i class="bi bi-upload"></i> Upload CSV
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let employees = [];
+let filteredEmployees = [];
+let locations = [];
+let positions = [];
+let currentSortField = null;
+let currentSortDirection = 'asc';
+
+async function loadLocations() {
+    try {
+        const response = await fetch('/hr/api/locations/', {
+            credentials: 'include'
+        });
+        if (response.ok) {
+            locations = await response.json();
+            const locationFilter = document.getElementById('locationFilter');
+            locations.forEach(loc => {
+                const option = document.createElement('option');
+                option.value = loc.id;
+                option.textContent = loc.name;
+                locationFilter.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading locations:', error);
+    }
+}
+
+async function loadPositions() {
+    try {
+        const response = await fetch('/hr/api/positions/', {
+            credentials: 'include'
+        });
+        if (response.ok) {
+            positions = await response.json();
+        }
+    } catch (error) {
+        console.error('Error loading positions:', error);
+    }
+}
+
+async function loadEmployees() {
+    try {
+        const response = await fetch('/hr/api/employees/', {
+            credentials: 'include'  // Include cookies for authentication
+        });
+
+        if (response.status === 401) {
+            // Session expired or not logged in - redirect to login
+            window.location.href = '/hr/login';
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        employees = await response.json();
+
+        // Fetch certification data for each employee
+        await Promise.all(employees.map(async (emp) => {
+            try {
+                const docsResponse = await fetch(`/hr/api/employees/${emp.id}/documents`, {
+                    credentials: 'include'
+                });
+                if (docsResponse.ok) {
+                    const docs = await docsResponse.json();
+                    // Filter for certification documents
+                    const certTypes = ['Food Handler Certificate', 'Food Manager Certificate', 'Alcohol Server Permit', 'TIPS Certification'];
+                    const certs = docs.filter(doc => certTypes.includes(doc.document_type));
+
+                    // Check for expiring soon (within 30 days) or expired
+                    const today = new Date();
+                    const thirtyDaysFromNow = new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+                    emp.expiringCerts = certs.filter(cert => {
+                        if (!cert.expiration_date) return false;
+                        const expDate = new Date(cert.expiration_date);
+                        return expDate <= thirtyDaysFromNow;
+                    });
+
+                    emp.expiredCerts = certs.filter(cert => {
+                        if (!cert.expiration_date) return false;
+                        const expDate = new Date(cert.expiration_date);
+                        return expDate < today;
+                    });
+                } else {
+                    emp.expiringCerts = [];
+                    emp.expiredCerts = [];
+                }
+            } catch (err) {
+                console.error(`Error loading docs for employee ${emp.id}:`, err);
+                emp.expiringCerts = [];
+                emp.expiredCerts = [];
+            }
+        }));
+
+        filterEmployees();
+    } catch (error) {
+        console.error('Error loading employees:', error);
+        document.getElementById('employeesBody').innerHTML = `
+            <tr><td colspan="9" style="text-align: center; color: #e74c3c;">Error loading employees. Please try refreshing the page.</td></tr>
+        `;
+    }
+}
+
+function filterEmployees() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const locationFilter = document.getElementById('locationFilter').value;
+    const searchInput = document.getElementById('searchInput').value.toLowerCase();
+
+    filteredEmployees = employees.filter(emp => {
+        // Status filter
+        if (statusFilter !== 'all' && emp.employment_status !== statusFilter) {
+            return false;
+        }
+
+        // Location filter
+        if (locationFilter !== 'all') {
+            const locationId = parseInt(locationFilter);
+            // Check if employee has assigned locations
+            if (emp.assigned_locations && emp.assigned_locations.length > 0) {
+                // Employee has location restrictions - check if selected location is in their list
+                const hasLocation = emp.assigned_locations.some(loc => loc.id === locationId);
+                if (!hasLocation) {
+                    return false;
+                }
+            }
+            // If employee has no assigned locations, they have access to all locations (passes filter)
+        }
+
+        // Search filter
+        if (searchInput) {
+            const fullName = `${emp.first_name} ${emp.last_name}`.toLowerCase();
+            const email = (emp.email || '').toLowerCase();
+            const phone = (emp.phone_number || '').toLowerCase();
+
+            if (!fullName.includes(searchInput) &&
+                !email.includes(searchInput) &&
+                !phone.includes(searchInput)) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    renderEmployees();
+}
+
+function renderEmployees() {
+    const tbody = document.getElementById('employeesBody');
+
+    if (filteredEmployees.length === 0) {
+        tbody.innerHTML = `
+            <tr><td colspan="9" style="text-align: center; padding: 2rem; color: #999;">No employees found</td></tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = filteredEmployees.map(emp => {
+        let certDisplay = '';
+        if (emp.expiredCerts && emp.expiredCerts.length > 0) {
+            certDisplay = `<span class="badge badge-danger" title="${emp.expiredCerts.length} expired">
+                <i class="bi bi-exclamation-circle"></i> ${emp.expiredCerts.length} Expired
+            </span>`;
+        } else if (emp.expiringCerts && emp.expiringCerts.length > 0) {
+            certDisplay = `<span class="badge badge-warning" title="${emp.expiringCerts.length} expiring soon">
+                <i class="bi bi-exclamation-triangle"></i> ${emp.expiringCerts.length} Expiring
+            </span>`;
+        } else {
+            certDisplay = '<span style="color: #8b949e; font-size: 12px;">All Current</span>';
+        }
+
+        // Get position title
+        let positionDisplay = '-';
+        if (emp.position_id) {
+            const position = positions.find(p => p.id === emp.position_id);
+            if (position) {
+                positionDisplay = position.title;
+            }
+        }
+
+        return `
+            <tr onclick="window.location='/hr/employees/${emp.id}'" style="cursor: pointer;">
+                <td>${emp.first_name} ${emp.last_name}</td>
+                <td class="hide-mobile">${emp.email || '-'}</td>
+                <td class="hide-mobile">${formatPhoneNumber(emp.phone_number)}</td>
+                <td class="hide-mobile">${emp.hire_date || '-'}</td>
+                <td class="hide-mobile">${positionDisplay}</td>
+                <td class="hide-mobile">${certDisplay}</td>
+                <td>
+                    <span class="badge ${emp.employment_status === 'Active' ? 'badge-success' : 'badge-danger'}">
+                        ${emp.employment_status}
+                    </span>
+                </td>
+                <td onclick="event.stopPropagation()">
+                    <button class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;"
+                            onclick="window.location='/hr/employees/${emp.id}'">View</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+document.getElementById('statusFilter').addEventListener('change', filterEmployees);
+
+// Format phone number
+function formatPhoneNumber(phone) {
+    if (!phone) return '-';
+
+    // Remove all non-numeric characters
+    const cleaned = phone.replace(/\D/g, '');
+
+    // Format as (XXX) XXX-XXXX
+    if (cleaned.length === 10) {
+        return `(${cleaned.substring(0, 3)}) ${cleaned.substring(3, 6)}-${cleaned.substring(6)}`;
+    }
+
+    // If not 10 digits, return as-is
+    return phone;
+}
+
+// Sorting functionality
+function sortBy(field) {
+    // Toggle direction if clicking same field, otherwise default to ascending
+    if (currentSortField === field) {
+        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSortField = field;
+        currentSortDirection = 'asc';
+    }
+
+    // Sort the filtered employees
+    filteredEmployees.sort((a, b) => {
+        let aVal, bVal;
+
+        if (field === 'name') {
+            aVal = `${a.last_name} ${a.first_name}`.toLowerCase();
+            bVal = `${b.last_name} ${b.first_name}`.toLowerCase();
+        } else if (field === 'hire_date') {
+            aVal = a.hire_date || '';
+            bVal = b.hire_date || '';
+        }
+
+        if (aVal < bVal) return currentSortDirection === 'asc' ? -1 : 1;
+        if (aVal > bVal) return currentSortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    renderEmployees();
+    updateSortIcons();
+}
+
+function updateSortIcons() {
+    // Reset all sort icons
+    document.querySelectorAll('th i').forEach(icon => {
+        icon.className = 'bi bi-arrow-down-up';
+        icon.style.opacity = '0.5';
+    });
+
+    // Update the active sort icon
+    const headers = document.querySelectorAll('th[onclick]');
+    headers.forEach(header => {
+        const field = header.getAttribute('onclick').match(/'([^']+)'/)[1];
+        if (field === currentSortField) {
+            const icon = header.querySelector('i');
+            icon.className = currentSortDirection === 'asc' ? 'bi bi-arrow-up' : 'bi bi-arrow-down';
+            icon.style.opacity = '1';
+        }
+    });
+}
+
+// Bulk Upload Modal Functions
+function showUploadModal() {
+    document.getElementById('uploadModal').style.display = 'flex';
+}
+
+function hideUploadModal() {
+    document.getElementById('uploadModal').style.display = 'none';
+    document.getElementById('uploadForm').reset();
+    document.getElementById('uploadResults').style.display = 'none';
+}
+
+function downloadTemplate() {
+    const csv = `employee_number,first_name,last_name,middle_name,email,phone_number,hire_date,employment_status,employee_type,starting_pay_rate,street_address,city,state,zip_code,emergency_contact_name,emergency_contact_relationship,emergency_contact_phone,date_of_birth,location_names
+EMP001,John,Doe,,john.doe@example.com,555-1234,2024-01-15,Active,Full-Time,15.50,123 Main St,Orlando,FL,32801,Jane Doe,Spouse,555-5678,1990-05-15,Seaside Grill|SW Grill
+EMP002,Jane,Smith,M,jane.smith@example.com,555-9876,2024-02-01,Active,Part-Time,14.00,456 Oak Ave,Orlando,FL,32802,John Smith,Father,555-4321,1995-08-20,The Nest Eatery
+EMP003,Bob,Johnson,,,,,,Part-Time,,,,,,,,,Seaside Grill`;
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'employee_import_template.csv';
+    a.click();
+}
+
+async function handleBulkUpload(e) {
+    e.preventDefault();
+
+    const fileInput = document.getElementById('csvFile');
+    const submitBtn = document.getElementById('uploadBtn');
+    const resultsDiv = document.getElementById('uploadResults');
+
+    if (!fileInput.files[0]) {
+        alert('Please select a CSV file');
+        return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Uploading...';
+    resultsDiv.style.display = 'none';
+
+    try {
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+
+        const response = await fetch('/hr/api/employees/bulk-upload', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Upload failed');
+        }
+
+        const results = await response.json();
+
+        // Show results
+        resultsDiv.style.display = 'block';
+        resultsDiv.innerHTML = `
+            <div style="padding: 15px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; margin-top: 15px;">
+                <h4 style="margin: 0 0 10px 0; color: #58a6ff;">Upload Results</h4>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                    <div style="padding: 10px; background: #0d1117; border-radius: 4px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #58a6ff;">${results.total}</div>
+                        <div style="font-size: 12px; color: #8b949e;">Total Rows</div>
+                    </div>
+                    <div style="padding: 10px; background: #0d1117; border-radius: 4px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #238636;">${results.created}</div>
+                        <div style="font-size: 12px; color: #8b949e;">Created</div>
+                    </div>
+                    <div style="padding: 10px; background: #0d1117; border-radius: 4px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #d29922;">${results.updated}</div>
+                        <div style="font-size: 12px; color: #8b949e;">Updated</div>
+                    </div>
+                </div>
+                ${results.errors.length > 0 ? `
+                    <div style="margin-top: 10px;">
+                        <h5 style="color: #f85149; margin: 0 0 5px 0;">Errors (${results.errors.length}):</h5>
+                        <div style="max-height: 200px; overflow-y: auto; padding: 10px; background: #0d1117; border-radius: 4px;">
+                            ${results.errors.map(err => `<div style="color: #f85149; font-size: 13px; margin-bottom: 5px;">• ${err}</div>`).join('')}
+                        </div>
+                    </div>
+                ` : '<div style="color: #238636; margin-top: 10px;"><i class="bi bi-check-circle"></i> All employees processed successfully!</div>'}
+            </div>
+        `;
+
+        // Reload employees list
+        await loadEmployees();
+
+    } catch (error) {
+        alert('Error: ' + error.message);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-upload"></i> Upload CSV';
+    }
+}
+
+// Load data on page load
+async function initializePage() {
+    await loadLocations();
+    await loadPositions();
+    await loadEmployees();
+    fixMobileLayout();
+}
+
+// Mobile layout fix
+function fixMobileLayout() {
+    if (window.innerWidth <= 992) {
+        console.log('Applying mobile layout fixes to employees page...');
+
+        // Reduce content area padding
+        const contentArea = document.querySelector('.content-area');
+        if (contentArea) {
+            contentArea.style.padding = '10px';
+        }
+
+        // Fix card header
+        const cardHeader = document.querySelector('.card-header');
+        if (cardHeader) {
+            cardHeader.style.padding = '15px 12px';
+            cardHeader.style.flexDirection = 'column';
+            cardHeader.style.gap = '15px';
+        }
+
+        // Fix header title
+        const headerTitle = document.querySelector('.card-header h2');
+        if (headerTitle) {
+            headerTitle.style.fontSize = '20px';
+            headerTitle.style.margin = '0';
+        }
+
+        // Fix the search/filter grid
+        const filterGrid = document.querySelector('div[style*="grid-template-columns: 2fr 1fr 1fr"]');
+        if (filterGrid) {
+            filterGrid.style.display = 'flex';
+            filterGrid.style.flexDirection = 'column';
+            filterGrid.style.gap = '15px';
+        }
+
+        // Fix search/filter section padding
+        const filterSection = document.querySelector('div[style*="padding: 1.5rem"]');
+        if (filterSection) {
+            filterSection.style.padding = '15px 12px';
+        }
+
+        // Fix header buttons
+        const headerButtons = document.querySelector('.card-header div[style*="display: flex"]');
+        if (headerButtons) {
+            headerButtons.style.flexDirection = 'column';
+            headerButtons.style.width = '100%';
+            headerButtons.style.gap = '10px';
+
+            const buttons = headerButtons.querySelectorAll('button');
+            buttons.forEach(btn => {
+                btn.style.width = '100%';
+                btn.style.whiteSpace = 'normal';
+            });
+        }
+
+        // Make all filter inputs full width
+        const searchInput = document.getElementById('searchInput');
+        const locationFilter = document.getElementById('locationFilter');
+        const statusFilter = document.getElementById('statusFilter');
+
+        [searchInput, locationFilter, statusFilter].forEach(input => {
+            if (input) {
+                input.style.width = '100%';
+            }
+        });
+
+        // Fix filter labels
+        const labels = document.querySelectorAll('label[for="searchInput"], label[for="locationFilter"], label[for="statusFilter"]');
+        labels.forEach(label => {
+            label.style.fontSize = '13px';
+            label.style.marginBottom = '6px';
+        });
+
+        // Fix table
+        const table = document.querySelector('table');
+        if (table) {
+            table.style.fontSize = '13px';
+        }
+
+        // Fix table cells
+        const tableCells = document.querySelectorAll('table th, table td');
+        tableCells.forEach(cell => {
+            cell.style.padding = '10px 8px';
+        });
+
+        // Fix view buttons
+        const viewButtons = document.querySelectorAll('table .btn');
+        viewButtons.forEach(btn => {
+            btn.style.fontSize = '12px';
+            btn.style.padding = '6px 12px';
+        });
+
+        console.log('Mobile layout fixes applied to employees page!');
+    }
+}
+
+// Run on window resize
+window.addEventListener('resize', fixMobileLayout);
+
+// Run after a short delay to ensure DOM is ready
+setTimeout(fixMobileLayout, 500);
+
+initializePage();
+</script>
+{% endblock %}

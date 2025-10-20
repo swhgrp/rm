@@ -1,14 +1,20 @@
-version: '3.8'
+# Restaurant System - Multi-Service Docker Compose Configuration
+# Services: Inventory Management, Accounting System, and future services (HR, etc.)
 
 services:
-  db:
+  # ============================================================================
+  # INVENTORY SERVICE
+  # ============================================================================
+
+  inventory-db:
     image: postgres:15
+    container_name: inventory-db
     environment:
       POSTGRES_USER: inventory_user
       POSTGRES_PASSWORD: inventory_pass
       POSTGRES_DB: inventory_db
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - inventory_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
@@ -16,9 +22,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+    networks:
+      - restaurant-network
 
-  redis:
+  inventory-redis:
     image: redis:7-alpine
+    container_name: inventory-redis
     volumes:
       - redis_data:/data
     healthcheck:
@@ -26,51 +36,39 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+    restart: unless-stopped
+    networks:
+      - restaurant-network
 
-  app:
-    build: .
+  inventory-app:
+    build: ./inventory
+    container_name: inventory-app
     volumes:
-      - ./src:/app/src
-      - ./uploads:/app/uploads
+      - ./inventory/src:/app/src
+      - ./inventory/uploads:/app/uploads
     env_file:
-      - .env
+      - ./inventory/.env
     environment:
-      - DATABASE_URL=postgresql://inventory_user:inventory_pass@db:5432/inventory_db
-      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db
+      - REDIS_URL=redis://inventory-redis:6379
       - DEBUG=true
+      - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
     depends_on:
-      db:
+      inventory-db:
         condition: service_healthy
-      redis:
+      inventory-redis:
         condition: service_healthy
     restart: unless-stopped
+    networks:
+      - restaurant-network
 
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./src/restaurant_inventory/static:/app/static:ro
-      - ./uploads:/app/uploads:ro
-      - ./certbot/conf:/etc/letsencrypt:ro
-      - ./certbot/www:/var/www/certbot:ro
-    depends_on:
-      - app
-    restart: unless-stopped
+  # ============================================================================
+  # ACCOUNTING SERVICE
+  # ============================================================================
 
-  certbot:
-    image: certbot/certbot
-    volumes:
-      - ./certbot/conf:/etc/letsencrypt
-      - ./certbot/www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
-
-  # Accounting Service
   accounting-db:
     image: postgres:15
+    container_name: accounting-db
     environment:
       POSTGRES_USER: accounting_user
       POSTGRES_PASSWORD: Acc0unt1ng_Pr0d_2024!
@@ -83,29 +81,213 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-    profiles:
-      - accounting
+    networks:
+      - restaurant-network
 
   accounting-app:
     build: ./accounting
+    container_name: accounting-app
     volumes:
       - ./accounting/src:/app/src
+      - ./accounting/alembic:/app/alembic
       - ./accounting/logs:/app/logs
     env_file:
       - ./accounting/.env
     environment:
       - DATABASE_URL=postgresql://accounting_user:Acc0unt1ng_Pr0d_2024!@accounting-db:5432/accounting_db
-      - INVENTORY_API_URL=http://app:8000/api
+      - INVENTORY_API_URL=http://inventory-app:8000/api
+      - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
     depends_on:
       accounting-db:
         condition: service_healthy
-      app:
+      inventory-app:
         condition: service_started
     restart: unless-stopped
-    profiles:
-      - accounting
+    networks:
+      - restaurant-network
+
+  # ============================================================================
+  # INTEGRATION HUB SERVICE
+  # ============================================================================
+
+  hub-db:
+    image: postgres:15
+    container_name: hub-db
+    environment:
+      POSTGRES_USER: hub_user
+      POSTGRES_PASSWORD: hub_password
+      POSTGRES_DB: integration_hub_db
+    volumes:
+      - hub_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hub_user -d integration_hub_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - restaurant-network
+
+  integration-hub:
+    build: ./integration-hub
+    container_name: integration-hub
+    volumes:
+      - ./integration-hub/src:/app/src
+      - ./integration-hub/alembic:/app/alembic
+      - ./integration-hub/uploads:/app/uploads
+    environment:
+      - DATABASE_URL=postgresql://hub_user:hub_password@hub-db:5432/integration_hub_db
+      - INVENTORY_API_URL=http://inventory-app:8000/api
+      - ACCOUNTING_API_URL=http://accounting-app:8000/api
+      - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    depends_on:
+      hub-db:
+        condition: service_healthy
+      inventory-app:
+        condition: service_started
+      accounting-app:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - restaurant-network
+
+  # ============================================================================
+  # HR SERVICE
+  # ============================================================================
+
+  hr-db:
+    image: postgres:15
+    container_name: hr-db
+    environment:
+      POSTGRES_USER: hr_user
+      POSTGRES_PASSWORD: HR_Pr0d_2024!
+      POSTGRES_DB: hr_db
+    volumes:
+      - hr_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hr_user -d hr_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - restaurant-network
+
+  hr-app:
+    build: ./hr
+    container_name: hr-app
+    volumes:
+      - ./hr/src:/app/src
+      - ./hr/alembic:/app/alembic
+      - ./hr/documents:/app/documents
+    env_file:
+      - ./hr/.env
+    environment:
+      - DATABASE_URL=postgresql://hr_user:HR_Pr0d_2024!@hr-db:5432/hr_db
+      - REDIS_URL=redis://inventory-redis:6379
+      - INVENTORY_API_URL=http://inventory-app:8000/api
+      - ACCOUNTING_API_URL=http://accounting-app:8000/api
+      - ENCRYPTION_KEY=yX_axNoTYxskNPgHeaoSSi2gM1jXhXvsdwf9acQqKpM=
+      - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    depends_on:
+      hr-db:
+        condition: service_healthy
+      inventory-redis:
+        condition: service_healthy
+      inventory-app:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - restaurant-network
+
+  # ============================================================================
+  # PORTAL SERVICE
+  # ============================================================================
+
+  portal-app:
+    build: ./portal
+    container_name: portal-app
+    volumes:
+      - ./portal/src:/app/src
+      - ./portal/templates:/app/templates
+      - ./portal/css:/app/static/css
+      - ./portal/images:/app/static/images
+    environment:
+      - HR_DATABASE_URL=postgresql://hr_user:HR_Pr0d_2024!@hr-db:5432/hr_db
+      - SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+      - INVENTORY_API_URL=http://inventory-app:8000
+      - ACCOUNTING_API_URL=http://accounting-app:8000
+      - HR_API_URL=http://hr-app:8000
+      - INTEGRATION_HUB_URL=http://integration-hub:8000
+    depends_on:
+      hr-db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - restaurant-network
+
+  # ============================================================================
+  # SHARED INFRASTRUCTURE
+  # ============================================================================
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-proxy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./shared/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./shared/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./portal:/var/www/portal:ro
+      - ./inventory/src/restaurant_inventory/static:/app/static:ro
+      - ./inventory/uploads:/app/uploads:ro
+      - ./shared/certbot/conf:/etc/letsencrypt:ro
+      - ./shared/certbot/www:/var/www/certbot:ro
+    depends_on:
+      - inventory-app
+      - accounting-app
+      - hr-app
+      - integration-hub
+      - portal-app
+    restart: unless-stopped
+    networks:
+      - restaurant-network
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./shared/certbot/conf:/etc/letsencrypt
+      - ./shared/certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - restaurant-network
+
+# ============================================================================
+# VOLUMES
+# ============================================================================
 
 volumes:
-  postgres_data:
+  inventory_data:
+    external: true
+    name: restaurant-inventory_postgres_data
   redis_data:
+    external: true
+    name: restaurant-inventory_redis_data
   accounting_data:
+    external: true
+    name: restaurant-inventory_accounting_data
+  hub_data:
+    name: restaurant-integration-hub_data
+  hr_data:
+    name: restaurant-hr_data
+
+# ============================================================================
+# NETWORKS
+# ============================================================================
+
+networks:
+  restaurant-network:
+    name: restaurant-network
+    driver: bridge

@@ -1,0 +1,1354 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - Restaurant Accounting System{% endblock %}
+{% block nav_reports %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    .tabs {
+        display: flex;
+        gap: 0;
+        border-bottom: 2px solid #30363d;
+        margin-bottom: 1.5rem;
+    }
+    .tab {
+        padding: 1rem 1.5rem;
+        background: #161b22;
+        border: none;
+        cursor: pointer;
+        font-size: 1rem;
+        color: #8b949e;
+        border-bottom: 3px solid transparent;
+        transition: all 0.2s;
+    }
+    .tab:hover {
+        background: #21262d;
+        color: #c9d1d9;
+    }
+    .tab.active {
+        border-bottom-color: #58a6ff;
+        color: #c9d1d9;
+        font-weight: 500;
+    }
+    .tab-content {
+        display: none;
+    }
+    .tab-content.active {
+        display: block;
+    }
+    .filters {
+        background: #161b22;
+        padding: 1rem;
+        border-radius: 4px;
+        border: 1px solid #30363d;
+        margin-bottom: 1rem;
+        display: flex;
+        gap: 1rem;
+        align-items: end;
+        flex-wrap: wrap;
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    .form-group label {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #c9d1d9;
+    }
+    .form-group input, .form-group select {
+        padding: 0.5rem;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        background: #0d1117;
+        color: #c9d1d9;
+    }
+    .report-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #30363d;
+    }
+    .report-header h2 {
+        color: #c9d1d9;
+        font-size: 1.75rem;
+        margin-bottom: 0.5rem;
+    }
+    .report-header .subtitle {
+        color: #8b949e;
+        font-size: 1rem;
+    }
+    .report-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1.5rem;
+    }
+    .report-table th {
+        background: #21262d;
+        color: #c9d1d9;
+        text-align: left;
+        padding: 0.75rem;
+        font-weight: 600;
+        border: 1px solid #30363d;
+    }
+    .report-table td {
+        padding: 0.75rem;
+        border-bottom: 1px solid #30363d;
+    }
+    .report-table tr:hover {
+        background: #161b22;
+    }
+    .report-table .number {
+        text-align: right;
+        font-family: 'Courier New', monospace;
+    }
+    .report-table .total-row {
+        background: #21262d;
+        font-weight: 600;
+        border-top: 2px solid #30363d;
+    }
+    .report-table .balance-check {
+        background: #238636;
+        color: white;
+    }
+    .report-table .balance-check.unbalanced {
+        background: #da3633;
+        color: white;
+    }
+    .report-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        justify-content: flex-end;
+    }
+    .loading {
+        text-align: center;
+        padding: 2rem;
+        color: #8b949e;
+    }
+    .no-data {
+        text-align: center;
+        padding: 3rem;
+        color: #8b949e;
+        font-size: 1.1rem;
+    }
+    .account-type-group {
+        margin-top: 1.5rem;
+    }
+    .account-type-header {
+        background: #21262d;
+        color: #c9d1d9;
+        padding: 0.5rem 0.75rem;
+        font-weight: 600;
+        font-size: 0.95rem;
+        border: 1px solid #30363d;
+    }
+    .gl-transaction {
+        font-size: 0.9rem;
+    }
+    .gl-balance {
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>📊 Financial Reports</h2>
+    <p style="color: #8b949e; margin-bottom: 1.5rem;">Generate and view accounting reports</p>
+
+    <!-- Report Tabs -->
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('profit-loss')">Profit & Loss</button>
+        <button class="tab" onclick="switchTab('balance-sheet')">Balance Sheet</button>
+        <button class="tab" onclick="switchTab('trial-balance')">Trial Balance</button>
+        <button class="tab" onclick="switchTab('general-ledger')">General Ledger</button>
+        <button class="tab" onclick="switchTab('account-activity')">Account Activity</button>
+        <button class="tab" onclick="switchTab('ap-aging')">AP Aging</button>
+    </div>
+
+    <!-- Profit & Loss Tab -->
+    <div id="profit-loss" class="tab-content active">
+        <div class="filters">
+            <div class="form-group">
+                <label for="pl-start-date">Start Date</label>
+                <input type="date" id="pl-start-date" value="">
+            </div>
+            <div class="form-group">
+                <label for="pl-end-date">End Date</label>
+                <input type="date" id="pl-end-date" value="">
+            </div>
+            <div class="form-group">
+                <label for="pl-location">Location</label>
+                <select id="pl-location">
+                    <option value="">All Locations (Consolidated)</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="loadProfitLoss()">Generate Report</button>
+        </div>
+
+        <div class="report-actions" id="pl-actions" style="display: none;">
+            <button class="btn btn-primary" onclick="printReport()">🖨️ Print</button>
+            <button class="btn btn-primary" onclick="exportReport('profit-loss')">📥 Export CSV</button>
+        </div>
+
+        <div id="pl-loading" class="loading" style="display: none;">
+            Loading Profit & Loss Report...
+        </div>
+
+        <div id="pl-report" style="display: none;">
+            <!-- Report will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Balance Sheet Tab -->
+    <div id="balance-sheet" class="tab-content">
+        <div class="filters">
+            <div class="form-group">
+                <label for="bs-date">As of Date</label>
+                <input type="date" id="bs-date" value="">
+            </div>
+            <div class="form-group">
+                <label for="bs-location">Location</label>
+                <select id="bs-location">
+                    <option value="">All Locations (Consolidated)</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="loadBalanceSheet()">Generate Report</button>
+        </div>
+
+        <div class="report-actions" id="bs-actions" style="display: none;">
+            <button class="btn btn-primary" onclick="printReport()">🖨️ Print</button>
+            <button class="btn btn-primary" onclick="exportReport('balance-sheet')">📥 Export CSV</button>
+        </div>
+
+        <div id="bs-loading" class="loading" style="display: none;">
+            Loading Balance Sheet...
+        </div>
+
+        <div id="bs-report" style="display: none;">
+            <!-- Report will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Trial Balance Tab -->
+    <div id="trial-balance" class="tab-content">
+        <div class="filters">
+            <div class="form-group">
+                <label for="tb-date">As of Date</label>
+                <input type="date" id="tb-date" value="">
+            </div>
+            <div class="form-group">
+                <label for="tb-location">Location</label>
+                <select id="tb-location">
+                    <option value="">All Locations (Consolidated)</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="loadTrialBalance()">Generate Report</button>
+        </div>
+
+        <div class="report-actions" id="tb-actions" style="display: none;">
+            <button class="btn btn-primary" onclick="printReport()">🖨️ Print</button>
+            <button class="btn btn-primary" onclick="exportReport('trial-balance')">📥 Export CSV</button>
+        </div>
+
+        <div id="tb-loading" class="loading" style="display: none;">
+            Loading Trial Balance...
+        </div>
+
+        <div id="tb-report" style="display: none;">
+            <!-- Report will be loaded here -->
+        </div>
+    </div>
+
+    <!-- General Ledger Tab -->
+    <div id="general-ledger" class="tab-content">
+        <div class="filters">
+            <div class="form-group">
+                <label for="gl-account">Account</label>
+                <select id="gl-account" style="min-width: 250px;">
+                    <option value="">Select an account...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="gl-start-date">Start Date</label>
+                <input type="date" id="gl-start-date" value="">
+            </div>
+            <div class="form-group">
+                <label for="gl-end-date">End Date</label>
+                <input type="date" id="gl-end-date" value="">
+            </div>
+            <div class="form-group">
+                <label for="gl-location">Location</label>
+                <select id="gl-location">
+                    <option value="">All Locations (Consolidated)</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="loadGeneralLedger()">Generate Report</button>
+        </div>
+
+        <div class="report-actions" id="gl-actions" style="display: none;">
+            <button class="btn btn-primary" onclick="printReport()">🖨️ Print</button>
+            <button class="btn btn-primary" onclick="exportReport('general-ledger')">📥 Export CSV</button>
+        </div>
+
+        <div id="gl-loading" class="loading" style="display: none;">
+            Loading General Ledger...
+        </div>
+
+        <div id="gl-report" style="display: none;">
+            <!-- Report will be loaded here -->
+        </div>
+    </div>
+
+    <!-- Account Activity Tab -->
+    <div id="account-activity" class="tab-content">
+        <div class="filters">
+            <div class="form-group">
+                <label for="aa-start-date">Start Date</label>
+                <input type="date" id="aa-start-date" value="">
+            </div>
+            <div class="form-group">
+                <label for="aa-end-date">End Date</label>
+                <input type="date" id="aa-end-date" value="">
+            </div>
+            <button class="btn btn-primary" onclick="loadAccountActivity()">Generate Report</button>
+        </div>
+
+        <div class="report-actions" id="aa-actions" style="display: none;">
+            <button class="btn btn-primary" onclick="printReport()">🖨️ Print</button>
+            <button class="btn btn-primary" onclick="exportReport('account-activity')">📥 Export CSV</button>
+        </div>
+
+        <div id="aa-loading" class="loading" style="display: none;">
+            Loading Account Activity...
+        </div>
+
+        <div id="aa-report" style="display: none;">
+            <!-- Report will be loaded here -->
+        </div>
+    </div>
+
+    <!-- AP Aging Tab -->
+    <div id="ap-aging" class="tab-content">
+        <div class="filters">
+            <div class="form-group">
+                <label for="aging-date">As of Date</label>
+                <input type="date" id="aging-date" value="">
+            </div>
+            <div class="form-group">
+                <label for="aging-location">Location</label>
+                <select id="aging-location">
+                    <option value="">All Locations</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="loadAPAging()">Generate Report</button>
+        </div>
+
+        <div class="report-actions" id="aging-actions" style="display: none;">
+            <button class="btn btn-primary" onclick="printReport()">🖨️ Print</button>
+            <button class="btn btn-primary" onclick="exportReport('ap-aging')">📥 Export CSV</button>
+        </div>
+
+        <div id="aging-loading" class="loading" style="display: none;">
+            Loading AP Aging Report...
+        </div>
+
+        <div id="aging-report" style="display: none;">
+            <!-- Report will be loaded here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Set default dates to current month
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const todayStr = today.toISOString().split('T')[0];
+    const firstDayStr = firstDay.toISOString().split('T')[0];
+
+    document.getElementById('pl-start-date').value = firstDayStr;
+    document.getElementById('pl-end-date').value = todayStr;
+    document.getElementById('bs-date').value = todayStr;
+    document.getElementById('tb-date').value = todayStr;
+    document.getElementById('gl-start-date').value = firstDayStr;
+    document.getElementById('gl-end-date').value = todayStr;
+    document.getElementById('aa-start-date').value = firstDayStr;
+    document.getElementById('aa-end-date').value = todayStr;
+    document.getElementById('aging-date').value = todayStr;
+
+    // Load accounts for General Ledger dropdown
+    async function loadAccounts() {
+        try {
+            const response = await fetch('/accounting/api/accounts/');
+            const accounts = await response.json();
+
+            const select = document.getElementById('gl-account');
+            accounts.forEach(account => {
+                const option = document.createElement('option');
+                option.value = account.id;
+                option.textContent = `${account.account_number} - ${account.account_name}`;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading accounts:', error);
+        }
+    }
+
+    // Load areas/locations for all report dropdowns
+    let areas = [];
+    async function loadAreas() {
+        try {
+            const response = await fetch('/accounting/api/areas/');
+            if (response.ok) {
+                areas = await response.json();
+                areas.sort((a, b) => a.code.localeCompare(b.code));
+                populateLocationDropdowns();
+            }
+        } catch (error) {
+            console.error('Error loading areas:', error);
+        }
+    }
+
+    function populateLocationDropdowns() {
+        const dropdowns = ['pl-location', 'bs-location', 'tb-location', 'gl-location', 'aging-location'];
+        const options = areas.map(area =>
+            `<option value="${area.id}">${area.code} - ${area.name}</option>`
+        ).join('');
+
+        dropdowns.forEach(id => {
+            const select = document.getElementById(id);
+            if (select) {
+                select.innerHTML = '<option value="">All Locations (Consolidated)</option>' + options;
+            }
+        });
+    }
+
+    // Load data on page load
+    loadAccounts();
+    loadAreas();
+
+    // Tab switching
+    function switchTab(tabName) {
+        // Update tab buttons
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        event.target.classList.add('active');
+
+        // Update tab content
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.getElementById(tabName).classList.add('active');
+    }
+
+    // Load Profit & Loss
+    async function loadProfitLoss() {
+        const startDate = document.getElementById('pl-start-date').value;
+        const endDate = document.getElementById('pl-end-date').value;
+        const areaId = document.getElementById('pl-location').value;
+
+        if (!startDate || !endDate) {
+            alert('Please select start and end dates');
+            return;
+        }
+
+        document.getElementById('pl-loading').style.display = 'block';
+        document.getElementById('pl-report').style.display = 'none';
+        document.getElementById('pl-actions').style.display = 'none';
+
+        try {
+            let url = `/accounting/api/reports/profit-loss?start_date=${startDate}&end_date=${endDate}`;
+            if (areaId) {
+                url += `&area_id=${areaId}`;
+            }
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to load report');
+            }
+
+            window.currentPLData = data; // Store for export
+            renderProfitLoss(data);
+            document.getElementById('pl-actions').style.display = 'flex';
+        } catch (error) {
+            alert('Error loading Profit & Loss: ' + error.message);
+            console.error(error);
+        } finally {
+            document.getElementById('pl-loading').style.display = 'none';
+        }
+    }
+
+    function renderProfitLoss(data) {
+        const reportDiv = document.getElementById('pl-report');
+
+        let html = `
+            <div class="report-header">
+                <h2>Profit & Loss Statement (Income Statement)</h2>
+                <p class="subtitle">
+                    ${new Date(data.start_date).toLocaleDateString()} to ${new Date(data.end_date).toLocaleDateString()}
+                </p>
+            </div>
+        `;
+
+        html += '<table class="report-table">';
+
+        // Revenue Section
+        html += `<tr><td colspan="2" class="account-type-header">${data.revenue_section.section_name}</td></tr>`;
+        data.revenue_section.accounts.forEach(acc => {
+            html += `<tr>
+                <td><a href="/accounting/accounts/${acc.account_id}" style="color: #58a6ff; text-decoration: none;">${acc.account_number} - ${acc.account_name}</a></td>
+                <td class="number">$${parseFloat(acc.amount).toFixed(2)}</td>
+            </tr>`;
+        });
+        html += `<tr class="total-row">
+            <td><strong>Total Revenue</strong></td>
+            <td class="number"><strong>$${parseFloat(data.revenue_section.total).toFixed(2)}</strong></td>
+        </tr>`;
+
+        // COGS Section
+        if (data.cogs_section.accounts.length > 0) {
+            html += `<tr><td colspan="2" class="account-type-header">${data.cogs_section.section_name}</td></tr>`;
+            data.cogs_section.accounts.forEach(acc => {
+                html += `<tr>
+                    <td><a href="/accounting/accounts/${acc.account_id}" style="color: #58a6ff; text-decoration: none;">${acc.account_number} - ${acc.account_name}</a></td>
+                    <td class="number">$${parseFloat(acc.amount).toFixed(2)}</td>
+                </tr>`;
+            });
+            html += `<tr class="total-row">
+                <td><strong>Total COGS</strong></td>
+                <td class="number"><strong>$${parseFloat(data.cogs_section.total).toFixed(2)}</strong></td>
+            </tr>`;
+        }
+
+        // Gross Profit
+        html += `<tr class="total-row" style="background: #e8f4f8;">
+            <td><strong>GROSS PROFIT</strong></td>
+            <td class="number"><strong>$${parseFloat(data.gross_profit).toFixed(2)}</strong></td>
+        </tr>`;
+
+        // Expenses Section
+        if (data.expense_section.accounts.length > 0) {
+            html += `<tr><td colspan="2" class="account-type-header">${data.expense_section.section_name}</td></tr>`;
+            data.expense_section.accounts.forEach(acc => {
+                html += `<tr>
+                    <td><a href="/accounting/accounts/${acc.account_id}" style="color: #58a6ff; text-decoration: none;">${acc.account_number} - ${acc.account_name}</a></td>
+                    <td class="number">$${parseFloat(acc.amount).toFixed(2)}</td>
+                </tr>`;
+            });
+            html += `<tr class="total-row">
+                <td><strong>Total Expenses</strong></td>
+                <td class="number"><strong>$${parseFloat(data.expense_section.total).toFixed(2)}</strong></td>
+            </tr>`;
+        }
+
+        // Net Income
+        const netIncomeClass = parseFloat(data.net_income) >= 0 ? 'balance-check' : 'balance-check unbalanced';
+        html += `<tr class="${netIncomeClass}" style="font-size: 1.1rem;">
+            <td><strong>NET INCOME</strong></td>
+            <td class="number"><strong>$${parseFloat(data.net_income).toFixed(2)}</strong></td>
+        </tr>`;
+
+        html += '</table>';
+
+        reportDiv.innerHTML = html;
+        reportDiv.style.display = 'block';
+    }
+
+    // Load Balance Sheet
+    async function loadBalanceSheet() {
+        const asOfDate = document.getElementById('bs-date').value;
+        const areaId = document.getElementById('bs-location').value;
+
+        if (!asOfDate) {
+            alert('Please select a date');
+            return;
+        }
+
+        document.getElementById('bs-loading').style.display = 'block';
+        document.getElementById('bs-report').style.display = 'none';
+        document.getElementById('bs-actions').style.display = 'none';
+
+        try {
+            let url = `/accounting/api/reports/balance-sheet?as_of_date=${asOfDate}`;
+            if (areaId) {
+                url += `&area_id=${areaId}`;
+            }
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to load report');
+            }
+
+            window.currentBSData = data; // Store for export
+            renderBalanceSheet(data);
+            document.getElementById('bs-actions').style.display = 'flex';
+        } catch (error) {
+            alert('Error loading Balance Sheet: ' + error.message);
+            console.error(error);
+        } finally {
+            document.getElementById('bs-loading').style.display = 'none';
+        }
+    }
+
+    function renderBalanceSheet(data) {
+        const reportDiv = document.getElementById('bs-report');
+
+        let html = `
+            <div class="report-header">
+                <h2>Balance Sheet</h2>
+                <p class="subtitle">As of ${new Date(data.as_of_date).toLocaleDateString('en-US', {
+                    year: 'numeric', month: 'long', day: 'numeric'
+                })}</p>
+            </div>
+        `;
+
+        html += '<table class="report-table">';
+
+        // Assets Section
+        html += `<tr><td colspan="2" class="account-type-header">${data.asset_section.section_name}</td></tr>`;
+        if (data.asset_section.accounts.length === 0) {
+            html += `<tr><td colspan="2" style="text-align: center; color: #999;">No asset activity</td></tr>`;
+        } else {
+            data.asset_section.accounts.forEach(acc => {
+                const accountLink = acc.account_id > 0
+                    ? `<a href="/accounting/accounts/${acc.account_id}" style="color: #58a6ff; text-decoration: none;">${acc.account_number} - ${acc.account_name}</a>`
+                    : `${acc.account_number} - ${acc.account_name}`;
+                html += `<tr>
+                    <td>${accountLink}</td>
+                    <td class="number">$${parseFloat(acc.amount).toFixed(2)}</td>
+                </tr>`;
+            });
+        }
+        html += `<tr class="total-row">
+            <td><strong>Total Assets</strong></td>
+            <td class="number"><strong>$${parseFloat(data.total_assets).toFixed(2)}</strong></td>
+        </tr>`;
+
+        // Spacing
+        html += `<tr><td colspan="2" style="height: 1.5rem;"></td></tr>`;
+
+        // Liabilities Section
+        html += `<tr><td colspan="2" class="account-type-header">${data.liability_section.section_name}</td></tr>`;
+        if (data.liability_section.accounts.length === 0) {
+            html += `<tr><td colspan="2" style="text-align: center; color: #999;">No liability activity</td></tr>`;
+        } else {
+            data.liability_section.accounts.forEach(acc => {
+                const accountLink = acc.account_id > 0
+                    ? `<a href="/accounting/accounts/${acc.account_id}" style="color: #58a6ff; text-decoration: none;">${acc.account_number} - ${acc.account_name}</a>`
+                    : `${acc.account_number} - ${acc.account_name}`;
+                html += `<tr>
+                    <td>${accountLink}</td>
+                    <td class="number">$${parseFloat(acc.amount).toFixed(2)}</td>
+                </tr>`;
+            });
+        }
+        html += `<tr class="total-row">
+            <td><strong>Total Liabilities</strong></td>
+            <td class="number"><strong>$${parseFloat(data.liability_section.total).toFixed(2)}</strong></td>
+        </tr>`;
+
+        // Equity Section
+        html += `<tr><td colspan="2" class="account-type-header">${data.equity_section.section_name}</td></tr>`;
+        if (data.equity_section.accounts.length === 0) {
+            html += `<tr><td colspan="2" style="text-align: center; color: #999;">No equity activity</td></tr>`;
+        } else {
+            data.equity_section.accounts.forEach(acc => {
+                const accountLink = acc.account_id > 0
+                    ? `<a href="/accounting/accounts/${acc.account_id}" style="color: #58a6ff; text-decoration: none;">${acc.account_number} - ${acc.account_name}</a>`
+                    : `${acc.account_number} - ${acc.account_name}`;
+                html += `<tr>
+                    <td>${accountLink}</td>
+                    <td class="number">$${parseFloat(acc.amount).toFixed(2)}</td>
+                </tr>`;
+            });
+        }
+        html += `<tr class="total-row">
+            <td><strong>Total Equity</strong></td>
+            <td class="number"><strong>$${parseFloat(data.equity_section.total).toFixed(2)}</strong></td>
+        </tr>`;
+
+        // Total Liabilities & Equity
+        html += `<tr class="total-row" style="background: #e8f4f8;">
+            <td><strong>TOTAL LIABILITIES & EQUITY</strong></td>
+            <td class="number"><strong>$${parseFloat(data.total_liabilities_equity).toFixed(2)}</strong></td>
+        </tr>`;
+
+        // Balance Check
+        const balanceClass = data.is_balanced ? 'balance-check' : 'balance-check unbalanced';
+        html += `<tr class="${balanceClass}">
+            <td colspan="2" style="text-align: center;">
+                <strong>${data.is_balanced ? '✓ BALANCED (Assets = Liabilities + Equity)' : '✗ OUT OF BALANCE'}</strong>
+            </td>
+        </tr>`;
+
+        html += '</table>';
+
+        reportDiv.innerHTML = html;
+        reportDiv.style.display = 'block';
+    }
+
+    // Load Trial Balance
+    async function loadTrialBalance() {
+        const date = document.getElementById('tb-date').value;
+        const areaId = document.getElementById('tb-location').value;
+        if (!date) {
+            alert('Please select a date');
+            return;
+        }
+
+        document.getElementById('tb-loading').style.display = 'block';
+        document.getElementById('tb-report').style.display = 'none';
+        document.getElementById('tb-actions').style.display = 'none';
+
+        try {
+            let url = `/accounting/api/reports/trial-balance?as_of_date=${date}`;
+            if (areaId) {
+                url += `&area_id=${areaId}`;
+            }
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to load report');
+            }
+
+            window.currentTBData = data; // Store for export
+            renderTrialBalance(data);
+            document.getElementById('tb-actions').style.display = 'flex';
+        } catch (error) {
+            alert('Error loading Trial Balance: ' + error.message);
+            console.error(error);
+        } finally {
+            document.getElementById('tb-loading').style.display = 'none';
+        }
+    }
+
+    function renderTrialBalance(data) {
+        const reportDiv = document.getElementById('tb-report');
+
+        // Group accounts by type
+        const accountsByType = {};
+        data.lines.forEach(line => {
+            if (!accountsByType[line.account_type]) {
+                accountsByType[line.account_type] = [];
+            }
+            accountsByType[line.account_type].push(line);
+        });
+
+        let html = `
+            <div class="report-header">
+                <h2>Trial Balance</h2>
+                <p class="subtitle">As of ${new Date(data.as_of_date).toLocaleDateString('en-US', {
+                    year: 'numeric', month: 'long', day: 'numeric'
+                })}</p>
+            </div>
+        `;
+
+        if (data.lines.length === 0) {
+            html += '<div class="no-data">No account activity found for this date</div>';
+        } else {
+            html += '<table class="report-table">';
+            html += `
+                <thead>
+                    <tr>
+                        <th>Account Number</th>
+                        <th>Account Name</th>
+                        <th class="number">Debit Balance</th>
+                        <th class="number">Credit Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+
+            // Render accounts grouped by type
+            const accountTypeOrder = ['ASSET', 'LIABILITY', 'EQUITY', 'REVENUE', 'EXPENSE'];
+            accountTypeOrder.forEach(type => {
+                if (accountsByType[type]) {
+                    html += `
+                        <tr class="account-type-group">
+                            <td colspan="4" class="account-type-header">${type}</td>
+                        </tr>
+                    `;
+                    accountsByType[type].forEach(line => {
+                        html += `
+                            <tr>
+                                <td>${line.account_number}</td>
+                                <td><a href="/accounting/accounts/${line.account_id}" style="color: #58a6ff; text-decoration: none;">${line.account_name}</a></td>
+                                <td class="number">${parseFloat(line.debit_balance).toFixed(2)}</td>
+                                <td class="number">${parseFloat(line.credit_balance).toFixed(2)}</td>
+                            </tr>
+                        `;
+                    });
+                }
+            });
+
+            html += `
+                    <tr class="total-row">
+                        <td colspan="2"><strong>TOTALS</strong></td>
+                        <td class="number"><strong>${parseFloat(data.total_debits).toFixed(2)}</strong></td>
+                        <td class="number"><strong>${parseFloat(data.total_credits).toFixed(2)}</strong></td>
+                    </tr>
+                    <tr class="${data.is_balanced ? 'balance-check' : 'balance-check unbalanced'}">
+                        <td colspan="2"><strong>DIFFERENCE</strong></td>
+                        <td colspan="2" class="number"><strong>${parseFloat(data.difference).toFixed(2)}</strong></td>
+                    </tr>
+                    <tr class="${data.is_balanced ? 'balance-check' : 'balance-check unbalanced'}">
+                        <td colspan="4" style="text-align: center;">
+                            <strong>${data.is_balanced ? '✓ IN BALANCE' : '✗ OUT OF BALANCE'}</strong>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            `;
+        }
+
+        reportDiv.innerHTML = html;
+        reportDiv.style.display = 'block';
+    }
+
+    // Load General Ledger
+    async function loadGeneralLedger() {
+        const accountId = document.getElementById('gl-account').value;
+        const startDate = document.getElementById('gl-start-date').value;
+        const endDate = document.getElementById('gl-end-date').value;
+        const areaId = document.getElementById('gl-location').value;
+
+        if (!accountId || !startDate || !endDate) {
+            alert('Please select an account and date range');
+            return;
+        }
+
+        document.getElementById('gl-loading').style.display = 'block';
+        document.getElementById('gl-report').style.display = 'none';
+        document.getElementById('gl-actions').style.display = 'none';
+
+        try {
+            let url = `/accounting/api/reports/general-ledger/${accountId}?start_date=${startDate}&end_date=${endDate}`;
+            if (areaId) {
+                url += `&area_id=${areaId}`;
+            }
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to load report');
+            }
+
+            renderGeneralLedger(data);
+            document.getElementById('gl-actions').style.display = 'flex';
+        } catch (error) {
+            alert('Error loading General Ledger: ' + error.message);
+            console.error(error);
+        } finally {
+            document.getElementById('gl-loading').style.display = 'none';
+        }
+    }
+
+    function renderGeneralLedger(data) {
+        const reportDiv = document.getElementById('gl-report');
+
+        let html = `
+            <div class="report-header">
+                <h2>General Ledger</h2>
+                <p class="subtitle">
+                    Account: ${data.account_number} - ${data.account_name} (${data.account_type})<br>
+                    Period: ${new Date(data.start_date).toLocaleDateString()} to ${new Date(data.end_date).toLocaleDateString()}
+                </p>
+            </div>
+        `;
+
+        html += `
+            <div style="margin-bottom: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 4px;">
+                <strong>Beginning Balance:</strong> $${parseFloat(data.beginning_balance).toFixed(2)}
+            </div>
+        `;
+
+        if (data.transactions.length === 0) {
+            html += '<div class="no-data">No transactions found for this period</div>';
+        } else {
+            html += '<table class="report-table">';
+            html += `
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Entry Number</th>
+                        <th>Description</th>
+                        <th class="number">Debit</th>
+                        <th class="number">Credit</th>
+                        <th class="number">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+
+            data.transactions.forEach(txn => {
+                html += `
+                    <tr class="gl-transaction">
+                        <td>${new Date(txn.entry_date).toLocaleDateString()}</td>
+                        <td>${txn.entry_number}</td>
+                        <td>${txn.description}</td>
+                        <td class="number">${parseFloat(txn.debit_amount).toFixed(2)}</td>
+                        <td class="number">${parseFloat(txn.credit_amount).toFixed(2)}</td>
+                        <td class="number gl-balance">${parseFloat(txn.balance).toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    <tr class="total-row">
+                        <td colspan="3"><strong>TOTALS</strong></td>
+                        <td class="number"><strong>${parseFloat(data.total_debits).toFixed(2)}</strong></td>
+                        <td class="number"><strong>${parseFloat(data.total_credits).toFixed(2)}</strong></td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+        `;
+        }
+
+        html += `
+            <div style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 4px; font-weight: 600;">
+                <strong>Ending Balance:</strong> $${parseFloat(data.ending_balance).toFixed(2)}
+            </div>
+        `;
+
+        reportDiv.innerHTML = html;
+        reportDiv.style.display = 'block';
+    }
+
+    // Load Account Activity
+    async function loadAccountActivity() {
+        const startDate = document.getElementById('aa-start-date').value;
+        const endDate = document.getElementById('aa-end-date').value;
+
+        if (!startDate || !endDate) {
+            alert('Please select a date range');
+            return;
+        }
+
+        document.getElementById('aa-loading').style.display = 'block';
+        document.getElementById('aa-report').style.display = 'none';
+        document.getElementById('aa-actions').style.display = 'none';
+
+        try {
+            const response = await fetch(
+                `/accounting/api/reports/account-activity-summary?start_date=${startDate}&end_date=${endDate}`
+            );
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.detail || 'Failed to load report');
+            }
+
+            renderAccountActivity(data);
+            document.getElementById('aa-actions').style.display = 'flex';
+        } catch (error) {
+            alert('Error loading Account Activity: ' + error.message);
+            console.error(error);
+        } finally {
+            document.getElementById('aa-loading').style.display = 'none';
+        }
+    }
+
+    function renderAccountActivity(data) {
+        const reportDiv = document.getElementById('aa-report');
+
+        let html = `
+            <div class="report-header">
+                <h2>Account Activity Summary</h2>
+                <p class="subtitle">
+                    Period: ${new Date(data.start_date).toLocaleDateString()} to ${new Date(data.end_date).toLocaleDateString()}
+                </p>
+            </div>
+        `;
+
+        if (data.accounts.length === 0) {
+            html += '<div class="no-data">No account activity found for this period</div>';
+        } else {
+            html += '<table class="report-table">';
+            html += `
+                <thead>
+                    <tr>
+                        <th>Account Number</th>
+                        <th>Account Name</th>
+                        <th>Type</th>
+                        <th class="number">Transactions</th>
+                        <th class="number">Total Debits</th>
+                        <th class="number">Total Credits</th>
+                        <th class="number">Net Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+
+            data.accounts.forEach(account => {
+                html += `
+                    <tr>
+                        <td>${account.account_number}</td>
+                        <td>${account.account_name}</td>
+                        <td>${account.account_type}</td>
+                        <td class="number">${account.transaction_count}</td>
+                        <td class="number">${account.total_debits.toFixed(2)}</td>
+                        <td class="number">${account.total_credits.toFixed(2)}</td>
+                        <td class="number">${account.net_change.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+            html += '</tbody></table>';
+        }
+
+        reportDiv.innerHTML = html;
+        reportDiv.style.display = 'block';
+    }
+
+    // Load AP Aging Report
+    async function loadAPAging() {
+        const asOfDate = document.getElementById('aging-date').value;
+        const areaId = document.getElementById('aging-location').value;
+
+        if (!asOfDate) {
+            alert('Please select an as-of date');
+            return;
+        }
+
+        document.getElementById('aging-loading').style.display = 'block';
+        document.getElementById('aging-report').style.display = 'none';
+        document.getElementById('aging-actions').style.display = 'none';
+
+        try {
+            let url = `/accounting/api/vendor-bills/aging-report?as_of_date=${asOfDate}`;
+            if (areaId) {
+                url += `&area_id=${areaId}`;
+            }
+
+            console.log('Fetching aging report from:', url);
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('API Error Response:', response.status, errorText);
+                try {
+                    const errorData = JSON.parse(errorText);
+                    throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+                } catch (parseError) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            }
+
+            const data = await response.json();
+            console.log('Aging report data:', data);
+
+            renderAPAging(data);
+            document.getElementById('aging-actions').style.display = 'flex';
+        } catch (error) {
+            console.error('Error loading AP Aging Report:', error);
+            alert('Error loading AP Aging Report: ' + (error.message || String(error)));
+        } finally {
+            document.getElementById('aging-loading').style.display = 'none';
+        }
+    }
+
+    function renderAPAging(data) {
+        const reportDiv = document.getElementById('aging-report');
+
+        let html = `
+            <div class="report-header">
+                <h2>Accounts Payable Aging Report</h2>
+                <p class="subtitle">
+                    As of ${new Date(data.as_of_date).toLocaleDateString()}
+                    ${data.area_name ? ` | Location: ${data.area_name}` : ' | All Locations'}
+                </p>
+            </div>
+        `;
+
+        if (data.vendors.length === 0) {
+            html += '<div class="no-data">No outstanding payables found</div>';
+        } else {
+            html += '<table class="report-table">';
+            html += `
+                <thead>
+                    <tr>
+                        <th>Vendor</th>
+                        <th class="number">Current<br>(0-30 days)</th>
+                        <th class="number">31-60 days</th>
+                        <th class="number">61-90 days</th>
+                        <th class="number">Over 90 days</th>
+                        <th class="number">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+            `;
+
+            data.vendors.forEach(vendor => {
+                html += `
+                    <tr>
+                        <td>
+                            ${vendor.vendor_name}
+                            ${vendor.vendor_id ? `<br><span style="font-size: 0.85rem; color: #8b949e;">${vendor.vendor_id}</span>` : ''}
+                        </td>
+                        <td class="number">${formatCurrency(vendor.current)}</td>
+                        <td class="number">${formatCurrency(vendor.days_31_60)}</td>
+                        <td class="number">${formatCurrency(vendor.days_61_90)}</td>
+                        <td class="number">${formatCurrency(vendor.over_90_days)}</td>
+                        <td class="number"><strong>${formatCurrency(vendor.total)}</strong></td>
+                    </tr>
+                `;
+            });
+
+            // Add totals row
+            html += `
+                <tr class="total-row">
+                    <td><strong>TOTAL ACCOUNTS PAYABLE</strong></td>
+                    <td class="number"><strong>${formatCurrency(data.totals.current)}</strong></td>
+                    <td class="number"><strong>${formatCurrency(data.totals.days_31_60)}</strong></td>
+                    <td class="number"><strong>${formatCurrency(data.totals.days_61_90)}</strong></td>
+                    <td class="number"><strong>${formatCurrency(data.totals.over_90_days)}</strong></td>
+                    <td class="number"><strong>${formatCurrency(data.totals.total)}</strong></td>
+                </tr>
+            `;
+
+            html += '</tbody></table>';
+
+            // Add summary metrics
+            if (data.totals.total > 0) {
+                const currentPercent = (parseFloat(data.totals.current) / parseFloat(data.totals.total) * 100).toFixed(1);
+                const aging3160Percent = (parseFloat(data.totals.days_31_60) / parseFloat(data.totals.total) * 100).toFixed(1);
+                const aging6190Percent = (parseFloat(data.totals.days_61_90) / parseFloat(data.totals.total) * 100).toFixed(1);
+                const aging90PlusPercent = (parseFloat(data.totals.over_90_days) / parseFloat(data.totals.total) * 100).toFixed(1);
+
+                html += `
+                    <div style="margin-top: 2rem; padding: 1rem; background: #161b22; border-radius: 6px; border: 1px solid #30363d;">
+                        <h3 style="color: #c9d1d9; margin-bottom: 1rem;">Aging Analysis</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                            <div>
+                                <div style="color: #8b949e; font-size: 0.85rem;">Current (0-30 days)</div>
+                                <div style="color: #2ea043; font-size: 1.25rem; font-weight: 600;">${currentPercent}%</div>
+                            </div>
+                            <div>
+                                <div style="color: #8b949e; font-size: 0.85rem;">31-60 days</div>
+                                <div style="color: #9e6a03; font-size: 1.25rem; font-weight: 600;">${aging3160Percent}%</div>
+                            </div>
+                            <div>
+                                <div style="color: #8b949e; font-size: 0.85rem;">61-90 days</div>
+                                <div style="color: #f85149; font-size: 1.25rem; font-weight: 600;">${aging6190Percent}%</div>
+                            </div>
+                            <div>
+                                <div style="color: #8b949e; font-size: 0.85rem;">Over 90 days</div>
+                                <div style="color: #da3633; font-size: 1.25rem; font-weight: 600;">${aging90PlusPercent}%</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        reportDiv.innerHTML = html;
+        reportDiv.style.display = 'block';
+    }
+
+    function formatCurrency(value) {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(value);
+    }
+
+    // Print report
+    function printReport() {
+        window.print();
+    }
+
+    // Export to CSV
+    function exportReport(reportType) {
+        const reportData = getCurrentReportData(reportType);
+        if (!reportData) {
+            alert('Please generate the report first before exporting');
+            return;
+        }
+
+        const csv = convertToCSV(reportType, reportData);
+        const filename = `${reportType}_${new Date().toISOString().split('T')[0]}.csv`;
+
+        // Create download link
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.download !== undefined) {
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    }
+
+    function getCurrentReportData(reportType) {
+        // Get the currently displayed report data from global scope
+        switch(reportType) {
+            case 'profit-loss':
+                return window.currentPLData;
+            case 'balance-sheet':
+                return window.currentBSData;
+            case 'trial-balance':
+                return window.currentTBData;
+            case 'general-ledger':
+                return window.currentGLData;
+            case 'account-activity':
+                return window.currentAAData;
+            default:
+                return null;
+        }
+    }
+
+    function convertToCSV(reportType, data) {
+        let csv = '';
+        const date = new Date().toLocaleDateString();
+
+        switch(reportType) {
+            case 'profit-loss':
+                csv = 'SW Hospitality Group - Accounting System\n';
+                csv += 'Profit & Loss Statement (Income Statement)\n';
+                csv += `Period: ${data.start_date} to ${data.end_date}\n`;
+                csv += `Generated: ${date}\n\n`;
+
+                // Revenue section
+                csv += 'REVENUE\n';
+                csv += 'Account Number,Account Name,Amount\n';
+                data.revenue_section.accounts.forEach(acct => {
+                    csv += `"${acct.account_number}","${acct.account_name}","${formatCurrency(acct.balance)}"\n`;
+                });
+                csv += `"","Total Revenue","${formatCurrency(data.total_revenue)}"\n\n`;
+
+                // COGS section
+                csv += 'COST OF GOODS SOLD\n';
+                csv += 'Account Number,Account Name,Amount\n';
+                data.cogs_section.accounts.forEach(acct => {
+                    csv += `"${acct.account_number}","${acct.account_name}","${formatCurrency(acct.balance)}"\n`;
+                });
+                csv += `"","Total COGS","${formatCurrency(data.total_cogs)}"\n\n`;
+
+                csv += `"","GROSS PROFIT","${formatCurrency(data.gross_profit)}"\n\n`;
+
+                // Expenses section
+                csv += 'EXPENSES\n';
+                csv += 'Account Number,Account Name,Amount\n';
+                data.expenses_section.accounts.forEach(acct => {
+                    csv += `"${acct.account_number}","${acct.account_name}","${formatCurrency(acct.balance)}"\n`;
+                });
+                csv += `"","Total Expenses","${formatCurrency(data.total_expenses)}"\n\n`;
+
+                csv += `"","NET INCOME","${formatCurrency(data.net_income)}"\n`;
+                break;
+
+            case 'balance-sheet':
+                csv = 'SW Hospitality Group - Accounting System\n';
+                csv += 'Balance Sheet\n';
+                csv += `As of: ${data.as_of_date}\n`;
+                csv += `Generated: ${date}\n\n`;
+
+                // Assets
+                csv += 'ASSETS\n';
+                csv += 'Account Number,Account Name,Amount\n';
+                data.assets_section.accounts.forEach(acct => {
+                    csv += `"${acct.account_number}","${acct.account_name}","${formatCurrency(acct.balance)}"\n`;
+                });
+                csv += `"","Total Assets","${formatCurrency(data.total_assets)}"\n\n`;
+
+                // Liabilities
+                csv += 'LIABILITIES\n';
+                csv += 'Account Number,Account Name,Amount\n';
+                data.liabilities_section.accounts.forEach(acct => {
+                    csv += `"${acct.account_number}","${acct.account_name}","${formatCurrency(acct.balance)}"\n`;
+                });
+                csv += `"","Total Liabilities","${formatCurrency(data.total_liabilities)}"\n\n`;
+
+                // Equity
+                csv += 'EQUITY\n';
+                csv += 'Account Number,Account Name,Amount\n';
+                data.equity_section.accounts.forEach(acct => {
+                    csv += `"${acct.account_number}","${acct.account_name}","${formatCurrency(acct.balance)}"\n`;
+                });
+                csv += `"","YTD Net Income","${formatCurrency(data.ytd_net_income)}"\n`;
+                csv += `"","Total Equity","${formatCurrency(data.total_equity)}"\n\n`;
+
+                csv += `"","TOTAL LIABILITIES + EQUITY","${formatCurrency(data.total_liabilities + data.total_equity)}"\n`;
+                break;
+
+            case 'trial-balance':
+                csv = 'SW Hospitality Group - Accounting System\n';
+                csv += 'Trial Balance\n';
+                csv += `As of: ${data.as_of_date}\n`;
+                csv += `Generated: ${date}\n\n`;
+                csv += 'Account Number,Account Name,Account Type,Debit Balance,Credit Balance\n';
+
+                data.lines.forEach(line => {
+                    csv += `"${line.account_number}","${line.account_name}","${line.account_type}",`;
+                    csv += `"${formatCurrency(line.debit_balance)}","${formatCurrency(line.credit_balance)}"\n`;
+                });
+
+                csv += '\n';
+                csv += `"","","TOTALS","${formatCurrency(data.total_debits)}","${formatCurrency(data.total_credits)}"\n`;
+                csv += `"","","Difference","${formatCurrency(data.difference)}",""\n`;
+                csv += `"","","Status","${data.is_balanced ? 'BALANCED ✓' : 'UNBALANCED ✗'}",""\n`;
+                break;
+
+            case 'general-ledger':
+                csv = 'SW Hospitality Group - Accounting System\n';
+                csv += 'General Ledger\n';
+                csv += `Account: ${data.account_number} - ${data.account_name}\n`;
+                csv += `Period: ${data.start_date} to ${data.end_date}\n`;
+                csv += `Generated: ${date}\n\n`;
+                csv += `Beginning Balance: ${formatCurrency(data.beginning_balance)}\n\n`;
+                csv += 'Date,Entry Number,Description,Debit,Credit,Balance\n';
+
+                data.transactions.forEach(txn => {
+                    csv += `"${txn.entry_date}","${txn.entry_number}","${txn.description}",`;
+                    csv += `"${formatCurrency(txn.debit_amount)}","${formatCurrency(txn.credit_amount)}","${formatCurrency(txn.balance)}"\n`;
+                });
+
+                csv += '\n';
+                csv += `"","","Total Debits","${formatCurrency(data.total_debits)}","",""\n`;
+                csv += `"","","Total Credits","","${formatCurrency(data.total_credits)}",""\n`;
+                csv += `"","","Ending Balance","","","${formatCurrency(data.ending_balance)}"\n`;
+                break;
+        }
+
+        return csv;
+    }
+
+    function formatCurrency(amount) {
+        return '$' + Number(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+    }
+
+    // Initialize
+    loadAccounts();
+</script>
+
+<style media="print">
+    .header, .nav, .filters, .report-actions, .tabs {
+        display: none !important;
+    }
+    .card {
+        box-shadow: none;
+        padding: 0;
+    }
+    body {
+        background: white;
+    }
+    .report-table {
+        page-break-inside: avoid;
+    }
+</style>
+{% endblock %}

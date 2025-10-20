@@ -1,0 +1,1315 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - Restaurant Inventory{% endblock %}
+
+{% block extra_css %}
+<style>
+@media print {
+    /* Hide navigation, filters, and buttons when printing */
+    nav, .navbar, .card.mb-4, .btn, .nav-tabs, .no-print {
+        display: none !important;
+    }
+
+    /* Show all tab content when printing */
+    .tab-pane {
+        display: block !important;
+        opacity: 1 !important;
+    }
+
+    /* Only show the active tab content */
+    .tab-pane:not(.active) {
+        display: none !important;
+    }
+
+    /* Better table styling for print */
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 10pt;
+    }
+
+    th, td {
+        border: 1px solid #ddd;
+        padding: 6px;
+        text-align: left;
+    }
+
+    th {
+        background-color: #f8f9fa !important;
+        font-weight: bold;
+    }
+
+    /* Preserve table row colors */
+    .table-danger {
+        background-color: #f8d7da !important;
+    }
+
+    .table-success {
+        background-color: #d1e7dd !important;
+    }
+
+    /* Page breaks */
+    .card {
+        page-break-inside: avoid;
+    }
+
+    /* Header for print */
+    .print-header {
+        display: block !important;
+        text-align: center;
+        margin-bottom: 20px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #000;
+    }
+
+    /* Summary cards in print */
+    .row .card {
+        border: 1px solid #ddd;
+        margin-bottom: 10px;
+        padding: 10px;
+    }
+
+    /* Footer for print */
+    @page {
+        margin: 1cm;
+    }
+}
+
+.print-header {
+    display: none;
+}
+
+@media screen {
+    .print-only {
+        display: none;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Report Type Tabs -->
+<ul class="nav nav-tabs mb-3" id="reportTabs" role="tablist" style="font-size: 14px;">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="variance-tab" data-bs-toggle="tab" data-bs-target="#variance" type="button" role="tab">
+            <i class="bi bi-graph-up-arrow"></i> Variance Report
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="usage-tab" data-bs-toggle="tab" data-bs-target="#usage" type="button" role="tab">
+            <i class="bi bi-graph-down"></i> Usage Report
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="cost-tab" data-bs-toggle="tab" data-bs-target="#cost" type="button" role="tab">
+            <i class="bi bi-currency-dollar"></i> Cost Report
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="cost-variance-tab" data-bs-toggle="tab" data-bs-target="#costVariance" type="button" role="tab">
+            <i class="bi bi-graph-up"></i> Cost Variance
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="vendor-spend-tab" data-bs-toggle="tab" data-bs-target="#vendorSpend" type="button" role="tab">
+            <i class="bi bi-shop"></i> Vendor Spend
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="transfers-tab" data-bs-toggle="tab" data-bs-target="#transfersReport" type="button" role="tab">
+            <i class="bi bi-arrow-left-right"></i> Transfers
+        </button>
+    </li>
+</ul>
+
+<!-- Filters -->
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="row g-2">
+            <div class="col-md-3">
+                <label class="form-label" style="font-size: 13px; margin-bottom: 4px;">Location</label>
+                <select class="form-select form-select-sm" id="locationFilter" onchange="filterCountSessions()">
+                    <option value="">All Locations</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" style="font-size: 13px; margin-bottom: 4px;">Storage Area</label>
+                <select class="form-select form-select-sm" id="storageAreaFilter" onchange="loadReportData()">
+                    <option value="">All Storage Areas</option>
+                </select>
+            </div>
+            <div class="col-md-3" id="varianceBeginFilter" style="display: none;">
+                <label class="form-label" style="font-size: 13px; margin-bottom: 4px;">Beginning Count</label>
+                <select class="form-select form-select-sm" id="varianceBeginSelect" onchange="loadReportData()">
+                    <option value="">Select Beginning Count</option>
+                </select>
+            </div>
+            <div class="col-md-3" id="varianceEndFilter" style="display: none;">
+                <label class="form-label" style="font-size: 13px; margin-bottom: 4px;">Ending Count</label>
+                <select class="form-select form-select-sm" id="varianceEndSelect" onchange="loadReportData()">
+                    <option value="">Select Ending Count</option>
+                </select>
+            </div>
+            <div class="col-md-3" id="usageBeginFilter" style="display: none;">
+                <label class="form-label" style="font-size: 13px; margin-bottom: 4px;">Beginning Count</label>
+                <select class="form-select form-select-sm" id="beginCountSelect" onchange="loadReportData()">
+                    <option value="">Select Beginning Count</option>
+                </select>
+            </div>
+            <div class="col-md-3" id="usageEndFilter" style="display: none;">
+                <label class="form-label" style="font-size: 13px; margin-bottom: 4px;">Ending Count</label>
+                <select class="form-select form-select-sm" id="endCountSelect" onchange="loadReportData()">
+                    <option value="">Select Ending Count</option>
+                </select>
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+                <button class="btn btn-success btn-sm w-100" onclick="exportReport()" title="Export to CSV">
+                    <i class="bi bi-file-earmark-spreadsheet"></i>
+                </button>
+            </div>
+            <div class="col-md-1 d-flex align-items-end">
+                <button class="btn btn-danger btn-sm w-100" onclick="exportToPDF()" title="Export to PDF">
+                    <i class="bi bi-file-earmark-pdf"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tab Content -->
+<div class="tab-content" id="reportTabContent">
+
+    <!-- Variance Report -->
+    <div class="tab-pane fade show active" id="variance" role="tabpanel">
+        <div class="card">
+            <div class="card-header" style="background-color: #2c3e50; color: white;">
+                <h5 class="mb-0">Variance Report - Expected vs Actual</h5>
+            </div>
+            <div class="card-body">
+                <div id="varianceReport">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Usage Report -->
+    <div class="tab-pane fade" id="usage" role="tabpanel">
+        <div class="card">
+            <div class="card-header" style="background-color: #2c3e50; color: white;">
+                <h5 class="mb-0">Usage Report - Consumption Analysis</h5>
+            </div>
+            <div class="card-body">
+                <div id="usageReport">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cost Report -->
+    <div class="tab-pane fade" id="cost" role="tabpanel">
+        <div class="card">
+            <div class="card-header" style="background-color: #2c3e50; color: white;">
+                <h5 class="mb-0">Cost Report - By Storage Area</h5>
+            </div>
+            <div class="card-body">
+                <div id="costReport">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cost Variance Tab -->
+    <div class="tab-pane fade" id="costVariance" role="tabpanel">
+        <div class="card">
+            <div class="card-header" style="background-color: #2c3e50; color: white;">
+                <h5 class="mb-0">Cost Variance Tracker</h5>
+                <small style="color: #ecf0f1;">Tracks cost changes over time to inform menu pricing decisions</small>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Start Date</label>
+                        <input type="date" class="form-control form-control-sm" id="cvStartDate">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">End Date</label>
+                        <input type="date" class="form-control form-control-sm" id="cvEndDate">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Min % Change</label>
+                        <input type="number" class="form-control form-control-sm" id="cvMinChange" placeholder="e.g., 10">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-primary btn-sm w-100" onclick="loadCostVariance()">
+                            <i class="bi bi-search"></i> Load Report
+                        </button>
+                    </div>
+                </div>
+                <div id="costVarianceReport">
+                    <p class="text-muted">Select date range and click Load Report</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Vendor Spend Tab -->
+    <div class="tab-pane fade" id="vendorSpend" role="tabpanel">
+        <div class="card">
+            <div class="card-header" style="background-color: #2c3e50; color: white;">
+                <h5 class="mb-0">Spend by Vendor</h5>
+                <small style="color: #ecf0f1;">Amount spent by vendor within selected date range</small>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Start Date</label>
+                        <input type="date" class="form-control form-control-sm" id="vsStartDate">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">End Date</label>
+                        <input type="date" class="form-control form-control-sm" id="vsEndDate">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-primary btn-sm w-100" onclick="loadVendorSpend()">
+                            <i class="bi bi-search"></i> Load Report
+                        </button>
+                    </div>
+                </div>
+                <div id="vendorSpendReport">
+                    <p class="text-muted">Select date range and click Load Report</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transfers Report Tab -->
+    <div class="tab-pane fade" id="transfersReport" role="tabpanel">
+        <div class="card">
+            <div class="card-header" style="background-color: #2c3e50; color: white;">
+                <h5 class="mb-0">Transfer History</h5>
+                <small style="color: #ecf0f1;">Inventory transfers between locations</small>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Start Date</label>
+                        <input type="date" class="form-control form-control-sm" id="trStartDate">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">End Date</label>
+                        <input type="date" class="form-control form-control-sm" id="trEndDate">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">From Location</label>
+                        <select class="form-select form-select-sm" id="trFromLocation">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">To Location</label>
+                        <select class="form-select form-select-sm" id="trToLocation">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">&nbsp;</label>
+                        <button class="btn btn-primary btn-sm w-100" onclick="loadTransfersReport()">
+                            <i class="bi bi-search"></i> Load Report
+                        </button>
+                    </div>
+                </div>
+                <div id="transfersReportContent">
+                    <p class="text-muted">Select date range and click Load Report</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+let locations = [];
+let storageAreas = [];
+let countSessions = [];
+let currentReportData = null;
+let usageReportData = null;
+let costReportData = null;
+
+async function init() {
+    try {
+        const results = await Promise.all([
+            apiRequest('api/locations/'),
+            apiRequest('api/storage-areas/'),
+            apiRequest('api/count-sessions/')
+        ]);
+
+        // Check if any request returned null (redirecting to login)
+        if (results.some(r => r === null)) return;
+
+        [locations, storageAreas, countSessions] = results;
+
+        // Populate location filter
+        const locationFilter = document.getElementById('locationFilter');
+        locations.forEach(loc => {
+            locationFilter.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+        });
+
+        // Populate storage area filter
+        const storageFilter = document.getElementById('storageAreaFilter');
+        storageAreas.forEach(area => {
+            storageFilter.innerHTML += `<option value="${area.id}">${area.name}</option>`;
+        });
+
+        // Populate count session filters (only approved sessions)
+        populateCountSessionFilters();
+
+        // Populate transfer report location filters
+        populateTransferLocationFilters();
+
+        // Setup tab change listener to show/hide appropriate filters
+        document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(tab => {
+            tab.addEventListener('shown.bs.tab', function(event) {
+                updateFilterVisibility();
+                loadReportData();
+            });
+        });
+
+        // Show initial filters
+        updateFilterVisibility();
+
+        // Load initial report
+        await loadReportData();
+    } catch (error) {
+        console.error('Error loading data:', error);
+        showAlert('Error loading report data: ' + error.message, 'danger');
+    }
+}
+
+function updateFilterVisibility() {
+    const activeTab = document.querySelector('.nav-link.active').id;
+
+    // Hide all dynamic filters first
+    document.getElementById('varianceBeginFilter').style.display = 'none';
+    document.getElementById('varianceEndFilter').style.display = 'none';
+    document.getElementById('usageBeginFilter').style.display = 'none';
+    document.getElementById('usageEndFilter').style.display = 'none';
+
+    // Show appropriate filters based on active tab
+    if (activeTab === 'variance-tab') {
+        document.getElementById('varianceBeginFilter').style.display = 'block';
+        document.getElementById('varianceEndFilter').style.display = 'block';
+    } else if (activeTab === 'usage-tab') {
+        document.getElementById('usageBeginFilter').style.display = 'block';
+        document.getElementById('usageEndFilter').style.display = 'block';
+    }
+}
+
+function populateCountSessionFilters(locationId = null) {
+    // Filter sessions by location if specified and only approved
+    let filteredSessions = countSessions.filter(s => s.status === 'APPROVED');
+    if (locationId) {
+        filteredSessions = filteredSessions.filter(s => s.location_id === parseInt(locationId));
+    }
+
+    // Sort by the count date (extracted from name) ascending (oldest first)
+    filteredSessions.sort((a, b) => {
+        // Extract date from name (format: "Location - YYYY-MM-DD")
+        const dateA = a.name.split(' - ').pop();
+        const dateB = b.name.split(' - ').pop();
+        return new Date(dateA) - new Date(dateB);
+    });
+
+    // Populate variance beginning count select
+    const varianceBeginSelect = document.getElementById('varianceBeginSelect');
+    varianceBeginSelect.innerHTML = '<option value="">Select Beginning Count</option>';
+    filteredSessions.forEach(session => {
+        varianceBeginSelect.innerHTML += `<option value="${session.id}">${session.name}</option>`;
+    });
+
+    // Populate variance ending count select
+    const varianceEndSelect = document.getElementById('varianceEndSelect');
+    varianceEndSelect.innerHTML = '<option value="">Select Ending Count</option>';
+    filteredSessions.forEach(session => {
+        varianceEndSelect.innerHTML += `<option value="${session.id}">${session.name}</option>`;
+    });
+
+    // Populate usage beginning count select
+    const beginCountSelect = document.getElementById('beginCountSelect');
+    beginCountSelect.innerHTML = '<option value="">Select Beginning Count</option>';
+    filteredSessions.forEach(session => {
+        beginCountSelect.innerHTML += `<option value="${session.id}">${session.name}</option>`;
+    });
+
+    // Populate usage ending count select
+    const endCountSelect = document.getElementById('endCountSelect');
+    endCountSelect.innerHTML = '<option value="">Select Ending Count</option>';
+    filteredSessions.forEach(session => {
+        endCountSelect.innerHTML += `<option value="${session.id}">${session.name}</option>`;
+    });
+}
+
+function filterCountSessions() {
+    const locationId = document.getElementById('locationFilter').value;
+    populateCountSessionFilters(locationId);
+    loadReportData();
+}
+
+async function loadReportData() {
+    const locationId = document.getElementById('locationFilter').value;
+    const storageAreaId = document.getElementById('storageAreaFilter').value;
+    const varianceBeginId = document.getElementById('varianceBeginSelect').value;
+    const varianceEndId = document.getElementById('varianceEndSelect').value;
+    const usageBeginId = document.getElementById('beginCountSelect').value;
+    const usageEndId = document.getElementById('endCountSelect').value;
+
+    try {
+        // Build params for variance report
+        let varianceParams = new URLSearchParams();
+        if (locationId) varianceParams.append('location_id', locationId);
+        if (storageAreaId) varianceParams.append('storage_area_id', storageAreaId);
+        if (varianceBeginId) varianceParams.append('begin_session_id', varianceBeginId);
+        if (varianceEndId) varianceParams.append('end_session_id', varianceEndId);
+
+        // Build params for usage report
+        let usageParams = new URLSearchParams();
+        if (locationId) usageParams.append('location_id', locationId);
+        if (storageAreaId) usageParams.append('storage_area_id', storageAreaId);
+        if (usageBeginId) usageParams.append('begin_session_id', usageBeginId);
+        if (usageEndId) usageParams.append('end_session_id', usageEndId);
+
+        // Build params for cost report (doesn't use storage_area_id)
+        let costParams = new URLSearchParams();
+        if (locationId) costParams.append('location_id', locationId);
+
+        // Load all report data from API
+        const results = await Promise.all([
+            apiRequest(`api/reports/variance?${varianceParams.toString()}`),
+            apiRequest(`api/reports/usage?${usageParams.toString()}`),
+            apiRequest(`api/reports/cost?${costParams.toString()}`)
+        ]);
+
+        // Check if any request returned null (redirecting to login)
+        if (results.some(r => r === null)) return;
+
+        [currentReportData, usageReportData, costReportData] = results;
+
+        displayVarianceReport();
+        displayUsageReport();
+        displayCostReport();
+    } catch (error) {
+        console.error('Error loading report:', error);
+        showAlert('Error loading report: ' + error.message, 'danger');
+    }
+}
+
+function displayVarianceReport() {
+    const container = document.getElementById('varianceReport');
+
+    if (!currentReportData || currentReportData.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center py-4">No variance data available for the selected filters.</p>';
+        return;
+    }
+
+    // Calculate totals
+    let totalExpected = 0;
+    let totalActual = 0;
+    let totalVariance = 0;
+    let totalExpectedValue = 0;
+    let totalActualValue = 0;
+    let totalVarianceValue = 0;
+
+    currentReportData.forEach(item => {
+        totalExpected += parseFloat(item.expected_quantity || 0);
+        totalActual += parseFloat(item.actual_quantity || 0);
+        totalVariance += parseFloat(item.variance || 0);
+        totalExpectedValue += parseFloat(item.expected_value || 0);
+        totalActualValue += parseFloat(item.actual_value || 0);
+        totalVarianceValue += parseFloat(item.variance_value || 0);
+    });
+
+    container.innerHTML = `
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h4>$${totalExpectedValue.toFixed(2)}</h4>
+                        <p class="mb-0">Expected Value</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h4>$${totalActualValue.toFixed(2)}</h4>
+                        <p class="mb-0">Actual Value</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card ${totalVarianceValue < 0 ? 'bg-danger' : 'bg-success'} text-white">
+                    <div class="card-body text-center">
+                        <h4>${totalVarianceValue > 0 ? '+' : ''}$${totalVarianceValue.toFixed(2)}</h4>
+                        <p class="mb-0">Variance Value</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card bg-secondary text-white">
+                    <div class="card-body text-center">
+                        <h4>${currentReportData.length}</h4>
+                        <p class="mb-0">Total Items</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover table-sm">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Item</th>
+                        <th>Category</th>
+                        <th>Storage Area</th>
+                        <th class="text-end">Expected Qty</th>
+                        <th class="text-end">Actual Qty</th>
+                        <th class="text-end">Variance</th>
+                        <th class="text-end">Unit Cost</th>
+                        <th class="text-end">Expected Value</th>
+                        <th class="text-end">Actual Value</th>
+                        <th class="text-end">Variance Value</th>
+                        <th>Unit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${currentReportData.map(item => {
+                        const variance = parseFloat(item.variance || 0);
+                        const varianceValue = parseFloat(item.variance_value || 0);
+
+                        let rowClass = '';
+                        if (Math.abs(varianceValue) > 50) {
+                            rowClass = varianceValue < 0 ? 'table-danger' : 'table-success';
+                        }
+
+                        return `
+                            <tr class="${rowClass}">
+                                <td><strong>${item.item_name}</strong></td>
+                                <td>${item.category || '-'}</td>
+                                <td>${item.storage_area_name || '-'}</td>
+                                <td class="text-end">${parseFloat(item.expected_quantity || 0).toFixed(2)}</td>
+                                <td class="text-end">${parseFloat(item.actual_quantity || 0).toFixed(2)}</td>
+                                <td class="text-end">
+                                    <span class="${variance < 0 ? 'text-danger' : variance > 0 ? 'text-success' : ''}">
+                                        ${variance > 0 ? '+' : ''}${variance.toFixed(2)}
+                                    </span>
+                                </td>
+                                <td class="text-end">${item.unit_cost ? '$' + parseFloat(item.unit_cost).toFixed(2) : '-'}</td>
+                                <td class="text-end">${item.expected_value ? '$' + parseFloat(item.expected_value).toFixed(2) : '-'}</td>
+                                <td class="text-end">${item.actual_value ? '$' + parseFloat(item.actual_value).toFixed(2) : '-'}</td>
+                                <td class="text-end">
+                                    <span class="${varianceValue < 0 ? 'text-danger' : varianceValue > 0 ? 'text-success' : ''}">
+                                        ${item.variance_value ? (varianceValue > 0 ? '+' : '') + '$' + varianceValue.toFixed(2) : '-'}
+                                    </span>
+                                </td>
+                                <td>${item.unit || '-'}</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function displayUsageReport() {
+    const container = document.getElementById('usageReport');
+
+    if (!usageReportData || usageReportData.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center py-4">No usage data available. Need at least 2 approved count sessions in the selected date range.</p>';
+        return;
+    }
+
+    // Group by category and calculate totals
+    const categoryGroups = {};
+    let grandTotalUsage = 0;
+    let grandTotalValue = 0;
+    let grandTotalBeginning = 0;
+    let grandTotalEnding = 0;
+
+    usageReportData.forEach(item => {
+        const category = item.category || 'Uncategorized';
+        if (!categoryGroups[category]) {
+            categoryGroups[category] = {
+                items: [],
+                totalUsage: 0,
+                totalValue: 0,
+                totalBeginning: 0,
+                totalEnding: 0
+            };
+        }
+        categoryGroups[category].items.push(item);
+        const usage = parseFloat(item.usage || 0);
+        const value = parseFloat(item.total_usage_cost || 0);
+        const beginning = parseFloat(item.beginning_quantity || 0);
+        const ending = parseFloat(item.ending_quantity || 0);
+
+        categoryGroups[category].totalUsage += usage;
+        categoryGroups[category].totalValue += value;
+        categoryGroups[category].totalBeginning += beginning;
+        categoryGroups[category].totalEnding += ending;
+
+        grandTotalUsage += usage;
+        grandTotalValue += value;
+        grandTotalBeginning += beginning;
+        grandTotalEnding += ending;
+    });
+
+    // Sort categories by name
+    const sortedCategories = Object.keys(categoryGroups).sort();
+
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table class="table table-hover table-sm mb-0" style="font-size: 13px;">
+                <thead style="background-color: #2c3e50; color: #fff;">
+                    <tr>
+                        <th style="width: 30px;"></th>
+                        <th>Name</th>
+                        <th class="text-end">Starting Inv.</th>
+                        <th class="text-end">Purchases</th>
+                        <th class="text-end">Adjustments</th>
+                        <th class="text-end">Ending Inv.</th>
+                        <th class="text-end">Usage</th>
+                        <th class="text-end">Cost</th>
+                        <th class="text-end">Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sortedCategories.map((category, catIndex) => {
+                        const group = categoryGroups[category];
+                        const categoryId = 'category-' + catIndex;
+                        return `
+                            <tr class="category-row" style="background-color: #34495e; color: #fff; cursor: pointer; font-weight: 600;" onclick="toggleCategory('${categoryId}')">
+                                <td>
+                                    <i class="bi bi-chevron-down category-chevron" id="${categoryId}-chevron"></i>
+                                </td>
+                                <td><strong>${category.toUpperCase()}</strong></td>
+                                <td class="text-end">${group.totalBeginning.toFixed(1)}</td>
+                                <td class="text-end">-</td>
+                                <td class="text-end">-</td>
+                                <td class="text-end">${group.totalEnding.toFixed(1)}</td>
+                                <td class="text-end"><strong>${group.totalUsage.toFixed(1)}</strong></td>
+                                <td class="text-end">-</td>
+                                <td class="text-end"><strong>$${group.totalValue.toFixed(2)}</strong></td>
+                            </tr>
+                            ${group.items.map(item => {
+                                const usage = parseFloat(item.usage || 0);
+                                const purchases = parseFloat(item.purchases || 0);
+                                const adjustments = parseFloat(item.adjustments || 0);
+                                return `
+                                    <tr class="item-row ${categoryId}" style="display: none;">
+                                        <td></td>
+                                        <td style="padding-left: 30px;">${item.item_name}</td>
+                                        <td class="text-end">${parseFloat(item.beginning_quantity || 0).toFixed(2)}</td>
+                                        <td class="text-end">${purchases > 0 ? purchases.toFixed(2) : '0'}</td>
+                                        <td class="text-end">${adjustments !== 0 ? adjustments.toFixed(2) : '0'}</td>
+                                        <td class="text-end">${parseFloat(item.ending_quantity || 0).toFixed(2)}</td>
+                                        <td class="text-end">${usage.toFixed(2)}</td>
+                                        <td class="text-end">${item.unit_cost ? '$' + parseFloat(item.unit_cost).toFixed(2) : '-'}</td>
+                                        <td class="text-end">${item.total_usage_cost ? '$' + parseFloat(item.total_usage_cost).toFixed(2) : '-'}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function toggleCategory(categoryId) {
+    const items = document.querySelectorAll('.' + categoryId);
+    const chevron = document.getElementById(categoryId + '-chevron');
+
+    items.forEach(item => {
+        if (item.style.display === 'none') {
+            item.style.display = 'table-row';
+            chevron.className = 'bi bi-chevron-up category-chevron';
+        } else {
+            item.style.display = 'none';
+            chevron.className = 'bi bi-chevron-down category-chevron';
+        }
+    });
+}
+
+function displayCostReport() {
+    const container = document.getElementById('costReport');
+
+    if (!costReportData || costReportData.length === 0) {
+        container.innerHTML = '<p class="text-muted text-center py-4">No cost data available.</p>';
+        return;
+    }
+
+    // Calculate grand total
+    let grandTotal = 0;
+    let totalQuantity = 0;
+
+    costReportData.forEach(item => {
+        grandTotal += parseFloat(item.total_value || 0);
+        totalQuantity += parseFloat(item.total_quantity || 0);
+    });
+
+    container.innerHTML = `
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h4>${costReportData.reduce((sum, item) => sum + item.total_items, 0)}</h4>
+                        <p class="mb-0">Total Items</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h4>${totalQuantity.toFixed(2)}</h4>
+                        <p class="mb-0">Total Quantity</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h4>$${grandTotal.toFixed(2)}</h4>
+                        <p class="mb-0">Total Inventory Value</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Storage Area</th>
+                        <th class="text-end">Items Count</th>
+                        <th class="text-end">Total Quantity</th>
+                        <th class="text-end">Total Value</th>
+                        <th class="text-end">% of Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${costReportData.map(item => {
+                        const percentage = grandTotal > 0 ? ((item.total_value / grandTotal) * 100).toFixed(1) : 0;
+
+                        return `
+                            <tr>
+                                <td><strong>${item.storage_area_name}</strong></td>
+                                <td class="text-end">${item.total_items}</td>
+                                <td class="text-end">${parseFloat(item.total_quantity).toFixed(2)}</td>
+                                <td class="text-end"><strong>$${parseFloat(item.total_value).toFixed(2)}</strong></td>
+                                <td class="text-end">${percentage}%</td>
+                            </tr>
+                        `;
+                    }).join('')}
+                    <tr class="table-primary">
+                        <td><strong>TOTAL</strong></td>
+                        <td class="text-end"><strong>${costReportData.reduce((sum, item) => sum + item.total_items, 0)}</strong></td>
+                        <td class="text-end"><strong>${totalQuantity.toFixed(2)}</strong></td>
+                        <td class="text-end"><strong>$${grandTotal.toFixed(2)}</strong></td>
+                        <td class="text-end"><strong>100%</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function exportReport() {
+    const activeTab = document.querySelector('.nav-link.active').id;
+
+    if (activeTab === 'variance-tab') {
+        exportVarianceReport();
+    } else if (activeTab === 'usage-tab') {
+        exportUsageReport();
+    } else if (activeTab === 'cost-tab') {
+        exportCostReport();
+    }
+}
+
+function exportVarianceReport() {
+    if (!currentReportData || currentReportData.length === 0) {
+        showAlert('No data to export', 'warning');
+        return;
+    }
+
+    // Create CSV content with pricing
+    const headers = ['Item', 'Category', 'Storage Area', 'Expected Qty', 'Actual Qty', 'Variance', 'Unit', 'Unit Cost', 'Expected Value', 'Actual Value', 'Variance Value'];
+    const rows = currentReportData.map(item => {
+        const variance = parseFloat(item.variance || 0);
+        return [
+            item.item_name,
+            item.category || '',
+            item.storage_area_name || '',
+            parseFloat(item.expected_quantity || 0).toFixed(2),
+            parseFloat(item.actual_quantity || 0).toFixed(2),
+            variance.toFixed(2),
+            item.unit || '',
+            item.unit_cost ? parseFloat(item.unit_cost).toFixed(2) : '',
+            item.expected_value ? parseFloat(item.expected_value).toFixed(2) : '',
+            item.actual_value ? parseFloat(item.actual_value).toFixed(2) : '',
+            item.variance_value ? parseFloat(item.variance_value).toFixed(2) : ''
+        ];
+    });
+
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    downloadCSV(csvContent, 'variance_report');
+}
+
+function exportUsageReport() {
+    if (!usageReportData || usageReportData.length === 0) {
+        showAlert('No data to export', 'warning');
+        return;
+    }
+
+    // Group by category
+    const categoryGroups = {};
+    let grandTotalCost = 0;
+
+    usageReportData.forEach(item => {
+        const category = item.category || 'Uncategorized';
+        if (!categoryGroups[category]) {
+            categoryGroups[category] = {
+                items: [],
+                totalCost: 0
+            };
+        }
+        categoryGroups[category].items.push(item);
+        const itemCost = parseFloat(item.total_usage_cost || 0);
+        categoryGroups[category].totalCost += itemCost;
+        grandTotalCost += itemCost;
+    });
+
+    // Sort categories by cost descending
+    const sortedCategories = Object.keys(categoryGroups).sort((a, b) =>
+        categoryGroups[b].totalCost - categoryGroups[a].totalCost
+    );
+
+    // Build CSV with category sections
+    const csvLines = [];
+
+    // Add summary header
+    csvLines.push('Usage Report by Category');
+    csvLines.push('');
+    csvLines.push(`Total Usage Cost,$${grandTotalCost.toFixed(2)}`);
+    csvLines.push('');
+
+    // Add category summary
+    csvLines.push('Category Summary');
+    csvLines.push('Category,Total Cost');
+    sortedCategories.forEach(category => {
+        csvLines.push(`"${category}",$${categoryGroups[category].totalCost.toFixed(2)}`);
+    });
+    csvLines.push('');
+
+    // Add detailed items by category
+    const headers = ['Item', 'Storage Area', 'Beginning Qty', 'Ending Qty', 'Usage', 'Unit', 'Unit Cost', 'Total Cost'];
+
+    sortedCategories.forEach(category => {
+        const group = categoryGroups[category];
+
+        // Category header
+        csvLines.push('');
+        csvLines.push(`"${category}",,,,,,,$${group.totalCost.toFixed(2)}`);
+        csvLines.push(headers.join(','));
+
+        // Items in category
+        group.items.forEach(item => {
+            const row = [
+                item.item_name,
+                item.storage_area_name || '',
+                parseFloat(item.beginning_quantity || 0).toFixed(2),
+                parseFloat(item.ending_quantity || 0).toFixed(2),
+                parseFloat(item.usage || 0).toFixed(2),
+                item.unit || '',
+                item.unit_cost ? parseFloat(item.unit_cost).toFixed(2) : '',
+                item.total_usage_cost ? parseFloat(item.total_usage_cost).toFixed(2) : ''
+            ];
+            csvLines.push(row.map(cell => `"${cell}"`).join(','));
+        });
+    });
+
+    downloadCSV(csvLines.join('\n'), 'usage_report');
+}
+
+function exportCostReport() {
+    if (!costReportData || costReportData.length === 0) {
+        showAlert('No data to export', 'warning');
+        return;
+    }
+
+    const headers = ['Storage Area', 'Items Count', 'Total Quantity', 'Total Value'];
+    const rows = costReportData.map(item => {
+        return [
+            item.storage_area_name,
+            item.total_items,
+            parseFloat(item.total_quantity).toFixed(2),
+            parseFloat(item.total_value).toFixed(2)
+        ];
+    });
+
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    downloadCSV(csvContent, 'cost_report');
+}
+
+function downloadCSV(csvContent, reportName) {
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${reportName}_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+
+    showAlert('Report exported successfully', 'success');
+}
+
+function exportToPDF() {
+    if (!currentReportData || currentReportData.length === 0) {
+        showAlert('No data to export', 'warning');
+        return;
+    }
+
+    // Update print header with current filters
+    const locationFilter = document.getElementById('locationFilter');
+    const storageAreaFilter = document.getElementById('storageAreaFilter');
+    const fromDate = document.getElementById('fromDate').value;
+    const toDate = document.getElementById('toDate').value;
+
+    // Set report title based on active tab
+    const activeTab = document.querySelector('.nav-link.active');
+    const reportTitle = activeTab ? activeTab.textContent.trim() : 'Variance Report';
+    document.getElementById('printReportTitle').textContent = reportTitle;
+
+    // Set date range
+    let dateRangeText = 'Date Range: ';
+    if (fromDate && toDate) {
+        dateRangeText += `${new Date(fromDate).toLocaleDateString()} - ${new Date(toDate).toLocaleDateString()}`;
+    } else if (fromDate) {
+        dateRangeText += `From ${new Date(fromDate).toLocaleDateString()}`;
+    } else if (toDate) {
+        dateRangeText += `Until ${new Date(toDate).toLocaleDateString()}`;
+    } else {
+        dateRangeText += 'All Dates';
+    }
+    document.getElementById('printDateRange').textContent = dateRangeText;
+
+    // Set filters
+    let filtersText = 'Filters: ';
+    const filters = [];
+    if (locationFilter.value) {
+        filters.push(`Location: ${locationFilter.options[locationFilter.selectedIndex].text}`);
+    }
+    if (storageAreaFilter.value) {
+        filters.push(`Storage Area: ${storageAreaFilter.options[storageAreaFilter.selectedIndex].text}`);
+    }
+    filtersText += filters.length > 0 ? filters.join(', ') : 'None';
+    document.getElementById('printFilters').textContent = filtersText;
+
+    // Set generated date
+    document.getElementById('printGeneratedDate').textContent = new Date().toLocaleString();
+
+    // Trigger print dialog
+    window.print();
+}
+
+// Cost Variance Report
+async function loadCostVariance() {
+    const startDate = document.getElementById('cvStartDate').value;
+    const endDate = document.getElementById('cvEndDate').value;
+    const minChange = document.getElementById('cvMinChange').value;
+
+    let url = 'api/reports/cost-variance?';
+    if (startDate) url += `start_date=${startDate}&`;
+    if (endDate) url += `end_date=${endDate}&`;
+    if (minChange) url += `min_percent_change=${minChange}&`;
+
+    try {
+        const data = await apiRequest(url);
+        displayCostVarianceReport(data);
+    } catch (error) {
+        console.error('Error loading cost variance:', error);
+        document.getElementById('costVarianceReport').innerHTML = `
+            <div class="alert alert-danger">Failed to load cost variance report</div>
+        `;
+    }
+}
+
+function displayCostVarianceReport(data) {
+    const container = document.getElementById('costVarianceReport');
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<p class="text-muted">No cost changes found for the selected criteria</p>';
+        return;
+    }
+
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-sm table-hover" style="font-size: 12px;">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Item</th>
+                        <th>Category</th>
+                        <th>Vendor</th>
+                        <th>Unit</th>
+                        <th>Earliest Cost</th>
+                        <th>Earliest Date</th>
+                        <th>Latest Cost</th>
+                        <th>Latest Date</th>
+                        <th>$ Change</th>
+                        <th>% Change</th>
+                        <th>Invoices</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    data.forEach(item => {
+        const changeClass = item.percent_change > 0 ? 'text-danger' : 'text-success';
+        const changeIcon = item.percent_change > 0 ? '↑' : '↓';
+
+        html += `
+            <tr>
+                <td>${item.item_name}</td>
+                <td>${item.category || '-'}</td>
+                <td>${item.vendor_name || '-'}</td>
+                <td>${item.unit}</td>
+                <td>$${item.earliest_cost.toFixed(2)}</td>
+                <td>${new Date(item.earliest_date).toLocaleDateString()}</td>
+                <td>$${item.latest_cost.toFixed(2)}</td>
+                <td>${new Date(item.latest_date).toLocaleDateString()}</td>
+                <td class="${changeClass}">$${item.cost_change.toFixed(2)}</td>
+                <td class="${changeClass}"><strong>${changeIcon} ${Math.abs(item.percent_change).toFixed(1)}%</strong></td>
+                <td>${item.invoice_count}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-3">
+            <small class="text-muted">
+                <i class="bi bi-info-circle"></i> Showing ${data.length} items with cost changes
+            </small>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+// Vendor Spend Report
+async function loadVendorSpend() {
+    const startDate = document.getElementById('vsStartDate').value;
+    const endDate = document.getElementById('vsEndDate').value;
+
+    let url = 'api/reports/vendor-spend?';
+    if (startDate) url += `start_date=${startDate}&`;
+    if (endDate) url += `end_date=${endDate}&`;
+
+    try {
+        const data = await apiRequest(url);
+        displayVendorSpendReport(data);
+    } catch (error) {
+        console.error('Error loading vendor spend:', error);
+        document.getElementById('vendorSpendReport').innerHTML = `
+            <div class="alert alert-danger">Failed to load vendor spend report</div>
+        `;
+    }
+}
+
+function displayVendorSpendReport(data) {
+    const container = document.getElementById('vendorSpendReport');
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<p class="text-muted">No vendor spending data found</p>';
+        return;
+    }
+
+    const totalSpent = data.reduce((sum, v) => sum + v.total_spent, 0);
+
+    let html = `
+        <div class="alert alert-info mb-3">
+            <strong>Total Spend:</strong> $${totalSpent.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            <span class="ms-3"><strong>Vendors:</strong> ${data.length}</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover" style="font-size: 12px;">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Vendor</th>
+                        <th>Invoice Count</th>
+                        <th>Total Spent</th>
+                        <th>Avg Invoice</th>
+                        <th>% of Total</th>
+                        <th>First Invoice</th>
+                        <th>Last Invoice</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    data.forEach(vendor => {
+        const pct = ((vendor.total_spent / totalSpent) * 100).toFixed(1);
+
+        html += `
+            <tr>
+                <td><strong>${vendor.vendor_name}</strong></td>
+                <td>${vendor.invoice_count}</td>
+                <td>$${vendor.total_spent.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                <td>$${vendor.avg_invoice_amount.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                <td>${pct}%</td>
+                <td>${vendor.earliest_invoice ? new Date(vendor.earliest_invoice).toLocaleDateString() : '-'}</td>
+                <td>${vendor.latest_invoice ? new Date(vendor.latest_invoice).toLocaleDateString() : '-'}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+// Transfers Report
+async function loadTransfersReport() {
+    const startDate = document.getElementById('trStartDate').value;
+    const endDate = document.getElementById('trEndDate').value;
+    const fromLocation = document.getElementById('trFromLocation').value;
+    const toLocation = document.getElementById('trToLocation').value;
+
+    let url = 'api/reports/transfers?';
+    if (startDate) url += `start_date=${startDate}&`;
+    if (endDate) url += `end_date=${endDate}&`;
+    if (fromLocation) url += `from_location_id=${fromLocation}&`;
+    if (toLocation) url += `to_location_id=${toLocation}&`;
+
+    try {
+        const data = await apiRequest(url);
+        displayTransfersReport(data);
+    } catch (error) {
+        console.error('Error loading transfers:', error);
+        document.getElementById('transfersReportContent').innerHTML = `
+            <div class="alert alert-danger">Failed to load transfers report</div>
+        `;
+    }
+}
+
+function displayTransfersReport(data) {
+    const container = document.getElementById('transfersReportContent');
+
+    if (!data || data.length === 0) {
+        container.innerHTML = '<p class="text-muted">No transfers found for the selected criteria</p>';
+        return;
+    }
+
+    const totalValue = data.reduce((sum, t) => sum + (t.total_value || 0), 0);
+
+    let html = `
+        <div class="alert alert-info mb-3">
+            <strong>Total Transfers:</strong> ${data.length}
+            <span class="ms-3"><strong>Total Value:</strong> $${totalValue.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm table-hover" style="font-size: 12px;">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Date</th>
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Item</th>
+                        <th>Category</th>
+                        <th>Quantity</th>
+                        <th>Unit Cost</th>
+                        <th>Total Value</th>
+                        <th>Created By</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    data.forEach(transfer => {
+        html += `
+            <tr>
+                <td>${new Date(transfer.transfer_date).toLocaleDateString()}</td>
+                <td>${transfer.from_location_name}</td>
+                <td>${transfer.to_location_name}</td>
+                <td>${transfer.item_name}</td>
+                <td>${transfer.category || '-'}</td>
+                <td>${transfer.quantity} ${transfer.unit}</td>
+                <td>${transfer.unit_cost ? '$' + transfer.unit_cost.toFixed(2) : '-'}</td>
+                <td>${transfer.total_value ? '$' + transfer.total_value.toFixed(2) : '-'}</td>
+                <td>${transfer.created_by_name || '-'}</td>
+                <td>${transfer.notes || '-'}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+
+// Populate location dropdowns for transfers report
+function populateTransferLocationFilters() {
+    const fromSelect = document.getElementById('trFromLocation');
+    const toSelect = document.getElementById('trToLocation');
+
+    locations.forEach(loc => {
+        fromSelect.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+        toSelect.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+    });
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

@@ -1,0 +1,1055 @@
+{% extends "base.html" %}
+
+{% block title %}Daily Sales Entry - Accounting{% endblock %}
+{% block nav_daily_sales %}active{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <input type="hidden" id="dssId" value="{{ dss_id }}">
+    <input type="hidden" id="isAdmin" value="{{ 'true' if current_user.is_admin else 'false' }}">
+
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-0">Daily Sales Entry</h2>
+                    <div id="statusBadge" class="mt-2"></div>
+                </div>
+                <div>
+                    <button class="btn btn-secondary" onclick="window.location.href='/accounting/daily-sales'">
+                        <i class="bi bi-arrow-left"></i> Back to List
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabbed Interface -->
+    <ul class="nav nav-tabs mb-3" id="dssTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="totals-tab" data-bs-toggle="tab" data-bs-target="#totals" type="button">
+                Totals
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="categories-tab" data-bs-toggle="tab" data-bs-target="#categories" type="button">
+                Sales Categories
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="payments-tab" data-bs-toggle="tab" data-bs-target="#payments" type="button">
+                Payment Methods
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="journal-tab" data-bs-toggle="tab" data-bs-target="#journal" type="button">
+                Journal Entry
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="dssTabContent">
+        <!-- TOTALS TAB -->
+        <div class="tab-pane fade show active" id="totals" role="tabpanel">
+            <div class="card">
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Business Date *</label>
+                            <input type="date" class="form-control" id="businessDate" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Location *</label>
+                            <select class="form-select" id="areaId" required>
+                                <option value="">Select Location...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Entry Type</label>
+                            <select class="form-select" id="posSystem">
+                                <option value="">Manual</option>
+                                <option value="POS_IMPORT">POS Import</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Gross Sales</label>
+                            <input type="number" step="0.01" class="form-control" id="grossSales" readonly
+                                   style="background-color: #f0f0f0;">
+                            <small class="text-muted">Calculated from categories</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Discounts</label>
+                            <input type="number" step="0.01" class="form-control" id="discounts" value="0.00">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Refunds</label>
+                            <input type="number" step="0.01" class="form-control" id="refunds" value="0.00">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Net Sales</label>
+                            <input type="number" step="0.01" class="form-control" id="netSales" readonly
+                                   style="background-color: #e8f4f8; font-weight: bold;">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Tax Collected</label>
+                            <input type="number" step="0.01" class="form-control" id="taxCollected" value="0.00">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Tips</label>
+                            <input type="number" step="0.01" class="form-control" id="tips" readonly
+                                   style="background-color: #f0f0f0;">
+                            <small class="text-muted">Calculated from payments</small>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label"><strong>Total Collected</strong></label>
+                            <input type="number" step="0.01" class="form-control" id="totalCollected" readonly
+                                   style="background-color: #d4edda; font-weight: bold; font-size: 1.1em;">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Deposit Amount</label>
+                            <input type="number" step="0.01" class="form-control" id="depositAmount" readonly
+                                   style="background-color: #f0f0f0;">
+                            <small class="text-muted">Calculated from payments</small>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Variance</label>
+                            <input type="number" step="0.01" class="form-control" id="variance" readonly
+                                   style="background-color: #fff3cd;">
+                            <small class="text-muted">Deposit - Total Collected</small>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" id="notes" rows="3"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SALES CATEGORIES TAB -->
+        <div class="tab-pane fade" id="categories" role="tabpanel">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Sales by Category</h5>
+                    <button class="btn btn-sm btn-primary" onclick="addCategoryLine()">
+                        <i class="bi bi-plus"></i> Add Category
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th style="width: 30%;">Category</th>
+                                    <th style="width: 20%;">GL Account</th>
+                                    <th style="width: 15%; text-align: right;">Amount</th>
+                                    <th style="width: 15%; text-align: right;">Tax</th>
+                                    <th style="width: 15%; text-align: right;">Total</th>
+                                    <th style="width: 5%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="categoryLines">
+                                <!-- Category lines will be added here -->
+                            </tbody>
+                            <tfoot>
+                                <tr style="font-weight: bold; background-color: #f8f9fa;">
+                                    <td colspan="2" style="text-align: right;">TOTAL:</td>
+                                    <td style="text-align: right;" id="categoryAmountTotal">$0.00</td>
+                                    <td style="text-align: right;" id="categoryTaxTotal">$0.00</td>
+                                    <td style="text-align: right;" id="categoryGrandTotal">$0.00</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div class="mt-2 text-muted small">
+                        <i class="bi bi-info-circle"></i> The total from categories will update Gross Sales on the Totals tab
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAYMENT METHODS TAB -->
+        <div class="tab-pane fade" id="payments" role="tabpanel">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Payment Methods</h5>
+                    <button class="btn btn-sm btn-primary" onclick="addPaymentLine()">
+                        <i class="bi bi-plus"></i> Add Payment
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th style="width: 25%;">Payment Type</th>
+                                    <th style="width: 25%;">Deposit Account</th>
+                                    <th style="width: 15%; text-align: right;">Amount</th>
+                                    <th style="width: 15%; text-align: right;">Tips</th>
+                                    <th style="width: 15%; text-align: right;">Total Deposit</th>
+                                    <th style="width: 5%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="paymentLines">
+                                <!-- Payment lines will be added here -->
+                            </tbody>
+                            <tfoot>
+                                <tr style="font-weight: bold; background-color: #f8f9fa;">
+                                    <td colspan="2" style="text-align: right;">TOTAL:</td>
+                                    <td style="text-align: right;" id="paymentAmountTotal">$0.00</td>
+                                    <td style="text-align: right;" id="paymentTipsTotal">$0.00</td>
+                                    <td style="text-align: right;" id="paymentGrandTotal">$0.00</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div class="mt-2 text-muted small">
+                        <i class="bi bi-info-circle"></i> Payment totals update Tips and Deposit Amount on the Totals tab
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- JOURNAL ENTRY TAB -->
+        <div class="tab-pane fade" id="journal" role="tabpanel">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Generated Journal Entry</h5>
+                </div>
+                <div class="card-body">
+                    <div id="journalEntryPreview">
+                        <p class="text-muted">Journal entry will be created when this sales summary is posted.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between">
+                <div>
+                    <span id="stepsComplete" class="text-muted"></span>
+                </div>
+                <div>
+                    <button class="btn btn-secondary" onclick="window.location.href='/accounting/daily-sales'">
+                        Cancel
+                    </button>
+                    <button class="btn btn-primary" id="saveBtn" onclick="saveDSS()">
+                        <i class="bi bi-save"></i> Save Draft
+                    </button>
+                    <button class="btn btn-success" id="verifyBtn" onclick="verifyDSS()" style="display: none;">
+                        <i class="bi bi-check-circle"></i> Verify
+                    </button>
+                    <button class="btn btn-success" id="postBtn" onclick="postDSS()" style="display: none;">
+                        <i class="bi bi-send"></i> Post & Create JE
+                    </button>
+                    <button class="btn btn-warning" id="reopenBtn" onclick="reopenDSS()" style="display: none;">
+                        <i class="bi bi-arrow-counterclockwise"></i> Reopen (Admin)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let dss = null;
+let areas = [];
+let accounts = [];
+let categoryLines = [];
+let paymentLines = [];
+
+// Standard category names
+const STANDARD_CATEGORIES = [
+    'Food Sales',
+    'Beverage Sales',
+    'Wine Sales',
+    'Beer Sales',
+    'Liquor Sales',
+    'Merchandise Sales',
+    'Coffee Sales',
+    'Discounts',
+    'Employee Meals',
+    'Comps',
+    'Over/Short'
+];
+
+// Standard payment types
+const PAYMENT_TYPES = [
+    'Cash',
+    'Credit Card',
+    'Debit Card',
+    'Gift Card',
+    'House Account',
+    'Mobile Payment',
+    'Other'
+];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadInitialData();
+
+    // Auto-calculate on input changes
+    ['discounts', 'refunds', 'taxCollected'].forEach(id => {
+        document.getElementById(id).addEventListener('input', calculateTotals);
+    });
+});
+
+async function loadInitialData() {
+    try {
+        // Load areas
+        const areasResp = await fetch('/accounting/api/areas/');
+        areas = await areasResp.json();
+
+        const areaSelect = document.getElementById('areaId');
+        areas.forEach(area => {
+            const option = document.createElement('option');
+            option.value = area.id;
+            option.textContent = area.name;
+            areaSelect.appendChild(option);
+        });
+
+        // Load accounts (revenue and asset accounts)
+        const accountsResp = await fetch('/accounting/api/accounts/?limit=1000');
+        accounts = await accountsResp.json();
+
+        // Load DSS if editing
+        const dssId = document.getElementById('dssId').value;
+        if (dssId && dssId !== 'new') {
+            await loadDSS(parseInt(dssId));
+        } else {
+            // New entry - set default date to today
+            document.getElementById('businessDate').valueAsDate = new Date();
+            // Add default category lines
+            addDefaultCategories();
+            // Add default payment lines
+            addDefaultPayments();
+        }
+
+        updateUI();
+    } catch (error) {
+        console.error('Error loading data:', error);
+        showNotification('Error loading page data: ' + error.message, 'Error');
+    }
+}
+
+async function loadDSS(id) {
+    try {
+        const response = await fetch(`/accounting/api/daily-sales/${id}`);
+        if (!response.ok) throw new Error('Failed to load sales summary');
+
+        dss = await response.json();
+
+        // Populate form
+        document.getElementById('businessDate').value = dss.business_date;
+        document.getElementById('areaId').value = dss.area_id;
+        document.getElementById('posSystem').value = dss.pos_system || '';
+        document.getElementById('discounts').value = dss.discounts;
+        document.getElementById('refunds').value = dss.refunds;
+        document.getElementById('taxCollected').value = dss.tax_collected;
+        document.getElementById('notes').value = dss.notes || '';
+
+        // Load line items
+        categoryLines = dss.line_items || [];
+        renderCategoryLines();
+
+        // Load payments
+        paymentLines = dss.payments || [];
+        renderPaymentLines();
+
+        calculateTotals();
+    } catch (error) {
+        console.error('Error loading DSS:', error);
+        showNotification('Error loading sales summary: ' + error.message, 'Error');
+    }
+}
+
+function addDefaultCategories() {
+    // Add common categories with empty amounts
+    STANDARD_CATEGORIES.forEach(category => {
+        categoryLines.push({
+            category: category,
+            revenue_account_id: null,
+            net_amount: 0,
+            tax_amount: 0
+        });
+    });
+    renderCategoryLines();
+}
+
+function addDefaultPayments() {
+    // Add Cash and Credit Card by default
+    ['Cash', 'Credit Card'].forEach(type => {
+        paymentLines.push({
+            payment_type: type,
+            deposit_account_id: null,
+            amount: 0,
+            tips: 0
+        });
+    });
+    renderPaymentLines();
+}
+
+function addCategoryLine() {
+    categoryLines.push({
+        category: '',
+        revenue_account_id: null,
+        net_amount: 0,
+        tax_amount: 0
+    });
+    renderCategoryLines();
+}
+
+function renderCategoryLines() {
+    const tbody = document.getElementById('categoryLines');
+    tbody.innerHTML = '';
+
+    categoryLines.forEach((line, index) => {
+        const tr = document.createElement('tr');
+
+        const revenueAccounts = accounts.filter(a => a.account_type === 'REVENUE' || a.account_type === 'EXPENSE');
+
+        tr.innerHTML = `
+            <td>
+                <input type="text" class="form-control form-control-sm"
+                       list="categoryList"
+                       value="${line.category || ''}"
+                       onchange="updateCategoryLine(${index}, 'category', this.value)">
+            </td>
+            <td>
+                <select class="form-select form-select-sm"
+                        onchange="updateCategoryLine(${index}, 'revenue_account_id', parseInt(this.value))">
+                    <option value="">Select Account...</option>
+                    ${revenueAccounts.map(acc => `
+                        <option value="${acc.id}" ${acc.id === line.revenue_account_id ? 'selected' : ''}>
+                            ${acc.account_number} - ${acc.account_name}
+                        </option>
+                    `).join('')}
+                </select>
+            </td>
+            <td>
+                <input type="number" step="0.01" class="form-control form-control-sm text-end"
+                       value="${line.net_amount}"
+                       onchange="updateCategoryLine(${index}, 'net_amount', parseFloat(this.value) || 0)">
+            </td>
+            <td>
+                <input type="number" step="0.01" class="form-control form-control-sm text-end"
+                       value="${line.tax_amount || 0}"
+                       onchange="updateCategoryLine(${index}, 'tax_amount', parseFloat(this.value) || 0)">
+            </td>
+            <td class="text-end" style="padding-top: 8px;">
+                ${formatCurrency((parseFloat(line.net_amount) || 0) + (parseFloat(line.tax_amount) || 0))}
+            </td>
+            <td>
+                <button class="btn btn-sm btn-outline-danger" onclick="removeCategoryLine(${index})">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(tr);
+    });
+
+    // Add datalist for category suggestions
+    if (!document.getElementById('categoryList')) {
+        const datalist = document.createElement('datalist');
+        datalist.id = 'categoryList';
+        STANDARD_CATEGORIES.forEach(cat => {
+            const option = document.createElement('option');
+            option.value = cat;
+            datalist.appendChild(option);
+        });
+        document.body.appendChild(datalist);
+    }
+
+    calculateCategoryTotals();
+}
+
+function updateCategoryLine(index, field, value) {
+    categoryLines[index][field] = value;
+    renderCategoryLines();
+}
+
+function removeCategoryLine(index) {
+    categoryLines.splice(index, 1);
+    renderCategoryLines();
+}
+
+function calculateCategoryTotals() {
+    let totalAmount = 0;
+    let totalTax = 0;
+
+    categoryLines.forEach(line => {
+        totalAmount += parseFloat(line.net_amount) || 0;
+        totalTax += parseFloat(line.tax_amount) || 0;
+    });
+
+    document.getElementById('categoryAmountTotal').textContent = formatCurrency(totalAmount);
+    document.getElementById('categoryTaxTotal').textContent = formatCurrency(totalTax);
+    document.getElementById('categoryGrandTotal').textContent = formatCurrency(totalAmount + totalTax);
+
+    // Update gross sales
+    document.getElementById('grossSales').value = totalAmount.toFixed(2);
+
+    calculateTotals();
+}
+
+function addPaymentLine() {
+    paymentLines.push({
+        payment_type: '',
+        deposit_account_id: null,
+        amount: 0,
+        tips: 0
+    });
+    renderPaymentLines();
+}
+
+function renderPaymentLines() {
+    const tbody = document.getElementById('paymentLines');
+    tbody.innerHTML = '';
+
+    paymentLines.forEach((line, index) => {
+        const tr = document.createElement('tr');
+
+        const assetAccounts = accounts.filter(a => a.account_type === 'ASSET');
+
+        tr.innerHTML = `
+            <td>
+                <input type="text" class="form-control form-control-sm"
+                       list="paymentTypeList"
+                       value="${line.payment_type || ''}"
+                       onchange="updatePaymentLine(${index}, 'payment_type', this.value)">
+            </td>
+            <td>
+                <select class="form-select form-select-sm"
+                        onchange="updatePaymentLine(${index}, 'deposit_account_id', parseInt(this.value))">
+                    <option value="">Select Account...</option>
+                    ${assetAccounts.map(acc => `
+                        <option value="${acc.id}" ${acc.id === line.deposit_account_id ? 'selected' : ''}>
+                            ${acc.account_number} - ${acc.account_name}
+                        </option>
+                    `).join('')}
+                </select>
+            </td>
+            <td>
+                <input type="number" step="0.01" class="form-control form-control-sm text-end"
+                       value="${line.amount}"
+                       onchange="updatePaymentLine(${index}, 'amount', parseFloat(this.value) || 0)">
+            </td>
+            <td>
+                <input type="number" step="0.01" class="form-control form-control-sm text-end"
+                       value="${line.tips || 0}"
+                       onchange="updatePaymentLine(${index}, 'tips', parseFloat(this.value) || 0)">
+            </td>
+            <td class="text-end" style="padding-top: 8px;">
+                ${formatCurrency((parseFloat(line.amount) || 0) + (parseFloat(line.tips) || 0))}
+            </td>
+            <td>
+                <button class="btn btn-sm btn-outline-danger" onclick="removePaymentLine(${index})">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(tr);
+    });
+
+    // Add datalist for payment type suggestions
+    if (!document.getElementById('paymentTypeList')) {
+        const datalist = document.createElement('datalist');
+        datalist.id = 'paymentTypeList';
+        PAYMENT_TYPES.forEach(type => {
+            const option = document.createElement('option');
+            option.value = type;
+            datalist.appendChild(option);
+        });
+        document.body.appendChild(datalist);
+    }
+
+    calculatePaymentTotals();
+}
+
+function updatePaymentLine(index, field, value) {
+    paymentLines[index][field] = value;
+    renderPaymentLines();
+}
+
+function removePaymentLine(index) {
+    paymentLines.splice(index, 1);
+    renderPaymentLines();
+}
+
+function calculatePaymentTotals() {
+    let totalAmount = 0;
+    let totalTips = 0;
+
+    paymentLines.forEach(line => {
+        totalAmount += parseFloat(line.amount) || 0;
+        totalTips += parseFloat(line.tips) || 0;
+    });
+
+    document.getElementById('paymentAmountTotal').textContent = formatCurrency(totalAmount);
+    document.getElementById('paymentTipsTotal').textContent = formatCurrency(totalTips);
+    document.getElementById('paymentGrandTotal').textContent = formatCurrency(totalAmount + totalTips);
+
+    // Update tips and deposit amount
+    document.getElementById('tips').value = totalTips.toFixed(2);
+    document.getElementById('depositAmount').value = (totalAmount + totalTips).toFixed(2);
+
+    calculateTotals();
+}
+
+function calculateTotals() {
+    const gross = parseFloat(document.getElementById('grossSales').value) || 0;
+    const discounts = parseFloat(document.getElementById('discounts').value) || 0;
+    const refunds = parseFloat(document.getElementById('refunds').value) || 0;
+    const tax = parseFloat(document.getElementById('taxCollected').value) || 0;
+    const tips = parseFloat(document.getElementById('tips').value) || 0;
+    const deposit = parseFloat(document.getElementById('depositAmount').value) || 0;
+
+    // Net sales = Gross - Discounts - Refunds
+    const netSales = gross - discounts - refunds;
+    document.getElementById('netSales').value = netSales.toFixed(2);
+
+    // Total collected = Net Sales + Tax + Tips
+    const totalCollected = netSales + tax + tips;
+    document.getElementById('totalCollected').value = totalCollected.toFixed(2);
+
+    // Variance = Deposit - Total Collected
+    const variance = deposit - totalCollected;
+    document.getElementById('variance').value = variance.toFixed(2);
+
+    // Color code variance
+    const varianceInput = document.getElementById('variance');
+    if (Math.abs(variance) < 0.01) {
+        varianceInput.style.backgroundColor = '#d4edda'; // Green
+    } else if (Math.abs(variance) <= 5.00) {
+        varianceInput.style.backgroundColor = '#fff3cd'; // Yellow
+    } else {
+        varianceInput.style.backgroundColor = '#f8d7da'; // Red
+    }
+}
+
+function updateUI() {
+    if (!dss) {
+        document.getElementById('statusBadge').innerHTML = '<span class="badge status-draft">NEW ENTRY</span>';
+        document.getElementById('saveBtn').style.display = 'inline-block';
+        return;
+    }
+
+    const status = dss.status.toLowerCase();
+    const statusBadge = document.getElementById('statusBadge');
+
+    if (status === 'draft') {
+        statusBadge.innerHTML = '<span class="badge status-draft">DRAFT</span>';
+        document.getElementById('saveBtn').style.display = 'inline-block';
+        document.getElementById('verifyBtn').style.display = 'inline-block';
+    } else if (status === 'verified') {
+        statusBadge.innerHTML = '<span class="badge status-verified">VERIFIED</span>';
+        document.getElementById('saveBtn').style.display = 'none';
+        document.getElementById('verifyBtn').style.display = 'none';
+        document.getElementById('postBtn').style.display = 'inline-block';
+        // Make fields readonly
+        disableEditing();
+    } else if (status === 'posted') {
+        statusBadge.innerHTML = '<span class="badge status-posted">POSTED</span>';
+        document.getElementById('saveBtn').style.display = 'none';
+        document.getElementById('verifyBtn').style.display = 'none';
+        document.getElementById('postBtn').style.display = 'none';
+
+        // Show reopen button for admins
+        const isAdmin = document.getElementById('isAdmin').value === 'true';
+        document.getElementById('reopenBtn').style.display = isAdmin ? 'inline-block' : 'none';
+
+        // Make everything readonly
+        disableEditing();
+        // Load journal entry
+        loadJournalEntry();
+    }
+}
+
+async function loadJournalEntry() {
+    if (!dss || !dss.journal_entry_id) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/journal-entries/${dss.journal_entry_id}`);
+        if (!response.ok) {
+            console.error('Failed to load journal entry');
+            return;
+        }
+
+        const je = await response.json();
+        displayJournalEntry(je);
+    } catch (error) {
+        console.error('Error loading journal entry:', error);
+    }
+}
+
+function displayJournalEntry(je) {
+    const preview = document.getElementById('journalEntryPreview');
+
+    let totalDebits = 0;
+    let totalCredits = 0;
+
+    const linesHtml = je.lines.map(line => {
+        totalDebits += parseFloat(line.debit_amount || 0);
+        totalCredits += parseFloat(line.credit_amount || 0);
+
+        return `
+            <tr>
+                <td>${line.account_number && line.account_name ? line.account_number + ' - ' + line.account_name : 'N/A'}</td>
+                <td>${line.description || ''}</td>
+                <td style="text-align: right;">${line.debit_amount > 0 ? formatCurrency(line.debit_amount) : ''}</td>
+                <td style="text-align: right;">${line.credit_amount > 0 ? formatCurrency(line.credit_amount) : ''}</td>
+            </tr>
+        `;
+    }).join('');
+
+    preview.innerHTML = `
+        <div class="mb-3">
+            <strong>Entry Number:</strong> ${je.entry_number} &nbsp;&nbsp;
+            <strong>Date:</strong> ${je.entry_date} &nbsp;&nbsp;
+            <strong>Status:</strong> <span class="badge bg-success">POSTED</span>
+        </div>
+        <div class="mb-2">
+            <strong>Description:</strong> ${je.description}
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th style="width: 30%;">Account</th>
+                        <th style="width: 40%;">Description</th>
+                        <th style="width: 15%; text-align: right;">Debit</th>
+                        <th style="width: 15%; text-align: right;">Credit</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${linesHtml}
+                </tbody>
+                <tfoot style="font-weight: bold; border-top: 2px solid #dee2e6;">
+                    <tr>
+                        <td colspan="2" style="text-align: right;">TOTALS:</td>
+                        <td style="text-align: right;">${formatCurrency(totalDebits)}</td>
+                        <td style="text-align: right;">${formatCurrency(totalCredits)}</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div class="mt-3">
+            <a href="/accounting/journal-entries" class="btn btn-sm btn-outline-primary">
+                <i class="bi bi-journal-text"></i> Go to Journal Entries
+            </a>
+            <span class="text-muted ms-2">Entry Number: <strong>${je.entry_number}</strong></span>
+        </div>
+    `;
+}
+
+function disableEditing() {
+    document.querySelectorAll('input, select, textarea').forEach(el => {
+        el.disabled = true;
+    });
+
+    // Disable buttons except action buttons (Back, Post, Cancel, Reopen) and modal buttons
+    document.querySelectorAll('button').forEach(el => {
+        const isActionButton = el.id === 'postBtn' ||
+                               el.id === 'verifyBtn' ||
+                               el.id === 'saveBtn' ||
+                               el.id === 'reopenBtn' ||
+                               el.id === 'confirmOkBtn' ||
+                               el.id === 'confirmCancelBtn' ||
+                               el.textContent.includes('Back to List') ||
+                               el.textContent.includes('Cancel') ||
+                               el.closest('.nav-tabs') ||
+                               el.closest('.modal');
+
+        if (!isActionButton) {
+            el.disabled = true;
+        }
+    });
+}
+
+async function saveDSS() {
+    try {
+        const businessDate = document.getElementById('businessDate').value;
+        const areaId = parseInt(document.getElementById('areaId').value);
+
+        if (!businessDate || !areaId) {
+            showNotification('Please fill in Business Date and Location', 'Missing Fields');
+            return;
+        }
+
+        const data = {
+            business_date: businessDate,
+            area_id: areaId,
+            pos_system: document.getElementById('posSystem').value || null,
+            gross_sales: parseFloat(document.getElementById('grossSales').value) || 0,
+            discounts: parseFloat(document.getElementById('discounts').value) || 0,
+            refunds: parseFloat(document.getElementById('refunds').value) || 0,
+            net_sales: parseFloat(document.getElementById('netSales').value) || 0,
+            tax_collected: parseFloat(document.getElementById('taxCollected').value) || 0,
+            tips: parseFloat(document.getElementById('tips').value) || 0,
+            total_collected: parseFloat(document.getElementById('totalCollected').value) || 0,
+            notes: document.getElementById('notes').value || null,
+            line_items: categoryLines.map(line => ({
+                category: line.category,
+                revenue_account_id: line.revenue_account_id,
+                gross_amount: parseFloat(line.net_amount) || 0,
+                net_amount: parseFloat(line.net_amount) || 0,
+                tax_amount: parseFloat(line.tax_amount) || 0,
+                discount_amount: 0
+            })),
+            payments: paymentLines.map(line => ({
+                payment_type: line.payment_type,
+                deposit_account_id: line.deposit_account_id,
+                amount: parseFloat(line.amount) || 0,
+                tips: parseFloat(line.tips) || 0
+            }))
+        };
+
+        let response;
+        const dssId = document.getElementById('dssId').value;
+
+        if (dssId && dssId !== 'new') {
+            response = await fetch(`/accounting/api/daily-sales/${dssId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+        } else {
+            response = await fetch('/accounting/api/daily-sales/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save');
+        }
+
+        dss = await response.json();
+        document.getElementById('dssId').value = dss.id;
+
+        showNotification('Sales summary saved successfully', 'Success');
+        updateUI();
+
+    } catch (error) {
+        console.error('Error saving DSS:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+async function verifyDSS() {
+    if (!dss) {
+        showNotification('Please save the entry first', 'Error');
+        return;
+    }
+
+    if (!await showConfirm('Verify this sales summary? Once verified, it can be posted to create the journal entry.', 'Verify Sales')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/daily-sales/${dss.id}/verify`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes: null })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to verify');
+        }
+
+        dss = await response.json();
+
+        // Update UI first
+        updateUI();
+
+        // Then show notification
+        showNotification('Sales summary verified successfully. You can now post it to create the journal entry.', 'Success');
+
+    } catch (error) {
+        console.error('Error verifying DSS:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+async function postDSS() {
+    console.log('postDSS called');
+
+    if (!dss) {
+        showNotification('Please save the entry first', 'Error');
+        return;
+    }
+
+    const confirmed = await showConfirm('Post this sales summary? This will create a journal entry and cannot be undone.', 'Post Sales');
+    console.log('Confirm result:', confirmed);
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        // Build account mappings
+        const categoryMapping = {};
+        const paymentMapping = {};
+
+        categoryLines.forEach(line => {
+            if (line.category && line.revenue_account_id) {
+                categoryMapping[line.category.toUpperCase()] = line.revenue_account_id;
+            }
+        });
+
+        paymentLines.forEach(line => {
+            if (line.payment_type && line.deposit_account_id) {
+                paymentMapping[line.payment_type.toUpperCase()] = line.deposit_account_id;
+            }
+        });
+
+        console.log('Category Mapping:', categoryMapping);
+        console.log('Payment Mapping:', paymentMapping);
+        console.log('Category Lines:', categoryLines);
+        console.log('Payment Lines:', paymentLines);
+
+        const response = await fetch(`/accounting/api/daily-sales/${dss.id}/post`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                notes: null,
+                category_account_mapping: categoryMapping,
+                payment_account_mapping: paymentMapping
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to post');
+        }
+
+        dss = await response.json();
+        showNotification('Sales summary posted successfully! Journal entry created.', 'Success');
+        updateUI();
+
+        // Reload to show JE
+        setTimeout(() => location.reload(), 1500);
+
+    } catch (error) {
+        console.error('Error posting DSS:', error);
+        console.error('Full error:', error);
+        showNotification('Error posting sales: ' + error.message, 'Error');
+    }
+}
+
+async function reopenDSS() {
+    console.log('reopenDSS called');
+
+    if (!dss) {
+        showNotification('No sales entry found', 'Error');
+        return;
+    }
+
+    const confirmed = await showConfirm(
+        'Reopen this posted sales summary? This will reverse the journal entry and allow editing. This action should only be used to correct errors.',
+        'Reopen Sales Entry'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/daily-sales/${dss.id}/reopen`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to reopen');
+        }
+
+        dss = await response.json();
+        showNotification('Sales summary reopened successfully. You can now make corrections.', 'Success');
+        updateUI();
+
+        // Reload to show updated state
+        setTimeout(() => location.reload(), 1500);
+
+    } catch (error) {
+        console.error('Error reopening DSS:', error);
+        showNotification('Error reopening sales: ' + error.message, 'Error');
+    }
+}
+
+// Log when page loads
+console.log('Daily Sales Detail page loaded');
+console.log('DSS ID:', document.getElementById('dssId').value);
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(amount);
+}
+</script>
+
+<style>
+.status-draft {
+    background-color: #6c757d;
+    color: white;
+}
+
+.status-verified {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.status-posted {
+    background-color: #198754;
+    color: white;
+}
+
+.nav-tabs .nav-link {
+    color: #8b949e;
+}
+
+.nav-tabs .nav-link.active {
+    background-color: #0d1117;
+    color: #58a6ff;
+    border-color: #30363d #30363d #0d1117;
+}
+
+.table th {
+    background-color: #161b22;
+    color: #c9d1d9;
+    border-color: #30363d;
+}
+
+.table td {
+    border-color: #30363d;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,263 @@
+/* SW Restaurant Management Portal Styles - Dark Mode */
+
+body {
+    background-color: #0d1117;
+    color: #c9d1d9;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Logo box styling - matches SW HOSPITALITY GROUP branding */
+.logo-box {
+    display: inline-block;
+    border: 2px solid #c9d1d9;
+    padding: 8px 16px;
+    color: #c9d1d9;
+    font-family: 'Arial', 'Helvetica', sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 2px;
+    text-decoration: none;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+}
+
+.logo-box:hover {
+    border-color: #58a6ff;
+    color: #58a6ff;
+}
+
+.logo-box-large {
+    font-size: 20px;
+    padding: 12px 24px;
+    letter-spacing: 3px;
+    margin: 0 auto;
+}
+
+.container {
+    flex: 1;
+}
+
+/* Navbar styling */
+.navbar {
+    background-color: #161b22 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    border-bottom: 1px solid #30363d;
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.3rem;
+    color: #c9d1d9 !important;
+}
+
+/* Module cards */
+.module-card {
+    background-color: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 15px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.module-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+    border-color: #58a6ff;
+}
+
+.module-card .card-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Module icons */
+.module-icon {
+    font-size: 5rem;
+    color: #58a6ff;
+}
+
+.module-icon-small {
+    font-size: 2.5rem;
+    color: #8b949e;
+}
+
+.module-card:nth-child(2) .module-icon {
+    color: #3fb950;
+}
+
+.module-card:nth-child(3) .module-icon {
+    color: #9b59b6;
+}
+
+/* Card title and text */
+.module-card .card-title {
+    font-weight: 600;
+    color: #c9d1d9;
+}
+
+.module-card .card-text {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: #8b949e;
+}
+
+/* Buttons */
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+    padding: 0.6rem 1.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+.btn-lg {
+    padding: 0.8rem 2rem;
+    font-size: 1.1rem;
+}
+
+.btn-primary {
+    background-color: #1f6feb;
+    border-color: #1f6feb;
+}
+
+.btn-primary:hover {
+    background-color: #58a6ff;
+    border-color: #58a6ff;
+}
+
+.btn-success {
+    background-color: #238636;
+    border-color: #238636;
+}
+
+.btn-success:hover {
+    background-color: #2ea043;
+    border-color: #2ea043;
+}
+
+.btn-purple {
+    background-color: #8e44ad;
+    border-color: #8e44ad;
+    color: white;
+}
+
+.btn-purple:hover {
+    background-color: #9b59b6;
+    border-color: #9b59b6;
+    color: white;
+}
+
+/* Header section */
+.display-4 {
+    color: #c9d1d9;
+}
+
+.lead {
+    font-size: 1.2rem;
+    color: #8b949e;
+}
+
+/* Footer */
+footer {
+    margin-top: auto;
+    background-color: #161b22;
+    border-top: 1px solid #30363d;
+}
+
+footer .text-muted {
+    color: #8b949e !important;
+}
+
+/* Coming soon modules */
+.opacity-50 {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.opacity-50:hover {
+    transform: none;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .module-icon {
+        font-size: 3.5rem;
+    }
+
+    .module-icon-small {
+        font-size: 2rem;
+    }
+
+    .module-card .card-body {
+        padding: 2rem !important;
+    }
+
+    .display-4 {
+        font-size: 2.5rem;
+    }
+
+    .lead {
+        font-size: 1rem;
+    }
+
+    .btn-lg {
+        padding: 0.6rem 1.5rem;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .navbar-brand {
+        font-size: 1rem;
+    }
+
+    .navbar-brand img {
+        height: 30px !important;
+    }
+
+    .display-4 {
+        font-size: 2rem;
+    }
+}
+
+/* Animation for page load */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.module-card {
+    animation: fadeInUp 0.6s ease;
+}
+
+.module-card:nth-child(1) {
+    animation-delay: 0.1s;
+}
+
+.module-card:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.module-card:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+.module-card:nth-child(4) {
+    animation-delay: 0.4s;
+}

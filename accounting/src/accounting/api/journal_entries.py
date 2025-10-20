@@ -11,6 +11,10 @@ from decimal import Decimal
 from accounting.db.database import get_db
 from accounting.models.journal_entry import JournalEntry, JournalEntryLine, JournalEntryStatus
 from accounting.models.account import Account
+from accounting.models.fiscal_period import FiscalPeriod, FiscalPeriodStatus
+from accounting.models.user import User
+from accounting.api.auth import require_auth, require_admin
+from accounting.core.permissions import require_permission
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -99,6 +103,35 @@ class JournalEntryResponse(BaseModel):
 router = APIRouter(prefix="/api/journal-entries", tags=["Journal Entries"])
 
 
+def validate_fiscal_period(db: Session, entry_date: date, allow_closed: bool = False):
+    """Validate that a fiscal period exists and is open for the entry date"""
+    period = db.query(FiscalPeriod).filter(
+        FiscalPeriod.start_date <= entry_date,
+        FiscalPeriod.end_date >= entry_date
+    ).first()
+
+    if not period:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No fiscal period found for date {entry_date}"
+        )
+
+    if not allow_closed:
+        if period.status == FiscalPeriodStatus.CLOSED:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Fiscal period {period.period_name} is closed. Cannot create or modify entries."
+            )
+
+        if period.status == FiscalPeriodStatus.LOCKED:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Fiscal period {period.period_name} is locked. Cannot create or modify entries."
+            )
+
+    return period
+
+
 def generate_entry_number(db: Session, entry_date: date) -> str:
     """Generate sequential entry number for the date: JE-YYYYMMDD-NNN"""
     date_str = entry_date.strftime('%Y%m%d')
@@ -124,13 +157,17 @@ def list_journal_entries(
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     location_id: Optional[int] = None,
+    reference_type: Optional[str] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
 ):
     """
     List journal entries with optional filters
     """
+    require_permission(user, 'journal_entries:view')
+
     query = db.query(JournalEntry)
 
     if status:
@@ -144,6 +181,9 @@ def list_journal_entries(
 
     if location_id:
         query = query.filter(JournalEntry.location_id == location_id)
+
+    if reference_type:
+        query = query.filter(JournalEntry.reference_type == reference_type.upper())
 
     entries = query.order_by(JournalEntry.entry_date.desc(), JournalEntry.entry_number.desc()).offset(skip).limit(limit).all()
 
@@ -184,10 +224,16 @@ def list_journal_entries(
 
 
 @router.get("/{entry_id}", response_model=JournalEntryResponse)
-def get_journal_entry(entry_id: int, db: Session = Depends(get_db)):
+def get_journal_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
     """
     Get a specific journal entry by ID
     """
+    require_permission(user, 'journal_entries:view')
+
     entry = db.query(JournalEntry).filter(JournalEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Journal entry not found")
@@ -225,10 +271,19 @@ def get_journal_entry(entry_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=JournalEntryResponse, status_code=201)
-def create_journal_entry(entry: JournalEntryCreate, db: Session = Depends(get_db)):
+def create_journal_entry(
+    entry: JournalEntryCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
     """
     Create a new journal entry (in DRAFT status)
     """
+    require_permission(user, 'journal_entries:create')
+
+    # Validate fiscal period is open
+    validate_fiscal_period(db, entry.entry_date)
+
     # Validate all accounts exist
     for line in entry.lines:
         account = db.query(Account).filter(Account.id == line.account_id).first()
@@ -248,6 +303,7 @@ def create_journal_entry(entry: JournalEntryCreate, db: Session = Depends(get_db
         reference_type=entry.reference_type,
         reference_id=entry.reference_id,
         location_id=entry.location_id,
+        created_by=user.id,
         status=JournalEntryStatus.DRAFT
     )
     db.add(new_entry)
@@ -272,10 +328,16 @@ def create_journal_entry(entry: JournalEntryCreate, db: Session = Depends(get_db
 
 
 @router.post("/{entry_id}/post")
-def post_journal_entry(entry_id: int, db: Session = Depends(get_db)):
+def post_journal_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
     """
     Post a journal entry (make it immutable)
     """
+    require_permission(user, 'journal_entries:approve')
+
     entry = db.query(JournalEntry).filter(JournalEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Journal entry not found")
@@ -285,6 +347,9 @@ def post_journal_entry(entry_id: int, db: Session = Depends(get_db)):
 
     if entry.status == JournalEntryStatus.REVERSED:
         raise HTTPException(status_code=400, detail="Cannot post a reversed entry")
+
+    # Validate fiscal period is open
+    validate_fiscal_period(db, entry.entry_date)
 
     # Validate debits equal credits (should already be validated, but double-check)
     total_debits = sum(line.debit_amount for line in entry.lines)
@@ -299,7 +364,7 @@ def post_journal_entry(entry_id: int, db: Session = Depends(get_db)):
     # Post the entry
     entry.status = JournalEntryStatus.POSTED
     entry.posted_at = func.now()
-    # entry.posted_by = current_user.id  # TODO: Add authentication
+    entry.approved_by = user.id
 
     db.commit()
 
@@ -310,11 +375,16 @@ def post_journal_entry(entry_id: int, db: Session = Depends(get_db)):
 def reverse_journal_entry(
     entry_id: int,
     reversal_date: date = Query(..., description="Date for the reversal entry"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
 ):
     """
     Reverse a posted journal entry by creating an opposite entry
     """
+    require_permission(user, 'journal_entries:reverse')
+
+    # Validate fiscal period is open for reversal date
+    validate_fiscal_period(db, reversal_date)
     entry = db.query(JournalEntry).filter(JournalEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Journal entry not found")
@@ -364,10 +434,16 @@ def reverse_journal_entry(
 
 
 @router.delete("/{entry_id}")
-def delete_journal_entry(entry_id: int, db: Session = Depends(get_db)):
+def delete_journal_entry(
+    entry_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
     """
     Delete a journal entry (only allowed for DRAFT entries)
     """
+    require_permission(user, 'journal_entries:delete')
+
     entry = db.query(JournalEntry).filter(JournalEntry.id == entry_id).first()
     if not entry:
         raise HTTPException(status_code=404, detail="Journal entry not found")
@@ -386,3 +462,161 @@ def delete_journal_entry(entry_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Journal entry deleted successfully"}
+
+
+@router.post("/from-hub")
+def receive_journal_entry_from_hub(
+    je_data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Receive journal entry from Integration Hub
+
+    This endpoint is called by the Integration Hub when an invoice is fully mapped
+    and ready to create a journal entry in the accounting system.
+
+    Expected payload:
+    {
+        "entry_date": "2025-10-19",
+        "description": "Invoice INV-12345 from US Foods",
+        "reference_number": "INV-12345",
+        "source": "hub",
+        "hub_invoice_id": 123,
+        "lines": [
+            {
+                "account_id": 1418,
+                "debit": 87.50,
+                "credit": 0.00,
+                "description": "Chicken Breast"
+            },
+            {
+                "account_id": 2010,
+                "debit": 0.00,
+                "credit": 87.50,
+                "description": "AP - US Foods"
+            }
+        ]
+    }
+    """
+    try:
+        # Extract data
+        entry_date_str = je_data.get("entry_date")
+        description = je_data.get("description")
+        reference_number = je_data.get("reference_number")
+        hub_invoice_id = je_data.get("hub_invoice_id")
+        lines_data = je_data.get("lines", [])
+
+        # Parse date
+        entry_date = datetime.fromisoformat(entry_date_str).date() if entry_date_str else date.today()
+
+        # Validate we have lines
+        if not lines_data or len(lines_data) < 2:
+            raise ValueError("Journal entry must have at least 2 lines")
+
+        # Calculate totals and validate
+        total_debits = Decimal('0.00')
+        total_credits = Decimal('0.00')
+
+        for line_data in lines_data:
+            debit = Decimal(str(line_data.get("debit", 0)))
+            credit = Decimal(str(line_data.get("credit", 0)))
+
+            if debit > 0 and credit > 0:
+                raise ValueError("Line cannot have both debit and credit amounts")
+            if debit == 0 and credit == 0:
+                raise ValueError("Line must have either debit or credit amount")
+
+            total_debits += debit
+            total_credits += credit
+
+        # Validate balanced
+        if abs(total_debits - total_credits) > Decimal('0.01'):
+            raise ValueError(
+                f"Debits ({total_debits}) must equal credits ({total_credits}). "
+                f"Difference: {abs(total_debits - total_credits)}"
+            )
+
+        # Find open fiscal period
+        fiscal_period = db.query(FiscalPeriod).filter(
+            FiscalPeriod.start_date <= entry_date,
+            FiscalPeriod.end_date >= entry_date,
+            FiscalPeriod.status == FiscalPeriodStatus.OPEN
+        ).first()
+
+        if not fiscal_period:
+            raise ValueError(f"No open fiscal period found for date {entry_date}")
+
+        # Generate entry number
+        max_entry_number = db.query(func.max(JournalEntry.entry_number)).scalar()
+        if max_entry_number:
+            last_num = int(max_entry_number.split('-')[1])
+            new_entry_number = f"JE-{last_num + 1:06d}"
+        else:
+            new_entry_number = "JE-000001"
+
+        # Create journal entry
+        entry = JournalEntry(
+            entry_number=new_entry_number,
+            entry_date=entry_date,
+            description=description,
+            reference_type="hub_invoice",
+            reference_id=hub_invoice_id,
+            fiscal_period_id=fiscal_period.id,
+            status=JournalEntryStatus.POSTED,  # Auto-post from hub
+            created_by=1,  # System user - TODO: create dedicated system user
+            approved_by=1,  # System user
+            posted_at=datetime.utcnow()
+        )
+
+        db.add(entry)
+        db.flush()  # Get entry ID
+
+        # Create journal entry lines
+        for line_data in lines_data:
+            account_id = line_data.get("account_id")
+            debit = Decimal(str(line_data.get("debit", 0)))
+            credit = Decimal(str(line_data.get("credit", 0)))
+            line_description = line_data.get("description", "")
+
+            # Verify account exists
+            account = db.query(Account).filter(Account.id == account_id).first()
+            if not account:
+                raise ValueError(f"Account ID {account_id} not found")
+
+            # Create line
+            line = JournalEntryLine(
+                journal_entry_id=entry.id,
+                account_id=account_id,
+                debit_amount=debit,
+                credit_amount=credit,
+                description=line_description
+            )
+
+            db.add(line)
+
+            # Update account balance
+            if debit > 0:
+                account.current_balance += debit
+            if credit > 0:
+                account.current_balance -= credit
+
+        db.commit()
+
+        return {
+            "success": True,
+            "journal_entry_id": entry.id,
+            "entry_number": new_entry_number,
+            "message": f"Journal entry {new_entry_number} created successfully",
+            "total_debits": float(total_debits),
+            "total_credits": float(total_credits)
+        }
+
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating journal entry from hub: {str(e)}"
+        )

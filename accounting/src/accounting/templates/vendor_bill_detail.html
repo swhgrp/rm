@@ -1,0 +1,954 @@
+{% extends "base.html" %}
+
+{% block title %}Bill Details - Restaurant Accounting{% endblock %}
+{% block nav_vendor_bills %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    .detail-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #30363d;
+    }
+
+    .detail-title h1 {
+        font-size: 2rem;
+        color: #c9d1d9;
+        margin-bottom: 0.5rem;
+    }
+
+    .detail-title .bill-number {
+        color: #8b949e;
+        font-size: 1rem;
+    }
+
+    .detail-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .back-button {
+        color: #58a6ff;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .back-button:hover {
+        text-decoration: underline;
+    }
+
+    /* Status Badge */
+    .status-badge {
+        display: inline-block;
+        padding: 0.375rem 0.75rem;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-left: 1rem;
+    }
+
+    /* Status badge colors - support both uppercase and lowercase */
+    .status-DRAFT, .status-draft { background: #6e7681; color: white; }
+    .status-PENDING_APPROVAL, .status-pending_approval { background: #1f6feb; color: white; }
+    .status-APPROVED, .status-approved { background: #238636; color: white; }
+    .status-PARTIALLY_PAID, .status-partially_paid { background: #9e6a03; color: white; }
+    .status-PAID, .status-paid { background: #2ea043; color: white; }
+    .status-VOID, .status-void { background: #da3633; color: white; }
+
+    /* Card Layout */
+    .detail-grid {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .detail-card {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+
+    .detail-card h2 {
+        color: #c9d1d9;
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid #30363d;
+    }
+
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #21262d;
+    }
+
+    .detail-row:last-child {
+        border-bottom: none;
+    }
+
+    .detail-row label {
+        color: #8b949e;
+        font-weight: 500;
+    }
+
+    .detail-row .value {
+        color: #c9d1d9;
+        text-align: right;
+    }
+
+    .detail-row.total {
+        font-size: 1.25rem;
+        font-weight: 700;
+        padding-top: 1rem;
+        margin-top: 0.5rem;
+        border-top: 2px solid #30363d;
+    }
+
+    .detail-row.total .value {
+        color: #58a6ff;
+    }
+
+    .detail-row.balance .value {
+        color: #f85149;
+        font-weight: 600;
+    }
+
+    /* Line Items Table */
+    .line-items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+    }
+
+    .line-items-table th {
+        background: #21262d;
+        color: #c9d1d9;
+        padding: 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid #30363d;
+    }
+
+    .line-items-table th:last-child,
+    .line-items-table td:last-child {
+        text-align: right;
+    }
+
+    .line-items-table td {
+        padding: 0.75rem;
+        color: #c9d1d9;
+        border-bottom: 1px solid #21262d;
+    }
+
+    .line-items-table tr:hover {
+        background: #0d1117;
+    }
+
+    .account-code {
+        color: #8b949e;
+        font-size: 0.875rem;
+    }
+
+    .line-total {
+        font-weight: 600;
+    }
+
+    /* Payment History */
+    .payment-item {
+        background: #0d1117;
+        padding: 1rem;
+        border-radius: 6px;
+        border: 1px solid #30363d;
+        margin-bottom: 1rem;
+    }
+
+    .payment-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .payment-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.75rem;
+    }
+
+    .payment-amount {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #2ea043;
+    }
+
+    .payment-method-badge {
+        background: #21262d;
+        color: #c9d1d9;
+        padding: 0.25rem 0.75rem;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        font-weight: 500;
+    }
+
+    .payment-details {
+        color: #8b949e;
+        font-size: 0.875rem;
+        line-height: 1.6;
+    }
+
+    .payment-details div {
+        margin-bottom: 0.25rem;
+    }
+
+    .payment-details strong {
+        color: #c9d1d9;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #8b949e;
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    /* Notes Section */
+    .notes-content {
+        color: #c9d1d9;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+
+    /* Loading State */
+    .loading {
+        text-align: center;
+        padding: 3rem;
+        color: #8b949e;
+    }
+
+    .loading i {
+        font-size: 2rem;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    /* Error State */
+    .error-state {
+        background: #da3633;
+        color: white;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 2rem;
+    }
+
+    @media (max-width: 768px) {
+        .detail-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .detail-header {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .detail-actions {
+            width: 100%;
+        }
+
+        .detail-actions button {
+            flex: 1;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="detail-container">
+    <a href="/accounting/vendor-bills" class="back-button">
+        <i class="bi bi-arrow-left"></i> Back to Bills
+    </a>
+
+    <div id="loadingState" class="loading">
+        <i class="bi bi-arrow-clockwise"></i>
+        <p>Loading bill details...</p>
+    </div>
+
+    <div id="errorState" class="error-state" style="display: none;"></div>
+
+    <div id="billContent" style="display: none;">
+        <!-- Header -->
+        <div class="detail-header">
+            <div class="detail-title">
+                <h1>
+                    <span id="vendorName">-</span>
+                    <span class="status-badge" id="statusBadge">-</span>
+                </h1>
+                <div class="bill-number">
+                    Bill #<span id="billNumber">-</span> |
+                    Due <span id="dueDate">-</span>
+                </div>
+            </div>
+            <div class="detail-actions" id="actionButtons">
+                <!-- Action buttons will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="detail-grid">
+            <!-- Left Column: Line Items & Notes -->
+            <div>
+                <!-- Line Items -->
+                <div class="detail-card">
+                    <h2><i class="bi bi-list-ul"></i> Line Items</h2>
+                    <div id="lineItemsContent">
+                        <div class="empty-state">
+                            <i class="bi bi-inbox"></i>
+                            <p>No line items</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="detail-card" style="margin-top: 1.5rem;" id="notesCard" style="display: none;">
+                    <h2><i class="bi bi-sticky"></i> Notes</h2>
+                    <div class="notes-content" id="notesContent">-</div>
+                </div>
+            </div>
+
+            <!-- Right Column: Summary & Payments -->
+            <div>
+                <!-- Bill Summary -->
+                <div class="detail-card">
+                    <h2><i class="bi bi-receipt"></i> Bill Summary</h2>
+                    <div class="detail-row">
+                        <label>Bill Date:</label>
+                        <span class="value" id="billDate">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <label>Received Date:</label>
+                        <span class="value" id="receivedDate">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <label>Due Date:</label>
+                        <span class="value" id="billDueDate">-</span>
+                    </div>
+                    <div class="detail-row" id="locationRow" style="display: none;">
+                        <label>Location:</label>
+                        <span class="value" id="locationName">-</span>
+                    </div>
+                    <div class="detail-row" id="referenceRow" style="display: none;">
+                        <label>Reference #:</label>
+                        <span class="value" id="referenceNumber">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <label>Subtotal:</label>
+                        <span class="value" id="subtotal">$0.00</span>
+                    </div>
+                    <div class="detail-row">
+                        <label>Tax:</label>
+                        <span class="value" id="taxAmount">$0.00</span>
+                    </div>
+                    <div class="detail-row total">
+                        <label>Total Amount:</label>
+                        <span class="value" id="totalAmount">$0.00</span>
+                    </div>
+                    <div class="detail-row">
+                        <label>Amount Paid:</label>
+                        <span class="value" id="paidAmount">$0.00</span>
+                    </div>
+                    <div class="detail-row balance">
+                        <label>Balance Due:</label>
+                        <span class="value" id="balanceDue">$0.00</span>
+                    </div>
+                </div>
+
+                <!-- Payment History -->
+                <div class="detail-card" style="margin-top: 1.5rem;">
+                    <h2><i class="bi bi-cash-stack"></i> Payment History</h2>
+                    <div id="paymentHistoryContent">
+                        <div class="empty-state">
+                            <i class="bi bi-cash"></i>
+                            <p>No payments recorded</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Audit Info -->
+                <div class="detail-card" style="margin-top: 1.5rem;">
+                    <h2><i class="bi bi-info-circle"></i> Audit Trail</h2>
+                    <div class="detail-row">
+                        <label>Created By:</label>
+                        <span class="value" id="createdBy">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <label>Created Date:</label>
+                        <span class="value" id="createdDate">-</span>
+                    </div>
+                    <div class="detail-row" id="approvedByRow" style="display: none;">
+                        <label>Approved By:</label>
+                        <span class="value" id="approvedBy">-</span>
+                    </div>
+                    <div class="detail-row" id="approvedDateRow" style="display: none;">
+                        <label>Approved Date:</label>
+                        <span class="value" id="approvedDate">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Modal (reuse from vendor_bills.html) -->
+<div id="paymentModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;">
+    <div class="modal-content" style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; border-bottom: 1px solid #30363d;">
+            <h3 style="margin: 0; color: #c9d1d9;"><i class="bi bi-cash-coin"></i> Record Payment</h3>
+            <button class="modal-close" onclick="closePaymentModal()" style="background: none; border: none; color: #8b949e; font-size: 1.5rem; cursor: pointer; padding: 0; width: 2rem; height: 2rem;">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 1.5rem;">
+            <!-- Bill Summary -->
+            <div class="bill-summary" style="background: #0d1117; padding: 1rem; border-radius: 6px; border: 1px solid #30363d; margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <label style="color: #8b949e;">Vendor:</label>
+                    <span class="value" id="payVendorName" style="color: #c9d1d9;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <label style="color: #8b949e;">Bill Number:</label>
+                    <span class="value" id="payBillNumber" style="color: #c9d1d9;">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <label style="color: #8b949e;">Total Amount:</label>
+                    <span class="value" id="payTotalAmount" style="color: #c9d1d9;">$0.00</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <label style="color: #8b949e;">Already Paid:</label>
+                    <span class="value" id="payPaidAmount" style="color: #c9d1d9;">$0.00</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <label style="color: #8b949e; font-weight: 600;">Balance Due:</label>
+                    <span class="value" id="payBalanceDue" style="color: #c9d1d9; font-weight: 600;">$0.00</span>
+                </div>
+            </div>
+
+            <!-- Payment Form -->
+            <form id="paymentForm" onsubmit="handlePaymentSubmit(event)">
+                <input type="hidden" id="payBillId">
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; color: #c9d1d9; margin-bottom: 0.5rem;">Payment Date <span style="color: #f85149;">*</span></label>
+                    <input type="date" id="paymentDate" required style="width: 100%; padding: 0.5rem; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; color: #c9d1d9; margin-bottom: 0.5rem;">Payment Amount <span style="color: #f85149;">*</span></label>
+                    <input type="number" id="paymentAmount" step="0.01" min="0.01" required placeholder="0.00" style="width: 100%; padding: 0.5rem; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px;">
+                    <small style="color: #8b949e; display: block; margin-top: 0.25rem;">
+                        Maximum: <span id="payMaxAmount">$0.00</span>
+                    </small>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; color: #c9d1d9; margin-bottom: 0.5rem;">Payment Method <span style="color: #f85149;">*</span></label>
+                    <select id="paymentMethod" required style="width: 100%; padding: 0.5rem; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px;">
+                        <option value="">Select Method...</option>
+                        <option value="CHECK">Check</option>
+                        <option value="ACH">ACH/Bank Transfer</option>
+                        <option value="WIRE">Wire Transfer</option>
+                        <option value="CREDIT_CARD">Credit Card</option>
+                        <option value="DEBIT_CARD">Debit Card</option>
+                        <option value="CASH">Cash</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; color: #c9d1d9; margin-bottom: 0.5rem;">Bank Account <span style="color: #f85149;">*</span></label>
+                    <select id="paymentBankAccount" required style="width: 100%; padding: 0.5rem; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px;">
+                        <option value="">Select Bank Account...</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; color: #c9d1d9; margin-bottom: 0.5rem;">Reference Number</label>
+                    <input type="text" id="paymentReference" placeholder="Check #, Confirmation #, etc." style="width: 100%; padding: 0.5rem; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; color: #c9d1d9; margin-bottom: 0.5rem;">Notes</label>
+                    <textarea id="paymentNotes" rows="3" placeholder="Payment notes" style="width: 100%; padding: 0.5rem; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 4px;"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; padding: 1.5rem; border-top: 1px solid #30363d;">
+            <button type="button" class="btn btn-secondary" onclick="closePaymentModal()">Cancel</button>
+            <button type="submit" form="paymentForm" class="btn btn-success">
+                <i class="bi bi-check-circle"></i> Record Payment
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let billData = null;
+let accounts = [];
+const billId = parseInt(window.location.pathname.split('/').pop());
+
+// Format currency
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(amount || 0);
+}
+
+// Format date
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// Format datetime
+function formatDateTime(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// Format payment method
+function formatPaymentMethod(method) {
+    const methods = {
+        'CHECK': 'Check',
+        'ACH': 'ACH',
+        'WIRE': 'Wire',
+        'CREDIT_CARD': 'Credit Card',
+        'DEBIT_CARD': 'Debit Card',
+        'CASH': 'Cash',
+        'OTHER': 'Other'
+    };
+    return methods[method] || method;
+}
+
+// Load accounts for payment dropdown
+async function loadAccounts() {
+    try {
+        const response = await fetch('/accounting/api/accounts/?limit=1000');
+        if (response.ok) {
+            accounts = await response.json();
+            accounts.sort((a, b) => a.account_number.localeCompare(b.account_number));
+
+            // Populate bank account dropdown (Asset accounts starting with 1)
+            const bankAccounts = accounts.filter(a => a.account_number.startsWith('1'));
+            const bankOptions = bankAccounts.map(acc =>
+                `<option value="${acc.id}">${acc.account_number} - ${acc.account_name}</option>`
+            ).join('');
+
+            const paymentBankAccount = document.getElementById('paymentBankAccount');
+            if (paymentBankAccount) {
+                paymentBankAccount.innerHTML = '<option value="">Select Bank Account...</option>' + bankOptions;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading accounts:', error);
+    }
+}
+
+// Load bill details
+async function loadBillDetails() {
+    try {
+        document.getElementById('loadingState').style.display = 'block';
+        document.getElementById('errorState').style.display = 'none';
+        document.getElementById('billContent').style.display = 'none';
+
+        const response = await fetch(`/accounting/api/vendor-bills/${billId}`);
+        if (!response.ok) {
+            throw new Error(`Failed to load bill: ${response.statusText}`);
+        }
+
+        billData = await response.json();
+        displayBillDetails(billData);
+
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('billContent').style.display = 'block';
+    } catch (error) {
+        console.error('Error loading bill:', error);
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('errorState').textContent = error.message;
+        document.getElementById('errorState').style.display = 'block';
+    }
+}
+
+// Display bill details
+function displayBillDetails(bill) {
+    // Header
+    document.getElementById('vendorName').textContent = bill.vendor_name;
+    document.getElementById('billNumber').textContent = bill.bill_number;
+    document.getElementById('dueDate').textContent = formatDate(bill.due_date);
+
+    // Status badge
+    const statusBadge = document.getElementById('statusBadge');
+    statusBadge.textContent = bill.status.replace('_', ' ');
+    statusBadge.className = 'status-badge status-' + bill.status;
+
+    // Action buttons
+    renderActionButtons(bill);
+
+    // Summary
+    document.getElementById('billDate').textContent = formatDate(bill.bill_date);
+    document.getElementById('receivedDate').textContent = formatDate(bill.received_date);
+    document.getElementById('billDueDate').textContent = formatDate(bill.due_date);
+    document.getElementById('subtotal').textContent = formatCurrency(bill.subtotal);
+    document.getElementById('taxAmount').textContent = formatCurrency(bill.tax_amount);
+    document.getElementById('totalAmount').textContent = formatCurrency(bill.total_amount);
+    document.getElementById('paidAmount').textContent = formatCurrency(bill.paid_amount);
+    document.getElementById('balanceDue').textContent = formatCurrency(bill.balance_due);
+
+    // Location
+    if (bill.area) {
+        document.getElementById('locationRow').style.display = 'flex';
+        document.getElementById('locationName').textContent = bill.area.name;
+    }
+
+    // Reference
+    if (bill.reference_number) {
+        document.getElementById('referenceRow').style.display = 'flex';
+        document.getElementById('referenceNumber').textContent = bill.reference_number;
+    }
+
+    // Line items
+    if (bill.line_items && bill.line_items.length > 0) {
+        renderLineItems(bill.line_items);
+    }
+
+    // Payment history
+    if (bill.payments && bill.payments.length > 0) {
+        renderPaymentHistory(bill.payments);
+    }
+
+    // Notes
+    if (bill.notes) {
+        document.getElementById('notesCard').style.display = 'block';
+        document.getElementById('notesContent').textContent = bill.notes;
+    }
+
+    // Audit trail
+    if (bill.creator) {
+        document.getElementById('createdBy').textContent = bill.creator.email;
+    }
+    document.getElementById('createdDate').textContent = formatDateTime(bill.created_at);
+
+    if (bill.approver) {
+        document.getElementById('approvedByRow').style.display = 'flex';
+        document.getElementById('approvedBy').textContent = bill.approver.email;
+    }
+    if (bill.approved_date) {
+        document.getElementById('approvedDateRow').style.display = 'flex';
+        document.getElementById('approvedDate').textContent = formatDateTime(bill.approved_date);
+    }
+}
+
+// Render action buttons based on bill status
+function renderActionButtons(bill) {
+    const buttonsHtml = [];
+
+    // Normalize status to lowercase for comparison
+    const status = bill.status.toLowerCase();
+    console.log('Bill status:', bill.status, '→ normalized:', status);
+
+    if (status === 'draft') {
+        buttonsHtml.push(`
+            <button class="btn btn-primary" onclick="submitForApproval()">
+                <i class="bi bi-send"></i> Submit for Approval
+            </button>
+        `);
+    }
+
+    if (status === 'pending_approval') {
+        console.log('Rendering approval buttons');
+        buttonsHtml.push(`
+            <button class="btn btn-success" onclick="approveBill()">
+                <i class="bi bi-check-circle"></i> Approve
+            </button>
+            <button class="btn btn-danger" onclick="rejectBill()">
+                <i class="bi bi-x-circle"></i> Reject
+            </button>
+        `);
+    }
+
+    if (status === 'approved' || status === 'partially_paid') {
+        buttonsHtml.push(`
+            <button class="btn btn-success" onclick="showPaymentModal(${bill.id})">
+                <i class="bi bi-cash-coin"></i> Record Payment
+            </button>
+        `);
+    }
+
+    if (status === 'draft' || status === 'pending_approval') {
+        buttonsHtml.push(`
+            <button class="btn btn-danger" onclick="voidBill()">
+                <i class="bi bi-slash-circle"></i> Void
+            </button>
+        `);
+    }
+
+    document.getElementById('actionButtons').innerHTML = buttonsHtml.join('');
+}
+
+// Render line items table
+function renderLineItems(lineItems) {
+    const tableHtml = `
+        <table class="line-items-table">
+            <thead>
+                <tr>
+                    <th>Account</th>
+                    <th>Description</th>
+                    <th style="text-align: right;">Amount</th>
+                    <th style="text-align: right;">Tax</th>
+                    <th style="text-align: right;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${lineItems.map(line => `
+                    <tr>
+                        <td>
+                            <div>${line.account.account_number}</div>
+                            <div class="account-code">${line.account.account_name}</div>
+                        </td>
+                        <td>${line.description || '-'}</td>
+                        <td style="text-align: right;">${formatCurrency(line.amount)}</td>
+                        <td style="text-align: right;">${formatCurrency(line.tax_amount)}</td>
+                        <td style="text-align: right;" class="line-total">${formatCurrency(parseFloat(line.amount) + parseFloat(line.tax_amount))}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+    document.getElementById('lineItemsContent').innerHTML = tableHtml;
+}
+
+// Render payment history
+function renderPaymentHistory(payments) {
+    const paymentsHtml = payments.map(payment => `
+        <div class="payment-item">
+            <div class="payment-header">
+                <span class="payment-amount">${formatCurrency(payment.amount)}</span>
+                <span class="payment-method-badge">${formatPaymentMethod(payment.payment_method)}</span>
+            </div>
+            <div class="payment-details">
+                <div><strong>Date:</strong> ${formatDate(payment.payment_date)}</div>
+                ${payment.reference_number ? `<div><strong>Reference:</strong> ${payment.reference_number}</div>` : ''}
+                ${payment.bank_account ? `<div><strong>Account:</strong> ${payment.bank_account.account_number} - ${payment.bank_account.account_name}</div>` : ''}
+                ${payment.notes ? `<div><strong>Notes:</strong> ${payment.notes}</div>` : ''}
+            </div>
+        </div>
+    `).join('');
+    document.getElementById('paymentHistoryContent').innerHTML = paymentsHtml;
+}
+
+// Action handlers
+async function submitForApproval() {
+    if (!await showConfirm('Submit this bill for approval?', 'Submit for Approval')) return;
+
+    try {
+        const response = await fetch(`/accounting/api/vendor-bills/${billId}/submit`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to submit bill');
+        }
+
+        showNotification('Bill submitted for approval', 'Success');
+        loadBillDetails();
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+async function approveBill() {
+    if (!await showConfirm('Approve this bill for payment?', 'Approve Bill')) return;
+
+    try {
+        const response = await fetch(`/accounting/api/vendor-bills/${billId}/approve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approve: true, notes: null })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to approve bill');
+        }
+
+        showNotification('Bill approved and ready for payment', 'Bill Approved');
+        loadBillDetails();
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+async function rejectBill() {
+    const reason = prompt('Reason for rejection:');
+    if (!reason) return;
+
+    try {
+        const response = await fetch(`/accounting/api/vendor-bills/${billId}/approve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ approve: false, notes: reason })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to reject bill');
+        }
+
+        showNotification('Bill rejected and returned to DRAFT status', 'Bill Rejected');
+        loadBillDetails();
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+async function voidBill() {
+    if (!await showConfirm('Void this bill? This action cannot be undone.', 'Void Bill')) return;
+
+    try {
+        const response = await fetch(`/accounting/api/vendor-bills/${billId}/void`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to void bill');
+        }
+
+        showNotification('Bill voided', 'Bill Voided');
+        loadBillDetails();
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+// Payment modal functions
+let currentBillForPayment = null;
+
+async function showPaymentModal(billId) {
+    currentBillForPayment = billData;
+
+    // Populate bill summary
+    document.getElementById('payBillId').value = billData.id;
+    document.getElementById('payVendorName').textContent = billData.vendor_name;
+    document.getElementById('payBillNumber').textContent = billData.bill_number;
+    document.getElementById('payTotalAmount').textContent = formatCurrency(billData.total_amount);
+    document.getElementById('payPaidAmount').textContent = formatCurrency(billData.paid_amount);
+    document.getElementById('payBalanceDue').textContent = formatCurrency(billData.balance_due);
+    document.getElementById('payMaxAmount').textContent = formatCurrency(billData.balance_due);
+
+    // Set payment date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('paymentDate').value = today;
+
+    // Set max amount
+    document.getElementById('paymentAmount').max = billData.balance_due;
+    document.getElementById('paymentAmount').value = billData.balance_due;
+
+    // Show modal
+    document.getElementById('paymentModal').style.display = 'flex';
+}
+
+function closePaymentModal() {
+    document.getElementById('paymentModal').style.display = 'none';
+    document.getElementById('paymentForm').reset();
+    currentBillForPayment = null;
+}
+
+async function handlePaymentSubmit(event) {
+    event.preventDefault();
+
+    const amount = parseFloat(document.getElementById('paymentAmount').value);
+    const maxAmount = currentBillForPayment ? currentBillForPayment.balance_due : 0;
+
+    if (amount <= 0) {
+        showNotification('Payment amount must be greater than zero', 'Invalid Amount');
+        return;
+    }
+
+    if (amount > maxAmount) {
+        showNotification(`Payment amount cannot exceed balance due (${formatCurrency(maxAmount)})`, 'Invalid Amount');
+        return;
+    }
+
+    const paymentData = {
+        bill_id: parseInt(document.getElementById('payBillId').value),
+        payment_date: document.getElementById('paymentDate').value,
+        amount: amount,
+        payment_method: document.getElementById('paymentMethod').value,
+        reference_number: document.getElementById('paymentReference').value || null,
+        bank_account_id: parseInt(document.getElementById('paymentBankAccount').value),
+        notes: document.getElementById('paymentNotes').value || null
+    };
+
+    try {
+        const response = await fetch(`/accounting/api/vendor-bills/${billId}/payments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(paymentData)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to record payment');
+        }
+
+        showNotification(`Payment of ${formatCurrency(amount)} recorded successfully`, 'Payment Recorded');
+        closePaymentModal();
+        loadBillDetails(); // Reload bill to show new payment
+    } catch (error) {
+        console.error('Error recording payment:', error);
+        showNotification('Error recording payment: ' + error.message, 'Error');
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadAccounts();
+    loadBillDetails();
+});
+</script>
+{% endblock %}

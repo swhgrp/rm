@@ -8,6 +8,8 @@ from datetime import datetime, date
 
 from accounting.db.database import get_db
 from accounting.models.fiscal_period import FiscalPeriod, FiscalPeriodStatus
+from accounting.models.user import User
+from accounting.api.auth import require_auth, require_admin
 from pydantic import BaseModel, Field
 
 
@@ -18,6 +20,13 @@ class FiscalPeriodCreate(BaseModel):
     quarter: Optional[int] = Field(None, ge=1, le=4)
     start_date: date
     end_date: date
+
+
+class FiscalPeriodUpdate(BaseModel):
+    period_name: Optional[str] = Field(None, max_length=50)
+    quarter: Optional[int] = Field(None, ge=1, le=4)
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
 
 
 class FiscalPeriodResponse(BaseModel):
@@ -44,7 +53,8 @@ def list_fiscal_periods(
     status: Optional[FiscalPeriodStatus] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
 ):
     """
     List fiscal periods with optional filters
@@ -87,9 +97,13 @@ def get_fiscal_period_by_year_name(year: int, period_name: str, db: Session = De
 
 
 @router.post("/", response_model=FiscalPeriodResponse, status_code=201)
-def create_fiscal_period(period: FiscalPeriodCreate, db: Session = Depends(get_db)):
+def create_fiscal_period(
+    period: FiscalPeriodCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin)
+):
     """
-    Create a new fiscal period
+    Create a new fiscal period (admin only)
     """
     # Check if period already exists
     existing = db.query(FiscalPeriod).filter(
@@ -121,10 +135,90 @@ def create_fiscal_period(period: FiscalPeriodCreate, db: Session = Depends(get_d
     return new_period
 
 
-@router.post("/{period_id}/close")
-def close_fiscal_period(period_id: int, db: Session = Depends(get_db)):
+@router.put("/{period_id}", response_model=FiscalPeriodResponse)
+def update_fiscal_period(
+    period_id: int,
+    period_update: FiscalPeriodUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin)
+):
     """
-    Close a fiscal period (prevent new entries)
+    Update a fiscal period (admin only)
+    """
+    period = db.query(FiscalPeriod).filter(FiscalPeriod.id == period_id).first()
+    if not period:
+        raise HTTPException(status_code=404, detail="Fiscal period not found")
+
+    # Can't update closed or locked periods
+    if period.status in [FiscalPeriodStatus.CLOSED, FiscalPeriodStatus.LOCKED]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot update {period.status.value.lower()} period"
+        )
+
+    # Update fields if provided
+    if period_update.period_name is not None:
+        period.period_name = period_update.period_name
+
+    if period_update.quarter is not None:
+        period.quarter = period_update.quarter
+
+    if period_update.start_date is not None:
+        period.start_date = period_update.start_date
+
+    if period_update.end_date is not None:
+        period.end_date = period_update.end_date
+
+    # Validate date range
+    if period.end_date <= period.start_date:
+        raise HTTPException(status_code=400, detail="End date must be after start date")
+
+    db.commit()
+    db.refresh(period)
+    return period
+
+
+@router.delete("/{period_id}")
+def delete_fiscal_period(
+    period_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin)
+):
+    """
+    Delete a fiscal period (admin only)
+    """
+    period = db.query(FiscalPeriod).filter(FiscalPeriod.id == period_id).first()
+    if not period:
+        raise HTTPException(status_code=404, detail="Fiscal period not found")
+
+    # Can't delete closed or locked periods
+    if period.status in [FiscalPeriodStatus.CLOSED, FiscalPeriodStatus.LOCKED]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot delete {period.status.value.lower()} period"
+        )
+
+    # TODO: Check if period has any journal entries
+    # if period has entries, raise HTTPException
+
+    db.delete(period)
+    db.commit()
+
+    return {
+        "message": "Fiscal period deleted successfully",
+        "year": period.year,
+        "period_name": period.period_name
+    }
+
+
+@router.post("/{period_id}/close")
+def close_fiscal_period(
+    period_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin)
+):
+    """
+    Close a fiscal period (admin only - prevents new entries)
     """
     period = db.query(FiscalPeriod).filter(FiscalPeriod.id == period_id).first()
     if not period:
@@ -138,7 +232,7 @@ def close_fiscal_period(period_id: int, db: Session = Depends(get_db)):
 
     period.status = FiscalPeriodStatus.CLOSED
     period.closed_at = datetime.utcnow()
-    # period.closed_by = current_user.id  # TODO: Add authentication
+    period.closed_by = user.id
 
     db.commit()
 
@@ -150,9 +244,13 @@ def close_fiscal_period(period_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{period_id}/reopen")
-def reopen_fiscal_period(period_id: int, db: Session = Depends(get_db)):
+def reopen_fiscal_period(
+    period_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin)
+):
     """
-    Reopen a closed fiscal period
+    Reopen a closed fiscal period (admin only)
     """
     period = db.query(FiscalPeriod).filter(FiscalPeriod.id == period_id).first()
     if not period:
@@ -178,9 +276,13 @@ def reopen_fiscal_period(period_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{period_id}/lock")
-def lock_fiscal_period(period_id: int, db: Session = Depends(get_db)):
+def lock_fiscal_period(
+    period_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin)
+):
     """
-    Lock a fiscal period (permanent, for audited periods)
+    Lock a fiscal period (admin only - permanent, for audited periods)
     """
     period = db.query(FiscalPeriod).filter(FiscalPeriod.id == period_id).first()
     if not period:
@@ -204,9 +306,13 @@ def lock_fiscal_period(period_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/create-year/{year}")
-def create_full_year(year: int, db: Session = Depends(get_db)):
+def create_full_year(
+    year: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_admin)
+):
     """
-    Create all 12 fiscal periods for a year
+    Create all 12 fiscal periods for a year (admin only)
     """
     from calendar import monthrange, month_name
 

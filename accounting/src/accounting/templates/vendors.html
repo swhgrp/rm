@@ -1,0 +1,557 @@
+{% extends "base.html" %}
+
+{% block title %}Vendors - Accounting System{% endblock %}
+{% block nav_vendors %}active{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0"><i class="bi bi-people"></i> Vendors</h2>
+            <p class="text-muted mb-0">Manage your suppliers and service providers</p>
+        </div>
+        <button class="btn btn-success" onclick="showCreateModal()">
+            <i class="bi bi-plus-circle"></i> Add Vendor
+        </button>
+    </div>
+
+    <!-- Vendors Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="mb-3">
+                <input type="text" class="form-control" id="searchBox" placeholder="Search vendors by name or code..." style="max-width: 400px;">
+            </div>
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Vendor Name</th>
+                        <th>Contact</th>
+                        <th>Phone</th>
+                        <th>City, State</th>
+                        <th>Payment Terms</th>
+                        <th>1099</th>
+                        <th>Status</th>
+                        <th style="width: 200px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="vendorsTable">
+                    <tr>
+                        <td colspan="9" class="text-center text-muted">Loading vendors...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+<div class="modal fade" id="vendorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="background-color: #161b22; border: 1px solid #30363d;">
+            <div class="modal-header" style="border-bottom: 1px solid #30363d;">
+                <h5 class="modal-title" id="modalTitle">Add Vendor</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <form id="vendorForm">
+                    <input type="hidden" id="vendorId">
+
+                    <!-- Basic Information -->
+                    <h6 class="mb-3"><i class="bi bi-info-circle"></i> Basic Information</h6>
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label for="vendorName" class="form-label">
+                                Vendor Name <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="vendorName"
+                                   placeholder="e.g., ABC Supplies Inc."
+                                   maxlength="200" required>
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="vendorCode" class="form-label">Vendor Code</label>
+                            <input type="text" class="form-control" id="vendorCode"
+                                   placeholder="e.g., ABC"
+                                   maxlength="50"
+                                   style="text-transform: uppercase;">
+                            <small class="text-muted">Optional short code</small>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Contact Information -->
+                    <h6 class="mb-3"><i class="bi bi-telephone"></i> Contact Information</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="contactName" class="form-label">Contact Name</label>
+                            <input type="text" class="form-control" id="contactName"
+                                   placeholder="Primary contact person"
+                                   maxlength="200">
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email"
+                                   placeholder="contact@vendor.com"
+                                   maxlength="100">
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="phone" class="form-label">Phone</label>
+                            <input type="tel" class="form-control" id="phone"
+                                   placeholder="(555) 123-4567"
+                                   maxlength="20">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="fax" class="form-label">Fax</label>
+                            <input type="tel" class="form-control" id="fax"
+                                   placeholder="(555) 123-4568"
+                                   maxlength="20">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="website" class="form-label">Website</label>
+                            <input type="url" class="form-control" id="website"
+                                   placeholder="https://vendor.com"
+                                   maxlength="200">
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Address -->
+                    <h6 class="mb-3"><i class="bi bi-map"></i> Address</h6>
+                    <div class="mb-3">
+                        <label for="addressLine1" class="form-label">Street Address</label>
+                        <input type="text" class="form-control" id="addressLine1"
+                               placeholder="123 Main Street"
+                               maxlength="200">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="addressLine2" class="form-label">Address Line 2</label>
+                        <input type="text" class="form-control" id="addressLine2"
+                               placeholder="Suite 100 (optional)"
+                               maxlength="200">
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="city" class="form-label">City</label>
+                            <input type="text" class="form-control" id="city"
+                                   placeholder="City"
+                                   maxlength="100">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="state" class="form-label">State</label>
+                            <input type="text" class="form-control" id="state"
+                                   placeholder="State"
+                                   maxlength="50">
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label for="zipCode" class="form-label">ZIP Code</label>
+                            <input type="text" class="form-control" id="zipCode"
+                                   placeholder="12345"
+                                   maxlength="20">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="country" class="form-label">Country</label>
+                        <input type="text" class="form-control" id="country"
+                               placeholder="United States"
+                               maxlength="100"
+                               value="United States">
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Tax & Payment Information -->
+                    <h6 class="mb-3"><i class="bi bi-cash-stack"></i> Tax & Payment Information</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="taxId" class="form-label">Tax ID (EIN/SSN)</label>
+                            <input type="text" class="form-control" id="taxId"
+                                   placeholder="XX-XXXXXXX"
+                                   maxlength="50">
+                            <small class="text-muted">For 1099 reporting</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label d-block">1099 Vendor</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="is1099Vendor">
+                                <label class="form-check-label" for="is1099Vendor">
+                                    Subject to 1099 reporting
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="paymentTerms" class="form-label">Payment Terms</label>
+                            <select class="form-select" id="paymentTerms">
+                                <option value="">Select...</option>
+                                <option value="Due on Receipt">Due on Receipt</option>
+                                <option value="Net 10">Net 10</option>
+                                <option value="Net 15">Net 15</option>
+                                <option value="Net 30">Net 30</option>
+                                <option value="Net 45">Net 45</option>
+                                <option value="Net 60">Net 60</option>
+                                <option value="Net 90">Net 90</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="creditLimit" class="form-label">Credit Limit ($)</label>
+                            <input type="number" class="form-control" id="creditLimit"
+                                   placeholder="0"
+                                   min="0" step="1">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="accountNumber" class="form-label">Account Number</label>
+                        <input type="text" class="form-control" id="accountNumber"
+                               placeholder="Our account number with this vendor"
+                               maxlength="100">
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Notes -->
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes"
+                                  rows="3"
+                                  placeholder="Additional notes about this vendor..."></textarea>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Status -->
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="vendorActive" checked>
+                            <label class="form-check-label" for="vendorActive">
+                                <strong>Active</strong>
+                            </label>
+                            <br>
+                            <small class="text-muted">Inactive vendors won't appear in dropdown selections</small>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #30363d;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="saveVendor()">
+                    <i class="bi bi-save"></i> Save Vendor
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background-color: #161b22; border: 1px solid #30363d;">
+            <div class="modal-header" style="border-bottom: 1px solid #30363d;">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete this vendor?</p>
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This vendor cannot be deleted if it has associated bills.
+                </div>
+                <div id="deleteVendorInfo"></div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #30363d;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let vendors = [];
+let editingVendorId = null;
+let deletingVendorId = null;
+let vendorModal, deleteModal;
+
+document.addEventListener('DOMContentLoaded', function() {
+    vendorModal = new bootstrap.Modal(document.getElementById('vendorModal'));
+    deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+
+    // Auto-uppercase vendor code input
+    document.getElementById('vendorCode').addEventListener('input', function(e) {
+        this.value = this.value.toUpperCase();
+    });
+
+    // Search functionality
+    document.getElementById('searchBox').addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        renderVendorsTable(searchTerm);
+    });
+
+    loadVendors();
+});
+
+async function loadVendors() {
+    try {
+        const response = await fetch('/accounting/api/vendors/?include_inactive=true');
+        if (!response.ok) {
+            throw new Error('Failed to load vendors');
+        }
+
+        vendors = await response.json();
+        renderVendorsTable();
+    } catch (error) {
+        console.error('Error loading vendors:', error);
+        showNotification('Error loading vendors', 'error');
+    }
+}
+
+function renderVendorsTable(searchTerm = '') {
+    const tbody = document.getElementById('vendorsTable');
+
+    let filteredVendors = vendors;
+    if (searchTerm) {
+        filteredVendors = vendors.filter(v =>
+            v.vendor_name.toLowerCase().includes(searchTerm) ||
+            (v.vendor_code && v.vendor_code.toLowerCase().includes(searchTerm))
+        );
+    }
+
+    if (filteredVendors.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" class="text-center text-muted">
+                    <i class="bi bi-info-circle"></i> No vendors found. Click "Add Vendor" to create one.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = filteredVendors.map(vendor => {
+        const cityState = [vendor.city, vendor.state].filter(Boolean).join(', ') || '-';
+
+        return `
+        <tr>
+            <td><strong>${vendor.vendor_code ? escapeHtml(vendor.vendor_code) : '<span class="text-muted">-</span>'}</strong></td>
+            <td>${escapeHtml(vendor.vendor_name)}</td>
+            <td>${vendor.contact_name ? escapeHtml(vendor.contact_name) : '<span class="text-muted">-</span>'}</td>
+            <td>${vendor.phone ? escapeHtml(vendor.phone) : '<span class="text-muted">-</span>'}</td>
+            <td>${escapeHtml(cityState)}</td>
+            <td>${vendor.payment_terms ? escapeHtml(vendor.payment_terms) : '<span class="text-muted">-</span>'}</td>
+            <td>
+                ${vendor.is_1099_vendor
+                    ? '<span class="badge bg-info">Yes</span>'
+                    : '<span class="badge bg-secondary">No</span>'}
+            </td>
+            <td>
+                ${vendor.is_active
+                    ? '<span class="badge bg-success">Active</span>'
+                    : '<span class="badge bg-secondary">Inactive</span>'}
+            </td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="editVendor(${vendor.id})" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="deleteVendor(${vendor.id})" title="Delete">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `}).join('');
+}
+
+function showCreateModal() {
+    editingVendorId = null;
+    document.getElementById('modalTitle').textContent = 'Add Vendor';
+    document.getElementById('vendorForm').reset();
+    document.getElementById('vendorId').value = '';
+    document.getElementById('vendorActive').checked = true;
+    document.getElementById('country').value = 'United States';
+    vendorModal.show();
+}
+
+function editVendor(id) {
+    const vendor = vendors.find(v => v.id === id);
+    if (!vendor) return;
+
+    editingVendorId = id;
+    document.getElementById('modalTitle').textContent = 'Edit Vendor';
+    document.getElementById('vendorId').value = id;
+    document.getElementById('vendorName').value = vendor.vendor_name;
+    document.getElementById('vendorCode').value = vendor.vendor_code || '';
+    document.getElementById('contactName').value = vendor.contact_name || '';
+    document.getElementById('email').value = vendor.email || '';
+    document.getElementById('phone').value = vendor.phone || '';
+    document.getElementById('fax').value = vendor.fax || '';
+    document.getElementById('website').value = vendor.website || '';
+    document.getElementById('addressLine1').value = vendor.address_line1 || '';
+    document.getElementById('addressLine2').value = vendor.address_line2 || '';
+    document.getElementById('city').value = vendor.city || '';
+    document.getElementById('state').value = vendor.state || '';
+    document.getElementById('zipCode').value = vendor.zip_code || '';
+    document.getElementById('country').value = vendor.country || 'United States';
+    document.getElementById('taxId').value = vendor.tax_id || '';
+    document.getElementById('is1099Vendor').checked = vendor.is_1099_vendor || false;
+    document.getElementById('paymentTerms').value = vendor.payment_terms || '';
+    document.getElementById('creditLimit').value = vendor.credit_limit || '';
+    document.getElementById('accountNumber').value = vendor.account_number || '';
+    document.getElementById('notes').value = vendor.notes || '';
+    document.getElementById('vendorActive').checked = vendor.is_active;
+
+    vendorModal.show();
+}
+
+async function saveVendor() {
+    const name = document.getElementById('vendorName').value.trim();
+
+    // Validation
+    if (!name) {
+        showNotification('Vendor name is required', 'error');
+        return;
+    }
+
+    const data = {
+        vendor_name: name,
+        vendor_code: document.getElementById('vendorCode').value.trim() || null,
+        contact_name: document.getElementById('contactName').value.trim() || null,
+        email: document.getElementById('email').value.trim() || null,
+        phone: document.getElementById('phone').value.trim() || null,
+        fax: document.getElementById('fax').value.trim() || null,
+        website: document.getElementById('website').value.trim() || null,
+        address_line1: document.getElementById('addressLine1').value.trim() || null,
+        address_line2: document.getElementById('addressLine2').value.trim() || null,
+        city: document.getElementById('city').value.trim() || null,
+        state: document.getElementById('state').value.trim() || null,
+        zip_code: document.getElementById('zipCode').value.trim() || null,
+        country: document.getElementById('country').value.trim() || null,
+        tax_id: document.getElementById('taxId').value.trim() || null,
+        is_1099_vendor: document.getElementById('is1099Vendor').checked,
+        payment_terms: document.getElementById('paymentTerms').value || null,
+        credit_limit: document.getElementById('creditLimit').value ? parseInt(document.getElementById('creditLimit').value) : null,
+        account_number: document.getElementById('accountNumber').value.trim() || null,
+        notes: document.getElementById('notes').value.trim() || null,
+        is_active: document.getElementById('vendorActive').checked
+    };
+
+    try {
+        let response;
+
+        if (editingVendorId) {
+            // Update existing vendor
+            response = await fetch(`/accounting/api/vendors/${editingVendorId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+        } else {
+            // Create new vendor
+            response = await fetch('/accounting/api/vendors/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save vendor');
+        }
+
+        showNotification(
+            editingVendorId ? 'Vendor updated successfully' : 'Vendor created successfully',
+            'success'
+        );
+
+        vendorModal.hide();
+        await loadVendors();
+
+    } catch (error) {
+        console.error('Error saving vendor:', error);
+        showNotification(error.message, 'error');
+    }
+}
+
+function deleteVendor(id) {
+    const vendor = vendors.find(v => v.id === id);
+    if (!vendor) return;
+
+    deletingVendorId = id;
+
+    document.getElementById('deleteVendorInfo').innerHTML = `
+        <p><strong>Code:</strong> ${escapeHtml(vendor.vendor_code || 'N/A')}</p>
+        <p><strong>Name:</strong> ${escapeHtml(vendor.vendor_name)}</p>
+    `;
+
+    deleteModal.show();
+}
+
+async function confirmDelete() {
+    if (!deletingVendorId) return;
+
+    try {
+        const response = await fetch(`/accounting/api/vendors/${deletingVendorId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete vendor');
+        }
+
+        showNotification('Vendor deleted successfully', 'success');
+        deleteModal.hide();
+        await loadVendors();
+
+    } catch (error) {
+        console.error('Error deleting vendor:', error);
+        showNotification(error.message, 'error');
+    }
+}
+
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'error' ? 'danger' : 'success'} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+
+    document.body.appendChild(notification);
+
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

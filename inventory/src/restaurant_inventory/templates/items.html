@@ -1,0 +1,827 @@
+{% extends "base.html" %}
+
+{% block title %}Master Items - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-box"></i> Master Items</h1>
+    <button class="btn btn-primary" onclick="showAddItemModal()">
+        <i class="bi bi-plus-circle"></i> Add Item
+    </button>
+</div>
+
+<!-- Search and Filter Controls -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <label for="searchItems" class="form-label">Search Items</label>
+                <input type="text" class="form-control" id="searchItems" placeholder="Search by name or description...">
+            </div>
+            <div class="col-md-3">
+                <label for="categoryFilter" class="form-label">Category</label>
+                <select class="form-select" id="categoryFilter">
+                    <option value="">All Categories</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="statusFilter" class="form-label">Status</label>
+                <select class="form-select" id="statusFilter">
+                    <option value="">All Items</option>
+                    <option value="active">Active Only</option>
+                    <option value="inactive">Inactive Only</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label">&nbsp;</label>
+                <button class="btn btn-outline-secondary d-block w-100" onclick="clearFilters()">
+                    <i class="bi bi-x-circle"></i> Clear
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Items Table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5>All Items</h5>
+        <span id="itemCount" class="badge bg-secondary">0 items</span>
+    </div>
+    <div class="card-body">
+        <div id="itemsTable">
+            <div class="loading">
+                <div class="spinner-border" role="status"></div>
+                <p>Loading items...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Vendor Upload Modal -->
+<div class="modal fade" id="vendorUploadModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Import Vendor Item List</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Step 1: File Upload -->
+                <div id="uploadStep">
+                    <h6>Step 1: Upload File</h6>
+                    <p class="text-muted">Upload a CSV or Excel file containing your vendor's item list.</p>
+                    <div class="mb-3">
+                        <label for="vendorFileInput" class="form-label">Select File (CSV, XLS, XLSX)</label>
+                        <input type="file" class="form-control" id="vendorFileInput" accept=".csv,.xlsx,.xls">
+                    </div>
+                    <button class="btn btn-primary" onclick="uploadVendorFile()">
+                        <i class="bi bi-upload"></i> Upload & Parse
+                    </button>
+                </div>
+
+                <!-- Step 2: Column Mapping -->
+                <div id="mappingStep" style="display: none;">
+                    <h6>Step 2: Map Columns</h6>
+                    <p class="text-muted">Map the vendor file columns to our system fields. We've suggested mappings based on column names.</p>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>Vendor Column</strong>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Maps To</strong>
+                        </div>
+                    </div>
+
+                    <div id="columnMappingList"></div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="updateExisting" checked>
+                        <label class="form-check-label" for="updateExisting">
+                            Update existing items (matches by vendor item code)
+                        </label>
+                    </div>
+
+                    <button class="btn btn-secondary me-2" onclick="backToUpload()">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </button>
+                    <button class="btn btn-primary" onclick="showPreview()">
+                        Preview Import <i class="bi bi-arrow-right"></i>
+                    </button>
+                </div>
+
+                <!-- Step 3: Preview & Import -->
+                <div id="previewStep" style="display: none;">
+                    <h6>Step 3: Preview & Import</h6>
+                    <p class="text-muted">Review the items that will be imported.</p>
+
+                    <div class="alert alert-info">
+                        <strong id="previewSummary"></strong>
+                    </div>
+
+                    <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Vendor Code</th>
+                                    <th>Name</th>
+                                    <th>Pack Size</th>
+                                    <th>Unit Cost</th>
+                                    <th>Category</th>
+                                    <th>Unit</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewTableBody"></tbody>
+                        </table>
+                    </div>
+
+                    <button class="btn btn-secondary me-2" onclick="backToMapping()">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </button>
+                    <button class="btn btn-success" onclick="importVendorItems()">
+                        <i class="bi bi-check-circle"></i> Import Items
+                    </button>
+                </div>
+
+                <!-- Import Progress -->
+                <div id="importingStep" style="display: none;">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary mb-3" role="status"></div>
+                        <p>Importing items...</p>
+                    </div>
+                </div>
+
+                <!-- Import Complete -->
+                <div id="completeStep" style="display: none;">
+                    <div class="alert alert-success">
+                        <h5><i class="bi bi-check-circle"></i> Import Complete!</h5>
+                        <div id="importResults"></div>
+                    </div>
+                    <button class="btn btn-primary" onclick="closeVendorUploadModal()">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Item Modal -->
+<div class="modal fade" id="itemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="itemModalTitle">Add Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="itemForm">
+                    <input type="hidden" id="itemId">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="mb-3">
+                                <label for="itemName" class="form-label">Item Name *</label>
+                                <input type="text" class="form-control" id="itemName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="itemSku" class="form-label">SKU</label>
+                                <input type="text" class="form-control" id="itemSku">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="itemDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="itemDescription" rows="3"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="itemCategory" class="form-label">Category *</label>
+                                <input type="text" class="form-control" id="itemCategory" list="categoryList" required>
+                                <datalist id="categoryList"></datalist>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="itemUnitId" class="form-label">Primary Unit *</label>
+                                <select class="form-select" id="itemUnitId" required>
+                                    <option value="">Select a unit...</option>
+                                </select>
+                                <small class="form-text text-muted">The unit you'll count in</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="itemSecondaryUnitId" class="form-label">Secondary Unit (Optional)</label>
+                                <select class="form-select" id="itemSecondaryUnitId">
+                                    <option value="">No secondary unit</option>
+                                </select>
+                                <small class="form-text text-muted">Larger unit for conversion (e.g., Case - 6 contains 6 Each)</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="itemCurrentCost" class="form-label">Current Cost</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="itemCurrentCost" step="0.01" min="0">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="itemBarcode" class="form-label">Barcode</label>
+                                <input type="text" class="form-control" id="itemBarcode">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="itemActive" checked>
+                        <label class="form-check-label" for="itemActive">Active Item</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveItem()">Save Item</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let items = [];
+let categories = [];
+let editingItemId = null;
+let unitsOfMeasure = [];
+
+// Helper function for API requests
+async function apiRequest(url, options = {}) {
+    const token = localStorage.getItem('token');
+    const defaultOptions = {
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+        }
+    };
+
+    const response = await fetch(url, { ...defaultOptions, ...options });
+
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+}
+
+// Check if user is authenticated
+function isAuthenticated() {
+    return !!localStorage.getItem('token');
+}
+
+async function loadUnitsOfMeasure() {
+    try {
+        const response = await apiRequest('api/units/');
+        unitsOfMeasure = response;
+        // Don't populate dropdowns here - they don't exist yet
+        // They will be populated when modal opens
+    } catch (error) {
+        console.error('Error loading units of measure:', error);
+        showAlert('Error loading units of measure', 'danger');
+    }
+}
+
+function populateUnitDropdowns() {
+    const primarySelect = document.getElementById("itemUnitId");
+    const secondarySelect = document.getElementById("itemSecondaryUnitId");
+
+    if (!primarySelect || !secondarySelect) return;
+
+    primarySelect.innerHTML = "<option value="">Select a unit...</option>";
+    unitsOfMeasure.forEach(unit => {
+        const option = document.createElement("option");
+        option.value = unit.id;
+        option.textContent = unit.name;
+        option.dataset.categoryId = unit.category_id;
+        primarySelect.appendChild(option);
+    });
+
+    updateSecondaryUnitsForCategory();
+}
+
+function updateSecondaryUnitsForCategory() {
+    const primarySelect = document.getElementById("itemUnitId");
+    const secondarySelect = document.getElementById("itemSecondaryUnitId");
+
+    if (!primarySelect || !secondarySelect) return;
+
+    const selectedPrimaryId = parseInt(primarySelect.value);
+    const selectedPrimaryUnit = unitsOfMeasure.find(u => u.id === selectedPrimaryId);
+
+    secondarySelect.innerHTML = "<option value="">No secondary unit</option>";
+
+    if (!selectedPrimaryUnit) return;
+
+    unitsOfMeasure
+        .filter(unit => unit.category_id === selectedPrimaryUnit.category_id)
+        .forEach(unit => {
+            const option = document.createElement("option");
+            option.value = unit.id;
+            option.textContent = unit.name;
+            secondarySelect.appendChild(option);
+        });
+}
+
+async function loadItems() {
+    try {
+        const response = await apiRequest('api/items/');
+        items = response;
+
+        // Load categories
+        const categoriesResponse = await apiRequest('api/items/categories');
+        categories = categoriesResponse.categories || [];
+
+        // Load units of measure
+        await loadUnitsOfMeasure();
+
+        displayItems();
+        updateCategoryFilter();
+        updateCategoryDatalist();
+
+    } catch (error) {
+        console.error('Error loading items:', error);
+        showAlert('Error loading items', 'danger');
+        document.getElementById('itemsTable').innerHTML = '<p class="text-danger">Error loading items</p>';
+    }
+}
+
+function displayItems() {
+    const container = document.getElementById('itemsTable');
+    const searchTerm = document.getElementById('searchItems').value.toLowerCase();
+    const categoryFilter = document.getElementById('categoryFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    
+    // Filter items
+    let filteredItems = items.filter(item => {
+        const matchesSearch = !searchTerm || 
+            item.name.toLowerCase().includes(searchTerm) || 
+            (item.description && item.description.toLowerCase().includes(searchTerm));
+            
+        const matchesCategory = !categoryFilter || item.category === categoryFilter;
+        
+        const matchesStatus = !statusFilter || 
+            (statusFilter === 'active' && item.is_active) ||
+            (statusFilter === 'inactive' && !item.is_active);
+            
+        return matchesSearch && matchesCategory && matchesStatus;
+    });
+    
+    document.getElementById('itemCount').textContent = `${filteredItems.length} items`;
+    
+    if (filteredItems.length === 0) {
+        container.innerHTML = '<p class="text-muted">No items found matching your criteria.</p>';
+        return;
+    }
+    
+    const html = `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Unit</th>
+                        <th>Current Cost</th>
+                        <th>SKU</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${filteredItems.map(item => `
+                        <tr>
+                            <td>
+                                <strong>${item.name}</strong>
+                                ${item.description ? `<br><small class="text-muted">${item.description}</small>` : ''}
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark">${item.category}</span>
+                            </td>
+                            <td>${item.unit_name || item.unit_of_measure || '<em class="text-muted">Not set</em>'}</td>
+                            <td>${item.current_cost ? formatCurrency(item.current_cost) : '<em class="text-muted">Not set</em>'}</td>
+                            <td>${item.sku || '<em class="text-muted">No SKU</em>'}</td>
+                            <td>
+                                <span class="badge ${item.is_active ? 'bg-success' : 'bg-secondary'}">
+                                    ${item.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" onclick="editItem(${item.id})" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn btn-outline-info" onclick="viewItemInventory(${item.id})" title="View Inventory">
+                                        <i class="bi bi-clipboard-data"></i>
+                                    </button>
+                                    <button class="btn btn-outline-danger" onclick="deleteItem(${item.id})" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+    
+    container.innerHTML = html;
+}
+
+function updateCategoryFilter() {
+    const select = document.getElementById('categoryFilter');
+    const currentValue = select.value;
+    
+    select.innerHTML = '<option value="">All Categories</option>';
+    
+    categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        option.textContent = category;
+        select.appendChild(option);
+    });
+    
+    select.value = currentValue;
+}
+
+function updateCategoryDatalist() {
+    const datalist = document.getElementById('categoryList');
+    datalist.innerHTML = '';
+    
+    categories.forEach(category => {
+        const option = document.createElement('option');
+        option.value = category;
+        datalist.appendChild(option);
+    });
+}
+
+function showAddItemModal() {
+    editingItemId = null;
+    document.getElementById('itemModalTitle').textContent = 'Add New Item';
+    document.getElementById('itemForm').reset();
+    document.getElementById('itemActive').checked = true;
+    populateUnitDropdowns(); // Populate units when modal opens
+    new bootstrap.Modal(document.getElementById('itemModal')).show();
+}
+
+function editItem(itemId) {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+
+    editingItemId = itemId;
+    document.getElementById('itemModalTitle').textContent = 'Edit Item';
+    document.getElementById('itemId').value = item.id;
+    document.getElementById('itemName').value = item.name;
+    document.getElementById('itemDescription').value = item.description || '';
+    document.getElementById('itemCategory').value = item.category;
+
+    // Populate dropdowns first, then set values
+    populateUnitDropdowns();
+    document.getElementById('itemUnitId').value = item.unit_of_measure_id || '';
+    document.getElementById('itemSecondaryUnitId').value = item.secondary_unit_id || '';
+
+    document.getElementById('itemCurrentCost').value = item.current_cost || '';
+    document.getElementById('itemSku').value = item.sku || '';
+    document.getElementById('itemBarcode').value = item.barcode || '';
+    document.getElementById('itemActive').checked = item.is_active;
+
+    new bootstrap.Modal(document.getElementById('itemModal')).show();
+}
+
+async function saveItem() {
+    const formData = {
+        name: document.getElementById('itemName').value,
+        description: document.getElementById('itemDescription').value || null,
+        category: document.getElementById('itemCategory').value,
+        unit_of_measure_id: parseInt(document.getElementById('itemUnitId').value) || null,
+        secondary_unit_id: parseInt(document.getElementById('itemSecondaryUnitId').value) || null,
+        current_cost: parseFloat(document.getElementById('itemCurrentCost').value) || null,
+        sku: document.getElementById('itemSku').value || null,
+        barcode: document.getElementById('itemBarcode').value || null,
+        is_active: document.getElementById('itemActive').checked
+    };
+    
+    try {
+        let response;
+        if (editingItemId) {
+            response = await apiRequest(`api/items/${editingItemId}`, {
+                method: 'PUT',
+                body: JSON.stringify(formData)
+            });
+        } else {
+            response = await apiRequest('api/items/', {
+                method: 'POST',
+                body: JSON.stringify(formData)
+            });
+        }
+        
+        showAlert(`Item ${editingItemId ? 'updated' : 'created'} successfully!`, 'success');
+        bootstrap.Modal.getInstance(document.getElementById('itemModal')).hide();
+        loadItems();
+        
+    } catch (error) {
+        console.error('Error saving item:', error);
+        showAlert('Error saving item', 'danger');
+    }
+}
+
+async function deleteItem(itemId) {
+    const item = items.find(i => i.id === itemId);
+    if (!item) return;
+    
+    if (!confirm(`Are you sure you want to delete "${item.name}"? This action cannot be undone.`)) {
+        return;
+    }
+    
+    try {
+        await apiRequest(`api/items/${itemId}`, {
+            method: 'DELETE'
+        });
+        
+        showAlert('Item deleted successfully!', 'success');
+        loadItems();
+        
+    } catch (error) {
+        console.error('Error deleting item:', error);
+        showAlert('Error deleting item. It may have inventory records.', 'danger');
+    }
+}
+
+function viewItemInventory(itemId) {
+    window.location.href = `/inventory?item=${itemId}`;
+}
+
+function clearFilters() {
+    document.getElementById('searchItems').value = '';
+    document.getElementById('categoryFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    displayItems();
+}
+
+// Vendor Upload Functions
+let vendorUploadData = {
+    columns: [],
+    sampleRows: [],
+    totalRows: 0,
+    suggestedMapping: {},
+    columnMapping: {},
+    parsedItems: []
+};
+
+function showVendorUploadModal() {
+    // Reset to step 1
+    document.getElementById('uploadStep').style.display = 'block';
+    document.getElementById('mappingStep').style.display = 'none';
+    document.getElementById('previewStep').style.display = 'none';
+    document.getElementById('importingStep').style.display = 'none';
+    document.getElementById('completeStep').style.display = 'none';
+    document.getElementById('vendorFileInput').value = '';
+
+    const modal = new bootstrap.Modal(document.getElementById('vendorUploadModal'));
+    modal.show();
+}
+
+async function uploadVendorFile() {
+    const fileInput = document.getElementById('vendorFileInput');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        showAlert('Please select a file', 'warning');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('api/items/parse-vendor-upload', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Upload failed');
+        }
+
+        const result = await response.json();
+
+        vendorUploadData.columns = result.columns;
+        vendorUploadData.sampleRows = result.sample_rows;
+        vendorUploadData.totalRows = result.total_rows;
+        vendorUploadData.suggestedMapping = result.suggested_mapping;
+        vendorUploadData.columnMapping = {...result.suggested_mapping};
+
+        // Show mapping step
+        buildColumnMapping();
+        document.getElementById('uploadStep').style.display = 'none';
+        document.getElementById('mappingStep').style.display = 'block';
+
+    } catch (error) {
+        showAlert('Error uploading file: ' + error.message, 'danger');
+    }
+}
+
+function buildColumnMapping() {
+    const container = document.getElementById('columnMappingList');
+    container.innerHTML = '';
+
+    const ourFields = [
+        { value: '', label: '(Skip this column)' },
+        { value: 'vendor_item_code', label: 'Vendor Item Code' },
+        { value: 'name', label: 'Item Name' },
+        { value: 'pack_size', label: 'Pack Size' },
+        { value: 'unit_cost', label: 'Unit Cost' },
+        { value: 'category', label: 'Category' },
+        { value: 'unit', label: 'Unit' }
+    ];
+
+    vendorUploadData.columns.forEach(col => {
+        const row = document.createElement('div');
+        row.className = 'row mb-2 align-items-center';
+
+        const suggested = vendorUploadData.suggestedMapping[col] || '';
+
+        row.innerHTML = `
+            <div class="col-md-6">
+                <input type="text" class="form-control" value="${col}" readonly>
+            </div>
+            <div class="col-md-6">
+                <select class="form-select" data-vendor-col="${col}">
+                    ${ourFields.map(f => `
+                        <option value="${f.value}" ${f.value === suggested ? 'selected' : ''}>
+                            ${f.label}
+                        </option>
+                    `).join('')}
+                </select>
+            </div>
+        `;
+
+        container.appendChild(row);
+    });
+
+    // Add change listeners
+    container.querySelectorAll('select').forEach(select => {
+        select.addEventListener('change', (e) => {
+            const vendorCol = e.target.dataset.vendorCol;
+            const ourField = e.target.value;
+
+            if (ourField) {
+                vendorUploadData.columnMapping[vendorCol] = ourField;
+            } else {
+                delete vendorUploadData.columnMapping[vendorCol];
+            }
+        });
+    });
+}
+
+function backToUpload() {
+    document.getElementById('mappingStep').style.display = 'none';
+    document.getElementById('uploadStep').style.display = 'block';
+}
+
+async function showPreview() {
+    // Re-parse file with the mapping
+    const fileInput = document.getElementById('vendorFileInput');
+    const file = fileInput.files[0];
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // The import endpoint needs column_mapping as JSON in the FormData
+    // But we can't send it that way easily, so let's parse it client-side
+    // Actually, let's just show a preview based on sample rows
+
+    // Build preview from sample rows
+    const previewItems = vendorUploadData.sampleRows.map(row => {
+        const item = {};
+        for (const [vendorCol, ourField] of Object.entries(vendorUploadData.columnMapping)) {
+            item[ourField] = row[vendorCol];
+        }
+        return item;
+    });
+
+    const tbody = document.getElementById('previewTableBody');
+    tbody.innerHTML = '';
+
+    previewItems.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${item.vendor_item_code || ''}</td>
+            <td>${item.name || ''}</td>
+            <td>${item.pack_size || ''}</td>
+            <td>${item.unit_cost ? '$' + parseFloat(item.unit_cost).toFixed(2) : ''}</td>
+            <td>${item.category || ''}</td>
+            <td>${item.unit || ''}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    document.getElementById('previewSummary').textContent =
+        `Ready to import ${vendorUploadData.totalRows} items (showing first ${previewItems.length})`;
+
+    document.getElementById('mappingStep').style.display = 'none';
+    document.getElementById('previewStep').style.display = 'block';
+}
+
+function backToMapping() {
+    document.getElementById('previewStep').style.display = 'none';
+    document.getElementById('mappingStep').style.display = 'block';
+}
+
+async function importVendorItems() {
+    document.getElementById('previewStep').style.display = 'none';
+    document.getElementById('importingStep').style.display = 'block';
+
+    const fileInput = document.getElementById('vendorFileInput');
+    const file = fileInput.files[0];
+    const updateExisting = document.getElementById('updateExisting').checked;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('column_mapping', JSON.stringify(vendorUploadData.columnMapping));
+    formData.append('update_existing', updateExisting);
+
+    try {
+        const response = await fetch('api/items/import-vendor-items', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Import failed');
+        }
+
+        const result = await response.json();
+
+        document.getElementById('importingStep').style.display = 'none';
+        document.getElementById('completeStep').style.display = 'block';
+
+        document.getElementById('importResults').innerHTML = `
+            <p><strong>Created:</strong> ${result.created} items</p>
+            <p><strong>Updated:</strong> ${result.updated} items</p>
+            <p><strong>Skipped:</strong> ${result.skipped} items</p>
+            <p><strong>Total Processed:</strong> ${result.total} rows</p>
+        `;
+
+        // Reload items list
+        await loadItems();
+
+    } catch (error) {
+        document.getElementById('importingStep').style.display = 'none';
+        document.getElementById('previewStep').style.display = 'block';
+        showAlert('Error importing items: ' + error.message, 'danger');
+    }
+}
+
+function closeVendorUploadModal() {
+    bootstrap.Modal.getInstance(document.getElementById('vendorUploadModal')).hide();
+}
+
+// Event listeners for filters
+document.getElementById('searchItems').addEventListener('input', displayItems);
+document.getElementById('categoryFilter').addEventListener('change', displayItems);
+document.getElementById('statusFilter').addEventListener('change', displayItems);
+
+// Load items when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    if (!isAuthenticated()) {
+        window.location.href = '/login';
+        return;
+    }
+    
+    loadItems();
+
+    // Setup primary unit change listener
+    document.addEventListener("change", function(e) {
+        if (e.target && e.target.id === "itemUnitId") {
+            updateSecondaryUnitsForCategory();
+        }
+    });
+});
+</script>
+{% endblock %}

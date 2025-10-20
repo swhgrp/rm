@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}HR Management{% endblock %}</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+        }
+
+        /* ========== SIDEBAR NAVIGATION ========== */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 200px;
+            background-color: #161b22;
+            padding-top: 20px;
+            z-index: 1000;
+            overflow-y: auto;
+            border-right: 1px solid #30363d;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .sidebar-brand {
+            padding: 20px 15px;
+            text-align: center;
+            color: #58a6ff;
+            font-size: 16px;
+            font-weight: 600;
+            border-bottom: 1px solid #30363d;
+            margin-bottom: 10px;
+        }
+
+        .sidebar-brand img {
+            max-width: 180px;
+            height: auto;
+            margin-bottom: 0px;
+        }
+
+        .sidebar-nav {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .sidebar-nav li {
+            margin: 0;
+        }
+
+        .sidebar-nav a {
+            display: block;
+            padding: 12px 20px;
+            color: #8b949e;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .sidebar-nav i {
+            margin-right: 10px;
+            font-size: 16px;
+            width: 20px;
+            display: inline-block;
+        }
+
+        .sidebar-nav a:hover,
+        .sidebar-nav a.active {
+            background-color: #21262d;
+            color: #58a6ff;
+            border-left: 3px solid #58a6ff;
+            padding-left: 17px;
+        }
+
+        /* Collapsible submenu */
+        .sidebar-nav .menu-toggle {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            padding: 12px 20px;
+            color: #8b949e;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .sidebar-nav .menu-toggle:hover {
+            background-color: #21262d;
+            color: #58a6ff;
+        }
+
+        .sidebar-nav .menu-toggle i {
+            margin-right: 10px;
+            font-size: 16px;
+            width: 20px;
+            display: inline-block;
+        }
+
+        .sidebar-nav .menu-toggle .arrow {
+            transition: transform 0.2s;
+            font-size: 10px;
+            margin-left: 5px;
+        }
+
+        .sidebar-nav .menu-toggle.expanded .arrow {
+            transform: rotate(90deg);
+        }
+
+        .sidebar-nav .submenu {
+            display: none;
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            background-color: #0d1117;
+        }
+
+        .sidebar-nav .submenu.expanded {
+            display: block;
+        }
+
+        .sidebar-nav .submenu li {
+            margin: 0;
+        }
+
+        .sidebar-nav .submenu a {
+            display: block;
+            padding: 10px 20px 10px 45px;
+            color: #8b949e;
+            text-decoration: none;
+            font-size: 13px;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar-nav .submenu i {
+            margin-right: 8px;
+            font-size: 14px;
+            width: 16px;
+            display: inline-block;
+        }
+
+        .sidebar-nav .submenu a:hover,
+        .sidebar-nav .submenu a.active {
+            background-color: #161b22;
+            color: #58a6ff;
+            border-left: 3px solid #58a6ff;
+            padding-left: 42px;
+        }
+
+        /* Mobile Toggle Button */
+        .sidebar-toggle {
+            display: none;
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1001;
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 20px;
+        }
+
+        .sidebar-toggle:hover {
+            background-color: #21262d;
+            color: #58a6ff;
+        }
+
+        /* Mobile Overlay */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        /* ========== MAIN CONTENT AREA ========== */
+        .main-wrapper {
+            margin-left: 200px;
+            min-height: 100vh;
+            transition: margin-left 0.3s ease-in-out;
+        }
+
+        /* Top Navbar */
+        .top-navbar {
+            background-color: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .top-navbar h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #c9d1d9;
+        }
+
+        .user-menu-top {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            position: relative;
+        }
+
+        .user-menu-top .dropdown-toggle {
+            background: none;
+            border: none;
+            color: #c9d1d9;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px 10px;
+        }
+
+        .user-menu-top .dropdown-toggle:hover {
+            color: #58a6ff;
+        }
+
+        /* Override Bootstrap dropdown styling */
+        .dropdown-menu {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+
+        .dropdown-item {
+            display: block;
+            color: #c9d1d9;
+            padding: 8px 16px;
+            text-decoration: none;
+            transition: all 0.2s;
+        }
+
+        .dropdown-item:hover {
+            background-color: #21262d;
+            color: #58a6ff;
+        }
+
+        .dropdown-item i {
+            margin-right: 8px;
+        }
+
+        .dropdown-header {
+            color: #c9d1d9;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .dropdown-divider {
+            height: 1px;
+            background-color: #30363d;
+            margin: 5px 0;
+            border: 0;
+        }
+
+        /* Content Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        /* ========== CARDS ========== */
+        .card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #c9d1d9;
+        }
+
+        .card-header h2 i {
+            margin-right: 10px;
+            color: #58a6ff;
+        }
+
+        /* ========== BUTTONS ========== */
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary {
+            background: #58a6ff;
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            background: #1f6feb;
+        }
+
+        .btn-success {
+            background: #3fb950;
+            color: #fff;
+        }
+
+        .btn-success:hover {
+            background: #2ea043;
+        }
+
+        .btn-danger {
+            background: #f85149;
+            color: #fff;
+        }
+
+        .btn-danger:hover {
+            background: #da3633;
+        }
+
+        .btn-secondary {
+            background: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+        }
+
+        .btn-secondary:hover {
+            background: #30363d;
+        }
+
+        /* ========== TABLES ========== */
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px;
+            background-color: #0d1117;
+            color: #8b949e;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            border-bottom: 1px solid #30363d;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #30363d;
+            color: #c9d1d9;
+        }
+
+        tr:hover {
+            background-color: #0d1117;
+        }
+
+        /* ========== MODALS ========== */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.7);
+        }
+
+        .modal.active {
+            display: block;
+        }
+
+        .modal-content {
+            background: #161b22;
+            margin: 5% auto;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid #30363d;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            margin: 0;
+            color: #c9d1d9;
+            font-size: 18px;
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .modal-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #30363d;
+            text-align: right;
+        }
+
+        .close-modal {
+            color: #8b949e;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            background: none;
+            border: none;
+        }
+
+        .close-modal:hover {
+            color: #c9d1d9;
+        }
+
+        /* ========== FORM ELEMENTS ========== */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #8b949e;
+            font-size: 14px;
+        }
+
+        .form-group input[type="text"],
+        .form-group input[type="email"],
+        .form-group input[type="password"],
+        .form-group input[type="tel"],
+        .form-group input[type="date"],
+        .form-group input[type="number"],
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            background: #0d1117;
+            color: #c9d1d9;
+            font-size: 14px;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #58a6ff;
+        }
+
+        /* ========== BADGES ========== */
+        .badge {
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: #238636;
+            color: #fff;
+        }
+
+        .badge-danger {
+            background: #da3633;
+            color: #fff;
+        }
+
+        .badge-warning {
+            background: #9e6a03;
+            color: #fff;
+        }
+
+        .badge-info {
+            background: #0969da;
+            color: #fff;
+        }
+
+        /* ========== MOBILE RESPONSIVE ========== */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-200px);
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .sidebar-toggle {
+                display: block;
+            }
+
+            .main-wrapper {
+                margin-left: 0;
+            }
+
+            .top-navbar {
+                padding-left: 60px;
+                padding-right: 10px;
+                justify-content: flex-end !important;
+            }
+
+            /* Hide page title on mobile to save space */
+            .top-navbar h1 {
+                display: none;
+            }
+
+            /* Position user menu to far right on mobile */
+            .user-menu-top {
+                display: flex !important;
+                margin-left: auto !important;
+            }
+
+            /* Force dropdown to appear on right side - override Popper inline styles */
+            .dropdown-menu[data-popper-placement],
+            .dropdown-menu[style*="position"],
+            .dropdown-menu {
+                position: fixed !important;
+                left: auto !important;
+                right: 10px !important;
+                top: 55px !important;
+                transform: none !important;
+                margin: 0 !important;
+            }
+
+            .hide-mobile {
+                display: none;
+            }
+
+            /* Content area padding to avoid menu overlap */
+            .content-area {
+                padding: 15px !important;
+            }
+
+            /* Table responsiveness - horizontal scroll */
+            table {
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                white-space: nowrap;
+                font-size: 13px;
+            }
+
+            table th,
+            table td {
+                padding: 8px 6px !important;
+            }
+
+            /* Touch-friendly buttons - minimum 44x44px */
+            .btn,
+            button {
+                min-height: 44px !important;
+                padding: 10px 16px !important;
+                font-size: 14px;
+            }
+
+            .btn-sm {
+                min-height: 40px !important;
+                padding: 8px 12px !important;
+                font-size: 13px;
+            }
+
+            /* Table action buttons */
+            table .btn,
+            table button {
+                min-height: 44px !important;
+                min-width: 44px !important;
+                padding: 8px 12px !important;
+            }
+
+            /* Form elements full width */
+            .form-group input,
+            .form-group select,
+            .form-group textarea,
+            input[type="text"],
+            input[type="email"],
+            input[type="password"],
+            input[type="number"],
+            input[type="date"],
+            select,
+            textarea {
+                width: 100% !important;
+                max-width: 100% !important;
+                font-size: 16px !important; /* Prevent iOS zoom */
+            }
+
+            /* Checkbox sizing */
+            input[type="checkbox"] {
+                width: auto !important;
+                min-width: 20px !important;
+                height: 20px !important;
+            }
+
+            /* Stack filter forms vertically */
+            .filters,
+            .filter-row,
+            .d-flex.gap-2,
+            .d-flex.gap-3 {
+                flex-direction: column !important;
+                gap: 10px !important;
+            }
+
+            .filters .form-group,
+            .filter-group {
+                width: 100% !important;
+            }
+
+            .filters button {
+                width: 100%;
+                margin-top: 10px;
+            }
+
+            /* Button groups stack */
+            .btn-group,
+            .header-actions {
+                flex-direction: column !important;
+                gap: 10px !important;
+            }
+
+            .btn-group button,
+            .btn-group .btn {
+                width: 100% !important;
+            }
+
+            /* Modal responsiveness */
+            .modal-dialog {
+                margin: 10px !important;
+                max-width: calc(100% - 20px) !important;
+            }
+
+            .modal-body {
+                max-height: calc(100vh - 200px);
+                overflow-y: auto;
+            }
+
+            /* Card spacing */
+            .card {
+                margin-bottom: 15px;
+            }
+
+            /* Form rows stack */
+            .form-row,
+            .row {
+                flex-direction: column !important;
+            }
+
+            /* Grid columns full width */
+            [class*="col-"] {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+        }
+
+        /* Very small screens (phones in portrait) */
+        @media (max-width: 480px) {
+            .content-area {
+                padding: 10px !important;
+            }
+
+            table {
+                font-size: 12px;
+            }
+
+            table th,
+            table td {
+                padding: 6px 4px !important;
+            }
+
+            .btn {
+                font-size: 13px;
+            }
+
+            /* Modal full screen on very small devices */
+            .modal-dialog {
+                margin: 0 !important;
+                max-width: 100% !important;
+                height: 100vh;
+            }
+
+            .modal-content {
+                height: 100vh;
+                border-radius: 0;
+            }
+        }
+
+        {% block extra_styles %}{% endblock %}
+    </style>
+</head>
+<body>
+    <!-- Mobile Sidebar Toggle -->
+    <button class="sidebar-toggle" onclick="toggleSidebar()">
+        <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Sidebar Overlay (mobile) -->
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar Navigation -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <img src="/hr/static/images/sw-logo.png" alt="SW Hospitality Group">
+        </div>
+        <ul class="sidebar-nav">
+            <li><a href="/" title="Return to Portal"><i class="bi bi-house-door"></i> Portal Home</a></li>
+            <li><a href="/hr/" class="{% block nav_dashboard %}{% endblock %}"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+            <li><a href="/hr/employees" class="{% block nav_employees %}{% endblock %}"><i class="bi bi-people"></i> Employees</a></li>
+            <li><a href="/hr/documents" class="{% block nav_documents %}{% endblock %}"><i class="bi bi-file-earmark-text"></i> Documents</a></li>
+
+            <!-- Settings Menu (Collapsible) -->
+            <li>
+                <div class="menu-toggle" onclick="toggleSettingsMenu()">
+                    <span><i class="bi bi-gear"></i> Settings</span>
+                    <span class="arrow">▸</span>
+                </div>
+                <ul class="submenu" id="settingsSubmenu">
+                    <li><a href="/hr/locations" class="{% block nav_locations %}{% endblock %}"><i class="bi bi-geo-alt"></i> Locations</a></li>
+                    <li><a href="/hr/departments" class="{% block nav_departments %}{% endblock %}"><i class="bi bi-diagram-3"></i> Departments</a></li>
+                    <li><a href="/hr/positions" class="{% block nav_positions %}{% endblock %}"><i class="bi bi-briefcase"></i> Positions</a></li>
+                    <li><a href="/hr/users" class="{% block nav_users %}{% endblock %}"><i class="bi bi-person-gear"></i> Users</a></li>
+                    <li><a href="/hr/audit" class="{% block nav_audit %}{% endblock %}"><i class="bi bi-shield-lock"></i> Audit Log</a></li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Main Content Wrapper -->
+    <div class="main-wrapper">
+        <!-- Top Navbar -->
+        <div class="top-navbar">
+            <h1>{% block page_title %}HR Management{% endblock %}</h1>
+            <div class="user-menu-top">
+                {% if current_user %}
+                <div class="dropdown">
+                    <button class="dropdown-toggle" type="button" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-person-circle"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+                        <li><h6 class="dropdown-header">
+                            {{ current_user.full_name or current_user.username }}<br>
+                            <small class="text-muted">{{ current_user.role if current_user.role else 'User' }}</small>
+                        </h6></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="/hr/profile">
+                            <i class="bi bi-person"></i> My Profile
+                        </a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="/hr/api/auth/logout">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </a></li>
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <script>
+        // Toggle Sidebar (Mobile)
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
+        // Bootstrap will handle the dropdown toggle automatically
+
+        // Toggle Settings Submenu
+        function toggleSettingsMenu() {
+            const submenu = document.getElementById('settingsSubmenu');
+            const toggle = document.querySelector('.menu-toggle');
+
+            submenu.classList.toggle('expanded');
+            toggle.classList.toggle('expanded');
+        }
+
+        // Auto-expand Settings menu if on a settings page
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            const settingsPages = ['/hr/locations', '/hr/departments', '/hr/positions', '/hr/users', '/hr/audit'];
+
+            if (settingsPages.some(page => currentPath.startsWith(page))) {
+                const submenu = document.getElementById('settingsSubmenu');
+                const toggle = document.querySelector('.menu-toggle');
+                if (submenu && toggle) {
+                    submenu.classList.add('expanded');
+                    toggle.classList.add('expanded');
+                }
+            }
+
+            // Close sidebar on mobile when clicking links
+            if (window.innerWidth <= 768) {
+                const sidebarLinks = document.querySelectorAll('.sidebar-nav a');
+                sidebarLinks.forEach(link => {
+                    link.addEventListener('click', function() {
+                        const sidebar = document.getElementById('sidebar');
+                        const overlay = document.querySelector('.sidebar-overlay');
+                        sidebar.classList.remove('active');
+                        overlay.classList.remove('active');
+                    });
+                });
+            }
+        });
+    </script>
+
+    <!-- Auto-logout after inactivity -->
+    <script>
+        (function() {
+            // Auto-logout after 30 minutes of inactivity
+            const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+            const WARNING_TIME = 2 * 60 * 1000; // Show warning 2 minutes before logout
+
+            let inactivityTimer;
+            let warningTimer;
+            let warningShown = false;
+
+            // Events that reset the inactivity timer
+            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+
+            function resetTimer() {
+                // Clear existing timers
+                clearTimeout(inactivityTimer);
+                clearTimeout(warningTimer);
+                warningShown = false;
+
+                // Set warning timer (28 minutes)
+                warningTimer = setTimeout(showWarning, INACTIVITY_TIMEOUT - WARNING_TIME);
+
+                // Set logout timer (30 minutes)
+                inactivityTimer = setTimeout(logout, INACTIVITY_TIMEOUT);
+            }
+
+            function showWarning() {
+                if (warningShown) return;
+                warningShown = true;
+
+                const remainingTime = Math.floor(WARNING_TIME / 60000); // Minutes
+                const proceed = confirm(
+                    `You will be automatically logged out in ${remainingTime} minutes due to inactivity.\n\n` +
+                    `Click OK to stay logged in, or Cancel to logout now.`
+                );
+
+                if (proceed) {
+                    // User wants to stay logged in
+                    resetTimer();
+                } else {
+                    // User chose to logout
+                    logout();
+                }
+            }
+
+            function logout() {
+                // Clear timers
+                clearTimeout(inactivityTimer);
+                clearTimeout(warningTimer);
+
+                // Show logout message
+                alert('You have been logged out due to inactivity.');
+
+                // Redirect to logout endpoint
+                window.location.href = '/hr/api/auth/logout';
+            }
+
+            // Add event listeners for activity
+            activityEvents.forEach(event => {
+                document.addEventListener(event, resetTimer, true);
+            });
+
+            // Start the timer when page loads
+            console.log('Auto-logout initialized - will logout after 30 minutes of inactivity');
+            resetTimer();
+
+            // Also reset timer on visibility change (user switches tabs)
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    console.log('Tab became visible - resetting inactivity timer');
+                    resetTimer();
+                }
+            });
+        })();
+    </script>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

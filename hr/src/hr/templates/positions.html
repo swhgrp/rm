@@ -1,0 +1,368 @@
+{% extends "base.html" %}
+
+{% block title %}Positions - Restaurant HR Management{% endblock %}
+{% block nav_positions %}active{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>Positions</h2>
+        <button class="btn btn-primary" onclick="openPositionModal()">+ New Position</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table id="positionsTable">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th class="hide-mobile">Department</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="positionsBody">
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 2rem; color: #999;">Loading positions...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Position Modal -->
+<div id="positionModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">New Position</h3>
+            <span class="close" onclick="closePositionModal()">&times;</span>
+        </div>
+        <form id="positionForm">
+            <input type="hidden" id="positionId">
+
+            <div class="form-group">
+                <label for="title">Position Title *</label>
+                <input type="text" id="title" required>
+            </div>
+
+            <div class="form-group">
+                <label for="department_id">Department</label>
+                <select id="department_id">
+                    <option value="">Select Department</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" rows="3"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="is_active" checked>
+                    Active
+                </label>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closePositionModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Position</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #e0e0e0;
+    }
+    .form-group input[type="text"],
+    .form-group input[type="number"],
+    .form-group select,
+    .form-group textarea {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #555;
+        border-radius: 4px;
+        background: #1a1a1a;
+        color: #e0e0e0;
+    }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+    }
+    .modal-content {
+        background: #2d2d2d;
+        margin: 5% auto;
+        padding: 0;
+        border: 1px solid #404040;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 600px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    }
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #404040;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .modal-header h3 {
+        margin: 0;
+        color: #fff;
+    }
+    #positionForm {
+        padding: 1.5rem;
+    }
+    .modal-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #404040;
+        text-align: right;
+    }
+    .modal-footer button {
+        margin-left: 0.5rem;
+    }
+    .close {
+        color: #aaa;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .close:hover {
+        color: #fff;
+    }
+    .status-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+    }
+    .status-active {
+        background: #27ae60;
+        color: white;
+    }
+    .status-inactive {
+        background: #666;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let positions = [];
+let departments = [];
+
+async function loadDepartments() {
+    try {
+        const response = await fetch('/hr/api/departments/', {
+            credentials: 'include'
+        });
+        if (!response.ok) {
+            throw new Error('Failed to load departments');
+        }
+        departments = await response.json();
+        console.log('Loaded departments:', departments);
+        populateDepartmentDropdown();
+    } catch (error) {
+        console.error('Error loading departments:', error);
+    }
+}
+
+function populateDepartmentDropdown() {
+    const select = document.getElementById('department_id');
+    select.innerHTML = '<option value="">Select Department</option>';
+
+    departments.forEach(dept => {
+        if (dept.is_active) {
+            const option = document.createElement('option');
+            option.value = dept.id;
+            option.textContent = dept.name;
+            select.appendChild(option);
+        }
+    });
+}
+
+async function loadPositions() {
+    try {
+        const response = await fetch('/hr/api/positions/');
+        if (!response.ok) {
+            throw new Error('Failed to load positions');
+        }
+        positions = await response.json();
+        console.log('Loaded positions:', positions);
+        renderPositions();
+    } catch (error) {
+        console.error('Error loading positions:', error);
+        document.getElementById('positionsBody').innerHTML = `
+            <tr><td colspan="4" style="text-align: center; color: #e74c3c;">Error loading positions</td></tr>
+        `;
+    }
+}
+
+function renderPositions() {
+    const tbody = document.getElementById('positionsBody');
+
+    if (positions.length === 0) {
+        tbody.innerHTML = `
+            <tr><td colspan="4" style="text-align: center; padding: 2rem; color: #999;">No positions found</td></tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = positions.map(pos => {
+        // Get department name from relationship or fall back to legacy field
+        let deptName = '-';
+        if (pos.department_id && departments.length > 0) {
+            const dept = departments.find(d => d.id === pos.department_id);
+            if (dept) {
+                deptName = dept.name;
+            } else {
+                console.log(`Department ID ${pos.department_id} not found for position ${pos.title}`);
+            }
+        } else if (pos.department) {
+            deptName = pos.department;
+        }
+
+        return `
+            <tr>
+                <td><strong>${pos.title}</strong></td>
+                <td class="hide-mobile">${deptName}</td>
+                <td>
+                    <span class="status-badge ${pos.is_active ? 'status-active' : 'status-inactive'}">
+                        ${pos.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="editPosition(${pos.id})">Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deletePosition(${pos.id}, '${pos.title}')">Delete</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function openPositionModal(positionId = null) {
+    const modal = document.getElementById('positionModal');
+    const form = document.getElementById('positionForm');
+
+    if (positionId) {
+        const position = positions.find(p => p.id === positionId);
+        document.getElementById('modalTitle').textContent = 'Edit Position';
+        document.getElementById('positionId').value = position.id;
+        document.getElementById('title').value = position.title;
+        document.getElementById('department_id').value = position.department_id || '';
+        document.getElementById('description').value = position.description || '';
+        document.getElementById('is_active').checked = position.is_active;
+    } else {
+        document.getElementById('modalTitle').textContent = 'New Position';
+        form.reset();
+        document.getElementById('positionId').value = '';
+        document.getElementById('is_active').checked = true;
+    }
+
+    modal.style.display = 'block';
+}
+
+function closePositionModal() {
+    document.getElementById('positionModal').style.display = 'none';
+}
+
+function editPosition(id) {
+    openPositionModal(id);
+}
+
+document.getElementById('positionForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const positionId = document.getElementById('positionId').value;
+    const departmentId = document.getElementById('department_id').value;
+    const data = {
+        title: document.getElementById('title').value,
+        department_id: departmentId ? parseInt(departmentId) : null,
+        description: document.getElementById('description').value || null,
+        is_active: document.getElementById('is_active').checked
+    };
+
+    try {
+        const url = positionId ? `/hr/api/positions/${positionId}` : '/hr/api/positions/';
+        const method = positionId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            closePositionModal();
+            loadPositions();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to save position'));
+        }
+    } catch (error) {
+        console.error('Error saving position:', error);
+        alert('Error saving position');
+    }
+});
+
+// Delete position
+async function deletePosition(positionId, positionTitle) {
+    if (!confirm(`Are you sure you want to delete the position "${positionTitle}"? This action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hr/api/positions/${positionId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            alert('Position deleted successfully');
+            await loadPositions();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to delete position'));
+        }
+    } catch (error) {
+        console.error('Error deleting position:', error);
+        alert('Error deleting position');
+    }
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('positionModal');
+    if (event.target === modal) {
+        closePositionModal();
+    }
+}
+
+// Load data on page load - wait for departments before loading positions
+async function initializePage() {
+    await loadDepartments();
+    await loadPositions();
+}
+
+initializePage();
+</script>
+{% endblock %}

@@ -50,6 +50,7 @@ class JournalEntryLine(Base):
     id = Column(Integer, primary_key=True, index=True)
     journal_entry_id = Column(Integer, ForeignKey('journal_entries.id'), nullable=False)
     account_id = Column(Integer, ForeignKey('accounts.id'), nullable=False)
+    area_id = Column(Integer, ForeignKey('areas.id', ondelete='SET NULL'), nullable=True, index=True)
 
     debit_amount = Column(DECIMAL(15, 2), default=0)
     credit_amount = Column(DECIMAL(15, 2), default=0)
@@ -59,3 +60,4 @@ class JournalEntryLine(Base):
     # Relationships
     journal_entry = relationship("JournalEntry", back_populates="lines")
     account = relationship("Account", back_populates="journal_entry_lines")
+    area = relationship("Area", back_populates="journal_entry_lines")

@@ -1,0 +1,1110 @@
+{% extends "base.html" %}
+
+{% block title %}{{ 'Edit' if employee else 'New' }} Employee - HR Management{% endblock %}
+{% block nav_employees %}active{% endblock %}
+{% block page_title %}{{ 'Edit' if employee else 'New' }} Employee{% endblock %}
+
+{% block extra_styles %}
+<style>
+    /* Mobile-specific overrides for employee form */
+    @media (max-width: 992px) {
+        /* Force ALL grid containers to single column - very aggressive */
+        #employeeForm div[style*="display: grid"],
+        #employeeForm div[style*="grid-template-columns"] {
+            display: grid !important;
+            grid-template-columns: 1fr !important;
+            gap: 15px !important;
+        }
+
+        /* All form groups take full width */
+        #employeeForm .form-group {
+            width: 100% !important;
+            max-width: 100% !important;
+            grid-column: 1 / -1 !important;
+        }
+
+        /* Remove ALL grid-column spans on mobile */
+        #employeeForm div[style*="grid-column"],
+        #employeeForm .form-group[style*="grid-column"] {
+            grid-column: 1 / -1 !important;
+        }
+
+        /* Stack ALL flex containers vertically */
+        #employeeForm div[style*="display: flex"] {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+            gap: 10px !important;
+        }
+
+        /* Exception: Keep checkboxes and their labels horizontal */
+        #employeeForm label[style*="cursor: pointer"],
+        #employeeForm label input[type="checkbox"] {
+            flex-direction: row !important;
+            align-items: center !important;
+        }
+
+        /* Exception: Card header actions stay horizontal but wrap */
+        #employeeForm .card-header div[style*="justify-content: space-between"] {
+            flex-direction: row !important;
+            flex-wrap: wrap !important;
+            justify-content: space-between !important;
+        }
+
+        /* Full width inputs */
+        #employeeForm input,
+        #employeeForm select,
+        #employeeForm textarea {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
+        /* Specific fix for date inputs - very aggressive */
+        #employeeForm input[type="date"] {
+            padding: 10px 2px 10px 8px !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            font-size: 14px !important;
+        }
+
+        /* All inputs get constrained */
+        #employeeForm input,
+        #employeeForm select,
+        #employeeForm textarea {
+            margin: 0 !important;
+        }
+
+        /* Ensure all form groups have proper constraints */
+        #employeeForm .form-group {
+            overflow: hidden !important;
+            max-width: 100% !important;
+        }
+
+        /* Card body padding on mobile - reduce further */
+        #employeeForm .card > div,
+        #employeeForm .card {
+            padding-left: 12px !important;
+            padding-right: 12px !important;
+        }
+
+        /* Content area padding */
+        .content-area {
+            padding: 10px !important;
+        }
+
+        /* Button container at bottom */
+        #employeeForm > div[style*="justify-content: flex-end"] {
+            display: flex !important;
+            flex-direction: column-reverse !important;
+            gap: 10px !important;
+        }
+
+        #employeeForm > div[style*="justify-content: flex-end"] button,
+        #employeeForm > div[style*="justify-content: flex-end"] .btn {
+            width: 100% !important;
+        }
+
+        /* Assigned locations grid */
+        #assigned_location_ids {
+            grid-template-columns: 1fr !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div style="margin-bottom: 20px; color: #8b949e;">
+    <a href="/hr/" style="color: #58a6ff;">Dashboard</a> /
+    <a href="/hr/employees" style="color: #58a6ff;">Employees</a> /
+    {{ 'Edit ' + employee.first_name + ' ' + employee.last_name if employee else 'New Employee' }}
+</div>
+
+<!-- Alert Container -->
+<div id="alertContainer"></div>
+
+<form id="employeeForm">
+    <!-- Section 1: Personal Information -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+            <h2><i class="bi bi-person"></i> Personal Information</h2>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+            <!-- Employee Number -->
+            <div class="form-group" style="grid-column: span 2;">
+                <label for="employee_number">Employee Number <span style="color: #f85149;">*</span></label>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" id="employee_number" name="employee_number"
+                           value="{{ employee.employee_number if employee else '' }}"
+                           {% if employee %}readonly{% endif %}
+                           style="flex: 1;" required>
+                    {% if not employee %}
+                    <label style="margin: 0; display: flex; align-items: center; gap: 5px; cursor: pointer;">
+                        <input type="checkbox" id="autoGenerate" checked
+                               style="width: auto; margin: 0;">
+                        <span style="color: #8b949e; font-size: 14px;">Auto-generate</span>
+                    </label>
+                    {% endif %}
+                </div>
+                <small style="color: #8b949e; font-size: 12px;">Format: EMP001, EMP002, etc.</small>
+            </div>
+
+            <!-- First Name -->
+            <div class="form-group">
+                <label for="first_name">First Name <span style="color: #f85149;">*</span></label>
+                <input type="text" id="first_name" name="first_name"
+                       value="{{ employee.first_name if employee else '' }}" required>
+            </div>
+
+            <!-- Middle Name -->
+            <div class="form-group">
+                <label for="middle_name">Middle Name</label>
+                <input type="text" id="middle_name" name="middle_name"
+                       value="{{ employee.middle_name if employee else '' }}">
+            </div>
+
+            <!-- Last Name -->
+            <div class="form-group">
+                <label for="last_name">Last Name <span style="color: #f85149;">*</span></label>
+                <input type="text" id="last_name" name="last_name"
+                       value="{{ employee.last_name if employee else '' }}" required>
+            </div>
+
+            <!-- Date of Birth -->
+            <div class="form-group">
+                <label for="date_of_birth">Date of Birth</label>
+                <input type="date" id="date_of_birth" name="date_of_birth"
+                       value="{{ employee.date_of_birth if employee else '' }}">
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 2: Contact Information -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+            <h2><i class="bi bi-envelope"></i> Contact Information</h2>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+            <!-- Email -->
+            <div class="form-group">
+                <label for="email">Email <span style="color: #f85149;">*</span></label>
+                <input type="email" id="email" name="email"
+                       value="{{ employee.email if employee else '' }}" required>
+            </div>
+
+            <!-- Phone Number -->
+            <div class="form-group">
+                <label for="phone_number">Phone Number</label>
+                <input type="tel" id="phone_number" name="phone_number"
+                       value="{{ employee.phone_number if employee else '' }}"
+                       placeholder="(555) 123-4567">
+            </div>
+
+            <!-- Address -->
+            <div class="form-group" style="grid-column: span 2;">
+                <label for="street_address">Street Address</label>
+                <input type="text" id="street_address" name="street_address"
+                       value="{{ employee.street_address if employee else '' }}">
+            </div>
+
+            <!-- City -->
+            <div class="form-group">
+                <label for="city">City</label>
+                <input type="text" id="city" name="city"
+                       value="{{ employee.city if employee else '' }}">
+            </div>
+
+            <!-- State -->
+            <div class="form-group">
+                <label for="state">State</label>
+                <select id="state" name="state">
+                    <option value="">Select State</option>
+                    <option value="AL" {% if employee and employee.state == 'AL' %}selected{% endif %}>Alabama</option>
+                    <option value="AK" {% if employee and employee.state == 'AK' %}selected{% endif %}>Alaska</option>
+                    <option value="AZ" {% if employee and employee.state == 'AZ' %}selected{% endif %}>Arizona</option>
+                    <option value="AR" {% if employee and employee.state == 'AR' %}selected{% endif %}>Arkansas</option>
+                    <option value="CA" {% if employee and employee.state == 'CA' %}selected{% endif %}>California</option>
+                    <option value="CO" {% if employee and employee.state == 'CO' %}selected{% endif %}>Colorado</option>
+                    <option value="CT" {% if employee and employee.state == 'CT' %}selected{% endif %}>Connecticut</option>
+                    <option value="DE" {% if employee and employee.state == 'DE' %}selected{% endif %}>Delaware</option>
+                    <option value="FL" {% if employee and employee.state == 'FL' %}selected{% endif %}>Florida</option>
+                    <option value="GA" {% if employee and employee.state == 'GA' %}selected{% endif %}>Georgia</option>
+                    <option value="HI" {% if employee and employee.state == 'HI' %}selected{% endif %}>Hawaii</option>
+                    <option value="ID" {% if employee and employee.state == 'ID' %}selected{% endif %}>Idaho</option>
+                    <option value="IL" {% if employee and employee.state == 'IL' %}selected{% endif %}>Illinois</option>
+                    <option value="IN" {% if employee and employee.state == 'IN' %}selected{% endif %}>Indiana</option>
+                    <option value="IA" {% if employee and employee.state == 'IA' %}selected{% endif %}>Iowa</option>
+                    <option value="KS" {% if employee and employee.state == 'KS' %}selected{% endif %}>Kansas</option>
+                    <option value="KY" {% if employee and employee.state == 'KY' %}selected{% endif %}>Kentucky</option>
+                    <option value="LA" {% if employee and employee.state == 'LA' %}selected{% endif %}>Louisiana</option>
+                    <option value="ME" {% if employee and employee.state == 'ME' %}selected{% endif %}>Maine</option>
+                    <option value="MD" {% if employee and employee.state == 'MD' %}selected{% endif %}>Maryland</option>
+                    <option value="MA" {% if employee and employee.state == 'MA' %}selected{% endif %}>Massachusetts</option>
+                    <option value="MI" {% if employee and employee.state == 'MI' %}selected{% endif %}>Michigan</option>
+                    <option value="MN" {% if employee and employee.state == 'MN' %}selected{% endif %}>Minnesota</option>
+                    <option value="MS" {% if employee and employee.state == 'MS' %}selected{% endif %}>Mississippi</option>
+                    <option value="MO" {% if employee and employee.state == 'MO' %}selected{% endif %}>Missouri</option>
+                    <option value="MT" {% if employee and employee.state == 'MT' %}selected{% endif %}>Montana</option>
+                    <option value="NE" {% if employee and employee.state == 'NE' %}selected{% endif %}>Nebraska</option>
+                    <option value="NV" {% if employee and employee.state == 'NV' %}selected{% endif %}>Nevada</option>
+                    <option value="NH" {% if employee and employee.state == 'NH' %}selected{% endif %}>New Hampshire</option>
+                    <option value="NJ" {% if employee and employee.state == 'NJ' %}selected{% endif %}>New Jersey</option>
+                    <option value="NM" {% if employee and employee.state == 'NM' %}selected{% endif %}>New Mexico</option>
+                    <option value="NY" {% if employee and employee.state == 'NY' %}selected{% endif %}>New York</option>
+                    <option value="NC" {% if employee and employee.state == 'NC' %}selected{% endif %}>North Carolina</option>
+                    <option value="ND" {% if employee and employee.state == 'ND' %}selected{% endif %}>North Dakota</option>
+                    <option value="OH" {% if employee and employee.state == 'OH' %}selected{% endif %}>Ohio</option>
+                    <option value="OK" {% if employee and employee.state == 'OK' %}selected{% endif %}>Oklahoma</option>
+                    <option value="OR" {% if employee and employee.state == 'OR' %}selected{% endif %}>Oregon</option>
+                    <option value="PA" {% if employee and employee.state == 'PA' %}selected{% endif %}>Pennsylvania</option>
+                    <option value="RI" {% if employee and employee.state == 'RI' %}selected{% endif %}>Rhode Island</option>
+                    <option value="SC" {% if employee and employee.state == 'SC' %}selected{% endif %}>South Carolina</option>
+                    <option value="SD" {% if employee and employee.state == 'SD' %}selected{% endif %}>South Dakota</option>
+                    <option value="TN" {% if employee and employee.state == 'TN' %}selected{% endif %}>Tennessee</option>
+                    <option value="TX" {% if employee and employee.state == 'TX' %}selected{% endif %}>Texas</option>
+                    <option value="UT" {% if employee and employee.state == 'UT' %}selected{% endif %}>Utah</option>
+                    <option value="VT" {% if employee and employee.state == 'VT' %}selected{% endif %}>Vermont</option>
+                    <option value="VA" {% if employee and employee.state == 'VA' %}selected{% endif %}>Virginia</option>
+                    <option value="WA" {% if employee and employee.state == 'WA' %}selected{% endif %}>Washington</option>
+                    <option value="WV" {% if employee and employee.state == 'WV' %}selected{% endif %}>West Virginia</option>
+                    <option value="WI" {% if employee and employee.state == 'WI' %}selected{% endif %}>Wisconsin</option>
+                    <option value="WY" {% if employee and employee.state == 'WY' %}selected{% endif %}>Wyoming</option>
+                </select>
+            </div>
+
+            <!-- Zip Code -->
+            <div class="form-group">
+                <label for="zip_code">Zip Code</label>
+                <input type="text" id="zip_code" name="zip_code"
+                       value="{{ employee.zip_code if employee else '' }}"
+                       placeholder="12345">
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 3: Emergency Contact -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+            <h2><i class="bi bi-telephone"></i> Emergency Contact</h2>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+            <!-- Emergency Contact Name -->
+            <div class="form-group">
+                <label for="emergency_contact_name">Name</label>
+                <input type="text" id="emergency_contact_name" name="emergency_contact_name"
+                       value="{{ employee.emergency_contact_name if employee else '' }}">
+            </div>
+
+            <!-- Emergency Contact Relationship -->
+            <div class="form-group">
+                <label for="emergency_contact_relationship">Relationship</label>
+                <input type="text" id="emergency_contact_relationship" name="emergency_contact_relationship"
+                       value="{{ employee.emergency_contact_relationship if employee else '' }}"
+                       placeholder="Spouse, Parent, etc.">
+            </div>
+
+            <!-- Emergency Contact Phone -->
+            <div class="form-group">
+                <label for="emergency_contact_phone">Phone Number</label>
+                <input type="tel" id="emergency_contact_phone" name="emergency_contact_phone"
+                       value="{{ employee.emergency_contact_phone if employee else '' }}"
+                       placeholder="(555) 123-4567">
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 4: Employment Details -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+            <h2><i class="bi bi-briefcase"></i> Employment Details</h2>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+            <!-- Hire Date -->
+            <div class="form-group">
+                <label for="hire_date">Hire Date <span style="color: #f85149;">*</span></label>
+                <input type="date" id="hire_date" name="hire_date"
+                       value="{{ employee.hire_date if employee else '' }}" required>
+            </div>
+
+            <!-- Employment Status -->
+            <div class="form-group">
+                <label for="employment_status">Employment Status <span style="color: #f85149;">*</span></label>
+                <select id="employment_status" name="employment_status" required>
+                    <option value="Active" {% if not employee or employee.employment_status == 'Active' %}selected{% endif %}>Active</option>
+                    <option value="On Leave" {% if employee and employee.employment_status == 'On Leave' %}selected{% endif %}>On Leave</option>
+                    <option value="Terminated" {% if employee and employee.employment_status == 'Terminated' %}selected{% endif %}>Terminated</option>
+                </select>
+            </div>
+
+            <!-- Employee Type -->
+            <div class="form-group">
+                <label for="employee_type">Employee Type <span style="color: #f85149;">*</span></label>
+                <select id="employee_type" name="employee_type" required>
+                    <option value="Full-Time" {% if employee and employee.employee_type == 'Full-Time' %}selected{% endif %}>Full-Time</option>
+                    <option value="Part-Time" {% if not employee or employee.employee_type == 'Part-Time' %}selected{% endif %}>Part-Time</option>
+                    <option value="Seasonal" {% if employee and employee.employee_type == 'Seasonal' %}selected{% endif %}>Seasonal</option>
+                    <option value="Contractor" {% if employee and employee.employee_type == 'Contractor' %}selected{% endif %}>Contractor</option>
+                </select>
+            </div>
+
+            <!-- Position -->
+            <div class="form-group">
+                <label for="position_id">Position</label>
+                <select id="position_id" name="position_id">
+                    <option value="">Select Position</option>
+                </select>
+            </div>
+
+            <!-- Starting Pay Rate -->
+            <div class="form-group">
+                <label for="starting_pay_rate">Starting Pay Rate</label>
+                <div style="position: relative;">
+                    <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #8b949e;">$</span>
+                    <input type="number" id="starting_pay_rate" name="starting_pay_rate"
+                           value="{{ employee.starting_pay_rate if employee and employee.starting_pay_rate else '' }}"
+                           step="0.01" min="0"
+                           placeholder="15.00"
+                           style="padding-left: 28px;">
+                </div>
+                <small style="color: #8b949e; font-size: 12px;">
+                    <i class="bi bi-info-circle"></i> Hourly rate or annual salary
+                </small>
+            </div>
+        </div>
+
+        <!-- Termination Details (conditionally shown) -->
+        <div id="terminationSection" style="display: none; margin-top: 20px; padding: 20px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;">
+            <h3 style="margin-bottom: 15px; color: #f85149;"><i class="bi bi-exclamation-triangle"></i> Termination Details</h3>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                <!-- Termination Date -->
+                <div class="form-group">
+                    <label for="termination_date">Termination Date <span style="color: #f85149;">*</span></label>
+                    <input type="date" id="termination_date" name="termination_date"
+                           value="{{ employee.termination_date if employee else '' }}">
+                </div>
+
+                <!-- Type of Termination -->
+                <div class="form-group">
+                    <label for="termination_type">Type of Termination <span style="color: #f85149;">*</span></label>
+                    <select id="termination_type" name="termination_type">
+                        <option value="">Select Type</option>
+                        <option value="Voluntary" {% if employee and employee.termination_type == 'Voluntary' %}selected{% endif %}>Voluntary (resignation, retirement)</option>
+                        <option value="Involuntary" {% if employee and employee.termination_type == 'Involuntary' %}selected{% endif %}>Involuntary (layoff, performance, misconduct, attendance)</option>
+                        <option value="Job Abandonment" {% if employee and employee.termination_type == 'Job Abandonment' %}selected{% endif %}>Job Abandonment (no-call, no-show, walkout)</option>
+                    </select>
+                </div>
+
+                <!-- Final Decision Date -->
+                <div class="form-group">
+                    <label for="final_decision_date">Final Decision Date <span style="color: #f85149;">*</span></label>
+                    <input type="date" id="final_decision_date" name="final_decision_date"
+                           value="{{ employee.final_decision_date if employee else '' }}">
+                    <small style="color: #8b949e; font-size: 12px;">When termination was approved/confirmed</small>
+                </div>
+
+                <!-- Authorized By -->
+                <div class="form-group">
+                    <label for="authorized_by">Authorized By <span style="color: #f85149;">*</span></label>
+                    <input type="text" id="authorized_by" name="authorized_by"
+                           value="{{ employee.authorized_by if employee else '' }}"
+                           placeholder="Name of authorizing person">
+                    <small style="color: #8b949e; font-size: 12px;">Usually HR or upper management</small>
+                </div>
+
+                <!-- Reason for Termination -->
+                <div class="form-group" style="grid-column: span 2;">
+                    <label for="termination_reason">Reason for Termination <span style="color: #f85149;">*</span></label>
+                    <textarea id="termination_reason" name="termination_reason" rows="4"
+                              placeholder="Brief explanation (e.g., 'Repeated tardiness despite written warnings.')">{{ employee.termination_reason if employee else '' }}</textarea>
+                </div>
+
+                <!-- Supporting Documentation -->
+                <div class="form-group" style="grid-column: span 2;">
+                    <label for="supporting_docs">Supporting Documentation</label>
+                    <input type="file" id="supporting_docs" name="supporting_docs"
+                           accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                           style="padding: 8px; background: #0d1117;">
+                    <small style="color: #8b949e; font-size: 12px;">Optional: Attach warnings, PIPs, etc. Can also add documents later from Documents section.</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Section 5: Assigned Locations -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+            <h2><i class="bi bi-geo-alt"></i> Assigned Locations</h2>
+            <small style="color: #8b949e;">Select all locations this employee works at</small>
+        </div>
+
+        <div class="form-group">
+            <label>Locations <span style="color: #f85149;">*</span></label>
+            <div id="assigned_location_ids" style="
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 12px;
+                padding: 15px;
+                background: #0d1117;
+                border: 1px solid #30363d;
+                border-radius: 6px;
+                margin-top: 8px;
+            ">
+                <div style="color: #8b949e; grid-column: 1 / -1;">
+                    <i class="bi bi-hourglass-split"></i> Loading locations...
+                </div>
+            </div>
+            <small style="color: #8b949e; font-size: 12px; margin-top: 8px; display: block;">
+                <i class="bi bi-info-circle"></i> Check all locations where this employee will work
+            </small>
+        </div>
+    </div>
+
+    <!-- Section 6: Initial Position Assignment (only for new employees) -->
+    {% if not employee %}
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2><i class="bi bi-pin-map"></i> Initial Position Assignment</h2>
+                <label style="margin: 0; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="assignPosition"
+                           style="width: auto; margin: 0;">
+                    <span style="color: #8b949e;">Assign position now</span>
+                </label>
+            </div>
+        </div>
+
+        <div id="positionSection" style="display: none;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                <!-- Position -->
+                <div class="form-group">
+                    <label for="position_id">Position</label>
+                    <select id="position_id" name="position_id">
+                        <option value="">Select Position</option>
+                    </select>
+                </div>
+
+                <!-- Location -->
+                <div class="form-group">
+                    <label for="location_id">Location</label>
+                    <select id="location_id" name="location_id">
+                        <option value="">Select Location</option>
+                    </select>
+                </div>
+
+                <!-- Start Date -->
+                <div class="form-group">
+                    <label for="position_start_date">Start Date</label>
+                    <input type="date" id="position_start_date" name="position_start_date">
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Section 7: Required Documents (only for new employees) -->
+    {% if not employee %}
+    <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+            <h2><i class="bi bi-file-earmark-text"></i> Required Documents</h2>
+            <small style="color: #8b949e;">These documents must be uploaded for new hires</small>
+        </div>
+
+        <div style="padding: 20px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px;">
+                <!-- ID Copy -->
+                <div class="form-group" style="margin: 0;">
+                    <label for="doc_id" style="display: block; margin-bottom: 8px; font-weight: 600;">
+                        ID Copy <span style="color: #f85149;">*</span>
+                    </label>
+                    <input type="file" id="doc_id" name="doc_id" required
+                           accept=".pdf,.jpg,.jpeg,.png"
+                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                    <small style="color: #8b949e; font-size: 12px; display: block; margin-top: 5px;">
+                        <i class="bi bi-info-circle"></i> Driver's license or government-issued ID
+                    </small>
+                </div>
+
+                <!-- Social Security Card -->
+                <div class="form-group" style="margin: 0;">
+                    <label for="doc_ssn" style="display: block; margin-bottom: 8px; font-weight: 600;">
+                        Social Security Card <span style="color: #f85149;">*</span>
+                    </label>
+                    <input type="file" id="doc_ssn" name="doc_ssn" required
+                           accept=".pdf,.jpg,.jpeg,.png"
+                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                    <small style="color: #8b949e; font-size: 12px; display: block; margin-top: 5px;">
+                        <i class="bi bi-info-circle"></i> Copy of Social Security card
+                    </small>
+                </div>
+
+                <!-- Food Certificate (Handler or Manager) -->
+                <div class="form-group" style="margin: 0;">
+                    <label for="doc_food_cert_type" style="display: block; margin-bottom: 8px; font-weight: 600;">
+                        Food Certificate <span style="color: #f85149;">*</span>
+                    </label>
+                    <select id="doc_food_cert_type" name="doc_food_cert_type" required
+                            style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; margin-bottom: 10px;">
+                        <option value="">Select Certificate Type</option>
+                        <option value="Food Handler Certificate">Food Handler Certificate</option>
+                        <option value="Food Manager Certificate">Food Manager Certificate</option>
+                    </select>
+                    <input type="file" id="doc_food_cert" name="doc_food_cert" required
+                           accept=".pdf,.jpg,.jpeg,.png"
+                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; margin-bottom: 10px;">
+                    <label for="doc_food_cert_exp" style="display: block; margin-bottom: 5px; font-size: 13px; color: #8b949e;">
+                        Expiration Date (Optional)
+                    </label>
+                    <input type="date" id="doc_food_cert_exp" name="doc_food_cert_exp"
+                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                </div>
+
+                <!-- TIPS Certification -->
+                <div class="form-group" style="margin: 0;">
+                    <label for="doc_tips" style="display: block; margin-bottom: 8px; font-weight: 600;">
+                        TIPS Certification <span style="color: #f85149;">*</span>
+                    </label>
+                    <input type="file" id="doc_tips" name="doc_tips" required
+                           accept=".pdf,.jpg,.jpeg,.png"
+                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; margin-bottom: 10px;">
+                    <label for="doc_tips_exp" style="display: block; margin-bottom: 5px; font-size: 13px; color: #8b949e;">
+                        Expiration Date (Optional)
+                    </label>
+                    <input type="date" id="doc_tips_exp" name="doc_tips_exp"
+                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Form Actions -->
+    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+        <button type="button" class="btn btn-secondary" onclick="window.location='/hr/employees'">
+            <i class="bi bi-x-circle"></i> Cancel
+        </button>
+        <button type="submit" class="btn btn-primary" id="submitBtn">
+            <i class="bi bi-check-circle"></i> {{ 'Update' if employee else 'Create' }} Employee
+        </button>
+    </div>
+</form>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const isEditMode = {{ 'true' if employee else 'false' }};
+const employeeId = {{ employee.id if employee else 'null' }};
+const employeePositionId = {{ employee.position_id if employee and employee.position_id else 'null' }};
+
+// Load positions and populate dropdown
+async function loadPositions() {
+    try {
+        const response = await fetch('/hr/api/positions/', {
+            credentials: 'include'
+        });
+        const positions = await response.json();
+
+        const select = document.getElementById('position_id');
+        positions.forEach(pos => {
+            if (pos.is_active) {
+                const option = document.createElement('option');
+                option.value = pos.id;
+                option.textContent = pos.title;
+                if (employeePositionId && pos.id === employeePositionId) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            }
+        });
+    } catch (error) {
+        console.error('Error loading positions:', error);
+    }
+}
+
+// Load positions on page load
+loadPositions();
+
+// Auto-generate employee number
+async function generateEmployeeNumber() {
+    try {
+        const response = await fetch('/hr/api/employees/', {
+            credentials: 'include'
+        });
+        const employees = await response.json();
+
+        // Find highest employee number
+        let maxNum = 0;
+        employees.forEach(emp => {
+            const match = emp.employee_number.match(/EMP(\d+)/);
+            if (match) {
+                const num = parseInt(match[1]);
+                if (num > maxNum) maxNum = num;
+            }
+        });
+
+        // Generate next number
+        const nextNum = (maxNum + 1).toString().padStart(3, '0');
+        document.getElementById('employee_number').value = `EMP${nextNum}`;
+    } catch (error) {
+        console.error('Error generating employee number:', error);
+    }
+}
+
+// Auto-generate checkbox handler
+if (!isEditMode) {
+    const autoGenCheckbox = document.getElementById('autoGenerate');
+    const empNumberInput = document.getElementById('employee_number');
+
+    autoGenCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            empNumberInput.readOnly = true;
+            generateEmployeeNumber();
+        } else {
+            empNumberInput.readOnly = false;
+            empNumberInput.value = '';
+            empNumberInput.focus();
+        }
+    });
+
+    // Generate on page load if auto-generate is checked
+    if (autoGenCheckbox.checked) {
+        generateEmployeeNumber();
+    }
+}
+
+// Employment Status change handler
+document.getElementById('employment_status').addEventListener('change', function() {
+    const terminationSection = document.getElementById('terminationSection');
+    const isTerminated = this.value === 'Terminated';
+
+    terminationSection.style.display = isTerminated ? 'block' : 'none';
+
+    // Set required attributes
+    document.getElementById('termination_date').required = isTerminated;
+    document.getElementById('termination_type').required = isTerminated;
+    document.getElementById('termination_reason').required = isTerminated;
+    document.getElementById('final_decision_date').required = isTerminated;
+    document.getElementById('authorized_by').required = isTerminated;
+
+    // Clear values if not terminated
+    if (!isTerminated) {
+        document.getElementById('termination_date').value = '';
+        document.getElementById('termination_type').value = '';
+        document.getElementById('termination_reason').value = '';
+        document.getElementById('final_decision_date').value = '';
+        document.getElementById('authorized_by').value = '';
+    }
+});
+
+// Show termination section on page load if status is terminated
+if (document.getElementById('employment_status').value === 'Terminated') {
+    document.getElementById('terminationSection').style.display = 'block';
+    document.getElementById('termination_date').required = true;
+    document.getElementById('termination_type').required = true;
+    document.getElementById('termination_reason').required = true;
+    document.getElementById('final_decision_date').required = true;
+    document.getElementById('authorized_by').required = true;
+}
+
+// Position assignment toggle (new employees only)
+if (!isEditMode) {
+    const assignPosCheckbox = document.getElementById('assignPosition');
+    const positionSection = document.getElementById('positionSection');
+
+    assignPosCheckbox.addEventListener('change', function() {
+        positionSection.style.display = this.checked ? 'block' : 'none';
+    });
+
+    // Load positions and locations for dropdown
+    async function loadPositionsAndLocations() {
+        try {
+            // Load positions (for position assignment section)
+            const posResponse = await fetch('/hr/api/positions/', {
+                credentials: 'include'
+            });
+            const positions = await posResponse.json();
+            const posSelect = document.getElementById('position_id');
+            if (posSelect) {
+                positions.forEach(pos => {
+                    const option = document.createElement('option');
+                    option.value = pos.id;
+                    option.textContent = pos.title;
+                    posSelect.appendChild(option);
+                });
+            }
+
+            // Load locations (for position assignment section)
+            const locResponse = await fetch('/hr/api/locations/', {
+                credentials: 'include'
+            });
+            const locations = await locResponse.json();
+            const locSelect = document.getElementById('location_id');
+            if (locSelect) {
+                locations.forEach(loc => {
+                    const option = document.createElement('option');
+                    option.value = loc.id;
+                    option.textContent = loc.name;
+                    locSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading positions/locations:', error);
+        }
+    }
+
+    loadPositionsAndLocations();
+
+    // Set position start date to hire date when hire date changes
+    document.getElementById('hire_date').addEventListener('change', function() {
+        document.getElementById('position_start_date').value = this.value;
+    });
+}
+
+// Set default hire date to today for new employees
+if (!isEditMode && !document.getElementById('hire_date').value) {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('hire_date').value = today;
+    if (document.getElementById('position_start_date')) {
+        document.getElementById('position_start_date').value = today;
+    }
+}
+
+// Load assigned locations (for ALL employees - new and edit)
+async function loadAssignedLocations() {
+    try {
+        const response = await fetch('/hr/api/locations/', {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const locations = await response.json();
+        const assignedLocContainer = document.getElementById('assigned_location_ids');
+
+        // Clear loading message
+        assignedLocContainer.innerHTML = '';
+
+        // Get employee's current locations if in edit mode
+        let employeeLocationIds = [];
+        if (isEditMode && employeeId) {
+            try {
+                const empResponse = await fetch(`/hr/api/employees/${employeeId}`, {
+                    credentials: 'include'
+                });
+                const employee = await empResponse.json();
+                if (employee.assigned_locations) {
+                    employeeLocationIds = employee.assigned_locations.map(loc => loc.id);
+                }
+            } catch (error) {
+                console.error('Error loading employee locations:', error);
+            }
+        }
+
+        // Create checkbox for each location
+        locations.forEach(loc => {
+            const checkboxWrapper = document.createElement('label');
+            checkboxWrapper.style.cssText = `
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 10px;
+                background: #161b22;
+                border: 1px solid #30363d;
+                border-radius: 6px;
+                cursor: pointer;
+                transition: all 0.2s;
+            `;
+            checkboxWrapper.onmouseover = function() {
+                this.style.background = '#1c2128';
+                this.style.borderColor = '#58a6ff';
+            };
+            checkboxWrapper.onmouseout = function() {
+                this.style.background = '#161b22';
+                this.style.borderColor = '#30363d';
+            };
+
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.name = 'location_ids';
+            checkbox.value = loc.id;
+            checkbox.className = 'location-checkbox';
+            checkbox.style.cssText = `
+                width: 18px;
+                height: 18px;
+                cursor: pointer;
+                margin: 0;
+            `;
+
+            // Check if this location is assigned to the employee
+            if (employeeLocationIds.includes(loc.id)) {
+                checkbox.checked = true;
+            }
+
+            const label = document.createElement('span');
+            label.textContent = loc.name;
+            label.style.cssText = `
+                color: #c9d1d9;
+                font-size: 14px;
+                flex: 1;
+            `;
+
+            checkboxWrapper.appendChild(checkbox);
+            checkboxWrapper.appendChild(label);
+            assignedLocContainer.appendChild(checkboxWrapper);
+        });
+    } catch (error) {
+        console.error('Error loading assigned locations:', error);
+        const assignedLocContainer = document.getElementById('assigned_location_ids');
+        assignedLocContainer.innerHTML = '<div style="color: #f85149; grid-column: 1 / -1;"><i class="bi bi-exclamation-triangle"></i> Error loading locations</div>';
+    }
+}
+
+// Load assigned locations on page load
+loadAssignedLocations();
+
+// Upload required documents function
+async function uploadRequiredDocuments(employeeId) {
+    const documents = [
+        {
+            file: document.getElementById('doc_id').files[0],
+            type: 'ID Copy',
+            expiration: null
+        },
+        {
+            file: document.getElementById('doc_ssn').files[0],
+            type: 'Social Security Card',
+            expiration: null
+        },
+        {
+            file: document.getElementById('doc_food_cert').files[0],
+            type: document.getElementById('doc_food_cert_type').value,
+            expiration: document.getElementById('doc_food_cert_exp').value || null
+        },
+        {
+            file: document.getElementById('doc_tips').files[0],
+            type: 'TIPS Certification',
+            expiration: document.getElementById('doc_tips_exp').value || null
+        }
+    ];
+
+    for (const doc of documents) {
+        if (!doc.file) {
+            throw new Error(`Missing required document: ${doc.type}`);
+        }
+
+        const docFormData = new FormData();
+        docFormData.append('file', doc.file);
+        docFormData.append('document_type', doc.type);
+        if (doc.expiration) {
+            docFormData.append('expiration_date', doc.expiration);
+        }
+
+        const response = await fetch(`/hr/api/employees/${employeeId}/documents`, {
+            method: 'POST',
+            credentials: 'include',
+            body: docFormData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(`Failed to upload ${doc.type}: ${error.detail || 'Unknown error'}`);
+        }
+    }
+}
+
+// Form submission
+document.getElementById('employeeForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+
+    try {
+        // Build employee data
+        const formData = {
+            employee_number: document.getElementById('employee_number').value,
+            first_name: document.getElementById('first_name').value,
+            last_name: document.getElementById('last_name').value,
+            middle_name: document.getElementById('middle_name').value || null,
+            date_of_birth: document.getElementById('date_of_birth').value || null,
+            email: document.getElementById('email').value,
+            phone_number: document.getElementById('phone_number').value || null,
+            street_address: document.getElementById('street_address').value || null,
+            city: document.getElementById('city').value || null,
+            state: document.getElementById('state').value || null,
+            zip_code: document.getElementById('zip_code').value || null,
+            emergency_contact_name: document.getElementById('emergency_contact_name').value || null,
+            emergency_contact_relationship: document.getElementById('emergency_contact_relationship').value || null,
+            emergency_contact_phone: document.getElementById('emergency_contact_phone').value || null,
+            hire_date: document.getElementById('hire_date').value,
+            employment_status: document.getElementById('employment_status').value,
+            employee_type: document.getElementById('employee_type').value,
+            position_id: document.getElementById('position_id').value || null,
+            starting_pay_rate: document.getElementById('starting_pay_rate').value || null,
+            termination_date: document.getElementById('termination_date').value || null,
+            termination_type: document.getElementById('termination_type').value || null,
+            termination_reason: document.getElementById('termination_reason').value || null,
+            final_decision_date: document.getElementById('final_decision_date').value || null,
+            authorized_by: document.getElementById('authorized_by').value || null
+        };
+
+        // Collect checked location IDs from checkboxes
+        const checkedBoxes = document.querySelectorAll('.location-checkbox:checked');
+        const selectedLocationIds = Array.from(checkedBoxes).map(checkbox => parseInt(checkbox.value));
+        formData.location_ids = selectedLocationIds;
+
+        // API call
+        const url = isEditMode ? `/hr/api/employees/${employeeId}` : '/hr/api/employees/';
+        const method = isEditMode ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            credentials: 'include',
+            body: JSON.stringify(formData)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save employee');
+        }
+
+        const employee = await response.json();
+
+        // Upload required documents for new employees
+        if (!isEditMode) {
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Uploading documents...';
+
+            try {
+                await uploadRequiredDocuments(employee.id);
+            } catch (docError) {
+                console.error('Error uploading documents:', docError);
+                showAlert(`Employee created but some documents failed to upload: ${docError.message}`, 'warning');
+                setTimeout(() => {
+                    window.location.href = `/hr/employees/${employee.id}`;
+                }, 2000);
+                return;
+            }
+        }
+
+        // Show success message and redirect
+        const message = isEditMode
+            ? `Employee ${employee.first_name} ${employee.last_name} updated successfully!`
+            : `Employee ${employee.first_name} ${employee.last_name} (${employee.employee_number}) created successfully! All documents uploaded.`;
+
+        showAlert(message, 'success');
+
+        // Redirect after 1.5 seconds
+        setTimeout(() => {
+            window.location.href = `/hr/employees/${employee.id}`;
+        }, 1500);
+
+    } catch (error) {
+        console.error('Error saving employee:', error);
+        showAlert(error.message, 'danger');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-check-circle"></i> {{ 'Update' if employee else 'Create' }} Employee';
+    }
+});
+
+function showAlert(message, type) {
+    const alertContainer = document.getElementById('alertContainer');
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type}`;
+    alert.style.cssText = `
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        border-radius: 6px;
+        background: ${type === 'success' ? '#238636' : '#da3633'};
+        color: white;
+        border: 1px solid ${type === 'success' ? '#2ea043' : '#f85149'};
+    `;
+    alert.innerHTML = `
+        <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>
+        ${message}
+    `;
+    alertContainer.appendChild(alert);
+
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        alert.remove();
+    }, 5000);
+}
+
+// Mobile layout fix - remove inline grid styles on small screens
+function fixMobileLayout() {
+    if (window.innerWidth <= 992) {
+        // Get all divs with inline grid styles
+        const gridDivs = document.querySelectorAll('#employeeForm div[style*="grid"]');
+        gridDivs.forEach(div => {
+            const style = div.getAttribute('style');
+            if (style && (style.includes('grid-template-columns') || style.includes('display: grid'))) {
+                // Replace grid styles with mobile-friendly single column
+                let newStyle = style
+                    .replace(/grid-template-columns:[^;]+;?/gi, 'display: flex; flex-direction: column;')
+                    .replace(/display:\s*grid;?/gi, 'display: flex; flex-direction: column;')
+                    .replace(/grid-column:[^;]+;?/gi, '');
+                div.setAttribute('style', newStyle);
+            }
+        });
+
+        // Fix date inputs specifically - very aggressive
+        const dateInputs = document.querySelectorAll('#employeeForm input[type="date"]');
+        dateInputs.forEach(input => {
+            input.style.padding = '10px 4px 10px 8px';
+            input.style.maxWidth = '100%';
+            input.style.width = '100%';
+            input.style.boxSizing = 'border-box';
+            input.style.fontSize = '14px';
+
+            // Fix parent container
+            if (input.parentElement) {
+                input.parentElement.style.maxWidth = '100%';
+                input.parentElement.style.overflow = 'hidden';
+            }
+        });
+
+        // Fix all form groups
+        const formGroups = document.querySelectorAll('#employeeForm .form-group');
+        formGroups.forEach(group => {
+            group.style.maxWidth = '100%';
+            group.style.overflow = 'hidden';
+            group.style.boxSizing = 'border-box';
+        });
+
+        // Reduce card padding
+        const cards = document.querySelectorAll('#employeeForm .card');
+        cards.forEach(card => {
+            card.style.paddingLeft = '10px';
+            card.style.paddingRight = '10px';
+        });
+
+        // Reduce content area padding
+        const contentArea = document.querySelector('.content-area');
+        if (contentArea) {
+            contentArea.style.padding = '8px';
+        }
+    }
+}
+
+// Run on page load
+fixMobileLayout();
+
+// Run on window resize
+window.addEventListener('resize', fixMobileLayout);
+
+// Run after a short delay to ensure DOM is ready
+setTimeout(fixMobileLayout, 500);
+</script>
+{% endblock %}

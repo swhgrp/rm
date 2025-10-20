@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Login - SW Hospitality Group{% endblock %}
+
+{% block extra_styles %}
+<style>
+    /* Hide sidebar and mobile menu on login page */
+    .sidebar,
+    .sidebar-toggle,
+    .sidebar-overlay,
+    .top-navbar {
+        display: none !important;
+    }
+
+    /* Remove all margins and padding, make full width */
+    body {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    .main-wrapper {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+    }
+
+    .content-area {
+        margin: 0 !important;
+        padding: 0 !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        min-height: 100vh !important;
+        width: 100vw !important;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+    }
+
+    /* Fix login button styling */
+    .btn {
+        white-space: nowrap !important;
+        padding: 10px 20px !important;
+        min-width: 120px !important;
+    }
+
+    /* Ensure form elements have proper spacing */
+    .card {
+        min-width: 320px;
+        max-width: 450px;
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%;">
+    <div style="display: flex; flex-direction: column; align-items: center; margin-bottom: 20px;">
+        <img src="/inventory/static/images/sw-logo.png?v=4" alt="SW Logo" style="max-width: 300px; height: auto; margin-bottom: 15px;">
+        <p class="text-muted" style="margin: 0;">Inventory Management System</p>
+    </div>
+    <div style="width: 100%; max-width: 400px;">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white text-center">
+                <h4><i class="bi bi-box-arrow-in-right"></i> Login</h4>
+            </div>
+            <div class="card-body">
+                <div id="sessionMessage" class="alert alert-warning" style="display: none;"></div>
+
+                <form id="loginForm">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-box-arrow-in-right"></i> Login
+                        </button>
+                    </div>
+                </form>
+
+                <div id="loginError" class="alert alert-danger mt-3" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Check for session expiration message
+const loginMessage = localStorage.getItem('login_message');
+if (loginMessage) {
+    const messageDiv = document.getElementById('sessionMessage');
+    messageDiv.textContent = loginMessage;
+    messageDiv.style.display = 'block';
+    localStorage.removeItem('login_message');
+}
+
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+    const errorDiv = document.getElementById('loginError');
+
+    try {
+        const response = await fetch('api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            localStorage.setItem('access_token', data.access_token);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('user_role', data.user.role);
+            window.location.href = 'dashboard';
+        } else {
+            const error = await response.json();
+            errorDiv.textContent = error.detail || 'Login failed';
+            errorDiv.style.display = 'block';
+        }
+    } catch (error) {
+        errorDiv.textContent = 'Network error. Please try again.';
+        errorDiv.style.display = 'block';
+    }
+});
+</script>
+{% endblock %}

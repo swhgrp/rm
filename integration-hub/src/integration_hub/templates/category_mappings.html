@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Category Mappings - Integration Hub{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header d-flex justify-content-between align-items-center">
+        <div>
+            <h1><i class="bi bi-list-ul"></i> Category Mappings</h1>
+            <p class="text-muted">Configure GL account mappings for inventory categories</p>
+        </div>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMappingModal">
+            <i class="bi bi-plus-circle"></i> Add Mapping
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            {% if mappings %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Category</th>
+                            <th>Display Name</th>
+                            <th>Asset Account</th>
+                            <th>COGS Account</th>
+                            <th>Waste Account</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mapping in mappings %}
+                        <tr>
+                            <td><code>{{ mapping.inventory_category }}</code></td>
+                            <td>{{ mapping.display_name }}</td>
+                            <td>{{ mapping.gl_asset_account }}</td>
+                            <td>{{ mapping.gl_cogs_account }}</td>
+                            <td>{{ mapping.gl_waste_account or '-' }}</td>
+                            <td>
+                                <button class="btn btn-sm btn-secondary">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+                <p class="text-muted mt-3">No category mappings configured yet.</p>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addMappingModal">
+                    <i class="bi bi-plus-circle"></i> Add First Mapping
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Reference Guide -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <i class="bi bi-info-circle"></i> GL Account Reference
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6>Asset Accounts (1400-1499)</h6>
+                    <ul class="small">
+                        <li>1405 - Produce Inventory</li>
+                        <li>1410 - Dairy Inventory</li>
+                        <li>1417 - Beef Inventory</li>
+                        <li>1418 - Poultry Inventory</li>
+                        <li>1420 - Seafood Inventory</li>
+                        <li>1422 - Pork Inventory</li>
+                        <li>1450 - Beer Inventory</li>
+                        <li>1455 - Wine Inventory</li>
+                        <li>1460 - Liquor Inventory</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h6>COGS Accounts (5100-5199)</h6>
+                    <ul class="small">
+                        <li>5105 - Produce Cost</li>
+                        <li>5110 - Dairy Cost</li>
+                        <li>5117 - Beef Cost</li>
+                        <li>5118 - Poultry Cost</li>
+                        <li>5120 - Seafood Cost</li>
+                        <li>5122 - Pork Cost</li>
+                        <li>5150 - Beer Cost</li>
+                        <li>5155 - Wine Cost</li>
+                        <li>5160 - Liquor Cost</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="row mt-3">
+                <div class="col-md-6">
+                    <h6>Waste Expense Accounts (7180-7183)</h6>
+                    <ul class="small">
+                        <li>7180 - Waste Expense - Food</li>
+                        <li>7181 - Waste Expense - Beverage</li>
+                        <li>7182 - Waste Expense - Alcohol</li>
+                        <li>7183 - Waste Expense - Merchandise</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Mapping Modal -->
+<div class="modal fade" id="addMappingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Category Mapping</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="/hub/api/category-mappings" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Category Code <span class="text-danger">*</span></label>
+                        <select class="form-select" name="inventory_category" required>
+                            <option value="">Select category...</option>
+                            <option value="produce">produce</option>
+                            <option value="dairy">dairy</option>
+                            <option value="poultry">poultry</option>
+                            <option value="beef">beef</option>
+                            <option value="seafood">seafood</option>
+                            <option value="pork">pork</option>
+                            <option value="dry_goods">dry_goods</option>
+                            <option value="frozen">frozen</option>
+                            <option value="beverage_na">beverage_na</option>
+                            <option value="beer_draft">beer_draft</option>
+                            <option value="beer_bottled">beer_bottled</option>
+                            <option value="wine">wine</option>
+                            <option value="liquor">liquor</option>
+                            <option value="supplies">supplies</option>
+                            <option value="merchandise">merchandise</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Display Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="display_name" required
+                               placeholder="e.g., Poultry">
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-3">
+                        <label class="form-label">Asset Account <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" name="gl_asset_account" required
+                               placeholder="e.g., 1418">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">COGS Account <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" name="gl_cogs_account" required
+                               placeholder="e.g., 5118">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Waste Account</label>
+                        <input type="number" class="form-control" name="gl_waste_account"
+                               placeholder="e.g., 7180">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Mapping</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

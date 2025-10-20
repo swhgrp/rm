@@ -1,0 +1,726 @@
+{% extends "base.html" %}
+
+{% block title %}Employee Details - Restaurant HR Management{% endblock %}
+{% block nav_employees %}active{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div style="margin-bottom: 20px; color: #8b949e;">
+    <a href="/hr/" style="color: #58a6ff;">Dashboard</a> /
+    <a href="/hr/employees" style="color: #58a6ff;">Employees</a> /
+    <span id="breadcrumbName">Employee Details</span>
+</div>
+
+<!-- Alert Container -->
+<div id="alertContainer"></div>
+
+<!-- Header Card with Actions -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h2 id="employeeTitle">Employee Details</h2>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="btn btn-secondary" onclick="window.location='/hr/employees'">
+                <i class="bi bi-arrow-left"></i> Back to List
+            </button>
+            <button class="btn btn-primary" id="editBtn">
+                <i class="bi bi-pencil"></i> Edit
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Section 1: Personal Information -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h2><i class="bi bi-person"></i> Personal Information</h2>
+    </div>
+
+    <div style="padding: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+            <!-- Employee Number -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Employee Number</label>
+                <div id="employee_number" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- Employment Status -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Employment Status</label>
+                <div id="employment_status" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- First Name -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">First Name</label>
+                <div id="first_name" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- Middle Name -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Middle Name</label>
+                <div id="middle_name" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- Last Name -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Last Name</label>
+                <div id="last_name" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- Date of Birth -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Date of Birth</label>
+                <div id="date_of_birth" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 2: Contact Information -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h2><i class="bi bi-envelope"></i> Contact Information</h2>
+    </div>
+
+    <div style="padding: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+            <!-- Email -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Email</label>
+                <div id="email" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- Phone Number -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Phone Number</label>
+                <div id="phone_number" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- Street Address -->
+            <div style="grid-column: span 2;">
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Street Address</label>
+                <div id="street_address" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- City -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">City</label>
+                <div id="city" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- State -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">State</label>
+                <div id="state" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- Zip Code -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Zip Code</label>
+                <div id="zip_code" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 3: Emergency Contact -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h2><i class="bi bi-telephone"></i> Emergency Contact</h2>
+    </div>
+
+    <div style="padding: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+            <!-- Emergency Contact Name -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Name</label>
+                <div id="emergency_contact_name" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- Emergency Contact Relationship -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Relationship</label>
+                <div id="emergency_contact_relationship" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- Emergency Contact Phone -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Phone Number</label>
+                <div id="emergency_contact_phone" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 4: Employment Details -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h2><i class="bi bi-briefcase"></i> Employment Details</h2>
+    </div>
+
+    <div style="padding: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+            <!-- Hire Date -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Hire Date</label>
+                <div id="hire_date" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- Employee Type -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Employee Type</label>
+                <div id="employee_type" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- Position -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Position</label>
+                <div id="position" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+
+            <!-- Starting Pay Rate -->
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Starting Pay Rate</label>
+                <div id="starting_pay_rate" style="color: #c9d1d9; font-size: 15px;">-</div>
+            </div>
+        </div>
+
+        <!-- Termination Details (conditionally shown) -->
+        <div id="terminationSection" style="display: none; margin-top: 20px; padding: 20px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;">
+            <h3 style="margin-bottom: 15px; color: #f85149;"><i class="bi bi-exclamation-triangle"></i> Termination Details</h3>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                <!-- Termination Date -->
+                <div>
+                    <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Termination Date</label>
+                    <div id="termination_date" style="color: #c9d1d9; font-size: 15px;">-</div>
+                </div>
+
+                <!-- Type of Termination -->
+                <div>
+                    <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Type of Termination</label>
+                    <div id="termination_type" style="color: #c9d1d9; font-size: 15px;">-</div>
+                </div>
+
+                <!-- Final Decision Date -->
+                <div>
+                    <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Final Decision Date</label>
+                    <div id="final_decision_date" style="color: #c9d1d9; font-size: 15px;">-</div>
+                </div>
+
+                <!-- Authorized By -->
+                <div>
+                    <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Authorized By</label>
+                    <div id="authorized_by" style="color: #c9d1d9; font-size: 15px;">-</div>
+                </div>
+
+                <!-- Reason for Termination -->
+                <div style="grid-column: span 2;">
+                    <label style="display: block; margin-bottom: 5px; color: #8b949e; font-size: 13px;">Reason for Termination</label>
+                    <div id="termination_reason" style="color: #c9d1d9; font-size: 15px; white-space: pre-wrap;">-</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 5: Assigned Locations -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h2><i class="bi bi-geo-alt"></i> Assigned Locations</h2>
+    </div>
+
+    <div style="padding: 20px;">
+        <div id="assigned_locations" style="display: flex; flex-wrap: wrap; gap: 10px;">
+            <div style="color: #8b949e;"><i class="bi bi-hourglass-split"></i> Loading...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Documents Section -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h2><i class="bi bi-file-earmark-text"></i> Documents</h2>
+        <button class="btn btn-primary" onclick="openUploadModal()">
+            <i class="bi bi-upload"></i> Upload Document
+        </button>
+    </div>
+
+    <div id="documentsContainer" style="padding: 20px;">
+        <p style="text-align: center; color: #8b949e;"><i class="bi bi-hourglass-split"></i> Loading documents...</p>
+    </div>
+</div>
+
+<!-- Document Preview Modal -->
+<div id="previewModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 1001; align-items: center; justify-content: center;">
+    <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; max-width: 90vw; width: 1200px; max-height: 90vh; display: flex; flex-direction: column;">
+        <div style="padding: 20px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0;" id="previewTitle"><i class="bi bi-eye"></i> Document Preview</h3>
+            <button onclick="closePreviewModal()" style="background: none; border: none; color: #8b949e; font-size: 24px; cursor: pointer; padding: 0; line-height: 1;">&times;</button>
+        </div>
+        <div id="previewContent" style="flex: 1; overflow: auto; padding: 20px; display: flex; align-items: center; justify-content: center; min-height: 400px;">
+            <p style="color: #8b949e;"><i class="bi bi-hourglass-split"></i> Loading preview...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Document Modal -->
+<div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+        <div style="padding: 20px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0;"><i class="bi bi-upload"></i> Upload Document</h3>
+            <button onclick="closeUploadModal()" style="background: none; border: none; color: #8b949e; font-size: 24px; cursor: pointer; padding: 0; line-height: 1;">&times;</button>
+        </div>
+
+        <form id="uploadForm" style="padding: 20px;">
+            <div class="form-group">
+                <label for="documentFile">File <span style="color: #f85149;">*</span></label>
+                <input type="file" id="documentFile" required
+                       accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.txt,.xlsx,.xls"
+                       style="width: 100%; padding: 10px; background: #161b22; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
+                <small style="color: #8b949e; display: block; margin-top: 5px;">
+                    Allowed: PDF, Word, Images, Excel (Max 10MB)
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="documentType">Document Type <span style="color: #f85149;">*</span></label>
+                <select id="documentType" required style="width: 100%; padding: 10px; background: #161b22; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
+                    <option value="">Select Type</option>
+                    <option value="Food Handler Certificate">Food Handler Certificate</option>
+                    <option value="Food Manager Certificate">Food Manager Certificate</option>
+                    <option value="Alcohol Server Permit">Alcohol Server Permit</option>
+                    <option value="TIPS Certification">TIPS Certification</option>
+                    <option value="Background Check">Background Check</option>
+                    <option value="Drug Test Results">Drug Test Results</option>
+                    <option value="ID Copy">ID Copy</option>
+                    <option value="Social Security Card">Social Security Card</option>
+                    <option value="Performance Review">Performance Review</option>
+                    <option value="Written Warning">Written Warning</option>
+                    <option value="Performance Improvement Plan">Performance Improvement Plan</option>
+                    <option value="Employee Handbook Acknowledgment">Employee Handbook Acknowledgment</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="expirationDate">Expiration Date (Optional)</label>
+                <input type="date" id="expirationDate" style="width: 100%; padding: 10px; background: #161b22; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
+            </div>
+
+            <div class="form-group">
+                <label for="documentNotes">Notes (Optional)</label>
+                <textarea id="documentNotes" rows="3" style="width: 100%; padding: 10px; background: #161b22; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;"></textarea>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeUploadModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Upload</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentEmployeeId = null;
+
+function formatPhoneNumber(phone) {
+    if (!phone) return '-';
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 10) {
+        return `(${cleaned.substring(0, 3)}) ${cleaned.substring(3, 6)}-${cleaned.substring(6)}`;
+    }
+    return phone;
+}
+
+async function loadEmployee() {
+    const pathParts = window.location.pathname.split('/');
+    const employeeId = pathParts[pathParts.length - 1];
+    currentEmployeeId = employeeId;
+
+    // Set up Edit button to redirect to edit page
+    document.getElementById('editBtn').onclick = () => {
+        window.location = `/hr/employees/${employeeId}/edit`;
+    };
+
+    try {
+        const response = await fetch(`/hr/api/employees/${employeeId}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            showAlert('Employee not found', 'error');
+            setTimeout(() => window.location = '/hr/employees', 2000);
+            return;
+        }
+
+        const employee = await response.json();
+        populateEmployee(employee);
+        loadDocuments(employeeId);
+    } catch (error) {
+        console.error('Error loading employee:', error);
+        showAlert('Error loading employee', 'error');
+    }
+}
+
+function populateEmployee(employee) {
+    // Update title and breadcrumb
+    const fullName = `${employee.first_name} ${employee.last_name}`;
+    document.getElementById('employeeTitle').textContent = fullName;
+    document.getElementById('breadcrumbName').textContent = fullName;
+
+    // Personal Information
+    document.getElementById('employee_number').textContent = employee.employee_number || '-';
+    document.getElementById('employment_status').textContent = employee.employment_status || '-';
+    document.getElementById('first_name').textContent = employee.first_name || '-';
+    document.getElementById('middle_name').textContent = employee.middle_name || '-';
+    document.getElementById('last_name').textContent = employee.last_name || '-';
+    document.getElementById('date_of_birth').textContent = employee.date_of_birth ? new Date(employee.date_of_birth).toLocaleDateString() : '-';
+
+    // Contact Information
+    document.getElementById('email').textContent = employee.email || '-';
+    document.getElementById('phone_number').textContent = formatPhoneNumber(employee.phone_number);
+    document.getElementById('street_address').textContent = employee.street_address || '-';
+    document.getElementById('city').textContent = employee.city || '-';
+    document.getElementById('state').textContent = employee.state || '-';
+    document.getElementById('zip_code').textContent = employee.zip_code || '-';
+
+    // Emergency Contact
+    document.getElementById('emergency_contact_name').textContent = employee.emergency_contact_name || '-';
+    document.getElementById('emergency_contact_relationship').textContent = employee.emergency_contact_relationship || '-';
+    document.getElementById('emergency_contact_phone').textContent = formatPhoneNumber(employee.emergency_contact_phone);
+
+    // Employment Details
+    document.getElementById('hire_date').textContent = employee.hire_date ? new Date(employee.hire_date).toLocaleDateString() : '-';
+    document.getElementById('employee_type').textContent = employee.employee_type || '-';
+
+    // Load and display position
+    if (employee.position_id) {
+        fetch(`/hr/api/positions/${employee.position_id}`, { credentials: 'include' })
+            .then(res => res.json())
+            .then(position => {
+                document.getElementById('position').textContent = position.title;
+            })
+            .catch(() => {
+                document.getElementById('position').textContent = '-';
+            });
+    } else {
+        document.getElementById('position').textContent = '-';
+    }
+
+    document.getElementById('starting_pay_rate').textContent = employee.starting_pay_rate ? `$${parseFloat(employee.starting_pay_rate).toFixed(2)}` : '-';
+
+    // Termination Details (if terminated)
+    if (employee.employment_status === 'Terminated') {
+        document.getElementById('terminationSection').style.display = 'block';
+        document.getElementById('termination_date').textContent = employee.termination_date ? new Date(employee.termination_date).toLocaleDateString() : '-';
+        document.getElementById('termination_type').textContent = employee.termination_type || '-';
+        document.getElementById('final_decision_date').textContent = employee.final_decision_date ? new Date(employee.final_decision_date).toLocaleDateString() : '-';
+        document.getElementById('authorized_by').textContent = employee.authorized_by || '-';
+        document.getElementById('termination_reason').textContent = employee.termination_reason || '-';
+    }
+
+    // Assigned Locations
+    if (employee.assigned_locations && employee.assigned_locations.length > 0) {
+        const locationsHtml = employee.assigned_locations.map(loc => `
+            <span style="background: #58a6ff; color: #0d1117; padding: 6px 12px; border-radius: 6px; font-size: 14px; font-weight: 500;">
+                <i class="bi bi-geo-alt-fill"></i> ${loc.name}
+            </span>
+        `).join('');
+        document.getElementById('assigned_locations').innerHTML = locationsHtml;
+    } else {
+        document.getElementById('assigned_locations').innerHTML = '<span style="color: #8b949e;">No locations assigned</span>';
+    }
+}
+
+async function loadDocuments(employeeId) {
+    try {
+        const response = await fetch(`/hr/api/employees/${employeeId}/documents`, {
+            credentials: 'include'
+        });
+        const documents = await response.json();
+        renderDocuments(documents);
+    } catch (error) {
+        console.error('Error loading documents:', error);
+        document.getElementById('documentsContainer').innerHTML = `
+            <p style="text-align: center; color: #f85149;">Error loading documents</p>
+        `;
+    }
+}
+
+function renderDocuments(documents) {
+    const container = document.getElementById('documentsContainer');
+
+    if (documents.length === 0) {
+        container.innerHTML = `
+            <p style="text-align: center; color: #8b949e;">No documents uploaded yet</p>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid #30363d;">
+                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Document Type</th>
+                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">File Name</th>
+                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Uploaded</th>
+                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Expiration</th>
+                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Status</th>
+                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${documents.map(doc => `
+                        <tr style="border-bottom: 1px solid #30363d;">
+                            <td style="padding: 12px; color: #c9d1d9;"><strong>${doc.document_type}</strong></td>
+                            <td style="padding: 12px; color: #c9d1d9;">${doc.file_name}</td>
+                            <td style="padding: 12px; color: #c9d1d9;">${new Date(doc.uploaded_at).toLocaleDateString()}</td>
+                            <td style="padding: 12px; color: #c9d1d9;">${doc.expiration_date ? new Date(doc.expiration_date).toLocaleDateString() : '-'}</td>
+                            <td style="padding: 12px;">
+                                <span style="padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; ${getStatusStyle(doc.status)}">
+                                    ${doc.status}
+                                </span>
+                            </td>
+                            <td style="padding: 12px;">
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;"
+                                            onclick="previewDocument(${doc.id}, '${doc.file_name}', '${doc.file_type}')">
+                                        <i class="bi bi-eye"></i> Preview
+                                    </button>
+                                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 13px;"
+                                            onclick="downloadDocument(${doc.id}, '${doc.file_name}')">
+                                        <i class="bi bi-download"></i> Download
+                                    </button>
+                                    <button class="btn btn-danger" style="padding: 6px 12px; font-size: 13px;"
+                                            onclick="deleteDocument(${doc.id})">
+                                        <i class="bi bi-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function getStatusStyle(status) {
+    switch(status) {
+        case 'Current':
+            return 'background: #238636; color: #ffffff;';
+        case 'Expiring Soon':
+            return 'background: #d29922; color: #ffffff;';
+        case 'Expired':
+            return 'background: #da3633; color: #ffffff;';
+        default:
+            return 'background: #388bfd; color: #ffffff;';
+    }
+}
+
+function openUploadModal() {
+    document.getElementById('uploadModal').style.display = 'flex';
+}
+
+function closeUploadModal() {
+    document.getElementById('uploadModal').style.display = 'none';
+    document.getElementById('uploadForm').reset();
+}
+
+async function previewDocument(documentId, fileName, fileType) {
+    const modal = document.getElementById('previewModal');
+    const content = document.getElementById('previewContent');
+    const title = document.getElementById('previewTitle');
+
+    title.innerHTML = `<i class="bi bi-eye"></i> Preview: ${fileName}`;
+    content.innerHTML = '<p style="color: #8b949e;"><i class="bi bi-hourglass-split"></i> Loading preview...</p>';
+    modal.style.display = 'flex';
+
+    try {
+        const response = await fetch(`/hr/api/documents/${documentId}/download`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load document');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        // Determine file type from blob or filename
+        const mimeType = blob.type || fileType;
+        const extension = fileName.split('.').pop().toLowerCase();
+
+        if (mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(extension)) {
+            // Display image
+            content.innerHTML = `
+                <img src="${url}" alt="${fileName}"
+                     style="max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 6px;">
+            `;
+        } else if (mimeType === 'application/pdf' || extension === 'pdf') {
+            // Display PDF
+            content.innerHTML = `
+                <iframe src="${url}"
+                        style="width: 100%; height: 70vh; border: none; border-radius: 6px;"
+                        type="application/pdf">
+                </iframe>
+            `;
+        } else {
+            // Unsupported file type
+            content.innerHTML = `
+                <div style="text-align: center; color: #8b949e;">
+                    <i class="bi bi-file-earmark" style="font-size: 48px; margin-bottom: 15px;"></i>
+                    <p>Preview not available for this file type.</p>
+                    <p style="font-size: 14px; margin-top: 10px;">File type: ${extension.toUpperCase()}</p>
+                    <button class="btn btn-primary" onclick="downloadDocument(${documentId}, '${fileName}')" style="margin-top: 15px;">
+                        <i class="bi bi-download"></i> Download to View
+                    </button>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error previewing document:', error);
+        content.innerHTML = `
+            <p style="color: #f85149; text-align: center;">
+                <i class="bi bi-exclamation-triangle"></i> Error loading preview
+            </p>
+        `;
+    }
+}
+
+function closePreviewModal() {
+    const modal = document.getElementById('previewModal');
+    modal.style.display = 'none';
+    // Clean up any object URLs
+    const content = document.getElementById('previewContent');
+    const img = content.querySelector('img');
+    const iframe = content.querySelector('iframe');
+    if (img && img.src.startsWith('blob:')) {
+        window.URL.revokeObjectURL(img.src);
+    }
+    if (iframe && iframe.src.startsWith('blob:')) {
+        window.URL.revokeObjectURL(iframe.src);
+    }
+    content.innerHTML = '';
+}
+
+document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const formData = new FormData();
+    formData.append('file', document.getElementById('documentFile').files[0]);
+    formData.append('document_type', document.getElementById('documentType').value);
+
+    const expirationDate = document.getElementById('expirationDate').value;
+    if (expirationDate) {
+        formData.append('expiration_date', expirationDate);
+    }
+
+    const notes = document.getElementById('documentNotes').value;
+    if (notes) {
+        formData.append('notes', notes);
+    }
+
+    try {
+        const response = await fetch(`/hr/api/employees/${currentEmployeeId}/documents`, {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        });
+
+        if (response.ok) {
+            showAlert('Document uploaded successfully', 'success');
+            closeUploadModal();
+            loadDocuments(currentEmployeeId);
+        } else {
+            const error = await response.json();
+            showAlert('Error: ' + (error.detail || 'Failed to upload document'), 'error');
+        }
+    } catch (error) {
+        console.error('Error uploading document:', error);
+        showAlert('Error uploading document', 'error');
+    }
+});
+
+async function downloadDocument(documentId, fileName) {
+    try {
+        const response = await fetch(`/hr/api/documents/${documentId}/download`, {
+            credentials: 'include'
+        });
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    } catch (error) {
+        console.error('Error downloading document:', error);
+        showAlert('Error downloading document', 'error');
+    }
+}
+
+async function deleteDocument(documentId) {
+    if (!confirm('Are you sure you want to delete this document?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hr/api/documents/${documentId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            showAlert('Document deleted successfully', 'success');
+            loadDocuments(currentEmployeeId);
+        } else {
+            const error = await response.json();
+            showAlert('Error: ' + (error.detail || 'Failed to delete document'), 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting document:', error);
+        showAlert('Error deleting document', 'error');
+    }
+}
+
+function showAlert(message, type) {
+    const alertContainer = document.getElementById('alertContainer');
+    const bgColor = type === 'error' ? '#da3633' : '#238636';
+
+    alertContainer.innerHTML = `
+        <div style="background: ${bgColor}; color: #ffffff; padding: 15px 20px; border-radius: 6px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <span><i class="bi bi-${type === 'error' ? 'exclamation-circle' : 'check-circle'}"></i> ${message}</span>
+            <button onclick="this.parentElement.remove()" style="background: none; border: none; color: #ffffff; font-size: 20px; cursor: pointer; padding: 0; line-height: 1;">&times;</button>
+        </div>
+    `;
+
+    setTimeout(() => {
+        alertContainer.innerHTML = '';
+    }, 5000);
+}
+
+// Close modals when clicking outside
+document.getElementById('uploadModal').addEventListener('click', (e) => {
+    if (e.target.id === 'uploadModal') {
+        closeUploadModal();
+    }
+});
+
+document.getElementById('previewModal').addEventListener('click', (e) => {
+    if (e.target.id === 'previewModal') {
+        closePreviewModal();
+    }
+});
+
+// Load employee on page load
+loadEmployee();
+</script>
+{% endblock %}

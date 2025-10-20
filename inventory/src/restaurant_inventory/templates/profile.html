@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+
+{% block title %}User Profile - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="bi bi-person-circle"></i> User Profile</h1>
+        </div>
+
+        <!-- Profile Info Card -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="bi bi-info-circle"></i> Profile Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Username</label>
+                        <input type="text" class="form-control" id="username" readonly>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Email</label>
+                        <input type="email" class="form-control" id="email">
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Full Name</label>
+                        <input type="text" class="form-control" id="fullName">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold">Role</label>
+                        <input type="text" class="form-control" id="role" readonly>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Status</label>
+                    <div>
+                        <span class="badge bg-success fs-6" id="statusBadge">Active</span>
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="updateProfile()">
+                    <i class="bi bi-check-circle"></i> Update Profile
+                </button>
+            </div>
+        </div>
+
+        <!-- Change Password Card -->
+        <div class="card mb-4">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0"><i class="bi bi-key"></i> Change Password</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Current Password</label>
+                    <input type="password" class="form-control" id="currentPassword">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">New Password</label>
+                    <input type="password" class="form-control" id="newPassword">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Confirm New Password</label>
+                    <input type="password" class="form-control" id="confirmPassword">
+                </div>
+                <button class="btn btn-warning" onclick="changePassword()">
+                    <i class="bi bi-key"></i> Change Password
+                </button>
+            </div>
+        </div>
+
+        <!-- Account Info Card -->
+        <div class="card">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="bi bi-calendar"></i> Account Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Account Created</label>
+                        <p class="mb-0" id="createdAt">-</p>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-bold">Last Updated</label>
+                        <p class="mb-0" id="updatedAt">-</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentUser = null;
+
+async function init() {
+    try {
+        // Get current user info
+        currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+        // Fetch full user details from API
+        const userDetails = await apiRequest(`api/users/${currentUser.id}`);
+
+        // Populate form
+        document.getElementById('username').value = userDetails.username || '';
+        document.getElementById('email').value = userDetails.email || '';
+        document.getElementById('fullName').value = userDetails.full_name || '';
+        document.getElementById('role').value = (userDetails.role || '').toUpperCase();
+
+        // Set status badge
+        const statusBadge = document.getElementById('statusBadge');
+        if (userDetails.is_active) {
+            statusBadge.textContent = 'Active';
+            statusBadge.className = 'badge bg-success fs-6';
+        } else {
+            statusBadge.textContent = 'Inactive';
+            statusBadge.className = 'badge bg-danger fs-6';
+        }
+
+        // Format dates
+        if (userDetails.created_at) {
+            document.getElementById('createdAt').textContent = new Date(userDetails.created_at).toLocaleString();
+        }
+        if (userDetails.updated_at) {
+            document.getElementById('updatedAt').textContent = new Date(userDetails.updated_at).toLocaleString();
+        }
+    } catch (error) {
+        console.error('Error loading profile:', error);
+        showAlert('Error loading profile: ' + error.message, 'danger');
+    }
+}
+
+async function updateProfile() {
+    const email = document.getElementById('email').value.trim();
+    const fullName = document.getElementById('fullName').value.trim();
+
+    if (!email) {
+        showAlert('Email is required', 'warning');
+        return;
+    }
+
+    try {
+        const updatedUser = await apiRequest(`api/users/${currentUser.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+                email: email,
+                full_name: fullName || null
+            })
+        });
+
+        // Update localStorage
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        storedUser.email = updatedUser.email;
+        storedUser.full_name = updatedUser.full_name;
+        localStorage.setItem('user', JSON.stringify(storedUser));
+
+        showAlert('Profile updated successfully', 'success');
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        showAlert('Error updating profile: ' + error.message, 'danger');
+    }
+}
+
+async function changePassword() {
+    const currentPassword = document.getElementById('currentPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+        showAlert('All password fields are required', 'warning');
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        showAlert('New passwords do not match', 'warning');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        showAlert('New password must be at least 6 characters', 'warning');
+        return;
+    }
+
+    try {
+        await apiRequest(`api/users/${currentUser.id}/change-password`, {
+            method: 'POST',
+            body: JSON.stringify({
+                current_password: currentPassword,
+                new_password: newPassword
+            })
+        });
+
+        // Clear password fields
+        document.getElementById('currentPassword').value = '';
+        document.getElementById('newPassword').value = '';
+        document.getElementById('confirmPassword').value = '';
+
+        showAlert('Password changed successfully', 'success');
+    } catch (error) {
+        console.error('Error changing password:', error);
+        showAlert('Error changing password: ' + error.message, 'danger');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

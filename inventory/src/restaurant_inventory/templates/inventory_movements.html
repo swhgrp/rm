@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory Movements - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-arrow-left-right"></i> Inventory Movements</h1>
+    <div>
+        <span class="badge bg-info" id="transactionCount">0 transactions</span>
+    </div>
+</div>
+
+<div class="alert alert-info mb-4">
+    <i class="bi bi-info-circle"></i>
+    View all inventory movements including POS sales deductions, purchases, transfers, waste, and adjustments.
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0"><i class="bi bi-funnel"></i> Filters</h5>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Location</label>
+                <select class="form-select" id="filterLocation">
+                    <option value="">All Locations</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Transaction Type</label>
+                <select class="form-select" id="filterTransactionType">
+                    <option value="">All Types</option>
+                    <option value="pos_sale">POS Sale</option>
+                    <option value="purchase">Purchase</option>
+                    <option value="transfer_in">Transfer In</option>
+                    <option value="transfer_out">Transfer Out</option>
+                    <option value="waste">Waste</option>
+                    <option value="adjustment">Adjustment</option>
+                    <option value="count">Physical Count</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Start Date</label>
+                <input type="date" class="form-control" id="filterStartDate">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">End Date</label>
+                <input type="date" class="form-control" id="filterEndDate">
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-12">
+                <button class="btn btn-primary" onclick="loadTransactions()">
+                    <i class="bi bi-search"></i> Apply Filters
+                </button>
+                <button class="btn btn-secondary" onclick="clearFilters()">
+                    <i class="bi bi-x-circle"></i> Clear
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Transactions Table -->
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Transaction History</h5>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover" id="transactionsTable">
+                <thead>
+                    <tr>
+                        <th>Date/Time</th>
+                        <th>Type</th>
+                        <th>Item</th>
+                        <th>Location</th>
+                        <th>Quantity Change</th>
+                        <th>Before</th>
+                        <th>After</th>
+                        <th>Cost</th>
+                        <th>Reason</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionsTableBody">
+                    <tr>
+                        <td colspan="9" class="text-center text-muted">
+                            <div class="spinner-border spinner-border-sm"></div> Loading...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div>
+                <button class="btn btn-sm btn-outline-secondary" id="prevBtn" onclick="previousPage()" disabled>
+                    <i class="bi bi-chevron-left"></i> Previous
+                </button>
+                <button class="btn btn-sm btn-outline-secondary" id="nextBtn" onclick="nextPage()">
+                    Next <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+            <div>
+                <span class="text-muted">Page <span id="currentPage">1</span></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentPage = 1;
+const pageSize = 50;
+let totalTransactions = 0;
+
+// Use global apiRequest from auth.js which handles authentication redirects
+
+// Format transaction type badge
+function formatTransactionType(type) {
+    const types = {
+        'pos_sale': '<span class="badge bg-primary">POS Sale</span>',
+        'purchase': '<span class="badge bg-success">Purchase</span>',
+        'transfer_in': '<span class="badge bg-info">Transfer In</span>',
+        'transfer_out': '<span class="badge bg-warning">Transfer Out</span>',
+        'waste': '<span class="badge bg-danger">Waste</span>',
+        'adjustment': '<span class="badge bg-secondary">Adjustment</span>',
+        'count': '<span class="badge bg-dark">Count</span>'
+    };
+    return types[type] || `<span class="badge bg-secondary">${type}</span>`;
+}
+
+// Format quantity change with color
+function formatQuantityChange(change) {
+    const num = parseFloat(change);
+    if (num > 0) {
+        return `<span class="text-success">+${num.toFixed(3)}</span>`;
+    } else if (num < 0) {
+        return `<span class="text-danger">${num.toFixed(3)}</span>`;
+    } else {
+        return `<span class="text-muted">${num.toFixed(3)}</span>`;
+    }
+}
+
+// Load locations for filter
+async function loadLocations() {
+    try {
+        const locations = await apiRequest('api/locations/');
+        if (!locations) return; // Redirecting to login
+        const select = document.getElementById('filterLocation');
+
+        locations.forEach(loc => {
+            const option = document.createElement('option');
+            option.value = loc.id;
+            option.textContent = loc.name;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading locations:', error);
+    }
+}
+
+// Load transactions
+async function loadTransactions() {
+    try {
+        const tbody = document.getElementById('transactionsTableBody');
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted"><div class="spinner-border spinner-border-sm"></div> Loading...</td></tr>';
+
+        // Build query params
+        const params = new URLSearchParams();
+        params.append('skip', (currentPage - 1) * pageSize);
+        params.append('limit', pageSize);
+
+        const locationId = document.getElementById('filterLocation').value;
+        if (locationId) params.append('location_id', locationId);
+
+        const transactionType = document.getElementById('filterTransactionType').value;
+        if (transactionType) params.append('transaction_type', transactionType);
+
+        const startDate = document.getElementById('filterStartDate').value;
+        if (startDate) params.append('start_date', startDate);
+
+        const endDate = document.getElementById('filterEndDate').value;
+        if (endDate) params.append('end_date', endDate);
+
+        const transactions = await apiRequest(`api/inventory/transactions?${params.toString()}`);
+        if (!transactions) return; // Redirecting to login
+
+        if (transactions.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted">No transactions found</td></tr>';
+            document.getElementById('transactionCount').textContent = '0 transactions';
+            return;
+        }
+
+        tbody.innerHTML = transactions.map(txn => {
+            const date = new Date(txn.transaction_date);
+            const costDisplay = txn.total_cost ? `$${txn.total_cost.toFixed(2)}` : '-';
+            const beforeDisplay = txn.quantity_before !== null ? txn.quantity_before.toFixed(3) : '-';
+            const afterDisplay = txn.quantity_after !== null ? txn.quantity_after.toFixed(3) : '-';
+
+            return `
+                <tr>
+                    <td>${date.toLocaleString()}</td>
+                    <td>${formatTransactionType(txn.transaction_type)}</td>
+                    <td><strong>${txn.master_item_name}</strong></td>
+                    <td>${txn.location_name || '-'}</td>
+                    <td>${formatQuantityChange(txn.quantity_change)}</td>
+                    <td>${beforeDisplay}</td>
+                    <td>${afterDisplay}</td>
+                    <td>${costDisplay}</td>
+                    <td>${txn.reason || '-'}</td>
+                </tr>
+            `;
+        }).join('');
+
+        // Update count
+        document.getElementById('transactionCount').textContent = `${transactions.length} transactions`;
+
+        // Update pagination buttons
+        document.getElementById('prevBtn').disabled = currentPage === 1;
+        document.getElementById('nextBtn').disabled = transactions.length < pageSize;
+        document.getElementById('currentPage').textContent = currentPage;
+
+    } catch (error) {
+        console.error('Error loading transactions:', error);
+        const tbody = document.getElementById('transactionsTableBody');
+        const errorMsg = error.message || 'Unknown error';
+        tbody.innerHTML = `<tr><td colspan="9" class="text-center text-danger">Error loading transactions: ${errorMsg}</td></tr>`;
+    }
+}
+
+// Pagination
+function nextPage() {
+    currentPage++;
+    loadTransactions();
+}
+
+function previousPage() {
+    if (currentPage > 1) {
+        currentPage--;
+        loadTransactions();
+    }
+}
+
+// Clear filters
+function clearFilters() {
+    document.getElementById('filterLocation').value = '';
+    document.getElementById('filterTransactionType').value = '';
+    document.getElementById('filterStartDate').value = '';
+    document.getElementById('filterEndDate').value = '';
+    currentPage = 1;
+    loadTransactions();
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadLocations();
+    await loadTransactions();
+});
+</script>
+
+{% endblock %}

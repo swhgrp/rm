@@ -1,0 +1,623 @@
+{% extends "base.html" %}
+
+{% block title %}Fiscal Periods - Restaurant Accounting{% endblock %}
+{% block nav_periods %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .page-header h1 {
+        font-size: 2rem;
+        color: #c9d1d9;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .periods-table {
+        background: #161b22;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .status-open {
+        background: #238636;
+        color: white;
+    }
+
+    .status-closed {
+        background: #9e6a03;
+        color: white;
+    }
+
+    .status-locked {
+        background: #da3633;
+        color: white;
+    }
+
+    .btn-sm {
+        padding: 0.35rem 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.7);
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal.show {
+        display: flex;
+    }
+
+    .modal-content {
+        background: #161b22;
+        border: 1px solid #30363d;
+        padding: 2rem;
+        border-radius: 8px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .modal-header h2 {
+        margin: 0;
+        font-size: 1.5rem;
+        color: #c9d1d9;
+    }
+
+    .close {
+        font-size: 2rem;
+        cursor: pointer;
+        color: #8b949e;
+        background: none;
+        border: none;
+    }
+
+    .close:hover {
+        color: #c9d1d9;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: #c9d1d9;
+    }
+
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        font-size: 1rem;
+        background: #0d1117;
+        color: #c9d1d9;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: #58a6ff;
+        box-shadow: 0 0 0 0.25rem rgba(88, 166, 255, 0.25);
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .message {
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+        display: none;
+    }
+
+    .message.show {
+        display: block;
+    }
+
+    .message.success {
+        background: #238636;
+        color: white;
+        border: 1px solid #2ea043;
+    }
+
+    .message.error {
+        background: #da3633;
+        color: white;
+        border: 1px solid #f85149;
+    }
+
+    .year-filter {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        align-items: center;
+    }
+
+    .year-filter label {
+        font-weight: 500;
+        color: #c9d1d9;
+    }
+
+    .year-filter select {
+        padding: 0.5rem;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        background: #0d1117;
+        color: #c9d1d9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Fiscal Periods Management</h1>
+    <div class="action-buttons">
+        {% if current_user.is_admin %}
+        <button class="btn btn-success" onclick="showCreateYearModal()">+ Create Full Year</button>
+        <button class="btn btn-primary" onclick="showCreateModal()">+ Add Period</button>
+        {% endif %}
+    </div>
+</div>
+
+<div id="message" class="message"></div>
+
+<div class="year-filter">
+    <label for="yearFilter">Filter by Year:</label>
+    <select id="yearFilter" onchange="loadPeriods()">
+        <option value="">All Years</option>
+    </select>
+    <label for="statusFilter">Filter by Status:</label>
+    <select id="statusFilter" onchange="loadPeriods()">
+        <option value="">All Statuses</option>
+        <option value="OPEN">Open</option>
+        <option value="CLOSED">Closed</option>
+        <option value="LOCKED">Locked</option>
+    </select>
+</div>
+
+<div class="periods-table">
+    <table id="periodsTable">
+        <thead>
+            <tr>
+                <th>Year</th>
+                <th>Period Name</th>
+                <th>Quarter</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Status</th>
+                <th>Closed Date</th>
+                {% if current_user.is_admin %}
+                <th>Actions</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="{% if current_user.is_admin %}8{% else %}7{% endif %}" style="text-align: center; padding: 2rem;">Loading...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- Create/Edit Period Modal -->
+<div id="periodModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="modalTitle">Add Fiscal Period</h2>
+            <button class="close" onclick="closeModal()">&times;</button>
+        </div>
+
+        <form id="periodForm">
+            <input type="hidden" id="periodId" value="">
+
+            <div class="form-group">
+                <label for="year">Year *</label>
+                <input type="number" id="year" min="2000" max="2100" required>
+            </div>
+
+            <div class="form-group">
+                <label for="period_name">Period Name *</label>
+                <input type="text" id="period_name" maxlength="50" placeholder="e.g., January 2025" required>
+            </div>
+
+            <div class="form-group">
+                <label for="quarter">Quarter</label>
+                <select id="quarter">
+                    <option value="">None</option>
+                    <option value="1">Q1</option>
+                    <option value="2">Q2</option>
+                    <option value="3">Q3</option>
+                    <option value="4">Q4</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="start_date">Start Date *</label>
+                <input type="date" id="start_date" required>
+            </div>
+
+            <div class="form-group">
+                <label for="end_date">End Date *</label>
+                <input type="date" id="end_date" required>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Period</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Create Year Modal -->
+<div id="createYearModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2>Create Full Year</h2>
+            <button class="close" onclick="closeCreateYearModal()">&times;</button>
+        </div>
+
+        <form id="createYearForm">
+            <div class="form-group">
+                <label for="createYear">Year *</label>
+                <input type="number" id="createYear" min="2000" max="2100" required>
+                <p style="font-size: 0.9rem; color: #666; margin-top: 0.5rem;">
+                    This will create 12 monthly periods (January - December) for the selected year.
+                </p>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn" onclick="closeCreateYearModal()">Cancel</button>
+                <button type="submit" class="btn btn-success">Create Year</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let periods = [];
+let years = [];
+
+async function loadPeriods() {
+    try {
+        const yearFilter = document.getElementById('yearFilter').value;
+        const statusFilter = document.getElementById('statusFilter').value;
+
+        let url = '/accounting/api/fiscal-periods/?limit=1000';
+        if (yearFilter) url += `&year=${yearFilter}`;
+        if (statusFilter) url += `&status=${statusFilter}`;
+
+        const response = await fetch(url);
+        if (response.ok) {
+            periods = await response.json();
+            populateYearFilter();
+            renderPeriodsTable();
+        } else {
+            showMessage('Failed to load fiscal periods', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading periods:', error);
+        showMessage('Error loading fiscal periods', 'error');
+    }
+}
+
+function populateYearFilter() {
+    // Get unique years from periods
+    const uniqueYears = [...new Set(periods.map(p => p.year))].sort((a, b) => b - a);
+    const yearFilter = document.getElementById('yearFilter');
+    const currentValue = yearFilter.value;
+
+    yearFilter.innerHTML = '<option value="">All Years</option>';
+    uniqueYears.forEach(year => {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        if (year == currentValue) option.selected = true;
+        yearFilter.appendChild(option);
+    });
+}
+
+function renderPeriodsTable() {
+    const tbody = document.querySelector('#periodsTable tbody');
+    const isAdmin = {{ 'true' if current_user.is_admin else 'false' }};
+
+    if (periods.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="${isAdmin ? '8' : '7'}" style="text-align: center; padding: 2rem;">No fiscal periods found</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = periods.map(period => `
+        <tr>
+            <td>${period.year}</td>
+            <td>${period.period_name}</td>
+            <td>${period.quarter ? 'Q' + period.quarter : '-'}</td>
+            <td>${period.start_date}</td>
+            <td>${period.end_date}</td>
+            <td><span class="badge status-${period.status.toLowerCase()}">${period.status}</span></td>
+            <td>${period.closed_at ? new Date(period.closed_at).toLocaleDateString() : '-'}</td>
+            ${isAdmin ? `
+            <td>
+                <div class="action-buttons">
+                    ${period.status === 'OPEN' ? `
+                        <button class="btn btn-primary btn-sm" onclick="editPeriod(${period.id})">Edit</button>
+                        <button class="btn btn-danger btn-sm" onclick="closePeriod(${period.id})">Close</button>
+                        <button class="btn btn-danger btn-sm" onclick="deletePeriod(${period.id})">Delete</button>
+                    ` : ''}
+                    ${period.status === 'CLOSED' ? `
+                        <button class="btn btn-success btn-sm" onclick="reopenPeriod(${period.id})">Reopen</button>
+                        <button class="btn btn-danger btn-sm" onclick="lockPeriod(${period.id})">Lock</button>
+                    ` : ''}
+                    ${period.status === 'LOCKED' ? '<span style="color: #999;">Locked (Permanent)</span>' : ''}
+                </div>
+            </td>
+            ` : ''}
+        </tr>
+    `).join('');
+}
+
+function showCreateModal() {
+    document.getElementById('modalTitle').textContent = 'Add Fiscal Period';
+    document.getElementById('periodId').value = '';
+    document.getElementById('periodForm').reset();
+
+    // Default to current year
+    const currentYear = new Date().getFullYear();
+    document.getElementById('year').value = currentYear;
+
+    document.getElementById('periodModal').classList.add('show');
+}
+
+function editPeriod(periodId) {
+    const period = periods.find(p => p.id === periodId);
+    if (!period) return;
+
+    if (period.status !== 'OPEN') {
+        showMessage('Can only edit OPEN periods', 'error');
+        return;
+    }
+
+    document.getElementById('modalTitle').textContent = 'Edit Fiscal Period';
+    document.getElementById('periodId').value = period.id;
+    document.getElementById('year').value = period.year;
+    document.getElementById('year').disabled = true;
+    document.getElementById('period_name').value = period.period_name;
+    document.getElementById('quarter').value = period.quarter || '';
+    document.getElementById('start_date').value = period.start_date;
+    document.getElementById('end_date').value = period.end_date;
+
+    document.getElementById('periodModal').classList.add('show');
+}
+
+function closeModal() {
+    document.getElementById('periodModal').classList.remove('show');
+    document.getElementById('year').disabled = false;
+}
+
+async function handleSubmit(event) {
+    event.preventDefault();
+
+    const periodId = document.getElementById('periodId').value;
+    const isEdit = periodId !== '';
+
+    const data = {
+        period_name: document.getElementById('period_name').value,
+        quarter: parseInt(document.getElementById('quarter').value) || null,
+        start_date: document.getElementById('start_date').value,
+        end_date: document.getElementById('end_date').value
+    };
+
+    if (!isEdit) {
+        data.year = parseInt(document.getElementById('year').value);
+    }
+
+    try {
+        const url = isEdit ? `/accounting/api/fiscal-periods/${periodId}` : '/accounting/api/fiscal-periods/';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            showMessage(`Fiscal period ${isEdit ? 'updated' : 'created'} successfully`, 'success');
+            closeModal();
+            await loadPeriods();
+        } else {
+            const error = await response.json();
+            showMessage(error.detail || 'Operation failed', 'error');
+        }
+    } catch (error) {
+        console.error('Error saving period:', error);
+        showMessage('An error occurred', 'error');
+    }
+}
+
+async function closePeriod(periodId) {
+    if (!confirm('Close this fiscal period? New entries will not be allowed.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/fiscal-periods/${periodId}/close`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            showMessage('Fiscal period closed successfully', 'success');
+            await loadPeriods();
+        } else {
+            const error = await response.json();
+            showMessage(error.detail || 'Failed to close period', 'error');
+        }
+    } catch (error) {
+        console.error('Error closing period:', error);
+        showMessage('An error occurred', 'error');
+    }
+}
+
+async function reopenPeriod(periodId) {
+    if (!confirm('Reopen this fiscal period?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/fiscal-periods/${periodId}/reopen`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            showMessage('Fiscal period reopened successfully', 'success');
+            await loadPeriods();
+        } else {
+            const error = await response.json();
+            showMessage(error.detail || 'Failed to reopen period', 'error');
+        }
+    } catch (error) {
+        console.error('Error reopening period:', error);
+        showMessage('An error occurred', 'error');
+    }
+}
+
+async function lockPeriod(periodId) {
+    if (!confirm('Lock this fiscal period? This action is PERMANENT and cannot be undone!')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/fiscal-periods/${periodId}/lock`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            showMessage('Fiscal period locked successfully (permanent)', 'success');
+            await loadPeriods();
+        } else {
+            const error = await response.json();
+            showMessage(error.detail || 'Failed to lock period', 'error');
+        }
+    } catch (error) {
+        console.error('Error locking period:', error);
+        showMessage('An error occurred', 'error');
+    }
+}
+
+async function deletePeriod(periodId) {
+    if (!confirm('Delete this fiscal period? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/fiscal-periods/${periodId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            showMessage('Fiscal period deleted successfully', 'success');
+            await loadPeriods();
+        } else {
+            const error = await response.json();
+            showMessage(error.detail || 'Failed to delete period', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting period:', error);
+        showMessage('An error occurred', 'error');
+    }
+}
+
+function showCreateYearModal() {
+    document.getElementById('createYearForm').reset();
+    const currentYear = new Date().getFullYear();
+    document.getElementById('createYear').value = currentYear;
+    document.getElementById('createYearModal').classList.add('show');
+}
+
+function closeCreateYearModal() {
+    document.getElementById('createYearModal').classList.remove('show');
+}
+
+async function handleCreateYear(event) {
+    event.preventDefault();
+
+    const year = parseInt(document.getElementById('createYear').value);
+
+    if (!confirm(`Create all 12 monthly periods for year ${year}?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/fiscal-periods/create-year/${year}`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showMessage(result.message, 'success');
+            closeCreateYearModal();
+            await loadPeriods();
+        } else {
+            const error = await response.json();
+            showMessage(error.detail || 'Failed to create year', 'error');
+        }
+    } catch (error) {
+        console.error('Error creating year:', error);
+        showMessage('An error occurred', 'error');
+    }
+}
+
+function showMessage(text, type) {
+    const messageEl = document.getElementById('message');
+    messageEl.textContent = text;
+    messageEl.className = `message ${type} show`;
+
+    setTimeout(() => {
+        messageEl.classList.remove('show');
+    }, 5000);
+}
+
+// Event listeners
+document.getElementById('periodForm').addEventListener('submit', handleSubmit);
+document.getElementById('createYearForm').addEventListener('submit', handleCreateYear);
+
+// Load data on page load
+loadPeriods();
+</script>
+{% endblock %}

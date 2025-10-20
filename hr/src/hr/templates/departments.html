@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block title %}Departments - HR Management{% endblock %}
+{% block nav_departments %}active{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>Departments</h2>
+        <button class="btn btn-primary" onclick="showCreateModal()">+ Add Department</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table id="departmentsTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="departmentsBody">
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 2rem;">Loading departments...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Create/Edit Department Modal -->
+<div id="departmentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">Add Department</h3>
+            <span class="close" onclick="closeModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="departmentForm" onsubmit="saveDepartment(event)">
+                <input type="hidden" id="departmentId">
+
+                <div class="form-group">
+                    <label for="name">Department Name *</label>
+                    <input type="text" id="name" required placeholder="e.g., Front of House, Kitchen, Management">
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description</label>
+                    <textarea id="description" rows="3" placeholder="Brief description of this department"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="is_active" checked>
+                        Active
+                    </label>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Department</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #e0e0e0;
+    }
+    .form-group input[type="text"],
+    .form-group textarea {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #555;
+        border-radius: 4px;
+        background: #1a1a1a;
+        color: #e0e0e0;
+    }
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+    }
+    .modal-content {
+        background: #2d2d2d;
+        margin: 5% auto;
+        padding: 0;
+        border: 1px solid #404040;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 600px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    }
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #404040;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .modal-header h3 {
+        margin: 0;
+        color: #fff;
+    }
+    .modal-body {
+        padding: 1.5rem;
+    }
+    .modal-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #404040;
+        text-align: right;
+    }
+    .modal-footer button {
+        margin-left: 0.5rem;
+    }
+    .close {
+        color: #aaa;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .close:hover {
+        color: #fff;
+    }
+    .status-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+    }
+    .status-active {
+        background: #27ae60;
+        color: white;
+    }
+    .status-inactive {
+        background: #666;
+        color: white;
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let departments = [];
+
+async function loadDepartments() {
+    try {
+        const response = await fetch('/hr/api/departments/?include_inactive=true', {
+            credentials: 'include'
+        });
+        departments = await response.json();
+        renderDepartments();
+    } catch (error) {
+        console.error('Error loading departments:', error);
+        document.getElementById('departmentsBody').innerHTML = `
+            <tr><td colspan="4" style="text-align: center; color: #e74c3c;">Error loading departments</td></tr>
+        `;
+    }
+}
+
+function renderDepartments() {
+    const tbody = document.getElementById('departmentsBody');
+
+    if (departments.length === 0) {
+        tbody.innerHTML = `
+            <tr><td colspan="4" style="text-align: center; padding: 2rem; color: #999;">No departments found. Click "Add Department" to create one.</td></tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = departments.map(dept => `
+        <tr>
+            <td><strong>${dept.name}</strong></td>
+            <td>${dept.description || '-'}</td>
+            <td>
+                <span class="status-badge ${dept.is_active ? 'status-active' : 'status-inactive'}">
+                    ${dept.is_active ? 'Active' : 'Inactive'}
+                </span>
+            </td>
+            <td>
+                <button class="btn btn-sm btn-secondary" onclick="editDepartment(${dept.id})">Edit</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteDepartment(${dept.id}, '${dept.name}')">Delete</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showCreateModal() {
+    document.getElementById('modalTitle').textContent = 'Add Department';
+    document.getElementById('departmentForm').reset();
+    document.getElementById('departmentId').value = '';
+    document.getElementById('is_active').checked = true;
+    document.getElementById('departmentModal').style.display = 'block';
+}
+
+function closeModal() {
+    document.getElementById('departmentModal').style.display = 'none';
+}
+
+function editDepartment(id) {
+    const dept = departments.find(d => d.id === id);
+    if (!dept) return;
+
+    document.getElementById('modalTitle').textContent = 'Edit Department';
+    document.getElementById('departmentId').value = dept.id;
+    document.getElementById('name').value = dept.name;
+    document.getElementById('description').value = dept.description || '';
+    document.getElementById('is_active').checked = dept.is_active;
+    document.getElementById('departmentModal').style.display = 'block';
+}
+
+async function saveDepartment(event) {
+    event.preventDefault();
+
+    const id = document.getElementById('departmentId').value;
+    const data = {
+        name: document.getElementById('name').value,
+        description: document.getElementById('description').value || null,
+        is_active: document.getElementById('is_active').checked
+    };
+
+    try {
+        const url = id ? `/hr/api/departments/${id}` : '/hr/api/departments/';
+        const method = id ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            credentials: 'include',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            closeModal();
+            await loadDepartments();
+            alert(`Department ${id ? 'updated' : 'created'} successfully!`);
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to save department'));
+        }
+    } catch (error) {
+        console.error('Error saving department:', error);
+        alert('Error saving department');
+    }
+}
+
+async function deleteDepartment(id, name) {
+    if (!confirm(`Are you sure you want to delete the department "${name}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hr/api/departments/${id}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            await loadDepartments();
+            alert('Department deleted successfully!');
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to delete department'));
+        }
+    } catch (error) {
+        console.error('Error deleting department:', error);
+        alert('Error deleting department');
+    }
+}
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const modal = document.getElementById('departmentModal');
+    if (event.target === modal) {
+        closeModal();
+    }
+}
+
+// Load departments on page load
+loadDepartments();
+</script>
+{% endblock %}

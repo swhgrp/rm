@@ -1,0 +1,637 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Accounting System{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .metric-card {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .metric-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+    }
+
+    .metric-title {
+        font-size: 0.875rem;
+        color: #8b949e;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .metric-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #c9d1d9;
+        margin: 0.5rem 0;
+    }
+
+    .metric-change {
+        font-size: 0.875rem;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+    }
+
+    .metric-change.positive {
+        color: #3fb950;
+        background-color: rgba(63, 185, 80, 0.15);
+    }
+
+    .metric-change.negative {
+        color: #f85149;
+        background-color: rgba(248, 81, 73, 0.15);
+    }
+
+    .period-tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .period-tab {
+        padding: 0.5rem 1rem;
+        background-color: #21262d;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        color: #8b949e;
+        cursor: pointer;
+        font-size: 0.875rem;
+        transition: all 0.2s;
+    }
+
+    .period-tab.active {
+        background-color: #238636;
+        border-color: #238636;
+        color: white;
+    }
+
+    .period-tab:hover:not(.active) {
+        background-color: #30363d;
+        color: #c9d1d9;
+    }
+
+    .cash-card {
+        background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+    }
+
+    .cash-account {
+        font-size: 0.875rem;
+        margin-bottom: 0.25rem;
+        opacity: 0.9;
+    }
+
+    .cash-balance {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+
+    .alert-card {
+        background-color: #161b22;
+        border-left: 4px solid #f85149;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .alert-card:hover {
+        background-color: #21262d;
+    }
+
+    .alert-card.warning {
+        border-left-color: #d29922;
+    }
+
+    .alert-card.info {
+        border-left-color: #58a6ff;
+    }
+
+    .alert-title {
+        font-weight: 600;
+        color: #c9d1d9;
+        margin-bottom: 0.25rem;
+    }
+
+    .alert-description {
+        font-size: 0.875rem;
+        color: #8b949e;
+    }
+
+    .alert-count {
+        background-color: #f85149;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 700;
+    }
+
+    .aging-bucket {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background-color: #21262d;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+    }
+
+    .aging-label {
+        font-size: 0.875rem;
+        color: #8b949e;
+    }
+
+    .aging-amount {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #c9d1d9;
+    }
+
+    .breakdown-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #30363d;
+    }
+
+    .breakdown-item:last-child {
+        border-bottom: none;
+    }
+
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #c9d1d9;
+        margin: 2rem 0 1rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    @media (max-width: 768px) {
+        .metric-value {
+            font-size: 1.5rem;
+        }
+        .period-tabs {
+            flex-wrap: wrap;
+        }
+        .period-tab {
+            flex: 1 1 45%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0"><i class="bi bi-speedometer2"></i> Financial Dashboard</h2>
+        <div class="period-tabs" id="periodTabs">
+            <div class="period-tab active" data-period="today">Today</div>
+            <div class="period-tab" data-period="wtd">WTD</div>
+            <div class="period-tab" data-period="mtd">MTD</div>
+            <div class="period-tab" data-period="ytd">YTD</div>
+        </div>
+    </div>
+
+    <!-- Core Financial Metrics -->
+    <div class="section-title">
+        <i class="bi bi-graph-up"></i> Core Financial Metrics
+    </div>
+
+    <div class="row">
+        <!-- Net Sales -->
+        <div class="col-lg-6 col-md-12">
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div>
+                        <div class="metric-title">Net Sales</div>
+                        <div class="metric-value" id="netSalesValue">$0.00</div>
+                        <span class="metric-change positive" id="netSalesChange">+0% vs prior</span>
+                    </div>
+                </div>
+                <canvas id="netSalesChart" height="100"></canvas>
+                <div id="netSalesBreakdown" class="mt-3"></div>
+            </div>
+        </div>
+
+        <!-- Gross Profit Margin -->
+        <div class="col-lg-6 col-md-12">
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div>
+                        <div class="metric-title">Gross Profit Margin</div>
+                        <div class="metric-value" id="grossProfitValue">0.0%</div>
+                        <span class="metric-change" id="grossProfitChange">+0% vs prior</span>
+                    </div>
+                </div>
+                <canvas id="grossProfitChart" height="100"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Operating Profit / EBITDA -->
+        <div class="col-lg-6 col-md-12">
+            <div class="metric-card">
+                <div class="metric-header">
+                    <div>
+                        <div class="metric-title">Operating Profit (EBITDA)</div>
+                        <div class="metric-value" id="ebitdaValue">$0.00</div>
+                        <span class="metric-change" id="ebitdaChange">+0% vs prior</span>
+                    </div>
+                </div>
+                <canvas id="ebitdaChart" height="100"></canvas>
+            </div>
+        </div>
+
+        <!-- Cash Position -->
+        <div class="col-lg-6 col-md-12">
+            <div class="metric-card">
+                <div class="metric-title mb-3">Cash Position</div>
+                <div id="cashCards">
+                    <!-- Cash cards will be dynamically generated -->
+                    <div class="cash-card">
+                        <div class="cash-account">Loading...</div>
+                        <div class="cash-balance">$0.00</div>
+                    </div>
+                </div>
+                <div class="mt-3" style="text-align: right;">
+                    <strong>Total Available Cash:</strong>
+                    <span class="metric-value" style="font-size: 1.5rem;" id="totalCash">$0.00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- AP Aging -->
+        <div class="col-lg-6 col-md-12">
+            <div class="metric-card">
+                <div class="metric-title mb-3">Accounts Payable Aging</div>
+                <div id="apAging">
+                    <div class="aging-bucket">
+                        <span class="aging-label">0-30 days</span>
+                        <span class="aging-amount">$0.00</span>
+                    </div>
+                    <div class="aging-bucket">
+                        <span class="aging-label">31-60 days</span>
+                        <span class="aging-amount">$0.00</span>
+                    </div>
+                    <div class="aging-bucket">
+                        <span class="aging-label">61-90 days</span>
+                        <span class="aging-amount">$0.00</span>
+                    </div>
+                    <div class="aging-bucket">
+                        <span class="aging-label">&gt;90 days</span>
+                        <span class="aging-amount">$0.00</span>
+                    </div>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <strong>Total Overdue:</strong>
+                    <span class="metric-value" style="font-size: 1.25rem; color: #f85149;" id="totalOverdueAP">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- AR Aging -->
+        <div class="col-lg-6 col-md-12">
+            <div class="metric-card">
+                <div class="metric-title mb-3">Accounts Receivable Aging</div>
+                <div id="arAging">
+                    <div class="aging-bucket">
+                        <span class="aging-label">0-30 days</span>
+                        <span class="aging-amount">$0.00</span>
+                    </div>
+                    <div class="aging-bucket">
+                        <span class="aging-label">31-60 days</span>
+                        <span class="aging-amount">$0.00</span>
+                    </div>
+                    <div class="aging-bucket">
+                        <span class="aging-label">61-90 days</span>
+                        <span class="aging-amount">$0.00</span>
+                    </div>
+                    <div class="aging-bucket">
+                        <span class="aging-label">&gt;90 days</span>
+                        <span class="aging-amount">$0.00</span>
+                    </div>
+                </div>
+                <hr>
+                <div class="d-flex justify-content-between">
+                    <strong>Total Outstanding:</strong>
+                    <span class="metric-value" style="font-size: 1.25rem;" id="totalOutstandingAR">$0.00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts & Automation Flags -->
+    <div class="section-title">
+        <i class="bi bi-exclamation-triangle"></i> Alerts & Action Items
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <div id="alertsContainer">
+                <!-- Alerts will be dynamically generated -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let currentPeriod = 'today';
+let charts = {};
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    initPeriodTabs();
+    loadDashboardData();
+});
+
+function initPeriodTabs() {
+    document.querySelectorAll('.period-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            currentPeriod = this.dataset.period;
+            loadDashboardData();
+        });
+    });
+}
+
+async function loadDashboardData() {
+    try {
+        // Load all data in parallel
+        await Promise.all([
+            loadNetSales(),
+            loadGrossProfit(),
+            loadEBITDA(),
+            loadCashPosition(),
+            loadAPAging(),
+            loadARAging(),
+            loadAlerts()
+        ]);
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+    }
+}
+
+async function loadNetSales() {
+    // TODO: Replace with actual API call
+    // For now, using mock data
+    const mockData = {
+        value: 15234.50,
+        change: 8.5,
+        trend: [12000, 13500, 14200, 15234],
+        breakdown: {
+            'Food': 8500,
+            'Beverage': 3200,
+            'Wine': 1800,
+            'Beer': 900,
+            'Liquor': 634.50,
+            'Retail': 200
+        }
+    };
+
+    document.getElementById('netSalesValue').textContent = formatCurrency(mockData.value);
+
+    const changeEl = document.getElementById('netSalesChange');
+    changeEl.textContent = `${mockData.change > 0 ? '+' : ''}${mockData.change.toFixed(1)}% vs prior`;
+    changeEl.className = `metric-change ${mockData.change >= 0 ? 'positive' : 'negative'}`;
+
+    // Breakdown
+    let breakdownHtml = '';
+    for (const [category, amount] of Object.entries(mockData.breakdown)) {
+        breakdownHtml += `
+            <div class="breakdown-item">
+                <span>${category}</span>
+                <strong>${formatCurrency(amount)}</strong>
+            </div>
+        `;
+    }
+    document.getElementById('netSalesBreakdown').innerHTML = breakdownHtml;
+
+    // Chart
+    createLineChart('netSalesChart', mockData.trend, 'Net Sales', '#3fb950');
+}
+
+async function loadGrossProfit() {
+    const mockData = {
+        value: 62.5,
+        change: 2.1,
+        trend: [58, 60, 61, 62.5]
+    };
+
+    document.getElementById('grossProfitValue').textContent = mockData.value.toFixed(1) + '%';
+
+    const changeEl = document.getElementById('grossProfitChange');
+    changeEl.textContent = `${mockData.change > 0 ? '+' : ''}${mockData.change.toFixed(1)}% vs prior`;
+    changeEl.className = `metric-change ${mockData.change >= 0 ? 'positive' : 'negative'}`;
+
+    createLineChart('grossProfitChart', mockData.trend, 'Gross Profit %', '#58a6ff');
+}
+
+async function loadEBITDA() {
+    const mockData = {
+        value: 4532.25,
+        change: -3.2,
+        trend: [5000, 4800, 4700, 4532]
+    };
+
+    document.getElementById('ebitdaValue').textContent = formatCurrency(mockData.value);
+
+    const changeEl = document.getElementById('ebitdaChange');
+    changeEl.textContent = `${mockData.change > 0 ? '+' : ''}${mockData.change.toFixed(1)}% vs prior`;
+    changeEl.className = `metric-change ${mockData.change >= 0 ? 'positive' : 'negative'}`;
+
+    createLineChart('ebitdaChart', mockData.trend, 'Operating Profit', '#d29922');
+}
+
+async function loadCashPosition() {
+    // TODO: Replace with actual bank account API
+    const mockAccounts = [
+        { name: 'Operating Account', balance: 45230.50 },
+        { name: 'Payroll Account', balance: 12000.00 },
+        { name: 'Savings Account', balance: 25000.00 }
+    ];
+
+    let html = '';
+    let total = 0;
+
+    mockAccounts.forEach(account => {
+        total += account.balance;
+        html += `
+            <div class="cash-card">
+                <div class="cash-account">${account.name}</div>
+                <div class="cash-balance">${formatCurrency(account.balance)}</div>
+            </div>
+        `;
+    });
+
+    document.getElementById('cashCards').innerHTML = html;
+    document.getElementById('totalCash').textContent = formatCurrency(total);
+}
+
+async function loadAPAging() {
+    // TODO: Replace with actual AP aging API
+    const mockAging = {
+        '0-30': 15000,
+        '31-60': 5000,
+        '61-90': 2000,
+        '>90': 500
+    };
+
+    const total = Object.values(mockAging).reduce((sum, val) => sum + val, 0);
+    const overdue = mockAging['31-60'] + mockAging['61-90'] + mockAging['>90'];
+
+    document.getElementById('totalOverdueAP').textContent = formatCurrency(overdue);
+}
+
+async function loadARAging() {
+    // TODO: Replace with actual AR aging API
+    const mockAging = {
+        '0-30': 8000,
+        '31-60': 3000,
+        '61-90': 1000,
+        '>90': 200
+    };
+
+    const total = Object.values(mockAging).reduce((sum, val) => sum + val, 0);
+    document.getElementById('totalOutstandingAR').textContent = formatCurrency(total);
+}
+
+async function loadAlerts() {
+    // TODO: Replace with actual alerts API
+    const mockAlerts = [
+        {
+            type: 'critical',
+            title: 'Unposted DSS Days',
+            description: '3 days without posted journal entries',
+            count: 3,
+            action: '/accounting/daily-sales'
+        },
+        {
+            type: 'warning',
+            title: 'Unmapped GL Lines',
+            description: '12 DSS lines missing GL account assignment',
+            count: 12,
+            action: '/accounting/daily-sales'
+        },
+        {
+            type: 'warning',
+            title: 'Upcoming Payments',
+            description: '5 invoices due in next 7 days',
+            count: 5,
+            action: '/accounting/vendor-bills'
+        },
+        {
+            type: 'info',
+            title: 'Bank Reconciliation Pending',
+            description: 'Operating Account not reconciled for 45 days',
+            count: 1,
+            action: '#'
+        }
+    ];
+
+    let html = '';
+    mockAlerts.forEach(alert => {
+        const cssClass = alert.type === 'critical' ? '' : alert.type;
+        html += `
+            <div class="alert-card ${cssClass}" onclick="window.location.href='${alert.action}'">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="alert-title">${alert.title}</div>
+                        <div class="alert-description">${alert.description}</div>
+                    </div>
+                    <span class="alert-count">${alert.count}</span>
+                </div>
+            </div>
+        `;
+    });
+
+    document.getElementById('alertsContainer').innerHTML = html;
+}
+
+function createLineChart(canvasId, data, label, color) {
+    const ctx = document.getElementById(canvasId);
+
+    if (charts[canvasId]) {
+        charts[canvasId].destroy();
+    }
+
+    charts[canvasId] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['', '', '', ''],
+            datasets: [{
+                label: label,
+                data: data,
+                borderColor: color,
+                backgroundColor: color + '20',
+                tension: 0.4,
+                fill: true,
+                pointRadius: 4,
+                pointBackgroundColor: color,
+                pointBorderColor: '#0d1117',
+                pointBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: '#30363d'
+                    },
+                    ticks: {
+                        color: '#8b949e'
+                    }
+                },
+                x: {
+                    grid: {
+                        display: false
+                    },
+                    ticks: {
+                        color: '#8b949e'
+                    }
+                }
+            }
+        }
+    });
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(amount);
+}
+</script>
+{% endblock %}

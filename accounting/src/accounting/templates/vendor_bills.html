@@ -1,0 +1,1313 @@
+{% extends "base.html" %}
+
+{% block title %}Vendor Bills - Restaurant Accounting{% endblock %}
+{% block nav_vendor_bills %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .page-header h1 {
+        font-size: 2rem;
+        color: #c9d1d9;
+    }
+
+    .view-toggle {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .view-toggle button {
+        padding: 0.5rem 1rem;
+        border: 1px solid #30363d;
+        background: #161b22;
+        color: #c9d1d9;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+
+    .view-toggle button.active {
+        background: #238636;
+        color: white;
+        border-color: #238636;
+    }
+
+    #listView, #createView {
+        display: none;
+    }
+
+    #listView.active, #createView.active {
+        display: block;
+    }
+
+    /* Filters */
+    .filters {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        background: #161b22;
+        padding: 1rem;
+        border-radius: 6px;
+        border: 1px solid #30363d;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .filter-group label {
+        font-weight: 500;
+        color: #c9d1d9;
+        font-size: 0.875rem;
+    }
+
+    .filter-group select, .filter-group input {
+        padding: 0.5rem;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        background: #0d1117;
+        color: #c9d1d9;
+        min-width: 150px;
+    }
+
+    /* Bills Table */
+    .bills-table {
+        background: #161b22;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    /* Status Badges */
+    .status-badge {
+        display: inline-block;
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .status-draft {
+        background: #6e7681;
+        color: white;
+    }
+
+    .status-pending_approval {
+        background: #9e6a03;
+        color: white;
+    }
+
+    .status-approved {
+        background: #1f6feb;
+        color: white;
+    }
+
+    .status-partially_paid {
+        background: #58a6ff;
+        color: #0d1117;
+    }
+
+    .status-paid {
+        background: #238636;
+        color: white;
+    }
+
+    .status-void {
+        background: #da3633;
+        color: white;
+    }
+
+    .overdue-badge {
+        background: #da3633;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-left: 0.5rem;
+    }
+
+    /* Form Section */
+    .form-section {
+        background: #161b22;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        border: 1px solid #30363d;
+        margin-bottom: 2rem;
+    }
+
+    .form-section h3 {
+        margin-bottom: 1.5rem;
+        color: #c9d1d9;
+        font-size: 1.25rem;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: #c9d1d9;
+    }
+
+    .form-group label .required {
+        color: #f85149;
+    }
+
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        font-size: 1rem;
+        background: #0d1117;
+        color: #c9d1d9;
+    }
+
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+        outline: none;
+        border-color: #58a6ff;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    /* Line Items Table */
+    .line-items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+    }
+
+    .line-items-table th, .line-items-table td {
+        padding: 0.75rem;
+        border: 1px solid #30363d;
+        text-align: left;
+    }
+
+    .line-items-table th {
+        background: #0d1117;
+        font-weight: 600;
+    }
+
+    .line-items-table select, .line-items-table input {
+        width: 100%;
+        padding: 0.4rem;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        background: #0d1117;
+        color: #c9d1d9;
+    }
+
+    .btn-remove {
+        background: #da3633;
+        color: white;
+        border: none;
+        padding: 0.4rem 0.6rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+
+    .btn-remove:hover {
+        background: #b62324;
+    }
+
+    /* Totals Summary */
+    .totals-summary {
+        background: #0d1117;
+        padding: 1.5rem;
+        border-radius: 6px;
+        border: 1px solid #30363d;
+        margin-top: 1rem;
+    }
+
+    .totals-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #30363d;
+    }
+
+    .totals-row:last-child {
+        border-bottom: none;
+        font-weight: 600;
+        font-size: 1.1rem;
+        padding-top: 1rem;
+        margin-top: 0.5rem;
+        border-top: 2px solid #30363d;
+    }
+
+    .totals-row label {
+        color: #8b949e;
+    }
+
+    .totals-row .amount {
+        color: #c9d1d9;
+        font-weight: 500;
+    }
+
+    .totals-row:last-child label,
+    .totals-row:last-child .amount {
+        color: #58a6ff;
+    }
+
+    /* Action Buttons */
+    .btn-group {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 2rem;
+    }
+
+    .btn-sm {
+        padding: 0.35rem 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    /* Empty State */
+    .empty-state {
+        text-align: center;
+        padding: 3rem;
+        color: #8b949e;
+    }
+
+    .empty-state i {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        display: block;
+    }
+
+    /* Payment Modal */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 2000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    }
+
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #30363d;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        color: #c9d1d9;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        color: #8b949e;
+        font-size: 1.5rem;
+        cursor: pointer;
+        padding: 0;
+        width: 32px;
+        height: 32px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+    }
+
+    .modal-close:hover {
+        background: #21262d;
+        color: #c9d1d9;
+    }
+
+    .modal-body {
+        padding: 1.5rem;
+    }
+
+    .modal-footer {
+        padding: 1.5rem;
+        border-top: 1px solid #30363d;
+        display: flex;
+        gap: 0.5rem;
+        justify-content: flex-end;
+    }
+
+    /* Bill Summary Box */
+    .bill-summary {
+        background: #0d1117;
+        padding: 1rem;
+        border-radius: 6px;
+        border: 1px solid #30363d;
+        margin-bottom: 1.5rem;
+    }
+
+    .bill-summary-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #30363d;
+    }
+
+    .bill-summary-row:last-child {
+        border-bottom: none;
+        font-weight: 600;
+        color: #58a6ff;
+    }
+
+    .bill-summary-row label {
+        color: #8b949e;
+    }
+
+    .bill-summary-row .value {
+        color: #c9d1d9;
+    }
+
+    /* Payment History */
+    .payment-history {
+        margin-top: 1.5rem;
+    }
+
+    .payment-item {
+        background: #0d1117;
+        padding: 1rem;
+        border-radius: 6px;
+        border: 1px solid #30363d;
+        margin-bottom: 0.75rem;
+    }
+
+    .payment-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .payment-amount {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #238636;
+    }
+
+    .payment-method-badge {
+        background: #1f6feb;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .payment-details {
+        color: #8b949e;
+        font-size: 0.875rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-receipt"></i> Vendor Bills</h1>
+    <div class="view-toggle">
+        <button id="btnListView" class="active" onclick="showListView()">
+            <i class="bi bi-list-ul"></i> List Bills
+        </button>
+        <button id="btnCreateView" onclick="showCreateView()">
+            <i class="bi bi-plus-circle"></i> New Bill
+        </button>
+    </div>
+</div>
+
+<!-- LIST VIEW -->
+<div id="listView" class="active">
+    <!-- Filters -->
+    <div class="filters">
+        <div class="filter-group">
+            <label for="filterVendor">Vendor</label>
+            <input type="text" id="filterVendor" placeholder="Search vendor...">
+        </div>
+        <div class="filter-group">
+            <label for="filterLocation">Location</label>
+            <select id="filterLocation">
+                <option value="">All Locations</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="filterStatus">Status</label>
+            <select id="filterStatus">
+                <option value="">All Statuses</option>
+                <option value="DRAFT">Draft</option>
+                <option value="PENDING_APPROVAL">Pending Approval</option>
+                <option value="APPROVED">Approved</option>
+                <option value="PARTIALLY_PAID">Partially Paid</option>
+                <option value="PAID">Paid</option>
+                <option value="VOID">Void</option>
+            </select>
+        </div>
+        <div class="filter-group">
+            <label for="filterStartDate">From Date</label>
+            <input type="date" id="filterStartDate">
+        </div>
+        <div class="filter-group">
+            <label for="filterEndDate">To Date</label>
+            <input type="date" id="filterEndDate">
+        </div>
+        <div class="filter-group">
+            <label>&nbsp;</label>
+            <label style="display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="filterOverdue" style="width: auto;">
+                <span>Overdue Only</span>
+            </label>
+        </div>
+        <div class="filter-group">
+            <label>&nbsp;</label>
+            <button class="btn btn-primary" onclick="loadBills()">
+                <i class="bi bi-search"></i> Filter
+            </button>
+        </div>
+    </div>
+
+    <!-- Bills Table -->
+    <div class="bills-table">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Bill #</th>
+                    <th>Vendor</th>
+                    <th>Location</th>
+                    <th>Bill Date</th>
+                    <th>Due Date</th>
+                    <th>Amount</th>
+                    <th>Balance</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="billsTableBody">
+                <tr>
+                    <td colspan="9" class="empty-state">
+                        <i class="bi bi-receipt"></i>
+                        <p>Loading bills...</p>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- CREATE VIEW -->
+<div id="createView">
+    <form id="billForm" onsubmit="handleSubmit(event)">
+        <!-- Bill Header -->
+        <div class="form-section">
+            <h3><i class="bi bi-file-earmark-text"></i> Bill Information</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Vendor <span class="required">*</span></label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <select id="vendorSelect" required style="flex: 1;">
+                            <option value="">Select vendor...</option>
+                        </select>
+                        <a href="/accounting/vendors" target="_blank" class="btn btn-sm btn-secondary" title="Manage Vendors">
+                            <i class="bi bi-people"></i>
+                        </a>
+                    </div>
+                    <small class="text-muted">Select a vendor or <a href="/accounting/vendors" target="_blank">add a new one</a></small>
+                </div>
+                <div class="form-group">
+                    <label>Bill Number <span class="required">*</span></label>
+                    <input type="text" id="billNumber" required placeholder="Invoice/bill number">
+                </div>
+                <div class="form-group">
+                    <label>Location</label>
+                    <select id="billLocation">
+                        <option value="">Corporate/Unassigned</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Bill Date <span class="required">*</span></label>
+                    <input type="date" id="billDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Due Date <span class="required">*</span></label>
+                    <input type="date" id="dueDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Received Date</label>
+                    <input type="date" id="receivedDate">
+                </div>
+                <div class="form-group">
+                    <label>PO/Reference Number</label>
+                    <input type="text" id="referenceNumber" placeholder="Optional">
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Description</label>
+                <textarea id="description" rows="2" placeholder="Brief description of the bill"></textarea>
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="is1099Eligible" style="width: auto;">
+                    <span>1099 Eligible Vendor</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Line Items -->
+        <div class="form-section">
+            <h3><i class="bi bi-list-check"></i> Line Items</h3>
+            <table class="line-items-table" id="lineItemsTable">
+                <thead>
+                    <tr>
+                        <th style="width: 30%">Account <span class="required">*</span></th>
+                        <th style="width: 20%">Location</th>
+                        <th style="width: 15%">Amount <span class="required">*</span></th>
+                        <th style="width: 10%">Tax</th>
+                        <th style="width: 20%">Description</th>
+                        <th style="width: 5%"></th>
+                    </tr>
+                </thead>
+                <tbody id="lineItemsBody">
+                    <!-- Line items will be added here -->
+                </tbody>
+            </table>
+            <button type="button" class="btn btn-secondary" onclick="addLineItem()">
+                <i class="bi bi-plus"></i> Add Line Item
+            </button>
+        </div>
+
+        <!-- Totals -->
+        <div class="form-section">
+            <h3><i class="bi bi-calculator"></i> Totals</h3>
+            <div class="totals-summary">
+                <div class="totals-row">
+                    <label>Subtotal:</label>
+                    <span class="amount" id="displaySubtotal">$0.00</span>
+                </div>
+                <div class="totals-row">
+                    <label>Tax:</label>
+                    <span class="amount" id="displayTax">$0.00</span>
+                </div>
+                <div class="totals-row">
+                    <label>Total Amount:</label>
+                    <span class="amount" id="displayTotal">$0.00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="form-section">
+            <h3><i class="bi bi-sticky"></i> Internal Notes</h3>
+            <div class="form-group">
+                <textarea id="notes" rows="3" placeholder="Internal notes (not visible on bill)"></textarea>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="btn-group">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-save"></i> Save as Draft
+            </button>
+            <button type="button" class="btn btn-success" onclick="handleSubmitAndApprove(event)">
+                <i class="bi bi-check-circle"></i> Save & Submit for Approval
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="showListView()">
+                <i class="bi bi-x-circle"></i> Cancel
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- PAYMENT MODAL -->
+<div id="paymentModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="bi bi-cash-coin"></i> Record Payment</h3>
+            <button class="modal-close" onclick="closePaymentModal()">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <!-- Bill Summary -->
+            <div class="bill-summary">
+                <div class="bill-summary-row">
+                    <label>Vendor:</label>
+                    <span class="value" id="payVendorName">-</span>
+                </div>
+                <div class="bill-summary-row">
+                    <label>Bill Number:</label>
+                    <span class="value" id="payBillNumber">-</span>
+                </div>
+                <div class="bill-summary-row">
+                    <label>Total Amount:</label>
+                    <span class="value" id="payTotalAmount">$0.00</span>
+                </div>
+                <div class="bill-summary-row">
+                    <label>Already Paid:</label>
+                    <span class="value" id="payPaidAmount">$0.00</span>
+                </div>
+                <div class="bill-summary-row">
+                    <label>Balance Due:</label>
+                    <span class="value" id="payBalanceDue">$0.00</span>
+                </div>
+            </div>
+
+            <!-- Payment Form -->
+            <form id="paymentForm" onsubmit="handlePaymentSubmit(event)">
+                <input type="hidden" id="payBillId">
+
+                <div class="form-group">
+                    <label>Payment Date <span class="required">*</span></label>
+                    <input type="date" id="paymentDate" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Payment Amount <span class="required">*</span></label>
+                    <input type="number" id="paymentAmount" step="0.01" min="0.01" required placeholder="0.00">
+                    <small style="color: #8b949e; display: block; margin-top: 0.25rem;">
+                        Maximum: <span id="payMaxAmount">$0.00</span>
+                    </small>
+                </div>
+
+                <div class="form-group">
+                    <label>Payment Method <span class="required">*</span></label>
+                    <select id="paymentMethod" required>
+                        <option value="">Select Method...</option>
+                        <option value="CHECK">Check</option>
+                        <option value="ACH">ACH/Bank Transfer</option>
+                        <option value="WIRE">Wire Transfer</option>
+                        <option value="CREDIT_CARD">Credit Card</option>
+                        <option value="DEBIT_CARD">Debit Card</option>
+                        <option value="CASH">Cash</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Bank Account <span class="required">*</span></label>
+                    <select id="paymentBankAccount" required>
+                        <option value="">Select Bank Account...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>Reference Number</label>
+                    <input type="text" id="paymentReference" placeholder="Check #, Confirmation #, etc.">
+                </div>
+
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="paymentNotes" rows="3" placeholder="Payment notes"></textarea>
+                </div>
+            </form>
+
+            <!-- Payment History -->
+            <div class="payment-history" id="paymentHistory" style="display: none;">
+                <h4 style="color: #c9d1d9; margin-bottom: 1rem;">Payment History</h4>
+                <div id="paymentHistoryList"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closePaymentModal()">
+                Cancel
+            </button>
+            <button type="submit" form="paymentForm" class="btn btn-success">
+                <i class="bi bi-check-circle"></i> Record Payment
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let accounts = [];
+let areas = [];
+
+// View Management
+function showListView() {
+    document.getElementById('listView').classList.add('active');
+    document.getElementById('createView').classList.remove('active');
+    document.getElementById('btnListView').classList.add('active');
+    document.getElementById('btnCreateView').classList.remove('active');
+    loadBills();
+}
+
+function showCreateView() {
+    document.getElementById('listView').classList.remove('active');
+    document.getElementById('createView').classList.add('active');
+    document.getElementById('btnListView').classList.remove('active');
+    document.getElementById('btnCreateView').classList.add('active');
+    resetForm();
+    addLineItem(); // Start with one line
+}
+
+// Load Areas/Locations
+async function loadAreas() {
+    try {
+        const response = await fetch('/accounting/api/areas/');
+        if (response.ok) {
+            areas = await response.json();
+            areas.sort((a, b) => a.code.localeCompare(b.code));
+            populateLocationDropdowns();
+        }
+    } catch (error) {
+        console.error('Error loading areas:', error);
+    }
+}
+
+function populateLocationDropdowns() {
+    const options = areas.map(area =>
+        `<option value="${area.id}">${area.code} - ${area.name}</option>`
+    ).join('');
+
+    // Populate filter dropdown
+    const filterLocation = document.getElementById('filterLocation');
+    if (filterLocation) {
+        filterLocation.innerHTML = '<option value="">All Locations</option>' + options;
+    }
+
+    // Populate bill location dropdown
+    const billLocation = document.getElementById('billLocation');
+    if (billLocation) {
+        billLocation.innerHTML = '<option value="">Corporate/Unassigned</option>' + options;
+    }
+}
+
+// Load Vendors
+let vendors = [];
+
+async function loadVendors() {
+    try {
+        const response = await fetch('/accounting/api/vendors/?include_inactive=false');
+        if (response.ok) {
+            vendors = await response.json();
+            vendors.sort((a, b) => a.vendor_name.localeCompare(b.vendor_name));
+            populateVendorDropdown();
+        }
+    } catch (error) {
+        console.error('Error loading vendors:', error);
+    }
+}
+
+function populateVendorDropdown() {
+    const options = vendors.map(vendor =>
+        `<option value="${vendor.id}" data-vendor-name="${escapeHtml(vendor.vendor_name)}" data-vendor-code="${escapeHtml(vendor.vendor_code || '')}">${escapeHtml(vendor.vendor_code ? vendor.vendor_code + ' - ' : '')}${escapeHtml(vendor.vendor_name)}</option>`
+    ).join('');
+
+    const vendorSelect = document.getElementById('vendorSelect');
+    if (vendorSelect) {
+        vendorSelect.innerHTML = '<option value="">Select vendor...</option>' + options;
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Load Accounts
+async function loadAccounts() {
+    try {
+        const response = await fetch('/accounting/api/accounts/?limit=1000');
+        if (response.ok) {
+            accounts = await response.json();
+            accounts.sort((a, b) => a.account_number.localeCompare(b.account_number));
+
+            // Populate bank account dropdown for payments
+            const bankAccounts = accounts.filter(a => a.account_number.startsWith('1'));  // Asset accounts
+            const bankOptions = bankAccounts.map(acc =>
+                `<option value="${acc.id}">${acc.account_number} - ${acc.account_name}</option>`
+            ).join('');
+
+            const paymentBankAccount = document.getElementById('paymentBankAccount');
+            if (paymentBankAccount) {
+                paymentBankAccount.innerHTML = '<option value="">Select Bank Account...</option>' + bankOptions;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading accounts:', error);
+    }
+}
+
+// Payment Modal Functions
+let currentBillForPayment = null;
+
+async function showPaymentModal(billId) {
+    try {
+        // Fetch bill details
+        const response = await fetch(`/accounting/api/vendor-bills/${billId}`);
+        if (!response.ok) {
+            throw new Error('Failed to load bill');
+        }
+
+        const bill = await response.json();
+        currentBillForPayment = bill;
+
+        // Populate bill summary
+        document.getElementById('payBillId').value = bill.id;
+        document.getElementById('payVendorName').textContent = bill.vendor_name;
+        document.getElementById('payBillNumber').textContent = bill.bill_number;
+        document.getElementById('payTotalAmount').textContent = '$' + formatNumber(bill.total_amount);
+        document.getElementById('payPaidAmount').textContent = '$' + formatNumber(bill.paid_amount);
+        document.getElementById('payBalanceDue').textContent = '$' + formatNumber(bill.balance_due);
+        document.getElementById('payMaxAmount').textContent = '$' + formatNumber(bill.balance_due);
+
+        // Set payment date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('paymentDate').value = today;
+
+        // Set max amount
+        document.getElementById('paymentAmount').max = bill.balance_due;
+        document.getElementById('paymentAmount').value = bill.balance_due;  // Default to full payment
+
+        // Load payment history
+        await loadPaymentHistory(billId);
+
+        // Show modal
+        document.getElementById('paymentModal').classList.add('active');
+    } catch (error) {
+        console.error('Error showing payment modal:', error);
+        showNotification('Error loading bill: ' + error.message, 'Error');
+    }
+}
+
+function closePaymentModal() {
+    document.getElementById('paymentModal').classList.remove('active');
+    document.getElementById('paymentForm').reset();
+    currentBillForPayment = null;
+}
+
+async function loadPaymentHistory(billId) {
+    try {
+        const response = await fetch(`/accounting/api/vendor-bills/${billId}/payments`);
+        if (response.ok) {
+            const payments = await response.json();
+
+            if (payments.length > 0) {
+                document.getElementById('paymentHistory').style.display = 'block';
+
+                const historyHtml = payments.map(payment => `
+                    <div class="payment-item">
+                        <div class="payment-header">
+                            <span class="payment-amount">$${formatNumber(payment.amount)}</span>
+                            <span class="payment-method-badge">${formatPaymentMethod(payment.payment_method)}</span>
+                        </div>
+                        <div class="payment-details">
+                            <div><strong>Date:</strong> ${formatDate(payment.payment_date)}</div>
+                            ${payment.reference_number ? `<div><strong>Reference:</strong> ${payment.reference_number}</div>` : ''}
+                            ${payment.bank_account ? `<div><strong>Account:</strong> ${payment.bank_account.account_number} - ${payment.bank_account.account_name}</div>` : ''}
+                            ${payment.notes ? `<div><strong>Notes:</strong> ${payment.notes}</div>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+
+                document.getElementById('paymentHistoryList').innerHTML = historyHtml;
+            } else {
+                document.getElementById('paymentHistory').style.display = 'none';
+            }
+        }
+    } catch (error) {
+        console.error('Error loading payment history:', error);
+    }
+}
+
+async function handlePaymentSubmit(event) {
+    event.preventDefault();
+
+    const billId = document.getElementById('payBillId').value;
+    const amount = parseFloat(document.getElementById('paymentAmount').value);
+    const maxAmount = currentBillForPayment ? currentBillForPayment.balance_due : 0;
+
+    // Validate amount
+    if (amount <= 0) {
+        showNotification('Payment amount must be greater than zero', 'Invalid Amount');
+        return;
+    }
+
+    if (amount > maxAmount) {
+        showNotification(`Payment amount cannot exceed balance due ($${formatNumber(maxAmount)})`, 'Invalid Amount');
+        return;
+    }
+
+    // Build payment data
+    const paymentData = {
+        bill_id: parseInt(billId),
+        payment_date: document.getElementById('paymentDate').value,
+        amount: amount,
+        payment_method: document.getElementById('paymentMethod').value,
+        reference_number: document.getElementById('paymentReference').value || null,
+        bank_account_id: parseInt(document.getElementById('paymentBankAccount').value),
+        notes: document.getElementById('paymentNotes').value || null
+    };
+
+    try {
+        const response = await fetch(`/accounting/api/vendor-bills/${billId}/payments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(paymentData)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to record payment');
+        }
+
+        const payment = await response.json();
+
+        showNotification(`Payment of $${formatNumber(amount)} recorded successfully`, 'Payment Recorded');
+        closePaymentModal();
+        loadBills();  // Refresh bill list
+    } catch (error) {
+        console.error('Error recording payment:', error);
+        showNotification('Error recording payment: ' + error.message, 'Error');
+    }
+}
+
+function formatPaymentMethod(method) {
+    const methods = {
+        'CHECK': 'Check',
+        'ACH': 'ACH',
+        'WIRE': 'Wire',
+        'CREDIT_CARD': 'Credit Card',
+        'DEBIT_CARD': 'Debit Card',
+        'CASH': 'Cash',
+        'OTHER': 'Other'
+    };
+    return methods[method] || method;
+}
+
+// Load Bills
+async function loadBills() {
+    const vendorName = document.getElementById('filterVendor').value;
+    const areaId = document.getElementById('filterLocation').value;
+    const status = document.getElementById('filterStatus').value;
+    const startDate = document.getElementById('filterStartDate').value;
+    const endDate = document.getElementById('filterEndDate').value;
+    const overdueOnly = document.getElementById('filterOverdue').checked;
+
+    let url = '/accounting/api/vendor-bills/?limit=100';
+    if (vendorName) url += `&vendor_name=${encodeURIComponent(vendorName)}`;
+    if (areaId) url += `&area_id=${areaId}`;
+    if (status) url += `&status=${status}`;
+    if (startDate) url += `&start_date=${startDate}`;
+    if (endDate) url += `&end_date=${endDate}`;
+    if (overdueOnly) url += `&overdue_only=true`;
+
+    try {
+        const response = await fetch(url);
+        if (response.ok) {
+            const bills = await response.json();
+            renderBills(bills);
+        } else {
+            throw new Error('Failed to load bills');
+        }
+    } catch (error) {
+        console.error('Error loading bills:', error);
+        showNotification('Error loading bills: ' + error.message, 'Error');
+    }
+}
+
+function renderBills(bills) {
+    const tbody = document.getElementById('billsTableBody');
+
+    if (bills.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="9" class="empty-state">
+                    <i class="bi bi-inbox"></i>
+                    <p>No bills found. Try adjusting your filters or create a new bill.</p>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = bills.map(bill => {
+        const statusClass = `status-${bill.status.toLowerCase()}`;
+        const locationName = bill.area ? `${bill.area.code}` : 'Corporate';
+        const overdueTag = bill.is_overdue ? '<span class="overdue-badge">OVERDUE</span>' : '';
+
+        return `
+            <tr>
+                <td>${bill.bill_number}</td>
+                <td>${bill.vendor_name}</td>
+                <td>${locationName}</td>
+                <td>${formatDate(bill.bill_date)}</td>
+                <td>${formatDate(bill.due_date)}${overdueTag}</td>
+                <td>$${formatNumber(bill.total_amount)}</td>
+                <td>$${formatNumber(bill.balance_due)}</td>
+                <td><span class="status-badge ${statusClass}">${formatStatus(bill.status)}</span></td>
+                <td>
+                    <div style="display: flex; gap: 0.25rem;">
+                        <button class="btn btn-sm btn-secondary" onclick="viewBill(${bill.id})" title="View Details">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        ${bill.status === 'APPROVED' || bill.status === 'PARTIALLY_PAID' ?
+                            `<button class="btn btn-sm btn-success" onclick="showPaymentModal(${bill.id})" title="Record Payment">
+                                <i class="bi bi-cash-coin"></i>
+                            </button>` : ''}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Line Items Management
+function addLineItem() {
+    const tbody = document.getElementById('lineItemsBody');
+    const row = document.createElement('tr');
+
+    const accountOptions = accounts.map(acc =>
+        `<option value="${acc.id}">${acc.account_number} - ${acc.account_name}</option>`
+    ).join('');
+
+    const areaOptions = areas.map(area =>
+        `<option value="${area.id}">${area.code} - ${area.name}</option>`
+    ).join('');
+
+    row.innerHTML = `
+        <td>
+            <select class="line-account" required>
+                <option value="">Select Account...</option>
+                ${accountOptions}
+            </select>
+        </td>
+        <td>
+            <select class="line-area">
+                <option value="">Same as Bill</option>
+                ${areaOptions}
+            </select>
+        </td>
+        <td>
+            <input type="number" class="line-amount" step="0.01" min="0" required placeholder="0.00" onchange="calculateTotals()">
+        </td>
+        <td>
+            <input type="number" class="line-tax" step="0.01" min="0" placeholder="0.00" onchange="calculateTotals()">
+        </td>
+        <td>
+            <input type="text" class="line-description" placeholder="Optional">
+        </td>
+        <td>
+            <button type="button" class="btn-remove" onclick="removeLineItem(this)">
+                <i class="bi bi-trash"></i>
+            </button>
+        </td>
+    `;
+
+    tbody.appendChild(row);
+}
+
+function removeLineItem(button) {
+    const row = button.closest('tr');
+    row.remove();
+    calculateTotals();
+}
+
+function calculateTotals() {
+    const rows = document.querySelectorAll('#lineItemsBody tr');
+    let subtotal = 0;
+    let tax = 0;
+
+    rows.forEach(row => {
+        const amount = parseFloat(row.querySelector('.line-amount').value) || 0;
+        const lineTax = parseFloat(row.querySelector('.line-tax').value) || 0;
+
+        subtotal += amount;
+        tax += lineTax;
+    });
+
+    const total = subtotal + tax;
+
+    document.getElementById('displaySubtotal').textContent = '$' + formatNumber(subtotal);
+    document.getElementById('displayTax').textContent = '$' + formatNumber(tax);
+    document.getElementById('displayTotal').textContent = '$' + formatNumber(total);
+}
+
+// Form Submission
+async function handleSubmit(event) {
+    event.preventDefault();
+    await saveBill(false);
+}
+
+async function handleSubmitAndApprove(event) {
+    event.preventDefault();
+    await saveBill(true);
+}
+
+async function saveBill(submitForApproval) {
+    // Collect line items
+    const rows = document.querySelectorAll('#lineItemsBody tr');
+    const lineItems = [];
+
+    for (const row of rows) {
+        const accountId = row.querySelector('.line-account').value;
+        const areaId = row.querySelector('.line-area').value;
+        const amount = parseFloat(row.querySelector('.line-amount').value) || 0;
+        const tax = parseFloat(row.querySelector('.line-tax').value) || 0;
+        const description = row.querySelector('.line-description').value;
+
+        if (!accountId || amount <= 0) {
+            showNotification('Each line item must have an account and amount greater than zero', 'Invalid Line Item');
+            return;
+        }
+
+        lineItems.push({
+            account_id: parseInt(accountId),
+            area_id: areaId ? parseInt(areaId) : null,
+            amount: amount,
+            tax_amount: tax,
+            description: description || null,
+            is_taxable: tax > 0
+        });
+    }
+
+    if (lineItems.length === 0) {
+        showNotification('Please add at least one line item', 'Missing Line Items');
+        return;
+    }
+
+    // Calculate totals
+    const subtotal = lineItems.reduce((sum, line) => sum + line.amount, 0);
+    const taxAmount = lineItems.reduce((sum, line) => sum + line.tax_amount, 0);
+    const totalAmount = subtotal + taxAmount;
+
+    // Get vendor information from dropdown
+    const vendorSelect = document.getElementById('vendorSelect');
+    const selectedVendorId = parseInt(vendorSelect.value);
+    const selectedOption = vendorSelect.options[vendorSelect.selectedIndex];
+    const vendorName = selectedOption.getAttribute('data-vendor-name') || '';
+    const vendorCode = selectedOption.getAttribute('data-vendor-code') || '';
+
+    if (!selectedVendorId) {
+        showNotification('Please select a vendor', 'Missing Vendor');
+        return;
+    }
+
+    // Build bill data
+    const billData = {
+        vendor_name: vendorName,
+        vendor_id: vendorCode || null,  // Store vendor code in vendor_id field for now
+        bill_number: document.getElementById('billNumber').value,
+        bill_date: document.getElementById('billDate').value,
+        due_date: document.getElementById('dueDate').value,
+        received_date: document.getElementById('receivedDate').value || null,
+        area_id: document.getElementById('billLocation').value ? parseInt(document.getElementById('billLocation').value) : null,
+        subtotal: subtotal,
+        tax_amount: taxAmount,
+        total_amount: totalAmount,
+        is_1099_eligible: document.getElementById('is1099Eligible').checked,
+        reference_number: document.getElementById('referenceNumber').value || null,
+        description: document.getElementById('description').value || null,
+        notes: document.getElementById('notes').value || null,
+        line_items: lineItems
+    };
+
+    try {
+        // Create bill
+        const response = await fetch('/accounting/api/vendor-bills/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(billData)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to create bill');
+        }
+
+        const bill = await response.json();
+
+        // If submit for approval, do that now
+        if (submitForApproval) {
+            const submitResponse = await fetch(`/accounting/api/vendor-bills/${bill.id}/submit`, {
+                method: 'POST'
+            });
+
+            if (!submitResponse.ok) {
+                throw new Error('Bill created but failed to submit for approval');
+            }
+        }
+
+        showNotification(`Bill ${bill.bill_number} created successfully${submitForApproval ? ' and submitted for approval' : ''}`, 'Success');
+        showListView();
+    } catch (error) {
+        console.error('Error saving bill:', error);
+        showNotification('Error saving bill: ' + error.message, 'Error');
+    }
+}
+
+function resetForm() {
+    document.getElementById('billForm').reset();
+    document.getElementById('lineItemsBody').innerHTML = '';
+    calculateTotals();
+
+    // Set bill date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('billDate').value = today;
+}
+
+// Helper Functions
+function formatDate(dateStr) {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function formatNumber(num) {
+    return parseFloat(num).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function formatStatus(status) {
+    return status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function viewBill(billId) {
+    window.location.href = `/accounting/vendor-bills/${billId}`;
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadAccounts();
+    await loadAreas();
+    await loadVendors();
+    await loadBills();
+});
+</script>
+{% endblock %}

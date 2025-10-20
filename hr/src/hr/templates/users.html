@@ -1,0 +1,725 @@
+{% extends "base.html" %}
+
+{% block title %}User Management - HR Management{% endblock %}
+{% block nav_users %}active{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>User Management</h2>
+        <button class="btn btn-primary" onclick="openUserModal()">+ New User</button>
+    </div>
+
+    <div class="table-wrapper">
+        <table id="usersTable">
+            <thead>
+                <tr>
+                    <th>Username</th>
+                    <th>Full Name</th>
+                    <th class="hide-mobile">Email</th>
+                    <th class="hide-mobile">Last Login</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="usersBody">
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 2rem; color: #999;">Loading users...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- User Modal -->
+<div id="userModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">New User</h3>
+            <span class="close" onclick="closeUserModal()">&times;</span>
+        </div>
+        <form id="userForm">
+            <input type="hidden" id="userId">
+
+            <div class="form-group">
+                <label for="username">Username *</label>
+                <input type="text" id="username" required minlength="3">
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email *</label>
+                <input type="email" id="email" required>
+            </div>
+
+            <div class="form-group">
+                <label for="full_name">Full Name *</label>
+                <input type="text" id="full_name" required>
+            </div>
+
+            <div class="form-group" id="passwordGroup">
+                <label for="password">Password *</label>
+                <input type="password" id="password" minlength="6">
+                <small style="color: #b0b0b0;">Minimum 6 characters</small>
+            </div>
+
+            <div class="form-group">
+                <label for="role_id">Role *</label>
+                <select id="role_id" required>
+                    <option value="">Select Role</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="location_ids">Assigned Locations</label>
+                <div id="locationCheckboxContainer" style="max-height: 150px; overflow-y: auto; border: 1px solid #30363d; border-radius: 6px; padding: 0.75rem; background: #0d1117;">
+                    <p style="color: #8b949e; font-size: 12px; margin-bottom: 0.5rem;">
+                        <em>Leave all unchecked to grant access to ALL locations</em>
+                    </p>
+                    <div id="locationCheckboxes">
+                        <!-- Checkboxes will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="is_active" checked>
+                    Active
+                </label>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save User</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Location Assignment Modal -->
+<div id="locationModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="locationModalTitle">Assign Locations</h3>
+            <span class="close" onclick="closeLocationModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="locationUserId">
+            <p style="margin-bottom: 1rem; color: #b0b0b0;">
+                Select locations for <strong id="locationUsername"></strong>:
+            </p>
+            <p style="margin-bottom: 1rem; color: #999; font-size: 0.9rem;">
+                <em>Leave all unchecked to grant access to ALL locations. Check specific locations to restrict access.</em>
+            </p>
+            <div id="locationCheckboxes" style="max-height: 400px; overflow-y: auto;">
+                <!-- Checkboxes will be populated here -->
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" onclick="closeLocationModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveUserLocations()">Save Locations</button>
+        </div>
+    </div>
+</div>
+
+<!-- Password Reset Modal -->
+<div id="passwordResetModal" class="modal">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3>Reset Password</h3>
+            <span class="close" onclick="closePasswordResetModal()">&times;</span>
+        </div>
+        <form id="passwordResetForm" onsubmit="handlePasswordReset(event)">
+            <div style="padding: 1.5rem;">
+                <input type="hidden" id="resetUserId">
+
+                <p style="margin-bottom: 1.5rem; color: #c9d1d9;">
+                    Reset password for: <strong id="resetUsername" style="color: #58a6ff;"></strong>
+                </p>
+
+                <div class="form-group">
+                    <label for="newPassword">New Password *</label>
+                    <input type="password" id="newPassword" required minlength="6"
+                           style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9;">
+                    <small style="color: #8b949e; font-size: 12px;">Minimum 6 characters</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password *</label>
+                    <input type="password" id="confirmPassword" required minlength="6"
+                           style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9;">
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closePasswordResetModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Reset Password</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let users = [];
+let roles = [];
+let locations = [];
+
+async function loadRoles() {
+    try {
+        const response = await fetch('/hr/api/roles/');
+        if (response.ok) {
+            roles = await response.json();
+            populateRoleSelect();
+        }
+    } catch (error) {
+        console.error('Error loading roles:', error);
+    }
+}
+
+async function loadLocations() {
+    try {
+        const response = await fetch('/hr/api/locations/all');
+        if (response.ok) {
+            locations = await response.json();
+            console.log('Loaded locations:', locations.length);
+        } else {
+            console.error('Error loading locations, status:', response.status);
+        }
+    } catch (error) {
+        console.error('Error loading locations:', error);
+    }
+}
+
+function populateRoleSelect() {
+    const roleSelect = document.getElementById('role_id');
+    roleSelect.innerHTML = '<option value="">Select Role</option>';
+    roles.forEach(role => {
+        const option = document.createElement('option');
+        option.value = role.id;
+        option.textContent = role.name + (role.description ? ` - ${role.description}` : '');
+        roleSelect.appendChild(option);
+    });
+}
+
+async function populateLocationCheckboxes(selectedLocationIds = []) {
+    const container = document.getElementById('locationCheckboxes');
+
+    // If locations aren't loaded yet, load them now
+    if (locations.length === 0) {
+        container.innerHTML = '<p style="color: #8b949e; font-size: 13px;">Loading locations...</p>';
+        await loadLocations();
+    }
+
+    console.log('Populating locations, count:', locations.length, 'selected:', selectedLocationIds);
+
+    if (locations.length === 0) {
+        container.innerHTML = '<p style="color: #f85149; font-size: 13px;">No locations available</p>';
+        return;
+    }
+
+    container.innerHTML = ''; // Clear loading message
+
+    locations.forEach(location => {
+        const div = document.createElement('div');
+        div.style.marginBottom = '0.5rem';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `location_${location.id}`;
+        checkbox.value = location.id;
+        checkbox.style.marginRight = '0.5rem';
+
+        if (selectedLocationIds.includes(location.id)) {
+            checkbox.checked = true;
+        }
+
+        const label = document.createElement('label');
+        label.htmlFor = `location_${location.id}`;
+        label.textContent = location.name;
+        label.style.cursor = 'pointer';
+        label.style.color = '#c9d1d9';
+
+        div.appendChild(checkbox);
+        div.appendChild(label);
+        container.appendChild(div);
+    });
+}
+
+async function loadUsers() {
+    try {
+        const response = await fetch('/hr/api/users/');
+        if (!response.ok) {
+            throw new Error('Failed to load users');
+        }
+        users = await response.json();
+        renderUsers();
+    } catch (error) {
+        console.error('Error loading users:', error);
+        document.getElementById('usersBody').innerHTML = `
+            <tr><td colspan="7" style="text-align: center; color: #e74c3c;">Error loading users</td></tr>
+        `;
+    }
+}
+
+function renderUsers() {
+    const tbody = document.getElementById('usersBody');
+
+    if (users.length === 0) {
+        tbody.innerHTML = `
+            <tr><td colspan="7" style="text-align: center; padding: 2rem; color: #999;">No users found</td></tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = users.map(user => {
+        // Get role name
+        let roleName = 'No Role';
+        if (user.roles && user.roles.length > 0) {
+            roleName = user.roles[0].name;
+        } else if (user.is_admin) {
+            roleName = 'Admin (Legacy)';
+        }
+
+        return `
+            <tr>
+                <td><strong>${user.username}</strong></td>
+                <td>${user.full_name}</td>
+                <td class="hide-mobile">${user.email}</td>
+                <td class="hide-mobile">${user.last_login ? new Date(user.last_login).toLocaleString() : 'Never'}</td>
+                <td>
+                    <span class="status-badge ${user.is_admin || (user.roles && user.roles.some(r => r.name === 'Admin')) ? 'status-warning' : 'status-info'}">
+                        ${roleName}
+                    </span>
+                </td>
+                <td>
+                    <span class="status-badge ${user.is_active ? 'status-active' : 'status-inactive'}">
+                        ${user.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="editUser(${user.id})">Edit</button>
+                    <button class="btn btn-sm btn-warning" onclick="resetPassword(${user.id}, '${user.username}')" style="background: #f0883e; border-color: #f0883e;">Reset Password</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteUser(${user.id}, '${user.username}')">Delete</button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function openUserModal(userId = null) {
+    const modal = document.getElementById('userModal');
+    const form = document.getElementById('userForm');
+    const passwordGroup = document.getElementById('passwordGroup');
+    const passwordInput = document.getElementById('password');
+
+    if (userId) {
+        const user = users.find(u => u.id === userId);
+        document.getElementById('modalTitle').textContent = 'Edit User';
+        document.getElementById('userId').value = user.id;
+        document.getElementById('username').value = user.username;
+        document.getElementById('username').disabled = true; // Can't change username
+        document.getElementById('email').value = user.email;
+        document.getElementById('full_name').value = user.full_name;
+        document.getElementById('is_active').checked = user.is_active;
+
+        // Ensure roles are populated first, then set role
+        if (roles.length === 0) {
+            // If roles haven't loaded yet, populate them now
+            populateRoleSelect();
+        }
+
+        // Set role with a small delay to ensure dropdown is ready
+        setTimeout(() => {
+            if (user.roles && user.roles.length > 0) {
+                const roleSelect = document.getElementById('role_id');
+                roleSelect.value = user.roles[0].id;
+                console.log('Setting role to:', user.roles[0].id, 'Current value:', roleSelect.value);
+            } else {
+                document.getElementById('role_id').value = '';
+            }
+        }, 50);
+
+        // Populate location checkboxes with user's assigned locations
+        const userLocationIds = user.assigned_locations ? user.assigned_locations.map(loc => loc.id) : [];
+        populateLocationCheckboxes(userLocationIds);
+
+        // Hide password field when editing
+        passwordGroup.style.display = 'none';
+        passwordInput.required = false;
+    } else {
+        document.getElementById('modalTitle').textContent = 'New User';
+        form.reset();
+        document.getElementById('userId').value = '';
+        document.getElementById('username').disabled = false;
+        document.getElementById('is_active').checked = true;
+
+        // Populate location checkboxes (none selected)
+        populateLocationCheckboxes([]);
+
+        // Show password field when creating
+        passwordGroup.style.display = 'block';
+        passwordInput.required = true;
+    }
+
+    modal.style.display = 'block';
+}
+
+function closeUserModal() {
+    document.getElementById('userModal').style.display = 'none';
+}
+
+function editUser(id) {
+    openUserModal(id);
+}
+
+document.getElementById('userForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const userId = document.getElementById('userId').value;
+    const isEdit = !!userId;
+
+    // Get selected location IDs
+    const selectedLocations = [];
+    document.querySelectorAll('#locationCheckboxes input[type="checkbox"]:checked').forEach(cb => {
+        selectedLocations.push(parseInt(cb.value));
+    });
+
+    const roleValue = document.getElementById('role_id').value;
+    const data = {
+        email: document.getElementById('email').value,
+        full_name: document.getElementById('full_name').value,
+        is_active: document.getElementById('is_active').checked,
+        role_id: roleValue ? parseInt(roleValue) : null,
+        location_ids: selectedLocations
+    };
+
+    // Add fields only for new users
+    if (!isEdit) {
+        data.username = document.getElementById('username').value;
+        data.password = document.getElementById('password').value;
+    }
+
+    console.log('Saving user with data:', data);
+
+    try {
+        const url = isEdit ? `/hr/api/users/${userId}` : '/hr/api/users/';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            closeUserModal();
+            loadUsers();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to save user'));
+        }
+    } catch (error) {
+        console.error('Error saving user:', error);
+        alert('Error saving user');
+    }
+});
+
+// Close modal when clicking outside
+window.onclick = function(event) {
+    const userModal = document.getElementById('userModal');
+    const locationModal = document.getElementById('locationModal');
+    if (event.target === userModal) {
+        closeUserModal();
+    } else if (event.target === locationModal) {
+        closeLocationModal();
+    }
+}
+
+// Location Management
+let allLocations = [];
+
+async function loadAllLocationsForManagement() {
+    try {
+        const response = await fetch('/hr/api/locations/all');
+        if (!response.ok) throw new Error('Failed to load locations');
+        allLocations = await response.json();
+    } catch (error) {
+        console.error('Error loading locations:', error);
+    }
+}
+
+async function manageLocations(userId, username) {
+    // Load locations if not already loaded
+    if (allLocations.length === 0) {
+        await loadAllLocationsForManagement();
+    }
+
+    document.getElementById('locationUserId').value = userId;
+    document.getElementById('locationUsername').textContent = username;
+
+    // Load user's current locations
+    let userLocationIds = [];
+    try {
+        const response = await fetch(`/api/locations/user/${userId}`);
+        if (response.ok) {
+            const data = await response.json();
+            userLocationIds = data.assigned_locations.map(loc => loc.id);
+        }
+    } catch (error) {
+        console.error('Error loading user locations:', error);
+    }
+
+    // Render location checkboxes
+    const checkboxContainer = document.getElementById('locationCheckboxes');
+    checkboxContainer.innerHTML = allLocations.map(location => `
+        <div style="margin-bottom: 0.75rem; padding: 0.5rem; background: #1a1a1a; border-radius: 4px;">
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <input type="checkbox"
+                       value="${location.id}"
+                       ${userLocationIds.includes(location.id) ? 'checked' : ''}
+                       style="margin-right: 0.75rem; width: 18px; height: 18px;">
+                <span style="color: #e0e0e0;">
+                    <strong>${location.name}</strong>
+                    ${location.city ? ` - ${location.city}, ${location.state || ''}` : ''}
+                </span>
+            </label>
+        </div>
+    `).join('');
+
+    document.getElementById('locationModal').style.display = 'block';
+}
+
+function closeLocationModal() {
+    document.getElementById('locationModal').style.display = 'none';
+}
+
+async function saveUserLocations() {
+    const userId = document.getElementById('locationUserId').value;
+    const checkboxes = document.querySelectorAll('#locationCheckboxes input[type="checkbox"]');
+    const selectedLocationIds = Array.from(checkboxes)
+        .filter(cb => cb.checked)
+        .map(cb => parseInt(cb.value));
+
+    try {
+        const response = await fetch(`/api/locations/user/${userId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ location_ids: selectedLocationIds })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save locations');
+        }
+
+        const result = await response.json();
+        alert(`Locations updated successfully! ${result.has_restrictions ?
+            `User has access to ${result.assigned_location_count} location(s)` :
+            'User has access to ALL locations'}`);
+        closeLocationModal();
+    } catch (error) {
+        alert('Error saving locations: ' + error.message);
+    }
+}
+
+// Delete user
+async function deleteUser(userId, username) {
+    if (!confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hr/api/users/${userId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            alert('User deleted successfully');
+            await loadUsers();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to delete user'));
+        }
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        alert('Error deleting user');
+    }
+}
+
+// Password Reset Functions
+function resetPassword(userId, username) {
+    document.getElementById('resetUserId').value = userId;
+    document.getElementById('resetUsername').textContent = username;
+    document.getElementById('newPassword').value = '';
+    document.getElementById('confirmPassword').value = '';
+    document.getElementById('passwordResetModal').style.display = 'flex';
+}
+
+function closePasswordResetModal() {
+    document.getElementById('passwordResetModal').style.display = 'none';
+}
+
+async function handlePasswordReset(event) {
+    event.preventDefault();
+
+    const userId = document.getElementById('resetUserId').value;
+    const username = document.getElementById('resetUsername').textContent;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+
+    // Validate passwords match
+    if (newPassword !== confirmPassword) {
+        alert('Passwords do not match');
+        return;
+    }
+
+    // Validate password length
+    if (newPassword.length < 6) {
+        alert('Password must be at least 6 characters');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hr/api/users/${userId}/reset-password`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ password: newPassword })
+        });
+
+        if (response.ok) {
+            alert(`Password reset successfully for ${username}`);
+            closePasswordResetModal();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to reset password'));
+        }
+    } catch (error) {
+        console.error('Error resetting password:', error);
+        alert('Error resetting password');
+    }
+}
+
+// Load data on page load
+async function initializePage() {
+    await loadRoles();
+    await loadLocations();
+    await loadUsers();
+}
+
+initializePage();
+</script>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .form-group {
+        margin-bottom: 1rem;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #e0e0e0;
+    }
+    .form-group input[type="text"],
+    .form-group input[type="email"],
+    .form-group input[type="password"] {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #555;
+        border-radius: 4px;
+        background: #1a1a1a;
+        color: #e0e0e0;
+    }
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.7);
+        overflow-y: auto;
+    }
+    .modal-content {
+        background: #2d2d2d;
+        margin: 2rem auto;
+        padding: 0;
+        border: 1px solid #404040;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 600px;
+        max-height: calc(100vh - 4rem);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+        display: flex;
+        flex-direction: column;
+    }
+    .modal-header {
+        padding: 1.5rem;
+        border-bottom: 1px solid #404040;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-shrink: 0;
+    }
+    .modal-header h3 {
+        margin: 0;
+        color: #fff;
+    }
+    .modal-body {
+        padding: 1.5rem;
+        overflow-y: auto;
+        flex: 1;
+    }
+    #userForm {
+        padding: 1.5rem;
+        overflow-y: auto;
+        flex: 1;
+    }
+    .modal-footer {
+        padding: 1rem 1.5rem;
+        border-top: 1px solid #404040;
+        text-align: right;
+        flex-shrink: 0;
+    }
+    .modal-footer button {
+        margin-left: 0.5rem;
+    }
+    .close {
+        color: #aaa;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .close:hover {
+        color: #fff;
+    }
+    .status-badge {
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+    }
+    .status-active {
+        background: #27ae60;
+        color: white;
+    }
+    .status-inactive {
+        background: #666;
+        color: white;
+    }
+    .status-warning {
+        background: #f39c12;
+        color: white;
+    }
+    .status-info {
+        background: #3498db;
+        color: white;
+    }
+</style>
+{% endblock %}

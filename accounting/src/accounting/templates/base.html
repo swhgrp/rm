@@ -1,185 +1,1250 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Restaurant Accounting System{% endblock %}</title>
-    <link rel="stylesheet" href="/accounting/static/css/styles.css">
+    <base href="/accounting/">
+    <title>{% block title %}SW Hospitality Group - Accounting{% endblock %}</title>
+
+    <!-- Bootstrap CSS and Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    {% block head %}{% endblock %}
+
     <style>
+        /* Dark mode custom styles matching HR and Inventory */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: #f5f5f5;
-            color: #333;
-        }
-        .header {
-            background: #2c3e50;
-            color: white;
-            padding: 1rem 2rem;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .header h1 {
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
-        .nav {
-            background: white;
-            border-bottom: 1px solid #e0e0e0;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            margin: 0;
             padding: 0;
         }
-        .nav ul {
+
+        /* ========== SIDEBAR NAVIGATION ========== */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 200px;
+            background-color: #161b22;
+            padding-top: 20px;
+            z-index: 1000;
+            overflow-y: auto;
+            border-right: 1px solid #30363d;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-200px);
+        }
+
+        .sidebar-brand {
+            padding: 20px 15px;
+            text-align: center;
+            color: #58a6ff;
+            font-size: 16px;
+            font-weight: 600;
+            border-bottom: 1px solid #30363d;
+            margin-bottom: 10px;
+        }
+
+        .sidebar-brand img {
+            max-width: 180px;
+            height: auto;
+            margin-bottom: 0px;
+        }
+
+        .sidebar-nav {
             list-style: none;
-            display: flex;
-            gap: 0;
+            padding: 0;
+            margin: 0;
         }
-        .nav a {
+
+        .sidebar-nav li {
+            margin: 0;
+        }
+
+        .sidebar-nav a {
             display: block;
-            padding: 1rem 1.5rem;
-            color: #555;
+            padding: 12px 20px;
+            color: #8b949e;
             text-decoration: none;
-            border-bottom: 3px solid transparent;
+            font-size: 14px;
             transition: all 0.2s;
         }
-        .nav a:hover {
-            background: #f8f9fa;
-            color: #2c3e50;
-        }
-        .nav a.active {
-            border-bottom-color: #3498db;
-            color: #2c3e50;
-            font-weight: 500;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-        .card {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-        }
-        .card h2 {
-            margin-bottom: 1rem;
-            color: #2c3e50;
-            font-size: 1.25rem;
-        }
-        .btn {
-            padding: 0.5rem 1rem;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.9rem;
-            transition: all 0.2s;
-            text-decoration: none;
+
+        .sidebar-nav i {
+            margin-right: 10px;
+            font-size: 16px;
+            width: 20px;
             display: inline-block;
         }
-        .btn-primary {
-            background: #3498db;
-            color: white;
+
+        .sidebar-nav a:hover,
+        .sidebar-nav a.active {
+            background-color: #21262d;
+            color: #58a6ff;
+            border-left: 3px solid #58a6ff;
+            padding-left: 17px;
         }
-        .btn-primary:hover {
-            background: #2980b9;
+
+        /* Submenu styles */
+        .submenu {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            background-color: #0d1117;
         }
-        .btn-success {
-            background: #27ae60;
-            color: white;
+
+        .submenu.open {
+            max-height: 1000px;
+            overflow: visible;
         }
-        .btn-success:hover {
-            background: #229954;
+
+        .submenu li {
+            margin: 0;
         }
-        .btn-danger {
-            background: #e74c3c;
-            color: white;
+
+        .submenu li a {
+            padding-left: 50px;
+            font-size: 13px;
+            color: #8b949e;
         }
-        .btn-danger:hover {
-            background: #c0392b;
+
+        .submenu li a:hover,
+        .submenu li a.active {
+            background-color: #21262d;
+            color: #58a6ff;
+            border-left: 3px solid #58a6ff;
+            padding-left: 47px;
         }
+
+        /* Section headers */
+        .sidebar-nav > li {
+            margin-bottom: 2px;
+        }
+
+        .nav-section-toggle {
+            position: relative;
+            font-weight: 600 !important;
+            color: #c9d1d9 !important;
+            background-color: #161b22 !important;
+            border-left: none !important;
+            padding-left: 20px !important;
+            padding-right: 20px !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: space-between;
+            white-space: nowrap;
+        }
+
+        .nav-section-toggle .float-end {
+            font-size: 12px;
+            transition: transform 0.3s ease;
+            flex-shrink: 0;
+            margin-left: auto;
+            padding-left: 8px;
+        }
+
+        .nav-section-toggle.open .float-end {
+            transform: rotate(180deg);
+        }
+
+        .nav-section-toggle:hover {
+            background-color: #1c2128 !important;
+            color: #58a6ff !important;
+        }
+
+        /* Main content area */
+        .main-wrapper {
+            margin-left: 200px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top navbar */
+        .top-navbar {
+            background-color: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #c9d1d9;
+        }
+
+        .user-menu-top {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-menu-top .dropdown-toggle {
+            background: none;
+            border: none;
+            color: #c9d1d9;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        /* Content area */
+        .content-area {
+            flex: 1;
+            padding: 20px;
+        }
+
+        .card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            color: #c9d1d9;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.4;
+        }
+
+        .card h1 {
+            color: #c9d1d9;
+            font-size: 2rem;
+            margin-bottom: 2rem;
+            line-height: 1.3;
+        }
+
+        .card p {
+            line-height: 1.6;
+            margin-bottom: 1rem;
+        }
+
+        /* Tables */
         table {
             width: 100%;
             border-collapse: collapse;
-        }
-        th, td {
-            text-align: left;
-            padding: 0.75rem;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        th {
-            background: #f8f9fa;
-            font-weight: 600;
-            color: #555;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        tr:hover {
-            background: #f8f9fa;
-        }
-        .badge {
-            padding: 0.25rem 0.5rem;
-            border-radius: 3px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-        .badge-success {
-            background: #d4edda;
-            color: #155724;
-        }
-        .badge-warning {
-            background: #fff3cd;
-            color: #856404;
-        }
-        .badge-danger {
-            background: #f8d7da;
-            color: #721c24;
-        }
-        .alert {
-            padding: 1rem;
-            border-radius: 4px;
             margin-bottom: 1rem;
         }
+
+        .table {
+            color: #c9d1d9;
+        }
+
+        .table thead th {
+            background-color: #0d1117 !important;
+            color: #ffffff !important;
+            border-color: #30363d !important;
+            font-weight: 600;
+            padding: 14px 16px !important;
+            font-size: 0.95rem;
+            letter-spacing: 0.3px;
+        }
+
+        .table tbody td {
+            border-color: #30363d;
+            padding: 14px 16px !important;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: #1c2128;
+        }
+
+        /* General table styling for non-Bootstrap tables */
+        table thead th {
+            background-color: #0d1117;
+            color: #ffffff;
+            border: 1px solid #30363d;
+            font-weight: 600;
+            padding: 14px 16px;
+            font-size: 0.95rem;
+            letter-spacing: 0.3px;
+            text-align: left;
+        }
+
+        table tbody td {
+            border: 1px solid #30363d;
+            padding: 14px 16px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        table tbody tr:hover {
+            background-color: #1c2128;
+        }
+
+        /* Forms */
+        .form-control, .form-select {
+            background-color: #0d1117;
+            border-color: #30363d;
+            color: #c9d1d9;
+        }
+
+        .form-control:focus, .form-select:focus {
+            background-color: #0d1117;
+            border-color: #58a6ff;
+            color: #c9d1d9;
+            box-shadow: 0 0 0 0.25rem rgba(88, 166, 255, 0.25);
+        }
+
+        .form-label {
+            color: #c9d1d9;
+            font-weight: 500;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background-color: #238636;
+            border-color: #238636;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2ea043;
+            border-color: #2ea043;
+        }
+
+        .btn-success {
+            background-color: #238636;
+            border-color: #238636;
+        }
+
+        .btn-success:hover {
+            background-color: #2ea043;
+            border-color: #2ea043;
+        }
+
+        .btn-danger {
+            background-color: #da3633;
+            border-color: #da3633;
+        }
+
+        .btn-danger:hover {
+            background-color: #b62324;
+            border-color: #b62324;
+        }
+
+        .btn-secondary {
+            background-color: #373e47;
+            border-color: #373e47;
+            color: #c9d1d9;
+        }
+
+        .btn-secondary:hover {
+            background-color: #444c56;
+            border-color: #444c56;
+        }
+
+        /* Badges */
+        .badge {
+            font-weight: 500;
+        }
+
+        .badge-success {
+            background: #238636;
+            color: white;
+        }
+
+        .badge-warning {
+            background: #9e6a03;
+            color: white;
+        }
+
+        .badge-danger {
+            background: #da3633;
+            color: white;
+        }
+
+        /* Alerts */
+        .alert {
+            border-radius: 6px;
+        }
+
         .alert-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
+            background: #1f6feb;
+            border-color: #58a6ff;
+            color: white;
         }
+
         .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+            background: #238636;
+            border-color: #2ea043;
+            color: white;
         }
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+
+        .alert-danger {
+            background: #da3633;
+            border-color: #f85149;
+            color: white;
+        }
+
+        /* Dropdowns */
+        .dropdown-menu {
+            background-color: #161b22;
+            border-color: #30363d;
+        }
+
+        .dropdown-item {
+            color: #c9d1d9;
+        }
+
+        .dropdown-item:hover {
+            background-color: #21262d;
+            color: #58a6ff;
+        }
+
+        .dropdown-divider {
+            border-color: #30363d;
+        }
+
+        /* Footer */
+        footer {
+            background-color: #161b22;
+            border-top: 1px solid #30363d;
+            padding: 15px 0;
+            margin-top: auto;
+        }
+
+        .text-muted {
+            color: #8b949e !important;
+        }
+
+        /* Mobile Menu Toggle Button */
+        .mobile-menu-toggle {
+            display: none;
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 1001;
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 22px;
+            line-height: 1;
+        }
+
+        .mobile-menu-toggle:hover {
+            background-color: #21262d;
+            color: #58a6ff;
+        }
+
+        /* Mobile Overlay */
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .mobile-overlay.active {
+            display: block;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .main-wrapper {
+                margin-left: 0;
+            }
+
+            .sidebar {
+                transform: translateX(-200px);
+                box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .mobile-menu-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            /* Make top navbar more compact on mobile */
+            .top-navbar {
+                padding: 10px 10px;
+            }
+
+            .page-title {
+                font-size: 13px;
+                margin-left: 48px; /* Push text right to avoid hamburger overlap */
+            }
+
+            .page-title i {
+                display: none; /* Hide icon on mobile to save space */
+            }
+
+            /* Content area padding */
+            .content-area {
+                padding: 70px 15px 15px 15px !important; /* Extra top padding to avoid hamburger button overlap */
+            }
+
+            /* Remove extra margins from first elements */
+            .content-area > .card:first-child {
+                margin-top: 0 !important;
+            }
+
+            .card h2:first-child {
+                padding-top: 0 !important;
+                margin-top: 0 !important;
+            }
+
+            /* Table responsiveness */
+            table {
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                white-space: nowrap;
+            }
+
+            /* Form elements full width on mobile */
+            .form-group input,
+            .form-group select,
+            .form-group textarea {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            /* Checkbox labels need proper spacing on mobile */
+            label {
+                display: flex !important;
+                align-items: flex-start !important;
+                flex-direction: row !important;
+                gap: 10px !important;
+                white-space: normal !important;
+                writing-mode: horizontal-tb !important;
+                min-width: 0 !important;
+                overflow: visible !important;
+            }
+
+            /* Ensure label text doesn't display vertically and wraps properly */
+            label span {
+                display: block !important;
+                white-space: normal !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                hyphens: auto !important;
+                writing-mode: horizontal-tb !important;
+                flex: 1 1 auto !important;
+                min-width: 0 !important;
+                overflow: visible !important;
+                text-overflow: clip !important;
+            }
+
+            /* Checkboxes should not be full width */
+            input[type="checkbox"] {
+                display: inline-block !important;
+                width: auto !important;
+                min-width: 20px !important;
+                height: 20px !important;
+                flex-shrink: 0 !important;
+                flex-grow: 0 !important;
+                margin: 0 !important;
+            }
+
+            /* Stack filter forms vertically */
+            .filters,
+            .filter-row,
+            .d-flex.gap-2,
+            .d-flex.gap-3 {
+                flex-direction: column !important;
+                align-items: stretch !important;
+            }
+
+            .filters .form-group,
+            .filter-group {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+
+            /* Override align-items for labels inside filters to prevent vertical text */
+            .filters label,
+            .form-group label {
+                align-items: center !important;
+                flex-direction: row !important;
+            }
+
+            .filters button {
+                width: 100%;
+                margin-top: 10px;
+            }
+
+            /* Filter inputs should be full width */
+            .filters input,
+            .filters select,
+            .filter-group input,
+            .filter-group select {
+                width: 100% !important;
+                max-width: 100% !important;
+                min-width: auto !important;
+            }
+
+            /* Card spacing */
+            .card, .form-section {
+                margin-bottom: 15px;
+            }
+
+            /* Button groups stack on mobile */
+            .btn-group {
+                flex-direction: column;
+            }
+
+            .btn-group button {
+                width: 100%;
+                margin-bottom: 5px;
+            }
+
+            /* Make dropdowns full width */
+            .dropdown-menu {
+                width: 100%;
+            }
+
+            /* Modal improvements for mobile */
+            .modal-dialog {
+                margin: 10px !important;
+                max-width: calc(100% - 20px) !important;
+            }
+
+            .modal-body {
+                max-height: calc(100vh - 200px);
+                overflow-y: auto;
+            }
+
+            /* Tab navigation on mobile */
+            .nav-tabs {
+                flex-wrap: wrap !important;
+            }
+
+            .nav-tabs .nav-link {
+                font-size: 13px;
+                padding: 8px 12px;
+            }
+
+            /* Report tabs - make them scrollable on mobile */
+            .tabs {
+                display: flex !important;
+                overflow-x: auto !important;
+                -webkit-overflow-scrolling: touch !important;
+                white-space: nowrap !important;
+                gap: 5px !important;
+                padding-bottom: 5px;
+                margin-bottom: 15px !important;
+                scrollbar-width: thin;
+            }
+
+            .tab {
+                flex-shrink: 0 !important;
+                font-size: 11px !important;
+                padding: 8px 10px !important;
+                white-space: nowrap !important;
+                min-width: auto !important;
+            }
+
+            /* Action buttons in tables - ensure touch-friendly size */
+            .table .btn-sm,
+            .table .btn,
+            .table button {
+                padding: 8px 12px !important;
+                font-size: 12px;
+                min-height: 44px !important;
+                min-width: 44px !important;
+            }
+
+            /* Header action buttons stack vertically */
+            .header-actions,
+            .btn-group {
+                flex-direction: column !important;
+                gap: 10px !important;
+            }
+
+            .header-actions button,
+            .header-actions .btn,
+            .btn-group button,
+            .btn-group .btn {
+                width: 100% !important;
+                min-height: 44px !important;
+            }
+
+            /* Form row items stack */
+            .form-row {
+                flex-direction: column !important;
+            }
+
+            .form-row .form-group {
+                width: 100% !important;
+                margin-bottom: 15px;
+            }
+
+            /* Report sections */
+            .report-section {
+                margin-bottom: 20px;
+            }
+
+            .report-filters {
+                flex-direction: column !important;
+            }
+
+            .report-filters > * {
+                width: 100% !important;
+                margin-bottom: 10px;
+            }
+
+            /* Hierarchical report indentation */
+            .report-line {
+                font-size: 13px !important;
+                padding: 6px 4px !important;
+            }
+
+            /* Make sure all inputs are properly sized */
+            input[type="text"],
+            input[type="email"],
+            input[type="password"],
+            input[type="number"],
+            input[type="date"],
+            input[type="datetime-local"],
+            select,
+            textarea {
+                width: 100% !important;
+                font-size: 16px !important; /* Prevents iOS zoom on focus */
+            }
+
+            /* Card headers */
+            .card-header {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+            }
+
+            .card-header h3,
+            .card-header h4 {
+                margin-bottom: 10px;
+            }
+        }
+
+        /* Very small screens (phones in portrait) */
+        @media (max-width: 480px) {
+            .top-navbar {
+                padding: 8px 10px;
+            }
+
+            .content-area {
+                padding: 10px !important;
+            }
+
+            /* Smaller fonts for tables on tiny screens */
+            table {
+                font-size: 12px;
+            }
+
+            table th,
+            table td {
+                padding: 8px 6px !important;
+            }
+
+            /* Compact buttons */
+            .btn {
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+
+            .btn-sm {
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+
+            /* Summary cards stack */
+            .summary-cards {
+                grid-template-columns: 1fr !important;
+            }
+
+            /* Hide table columns on very small screens - keep only essential info */
+            .hide-mobile {
+                display: none !important;
+            }
+
+            /* Modal full screen on small devices */
+            .modal-dialog {
+                margin: 0 !important;
+                max-width: 100% !important;
+                height: 100vh;
+            }
+
+            .modal-content {
+                height: 100vh;
+                border-radius: 0;
+            }
+
+            /* Tab content full width */
+            .tab-content {
+                padding: 10px !important;
+            }
+
+            /* Report tables compact */
+            .report-table {
+                font-size: 11px !important;
+            }
+
+            .report-table th,
+            .report-table td {
+                padding: 4px !important;
+            }
         }
     </style>
+
     {% block extra_head %}{% endblock %}
 </head>
 <body>
-    <div class="header">
-        <h1>🧾 Restaurant Accounting System</h1>
-    </div>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <img src="/inventory/static/images/sw-logo.png" alt="SW Logo">
+        </div>
+        <ul class="sidebar-nav">
+            <li><a href="/" title="Return to Portal"><i class="bi bi-house-door"></i> Portal Home</a></li>
 
-    <nav class="nav">
-        <ul>
-            <li><a href="/accounting/" class="{% block nav_dashboard %}{% endblock %}">Dashboard</a></li>
-            <li><a href="/accounting/accounts" class="{% block nav_accounts %}{% endblock %}">Chart of Accounts</a></li>
-            <li><a href="/accounting/journal-entries" class="{% block nav_journal %}{% endblock %}">Journal Entries</a></li>
-            <li><a href="/accounting/reports" class="{% block nav_reports %}{% endblock %}">Reports</a></li>
-            <li><a href="/accounting/periods" class="{% block nav_periods %}{% endblock %}">Fiscal Periods</a></li>
+            <!-- REPORTS SECTION -->
+            <li>
+                <a href="#" class="nav-section-toggle" onclick="toggleSection('reportsSection', event); return false;">
+                    <i class="bi bi-file-earmark-bar-graph"></i> Reports
+                    <i class="bi bi-chevron-down float-end"></i>
+                </a>
+                <ul id="reportsSection" class="submenu">
+                    <li><a href="/accounting/" class="{% block nav_dashboard %}{% endblock %}"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+                    <li><a href="reports" class="{% block nav_reports %}{% endblock %}"><i class="bi bi-graph-up"></i> Financial Reports</a></li>
+                </ul>
+            </li>
+
+            <!-- GENERAL LEDGER SECTION -->
+            <li>
+                <a href="#" class="nav-section-toggle" onclick="toggleSection('glSection', event); return false;">
+                    <i class="bi bi-journal-text"></i> General Ledger
+                    <i class="bi bi-chevron-down float-end"></i>
+                </a>
+                <ul id="glSection" class="submenu">
+                    <li><a href="accounts" class="{% block nav_accounts %}{% endblock %}"><i class="bi bi-list-ul"></i> GL Accounts</a></li>
+                    <li><a href="journal-entries" class="{% block nav_journal %}{% endblock %}"><i class="bi bi-journal-text"></i> Journal Entries</a></li>
+                    <li><a href="daily-sales" class="{% block nav_daily_sales %}{% endblock %}"><i class="bi bi-cash-coin"></i> Daily Sales Summary</a></li>
+                    <li><a href="journal-entries?source=sale" class="{% block nav_dss_journal %}{% endblock %}"><i class="bi bi-receipt-cutoff"></i> DSS Journal Entries</a></li>
+                </ul>
+            </li>
+
+            <!-- ACCOUNTS PAYABLE SECTION -->
+            <li>
+                <a href="#" class="nav-section-toggle" onclick="toggleSection('apSection', event); return false;">
+                    <i class="bi bi-credit-card"></i> Accounts Payable
+                    <i class="bi bi-chevron-down float-end"></i>
+                </a>
+                <ul id="apSection" class="submenu">
+                    <li><a href="vendors" class="{% block nav_vendors %}{% endblock %}"><i class="bi bi-people"></i> Vendors</a></li>
+                    <li><a href="vendor-bills" class="{% block nav_vendor_bills %}{% endblock %}"><i class="bi bi-receipt"></i> Vendor Bills</a></li>
+                    <li><a href="journal-entries?source=bill" class="{% block nav_bill_journal %}{% endblock %}"><i class="bi bi-receipt-cutoff"></i> Bill Journal Entries</a></li>
+                </ul>
+            </li>
+
+            <!-- ACCOUNTS RECEIVABLE SECTION -->
+            <li>
+                <a href="#" class="nav-section-toggle" onclick="toggleSection('arSection', event); return false;">
+                    <i class="bi bi-cash-coin"></i> Accounts Receivable
+                    <i class="bi bi-chevron-down float-end"></i>
+                </a>
+                <ul id="arSection" class="submenu">
+                    <li><a href="customers" class="{% block nav_customers %}{% endblock %}"><i class="bi bi-people"></i> Customers</a></li>
+                    <li><a href="customer-invoices" class="{% block nav_customer_invoices %}{% endblock %}"><i class="bi bi-receipt"></i> Customer Invoices</a></li>
+                </ul>
+            </li>
+
+            <!-- Administration Section (admin only) -->
+            {% if current_user and current_user.is_admin %}
+            <li>
+                <a href="#" class="nav-section-toggle" onclick="toggleSection('adminSection', event); return false;">
+                    <i class="bi bi-gear"></i> Administration
+                    <i class="bi bi-chevron-down float-end"></i>
+                </a>
+                <ul id="adminSection" class="submenu">
+                    <li><a href="users" class="{% block nav_users %}{% endblock %}"><i class="bi bi-people"></i> Users</a></li>
+                    <li><a href="roles" class="{% block nav_roles %}{% endblock %}"><i class="bi bi-person-badge"></i> Roles</a></li>
+                    <li><a href="locations" class="{% block nav_locations %}{% endblock %}"><i class="bi bi-geo-alt"></i> Locations</a></li>
+                    <li><a href="periods" class="{% block nav_periods %}{% endblock %}"><i class="bi bi-calendar3"></i> Fiscal Periods</a></li>
+                    <li><a href="settings" class="{% block nav_settings %}{% endblock %}"><i class="bi bi-sliders"></i> Settings</a></li>
+                </ul>
+            </li>
+            {% endif %}
         </ul>
-    </nav>
-
-    <div class="container">
-        {% block content %}{% endblock %}
     </div>
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
+
+    <!-- Mobile Menu Toggle Button -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileMenu()">
+        <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Main wrapper -->
+    <div class="main-wrapper">
+        <!-- Top navbar -->
+        <div class="top-navbar">
+            <div class="page-title">
+                <i class="bi bi-calculator"></i> Accounting System
+            </div>
+            <div class="user-menu-top">
+                {% if current_user %}
+                <div class="dropdown">
+                    <button class="dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <i class="bi bi-person-circle"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><h6 class="dropdown-header">
+                            {{ current_user.full_name or current_user.username }}<br>
+                            <small class="text-muted">{{ current_user.role.role_name if current_user.role else 'User' }}</small>
+                        </h6></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="/accounting/api/auth/logout">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </a></li>
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Main content -->
+        <main class="content-area">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <div class="container text-center">
+                <small class="text-muted">&copy; 2025 SW Hospitality Group - Accounting System</small>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Custom Notification Modals -->
+    <div id="notificationModal" class="modal fade" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="notificationTitle">Notification</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="notificationMessage"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirmModal" class="modal fade" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmTitle">Confirm Action</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="confirmMessage"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmOkBtn">Confirm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Custom Notification System -->
+    <script>
+        // Custom notification function to replace alert()
+        function showNotification(message, title = 'Accounting System') {
+            document.getElementById('notificationTitle').textContent = title;
+            document.getElementById('notificationMessage').textContent = message;
+            const modal = new bootstrap.Modal(document.getElementById('notificationModal'));
+            modal.show();
+        }
+
+        // Custom confirm function to replace confirm()
+        function showConfirm(message, title = 'Confirm Action') {
+            return new Promise((resolve) => {
+                console.log('showConfirm called with:', message, title);
+                document.getElementById('confirmTitle').textContent = title;
+                document.getElementById('confirmMessage').textContent = message;
+
+                const modalElement = document.getElementById('confirmModal');
+                const modal = new bootstrap.Modal(modalElement);
+
+                let resolved = false;
+
+                // Make sure buttons are enabled
+                const okBtn = document.getElementById('confirmOkBtn');
+                const cancelBtn = document.getElementById('confirmCancelBtn');
+                okBtn.disabled = false;
+                cancelBtn.disabled = false;
+                console.log('Confirm buttons enabled. OK disabled:', okBtn.disabled, 'Cancel disabled:', cancelBtn.disabled);
+
+                // Set onclick handlers directly
+                okBtn.onclick = function(e) {
+                    console.log('Confirm OK clicked, event:', e);
+                    if (!resolved) {
+                        resolved = true;
+                        modal.hide();
+                        setTimeout(() => resolve(true), 100);
+                    }
+                };
+
+                cancelBtn.onclick = function(e) {
+                    console.log('Confirm Cancel clicked, event:', e);
+                    if (!resolved) {
+                        resolved = true;
+                        modal.hide();
+                        setTimeout(() => resolve(false), 100);
+                    }
+                };
+
+                // Handle modal being closed without clicking buttons
+                modalElement.addEventListener('hidden.bs.modal', function handler() {
+                    console.log('Modal hidden, resolved:', resolved);
+                    modalElement.removeEventListener('hidden.bs.modal', handler);
+                    if (!resolved) {
+                        resolved = true;
+                        setTimeout(() => resolve(false), 100);
+                    }
+                }, { once: true });
+
+                console.log('Showing confirm modal');
+                modal.show();
+            });
+        }
+
+        // Keep the old functions as fallbacks but map them to new ones
+        window.alert = showNotification;
+    </script>
+
+    <!-- Sidebar Toggle Script -->
+    <script>
+        // Toggle submenu sections
+        function toggleSection(sectionId, event) {
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+
+            const section = document.getElementById(sectionId);
+            const toggle = event ? event.currentTarget : null;
+
+            if (section) {
+                const isOpen = section.classList.contains('open');
+
+                if (isOpen) {
+                    section.classList.remove('open');
+                    if (toggle) {
+                        toggle.classList.remove('open');
+                    }
+                } else {
+                    section.classList.add('open');
+                    if (toggle) {
+                        toggle.classList.add('open');
+                    }
+                }
+            }
+        }
+
+        // Toggle mobile menu
+        function toggleMobileMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            const toggleBtn = document.getElementById('mobileMenuToggle');
+
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+
+            // Change icon when menu is open
+            const icon = toggleBtn.querySelector('i');
+            if (sidebar.classList.contains('active')) {
+                icon.className = 'bi bi-x';  // X icon when open
+            } else {
+                icon.className = 'bi bi-list';  // Hamburger icon when closed
+            }
+        }
+
+        // Prevent submenu links from collapsing parent section
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+
+            // Prevent submenu item clicks from bubbling to parent
+            document.querySelectorAll('.submenu a').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.stopPropagation();
+
+                    // Close mobile menu when clicking a link (on mobile)
+                    if (window.innerWidth <= 768) {
+                        const sidebar = document.getElementById('sidebar');
+                        const overlay = document.getElementById('mobileOverlay');
+                        const toggleBtn = document.getElementById('mobileMenuToggle');
+
+                        if (sidebar.classList.contains('active')) {
+                            sidebar.classList.remove('active');
+                            overlay.classList.remove('active');
+                            const icon = toggleBtn.querySelector('i');
+                            icon.className = 'bi bi-list';
+                        }
+                    }
+                });
+            });
+
+            // Auto-open section based on current page
+            let sectionToOpen = null;
+            let toggleToOpen = null;
+            const urlParams = new URLSearchParams(window.location.search);
+            const source = urlParams.get('source');
+
+            if (currentPath === '/accounting/' || currentPath === '/accounting') {
+                // Dashboard - open Reports section
+                sectionToOpen = document.getElementById('reportsSection');
+                toggleToOpen = document.querySelector('[onclick*="reportsSection"]');
+            } else if (currentPath.includes('/users') || currentPath.includes('/roles') || currentPath.includes('/locations') || currentPath.includes('/settings') || currentPath.includes('/periods')) {
+                sectionToOpen = document.getElementById('adminSection');
+                toggleToOpen = document.querySelector('[onclick*="adminSection"]');
+            } else if (currentPath.includes('/vendors') || currentPath.includes('/vendor-bills')) {
+                sectionToOpen = document.getElementById('apSection');
+                toggleToOpen = document.querySelector('[onclick*="apSection"]');
+            } else if (currentPath.includes('/customers') || currentPath.includes('/customer-invoices')) {
+                sectionToOpen = document.getElementById('arSection');
+                toggleToOpen = document.querySelector('[onclick*="arSection"]');
+            } else if (currentPath.includes('/journal-entries') && source === 'bill') {
+                // Bill Journal Entries - open AP section
+                sectionToOpen = document.getElementById('apSection');
+                toggleToOpen = document.querySelector('[onclick*="apSection"]');
+            } else if (currentPath.includes('/journal-entries') && source === 'sale') {
+                // Daily Sales Journal Entries - open GL section (DSS is under GL)
+                sectionToOpen = document.getElementById('glSection');
+                toggleToOpen = document.querySelector('[onclick*="glSection"]');
+            } else if (currentPath.includes('/accounts') || currentPath.includes('/journal-entries') || currentPath.includes('/daily-sales')) {
+                // General journal entries or accounts - open GL section
+                sectionToOpen = document.getElementById('glSection');
+                toggleToOpen = document.querySelector('[onclick*="glSection"]');
+            } else if (currentPath.includes('/reports')) {
+                sectionToOpen = document.getElementById('reportsSection');
+                toggleToOpen = document.querySelector('[onclick*="reportsSection"]');
+            }
+
+            if (sectionToOpen) {
+                sectionToOpen.classList.add('open');
+            }
+            if (toggleToOpen) {
+                toggleToOpen.classList.add('open');
+            }
+        });
+    </script>
+
+    <!-- Auto-logout after inactivity -->
+    <script>
+        (function() {
+            // Auto-logout after 30 minutes of inactivity
+            const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+            const WARNING_TIME = 2 * 60 * 1000; // Show warning 2 minutes before logout
+
+            let inactivityTimer;
+            let warningTimer;
+            let warningShown = false;
+
+            // Events that reset the inactivity timer
+            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+
+            function resetTimer() {
+                // Clear existing timers
+                clearTimeout(inactivityTimer);
+                clearTimeout(warningTimer);
+                warningShown = false;
+
+                // Set warning timer (28 minutes)
+                warningTimer = setTimeout(showWarning, INACTIVITY_TIMEOUT - WARNING_TIME);
+
+                // Set logout timer (30 minutes)
+                inactivityTimer = setTimeout(logout, INACTIVITY_TIMEOUT);
+            }
+
+            function showWarning() {
+                if (warningShown) return;
+                warningShown = true;
+
+                const remainingTime = Math.floor(WARNING_TIME / 60000); // Minutes
+                const proceed = confirm(
+                    `You will be automatically logged out in ${remainingTime} minutes due to inactivity.\n\n` +
+                    `Click OK to stay logged in, or Cancel to logout now.`
+                );
+
+                if (proceed) {
+                    // User wants to stay logged in
+                    resetTimer();
+                } else {
+                    // User chose to logout
+                    logout();
+                }
+            }
+
+            function logout() {
+                // Clear timers
+                clearTimeout(inactivityTimer);
+                clearTimeout(warningTimer);
+
+                // Show logout message
+                alert('You have been logged out due to inactivity.');
+
+                // Redirect to logout endpoint
+                window.location.href = '/accounting/api/auth/logout';
+            }
+
+            // Add event listeners for activity
+            activityEvents.forEach(event => {
+                document.addEventListener(event, resetTimer, true);
+            });
+
+            // Start the timer when page loads
+            console.log('Auto-logout initialized - will logout after 30 minutes of inactivity');
+            resetTimer();
+
+            // Also reset timer on visibility change (user switches tabs)
+            document.addEventListener('visibilitychange', function() {
+                if (!document.hidden) {
+                    console.log('Tab became visible - resetting inactivity timer');
+                    resetTimer();
+                }
+            });
+        })();
+    </script>
 
     {% block extra_scripts %}{% endblock %}
 </body>

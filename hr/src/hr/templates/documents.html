@@ -1,0 +1,646 @@
+{% extends "base.html" %}
+
+{% block title %}Documents - HR System{% endblock %}
+{% block nav_documents %}active{% endblock %}
+
+{% block content %}
+<div style="max-width: 1400px; margin: 0 auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <div>
+            <h1 style="margin: 0 0 5px 0;">Document Management</h1>
+            <p style="color: #8b949e; margin: 0;">Centralized employee document repository with expiration tracking</p>
+        </div>
+        <button class="btn btn-primary" onclick="showUploadModal()" style="white-space: nowrap;">
+            <i class="bi bi-upload"></i> Upload Document
+        </button>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 30px;">
+        <div class="stat-card" style="background: linear-gradient(135deg, #238636 0%, #2ea043 100%);">
+            <div class="stat-icon"><i class="bi bi-file-earmark-check"></i></div>
+            <div>
+                <div class="stat-value" id="totalCurrent">0</div>
+                <div class="stat-label">Current</div>
+            </div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #bb8009 0%, #d29922 100%);">
+            <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
+            <div>
+                <div class="stat-value" id="totalExpiring">0</div>
+                <div class="stat-label">Expiring Soon</div>
+            </div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #da3633 0%, #f85149 100%);">
+            <div class="stat-icon"><i class="bi bi-x-circle"></i></div>
+            <div>
+                <div class="stat-value" id="totalExpired">0</div>
+                <div class="stat-label">Expired</div>
+            </div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%);">
+            <div class="stat-icon"><i class="bi bi-files"></i></div>
+            <div>
+                <div class="stat-value" id="totalDocuments">0</div>
+                <div class="stat-label">Total Documents</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="padding: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div>
+                    <label for="filterType" style="display: block; margin-bottom: 5px; color: #c9d1d9; font-size: 14px;">Document Type</label>
+                    <select id="filterType" onchange="loadDocuments()" style="width: 100%; padding: 8px 12px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                        <option value="">All Types</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="filterStatus" style="display: block; margin-bottom: 5px; color: #c9d1d9; font-size: 14px;">Status</label>
+                    <select id="filterStatus" onchange="loadDocuments()" style="width: 100%; padding: 8px 12px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                        <option value="">All Statuses</option>
+                        <option value="Current">Current</option>
+                        <option value="Expiring Soon">Expiring Soon</option>
+                        <option value="Expired">Expired</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="filterEmployee" style="display: block; margin-bottom: 5px; color: #c9d1d9; font-size: 14px;">Employee</label>
+                    <select id="filterEmployee" onchange="loadDocuments()" style="width: 100%; padding: 8px 12px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                        <option value="">All Employees</option>
+                    </select>
+                </div>
+                <div style="display: flex; align-items: flex-end;">
+                    <button onclick="resetFilters()" class="btn btn-secondary" style="width: 100%;">
+                        <i class="bi bi-arrow-clockwise"></i> Reset Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents Table -->
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="bi bi-file-earmark-text"></i> Documents</h2>
+        </div>
+
+        <div id="documentsTableContainer" style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #161b22; border-bottom: 1px solid #30363d;">
+                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Employee</th>
+                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Document Type</th>
+                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">File Name</th>
+                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Uploaded</th>
+                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Expiration</th>
+                        <th style="padding: 12px; text-align: center; color: #8b949e; font-weight: 600;">Status</th>
+                        <th style="padding: 12px; text-align: center; color: #8b949e; font-weight: 600;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="documentsTableBody">
+                    <tr>
+                        <td colspan="7" style="padding: 40px; text-align: center; color: #8b949e;">
+                            <i class="bi bi-hourglass-split" style="font-size: 24px; display: block; margin-bottom: 10px;"></i>
+                            Loading documents...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Document Preview Modal -->
+<div id="previewModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 1001; align-items: center; justify-content: center;">
+    <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; max-width: 90vw; width: 1200px; max-height: 90vh; display: flex; flex-direction: column;">
+        <div style="padding: 20px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0;" id="previewTitle"><i class="bi bi-eye"></i> Document Preview</h3>
+            <button onclick="closePreviewModal()" style="background: none; border: none; color: #8b949e; font-size: 24px; cursor: pointer; padding: 0; line-height: 1;">&times;</button>
+        </div>
+        <div id="previewContent" style="flex: 1; overflow: auto; padding: 20px; display: flex; align-items: center; justify-content: center; min-height: 400px;">
+            <p style="color: #8b949e;"><i class="bi bi-hourglass-split"></i> Loading preview...</p>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Modal -->
+<div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+        <div style="padding: 20px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0;"><i class="bi bi-upload"></i> Upload Document</h2>
+            <button onclick="hideUploadModal()" style="background: none; border: none; color: #8b949e; font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px;">&times;</button>
+        </div>
+
+        <form id="uploadForm" enctype="multipart/form-data" style="padding: 20px;">
+            <div class="form-group">
+                <label for="uploadEmployee">Employee <span style="color: #f85149;">*</span></label>
+                <select id="uploadEmployee" name="employee_id" required style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                    <option value="">Select Employee</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="uploadType">Document Type <span style="color: #f85149;">*</span></label>
+                <select id="uploadType" name="document_type" required style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                    <option value="">Select Type</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="uploadFile">File <span style="color: #f85149;">*</span></label>
+                <input type="file" id="uploadFile" name="file" required
+                       accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.txt,.xlsx,.xls"
+                       style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                <small style="color: #8b949e; font-size: 12px;">
+                    <i class="bi bi-info-circle"></i> Max 10MB. Allowed: PDF, Word, Excel, Images, Text
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="uploadExpiration">Expiration Date (Optional)</label>
+                <input type="date" id="uploadExpiration" name="expiration_date"
+                       style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                <small style="color: #8b949e; font-size: 12px;">
+                    <i class="bi bi-info-circle"></i> For certifications, licenses, etc.
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="uploadNotes">Notes (Optional)</label>
+                <textarea id="uploadNotes" name="notes" rows="3"
+                          style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;"
+                          placeholder="Additional information about this document..."></textarea>
+            </div>
+
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button type="button" onclick="hideUploadModal()" class="btn btn-secondary">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </button>
+                <button type="submit" class="btn btn-primary" id="uploadBtn">
+                    <i class="bi bi-upload"></i> Upload Document
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.stat-card {
+    padding: 20px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    color: white;
+}
+
+.stat-icon {
+    font-size: 32px;
+    opacity: 0.9;
+}
+
+.stat-value {
+    font-size: 28px;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 13px;
+    opacity: 0.9;
+    margin-top: 5px;
+}
+
+.status-badge {
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.status-current {
+    background: #238636;
+    color: white;
+}
+
+.status-expiring {
+    background: #bb8009;
+    color: white;
+}
+
+.status-expired {
+    background: #da3633;
+    color: white;
+}
+
+table tbody tr {
+    border-bottom: 1px solid #21262d;
+    transition: background 0.2s;
+}
+
+table tbody tr:hover {
+    background: #161b22;
+}
+
+table td {
+    padding: 12px;
+    color: #c9d1d9;
+}
+
+.action-btn {
+    background: none;
+    border: 1px solid #30363d;
+    color: #58a6ff;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+    margin: 0 3px;
+}
+
+.action-btn:hover {
+    background: #1c2128;
+    border-color: #58a6ff;
+}
+
+.action-btn.danger {
+    color: #f85149;
+}
+
+.action-btn.danger:hover {
+    border-color: #f85149;
+}
+</style>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let allDocuments = [];
+let allEmployees = [];
+const documentTypes = {{ document_types|tojson }};
+
+// Load initial data
+async function loadInitialData() {
+    try {
+        // Load employees for filter and upload dropdown
+        const empResponse = await fetch('/hr/api/employees/', {
+            credentials: 'include'
+        });
+        allEmployees = await empResponse.json();
+
+        // Populate employee dropdowns
+        const filterSelect = document.getElementById('filterEmployee');
+        const uploadSelect = document.getElementById('uploadEmployee');
+
+        allEmployees.forEach(emp => {
+            const option1 = document.createElement('option');
+            option1.value = emp.id;
+            option1.textContent = `${emp.first_name} ${emp.last_name} (${emp.employee_number})`;
+            filterSelect.appendChild(option1);
+
+            const option2 = document.createElement('option');
+            option2.value = emp.id;
+            option2.textContent = `${emp.first_name} ${emp.last_name} (${emp.employee_number})`;
+            uploadSelect.appendChild(option2);
+        });
+
+        // Populate document type dropdowns
+        const filterType = document.getElementById('filterType');
+        const uploadType = document.getElementById('uploadType');
+
+        documentTypes.forEach(type => {
+            const option1 = document.createElement('option');
+            option1.value = type;
+            option1.textContent = type;
+            filterType.appendChild(option1);
+
+            const option2 = document.createElement('option');
+            option2.value = type;
+            option2.textContent = type;
+            uploadType.appendChild(option2);
+        });
+
+        // Load documents
+        await loadDocuments();
+
+    } catch (error) {
+        console.error('Error loading initial data:', error);
+        showError('Failed to load initial data');
+    }
+}
+
+// Load documents with filters
+async function loadDocuments() {
+    try {
+        const filterType = document.getElementById('filterType').value;
+        const filterStatus = document.getElementById('filterStatus').value;
+        const filterEmployee = document.getElementById('filterEmployee').value;
+
+        let url = '/hr/api/documents/?';
+        if (filterType) url += `document_type=${encodeURIComponent(filterType)}&`;
+        if (filterStatus) url += `status=${encodeURIComponent(filterStatus)}&`;
+        if (filterEmployee) url += `employee_id=${filterEmployee}&`;
+
+        const response = await fetch(url, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load documents');
+        }
+
+        allDocuments = await response.json();
+        renderDocuments();
+        updateStats();
+
+    } catch (error) {
+        console.error('Error loading documents:', error);
+        showError('Failed to load documents');
+    }
+}
+
+// Render documents table
+function renderDocuments() {
+    const tbody = document.getElementById('documentsTableBody');
+
+    if (allDocuments.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" style="padding: 40px; text-align: center; color: #8b949e;">
+                    <i class="bi bi-inbox" style="font-size: 24px; display: block; margin-bottom: 10px;"></i>
+                    No documents found
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = allDocuments.map(doc => {
+        const uploadedDate = new Date(doc.uploaded_at).toLocaleDateString();
+        const expirationDate = doc.expiration_date ? new Date(doc.expiration_date).toLocaleDateString() : 'N/A';
+
+        let statusClass = 'current';
+        if (doc.status === 'Expiring Soon') statusClass = 'expiring';
+        if (doc.status === 'Expired') statusClass = 'expired';
+
+        return `
+            <tr>
+                <td>
+                    <div style="font-weight: 500;">${doc.employee_name}</div>
+                    <div style="font-size: 12px; color: #8b949e;">${doc.employee_number}</div>
+                </td>
+                <td>${doc.document_type}</td>
+                <td>
+                    <i class="bi bi-file-earmark"></i> ${doc.file_name}
+                    <div style="font-size: 11px; color: #8b949e;">${formatFileSize(doc.file_size)}</div>
+                </td>
+                <td>${uploadedDate}</td>
+                <td>${expirationDate}</td>
+                <td style="text-align: center;">
+                    <span class="status-badge status-${statusClass}">${doc.status}</span>
+                </td>
+                <td style="text-align: center; white-space: nowrap;">
+                    <button class="action-btn" onclick="previewDocument(${doc.id}, '${doc.file_name}', '${doc.file_type}')" title="Preview">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <button class="action-btn" onclick="downloadDocument(${doc.id}, '${doc.file_name}')" title="Download">
+                        <i class="bi bi-download"></i>
+                    </button>
+                    <button class="action-btn danger" onclick="deleteDocument(${doc.id}, '${doc.file_name}')" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Update statistics
+function updateStats() {
+    const current = allDocuments.filter(d => d.status === 'Current').length;
+    const expiring = allDocuments.filter(d => d.status === 'Expiring Soon').length;
+    const expired = allDocuments.filter(d => d.status === 'Expired').length;
+
+    document.getElementById('totalCurrent').textContent = current;
+    document.getElementById('totalExpiring').textContent = expiring;
+    document.getElementById('totalExpired').textContent = expired;
+    document.getElementById('totalDocuments').textContent = allDocuments.length;
+}
+
+// Format file size
+function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// Show/hide upload modal
+function showUploadModal() {
+    document.getElementById('uploadModal').style.display = 'flex';
+}
+
+function hideUploadModal() {
+    document.getElementById('uploadModal').style.display = 'none';
+    document.getElementById('uploadForm').reset();
+}
+
+// Handle upload form submission
+document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const uploadBtn = document.getElementById('uploadBtn');
+    uploadBtn.disabled = true;
+    uploadBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Uploading...';
+
+    try {
+        const formData = new FormData();
+        const employeeId = document.getElementById('uploadEmployee').value;
+        const file = document.getElementById('uploadFile').files[0];
+        const documentType = document.getElementById('uploadType').value;
+        const expirationDate = document.getElementById('uploadExpiration').value;
+        const notes = document.getElementById('uploadNotes').value;
+
+        formData.append('file', file);
+        formData.append('document_type', documentType);
+        if (expirationDate) formData.append('expiration_date', expirationDate);
+        if (notes) formData.append('notes', notes);
+
+        const response = await fetch(`/hr/api/employees/${employeeId}/documents`, {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Upload failed');
+        }
+
+        showSuccess('Document uploaded successfully!');
+        hideUploadModal();
+        await loadDocuments();
+
+    } catch (error) {
+        console.error('Error uploading document:', error);
+        showError(error.message);
+    } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = '<i class="bi bi-upload"></i> Upload Document';
+    }
+});
+
+// Download document
+async function downloadDocument(docId, fileName) {
+    try {
+        window.location.href = `/hr/api/documents/${docId}/download`;
+    } catch (error) {
+        console.error('Error downloading document:', error);
+        showError('Failed to download document');
+    }
+}
+
+// Delete document
+async function deleteDocument(docId, fileName) {
+    if (!confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hr/api/documents/${docId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Delete failed');
+        }
+
+        showSuccess('Document deleted successfully');
+        await loadDocuments();
+
+    } catch (error) {
+        console.error('Error deleting document:', error);
+        showError('Failed to delete document');
+    }
+}
+
+// Reset filters
+function resetFilters() {
+    document.getElementById('filterType').value = '';
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('filterEmployee').value = '';
+    loadDocuments();
+}
+
+// Show success/error messages
+function showSuccess(message) {
+    // You can implement a toast notification here
+    alert(message);
+}
+
+function showError(message) {
+    alert('Error: ' + message);
+}
+
+// Preview document
+async function previewDocument(documentId, fileName, fileType) {
+    const modal = document.getElementById('previewModal');
+    const content = document.getElementById('previewContent');
+    const title = document.getElementById('previewTitle');
+
+    title.innerHTML = `<i class="bi bi-eye"></i> Preview: ${fileName}`;
+    content.innerHTML = '<p style="color: #8b949e;"><i class="bi bi-hourglass-split"></i> Loading preview...</p>';
+    modal.style.display = 'flex';
+
+    try {
+        const response = await fetch(`/hr/api/documents/${documentId}/download`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load document');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        // Determine file type from blob or filename
+        const mimeType = blob.type || fileType;
+        const extension = fileName.split('.').pop().toLowerCase();
+
+        if (mimeType.startsWith('image/') || ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'].includes(extension)) {
+            // Display image
+            content.innerHTML = `
+                <img src="${url}" alt="${fileName}"
+                     style="max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 6px;">
+            `;
+        } else if (mimeType === 'application/pdf' || extension === 'pdf') {
+            // Display PDF
+            content.innerHTML = `
+                <iframe src="${url}"
+                        style="width: 100%; height: 70vh; border: none; border-radius: 6px;"
+                        type="application/pdf">
+                </iframe>
+            `;
+        } else {
+            // Unsupported file type
+            content.innerHTML = `
+                <div style="text-align: center; color: #8b949e;">
+                    <i class="bi bi-file-earmark" style="font-size: 48px; margin-bottom: 15px;"></i>
+                    <p>Preview not available for this file type.</p>
+                    <p style="font-size: 14px; margin-top: 10px;">File type: ${extension.toUpperCase()}</p>
+                    <button class="btn btn-primary" onclick="downloadDocument(${documentId}, '${fileName}')" style="margin-top: 15px;">
+                        <i class="bi bi-download"></i> Download to View
+                    </button>
+                </div>
+            `;
+        }
+    } catch (error) {
+        console.error('Error previewing document:', error);
+        content.innerHTML = `
+            <p style="color: #f85149; text-align: center;">
+                <i class="bi bi-exclamation-triangle"></i> Error loading preview
+            </p>
+        `;
+    }
+}
+
+function closePreviewModal() {
+    const modal = document.getElementById('previewModal');
+    modal.style.display = 'none';
+    // Clean up any object URLs
+    const content = document.getElementById('previewContent');
+    const img = content.querySelector('img');
+    const iframe = content.querySelector('iframe');
+    if (img && img.src.startsWith('blob:')) {
+        window.URL.revokeObjectURL(img.src);
+    }
+    if (iframe && iframe.src.startsWith('blob:')) {
+        window.URL.revokeObjectURL(iframe.src);
+    }
+    content.innerHTML = '';
+}
+
+// Close modals when clicking outside
+document.getElementById('uploadModal').addEventListener('click', (e) => {
+    if (e.target.id === 'uploadModal') {
+        hideUploadModal();
+    }
+});
+
+document.getElementById('previewModal').addEventListener('click', (e) => {
+    if (e.target.id === 'previewModal') {
+        closePreviewModal();
+    }
+});
+
+// Initialize on page load
+loadInitialData();
+</script>
+{% endblock %}

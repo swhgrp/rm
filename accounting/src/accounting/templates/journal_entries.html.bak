@@ -1,0 +1,809 @@
+{% extends "base.html" %}
+
+{% block title %}Journal Entries - Restaurant Accounting{% endblock %}
+{% block nav_journal %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .page-header h1 {
+        font-size: 2rem;
+        color: #c9d1d9;
+    }
+
+    .view-toggle {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .view-toggle button {
+        padding: 0.5rem 1rem;
+        border: 1px solid #30363d;
+        background: #161b22;
+        color: #c9d1d9;
+        cursor: pointer;
+        border-radius: 4px;
+    }
+
+    .view-toggle button.active {
+        background: #238636;
+        color: white;
+        border-color: #238636;
+    }
+
+    #listView, #createView {
+        display: none;
+    }
+
+    #listView.active, #createView.active {
+        display: block;
+    }
+
+    .filters {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        align-items: center;
+        background: #161b22;
+        padding: 1rem;
+        border-radius: 6px;
+        border: 1px solid #30363d;
+    }
+
+    .filters label {
+        font-weight: 500;
+        color: #c9d1d9;
+    }
+
+    .filters select, .filters input {
+        padding: 0.5rem;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        background: #0d1117;
+        color: #c9d1d9;
+    }
+
+    .entries-table {
+        background: #161b22;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .status-draft {
+        background: #9e6a03;
+        color: white;
+    }
+
+    .status-posted {
+        background: #238636;
+        color: white;
+    }
+
+    .status-reversed {
+        background: #da3633;
+        color: white;
+    }
+
+    .btn-sm {
+        padding: 0.35rem 0.75rem;
+        font-size: 0.85rem;
+    }
+
+    .form-section {
+        background: #161b22;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        border: 1px solid #30363d;
+        margin-bottom: 2rem;
+    }
+
+    .form-section h3 {
+        margin-bottom: 1.5rem;
+        color: #c9d1d9;
+    }
+
+    .form-group {
+        margin-bottom: 1rem;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: #c9d1d9;
+    }
+
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        font-size: 1rem;
+        background: #0d1117;
+        color: #c9d1d9;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .line-items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+    }
+
+    .line-items-table th, .line-items-table td {
+        padding: 0.75rem;
+        border: 1px solid #30363d;
+        text-align: left;
+    }
+
+    .line-items-table th {
+        background: #21262d;
+        font-weight: 600;
+    }
+
+    .line-items-table input, .line-items-table select {
+        width: 100%;
+        padding: 0.4rem;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        background: #0d1117;
+        color: #c9d1d9;
+    }
+
+    .line-items-table .account-select {
+        min-width: 250px;
+    }
+
+    .balance-summary {
+        background: #21262d;
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+    }
+
+    .balance-summary table {
+        width: 100%;
+        max-width: 400px;
+        margin-left: auto;
+    }
+
+    .balance-summary td {
+        padding: 0.5rem;
+        font-weight: 500;
+    }
+
+    .balance-summary .label {
+        text-align: right;
+        padding-right: 1rem;
+    }
+
+    .balance-summary .amount {
+        text-align: right;
+        font-family: monospace;
+    }
+
+    .balanced {
+        color: #238636;
+    }
+
+    .unbalanced {
+        color: #da3633;
+    }
+
+    .message {
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+        display: none;
+    }
+
+    .message.show {
+        display: block;
+    }
+
+    .message.success {
+        background: #238636;
+        color: white;
+        border: 1px solid #2ea043;
+    }
+
+    .message.error {
+        background: #da3633;
+        color: white;
+        border: 1px solid #f85149;
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .btn-icon {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #da3633;
+        font-size: 1.2rem;
+        padding: 0.25rem;
+    }
+
+    .btn-icon:hover {
+        color: #c0392b;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Journal Entries</h1>
+    <div class="view-toggle">
+        <button id="showListBtn" class="active" onclick="showListView()">View Entries</button>
+        <button id="showCreateBtn" onclick="showCreateView()">+ New Entry</button>
+    </div>
+</div>
+
+<div id="message" class="message"></div>
+
+<!-- LIST VIEW -->
+<div id="listView" class="active">
+    <div class="filters">
+        <label for="statusFilter">Status:</label>
+        <select id="statusFilter" onchange="loadEntries()">
+            <option value="">All Statuses</option>
+            <option value="DRAFT">Draft</option>
+            <option value="POSTED">Posted</option>
+            <option value="REVERSED">Reversed</option>
+        </select>
+
+        <label for="locationFilter">Location:</label>
+        <select id="locationFilter" onchange="loadEntries()">
+            <option value="">All Locations</option>
+        </select>
+
+        <label for="startDateFilter">From:</label>
+        <input type="date" id="startDateFilter" onchange="loadEntries()">
+
+        <label for="endDateFilter">To:</label>
+        <input type="date" id="endDateFilter" onchange="loadEntries()">
+
+        <button class="btn btn-primary" onclick="loadEntries()">Refresh</button>
+    </div>
+
+    <div class="entries-table">
+        <table id="entriesTable">
+            <thead>
+                <tr>
+                    <th>Entry Number</th>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Location(s)</th>
+                    <th>Status</th>
+                    <th>Total Amount</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 2rem;">Loading...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- CREATE/EDIT VIEW -->
+<div id="createView">
+    <form id="journalEntryForm">
+        <div class="form-section">
+            <h3>Entry Details</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="entry_date">Entry Date *</label>
+                    <input type="date" id="entry_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="reference_type">Reference Type</label>
+                    <select id="reference_type">
+                        <option value="">None</option>
+                        <option value="INVOICE">Invoice</option>
+                        <option value="PAYMENT">Payment</option>
+                        <option value="ADJUSTMENT">Adjustment</option>
+                        <option value="ACCRUAL">Accrual</option>
+                        <option value="DEPRECIATION">Depreciation</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="description">Description *</label>
+                <textarea id="description" rows="2" required></textarea>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Line Items</h3>
+
+            <table class="line-items-table" id="lineItemsTable">
+                <thead>
+                    <tr>
+                        <th style="width: 30%">Account</th>
+                        <th style="width: 20%">Location</th>
+                        <th style="width: 20%">Debit</th>
+                        <th style="width: 20%">Credit</th>
+                        <th style="width: 10%"></th>
+                    </tr>
+                </thead>
+                <tbody id="lineItemsBody">
+                    <!-- Lines will be added here dynamically -->
+                </tbody>
+            </table>
+
+            <button type="button" class="btn btn-success" onclick="addLineItem()">+ Add Line</button>
+
+            <div class="balance-summary">
+                <table>
+                    <tr>
+                        <td class="label">Total Debits:</td>
+                        <td class="amount" id="totalDebits">$0.00</td>
+                    </tr>
+                    <tr>
+                        <td class="label">Total Credits:</td>
+                        <td class="amount" id="totalCredits">$0.00</td>
+                    </tr>
+                    <tr style="border-top: 2px solid #333;">
+                        <td class="label"><strong>Difference:</strong></td>
+                        <td class="amount" id="difference"><strong>$0.00</strong></td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" class="label" id="balanceStatus"></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="button" class="btn" onclick="cancelEntry()">Cancel</button>
+            <button type="submit" class="btn btn-primary">Save as Draft</button>
+        </div>
+    </form>
+</div>
+
+<script>
+let entries = [];
+let accounts = [];
+let areas = [];  // Locations/areas for multi-location accounting
+let lineItemCounter = 0;
+
+// Load accounts for dropdown
+async function loadAccounts() {
+    try {
+        const response = await fetch('/accounting/api/accounts/?limit=1000');
+        if (response.ok) {
+            accounts = await response.json();
+            accounts.sort((a, b) => a.account_number.localeCompare(b.account_number));
+        }
+    } catch (error) {
+        console.error('Error loading accounts:', error);
+    }
+}
+
+// Load areas/locations for dropdown
+async function loadAreas() {
+    try {
+        const response = await fetch('/accounting/api/areas/');
+        if (response.ok) {
+            areas = await response.json();
+            areas.sort((a, b) => a.code.localeCompare(b.code));
+
+            // Populate location filter dropdown
+            const locationFilter = document.getElementById('locationFilter');
+            if (locationFilter) {
+                const options = areas.map(area =>
+                    `<option value="${area.id}">${area.code} - ${area.name}</option>`
+                ).join('');
+                locationFilter.innerHTML = '<option value="">All Locations</option>' + options;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading areas:', error);
+    }
+}
+
+// Load journal entries
+async function loadEntries() {
+    try {
+        let url = '/accounting/api/journal-entries/?limit=100';
+
+        const status = document.getElementById('statusFilter').value;
+        if (status) url += `&status=${status}`;
+
+        const startDate = document.getElementById('startDateFilter').value;
+        if (startDate) url += `&start_date=${startDate}`;
+
+        const endDate = document.getElementById('endDateFilter').value;
+        if (endDate) url += `&end_date=${endDate}`;
+
+        const response = await fetch(url);
+        if (response.ok) {
+            entries = await response.json();
+            renderEntriesTable();
+        } else {
+            showMessage('Failed to load journal entries', 'error');
+        }
+    } catch (error) {
+        console.error('Error loading entries:', error);
+        showMessage('Error loading journal entries', 'error');
+    }
+}
+
+function renderEntriesTable() {
+    const tbody = document.querySelector('#entriesTable tbody');
+
+    if (entries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">No journal entries found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = entries.map(entry => {
+        const totalAmount = entry.lines.reduce((sum, line) => sum + parseFloat(line.debit_amount), 0);
+
+        // Collect unique locations from lines
+        const uniqueAreas = new Set();
+        entry.lines.forEach(line => {
+            if (line.area) {
+                uniqueAreas.add(line.area.code);
+            }
+        });
+
+        const locationDisplay = uniqueAreas.size > 0
+            ? Array.from(uniqueAreas).join(', ')
+            : '<span style="color: #8b949e;">Corporate</span>';
+
+        return `
+            <tr onclick="viewEntry(${entry.id})" style="cursor: pointer;">
+                <td>${entry.entry_number}</td>
+                <td>${entry.entry_date}</td>
+                <td>${entry.description}</td>
+                <td>${locationDisplay}</td>
+                <td><span class="badge status-${entry.status.toLowerCase()}">${entry.status}</span></td>
+                <td>$${totalAmount.toFixed(2)}</td>
+                <td>${new Date(entry.created_at).toLocaleDateString()}</td>
+                <td onclick="event.stopPropagation()">
+                    ${entry.status === 'DRAFT' ? `
+                        <button class="btn btn-success btn-sm" onclick="postEntry(${entry.id})">Post</button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteEntry(${entry.id})">Delete</button>
+                    ` : ''}
+                    ${entry.status === 'POSTED' ? `
+                        <button class="btn btn-primary btn-sm" onclick="showReverseModal(${entry.id})">Reverse</button>
+                    ` : ''}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function showListView() {
+    document.getElementById('listView').classList.add('active');
+    document.getElementById('createView').classList.remove('active');
+    document.getElementById('showListBtn').classList.add('active');
+    document.getElementById('showCreateBtn').classList.remove('active');
+    loadEntries();
+}
+
+function showCreateView() {
+    document.getElementById('listView').classList.remove('active');
+    document.getElementById('createView').classList.add('active');
+    document.getElementById('showListBtn').classList.remove('active');
+    document.getElementById('showCreateBtn').classList.add('active');
+
+    // Reset form
+    document.getElementById('journalEntryForm').reset();
+    document.getElementById('lineItemsBody').innerHTML = '';
+    lineItemCounter = 0;
+
+    // Set default date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('entry_date').value = today;
+
+    // Add initial line items
+    addLineItem();
+    addLineItem();
+}
+
+function addLineItem() {
+    lineItemCounter++;
+    const lineId = `line_${lineItemCounter}`;
+
+    const accountOptions = accounts.map(acc =>
+        `<option value="${acc.id}">${acc.account_number} - ${acc.account_name}</option>`
+    ).join('');
+
+    const areaOptions = areas.map(area =>
+        `<option value="${area.id}">${area.code} - ${area.name}</option>`
+    ).join('');
+
+    const row = document.createElement('tr');
+    row.id = lineId;
+    row.innerHTML = `
+        <td>
+            <select class="account-select line-account" data-line="${lineId}" required>
+                <option value="">Select Account...</option>
+                ${accountOptions}
+            </select>
+        </td>
+        <td>
+            <select class="line-area" data-line="${lineId}">
+                <option value="">Corporate/Unassigned</option>
+                ${areaOptions}
+            </select>
+        </td>
+        <td>
+            <input type="number" class="line-debit" data-line="${lineId}"
+                   step="0.01" min="0" placeholder="0.00"
+                   oninput="handleAmountChange(this, '${lineId}')">
+        </td>
+        <td>
+            <input type="number" class="line-credit" data-line="${lineId}"
+                   step="0.01" min="0" placeholder="0.00"
+                   oninput="handleAmountChange(this, '${lineId}')">
+        </td>
+        <td>
+            <button type="button" class="btn-icon" onclick="removeLineItem('${lineId}')"
+                    title="Remove line">×</button>
+        </td>
+    `;
+
+    document.getElementById('lineItemsBody').appendChild(row);
+    updateBalance();
+}
+
+function removeLineItem(lineId) {
+    const row = document.getElementById(lineId);
+    if (row) {
+        row.remove();
+        updateBalance();
+    }
+}
+
+function handleAmountChange(input, lineId) {
+    const row = document.getElementById(lineId);
+    const debitInput = row.querySelector('.line-debit');
+    const creditInput = row.querySelector('.line-credit');
+
+    // If entering debit, clear credit and vice versa
+    if (input.classList.contains('line-debit') && input.value) {
+        creditInput.value = '';
+    } else if (input.classList.contains('line-credit') && input.value) {
+        debitInput.value = '';
+    }
+
+    updateBalance();
+}
+
+function updateBalance() {
+    let totalDebits = 0;
+    let totalCredits = 0;
+
+    document.querySelectorAll('.line-debit').forEach(input => {
+        totalDebits += parseFloat(input.value) || 0;
+    });
+
+    document.querySelectorAll('.line-credit').forEach(input => {
+        totalCredits += parseFloat(input.value) || 0;
+    });
+
+    const difference = Math.abs(totalDebits - totalCredits);
+    const isBalanced = difference < 0.01 && totalDebits > 0;
+
+    document.getElementById('totalDebits').textContent = `$${totalDebits.toFixed(2)}`;
+    document.getElementById('totalCredits').textContent = `$${totalCredits.toFixed(2)}`;
+    document.getElementById('difference').textContent = `$${difference.toFixed(2)}`;
+
+    const statusEl = document.getElementById('balanceStatus');
+    if (isBalanced) {
+        statusEl.textContent = '✓ Entry is balanced';
+        statusEl.className = 'label balanced';
+    } else if (totalDebits === 0 && totalCredits === 0) {
+        statusEl.textContent = '';
+        statusEl.className = 'label';
+    } else {
+        statusEl.textContent = '✗ Entry is not balanced';
+        statusEl.className = 'label unbalanced';
+    }
+}
+
+async function handleSubmit(event) {
+    event.preventDefault();
+
+    // Collect line items
+    const lines = [];
+    const rows = document.querySelectorAll('#lineItemsBody tr');
+
+    rows.forEach(row => {
+        const accountId = row.querySelector('.line-account').value;
+        const areaId = row.querySelector('.line-area').value;
+        const debit = parseFloat(row.querySelector('.line-debit').value) || 0;
+        const credit = parseFloat(row.querySelector('.line-credit').value) || 0;
+
+        if (accountId && (debit > 0 || credit > 0)) {
+            lines.push({
+                account_id: parseInt(accountId),
+                area_id: areaId ? parseInt(areaId) : null,  // Include location/area
+                debit_amount: debit,
+                credit_amount: credit,
+                description: null
+            });
+        }
+    });
+
+    if (lines.length < 2) {
+        showMessage('At least 2 line items are required', 'error');
+        return;
+    }
+
+    const data = {
+        entry_date: document.getElementById('entry_date').value,
+        description: document.getElementById('description').value,
+        reference_type: document.getElementById('reference_type').value || null,
+        lines: lines
+    };
+
+    try {
+        const response = await fetch('/accounting/api/journal-entries/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showMessage(`Journal entry ${result.entry_number} created successfully`, 'success');
+            showListView();
+        } else {
+            const error = await response.json();
+            showMessage(error.detail || 'Failed to create journal entry', 'error');
+        }
+    } catch (error) {
+        console.error('Error creating journal entry:', error);
+        showMessage('An error occurred', 'error');
+    }
+}
+
+async function postEntry(entryId) {
+    if (!confirm('Post this journal entry? Once posted, it cannot be edited or deleted.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/journal-entries/${entryId}/post`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            showMessage('Journal entry posted successfully', 'success');
+            await loadEntries();
+        } else {
+            const error = await response.json();
+            showMessage(error.detail || 'Failed to post journal entry', 'error');
+        }
+    } catch (error) {
+        console.error('Error posting entry:', error);
+        showMessage('An error occurred', 'error');
+    }
+}
+
+async function deleteEntry(entryId) {
+    if (!confirm('Delete this journal entry? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/journal-entries/${entryId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            showMessage('Journal entry deleted successfully', 'success');
+            await loadEntries();
+        } else {
+            const error = await response.json();
+            showMessage(error.detail || 'Failed to delete journal entry', 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting entry:', error);
+        showMessage('An error occurred', 'error');
+    }
+}
+
+function showReverseModal(entryId) {
+    const reversalDate = prompt('Enter reversal date (YYYY-MM-DD):');
+    if (!reversalDate) return;
+
+    reverseEntry(entryId, reversalDate);
+}
+
+async function reverseEntry(entryId, reversalDate) {
+    try {
+        const response = await fetch(`/accounting/api/journal-entries/${entryId}/reverse?reversal_date=${reversalDate}`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showMessage(`Journal entry reversed. Reversal entry: ${result.reversal_entry}`, 'success');
+            await loadEntries();
+        } else {
+            const error = await response.json();
+            showMessage(error.detail || 'Failed to reverse journal entry', 'error');
+        }
+    } catch (error) {
+        console.error('Error reversing entry:', error);
+        showMessage('An error occurred', 'error');
+    }
+}
+
+function viewEntry(entryId) {
+    const entry = entries.find(e => e.id === entryId);
+    if (!entry) return;
+
+    let details = `Entry Number: ${entry.entry_number}\n`;
+    details += `Date: ${entry.entry_date}\n`;
+    details += `Description: ${entry.description}\n`;
+    details += `Status: ${entry.status}\n\n`;
+    details += `Line Items:\n`;
+
+    entry.lines.forEach((line, i) => {
+        details += `${i+1}. ${line.account_number} - ${line.account_name}\n`;
+        if (line.debit_amount > 0) {
+            details += `   Debit: $${parseFloat(line.debit_amount).toFixed(2)}\n`;
+        } else {
+            details += `   Credit: $${parseFloat(line.credit_amount).toFixed(2)}\n`;
+        }
+    });
+
+    alert(details);
+}
+
+function cancelEntry() {
+    if (confirm('Cancel creating this journal entry? All data will be lost.')) {
+        showListView();
+    }
+}
+
+function showMessage(text, type) {
+    const messageEl = document.getElementById('message');
+    messageEl.textContent = text;
+    messageEl.className = `message ${type} show`;
+
+    setTimeout(() => {
+        messageEl.classList.remove('show');
+    }, 5000);
+}
+
+// Event listeners
+document.getElementById('journalEntryForm').addEventListener('submit', handleSubmit);
+
+// Load data on page load
+Promise.all([loadAccounts(), loadAreas()]).then(() => {
+    loadEntries();
+});
+</script>
+{% endblock %}

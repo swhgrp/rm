@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - Accounting System{% endblock %}
+{% block nav_settings %}active{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2><i class="bi bi-sliders"></i> Accounting System Settings</h2>
+    <p class="text-muted">Configure system-wide accounting settings and preferences</p>
+</div>
+
+<!-- General Settings -->
+<div class="card">
+    <h3><i class="bi bi-gear"></i> General Settings</h3>
+    <hr>
+    <form id="generalSettingsForm">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="companyName" class="form-label">Company Name</label>
+                <input type="text" class="form-control" id="companyName" value="SW Hospitality Group" disabled>
+                <small class="text-muted">Contact system administrator to change</small>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="fiscalYearEnd" class="form-label">Fiscal Year End</label>
+                <select class="form-select" id="fiscalYearEnd" disabled>
+                    <option value="12-31" selected>December 31</option>
+                    <option value="06-30">June 30</option>
+                    <option value="03-31">March 31</option>
+                </select>
+                <small class="text-muted">Contact system administrator to change</small>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="baseCurrency" class="form-label">Base Currency</label>
+                <input type="text" class="form-control" id="baseCurrency" value="USD" disabled>
+                <small class="text-muted">Contact system administrator to change</small>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="decimalPlaces" class="form-label">Decimal Places</label>
+                <select class="form-select" id="decimalPlaces" disabled>
+                    <option value="2" selected>2 (Standard)</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                </select>
+                <small class="text-muted">Contact system administrator to change</small>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Journal Entry Settings -->
+<div class="card">
+    <h3><i class="bi bi-journal-text"></i> Journal Entry Settings</h3>
+    <hr>
+    <form id="journalSettingsForm">
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="requireApproval" disabled>
+                <label class="form-check-label" for="requireApproval">
+                    Require approval before posting journal entries
+                </label>
+            </div>
+            <small class="text-muted">When enabled, journal entries must be approved by a manager before posting</small>
+        </div>
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoNumbering" checked disabled>
+                <label class="form-check-label" for="autoNumbering">
+                    Auto-generate journal entry numbers
+                </label>
+            </div>
+            <small class="text-muted">Automatically assigns sequential entry numbers (JE-YYYYMMDD-NNN)</small>
+        </div>
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="allowEdits" disabled>
+                <label class="form-check-label" for="allowEdits">
+                    Allow editing posted journal entries
+                </label>
+            </div>
+            <small class="text-muted text-danger">⚠️ Not recommended - may violate audit requirements</small>
+        </div>
+    </form>
+</div>
+
+<!-- Fiscal Period Settings -->
+<div class="card">
+    <h3><i class="bi bi-calendar3"></i> Fiscal Period Settings</h3>
+    <hr>
+    <form id="periodSettingsForm">
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoPeriodClose" disabled>
+                <label class="form-check-label" for="autoPeriodClose">
+                    Automatically close periods after month-end
+                </label>
+            </div>
+            <small class="text-muted">Periods will be automatically closed 5 days after the month ends</small>
+        </div>
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="warnClosedPeriod" checked disabled>
+                <label class="form-check-label" for="warnClosedPeriod">
+                    Warn when attempting to post to closed period
+                </label>
+            </div>
+            <small class="text-muted">Shows a warning message when trying to post to a closed or locked period</small>
+        </div>
+    </form>
+</div>
+
+<!-- Reporting Settings -->
+<div class="card">
+    <h3><i class="bi bi-file-earmark-bar-graph"></i> Reporting Settings</h3>
+    <hr>
+    <form id="reportSettingsForm">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="defaultReportFormat" class="form-label">Default Report Format</label>
+                <select class="form-select" id="defaultReportFormat" disabled>
+                    <option value="html" selected>HTML (Browser)</option>
+                    <option value="pdf">PDF</option>
+                    <option value="excel">Excel</option>
+                    <option value="csv">CSV</option>
+                </select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="reportDateRange" class="form-label">Default Date Range</label>
+                <select class="form-select" id="reportDateRange" disabled>
+                    <option value="current-month" selected>Current Month</option>
+                    <option value="current-quarter">Current Quarter</option>
+                    <option value="current-year">Current Year</option>
+                    <option value="last-month">Last Month</option>
+                </select>
+            </div>
+        </div>
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="showZeroBalances" disabled>
+                <label class="form-check-label" for="showZeroBalances">
+                    Show accounts with zero balances in reports
+                </label>
+            </div>
+            <small class="text-muted">Include accounts with no activity in financial reports</small>
+        </div>
+    </form>
+</div>
+
+<!-- Integration Settings -->
+<div class="card">
+    <h3><i class="bi bi-diagram-3"></i> Integration Settings</h3>
+    <hr>
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> <strong>Inventory Integration:</strong> Automatic journal entry creation from inventory transactions is configured in the Inventory system.
+    </div>
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> <strong>HR Integration:</strong> Payroll journal entries can be imported from the HR system.
+    </div>
+    <form id="integrationSettingsForm">
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoInventoryJE" disabled>
+                <label class="form-check-label" for="autoInventoryJE">
+                    Automatically create journal entries from inventory transactions
+                </label>
+            </div>
+            <small class="text-muted">Creates COGS and inventory adjustment entries automatically</small>
+        </div>
+        <div class="mb-3">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoPayrollJE" disabled>
+                <label class="form-check-label" for="autoPayrollJE">
+                    Enable payroll journal entry import from HR system
+                </label>
+            </div>
+            <small class="text-muted">Allows importing payroll data as journal entries</small>
+        </div>
+    </form>
+</div>
+
+<!-- Audit & Security -->
+<div class="card">
+    <h3><i class="bi bi-shield-check"></i> Audit & Security</h3>
+    <hr>
+    <div class="mb-3">
+        <label class="form-label">Audit Log Retention</label>
+        <div class="row">
+            <div class="col-md-6">
+                <select class="form-select" disabled>
+                    <option value="365" selected>1 Year</option>
+                    <option value="730">2 Years</option>
+                    <option value="1095">3 Years</option>
+                    <option value="1825">5 Years</option>
+                    <option value="-1">Forever</option>
+                </select>
+            </div>
+        </div>
+        <small class="text-muted">How long to keep audit trail records</small>
+    </div>
+    <div class="mb-3">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="logAllChanges" checked disabled>
+            <label class="form-check-label" for="logAllChanges">
+                Log all changes to financial data
+            </label>
+        </div>
+        <small class="text-muted">Records all create, update, and delete operations</small>
+    </div>
+    <div class="mb-3">
+        <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="requireReversalReason" checked disabled>
+            <label class="form-check-label" for="requireReversalReason">
+                Require reason when reversing journal entries
+            </label>
+        </div>
+        <small class="text-muted">Users must provide a reason before reversing posted entries</small>
+    </div>
+</div>
+
+<!-- System Information -->
+<div class="card">
+    <h3><i class="bi bi-info-circle"></i> System Information</h3>
+    <hr>
+    <table class="table table-sm">
+        <tbody>
+            <tr>
+                <td><strong>System Version:</strong></td>
+                <td>1.0.0</td>
+            </tr>
+            <tr>
+                <td><strong>Database:</strong></td>
+                <td>PostgreSQL (accounting_db)</td>
+            </tr>
+            <tr>
+                <td><strong>Active Users:</strong></td>
+                <td id="activeUsers">Loading...</td>
+            </tr>
+            <tr>
+                <td><strong>Total Accounts:</strong></td>
+                <td id="totalAccounts">Loading...</td>
+            </tr>
+            <tr>
+                <td><strong>Active Fiscal Periods:</strong></td>
+                <td id="activePeriods">Loading...</td>
+            </tr>
+            <tr>
+                <td><strong>Journal Entries (YTD):</strong></td>
+                <td id="ytdEntries">Loading...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle"></i> <strong>Note:</strong> Most settings are currently view-only. Contact your system administrator to modify system configuration.
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // Load system statistics
+    async function loadSystemStats() {
+        try {
+            // Get total accounts
+            const accountsResponse = await fetch('/accounting/api/accounts/');
+            const accounts = await accountsResponse.json();
+            document.getElementById('totalAccounts').textContent = accounts.length;
+
+            // Get active users (placeholder - would need API endpoint)
+            document.getElementById('activeUsers').textContent = '1 (admin)';
+
+            // Get fiscal periods
+            const periodsResponse = await fetch('/accounting/api/fiscal-periods/');
+            const periods = await periodsResponse.json();
+            const openPeriods = periods.filter(p => p.status === 'OPEN');
+            document.getElementById('activePeriods').textContent = `${openPeriods.length} of ${periods.length} open`;
+
+            // Get YTD journal entries
+            const today = new Date();
+            const yearStart = new Date(today.getFullYear(), 0, 1);
+            const entriesResponse = await fetch(
+                `/accounting/api/journal-entries/?start_date=${yearStart.toISOString().split('T')[0]}&end_date=${today.toISOString().split('T')[0]}`
+            );
+            const entries = await entriesResponse.json();
+            document.getElementById('ytdEntries').textContent = entries.length;
+
+        } catch (error) {
+            console.error('Error loading stats:', error);
+            document.getElementById('activeUsers').textContent = 'Error';
+            document.getElementById('totalAccounts').textContent = 'Error';
+            document.getElementById('activePeriods').textContent = 'Error';
+            document.getElementById('ytdEntries').textContent = 'Error';
+        }
+    }
+
+    // Load stats on page load
+    document.addEventListener('DOMContentLoaded', loadSystemStats);
+</script>
+{% endblock %}

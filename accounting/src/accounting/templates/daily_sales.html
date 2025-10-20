@@ -1,0 +1,400 @@
+{% extends "base.html" %}
+
+{% block title %}Daily Sales Summary - Accounting{% endblock %}
+{% block nav_daily_sales %}active{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0">Daily Sales Summary</h2>
+                <button class="btn btn-primary" onclick="window.location.href='/accounting/daily-sales/new'">
+                    <i class="bi bi-plus-lg"></i> New Sales Entry
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select class="form-select" id="filterArea" onchange="loadSummaries()">
+                        <option value="">All Locations</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="filterStatus" onchange="loadSummaries()">
+                        <option value="">All Statuses</option>
+                        <option value="draft">Draft</option>
+                        <option value="verified">Verified</option>
+                        <option value="posted">Posted</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" class="form-control" id="filterStartDate" onchange="loadSummaries()">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">End Date</label>
+                    <input type="date" class="form-control" id="filterEndDate" onchange="loadSummaries()">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summaries List -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Business Date</th>
+                            <th>Location</th>
+                            <th>Entry Type</th>
+                            <th style="text-align: right;">Net Sales</th>
+                            <th style="text-align: right;">Tax</th>
+                            <th style="text-align: right;">Tips</th>
+                            <th style="text-align: right;">Total</th>
+                            <th>Status</th>
+                            <th>JE #</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summariesTable">
+                        <tr>
+                            <td colspan="10" class="text-center">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create/Edit Modal -->
+<div class="modal fade" id="dssModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="dssModalTitle">New Sales Entry</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="dssForm">
+                    <input type="hidden" id="dssId">
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Business Date *</label>
+                            <input type="date" class="form-control" id="businessDate" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Area *</label>
+                            <select class="form-select" id="areaId" required>
+                                <option value="">Select Area...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Entry Type</label>
+                            <select class="form-select" id="posSystem">
+                                <option value="">Manual</option>
+                                <option value="POS_IMPORT">POS Import</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Gross Sales *</label>
+                            <input type="number" step="0.01" class="form-control" id="grossSales" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Discounts</label>
+                            <input type="number" step="0.01" class="form-control" id="discounts" value="0.00">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Refunds</label>
+                            <input type="number" step="0.01" class="form-control" id="refunds" value="0.00">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Net Sales</label>
+                            <input type="number" step="0.01" class="form-control" id="netSales" readonly>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Tax Collected *</label>
+                            <input type="number" step="0.01" class="form-control" id="taxCollected" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Tips</label>
+                            <input type="number" step="0.01" class="form-control" id="tips" value="0.00">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Total Collected</label>
+                            <input type="number" step="0.01" class="form-control" id="totalCollected" readonly>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Notes</label>
+                        <textarea class="form-control" id="notes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveDSS()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentDSS = null;
+let areas = [];
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadAreas();
+    loadSummaries();
+
+    // Auto-calculate net sales
+    ['grossSales', 'discounts', 'refunds'].forEach(id => {
+        document.getElementById(id).addEventListener('input', calculateTotals);
+    });
+
+    // Auto-calculate total collected
+    ['netSales', 'taxCollected', 'tips'].forEach(id => {
+        document.getElementById(id).addEventListener('input', calculateTotals);
+    });
+});
+
+async function loadAreas() {
+    try {
+        const response = await fetch('/accounting/api/areas/');
+        areas = await response.json();
+
+        // Populate dropdowns
+        ['filterArea', 'areaId'].forEach(selectId => {
+            const select = document.getElementById(selectId);
+            const isFilter = selectId === 'filterArea';
+
+            select.innerHTML = isFilter ? '<option value="">All Locations</option>' : '<option value="">Select Location...</option>';
+
+            areas.forEach(area => {
+                const option = document.createElement('option');
+                option.value = area.id;
+                option.textContent = area.name;
+                select.appendChild(option);
+            });
+        });
+    } catch (error) {
+        console.error('Error loading areas:', error);
+        showNotification('Error loading areas: ' + error.message, 'Error');
+    }
+}
+
+async function loadSummaries() {
+    try {
+        const areaId = document.getElementById('filterArea').value;
+        const status = document.getElementById('filterStatus').value;
+        const startDate = document.getElementById('filterStartDate').value;
+        const endDate = document.getElementById('filterEndDate').value;
+
+        let url = '/accounting/api/daily-sales/?';
+        if (areaId) url += `area_id=${areaId}&`;
+        if (status) url += `status=${status}&`;
+        if (startDate) url += `start_date=${startDate}&`;
+        if (endDate) url += `end_date=${endDate}&`;
+
+        const response = await fetch(url);
+        const summaries = await response.json();
+
+        const tbody = document.getElementById('summariesTable');
+
+        if (summaries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center">No sales summaries found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = summaries.map(dss => {
+            const area = areas.find(a => a.id === dss.area_id);
+            const statusClass = `status-${dss.status.toLowerCase()}`;
+
+            return `
+                <tr>
+                    <td>${dss.business_date}</td>
+                    <td>${area ? area.name : dss.area_id}</td>
+                    <td>${dss.pos_system === 'POS_IMPORT' ? 'POS Import' : 'Manual'}</td>
+                    <td style="text-align: right;">${formatCurrency(dss.net_sales)}</td>
+                    <td style="text-align: right;">${formatCurrency(dss.tax_collected)}</td>
+                    <td style="text-align: right;">${formatCurrency(dss.tips)}</td>
+                    <td style="text-align: right;">${formatCurrency(dss.total_collected)}</td>
+                    <td><span class="badge ${statusClass}">${dss.status.toUpperCase()}</span></td>
+                    <td>${dss.journal_entry_id ? `JE-${dss.journal_entry_id}` : '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewDSS(${dss.id})">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        ${dss.status === 'draft' ? `
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteDSS(${dss.id})">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        ` : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading summaries:', error);
+        showNotification('Error loading sales summaries: ' + error.message, 'Error');
+    }
+}
+
+function showCreateModal() {
+    document.getElementById('dssModalTitle').textContent = 'New Sales Entry';
+    document.getElementById('dssForm').reset();
+    document.getElementById('dssId').value = '';
+
+    // Set default date to today
+    document.getElementById('businessDate').valueAsDate = new Date();
+
+    const modal = new bootstrap.Modal(document.getElementById('dssModal'));
+    modal.show();
+}
+
+function viewDSS(id) {
+    window.location.href = `/accounting/daily-sales/${id}`;
+}
+
+async function saveDSS() {
+    try {
+        const dssId = document.getElementById('dssId').value;
+        const businessDate = document.getElementById('businessDate').value;
+        const areaId = parseInt(document.getElementById('areaId').value);
+
+        if (!businessDate || !areaId) {
+            showNotification('Please fill in all required fields', 'Missing Fields');
+            return;
+        }
+
+        const data = {
+            business_date: businessDate,
+            area_id: areaId,
+            pos_system: document.getElementById('posSystem').value || null,
+            gross_sales: parseFloat(document.getElementById('grossSales').value) || 0,
+            discounts: parseFloat(document.getElementById('discounts').value) || 0,
+            refunds: parseFloat(document.getElementById('refunds').value) || 0,
+            net_sales: parseFloat(document.getElementById('netSales').value) || 0,
+            tax_collected: parseFloat(document.getElementById('taxCollected').value) || 0,
+            tips: parseFloat(document.getElementById('tips').value) || 0,
+            total_collected: parseFloat(document.getElementById('totalCollected').value) || 0,
+            notes: document.getElementById('notes').value || null
+        };
+
+        let response;
+        if (dssId) {
+            // Update existing
+            response = await fetch(`/accounting/api/daily-sales/${dssId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+        } else {
+            // Create new
+            response = await fetch('/accounting/api/daily-sales/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save sales summary');
+        }
+
+        const dss = await response.json();
+
+        showNotification(`Sales summary for ${dss.business_date} saved successfully`, 'Success');
+
+        bootstrap.Modal.getInstance(document.getElementById('dssModal')).hide();
+        loadSummaries();
+    } catch (error) {
+        console.error('Error saving DSS:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+async function deleteDSS(id) {
+    if (!await showConfirm('Delete this sales summary? This action cannot be undone.', 'Delete Sales Summary')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/daily-sales/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete sales summary');
+        }
+
+        showNotification('Sales summary deleted successfully', 'Success');
+        loadSummaries();
+    } catch (error) {
+        console.error('Error deleting DSS:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+function calculateTotals() {
+    const gross = parseFloat(document.getElementById('grossSales').value) || 0;
+    const discounts = parseFloat(document.getElementById('discounts').value) || 0;
+    const refunds = parseFloat(document.getElementById('refunds').value) || 0;
+    const tax = parseFloat(document.getElementById('taxCollected').value) || 0;
+    const tips = parseFloat(document.getElementById('tips').value) || 0;
+
+    // Net sales = Gross - Discounts - Refunds
+    const netSales = gross - discounts - refunds;
+    document.getElementById('netSales').value = netSales.toFixed(2);
+
+    // Total collected = Net Sales + Tax + Tips
+    const totalCollected = netSales + tax + tips;
+    document.getElementById('totalCollected').value = totalCollected.toFixed(2);
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(amount);
+}
+</script>
+
+<style>
+.status-draft {
+    background-color: #6c757d;
+    color: white;
+}
+
+.status-verified {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.status-posted {
+    background-color: #198754;
+    color: white;
+}
+</style>
+{% endblock %}

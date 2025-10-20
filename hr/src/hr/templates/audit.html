@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+
+{% block title %}Audit Log - HR Management{% endblock %}
+{% block nav_audit %}active{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h2>Audit Log</h2>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+            <div style="font-size: 0.9rem; color: #8b949e;">
+                <span id="totalLogs">0</span> total entries
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div style="padding: 1.5rem; border-bottom: 1px solid #30363d; background: #161b22;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div>
+                <label for="actionFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9; font-size: 14px;">Action</label>
+                <select id="actionFilter" onchange="loadAuditLogs()"
+                        style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9; font-size: 14px;">
+                    <option value="">All Actions</option>
+                    <option value="view">View</option>
+                    <option value="create">Create</option>
+                    <option value="update">Update</option>
+                    <option value="delete">Delete</option>
+                </select>
+            </div>
+            <div>
+                <label for="entityFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9; font-size: 14px;">Entity Type</label>
+                <select id="entityFilter" onchange="loadAuditLogs()"
+                        style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9; font-size: 14px;">
+                    <option value="">All Types</option>
+                    <option value="employee">Employee</option>
+                    <option value="user">User</option>
+                    <option value="document">Document</option>
+                </select>
+            </div>
+            <div>
+                <label for="userFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9; font-size: 14px;">User</label>
+                <input type="text" id="userFilter" placeholder="Username..." onkeyup="filterByUsername()"
+                       style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9; font-size: 14px;">
+            </div>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+        <table id="auditTable">
+            <thead>
+                <tr>
+                    <th style="width: 150px;">Timestamp</th>
+                    <th style="width: 100px;">User</th>
+                    <th style="width: 80px;">Action</th>
+                    <th style="width: 100px;">Entity</th>
+                    <th style="width: 120px;">Field</th>
+                    <th>Details</th>
+                    <th style="width: 120px;">IP Address</th>
+                </tr>
+            </thead>
+            <tbody id="auditBody">
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 2rem;">Loading audit logs...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    <div style="padding: 1rem; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #30363d;">
+        <div style="color: #8b949e; font-size: 14px;">
+            Showing <span id="showingStart">0</span>-<span id="showingEnd">0</span> of <span id="showingTotal">0</span>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button id="prevBtn" onclick="previousPage()" class="btn btn-sm btn-secondary" disabled>Previous</button>
+            <button id="nextBtn" onclick="nextPage()" class="btn btn-sm btn-secondary">Next</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+        display: inline-block;
+    }
+
+    .badge-view {
+        background: #1f6feb;
+        color: white;
+    }
+
+    .badge-create {
+        background: #238636;
+        color: white;
+    }
+
+    .badge-update {
+        background: #d29922;
+        color: #1b1f23;
+    }
+
+    .badge-delete {
+        background: #da3633;
+        color: white;
+    }
+
+    .entity-link {
+        color: #58a6ff;
+        text-decoration: none;
+    }
+
+    .entity-link:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let auditLogs = [];
+let allLogs = [];
+let currentPage = 0;
+let pageSize = 50;
+
+async function loadAuditLogs() {
+    try {
+        const actionFilter = document.getElementById('actionFilter').value;
+        const entityFilter = document.getElementById('entityFilter').value;
+
+        let url = '/hr/api/audit/?limit=500';
+        if (actionFilter) url += `&action=${actionFilter}`;
+        if (entityFilter) url += `&entity_type=${entityFilter}`;
+
+        const response = await fetch(url, {
+            credentials: 'include'
+        });
+
+        if (response.status === 401) {
+            window.location.href = '/login';
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        allLogs = await response.json();
+        auditLogs = allLogs;
+
+        // Apply username filter if present
+        filterByUsername();
+
+        // Update total count
+        document.getElementById('totalLogs').textContent = auditLogs.length;
+
+        // Reset to first page
+        currentPage = 0;
+        renderAuditLogs();
+    } catch (error) {
+        console.error('Error loading audit logs:', error);
+        document.getElementById('auditBody').innerHTML = `
+            <tr><td colspan="7" style="text-align: center; color: #e74c3c;">Error loading audit logs. Please try refreshing the page.</td></tr>
+        `;
+    }
+}
+
+function filterByUsername() {
+    const filter = document.getElementById('userFilter').value.toLowerCase();
+    if (filter) {
+        auditLogs = allLogs.filter(log =>
+            log.username && log.username.toLowerCase().includes(filter)
+        );
+    } else {
+        auditLogs = allLogs;
+    }
+    document.getElementById('totalLogs').textContent = auditLogs.length;
+    currentPage = 0;
+    renderAuditLogs();
+}
+
+function renderAuditLogs() {
+    const tbody = document.getElementById('auditBody');
+
+    if (auditLogs.length === 0) {
+        tbody.innerHTML = `
+            <tr><td colspan="7" style="text-align: center; padding: 2rem; color: #999;">No audit logs found</td></tr>
+        `;
+        updatePagination();
+        return;
+    }
+
+    // Calculate pagination
+    const start = currentPage * pageSize;
+    const end = Math.min(start + pageSize, auditLogs.length);
+    const pageData = auditLogs.slice(start, end);
+
+    tbody.innerHTML = pageData.map(log => {
+        const timestamp = new Date(log.timestamp).toLocaleString();
+        const actionBadge = `<span class="badge badge-${log.action}">${log.action}</span>`;
+        const entityLink = log.entity_type === 'employee'
+            ? `<a href="/employees/${log.entity_id}" class="entity-link">${log.entity_type} #${log.entity_id}</a>`
+            : `${log.entity_type} #${log.entity_id}`;
+
+        const details = log.notes || '-';
+        const field = log.field_name || '-';
+        const ipAddress = log.ip_address || '-';
+
+        return `
+            <tr>
+                <td style="font-size: 12px;">${timestamp}</td>
+                <td><strong>${log.username || 'System'}</strong></td>
+                <td>${actionBadge}</td>
+                <td>${entityLink}</td>
+                <td style="font-size: 13px; color: #8b949e;">${field}</td>
+                <td style="font-size: 13px;">${details}</td>
+                <td style="font-size: 12px; color: #8b949e;">${ipAddress}</td>
+            </tr>
+        `;
+    }).join('');
+
+    updatePagination();
+}
+
+function updatePagination() {
+    const start = currentPage * pageSize + 1;
+    const end = Math.min((currentPage + 1) * pageSize, auditLogs.length);
+    const total = auditLogs.length;
+
+    document.getElementById('showingStart').textContent = total > 0 ? start : 0;
+    document.getElementById('showingEnd').textContent = end;
+    document.getElementById('showingTotal').textContent = total;
+
+    // Update button states
+    document.getElementById('prevBtn').disabled = currentPage === 0;
+    document.getElementById('nextBtn').disabled = end >= total;
+}
+
+function previousPage() {
+    if (currentPage > 0) {
+        currentPage--;
+        renderAuditLogs();
+    }
+}
+
+function nextPage() {
+    if ((currentPage + 1) * pageSize < auditLogs.length) {
+        currentPage++;
+        renderAuditLogs();
+    }
+}
+
+// Load audit logs on page load
+loadAuditLogs();
+</script>
+{% endblock %}

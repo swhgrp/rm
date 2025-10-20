@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice #{{ invoice.invoice_number }} - Integration Hub{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1><i class="bi bi-file-earmark-text"></i> Invoice #{{ invoice.invoice_number }}</h1>
+                <p class="text-muted mb-0">{{ invoice.vendor_name }}</p>
+            </div>
+            <div>
+                <a href="/hub/invoices" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Invoices
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoice Header -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-info-circle"></i> Invoice Information
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <table class="table table-sm">
+                                <tr>
+                                    <th width="40%">Invoice Number:</th>
+                                    <td><strong>{{ invoice.invoice_number }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>Vendor:</th>
+                                    <td>{{ invoice.vendor_name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Invoice Date:</th>
+                                    <td>{{ invoice.invoice_date }}</td>
+                                </tr>
+                                {% if invoice.due_date %}
+                                <tr>
+                                    <th>Due Date:</th>
+                                    <td>{{ invoice.due_date }}</td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <table class="table table-sm">
+                                <tr>
+                                    <th width="40%">Total Amount:</th>
+                                    <td><strong>${{ "{:,.2f}".format(invoice.total_amount) }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <th>Source:</th>
+                                    <td><span class="badge bg-secondary">{{ invoice.source or 'unknown' }}</span></td>
+                                </tr>
+                                <tr>
+                                    <th>Status:</th>
+                                    <td>
+                                        {% if invoice.status == 'pending' %}
+                                        <span class="badge badge-pending">Pending</span>
+                                        {% elif invoice.status == 'mapping' %}
+                                        <span class="badge badge-pending">Mapping</span>
+                                        {% elif invoice.status == 'ready' %}
+                                        <span class="badge badge-ready">Ready to Send</span>
+                                        {% elif invoice.status == 'sent' %}
+                                        <span class="badge badge-sent">Sent</span>
+                                        {% elif invoice.status == 'partial' %}
+                                        <span class="badge bg-warning">Partially Sent</span>
+                                        {% elif invoice.status == 'error' %}
+                                        <span class="badge badge-error">Error</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>Created:</th>
+                                    <td>{{ invoice.created_at.strftime('%Y-%m-%d %H:%M') if invoice.created_at else 'N/A' }}</td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-send"></i> Sync Status
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Inventory System:</strong>
+                        {% if invoice.sent_to_inventory %}
+                        <span class="text-success">
+                            <i class="bi bi-check-circle-fill"></i> Sent
+                        </span>
+                        {% if invoice.inventory_invoice_id %}
+                        <br><small class="text-muted">ID: {{ invoice.inventory_invoice_id }}</small>
+                        {% endif %}
+                        {% else %}
+                        <span class="text-muted">
+                            <i class="bi bi-x-circle"></i> Not Sent
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <strong>Accounting System:</strong>
+                        {% if invoice.sent_to_accounting %}
+                        <span class="text-success">
+                            <i class="bi bi-check-circle-fill"></i> Sent
+                        </span>
+                        {% if invoice.accounting_je_id %}
+                        <br><small class="text-muted">JE ID: {{ invoice.accounting_je_id }}</small>
+                        {% endif %}
+                        {% else %}
+                        <span class="text-muted">
+                            <i class="bi bi-x-circle"></i> Not Sent
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    {% if invoice.status == 'ready' %}
+                    <button class="btn btn-primary btn-sm w-100" onclick="sendInvoice()">
+                        <i class="bi bi-send"></i> Send to Both Systems
+                    </button>
+                    {% elif invoice.status == 'partial' or invoice.status == 'error' %}
+                    <button class="btn btn-warning btn-sm w-100 mb-2" onclick="retryInvoice('both')">
+                        <i class="bi bi-arrow-repeat"></i> Retry Both
+                    </button>
+                    {% if not invoice.sent_to_inventory %}
+                    <button class="btn btn-outline-warning btn-sm w-100 mb-2" onclick="retryInvoice('inventory')">
+                        <i class="bi bi-arrow-repeat"></i> Retry Inventory Only
+                    </button>
+                    {% endif %}
+                    {% if not invoice.sent_to_accounting %}
+                    <button class="btn btn-outline-warning btn-sm w-100" onclick="retryInvoice('accounting')">
+                        <i class="bi bi-arrow-repeat"></i> Retry Accounting Only
+                    </button>
+                    {% endif %}
+                    {% endif %}
+
+                    {% if invoice.inventory_error or invoice.accounting_error %}
+                    <div class="alert alert-danger mt-3 mb-0">
+                        <small>
+                            {% if invoice.inventory_error %}
+                            <strong>Inventory Error:</strong><br>
+                            {{ invoice.inventory_error }}<br>
+                            {% endif %}
+                            {% if invoice.accounting_error %}
+                            <strong>Accounting Error:</strong><br>
+                            {{ invoice.accounting_error }}
+                            {% endif %}
+                        </small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoice Items -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <i class="bi bi-list-ul"></i> Line Items ({{ items|length }})
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Description</th>
+                            <th>Qty</th>
+                            <th>Unit Price</th>
+                            <th>Total</th>
+                            <th>Category</th>
+                            <th>GL Asset</th>
+                            <th>GL COGS</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>{{ item.line_number }}</td>
+                            <td>{{ item.item_description }}</td>
+                            <td>{{ item.quantity }} {{ item.unit_of_measure or '' }}</td>
+                            <td>${{ "{:,.4f}".format(item.unit_price) }}</td>
+                            <td><strong>${{ "{:,.2f}".format(item.line_total) }}</strong></td>
+                            <td>
+                                {% if item.inventory_category %}
+                                <span class="badge bg-info">{{ item.inventory_category }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.gl_asset_account %}
+                                {{ item.gl_asset_account }}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.gl_cogs_account %}
+                                {{ item.gl_cogs_account }}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.is_mapped %}
+                                <span class="text-success"><i class="bi bi-check-circle"></i> Mapped</span>
+                                {% else %}
+                                <span class="text-warning"><i class="bi bi-exclamation-circle"></i> Unmapped</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function sendInvoice() {
+    if (!confirm('Send this invoice to both Inventory and Accounting systems?')) {
+        return;
+    }
+
+    const button = event.target;
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sending...';
+
+    try {
+        const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/send`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            alert('Invoice sent successfully to both systems!');
+            location.reload();
+        } else {
+            alert(`Error sending invoice:\n${result.errors ? result.errors.join('\n') : 'Unknown error'}`);
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-send"></i> Send to Both Systems';
+        }
+    } catch (error) {
+        alert(`Error sending invoice: ${error.message}`);
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-send"></i> Send to Both Systems';
+    }
+}
+
+async function retryInvoice(system) {
+    if (!confirm(`Retry sending to ${system}?`)) {
+        return;
+    }
+
+    const button = event.target;
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Retrying...';
+
+    try {
+        const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/retry?system=${system}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            alert('Retry successful!');
+            location.reload();
+        } else {
+            alert(`Error retrying:\n${result.errors ? result.errors.join('\n') : 'Unknown error'}`);
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-arrow-repeat"></i> Retry';
+        }
+    } catch (error) {
+        alert(`Error retrying: ${error.message}`);
+        button.disabled = false;
+        button.innerHTML = '<i class="bi bi-arrow-repeat"></i> Retry';
+    }
+}
+</script>
+{% endblock %}

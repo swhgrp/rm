@@ -1,0 +1,606 @@
+{% extends "base.html" %}
+
+{% block title %}Account Detail - Restaurant Accounting{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+    .account-header {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .account-header h1 {
+        font-size: 2rem;
+        color: #c9d1d9;
+        margin-bottom: 0.5rem;
+    }
+
+    .account-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
+
+    .meta-item {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .meta-label {
+        font-size: 0.85rem;
+        color: #8b949e;
+        margin-bottom: 0.25rem;
+    }
+
+    .meta-value {
+        font-size: 1.1rem;
+        color: #c9d1d9;
+        font-weight: 500;
+    }
+
+    .balance-positive {
+        color: #238636;
+    }
+
+    .balance-negative {
+        color: #da3633;
+    }
+
+    .action-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .filters {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        align-items: center;
+        background: #161b22;
+        padding: 1rem;
+        border-radius: 6px;
+        border: 1px solid #30363d;
+    }
+
+    .filters label {
+        font-weight: 500;
+        color: #c9d1d9;
+    }
+
+    .filters input, .filters select {
+        padding: 0.5rem;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        background: #0d1117;
+        color: #c9d1d9;
+    }
+
+    .transaction-list {
+        background: #161b22;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+
+    .balance-chart {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 2rem;
+        margin-bottom: 2rem;
+    }
+
+    .chart-placeholder {
+        min-height: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #8b949e;
+        border: 2px dashed #30363d;
+        border-radius: 4px;
+    }
+
+    .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .summary-card {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+
+    .summary-card h3 {
+        font-size: 0.85rem;
+        color: #8b949e;
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .summary-card .value {
+        font-size: 1.75rem;
+        color: #c9d1d9;
+        font-weight: 600;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #8b949e;
+    }
+
+    .empty-state i {
+        font-size: 4rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+    }
+
+    .running-balance {
+        font-family: 'Courier New', monospace;
+        font-weight: 500;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Account Header -->
+<div class="account-header">
+    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
+        <div>
+            <h1 id="accountTitle">Loading...</h1>
+            <p style="color: #8b949e; margin: 0;">Account Number: <span id="accountNumber"></span></p>
+        </div>
+        <span id="accountStatusBadge" class="badge"></span>
+    </div>
+
+    <div class="account-meta">
+        <div class="meta-item">
+            <span class="meta-label">Account Type</span>
+            <span class="meta-value" id="accountType"></span>
+        </div>
+        <div class="meta-item">
+            <span class="meta-label">Current Balance</span>
+            <span class="meta-value" id="currentBalance">$0.00</span>
+        </div>
+        <div class="meta-item">
+            <span class="meta-label">Normal Balance</span>
+            <span class="meta-value" id="normalBalance"></span>
+        </div>
+        <div class="meta-item">
+            <span class="meta-label">Last Activity</span>
+            <span class="meta-value" id="lastActivity">Never</span>
+        </div>
+    </div>
+
+    <div id="accountDescription" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #30363d; color: #8b949e; display: none;">
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="summary-cards">
+    <div class="summary-card">
+        <h3>Total Debits</h3>
+        <div class="value" id="totalDebits">$0.00</div>
+    </div>
+    <div class="summary-card">
+        <h3>Total Credits</h3>
+        <div class="value" id="totalCredits">$0.00</div>
+    </div>
+    <div class="summary-card">
+        <h3>Transaction Count</h3>
+        <div class="value" id="transactionCount">0</div>
+    </div>
+    <div class="summary-card">
+        <h3>Beginning Balance</h3>
+        <div class="value" id="beginningBalance">$0.00</div>
+    </div>
+</div>
+
+<!-- Balance History Chart -->
+<div class="balance-chart">
+    <h2 style="margin-bottom: 1.5rem;">Balance History</h2>
+    <div style="position: relative; height: 300px;">
+        <canvas id="balanceChart"></canvas>
+    </div>
+    <div id="chartPlaceholder" class="chart-placeholder" style="display: none;">
+        <div style="text-align: center;">
+            <i class="bi bi-graph-up" style="font-size: 3rem; display: block; margin-bottom: 1rem;"></i>
+            <p>No data available for chart</p>
+        </div>
+    </div>
+</div>
+
+<!-- Action Bar -->
+<div class="action-bar">
+    <h2>Transaction History</h2>
+    <div>
+        <button class="btn btn-primary" onclick="exportTransactions()">📥 Export CSV</button>
+        <button class="btn btn-secondary" onclick="window.location.href='/accounting/accounts'">← Back to Accounts</button>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+    <label for="startDate">From:</label>
+    <input type="date" id="startDate" onchange="loadTransactions()">
+
+    <label for="endDate">To:</label>
+    <input type="date" id="endDate" onchange="loadTransactions()">
+
+    <label for="statusFilter">Status:</label>
+    <select id="statusFilter" onchange="loadTransactions()">
+        <option value="">All Statuses</option>
+        <option value="POSTED" selected>Posted Only</option>
+        <option value="DRAFT">Draft Only</option>
+    </select>
+
+    <button class="btn btn-primary" onclick="loadTransactions()">Refresh</button>
+</div>
+
+<!-- Transaction List -->
+<div class="transaction-list">
+    <table id="transactionsTable">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Entry Number</th>
+                <th>Description</th>
+                <th class="number">Debit</th>
+                <th class="number">Credit</th>
+                <th class="number">Balance</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 2rem;">Loading transactions...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const accountId = {{ account_id }};
+let accountData = null;
+let transactionData = null;
+let balanceChart = null;
+
+async function loadAccountDetails() {
+    try {
+        const response = await fetch(`/accounting/api/accounts/${accountId}`);
+        if (!response.ok) throw new Error('Failed to load account details');
+
+        accountData = await response.json();
+        displayAccountDetails(accountData);
+    } catch (error) {
+        console.error('Error loading account:', error);
+        alert('Error loading account details: ' + error.message);
+    }
+}
+
+function displayAccountDetails(account) {
+    document.getElementById('accountTitle').textContent = account.account_name;
+    document.getElementById('accountNumber').textContent = account.account_number;
+    document.getElementById('accountType').textContent = account.account_type;
+
+    const statusBadge = document.getElementById('accountStatusBadge');
+    statusBadge.className = `badge badge-${account.is_active ? 'success' : 'danger'}`;
+    statusBadge.textContent = account.is_active ? 'Active' : 'Inactive';
+
+    // Normal balance based on account type
+    const normalBalances = {
+        'ASSET': 'Debit',
+        'EXPENSE': 'Debit',
+        'COGS': 'Debit',
+        'LIABILITY': 'Credit',
+        'EQUITY': 'Credit',
+        'REVENUE': 'Credit'
+    };
+    document.getElementById('normalBalance').textContent = normalBalances[account.account_type] || 'N/A';
+
+    // Description
+    if (account.description) {
+        document.getElementById('accountDescription').style.display = 'block';
+        document.getElementById('accountDescription').textContent = account.description;
+    }
+}
+
+async function loadTransactions() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const status = document.getElementById('statusFilter').value;
+
+    if (!startDate || !endDate) {
+        alert('Please select start and end dates');
+        return;
+    }
+
+    try {
+        let url = `/accounting/api/reports/general-ledger/${accountId}?start_date=${startDate}&end_date=${endDate}`;
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to load transactions');
+
+        transactionData = await response.json();
+        displayTransactions(transactionData);
+        updateSummary(transactionData);
+    } catch (error) {
+        console.error('Error loading transactions:', error);
+        alert('Error loading transactions: ' + error.message);
+    }
+}
+
+function displayTransactions(data) {
+    const tbody = document.querySelector('#transactionsTable tbody');
+
+    if (data.transactions.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8">
+                    <div class="empty-state">
+                        <i class="bi bi-inbox"></i>
+                        <p>No transactions found for the selected date range</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = data.transactions.map(txn => {
+        const debit = parseFloat(txn.debit_amount);
+        const credit = parseFloat(txn.credit_amount);
+        const balance = parseFloat(txn.balance);
+
+        return `
+            <tr>
+                <td>${new Date(txn.entry_date).toLocaleDateString()}</td>
+                <td><a href="/accounting/journal-entries" style="color: #58a6ff;">${txn.entry_number}</a></td>
+                <td>${txn.description}</td>
+                <td class="number">${debit > 0 ? formatCurrency(debit) : '-'}</td>
+                <td class="number">${credit > 0 ? formatCurrency(credit) : '-'}</td>
+                <td class="number running-balance ${balance >= 0 ? 'balance-positive' : 'balance-negative'}">
+                    ${formatCurrency(Math.abs(balance))} ${balance < 0 ? 'CR' : 'DR'}
+                </td>
+                <td><span class="badge badge-${getStatusBadge(txn.status)}">${txn.status}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="viewJournalEntry('${txn.entry_number}')" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;">
+                        View Entry
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function updateSummary(data) {
+    document.getElementById('currentBalance').textContent = formatCurrency(data.ending_balance);
+    document.getElementById('totalDebits').textContent = formatCurrency(data.total_debits);
+    document.getElementById('totalCredits').textContent = formatCurrency(data.total_credits);
+    document.getElementById('transactionCount').textContent = data.transactions.length;
+    document.getElementById('beginningBalance').textContent = formatCurrency(data.beginning_balance);
+
+    // Set balance color
+    const balanceEl = document.getElementById('currentBalance');
+    const balance = parseFloat(data.ending_balance);
+    balanceEl.className = `meta-value ${balance >= 0 ? 'balance-positive' : 'balance-negative'}`;
+
+    // Last activity
+    if (data.transactions.length > 0) {
+        const lastTxn = data.transactions[data.transactions.length - 1];
+        document.getElementById('lastActivity').textContent = new Date(lastTxn.entry_date).toLocaleDateString();
+    }
+
+    // Render balance chart
+    renderBalanceChart(data);
+}
+
+function renderBalanceChart(data) {
+    if (!data || !data.transactions || data.transactions.length === 0) {
+        document.getElementById('balanceChart').style.display = 'none';
+        document.getElementById('chartPlaceholder').style.display = 'flex';
+        return;
+    }
+
+    document.getElementById('balanceChart').style.display = 'block';
+    document.getElementById('chartPlaceholder').style.display = 'none';
+
+    // Prepare chart data
+    const labels = [];
+    const balances = [];
+
+    // Add beginning balance point
+    const startDate = new Date(data.start_date);
+    labels.push(startDate.toLocaleDateString());
+    balances.push(parseFloat(data.beginning_balance));
+
+    // Add transaction points
+    data.transactions.forEach(txn => {
+        labels.push(new Date(txn.entry_date).toLocaleDateString());
+        balances.push(parseFloat(txn.balance));
+    });
+
+    // Destroy existing chart if it exists
+    if (balanceChart) {
+        balanceChart.destroy();
+    }
+
+    // Create new chart
+    const ctx = document.getElementById('balanceChart').getContext('2d');
+    balanceChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Account Balance',
+                data: balances,
+                borderColor: '#58a6ff',
+                backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                borderWidth: 2,
+                tension: 0.1,
+                fill: true,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                pointBackgroundColor: '#58a6ff',
+                pointBorderColor: '#0d1117',
+                pointBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false,
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    labels: {
+                        color: '#c9d1d9',
+                        font: {
+                            size: 12
+                        }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: '#161b22',
+                    titleColor: '#c9d1d9',
+                    bodyColor: '#c9d1d9',
+                    borderColor: '#30363d',
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        label: function(context) {
+                            return 'Balance: ' + formatCurrency(context.parsed.y);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        color: '#30363d',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: '#8b949e',
+                        maxRotation: 45,
+                        minRotation: 0,
+                        font: {
+                            size: 11
+                        }
+                    }
+                },
+                y: {
+                    grid: {
+                        color: '#30363d',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        color: '#8b949e',
+                        font: {
+                            size: 11
+                        },
+                        callback: function(value) {
+                            return '$' + value.toFixed(2);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function formatCurrency(amount) {
+    return '$' + Number(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+}
+
+function getStatusBadge(status) {
+    const badges = {
+        'POSTED': 'success',
+        'DRAFT': 'warning',
+        'REVERSED': 'danger'
+    };
+    return badges[status] || 'secondary';
+}
+
+function viewJournalEntry(entryNumber) {
+    window.location.href = `/accounting/journal-entries?entry=${encodeURIComponent(entryNumber)}`;
+}
+
+function exportTransactions() {
+    if (!transactionData || !transactionData.transactions || transactionData.transactions.length === 0) {
+        alert('No transactions to export. Please load transactions first.');
+        return;
+    }
+
+    let csv = 'SW Hospitality Group - Accounting System\n';
+    csv += `Account Detail - ${accountData.account_number} ${accountData.account_name}\n`;
+    csv += `Period: ${transactionData.start_date} to ${transactionData.end_date}\n`;
+    csv += `Generated: ${new Date().toLocaleDateString()}\n\n`;
+    csv += `Beginning Balance: ${formatCurrency(transactionData.beginning_balance)}\n\n`;
+    csv += 'Date,Entry Number,Description,Debit,Credit,Balance,Status\n';
+
+    transactionData.transactions.forEach(txn => {
+        csv += `"${txn.entry_date}","${txn.entry_number}","${txn.description}",`;
+        csv += `"${formatCurrency(txn.debit_amount)}","${formatCurrency(txn.credit_amount)}",`;
+        csv += `"${formatCurrency(txn.balance)}","${txn.status}"\n`;
+    });
+
+    csv += '\n';
+    csv += `"","","Total Debits","${formatCurrency(transactionData.total_debits)}","","",""\n`;
+    csv += `"","","Total Credits","","${formatCurrency(transactionData.total_credits)}","",""\n`;
+    csv += `"","","Ending Balance","","","${formatCurrency(transactionData.ending_balance)}",""\n`;
+
+    // Download CSV
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const filename = `account_${accountData.account_number}_${new Date().toISOString().split('T')[0]}.csv`;
+
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', filename);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadAccountDetails();
+
+    // Set default date range (last 90 days)
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 90);
+
+    document.getElementById('startDate').valueAsDate = startDate;
+    document.getElementById('endDate').valueAsDate = endDate;
+
+    loadTransactions();
+});
+</script>
+{% endblock %}
