@@ -20,14 +20,33 @@ restaurant-system/
 │   ├── logs/           # Application logs
 │   └── .env            # Service configuration
 │
-├── portal/             # Central Web Portal
-│   ├── index.html      # Landing page
-│   ├── css/            # Portal styles
-│   └── images/         # Portal assets
+├── hr/                 # HR Management Service
+│   ├── src/            # FastAPI application code
+│   ├── alembic/        # Database migrations
+│   ├── documents/      # Employee document storage
+│   └── .env            # Service configuration
+│
+├── integration-hub/    # Integration Hub Service
+│   ├── src/            # FastAPI application code
+│   ├── alembic/        # Database migrations
+│   └── .env            # Service configuration
+│
+├── portal/             # Central Authentication Portal
+│   ├── src/            # FastAPI application code
+│   ├── templates/      # Portal pages
+│   ├── static/         # Portal assets
+│   └── .env            # Service configuration
+│
+├── docs/               # Documentation
+│   ├── status/         # Current status and progress reports
+│   ├── guides/         # User and admin guides
+│   ├── reference/      # Technical reference documentation
+│   └── planning/       # Future planning documents
 │
 ├── shared/             # Shared Infrastructure
 │   ├── nginx/          # Reverse proxy configuration
-│   └── certbot/        # SSL certificates
+│   ├── certbot/        # SSL certificates
+│   └── python/         # Shared Python libraries
 │
 ├── scripts/            # Utility Scripts
 │   ├── backup_databases.sh    # Automated database backups
@@ -36,6 +55,7 @@ restaurant-system/
 │   └── tests/                 # Test scripts
 │
 ├── docker-compose.yml  # Multi-service orchestration
+├── DOCUMENTATION_INDEX.md  # Documentation navigation
 └── README.md          # This file
 ```
 
@@ -64,27 +84,57 @@ restaurant-system/
   - Fiscal period management
   - Financial reporting
 
-### 3. Central Portal
-- **URL**: http://rm.swhgrp.com
+### 3. HR Management Service
+- **Port**: Internal (proxied via nginx at `/hr/`)
+- **Database**: PostgreSQL (`hr_db`) - Completely isolated
 - **Features**:
-  - Unified entry point for all modules
-  - Dark mode design matching inventory system
-  - Path-based routing to each service
-  - Separate authentication per module
+  - Employee information management
+  - Position and department tracking
+  - Document management with encryption
+  - Role-based access control
+  - Location-based permissions
+  - Audit logging
+  - SSO integration with portal
 
-### 4. Future Services
-- **HR System** (planned) - Document retention, employee information, personnel records
+### 4. Integration Hub Service
+- **Port**: Internal (proxied via nginx at `/hub/`)
+- **Database**: PostgreSQL (`hub_db`) - Completely isolated
+- **Features**:
+  - Centralized vendor management
+  - Vendor synchronization across systems
+  - Invoice processing and routing
+  - Category mapping for GL codes
+  - System-to-system integrations
+  - Automated data distribution
+
+### 5. Central Authentication Portal
+- **URL**: https://rm.swhgrp.com/portal/
+- **Database**: PostgreSQL (`portal_db`) - Completely isolated
+- **Features**:
+  - Single Sign-On (SSO) for all systems
+  - Centralized user authentication
+  - JWT token-based session management
+  - System access management
+  - Professional dark theme UI
+  - 30-minute inactivity timeout
+
+### 6. Future Services
 - **Analytics Dashboard** (planned) - Advanced reporting and data visualization
+- **API Gateway** (planned) - Centralized API management and rate limiting
 
 ## Service Communication
 
 Services communicate via:
 - **REST APIs**: HTTP-based synchronous communication
 - **Database Isolation**: Each service has its own database
+- **SSO Authentication**: Portal provides SSO tokens for seamless navigation
 - **Nginx Routing**:
-  - `/` → Portal Landing Page
+  - `/` → Portal Landing Page (redirects to `/portal/`)
+  - `/portal/` → Central Authentication Portal
   - `/inventory/` → Inventory Service
   - `/accounting/` → Accounting Service
+  - `/hr/` → HR Management Service
+  - `/hub/` → Integration Hub Service
 
 ## Technology Stack
 
