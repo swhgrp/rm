@@ -1,6 +1,7 @@
 """
 Bank statement and matching API endpoints
 """
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, desc
@@ -8,6 +9,8 @@ from typing import List, Optional
 from datetime import date
 
 from accounting.db.database import get_db
+
+logger = logging.getLogger(__name__)
 from accounting.models.bank_account import (
     BankStatement,
     BankTransaction,
@@ -1109,7 +1112,7 @@ def assign_transaction_to_gl(
         )
     except Exception as e:
         # Don't fail the assignment if learning fails
-        print(f"Warning: Failed to record GL learning: {e}")
+        logger.warning(f"Failed to record GL learning: {e}")
 
     return GLAssignmentResponse(
         bank_transaction_id=transaction.id,
@@ -1181,7 +1184,7 @@ def update_transaction_gl_assignment(
         )
     except Exception as e:
         # Don't fail the update if learning fails
-        print(f"Warning: Failed to record GL learning: {e}")
+        logger.warning(f"Failed to record GL learning: {e}")
 
     return GLAssignmentResponse(
         bank_transaction_id=transaction.id,

@@ -1,8 +1,11 @@
 """
 Security utilities for password hashing and session management
 """
+import logging
 import secrets
 import bcrypt
+
+logger = logging.getLogger(__name__)
 
 
 def hash_password(password: str) -> str:
@@ -20,7 +23,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         hashed_bytes = hashed_password.encode('utf-8')
         return bcrypt.checkpw(password_bytes, hashed_bytes)
     except Exception as e:
-        print(f"Password verification error: {e}")
+        logger.error(f"Password verification error: {e}")
         return False
 
 

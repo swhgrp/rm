@@ -77,12 +77,6 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
     lines = []
     line_number = 1
 
-    print(f"DEBUG: DSS gross_sales: {dss.gross_sales}")
-    print(f"DEBUG: DSS net_sales: {dss.net_sales}")
-    print(f"DEBUG: DSS tax_collected: {dss.tax_collected}")
-    print(f"DEBUG: DSS tips: {dss.tips}")
-    print(f"DEBUG: DSS total_collected: {dss.total_collected}")
-
     # DEBIT: Payment methods (Cash, Credit Card, etc.) - Asset accounts
     if dss.payments:
         for payment in dss.payments:
@@ -145,10 +139,6 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
                 category_totals[key] = Decimal("0.00")
             category_totals[key] += item.net_amount
             category_tax_total += (item.tax_amount or Decimal("0.00"))
-
-        print(f"DEBUG: Category totals (net): {sum(category_totals.values())}")
-        print(f"DEBUG: Category tax total: {category_tax_total}")
-        print(f"DEBUG: DSS tax_collected: {dss.tax_collected}")
 
         for (category, account_id), amount in category_totals.items():
             if amount != 0:  # Include both positive and negative amounts
@@ -254,12 +244,6 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
     # Verify debits = credits
     total_debits = sum(line.debit_amount for line in lines)
     total_credits = sum(line.credit_amount for line in lines)
-
-    print(f"DEBUG: Total lines created: {len(lines)}")
-    for idx, line in enumerate(lines):
-        print(f"DEBUG: Line {idx+1}: {line.description} - DR: {line.debit_amount}, CR: {line.credit_amount}")
-    print(f"DEBUG: Total Debits: {total_debits}")
-    print(f"DEBUG: Total Credits: {total_credits}")
 
     if abs(total_debits - total_credits) > Decimal("0.01"):
         raise HTTPException(
