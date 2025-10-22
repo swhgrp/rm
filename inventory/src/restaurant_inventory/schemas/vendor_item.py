@@ -10,7 +10,7 @@ from datetime import datetime
 
 class VendorItemBase(BaseModel):
     vendor_id: int
-    master_item_id: int
+    master_item_id: Optional[int] = None  # Nullable - vendor items can be imported without master item link
     vendor_sku: Optional[str] = None
     vendor_product_name: str
     vendor_description: Optional[str] = None

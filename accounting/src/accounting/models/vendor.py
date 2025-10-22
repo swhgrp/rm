@@ -58,6 +58,7 @@ class Vendor(Base):
 
     # Relationships
     # vendor_bills = relationship("VendorBill", back_populates="vendor")  # Will add after migration
+    gl_mappings = relationship("VendorGLMapping", back_populates="vendor")
 
     def __repr__(self):
         return f"<Vendor {self.vendor_code or self.id}: {self.vendor_name}>"

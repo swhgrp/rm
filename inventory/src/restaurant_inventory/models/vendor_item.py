@@ -20,7 +20,7 @@ class VendorItem(Base):
 
     # Link to vendor and master item
     vendor_id = Column(Integer, ForeignKey("vendors.id", ondelete="CASCADE"), nullable=False, index=True)
-    master_item_id = Column(Integer, ForeignKey("master_items.id", ondelete="CASCADE"), nullable=False, index=True)
+    master_item_id = Column(Integer, ForeignKey("master_items.id", ondelete="CASCADE"), nullable=True, index=True)  # Optional - can be linked later
 
     # Vendor-specific details
     vendor_sku = Column(String, nullable=True, index=True)  # Vendor's SKU/product code

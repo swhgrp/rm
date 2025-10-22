@@ -205,6 +205,9 @@ async def update_vendor_item(
     current_user: User = Depends(get_current_user)
 ):
     """Update a vendor item"""
+    import logging
+    logger = logging.getLogger(__name__)
+
     db_vendor_item = db.query(VendorItem).filter(VendorItem.id == vendor_item_id).first()
     if not db_vendor_item:
         raise HTTPException(status_code=404, detail="Vendor item not found")
@@ -217,11 +220,17 @@ async def update_vendor_item(
 
     # Update fields
     update_data = vendor_item_update.model_dump(exclude_unset=True)
+    logger.info(f"Updating vendor item {vendor_item_id} with data: {update_data}")
+    logger.info(f"master_item_id in update_data: {update_data.get('master_item_id')}")
+
     for field, value in update_data.items():
+        logger.info(f"Setting {field} = {value}")
         setattr(db_vendor_item, field, value)
 
     db.commit()
     db.refresh(db_vendor_item)
+
+    logger.info(f"After commit, master_item_id = {db_vendor_item.master_item_id}")
 
     # Load relationships
     db_vendor_item = db.query(VendorItem).options(

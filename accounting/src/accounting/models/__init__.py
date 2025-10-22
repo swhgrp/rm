@@ -9,7 +9,7 @@ from accounting.models.role import Role
 from accounting.models.user import User, UserSession
 
 # Then other models
-from accounting.models.account import Account, AccountType
+from accounting.models.account import Account, AccountType, CashFlowClass
 from accounting.models.account_group import AccountGroup, ReportSection
 from accounting.models.journal_entry import JournalEntry, JournalEntryLine, JournalEntryStatus
 from accounting.models.fiscal_period import FiscalPeriod, FiscalPeriodStatus
@@ -21,6 +21,38 @@ from accounting.models.vendor_bill import VendorBill, VendorBillLine, BillPaymen
 from accounting.models.customer import Customer
 from accounting.models.customer_invoice import CustomerInvoice, CustomerInvoiceLine, InvoicePayment, InvoiceStatus
 from accounting.models.daily_sales_summary import DailySalesSummary
+from accounting.models.bank_account import (
+    BankAccount,
+    BankStatementImport,
+    BankTransaction,
+    BankReconciliation,
+    BankReconciliationItem,
+    BankMatchingRule,
+    BankStatement,
+    BankTransactionMatch,
+    BankCompositeMatch,
+    BankTransactionCompositeMatch,
+    BankMatchingRuleV2,
+    BankStatementSnapshot
+)
+from accounting.models.gl_learning import VendorGLMapping, DescriptionPatternMapping, RecurringTransactionPattern
+from accounting.models.banking_dashboard import (
+    DailyCashPosition,
+    CashFlowTransaction,
+    BankingAlert,
+    ReconciliationHealthMetric,
+    LocationCashFlowSummary,
+    CashFlowCategory,
+    AlertSeverity,
+    AlertType
+)
+from accounting.models.general_dashboard import (
+    DailyFinancialSnapshot,
+    MonthlyPerformanceSummary,
+    DashboardAlert,
+    ExpenseCategorySummary,
+    DashboardAlertType
+)
 
 __all__ = [
     "Area",
@@ -30,6 +62,7 @@ __all__ = [
     "UserSession",
     "Account",
     "AccountType",
+    "CashFlowClass",
     "AccountGroup",
     "ReportSection",
     "JournalEntry",
@@ -54,4 +87,32 @@ __all__ = [
     "InvoicePayment",
     "InvoiceStatus",
     "DailySalesSummary",
+    "BankAccount",
+    "BankStatementImport",
+    "BankTransaction",
+    "BankReconciliation",
+    "BankReconciliationItem",
+    "BankMatchingRule",
+    "BankStatement",
+    "BankTransactionMatch",
+    "BankCompositeMatch",
+    "BankTransactionCompositeMatch",
+    "BankMatchingRuleV2",
+    "BankStatementSnapshot",
+    "VendorGLMapping",
+    "DescriptionPatternMapping",
+    "RecurringTransactionPattern",
+    "DailyCashPosition",
+    "CashFlowTransaction",
+    "BankingAlert",
+    "ReconciliationHealthMetric",
+    "LocationCashFlowSummary",
+    "CashFlowCategory",
+    "AlertSeverity",
+    "AlertType",
+    "DailyFinancialSnapshot",
+    "MonthlyPerformanceSummary",
+    "DashboardAlert",
+    "ExpenseCategorySummary",
+    "DashboardAlertType",
 ]

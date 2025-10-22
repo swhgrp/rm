@@ -92,6 +92,24 @@ app.add_event_handler("shutdown", shutdown_event_handler)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Custom exception handler for authentication redirects
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Handle HTTP exceptions - redirect 401 to Portal login for HTML requests"""
+    if exc.status_code == 401:  # HTTP_401_UNAUTHORIZED
+        # Check if this is an HTML request (not API)
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept or "/inventory/" in request.url.path:
+            # Redirect to Portal login instead of local login
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url="/portal/login?redirect=/inventory/", status_code=302)
+    # For API requests or other errors, return JSON response
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -319,6 +337,11 @@ async def pos_item_mapping_page(request: Request):
 async def inventory_movements_page(request: Request):
     """Inventory Movements/Transactions page"""
     return templates.TemplateResponse("inventory_movements.html", {"request": request})
+
+@app.get("/categories", response_class=HTMLResponse)
+async def categories_page(request: Request):
+    """Categories management page"""
+    return templates.TemplateResponse("categories.html", {"request": request})
 
 @app.get("/master-items", response_class=HTMLResponse)
 async def master_items_page(request: Request):

@@ -1,0 +1,845 @@
+{% extends "base.html" %}
+
+{% block nav_banking_dashboard %}nav-active{% endblock %}
+
+{% block title %}Banking Dashboard - Accounting System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Header with Filters and Actions -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-speedometer2 me-2"></i>Banking Dashboard</h2>
+            <p class="text-muted mb-0">Comprehensive banking, reconciliation, and cash flow analytics</p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <!-- Date Range Filter -->
+            <div class="d-flex align-items-center gap-2">
+                <label class="text-muted mb-0">Period:</label>
+                <select class="form-select" id="periodFilter" style="width: 150px;" onchange="changePeriod()">
+                    <option value="7">Last 7 Days</option>
+                    <option value="30" selected>Last 30 Days</option>
+                    <option value="90">Last 90 Days</option>
+                    <option value="custom">Custom Range</option>
+                </select>
+            </div>
+            <!-- Location Filter -->
+            <div class="d-flex align-items-center gap-2">
+                <label class="text-muted mb-0">Location:</label>
+                <select class="form-select" id="locationFilter" style="width: 200px;" onchange="filterByLocation()">
+                    <option value="">All Locations</option>
+                </select>
+            </div>
+            <!-- Actions -->
+            <button class="btn btn-outline-primary" onclick="refreshDashboard()" title="Refresh Data">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+            <button class="btn btn-primary" onclick="window.location.href='bank-reconciliation'">
+                <i class="bi bi-arrow-left-right me-1"></i>Reconciliation
+            </button>
+        </div>
+    </div>
+
+    <!-- Alert Banner (if critical alerts exist) -->
+    <div id="criticalAlertBanner" class="alert alert-danger d-none mb-4" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="bi bi-exclamation-triangle-fill fs-4 me-3"></i>
+            <div class="flex-grow-1">
+                <h5 class="alert-heading mb-1">Critical Alerts Detected</h5>
+                <p class="mb-0" id="criticalAlertMessage"></p>
+            </div>
+            <button class="btn btn-sm btn-outline-danger" onclick="scrollToAlerts()">View Alerts</button>
+        </div>
+    </div>
+
+    <!-- Top-Level KPI Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-dark border-secondary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="text-muted mb-0">Total Cash Balance</h6>
+                        <div class="bg-success rounded p-2">
+                            <i class="bi bi-cash-stack fs-4 text-white"></i>
+                        </div>
+                    </div>
+                    <h3 class="mb-1" id="totalCashBalance">$0.00</h3>
+                    <small class="text-muted" id="totalCashChange"></small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-dark border-secondary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="text-muted mb-0">GL vs Bank Variance</h6>
+                        <div class="bg-warning rounded p-2">
+                            <i class="bi bi-exclamation-diamond fs-4 text-dark"></i>
+                        </div>
+                    </div>
+                    <h3 class="mb-1" id="glVariance">$0.00</h3>
+                    <small class="text-muted">Across all accounts</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-dark border-secondary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="text-muted mb-0">Reconciliation Rate</h6>
+                        <div class="bg-info rounded p-2">
+                            <i class="bi bi-check-circle fs-4 text-white"></i>
+                        </div>
+                    </div>
+                    <h3 class="mb-1" id="reconRate">0%</h3>
+                    <small class="text-muted" id="reconChange"></small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-dark border-secondary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="text-muted mb-0">Unreconciled Items</h6>
+                        <div class="bg-danger rounded p-2">
+                            <i class="bi bi-exclamation-circle fs-4 text-white"></i>
+                        </div>
+                    </div>
+                    <h3 class="mb-1" id="unreconItems">0</h3>
+                    <small class="text-muted">Requiring attention</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Location Detail Grid -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header bg-dark border-secondary d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Location Breakdown</h5>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="toggleLocationDetail()">
+                        <i class="bi bi-arrows-expand"></i> Toggle Details
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Location</th>
+                                    <th class="text-end">Cash Balance</th>
+                                    <th class="text-end">GL Variance</th>
+                                    <th class="text-end">Recon Rate</th>
+                                    <th class="text-end">Unreconciled</th>
+                                    <th class="text-center">Alerts</th>
+                                    <th class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="locationTableBody">
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        <i class="bi bi-hourglass-split"></i> Loading location data...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cash Flow Metrics and Trends -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header bg-dark border-secondary">
+                    <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Cash Flow Trend</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="cashFlowChart" height="80"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card bg-dark border-secondary h-100">
+                <div class="card-header bg-dark border-secondary">
+                    <h5 class="mb-0"><i class="bi bi-currency-exchange me-2"></i>Cash Flow Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted">Operating Inflows</span>
+                            <strong class="text-success" id="operatingInflows">$0.00</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted">Operating Outflows</span>
+                            <strong class="text-danger" id="operatingOutflows">$0.00</strong>
+                        </div>
+                        <hr class="border-secondary">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>Net Operating</strong>
+                            <strong id="netOperating">$0.00</strong>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted">Investing Inflows</span>
+                            <strong class="text-success" id="investingInflows">$0.00</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted">Investing Outflows</span>
+                            <strong class="text-danger" id="investingOutflows">$0.00</strong>
+                        </div>
+                        <hr class="border-secondary">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>Net Investing</strong>
+                            <strong id="netInvesting">$0.00</strong>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted">Financing Inflows</span>
+                            <strong class="text-success" id="financingInflows">$0.00</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted">Financing Outflows</span>
+                            <strong class="text-danger" id="financingOutflows">$0.00</strong>
+                        </div>
+                        <hr class="border-secondary">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong>Net Financing</strong>
+                            <strong id="netFinancing">$0.00</strong>
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Total Net Change</h6>
+                        <h5 class="mb-0" id="totalNetChange">$0.00</h5>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reconciliation Health -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header bg-dark border-secondary">
+                    <h5 class="mb-0"><i class="bi bi-heart-pulse me-2"></i>Reconciliation Health Trend</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="reconHealthChart" height="80"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card bg-dark border-secondary h-100">
+                <div class="card-header bg-dark border-secondary">
+                    <h5 class="mb-0"><i class="bi bi-speedometer me-2"></i>Health Metrics</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="text-muted small">Avg Days to Reconcile</label>
+                        <h4 id="avgDaysToRecon">-</h4>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="text-muted small">Auto-Match Rate</label>
+                        <h4 id="autoMatchRate">-</h4>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="text-muted small">Aging Breakdown</label>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="small text-warning">30-60 days</span>
+                            <strong id="aging30">0</strong>
+                        </div>
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="small text-danger">60-90 days</span>
+                            <strong id="aging60">0</strong>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span class="small text-danger">90+ days</span>
+                            <strong id="aging90">0</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Alerts Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header bg-dark border-secondary d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0" id="alertsSection"><i class="bi bi-bell me-2"></i>Active Alerts</h5>
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button class="btn btn-outline-danger" onclick="filterAlerts('critical')">Critical <span class="badge bg-danger" id="criticalCount">0</span></button>
+                        <button class="btn btn-outline-warning" onclick="filterAlerts('warning')">Warning <span class="badge bg-warning text-dark" id="warningCount">0</span></button>
+                        <button class="btn btn-outline-info" onclick="filterAlerts('info')">Info <span class="badge bg-info text-dark" id="infoCount">0</span></button>
+                        <button class="btn btn-outline-secondary" onclick="filterAlerts('all')">All</button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th width="80">Severity</th>
+                                    <th width="150">Type</th>
+                                    <th>Title</th>
+                                    <th>Message</th>
+                                    <th width="120">Amount</th>
+                                    <th width="150">Created</th>
+                                    <th width="120" class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alertsTableBody">
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted py-4">
+                                        <i class="bi bi-check-circle"></i> No active alerts
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Global variables
+let cashFlowChart = null;
+let reconHealthChart = null;
+let selectedLocationId = null;
+let selectedPeriodDays = 30;
+let currentAlertFilter = 'all';
+
+// Initialize dashboard
+document.addEventListener('DOMContentLoaded', function() {
+    loadLocations();
+    loadDashboardData();
+
+    // Auto-refresh every 5 minutes
+    setInterval(refreshDashboard, 300000);
+});
+
+async function loadLocations() {
+    try {
+        const response = await fetch('/accounting/api/areas/');
+        if (!response.ok) throw new Error('Failed to load locations');
+
+        const areas = await response.json();
+        const locationFilter = document.getElementById('locationFilter');
+
+        areas.forEach(area => {
+            const option = document.createElement('option');
+            option.value = area.id;
+            option.textContent = area.name;
+            locationFilter.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading locations:', error);
+        showToast('Error loading locations', 'danger');
+    }
+}
+
+async function loadDashboardData() {
+    try {
+        // Calculate date range
+        const endDate = new Date().toISOString().split('T')[0];
+        const startDate = new Date(Date.now() - selectedPeriodDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        // Build URL with filters
+        let url = `/accounting/api/banking-dashboard/summary?start_date=${startDate}&end_date=${endDate}`;
+        if (selectedLocationId) {
+            url += `&area_id=${selectedLocationId}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to load dashboard data');
+
+        const data = await response.json();
+
+        // Update KPIs
+        updateKPIs(data);
+
+        // Update location table
+        updateLocationTable(data.locations);
+
+        // Update cash flow
+        updateCashFlowSummary(data.cash_flow);
+
+        // Update health metrics
+        updateHealthMetrics(data);
+
+        // Load charts
+        loadCashFlowChart(startDate, endDate);
+        loadReconHealthChart(startDate, endDate);
+
+        // Load alerts
+        loadAlerts();
+
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+        showToast('Error loading dashboard data', 'danger');
+    }
+}
+
+function updateKPIs(data) {
+    // Total Cash Balance
+    document.getElementById('totalCashBalance').textContent = formatCurrency(data.total_cash_balance.value);
+    const changeText = data.total_cash_balance.change ?
+        `${data.total_cash_balance.trend === 'up' ? '▲' : '▼'} ${formatCurrency(Math.abs(data.total_cash_balance.change))} vs yesterday` :
+        '';
+    document.getElementById('totalCashChange').textContent = changeText;
+    document.getElementById('totalCashChange').className = data.total_cash_balance.trend === 'up' ? 'text-success' : 'text-danger';
+
+    // GL Variance
+    document.getElementById('glVariance').textContent = formatCurrency(data.gl_variance.value);
+
+    // Reconciliation Rate
+    document.getElementById('reconRate').textContent = data.reconciliation_rate.value + '%';
+    const reconChange = data.reconciliation_rate.change ?
+        `${data.reconciliation_rate.trend === 'up' ? '▲' : '▼'} ${Math.abs(data.reconciliation_rate.change).toFixed(1)}% vs last period` :
+        '';
+    document.getElementById('reconChange').textContent = reconChange;
+    document.getElementById('reconChange').className = data.reconciliation_rate.trend === 'up' ? 'text-success' : 'text-danger';
+
+    // Unreconciled Items
+    document.getElementById('unreconItems').textContent = data.unreconciled_transactions.value;
+
+    // Update alert counts
+    document.getElementById('criticalCount').textContent = data.critical_alerts;
+    document.getElementById('warningCount').textContent = data.warning_alerts;
+    document.getElementById('infoCount').textContent = data.info_alerts;
+
+    // Show critical alert banner if needed
+    if (data.critical_alerts > 0) {
+        document.getElementById('criticalAlertBanner').classList.remove('d-none');
+        document.getElementById('criticalAlertMessage').textContent =
+            `You have ${data.critical_alerts} critical alert${data.critical_alerts > 1 ? 's' : ''} requiring immediate attention.`;
+    } else {
+        document.getElementById('criticalAlertBanner').classList.add('d-none');
+    }
+}
+
+function updateLocationTable(locations) {
+    const tbody = document.getElementById('locationTableBody');
+    tbody.innerHTML = '';
+
+    if (!locations || locations.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No location data available</td></tr>';
+        return;
+    }
+
+    locations.forEach(loc => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${loc.area_name}</strong></td>
+            <td class="text-end">${formatCurrency(loc.total_balance)}</td>
+            <td class="text-end ${Math.abs(loc.gl_variance) > 1000 ? 'text-warning' : ''}">${formatCurrency(loc.gl_variance)}</td>
+            <td class="text-end">
+                <span class="badge ${loc.reconciliation_rate >= 90 ? 'bg-success' : loc.reconciliation_rate >= 70 ? 'bg-warning text-dark' : 'bg-danger'}">
+                    ${loc.reconciliation_rate}%
+                </span>
+            </td>
+            <td class="text-end">${loc.unreconciled_transactions}</td>
+            <td class="text-center">
+                ${loc.active_alerts > 0 ? `<span class="badge bg-danger">${loc.active_alerts}</span>` : '<span class="text-success">✓</span>'}
+            </td>
+            <td class="text-center">
+                <button class="btn btn-sm btn-outline-primary" onclick="drillDownLocation(${loc.area_id})" title="View Details">
+                    <i class="bi bi-zoom-in"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function updateCashFlowSummary(cashFlow) {
+    document.getElementById('operatingInflows').textContent = formatCurrency(cashFlow.operating_inflows);
+    document.getElementById('operatingOutflows').textContent = formatCurrency(cashFlow.operating_outflows);
+    document.getElementById('netOperating').textContent = formatCurrency(cashFlow.net_operating);
+    document.getElementById('netOperating').className = cashFlow.net_operating >= 0 ? 'text-success' : 'text-danger';
+
+    document.getElementById('investingInflows').textContent = formatCurrency(cashFlow.investing_inflows);
+    document.getElementById('investingOutflows').textContent = formatCurrency(cashFlow.investing_outflows);
+    document.getElementById('netInvesting').textContent = formatCurrency(cashFlow.net_investing);
+    document.getElementById('netInvesting').className = cashFlow.net_investing >= 0 ? 'text-success' : 'text-danger';
+
+    document.getElementById('financingInflows').textContent = formatCurrency(cashFlow.financing_inflows);
+    document.getElementById('financingOutflows').textContent = formatCurrency(cashFlow.financing_outflows);
+    document.getElementById('netFinancing').textContent = formatCurrency(cashFlow.net_financing);
+    document.getElementById('netFinancing').className = cashFlow.net_financing >= 0 ? 'text-success' : 'text-danger';
+
+    document.getElementById('totalNetChange').textContent = formatCurrency(cashFlow.net_change);
+    document.getElementById('totalNetChange').className = cashFlow.net_change >= 0 ? 'text-success' : 'text-danger';
+}
+
+function updateHealthMetrics(data) {
+    document.getElementById('avgDaysToRecon').textContent = data.avg_days_to_reconcile ?
+        data.avg_days_to_reconcile + ' days' : 'N/A';
+
+    document.getElementById('autoMatchRate').textContent = data.auto_match_rate ?
+        data.auto_match_rate + '%' : 'N/A';
+
+    document.getElementById('aging30').textContent = data.transactions_over_30_days || 0;
+    // Assuming we have aging60 and aging90 in the future
+}
+
+async function loadCashFlowChart(startDate, endDate) {
+    try {
+        let url = `/accounting/api/banking-dashboard/cash-flow-trend?start_date=${startDate}&end_date=${endDate}`;
+        if (selectedLocationId) {
+            url += `&area_id=${selectedLocationId}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to load cash flow trend');
+
+        const data = await response.json();
+
+        const ctx = document.getElementById('cashFlowChart').getContext('2d');
+
+        if (cashFlowChart) {
+            cashFlowChart.destroy();
+        }
+
+        cashFlowChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.data_points.map(p => p.date),
+                datasets: [
+                    {
+                        label: 'Closing Balance',
+                        data: data.data_points.map(p => p.closing_balance),
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.1)',
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Inflows',
+                        data: data.data_points.map(p => p.inflows),
+                        borderColor: 'rgb(54, 162, 235)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Outflows',
+                        data: data.data_points.map(p => -Math.abs(p.outflows)),
+                        borderColor: 'rgb(255, 99, 132)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.1)',
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#fff'
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#aaa'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#aaa',
+                            callback: function(value) {
+                                return '$' + value.toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error loading cash flow chart:', error);
+    }
+}
+
+async function loadReconHealthChart(startDate, endDate) {
+    try {
+        let url = `/accounting/api/banking-dashboard/reconciliation-trend?start_date=${startDate}&end_date=${endDate}`;
+        if (selectedLocationId) {
+            url += `&area_id=${selectedLocationId}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to load reconciliation trend');
+
+        const data = await response.json();
+
+        const ctx = document.getElementById('reconHealthChart').getContext('2d');
+
+        if (reconHealthChart) {
+            reconHealthChart.destroy();
+        }
+
+        reconHealthChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.data_points.map(p => p.date),
+                datasets: [
+                    {
+                        label: 'Reconciled',
+                        data: data.data_points.map(p => p.reconciled_transactions),
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                        borderColor: 'rgb(75, 192, 192)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Total Transactions',
+                        data: data.data_points.map(p => p.total_transactions),
+                        backgroundColor: 'rgba(201, 203, 207, 0.2)',
+                        borderColor: 'rgb(201, 203, 207)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#fff'
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#aaa'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#aaa'
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error loading recon health chart:', error);
+    }
+}
+
+async function loadAlerts() {
+    try {
+        let url = '/accounting/api/banking-dashboard/alerts?active_only=true';
+        if (selectedLocationId) {
+            url += `&area_id=${selectedLocationId}`;
+        }
+        if (currentAlertFilter !== 'all') {
+            url += `&severity=${currentAlertFilter}`;
+        }
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to load alerts');
+
+        const alerts = await response.json();
+
+        const tbody = document.getElementById('alertsTableBody');
+        tbody.innerHTML = '';
+
+        if (!alerts || alerts.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4"><i class="bi bi-check-circle"></i> No active alerts</td></tr>';
+            return;
+        }
+
+        alerts.forEach(alert => {
+            const row = document.createElement('tr');
+
+            const severityBadge = alert.severity === 'critical' ? 'bg-danger' :
+                                 alert.severity === 'warning' ? 'bg-warning text-dark' : 'bg-info text-dark';
+
+            row.innerHTML = `
+                <td><span class="badge ${severityBadge}">${alert.severity}</span></td>
+                <td><small>${alert.alert_type.replace('_', ' ')}</small></td>
+                <td><strong>${alert.title}</strong></td>
+                <td>${alert.message}</td>
+                <td class="text-end">${alert.amount ? formatCurrency(alert.amount) : '-'}</td>
+                <td><small>${formatDate(alert.created_at)}</small></td>
+                <td class="text-center">
+                    <button class="btn btn-sm btn-outline-success" onclick="acknowledgeAlert(${alert.id})" title="Acknowledge">
+                        <i class="bi bi-check"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-primary" onclick="resolveAlert(${alert.id})" title="Resolve">
+                        <i class="bi bi-x-circle"></i>
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('Error loading alerts:', error);
+    }
+}
+
+// Filter and action functions
+function filterByLocation() {
+    const locationId = document.getElementById('locationFilter').value;
+    selectedLocationId = locationId ? parseInt(locationId) : null;
+    loadDashboardData();
+}
+
+function changePeriod() {
+    const period = document.getElementById('periodFilter').value;
+    if (period === 'custom') {
+        // TODO: Implement custom date range picker
+        alert('Custom date range picker coming soon!');
+        return;
+    }
+    selectedPeriodDays = parseInt(period);
+    loadDashboardData();
+}
+
+function filterAlerts(severity) {
+    currentAlertFilter = severity;
+    loadAlerts();
+}
+
+function refreshDashboard() {
+    loadDashboardData();
+    showToast('Dashboard refreshed', 'success');
+}
+
+function drillDownLocation(areaId) {
+    selectedLocationId = areaId;
+    document.getElementById('locationFilter').value = areaId;
+    loadDashboardData();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function scrollToAlerts() {
+    document.getElementById('alertsSection').scrollIntoView({ behavior: 'smooth' });
+}
+
+function toggleLocationDetail() {
+    // TODO: Implement expand/collapse for location table
+    showToast('Feature coming soon', 'info');
+}
+
+async function acknowledgeAlert(alertId) {
+    try {
+        const response = await fetch(`/accounting/api/banking-dashboard/alerts/${alertId}/acknowledge`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) throw new Error('Failed to acknowledge alert');
+
+        showToast('Alert acknowledged', 'success');
+        loadAlerts();
+        loadDashboardData(); // Refresh alert counts
+    } catch (error) {
+        console.error('Error acknowledging alert:', error);
+        showToast('Error acknowledging alert', 'danger');
+    }
+}
+
+async function resolveAlert(alertId) {
+    const notes = prompt('Resolution notes (optional):');
+
+    try {
+        const response = await fetch(`/accounting/api/banking-dashboard/alerts/${alertId}/resolve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                user_id: {{ current_user.id }},
+                resolution_notes: notes
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to resolve alert');
+
+        showToast('Alert resolved', 'success');
+        loadAlerts();
+        loadDashboardData(); // Refresh alert counts
+    } catch (error) {
+        console.error('Error resolving alert:', error);
+        showToast('Error resolving alert', 'danger');
+    }
+}
+
+// Utility functions
+function formatCurrency(value) {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(value);
+}
+
+function formatDate(dateString) {
+    return new Date(dateString).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+function showToast(message, type = 'info') {
+    // Simple toast notification (you can enhance this)
+    console.log(`[${type.toUpperCase()}] ${message}`);
+    // TODO: Implement actual toast UI
+}
+</script>
+
+<style>
+.nav-active {
+    background-color: #0d6efd !important;
+    color: white !important;
+}
+
+.table-dark tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.card-header h5 {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+</style>
+{% endblock %}

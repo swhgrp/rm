@@ -1,0 +1,514 @@
+{% extends "base.html" %}
+
+{% block title %}Cash Flow Statement - Restaurant Accounting System{% endblock %}
+{% block nav_cash_flow %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    .filters {
+        background: #161b22;
+        padding: 1rem;
+        border-radius: 4px;
+        border: 1px solid #30363d;
+        margin-bottom: 1rem;
+        display: flex;
+        gap: 1rem;
+        align-items: end;
+        flex-wrap: wrap;
+    }
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    .form-group label {
+        font-size: 0.85rem;
+        font-weight: 500;
+        color: #c9d1d9;
+    }
+    .form-group input, .form-group select {
+        padding: 0.5rem;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        font-size: 0.9rem;
+        background: #0d1117;
+        color: #c9d1d9;
+    }
+    .report-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #30363d;
+    }
+    .report-header h2 {
+        color: #c9d1d9;
+        font-size: 1.75rem;
+        margin-bottom: 0.5rem;
+    }
+    .report-header .subtitle {
+        color: #8b949e;
+        font-size: 1rem;
+    }
+    .report-section {
+        margin-bottom: 2rem;
+    }
+    .section-header {
+        background: #21262d;
+        color: #58a6ff;
+        padding: 0.75rem;
+        font-weight: 600;
+        font-size: 1.05rem;
+        border: 1px solid #30363d;
+        border-bottom: none;
+        margin-top: 1.5rem;
+    }
+    .report-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 0.5rem;
+    }
+    .report-table td {
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid #30363d;
+    }
+    .report-table tr:hover {
+        background: #161b22;
+    }
+    .report-table .number {
+        text-align: right;
+        font-family: 'Courier New', monospace;
+        width: 150px;
+    }
+    .report-table .label {
+        padding-left: 1.5rem;
+    }
+    .report-table .subsection-label {
+        padding-left: 2.5rem;
+        font-style: italic;
+        color: #8b949e;
+    }
+    .subtotal-row {
+        background: #21262d;
+        font-weight: 600;
+        border-top: 1px solid #30363d;
+    }
+    .total-row {
+        background: #1f6feb;
+        color: white;
+        font-weight: 700;
+        font-size: 1.05rem;
+        border-top: 2px solid #58a6ff;
+    }
+    .final-total-row {
+        background: #238636;
+        color: white;
+        font-weight: 700;
+        font-size: 1.1rem;
+        border-top: 3px double #2ea043;
+    }
+    .report-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        justify-content: flex-end;
+    }
+    .loading {
+        text-align: center;
+        padding: 2rem;
+        color: #8b949e;
+    }
+    .no-data {
+        text-align: center;
+        padding: 3rem;
+        color: #8b949e;
+        font-size: 1.1rem;
+    }
+    .cash-summary-box {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 4px;
+        padding: 1rem;
+        margin-top: 2rem;
+    }
+    .cash-summary-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+    }
+    .cash-summary-row.total {
+        border-top: 2px solid #58a6ff;
+        padding-top: 0.75rem;
+        font-weight: 700;
+        font-size: 1.1rem;
+        color: #58a6ff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <div class="page-header">
+        <h1><i class="bi bi-cash-stack me-2"></i>Cash Flow Statement</h1>
+        <p>Indirect Method - Shows cash generated/used by operating, investing, and financing activities</p>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters">
+        <div class="form-group">
+            <label for="startDate">Start Date</label>
+            <input type="date" id="startDate" value="{{ start_date or '' }}">
+        </div>
+        <div class="form-group">
+            <label for="endDate">End Date</label>
+            <input type="date" id="endDate" value="{{ end_date or '' }}">
+        </div>
+        <div class="form-group">
+            <label for="locationFilter">Location</label>
+            <select id="locationFilter">
+                <option value="">All Locations (Consolidated)</option>
+            </select>
+        </div>
+        <button class="btn btn-primary" onclick="loadCashFlowStatement()">
+            <i class="bi bi-arrow-clockwise me-1"></i>Generate Report
+        </button>
+    </div>
+
+    <!-- Report Actions -->
+    <div class="report-actions" id="reportActions" style="display: none;">
+        <button class="btn btn-secondary" onclick="exportToCSV()">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export CSV
+        </button>
+        <button class="btn btn-secondary" onclick="exportToPDF()">
+            <i class="bi bi-file-earmark-pdf me-1"></i>Export PDF
+        </button>
+        <button class="btn btn-secondary" onclick="window.print()">
+            <i class="bi bi-printer me-1"></i>Print
+        </button>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading" class="loading" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2">Generating cash flow statement...</p>
+    </div>
+
+    <!-- Report Container -->
+    <div id="reportContainer" style="display: none;">
+        <!-- Report Header -->
+        <div class="report-header">
+            <h2>Cash Flow Statement</h2>
+            <div class="subtitle" id="reportSubtitle"></div>
+        </div>
+
+        <!-- Operating Activities -->
+        <div class="section-header">Cash Flows from Operating Activities (Indirect Method)</div>
+        <table class="report-table">
+            <tr>
+                <td class="label">Net Income</td>
+                <td class="number" id="netIncome">$0.00</td>
+            </tr>
+        </table>
+
+        <table class="report-table" id="operatingAdjustments">
+            <tr class="subsection-label">
+                <td colspan="2">Adjustments to reconcile net income to cash from operations:</td>
+            </tr>
+        </table>
+
+        <table class="report-table" id="workingCapitalChanges">
+            <tr class="subsection-label">
+                <td colspan="2">Changes in operating assets and liabilities:</td>
+            </tr>
+        </table>
+
+        <table class="report-table">
+            <tr class="total-row">
+                <td class="label">Net Cash from Operating Activities</td>
+                <td class="number" id="netOperating">$0.00</td>
+            </tr>
+        </table>
+
+        <!-- Investing Activities -->
+        <div class="section-header">Cash Flows from Investing Activities</div>
+        <table class="report-table" id="investingActivities">
+        </table>
+        <table class="report-table">
+            <tr class="total-row">
+                <td class="label">Net Cash from Investing Activities</td>
+                <td class="number" id="netInvesting">$0.00</td>
+            </tr>
+        </table>
+
+        <!-- Financing Activities -->
+        <div class="section-header">Cash Flows from Financing Activities</div>
+        <table class="report-table" id="financingActivities">
+        </table>
+        <table class="report-table">
+            <tr class="total-row">
+                <td class="label">Net Cash from Financing Activities</td>
+                <td class="number" id="netFinancing">$0.00</td>
+            </tr>
+        </table>
+
+        <!-- Summary -->
+        <div class="cash-summary-box">
+            <div class="cash-summary-row">
+                <span>Net Increase (Decrease) in Cash:</span>
+                <span id="netIncrease" style="font-family: 'Courier New', monospace;">$0.00</span>
+            </div>
+            <div class="cash-summary-row">
+                <span>Cash at Beginning of Period:</span>
+                <span id="cashBeginning" style="font-family: 'Courier New', monospace;">$0.00</span>
+            </div>
+            <div class="cash-summary-row total">
+                <span>Cash at End of Period:</span>
+                <span id="cashEnding" style="font-family: 'Courier New', monospace;">$0.00</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- No Data -->
+    <div id="noData" class="no-data" style="display: none;">
+        <i class="bi bi-inbox" style="font-size: 3rem; color: #30363d;"></i>
+        <p>No data available for the selected period</p>
+    </div>
+</div>
+
+<script>
+let currentData = null;
+
+// Load locations on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadLocations();
+    setDefaultDates();
+});
+
+function setDefaultDates() {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    document.getElementById('startDate').value = firstDay.toISOString().split('T')[0];
+    document.getElementById('endDate').value = lastDay.toISOString().split('T')[0];
+}
+
+async function loadLocations() {
+    try {
+        const response = await fetch('/accounting/api/areas/');
+        if (response.ok) {
+            const locations = await response.json();
+            const select = document.getElementById('locationFilter');
+            locations.forEach(location => {
+                const option = document.createElement('option');
+                option.value = location.id;
+                option.textContent = location.name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading locations:', error);
+    }
+}
+
+async function loadCashFlowStatement() {
+    const startDate = document.getElementById('startDate').value;
+    const endDate = document.getElementById('endDate').value;
+    const areaId = document.getElementById('locationFilter').value;
+
+    if (!startDate || !endDate) {
+        showToast('Please select both start and end dates', 'warning');
+        return;
+    }
+
+    // Show loading
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('reportContainer').style.display = 'none';
+    document.getElementById('noData').style.display = 'none';
+    document.getElementById('reportActions').style.display = 'none';
+
+    try {
+        let url = `/accounting/api/reports/cash-flow-statement?start_date=${startDate}&end_date=${endDate}`;
+        if (areaId) {
+            url += `&area_id=${areaId}`;
+        }
+
+        const response = await fetch(url);
+        if (response.ok) {
+            const data = await response.json();
+            currentData = data;
+            displayCashFlowStatement(data);
+            document.getElementById('reportActions').style.display = 'flex';
+        } else {
+            throw new Error('Failed to load cash flow statement');
+        }
+    } catch (error) {
+        console.error('Error loading cash flow statement:', error);
+        showToast('Error loading cash flow statement', 'danger');
+        document.getElementById('noData').style.display = 'block';
+    } finally {
+        document.getElementById('loading').style.display = 'none';
+    }
+}
+
+function displayCashFlowStatement(data) {
+    // Update report subtitle
+    const subtitle = `${data.area_name || 'All Locations'}<br>${formatDate(data.start_date)} to ${formatDate(data.end_date)}`;
+    document.getElementById('reportSubtitle').innerHTML = subtitle;
+
+    // Net Income
+    document.getElementById('netIncome').textContent = formatCurrency(data.net_income);
+
+    // Operating Adjustments
+    const adjustmentsTable = document.getElementById('operatingAdjustments');
+    adjustmentsTable.innerHTML = '<tr class="subsection-label"><td colspan="2">Adjustments to reconcile net income to cash from operations:</td></tr>';
+    data.operating_adjustments.forEach(item => {
+        const row = createLineItemRow(item);
+        adjustmentsTable.appendChild(row);
+    });
+
+    // Working Capital Changes
+    const wcTable = document.getElementById('workingCapitalChanges');
+    wcTable.innerHTML = '<tr class="subsection-label"><td colspan="2">Changes in operating assets and liabilities:</td></tr>';
+    data.operating_working_capital_changes.forEach(item => {
+        const row = createLineItemRow(item);
+        wcTable.appendChild(row);
+    });
+
+    // Net Operating
+    document.getElementById('netOperating').textContent = formatCurrency(data.net_cash_from_operating);
+    document.getElementById('netOperating').style.color = data.net_cash_from_operating >= 0 ? '#2ea043' : '#f85149';
+
+    // Investing Activities
+    const investingTable = document.getElementById('investingActivities');
+    investingTable.innerHTML = '';
+    if (data.investing_activities.length === 0) {
+        investingTable.innerHTML = '<tr><td class="label" style="font-style: italic; color: #8b949e;">No investing activities</td><td class="number">$0.00</td></tr>';
+    } else {
+        data.investing_activities.forEach(item => {
+            const row = createLineItemRow(item);
+            investingTable.appendChild(row);
+        });
+    }
+    document.getElementById('netInvesting').textContent = formatCurrency(data.net_cash_from_investing);
+    document.getElementById('netInvesting').style.color = data.net_cash_from_investing >= 0 ? '#2ea043' : '#f85149';
+
+    // Financing Activities
+    const financingTable = document.getElementById('financingActivities');
+    financingTable.innerHTML = '';
+    if (data.financing_activities.length === 0) {
+        financingTable.innerHTML = '<tr><td class="label" style="font-style: italic; color: #8b949e;">No financing activities</td><td class="number">$0.00</td></tr>';
+    } else {
+        data.financing_activities.forEach(item => {
+            const row = createLineItemRow(item);
+            financingTable.appendChild(row);
+        });
+    }
+    document.getElementById('netFinancing').textContent = formatCurrency(data.net_cash_from_financing);
+    document.getElementById('netFinancing').style.color = data.net_cash_from_financing >= 0 ? '#2ea043' : '#f85149';
+
+    // Summary
+    document.getElementById('netIncrease').textContent = formatCurrency(data.net_increase_in_cash);
+    document.getElementById('netIncrease').style.color = data.net_increase_in_cash >= 0 ? '#2ea043' : '#f85149';
+    document.getElementById('cashBeginning').textContent = formatCurrency(data.cash_beginning_of_period);
+    document.getElementById('cashEnding').textContent = formatCurrency(data.cash_end_of_period);
+
+    // Show report
+    document.getElementById('reportContainer').style.display = 'block';
+}
+
+function createLineItemRow(item) {
+    const row = document.createElement('tr');
+
+    const labelCell = document.createElement('td');
+    labelCell.className = 'label';
+    labelCell.textContent = item.description || item.account_name;
+    row.appendChild(labelCell);
+
+    const amountCell = document.createElement('td');
+    amountCell.className = 'number';
+    amountCell.textContent = formatCurrency(item.amount);
+    amountCell.style.color = item.amount >= 0 ? '#c9d1d9' : '#f85149';
+    row.appendChild(amountCell);
+
+    return row;
+}
+
+function formatCurrency(amount) {
+    const num = parseFloat(amount);
+    if (isNaN(num)) return '$0.00';
+    const formatted = Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return num < 0 ? `($${formatted})` : `$${formatted}`;
+}
+
+function formatDate(dateStr) {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function exportToCSV() {
+    if (!currentData) return;
+
+    let csv = 'Cash Flow Statement\n';
+    csv += `${currentData.area_name || 'All Locations'}\n`;
+    csv += `${currentData.start_date} to ${currentData.end_date}\n\n`;
+
+    csv += 'OPERATING ACTIVITIES\n';
+    csv += `Net Income,${currentData.net_income}\n`;
+    csv += '\nAdjustments:\n';
+    currentData.operating_adjustments.forEach(item => {
+        csv += `${item.description || item.account_name},${item.amount}\n`;
+    });
+    csv += '\nWorking Capital Changes:\n';
+    currentData.operating_working_capital_changes.forEach(item => {
+        csv += `${item.description || item.account_name},${item.amount}\n`;
+    });
+    csv += `\nNet Cash from Operating,${currentData.net_cash_from_operating}\n`;
+
+    csv += '\nINVESTING ACTIVITIES\n';
+    currentData.investing_activities.forEach(item => {
+        csv += `${item.description || item.account_name},${item.amount}\n`;
+    });
+    csv += `Net Cash from Investing,${currentData.net_cash_from_investing}\n`;
+
+    csv += '\nFINANCING ACTIVITIES\n';
+    currentData.financing_activities.forEach(item => {
+        csv += `${item.description || item.account_name},${item.amount}\n`;
+    });
+    csv += `Net Cash from Financing,${currentData.net_cash_from_financing}\n`;
+
+    csv += '\nSUMMARY\n';
+    csv += `Net Increase in Cash,${currentData.net_increase_in_cash}\n`;
+    csv += `Cash Beginning,${currentData.cash_beginning_of_period}\n`;
+    csv += `Cash Ending,${currentData.cash_end_of_period}\n`;
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `CashFlow_${currentData.start_date}_to_${currentData.end_date}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+function exportToPDF() {
+    showToast('PDF export coming soon', 'info');
+}
+
+function showToast(message, type = 'info') {
+    // Simple toast notification
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type}`;
+    toast.style.position = 'fixed';
+    toast.style.top = '20px';
+    toast.style.right = '20px';
+    toast.style.zIndex = '9999';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+</script>
+{% endblock %}

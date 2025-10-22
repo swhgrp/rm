@@ -527,7 +527,7 @@ async function saveUserLocations() {
 
 // Delete user
 async function deleteUser(userId, username) {
-    if (!confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
+    if (!await showConfirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
         return;
     }
 

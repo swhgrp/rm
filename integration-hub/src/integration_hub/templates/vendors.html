@@ -190,7 +190,7 @@
 <script>
 // Sync vendors from other systems
 async function syncVendors() {
-    if (!confirm('Sync vendors from Inventory and Accounting systems?')) {
+    if (!await showConfirm('Sync vendors from Inventory and Accounting systems?')) {
         return;
     }
 

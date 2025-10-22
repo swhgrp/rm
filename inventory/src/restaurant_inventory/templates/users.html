@@ -253,7 +253,7 @@
 
     // Deactivate user
     async function deactivateUser(userId) {
-        if (!confirm('Are you sure you want to deactivate this user?')) {
+        if (!await showConfirm('Are you sure you want to deactivate this user?')) {
             return;
         }
 
@@ -285,7 +285,7 @@
 
     // Delete user
     async function deleteUser(userId) {
-        if (!confirm('Are you sure you want to permanently delete this user? This action cannot be undone.')) {
+        if (!await showConfirm('Are you sure you want to permanently delete this user? This action cannot be undone.')) {
             return;
         }
 

@@ -203,7 +203,7 @@ async function deleteLocation(locationId) {
     const location = locations.find(loc => loc.id === locationId);
     if (!location) return;
     
-    if (!confirm(`Are you sure you want to delete "${location.name}"? This action cannot be undone.`)) {
+    if (!await showConfirm(`Are you sure you want to delete "${location.name}"? This action cannot be undone.`)) {
         return;
     }
     

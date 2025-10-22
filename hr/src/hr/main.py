@@ -48,12 +48,13 @@ if os.path.exists(static_dir):
 # Custom exception handler for authentication redirects
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    """Handle HTTP exceptions - redirect 401 to login for HTML requests"""
+    """Handle HTTP exceptions - redirect 401 to Portal login for HTML requests"""
     if exc.status_code == status.HTTP_401_UNAUTHORIZED:
         # Check if this is an HTML request (not API)
         accept = request.headers.get("accept", "")
         if "text/html" in accept or request.url.path.startswith("/hr/"):
-            return RedirectResponse(url="/hr/login", status_code=302)
+            # Redirect to Portal login instead of local login
+            return RedirectResponse(url="/portal/login?redirect=/hr/", status_code=302)
     # For API requests or other errors, return JSON response
     from fastapi.responses import JSONResponse
     return JSONResponse(

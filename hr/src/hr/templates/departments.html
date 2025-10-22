@@ -259,7 +259,7 @@ async function saveDepartment(event) {
 }
 
 async function deleteDepartment(id, name) {
-    if (!confirm(`Are you sure you want to delete the department "${name}"?`)) {
+    if (!await showConfirm(`Are you sure you want to delete the department "${name}"?`)) {
         return;
     }
 

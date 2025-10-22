@@ -423,7 +423,7 @@ async function saveTemplate() {
 }
 
 async function deleteTemplate(templateId) {
-    if (!confirm('Are you sure you want to delete this template?')) return;
+    if (!await showConfirm('Are you sure you want to delete this template?')) return;
 
     try {
         await apiRequest(`api/count-templates/${templateId}`, {

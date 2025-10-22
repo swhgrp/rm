@@ -11,7 +11,7 @@ HR_DATABASE_URL = os.getenv(
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
 SESSION_COOKIE_NAME = "portal_session"
-SESSION_EXPIRE_MINUTES = 480  # 8 hours
+SESSION_EXPIRE_MINUTES = 30  # 30 minutes inactivity timeout
 
 # System URLs (for token validation endpoints)
 INVENTORY_API_URL = os.getenv("INVENTORY_API_URL", "http://inventory-app:8000")

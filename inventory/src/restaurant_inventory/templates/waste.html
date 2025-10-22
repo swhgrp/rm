@@ -634,7 +634,7 @@ async function viewDetails(wasteId) {
 }
 
 async function deleteWaste(wasteId) {
-    if (!confirm('Are you sure you want to delete this waste record?')) {
+    if (!await showConfirm('Are you sure you want to delete this waste record?')) {
         return;
     }
 

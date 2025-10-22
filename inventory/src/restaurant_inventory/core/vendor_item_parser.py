@@ -5,7 +5,8 @@ Vendor item list parser for CSV and Excel files
 import os
 import csv
 import io
-from typing import Dict, List, Optional
+import re
+from typing import Dict, List, Optional, Tuple
 import pandas as pd
 
 
@@ -128,3 +129,76 @@ class VendorItemParser:
                     break
 
         return mapping
+
+    @staticmethod
+    def parse_unit_size(unit_size_str: str) -> Tuple[Optional[float], Optional[str]]:
+        """
+        Parse a combined unit size string into numeric size and unit.
+
+        Examples:
+            "5.0 LB" -> (5.0, "LB")
+            "10.0 LB" -> (10.0, "LB")
+            "16.0 OZ" -> (16.0, "OZ")
+            "2.5 GAL" -> (2.5, "GAL")
+            "54.0 CO" -> (54.0, "CO")  # Count
+            "32.0 FOZ" -> (32.0, "FOZ")  # Fluid Ounces
+
+        Args:
+            unit_size_str: String like "5.0 LB" or "16.0 OZ"
+
+        Returns:
+            Tuple of (numeric_size, unit) or (None, None) if parsing fails
+        """
+        if not unit_size_str or pd.isna(unit_size_str):
+            return None, None
+
+        try:
+            # Convert to string and clean up
+            unit_str = str(unit_size_str).strip()
+
+            # Pattern: number (with optional decimal) followed by space and unit
+            # Examples: "5.0 LB", "10 LB", "16.0 OZ", "2.5 GAL"
+            match = re.match(r'^(\d+\.?\d*)\s+([A-Za-z]+)$', unit_str)
+
+            if match:
+                size = float(match.group(1))
+                unit = match.group(2).upper()
+                return size, unit
+
+            return None, None
+
+        except (ValueError, AttributeError):
+            return None, None
+
+    def post_process_items(self, items: List[Dict], parse_unit_size_field: Optional[str] = None) -> List[Dict]:
+        """
+        Post-process items to handle vendor-specific formats.
+
+        Args:
+            items: List of parsed items
+            parse_unit_size_field: If provided, parse this field as combined unit size
+
+        Returns:
+            Processed items with pack_size and unit separated
+        """
+        if not parse_unit_size_field:
+            return items
+
+        processed_items = []
+        for item in items:
+            # Copy the item
+            processed_item = item.copy()
+
+            # If the item has the combined unit size field, parse it
+            if parse_unit_size_field in processed_item:
+                unit_size_value = processed_item.get(parse_unit_size_field)
+                size, unit = self.parse_unit_size(unit_size_value)
+
+                if size is not None:
+                    processed_item['pack_size'] = size
+                if unit is not None:
+                    processed_item['unit'] = unit
+
+            processed_items.append(processed_item)
+
+        return processed_items

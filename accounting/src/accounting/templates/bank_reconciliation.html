@@ -1,0 +1,1319 @@
+{% extends "base.html" %}
+
+{% block title %}Bank Reconciliation - {{ super() }}{% endblock %}
+
+{% block nav_bank_reconciliation %}active{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2 class="mb-2">
+                <i class="bi bi-bank me-2"></i>Bank Reconciliation
+            </h2>
+            <p class="text-muted">Match bank transactions to vendor bills and journal entries</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <select class="form-select form-select-sm d-inline-block w-auto" id="bankAccountSelect">
+                <option value="">Select Bank Account...</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="btn-group" role="group">
+                <input type="radio" class="btn-check" name="statusFilter" id="filterAll" value="all" checked>
+                <label class="btn btn-outline-secondary btn-sm" for="filterAll">
+                    All Transactions
+                </label>
+
+                <input type="radio" class="btn-check" name="statusFilter" id="filterUnreconciled" value="unreconciled">
+                <label class="btn btn-outline-warning btn-sm" for="filterUnreconciled">
+                    Unreconciled Only
+                </label>
+
+                <input type="radio" class="btn-check" name="statusFilter" id="filterReconciled" value="reconciled">
+                <label class="btn btn-outline-success btn-sm" for="filterReconciled">
+                    Reconciled Only
+                </label>
+            </div>
+
+            <div class="float-end">
+                <input type="date" class="form-control form-control-sm d-inline-block w-auto me-2" id="startDate">
+                <span class="text-muted">to</span>
+                <input type="date" class="form-control form-control-sm d-inline-block w-auto ms-2 me-2" id="endDate">
+                <button class="btn btn-sm btn-primary" onclick="loadTransactions()">
+                    <i class="bi bi-funnel me-1"></i>Filter
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transactions Table -->
+    <div class="card">
+        <div class="card-body">
+            <div id="loadingSpinner" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-muted mt-2">Loading transactions...</p>
+            </div>
+
+            <div id="transactionsContainer" style="display: none;">
+                <table class="table table-dark table-striped table-hover" id="transactionsTable">
+                    <thead>
+                        <tr>
+                            <th width="100">Date</th>
+                            <th>Description</th>
+                            <th width="120" class="text-end">Amount</th>
+                            <th width="150">Status</th>
+                            <th width="150" class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsBody">
+                        <!-- Transactions will be loaded here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div id="noTransactions" style="display: none;" class="text-center py-5 text-muted">
+                <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                <p class="mt-3">No transactions found. Select a bank account to get started.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Open Bills Modal -->
+<div class="modal fade" id="openBillsModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark text-light">
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title" id="modalVendorName">
+                        <i class="bi bi-receipt me-2"></i>Open Bills
+                    </h5>
+                    <p class="text-muted mb-0 small" id="modalTransactionInfo">
+                        Transaction info will appear here
+                    </p>
+                </div>
+                <button type="button" class="btn-close btn-close-white" onclick="closeOpenBillsModal()"></button>
+            </div>
+            <div class="modal-body">
+                <div id="billsLoadingSpinner" class="text-center py-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading bills...</span>
+                    </div>
+                </div>
+
+                <div id="billsContainer" style="display: none;">
+                    <table class="table table-dark table-hover">
+                        <thead>
+                            <tr>
+                                <th width="50">
+                                    <input type="checkbox" id="selectAllBills" onchange="toggleAllBills()">
+                                </th>
+                                <th>Bill #</th>
+                                <th>Bill Date</th>
+                                <th>Due Date</th>
+                                <th class="text-end">Total</th>
+                                <th class="text-end">Paid</th>
+                                <th class="text-end">Amount Due</th>
+                                <th width="100" class="text-center">Match</th>
+                            </tr>
+                        </thead>
+                        <tbody id="billsTableBody">
+                            <!-- Bills will be loaded here -->
+                        </tbody>
+                    </table>
+
+                    <div class="alert alert-info mt-3" id="selectionSummary">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <strong>Selected Bills Total:</strong>
+                                <span id="selectedTotal" class="ms-2">$0.00</span>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Transaction Amount:</strong>
+                                <span id="transactionAmount" class="ms-2">$0.00</span>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Difference:</strong>
+                                <span id="difference" class="ms-2 badge bg-secondary">$0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="noBillsFound" style="display: none;" class="text-center py-5 text-muted">
+                    <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+                    <p class="mt-3">No open bills found for this vendor.</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeOpenBillsModal()">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-success" id="confirmMatchBtn" onclick="confirmMatch()" disabled>
+                    <i class="bi bi-check-circle me-1"></i>Confirm Match
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- GL Assignment Modal -->
+<div class="modal fade" id="glAssignmentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Assign to General Ledger</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Transaction Info -->
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <strong>Date:</strong>
+                                <div id="glTransactionDate"></div>
+                            </div>
+                            <div class="col-md-5">
+                                <strong>Description:</strong>
+                                <div id="glTransactionDesc"></div>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Amount:</strong>
+                                <div id="glTransactionAmount" class="fs-5"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI-Suggested GL Accounts -->
+                <div id="glSuggestionsSection" class="mb-3" style="display: none;">
+                    <label class="form-label">
+                        <i class="bi bi-lightbulb text-warning me-1"></i>Suggested GL Accounts
+                    </label>
+                    <div id="glSuggestionsList" class="d-flex flex-wrap gap-2">
+                        <!-- Suggestions will be dynamically inserted here -->
+                    </div>
+                </div>
+
+                <!-- GL Account Selection with Search -->
+                <div class="mb-3">
+                    <label for="glAccountSearch" class="form-label">Select GL Account *</label>
+                    <input type="text"
+                           class="form-control"
+                           id="glAccountSearch"
+                           placeholder="Search accounts by number or name..."
+                           autocomplete="off">
+                    <input type="hidden" id="glAccountSelect" required>
+                    <div id="glAccountDropdown"
+                         class="dropdown-menu w-100"
+                         style="max-height: 300px; overflow-y: auto; display: none;">
+                        <!-- Account options will be dynamically inserted here -->
+                    </div>
+                    <small class="text-muted" id="selectedAccountDisplay"></small>
+                </div>
+
+                <!-- Description/Memo -->
+                <div class="mb-3">
+                    <label for="glMemo" class="form-label">Memo/Notes</label>
+                    <textarea class="form-control" id="glMemo" rows="2" placeholder="Optional notes about this transaction"></textarea>
+                </div>
+
+                <!-- Note: Location/Area is automatically inherited from the bank account -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmGLBtn" onclick="confirmGLAssignment()" disabled>
+                    <i class="bi bi-check-circle me-1"></i>Confirm Assignment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Highlight exact matches */
+    .exact-match {
+        background-color: rgba(25, 135, 84, 0.2) !important;
+    }
+
+    .exact-match:hover {
+        background-color: rgba(25, 135, 84, 0.3) !important;
+    }
+
+    /* Status badges */
+    .status-unreconciled {
+        background-color: #6c757d;
+    }
+
+    .status-reconciled {
+        background-color: #198754;
+    }
+
+    /* Vendor badge colors */
+    .vendor-badge {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+
+    /* Amount colors */
+    .amount-negative {
+        color: #dc3545;
+    }
+
+    .amount-positive {
+        color: #198754;
+    }
+</style>
+
+<script>
+let currentBankAccountId = null;
+let currentTransactionId = null;
+let allTransactions = [];
+let openBills = [];
+
+// Initialize
+document.addEventListener('DOMContentLoaded', function() {
+    // Hide loading spinner and show empty state initially
+    document.getElementById('loadingSpinner').style.display = 'none';
+    document.getElementById('noTransactions').style.display = 'block';
+
+    loadBankAccounts();
+
+    // Set default date range (last 30 days)
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+
+    document.getElementById('startDate').valueAsDate = startDate;
+    document.getElementById('endDate').valueAsDate = endDate;
+
+    // Listen for bank account selection
+    document.getElementById('bankAccountSelect').addEventListener('change', function() {
+        currentBankAccountId = this.value;
+        if (currentBankAccountId) {
+            loadTransactions();
+        } else {
+            // Reset to empty state
+            document.getElementById('loadingSpinner').style.display = 'none';
+            document.getElementById('transactionsContainer').style.display = 'none';
+            document.getElementById('noTransactions').style.display = 'block';
+        }
+    });
+
+    // Listen for filter changes
+    document.querySelectorAll('input[name="statusFilter"]').forEach(radio => {
+        radio.addEventListener('change', filterTransactions);
+    });
+});
+
+// Load bank accounts
+async function loadBankAccounts() {
+    try {
+        const response = await fetch('/accounting/api/bank-accounts/');
+        const accounts = await response.json();
+
+        const select = document.getElementById('bankAccountSelect');
+        select.innerHTML = '<option value="">Select Bank Account...</option>';
+
+        accounts.forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.id;
+            option.textContent = `${account.account_name} (${account.account_number || 'N/A'})`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading bank accounts:', error);
+        showToast('Error loading bank accounts', 'danger');
+    }
+}
+
+// Load transactions for selected account
+async function loadTransactions() {
+    if (!currentBankAccountId) {
+        document.getElementById('noTransactions').style.display = 'block';
+        document.getElementById('loadingSpinner').style.display = 'none';
+        return;
+    }
+
+    document.getElementById('loadingSpinner').style.display = 'block';
+    document.getElementById('transactionsContainer').style.display = 'none';
+    document.getElementById('noTransactions').style.display = 'none';
+
+    try {
+        const response = await fetch(`/accounting/api/bank-accounts/${currentBankAccountId}/transactions?limit=1000`);
+        allTransactions = await response.json();
+
+        // Load vendor recognition for each transaction
+        for (let transaction of allTransactions) {
+            transaction.vendorInfo = await recognizeVendor(transaction.id);
+        }
+
+        filterTransactions();
+
+    } catch (error) {
+        console.error('Error loading transactions:', error);
+        showToast('Error loading transactions', 'danger');
+        document.getElementById('loadingSpinner').style.display = 'none';
+        document.getElementById('noTransactions').style.display = 'block';
+    }
+}
+
+// Recognize vendor for a transaction
+async function recognizeVendor(transactionId) {
+    try {
+        const response = await fetch(`/accounting/api/bank-statements/transactions/${transactionId}/recognize-vendor`);
+        return await response.json();
+    } catch (error) {
+        console.error('Error recognizing vendor:', error);
+        return null;
+    }
+}
+
+// Filter transactions based on status
+function filterTransactions() {
+    const filter = document.querySelector('input[name="statusFilter"]:checked').value;
+
+    let filtered = allTransactions;
+    if (filter === 'unreconciled') {
+        filtered = allTransactions.filter(t => t.status === 'unreconciled');
+    } else if (filter === 'reconciled') {
+        filtered = allTransactions.filter(t => t.status === 'reconciled');
+    }
+
+    renderTransactions(filtered);
+}
+
+// Render transactions table
+function renderTransactions(transactions) {
+    const tbody = document.getElementById('transactionsBody');
+    tbody.innerHTML = '';
+
+    if (transactions.length === 0) {
+        document.getElementById('loadingSpinner').style.display = 'none';
+        document.getElementById('noTransactions').style.display = 'block';
+        return;
+    }
+
+    transactions.forEach(transaction => {
+        const row = document.createElement('tr');
+
+        // Date
+        const dateCell = document.createElement('td');
+        dateCell.textContent = new Date(transaction.transaction_date).toLocaleDateString();
+        row.appendChild(dateCell);
+
+        // Description with badges
+        const descCell = document.createElement('td');
+        descCell.innerHTML = transaction.description || '';
+
+        // Add GL account badge if assigned
+        if (transaction.suggested_account) {
+            const glBadge = document.createElement('div');
+            glBadge.className = 'mt-1 d-flex align-items-center gap-2';
+
+            // Show confidence score if this is an auto-match
+            let confidenceBadge = '';
+            if (transaction.suggestion_confidence && transaction.suggestion_confidence > 0) {
+                const confidence = parseFloat(transaction.suggestion_confidence);
+                const confidenceColor = confidence >= 90 ? 'success' :
+                                       confidence >= 70 ? 'warning' : 'secondary';
+                confidenceBadge = `
+                    <span class="badge bg-${confidenceColor}" title="Auto-Match Confidence">
+                        <i class="bi bi-robot me-1"></i>${Math.round(confidence)}%
+                    </span>
+                `;
+            }
+
+            glBadge.innerHTML = `
+                ${confidenceBadge}
+                <span class="badge bg-info">
+                    <i class="bi bi-journal-text me-1"></i>GL: ${transaction.suggested_account.account_number} - ${transaction.suggested_account.account_name}
+                </span>
+                <button class="btn btn-sm btn-outline-secondary py-0 px-2"
+                        onclick="editGLAssignment(${transaction.id}, '${transaction.description}')"
+                        title="Change GL Account">
+                    <i class="bi bi-pencil-square"></i>
+                </button>
+            `;
+            descCell.appendChild(glBadge);
+        }
+
+        // Add vendor badges if vendor recognized
+        if (transaction.vendorInfo && transaction.vendorInfo.matched_vendor) {
+            const vendorInfo = transaction.vendorInfo;
+
+            // Open bills badge
+            if (vendorInfo.open_bills_count > 0) {
+                const billsBadge = document.createElement('span');
+                billsBadge.className = 'badge bg-success ms-2 vendor-badge';
+                billsBadge.textContent = `Reconcile ${vendorInfo.open_bills_count}`;
+                descCell.appendChild(billsBadge);
+            }
+
+            // Exact match badge
+            if (vendorInfo.has_exact_match) {
+                const matchBadge = document.createElement('span');
+                matchBadge.className = 'badge bg-warning ms-2 vendor-badge';
+                matchBadge.textContent = '100% Match';
+                descCell.appendChild(matchBadge);
+            }
+        }
+
+        row.appendChild(descCell);
+
+        // Amount
+        const amountCell = document.createElement('td');
+        amountCell.className = 'text-end';
+        const amount = parseFloat(transaction.amount);
+        amountCell.innerHTML = `<span class="${amount < 0 ? 'amount-negative' : 'amount-positive'}">
+            ${formatCurrency(amount)}
+        </span>`;
+        row.appendChild(amountCell);
+
+        // Status
+        const statusCell = document.createElement('td');
+        const statusBadge = document.createElement('span');
+        statusBadge.className = `badge status-${transaction.status}`;
+        statusBadge.textContent = transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1);
+        statusCell.appendChild(statusBadge);
+        row.appendChild(statusCell);
+
+        // Action
+        const actionCell = document.createElement('td');
+        actionCell.className = 'text-center';
+
+        if (transaction.status === 'unreconciled') {
+            const btnGroup = document.createElement('div');
+            btnGroup.className = 'd-flex gap-1 justify-content-center';
+
+            // If auto-matched, show Verify & Approve button prominently
+            if (transaction.suggested_account && transaction.suggestion_confidence && parseFloat(transaction.suggestion_confidence) >= 70) {
+                const verifyBtn = document.createElement('button');
+                verifyBtn.className = 'btn btn-sm btn-warning';
+                verifyBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Verify';
+                verifyBtn.title = 'Verify & Approve Auto-Match';
+                verifyBtn.onclick = () => verifyAndApproveAutoMatch(transaction.id, transaction.suggested_account.id);
+                btnGroup.appendChild(verifyBtn);
+
+                // Add smaller reject button
+                const rejectBtn = document.createElement('button');
+                rejectBtn.className = 'btn btn-sm btn-outline-danger';
+                rejectBtn.innerHTML = '<i class="bi bi-x-circle"></i>';
+                rejectBtn.title = 'Reject Auto-Match';
+                rejectBtn.onclick = () => rejectAutoMatch(transaction.id);
+                btnGroup.appendChild(rejectBtn);
+            } else {
+                // Standard buttons for non-auto-matched transactions
+                const matchBtn = document.createElement('button');
+                matchBtn.className = 'btn btn-sm btn-success';
+                matchBtn.innerHTML = '<i class="bi bi-receipt"></i>';
+                matchBtn.title = 'Match Bills';
+                matchBtn.onclick = () => showOpenBills(transaction.id);
+
+                const glBtn = document.createElement('button');
+                glBtn.className = 'btn btn-sm btn-primary';
+                glBtn.innerHTML = '<i class="bi bi-journal-text"></i>';
+                glBtn.title = 'Assign to GL';
+                glBtn.onclick = () => showGLAssignment(transaction.id);
+
+                btnGroup.appendChild(matchBtn);
+                btnGroup.appendChild(glBtn);
+            }
+
+            actionCell.appendChild(btnGroup);
+        } else if (transaction.status === 'reconciled') {
+            // Show if it was confirmed or auto-matched
+            if (transaction.confirmed_at) {
+                actionCell.innerHTML = '<i class="bi bi-check-circle-fill text-success" title="Verified & Approved"></i>';
+            } else {
+                actionCell.innerHTML = '<i class="bi bi-check-circle text-success" title="Matched"></i>';
+            }
+        }
+
+        row.appendChild(actionCell);
+        tbody.appendChild(row);
+    });
+
+    document.getElementById('loadingSpinner').style.display = 'none';
+    document.getElementById('transactionsContainer').style.display = 'block';
+}
+
+// Show open bills modal
+async function showOpenBills(transactionId) {
+    currentTransactionId = transactionId;
+
+    const modal = new bootstrap.Modal(document.getElementById('openBillsModal'));
+    modal.show();
+
+    document.getElementById('billsLoadingSpinner').style.display = 'block';
+    document.getElementById('billsContainer').style.display = 'none';
+    document.getElementById('noBillsFound').style.display = 'none';
+
+    try {
+        // Load transaction details
+        const transaction = allTransactions.find(t => t.id === transactionId);
+
+        // Load open bills
+        const response = await fetch(`/accounting/api/bank-statements/transactions/${transactionId}/open-bills`);
+        const billsData = await response.json();
+
+        openBills = billsData.open_bills;
+
+        // Update modal header
+        if (billsData.vendor) {
+            document.getElementById('modalVendorName').innerHTML = `
+                <i class="bi bi-receipt me-2"></i>${billsData.vendor.vendor_name} - Open Bills
+            `;
+        }
+
+        document.getElementById('modalTransactionInfo').textContent =
+            `Transaction: ${formatCurrency(billsData.bank_amount)} on ${new Date(billsData.bank_date).toLocaleDateString()} - ${billsData.bank_description}`;
+
+        document.getElementById('transactionAmount').textContent = formatCurrency(Math.abs(parseFloat(billsData.bank_amount)));
+
+        if (openBills.length === 0) {
+            document.getElementById('billsLoadingSpinner').style.display = 'none';
+            document.getElementById('noBillsFound').style.display = 'block';
+        } else {
+            renderOpenBills();
+        }
+
+    } catch (error) {
+        console.error('Error loading open bills:', error);
+        showToast('Error loading open bills', 'danger');
+    }
+}
+
+// Render open bills table
+function renderOpenBills() {
+    const tbody = document.getElementById('billsTableBody');
+    tbody.innerHTML = '';
+
+    openBills.forEach((bill, index) => {
+        const row = document.createElement('tr');
+
+        // Add exact-match class for 100% matches
+        if (bill.is_exact_match) {
+            row.className = 'exact-match';
+        }
+
+        // Checkbox
+        const checkCell = document.createElement('td');
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.id = `bill_${bill.id}`;
+        checkbox.value = bill.id;
+        checkbox.onchange = updateSelectionSummary;
+        // Auto-select exact matches
+        if (bill.is_exact_match) {
+            checkbox.checked = true;
+        }
+        checkCell.appendChild(checkbox);
+        row.appendChild(checkCell);
+
+        // Bill Number
+        const billNumCell = document.createElement('td');
+        billNumCell.textContent = bill.bill_number;
+        row.appendChild(billNumCell);
+
+        // Bill Date
+        const billDateCell = document.createElement('td');
+        billDateCell.textContent = new Date(bill.bill_date).toLocaleDateString();
+        row.appendChild(billDateCell);
+
+        // Due Date
+        const dueDateCell = document.createElement('td');
+        dueDateCell.textContent = bill.due_date ? new Date(bill.due_date).toLocaleDateString() : 'N/A';
+        row.appendChild(dueDateCell);
+
+        // Total Amount
+        const totalCell = document.createElement('td');
+        totalCell.className = 'text-end';
+        totalCell.textContent = formatCurrency(bill.total_amount);
+        row.appendChild(totalCell);
+
+        // Paid Amount
+        const paidCell = document.createElement('td');
+        paidCell.className = 'text-end';
+        paidCell.textContent = formatCurrency(bill.paid_amount);
+        row.appendChild(paidCell);
+
+        // Amount Due
+        const dueCell = document.createElement('td');
+        dueCell.className = 'text-end';
+        dueCell.innerHTML = `<strong>${formatCurrency(bill.amount_due)}</strong>`;
+        row.appendChild(dueCell);
+
+        // Match Confidence
+        const matchCell = document.createElement('td');
+        matchCell.className = 'text-center';
+        const badge = document.createElement('span');
+        badge.className = `badge ${bill.is_exact_match ? 'bg-success' : 'bg-secondary'}`;
+        badge.textContent = `${bill.match_confidence.toFixed(0)}%`;
+        matchCell.appendChild(badge);
+        row.appendChild(matchCell);
+
+        tbody.appendChild(row);
+    });
+
+    document.getElementById('billsLoadingSpinner').style.display = 'none';
+    document.getElementById('billsContainer').style.display = 'block';
+
+    updateSelectionSummary();
+}
+
+// Toggle all bills
+function toggleAllBills() {
+    const selectAll = document.getElementById('selectAllBills').checked;
+    openBills.forEach(bill => {
+        document.getElementById(`bill_${bill.id}`).checked = selectAll;
+    });
+    updateSelectionSummary();
+}
+
+// Update selection summary
+function updateSelectionSummary() {
+    let selectedTotal = 0;
+    const selectedBills = [];
+
+    openBills.forEach(bill => {
+        const checkbox = document.getElementById(`bill_${bill.id}`);
+        if (checkbox && checkbox.checked) {
+            selectedTotal += parseFloat(bill.amount_due);
+            selectedBills.push(bill.id);
+        }
+    });
+
+    document.getElementById('selectedTotal').textContent = formatCurrency(selectedTotal);
+
+    const transactionAmountText = document.getElementById('transactionAmount').textContent;
+    const transactionAmount = parseFloat(transactionAmountText.replace(/[$,]/g, ''));
+
+    const difference = Math.abs(selectedTotal - transactionAmount);
+    const differenceSpan = document.getElementById('difference');
+    differenceSpan.textContent = formatCurrency(difference);
+
+    // Update badge color based on difference
+    if (difference < 0.01) {
+        differenceSpan.className = 'ms-2 badge bg-success';
+        differenceSpan.innerHTML = `${formatCurrency(difference)} <i class="bi bi-check-circle ms-1"></i> Perfect Match!`;
+    } else if (difference < 1) {
+        differenceSpan.className = 'ms-2 badge bg-warning';
+    } else {
+        differenceSpan.className = 'ms-2 badge bg-danger';
+    }
+
+    // Enable/disable confirm button
+    document.getElementById('confirmMatchBtn').disabled = selectedBills.length === 0;
+}
+
+// Confirm match
+async function confirmMatch() {
+    const selectedBills = [];
+    openBills.forEach(bill => {
+        const checkbox = document.getElementById(`bill_${bill.id}`);
+        if (checkbox && checkbox.checked) {
+            selectedBills.push(bill.id);
+        }
+    });
+
+    if (selectedBills.length === 0) {
+        showToast('Please select at least one bill', 'warning');
+        return;
+    }
+
+    document.getElementById('confirmMatchBtn').disabled = true;
+    document.getElementById('confirmMatchBtn').innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Matching...';
+
+    try {
+        const response = await fetch(`/accounting/api/bank-statements/transactions/${currentTransactionId}/match-bills?user_id=1`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                bill_ids: selectedBills,
+                create_clearing_entry: true
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showToast(`Successfully matched ${selectedBills.length} bill(s)!`, 'success');
+            closeOpenBillsModal();
+            loadTransactions(); // Reload to update status
+        } else {
+            const error = await response.json();
+            showToast(`Error: ${error.detail || 'Failed to match bills'}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error confirming match:', error);
+        showToast('Error confirming match', 'danger');
+    } finally {
+        document.getElementById('confirmMatchBtn').disabled = false;
+        document.getElementById('confirmMatchBtn').innerHTML = '<i class="bi bi-check-circle me-1"></i>Confirm Match';
+    }
+}
+
+// Close open bills modal
+function closeOpenBillsModal() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('openBillsModal'));
+    if (modal) {
+        modal.hide();
+    }
+}
+
+// Show GL assignment modal
+async function showGLAssignment(transactionId) {
+    currentTransactionId = transactionId;
+
+    // Find the transaction
+    const transaction = allTransactions.find(t => t.id === transactionId);
+    if (!transaction) {
+        showToast('Transaction not found', 'danger');
+        return;
+    }
+
+    // Populate transaction details
+    document.getElementById('glTransactionDate').textContent = new Date(transaction.transaction_date).toLocaleDateString();
+    document.getElementById('glTransactionDesc').textContent = transaction.description;
+    document.getElementById('glTransactionAmount').textContent = formatCurrency(transaction.amount);
+
+    // Load GL accounts
+    await loadGLAccountsForModal();
+
+    // Load AI suggestions
+    await loadGLSuggestions(transactionId);
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('glAssignmentModal'));
+    modal.show();
+
+    // Reset form
+    document.getElementById('glAccountSelect').value = '';
+    document.getElementById('glAccountSearch').value = '';
+    document.getElementById('selectedAccountDisplay').textContent = '';
+    document.getElementById('glMemo').value = transaction.description; // Pre-fill with transaction description
+    document.getElementById('confirmGLBtn').disabled = true;
+}
+
+// Edit existing GL assignment
+async function editGLAssignment(transactionId, description) {
+    currentTransactionId = transactionId;
+
+    // Find the transaction
+    const transaction = allTransactions.find(t => t.id === transactionId);
+    if (!transaction) {
+        showToast('Transaction not found', 'danger');
+        return;
+    }
+
+    // Populate transaction details
+    document.getElementById('glTransactionDate').textContent = new Date(transaction.transaction_date).toLocaleDateString();
+    document.getElementById('glTransactionDesc').textContent = transaction.description;
+    document.getElementById('glTransactionAmount').textContent = formatCurrency(transaction.amount);
+
+    // Load GL accounts
+    await loadGLAccountsForModal();
+
+    // Load AI suggestions
+    await loadGLSuggestions(transactionId);
+
+    // Pre-select the current GL account if one is assigned
+    if (transaction.suggested_account) {
+        selectGLAccount(
+            transaction.suggested_account.id,
+            transaction.suggested_account.account_number,
+            transaction.suggested_account.account_name
+        );
+    }
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('glAssignmentModal'));
+    modal.show();
+
+    // Pre-fill memo with transaction description
+    document.getElementById('glMemo').value = transaction.description;
+}
+
+// Load GL accounts for modal
+// Store all accounts for searching
+let allGLAccounts = [];
+
+async function loadGLAccountsForModal() {
+    try {
+        const response = await fetch('/accounting/api/accounts/?limit=1000');
+        if (response.ok) {
+            allGLAccounts = await response.json();
+
+            // Filter only active accounts
+            allGLAccounts = allGLAccounts.filter(acc => acc.is_active);
+
+            // Setup search functionality
+            setupGLAccountSearch();
+        }
+    } catch (error) {
+        console.error('Error loading GL accounts:', error);
+        showToast('Error loading GL accounts', 'danger');
+    }
+}
+
+function setupGLAccountSearch() {
+    const searchInput = document.getElementById('glAccountSearch');
+    const dropdown = document.getElementById('glAccountDropdown');
+    const hiddenSelect = document.getElementById('glAccountSelect');
+    const displayText = document.getElementById('selectedAccountDisplay');
+
+    // Show dropdown on focus
+    searchInput.addEventListener('focus', function() {
+        renderGLAccountDropdown('');
+        dropdown.style.display = 'block';
+    });
+
+    // Search as user types
+    searchInput.addEventListener('input', function() {
+        renderGLAccountDropdown(this.value);
+        dropdown.style.display = 'block';
+    });
+
+    // Hide dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+}
+
+function renderGLAccountDropdown(searchTerm) {
+    const dropdown = document.getElementById('glAccountDropdown');
+    dropdown.innerHTML = '';
+
+    // Filter accounts based on search
+    const filtered = allGLAccounts.filter(acc => {
+        const searchLower = searchTerm.toLowerCase();
+        return acc.account_number.toLowerCase().includes(searchLower) ||
+               acc.account_name.toLowerCase().includes(searchLower) ||
+               acc.account_type.toLowerCase().includes(searchLower);
+    });
+
+    if (filtered.length === 0) {
+        dropdown.innerHTML = '<div class="dropdown-item disabled">No accounts found</div>';
+        dropdown.style.display = 'block';
+        return;
+    }
+
+    // Group by account type
+    const grouped = {};
+    filtered.forEach(account => {
+        const type = account.account_type;
+        if (!grouped[type]) {
+            grouped[type] = [];
+        }
+        grouped[type].push(account);
+    });
+
+    // Render grouped accounts
+    Object.keys(grouped).sort().forEach(type => {
+        // Add type header
+        const header = document.createElement('h6');
+        header.className = 'dropdown-header';
+        header.textContent = type;
+        dropdown.appendChild(header);
+
+        // Add accounts in this group
+        grouped[type].forEach(account => {
+            const item = document.createElement('a');
+            item.className = 'dropdown-item';
+            item.href = '#';
+            item.innerHTML = `<strong>${account.account_number}</strong> - ${account.account_name}`;
+            item.dataset.accountId = account.id;
+            item.dataset.accountNumber = account.account_number;
+            item.dataset.accountName = account.account_name;
+
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                selectGLAccount(account.id, account.account_number, account.account_name);
+            });
+
+            dropdown.appendChild(item);
+        });
+
+        // Add divider between groups (except last)
+        const typeKeys = Object.keys(grouped).sort();
+        if (type !== typeKeys[typeKeys.length - 1]) {
+            const divider = document.createElement('div');
+            divider.className = 'dropdown-divider';
+            dropdown.appendChild(divider);
+        }
+    });
+
+    dropdown.style.display = 'block';
+}
+
+function selectGLAccount(accountId, accountNumber, accountName) {
+    const searchInput = document.getElementById('glAccountSearch');
+    const hiddenSelect = document.getElementById('glAccountSelect');
+    const dropdown = document.getElementById('glAccountDropdown');
+    const displayText = document.getElementById('selectedAccountDisplay');
+    const confirmBtn = document.getElementById('confirmGLBtn');
+
+    // Set values
+    hiddenSelect.value = accountId;
+    searchInput.value = `${accountNumber} - ${accountName}`;
+    displayText.textContent = `Selected: ${accountNumber} - ${accountName}`;
+    displayText.className = 'text-success small';
+
+    // Enable confirm button
+    confirmBtn.disabled = false;
+
+    // Hide dropdown
+    dropdown.style.display = 'none';
+}
+
+// Load GL suggestions using AI
+async function loadGLSuggestions(transactionId) {
+    try {
+        const response = await fetch(`/accounting/api/bank-statements/transactions/${transactionId}/gl-suggestions`);
+        if (!response.ok) {
+            // Silently fail - suggestions are optional
+            document.getElementById('glSuggestionsSection').style.display = 'none';
+            return;
+        }
+
+        const data = await response.json();
+        const suggestionsList = document.getElementById('glSuggestionsList');
+        suggestionsList.innerHTML = ''; // Clear previous suggestions
+
+        // Phase 3: Auto-assignment for high confidence (>90%)
+        if (data.auto_assign_enabled && data.auto_assign_account_id) {
+            // Automatically select the high-confidence suggestion
+            document.getElementById('glAccountSelect').value = data.auto_assign_account_id;
+            document.getElementById('confirmGLBtn').disabled = false;
+
+            // Show auto-assign notification
+            const autoAssignNotice = document.createElement('div');
+            autoAssignNotice.className = 'alert alert-success mb-3';
+            autoAssignNotice.innerHTML = `
+                <i class="bi bi-magic me-2"></i>
+                <strong>Auto-Selected:</strong> High confidence match (${Math.round(data.suggestions[0].confidence_score)}%).
+                Account ${data.suggestions[0].account_number} - ${data.suggestions[0].account_name} has been pre-selected.
+                You can change it if needed.
+            `;
+            document.getElementById('glSuggestionsSection').parentElement.insertBefore(
+                autoAssignNotice,
+                document.getElementById('glSuggestionsSection')
+            );
+        }
+
+        if (data.suggestions && data.suggestions.length > 0) {
+            // Show suggestions section
+            document.getElementById('glSuggestionsSection').style.display = 'block';
+
+            // Create suggestion cards
+            data.suggestions.forEach(suggestion => {
+                const card = document.createElement('div');
+                card.className = 'suggestion-card';
+                card.style.cssText = 'cursor: pointer; border: 2px solid #495057; border-radius: 8px; padding: 12px; min-width: 200px; transition: all 0.2s; background-color: #2b3035;';
+
+                // Confidence color
+                let confidenceColor = '#6c757d';
+                if (suggestion.confidence_score >= 70) confidenceColor = '#198754';
+                else if (suggestion.confidence_score >= 50) confidenceColor = '#ffc107';
+
+                // Type badge (Phase 3: added recurring badge)
+                let typeBadge = '';
+                if (suggestion.suggestion_type === 'recurring') {
+                    typeBadge = '<span class="badge bg-primary me-1"><i class="bi bi-arrow-repeat"></i> Recurring</span>';
+                } else if (suggestion.suggestion_type === 'vendor') {
+                    typeBadge = '<span class="badge bg-success me-1"><i class="bi bi-building"></i> Vendor</span>';
+                } else if (suggestion.suggestion_type === 'pattern') {
+                    typeBadge = '<span class="badge bg-info me-1"><i class="bi bi-text-paragraph"></i> Pattern</span>';
+                }
+
+                card.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <div>
+                            <strong>${suggestion.account_number}</strong>
+                            <div class="small text-muted">${suggestion.account_name}</div>
+                        </div>
+                        <div class="text-end">
+                            <div class="badge" style="background-color: ${confidenceColor}">
+                                ${Math.round(suggestion.confidence_score)}%
+                            </div>
+                        </div>
+                    </div>
+                    <div class="small">
+                        ${typeBadge}
+                        <span class="text-muted">${suggestion.reason}</span>
+                    </div>
+                `;
+
+                // Click to select
+                card.addEventListener('click', function() {
+                    document.getElementById('glAccountSelect').value = suggestion.account_id;
+                    document.getElementById('confirmGLBtn').disabled = false;
+
+                    // Visual feedback - clear all selections first
+                    document.querySelectorAll('.suggestion-card').forEach(c => {
+                        c.dataset.selected = 'false';
+                        c.style.borderColor = '#495057';
+                        c.style.backgroundColor = '#2b3035';
+                        c.style.transform = 'translateY(0)';
+                        c.style.boxShadow = 'none';
+                    });
+
+                    // Mark this card as selected
+                    card.dataset.selected = 'true';
+                    card.style.borderColor = '#0d6efd';
+                    card.style.backgroundColor = '#e7f1ff';
+
+                    showToast(`Selected: ${suggestion.account_number} - ${suggestion.account_name}`, 'success');
+                });
+
+                // Hover effect - use light blue tint on hover (only if not selected)
+                card.addEventListener('mouseenter', function() {
+                    if (card.dataset.selected !== 'true') {
+                        card.style.borderColor = '#0d6efd';
+                        card.style.backgroundColor = '#cfe2ff';  // Lighter blue for hover
+                        card.style.transform = 'translateY(-2px)';
+                        card.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                    }
+                });
+                card.addEventListener('mouseleave', function() {
+                    if (card.dataset.selected !== 'true') {
+                        card.style.borderColor = '#495057';
+                        card.style.backgroundColor = '#2b3035';
+                        card.style.transform = 'translateY(0)';
+                        card.style.boxShadow = 'none';
+                    }
+                });
+
+                suggestionsList.appendChild(card);
+            });
+        } else {
+            // No suggestions - hide section
+            document.getElementById('glSuggestionsSection').style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error loading GL suggestions:', error);
+        document.getElementById('glSuggestionsSection').style.display = 'none';
+    }
+}
+
+// Load areas for modal
+async function loadAreasForModal() {
+    try {
+        const response = await fetch('/accounting/api/areas/');
+        if (response.ok) {
+            const areas = await response.json();
+            const select = document.getElementById('glAreaSelect');
+
+            // Clear existing options except first
+            while (select.options.length > 1) {
+                select.remove(1);
+            }
+
+            areas.forEach(area => {
+                const option = document.createElement('option');
+                option.value = area.id;
+                option.textContent = area.area_name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading areas:', error);
+    }
+}
+
+// Confirm GL assignment
+async function confirmGLAssignment() {
+    const accountId = document.getElementById('glAccountSelect').value;
+    const memo = document.getElementById('glMemo').value;
+
+    if (!accountId) {
+        showToast('Please select a GL account', 'warning');
+        return;
+    }
+
+    document.getElementById('confirmGLBtn').disabled = true;
+    document.getElementById('confirmGLBtn').innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Processing...';
+
+    try {
+        // Find the transaction to check if it already has a GL assignment
+        const transaction = allTransactions.find(t => t.id === currentTransactionId);
+        const isUpdate = transaction && transaction.suggested_account;
+
+        // Use PUT endpoint for updates, POST for new assignments
+        const endpoint = isUpdate
+            ? `/accounting/api/bank-statements/transactions/${currentTransactionId}/update-gl?user_id=1`
+            : `/accounting/api/bank-statements/transactions/${currentTransactionId}/assign-gl?user_id=1`;
+        const method = isUpdate ? 'PUT' : 'POST';
+
+        const response = await fetch(endpoint, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                account_id: parseInt(accountId),
+                memo: memo
+                // Note: area_id is automatically inherited from the bank account
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            const message = isUpdate ? 'GL account updated successfully!' : 'Successfully assigned to GL account!';
+            showToast(message, 'success');
+
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('glAssignmentModal'));
+            if (modal) {
+                modal.hide();
+            }
+
+            // Reload transactions
+            loadTransactions();
+        } else {
+            const error = await response.json();
+            showToast(`Error: ${error.detail || 'Failed to assign to GL'}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error confirming GL assignment:', error);
+        showToast('Error confirming GL assignment', 'danger');
+    } finally {
+        document.getElementById('confirmGLBtn').disabled = false;
+        document.getElementById('confirmGLBtn').innerHTML = '<i class="bi bi-check-circle me-1"></i>Confirm Assignment';
+    }
+}
+
+// Verify and approve auto-matched transaction
+async function verifyAndApproveAutoMatch(transactionId, accountId) {
+    // Find the transaction
+    const transaction = allTransactions.find(t => t.id === transactionId);
+    if (!transaction) {
+        showToast('Transaction not found', 'danger');
+        return;
+    }
+
+    // Confirm with user
+    const confidence = Math.round(parseFloat(transaction.suggestion_confidence));
+    const accountName = transaction.suggested_account ? transaction.suggested_account.account_name : 'Unknown';
+
+    if (!confirm(`Verify this auto-match?\n\nConfidence: ${confidence}%\nGL Account: ${accountName}\n\nThis will create a journal entry and mark the transaction as reconciled.`)) {
+        return;
+    }
+
+    try {
+        // Call the confirm endpoint (similar to confirmGLAssignment but for auto-matches)
+        const response = await fetch(`/accounting/api/bank-statements/transactions/${transactionId}/confirm-auto-match?user_id=1`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                account_id: parseInt(accountId),
+                memo: transaction.description
+            })
+        });
+
+        if (response.ok) {
+            showToast('Auto-match verified and approved!', 'success');
+            loadTransactions(); // Reload to update status
+        } else {
+            const error = await response.json();
+            showToast(`Error: ${error.detail || 'Failed to verify auto-match'}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error verifying auto-match:', error);
+        showToast('Error verifying auto-match', 'danger');
+    }
+}
+
+// Reject auto-matched suggestion
+async function rejectAutoMatch(transactionId) {
+    // Find the transaction
+    const transaction = allTransactions.find(t => t.id === transactionId);
+    if (!transaction) {
+        showToast('Transaction not found', 'danger');
+        return;
+    }
+
+    const confidence = Math.round(parseFloat(transaction.suggestion_confidence));
+    const accountName = transaction.suggested_account ? transaction.suggested_account.account_name : 'Unknown';
+
+    if (!confirm(`Reject this auto-match?\n\nConfidence: ${confidence}%\nGL Account: ${accountName}\n\nThe transaction will remain unreconciled and you can manually match it.`)) {
+        return;
+    }
+
+    try {
+        // Call the reject endpoint to clear the auto-match suggestion
+        const response = await fetch(`/accounting/api/bank-statements/transactions/${transactionId}/reject-auto-match?user_id=1`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            showToast('Auto-match rejected. Transaction remains unreconciled.', 'info');
+            loadTransactions(); // Reload to update status
+        } else {
+            const error = await response.json();
+            showToast(`Error: ${error.detail || 'Failed to reject auto-match'}`, 'danger');
+        }
+    } catch (error) {
+        console.error('Error rejecting auto-match:', error);
+        showToast('Error rejecting auto-match', 'danger');
+    }
+}
+
+// Format currency
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(amount);
+}
+
+// Show toast notification
+function showToast(message, type = 'info') {
+    // Create toast container if it doesn't exist
+    let container = document.getElementById('toastContainer');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'toast-container position-fixed top-0 end-0 p-3';
+        container.style.zIndex = '9999';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast align-items-center text-white bg-${type} border-0`;
+    toast.setAttribute('role', 'alert');
+    toast.innerHTML = `
+        <div class="d-flex">
+            <div class="toast-body">${message}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    `;
+
+    container.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+    bsToast.show();
+
+    toast.addEventListener('hidden.bs.toast', () => {
+        toast.remove();
+    });
+}
+</script>
+{% endblock %}

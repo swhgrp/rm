@@ -546,7 +546,7 @@ async function deleteItem(itemId) {
     const item = items.find(i => i.id === itemId);
     if (!item) return;
     
-    if (!confirm(`Are you sure you want to delete "${item.name}"? This action cannot be undone.`)) {
+    if (!await showConfirm(`Are you sure you want to delete "${item.name}"? This action cannot be undone.`)) {
         return;
     }
     

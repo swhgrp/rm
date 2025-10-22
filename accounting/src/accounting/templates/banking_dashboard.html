@@ -1,0 +1,481 @@
+{% extends "base.html" %}
+
+{% block nav_banking_dashboard %}nav-active{% endblock %}
+
+{% block title %}Banking Dashboard - Accounting System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2><i class="bi bi-speedometer2 me-2"></i>Banking Dashboard</h2>
+            <p class="text-muted">Overview of bank reconciliation status and activity</p>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+            <!-- Location Filter -->
+            <div class="d-flex align-items-center gap-2">
+                <label class="text-muted mb-0">Location:</label>
+                <select class="form-select" id="locationFilter" style="width: 250px;" onchange="filterByLocation()">
+                    <option value="">All Locations</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="window.location.href='bank-reconciliation'">
+                <i class="bi bi-arrow-left-right me-1"></i>Go to Reconciliation
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-dark border-secondary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-1">Total Transactions</h6>
+                            <h3 class="mb-0" id="totalTransactions">-</h3>
+                        </div>
+                        <div class="bg-primary rounded p-3">
+                            <i class="bi bi-list-ul fs-4 text-white"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-dark border-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-1">Reconciled</h6>
+                            <h3 class="mb-0 text-success" id="reconciledCount">-</h3>
+                            <small class="text-muted" id="reconciledPercent">-</small>
+                        </div>
+                        <div class="bg-success rounded p-3">
+                            <i class="bi bi-check-circle fs-4 text-white"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-dark border-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-1">Unreconciled</h6>
+                            <h3 class="mb-0 text-warning" id="unreconciledCount">-</h3>
+                            <small class="text-muted" id="unreconciledPercent">-</small>
+                        </div>
+                        <div class="bg-warning rounded p-3">
+                            <i class="bi bi-exclamation-triangle fs-4 text-dark"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card bg-dark border-info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="text-muted mb-1">Total Amount</h6>
+                            <h3 class="mb-0 text-info" id="totalAmount">-</h3>
+                            <small class="text-muted">Last 30 days</small>
+                        </div>
+                        <div class="bg-info rounded p-3">
+                            <i class="bi bi-cash-stack fs-4 text-dark"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts and Progress -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header bg-dark border-secondary">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Reconciliation Progress</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="reconciliationChart" height="80"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header bg-dark border-secondary">
+                    <h5 class="mb-0"><i class="bi bi-pie-chart me-2"></i>Status Breakdown</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="statusPieChart" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Transactions & Pending Items -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card bg-dark border-secondary">
+                <div class="card-header bg-dark border-secondary d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Recent Transactions</h5>
+                    <a href="bank-reconciliation" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th class="text-end">Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentTransactionsTable">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">
+                                        <div class="spinner-border spinner-border-sm me-2"></div>Loading...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card bg-dark border-warning">
+                <div class="card-header bg-dark border-warning d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-exclamation-circle me-2"></i>Needs Attention</h5>
+                    <span class="badge bg-warning text-dark" id="needsAttentionBadge">0</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th class="text-end">Amount</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="needsAttentionTable">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">
+                                        <div class="spinner-border spinner-border-sm me-2"></div>Loading...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+let reconciliationChart = null;
+let statusPieChart = null;
+let allBankAccounts = [];
+let selectedLocationId = null;
+
+// Load dashboard data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadLocationsAndBankAccounts();
+});
+
+async function loadLocationsAndBankAccounts() {
+    try {
+        // Load all bank accounts
+        const accountsResponse = await fetch('/accounting/api/bank-accounts/');
+        if (!accountsResponse.ok) throw new Error('Failed to load bank accounts');
+        allBankAccounts = await accountsResponse.json();
+
+        // Load areas/locations
+        const areasResponse = await fetch('/accounting/api/areas/');
+        if (!areasResponse.ok) throw new Error('Failed to load locations');
+        const areas = await areasResponse.json();
+
+        // Populate location dropdown
+        const locationFilter = document.getElementById('locationFilter');
+        areas.forEach(area => {
+            const option = document.createElement('option');
+            option.value = area.id;
+            option.textContent = area.legal_name || area.name;
+            locationFilter.appendChild(option);
+        });
+
+        // Load initial dashboard data (all locations)
+        loadDashboardData();
+    } catch (error) {
+        console.error('Error loading locations:', error);
+        // Fallback: load data anyway
+        loadDashboardData();
+    }
+}
+
+function filterByLocation() {
+    const locationId = document.getElementById('locationFilter').value;
+    selectedLocationId = locationId ? parseInt(locationId) : null;
+    loadDashboardData();
+}
+
+async function loadDashboardData() {
+    try {
+        // Determine which bank accounts to query based on location filter
+        let accountsToQuery = allBankAccounts;
+
+        if (selectedLocationId) {
+            accountsToQuery = allBankAccounts.filter(acc => acc.area_id === selectedLocationId);
+        }
+
+        if (accountsToQuery.length === 0) {
+            // No accounts for this location
+            updateDashboardWithNoData();
+            return;
+        }
+
+        // Fetch transactions from all relevant accounts
+        const transactionPromises = accountsToQuery.map(account =>
+            fetch(`/accounting/api/bank-accounts/${account.id}/transactions?limit=1000`)
+                .then(res => res.ok ? res.json() : [])
+        );
+
+        const transactionArrays = await Promise.all(transactionPromises);
+        const transactions = transactionArrays.flat();
+
+        // Calculate statistics
+        const total = transactions.length;
+        const reconciled = transactions.filter(t => t.status === 'reconciled').length;
+        const unreconciled = transactions.filter(t => t.status === 'unreconciled').length;
+        const totalAmount = transactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+
+        // Update summary cards
+        document.getElementById('totalTransactions').textContent = total;
+        document.getElementById('reconciledCount').textContent = reconciled;
+        document.getElementById('reconciledPercent').textContent = `${Math.round(reconciled / total * 100)}%`;
+        document.getElementById('unreconciledCount').textContent = unreconciled;
+        document.getElementById('unreconciledPercent').textContent = `${Math.round(unreconciled / total * 100)}%`;
+        document.getElementById('totalAmount').textContent = formatCurrency(totalAmount);
+
+        // Load charts
+        loadReconciliationChart(transactions);
+        loadStatusPieChart(reconciled, unreconciled);
+
+        // Load tables
+        loadRecentTransactions(transactions.slice(0, 5));
+        loadNeedsAttention(transactions.filter(t => t.status === 'unreconciled').slice(0, 5));
+
+    } catch (error) {
+        console.error('Error loading dashboard data:', error);
+    }
+}
+
+function loadReconciliationChart(transactions) {
+    // Group by date
+    const groupedByDate = {};
+    transactions.forEach(t => {
+        const date = new Date(t.transaction_date).toLocaleDateString();
+        if (!groupedByDate[date]) {
+            groupedByDate[date] = { reconciled: 0, unreconciled: 0 };
+        }
+        if (t.status === 'reconciled') {
+            groupedByDate[date].reconciled++;
+        } else {
+            groupedByDate[date].unreconciled++;
+        }
+    });
+
+    const labels = Object.keys(groupedByDate).slice(-7); // Last 7 days
+    const reconciledData = labels.map(date => groupedByDate[date].reconciled);
+    const unreconciledData = labels.map(date => groupedByDate[date].unreconciled);
+
+    const ctx = document.getElementById('reconciliationChart').getContext('2d');
+
+    if (reconciliationChart) {
+        reconciliationChart.destroy();
+    }
+
+    reconciliationChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Reconciled',
+                    data: reconciledData,
+                    backgroundColor: 'rgba(25, 135, 84, 0.8)',
+                    borderColor: 'rgb(25, 135, 84)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Unreconciled',
+                    data: unreconciledData,
+                    backgroundColor: 'rgba(255, 193, 7, 0.8)',
+                    borderColor: 'rgb(255, 193, 7)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: '#8b949e' },
+                    grid: { color: 'rgba(139, 148, 158, 0.1)' }
+                },
+                x: {
+                    ticks: { color: '#8b949e' },
+                    grid: { color: 'rgba(139, 148, 158, 0.1)' }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { color: '#c9d1d9' }
+                }
+            }
+        }
+    });
+}
+
+function loadStatusPieChart(reconciled, unreconciled) {
+    const ctx = document.getElementById('statusPieChart').getContext('2d');
+
+    if (statusPieChart) {
+        statusPieChart.destroy();
+    }
+
+    statusPieChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Reconciled', 'Unreconciled'],
+            datasets: [{
+                data: [reconciled, unreconciled],
+                backgroundColor: [
+                    'rgba(25, 135, 84, 0.8)',
+                    'rgba(255, 193, 7, 0.8)'
+                ],
+                borderColor: [
+                    'rgb(25, 135, 84)',
+                    'rgb(255, 193, 7)'
+                ],
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { color: '#c9d1d9' }
+                }
+            }
+        }
+    });
+}
+
+function loadRecentTransactions(transactions) {
+    const tbody = document.getElementById('recentTransactionsTable');
+    tbody.innerHTML = '';
+
+    if (transactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No recent transactions</td></tr>';
+        return;
+    }
+
+    transactions.forEach(t => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${new Date(t.transaction_date).toLocaleDateString()}</td>
+            <td>${t.description}</td>
+            <td class="text-end ${parseFloat(t.amount) >= 0 ? 'text-success' : 'text-danger'}">
+                ${formatCurrency(t.amount)}
+            </td>
+            <td>
+                ${t.status === 'reconciled'
+                    ? '<span class="badge bg-success">Reconciled</span>'
+                    : '<span class="badge bg-warning text-dark">Unreconciled</span>'}
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function loadNeedsAttention(transactions) {
+    const tbody = document.getElementById('needsAttentionTable');
+    const badge = document.getElementById('needsAttentionBadge');
+
+    tbody.innerHTML = '';
+    badge.textContent = transactions.length;
+
+    if (transactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-success"><i class="bi bi-check-circle me-2"></i>All caught up!</td></tr>';
+        return;
+    }
+
+    transactions.forEach(t => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${new Date(t.transaction_date).toLocaleDateString()}</td>
+            <td>${t.description.substring(0, 30)}${t.description.length > 30 ? '...' : ''}</td>
+            <td class="text-end ${parseFloat(t.amount) >= 0 ? 'text-success' : 'text-danger'}">
+                ${formatCurrency(t.amount)}
+            </td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="window.location.href='bank-reconciliation'">
+                    <i class="bi bi-arrow-right"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(amount);
+}
+
+function updateDashboardWithNoData() {
+    // Update summary cards to show zeros
+    document.getElementById('totalTransactions').textContent = '0';
+    document.getElementById('reconciledCount').textContent = '0';
+    document.getElementById('reconciledPercent').textContent = '0%';
+    document.getElementById('unreconciledCount').textContent = '0';
+    document.getElementById('unreconciledPercent').textContent = '0%';
+    document.getElementById('totalAmount').textContent = '$0.00';
+
+    // Clear charts
+    if (reconciliationChart) {
+        reconciliationChart.destroy();
+        reconciliationChart = null;
+    }
+    if (statusPieChart) {
+        statusPieChart.destroy();
+        statusPieChart = null;
+    }
+
+    // Clear tables
+    document.getElementById('recentTransactionsTable').innerHTML = '<tr><td colspan="4" class="text-center text-muted">No transactions for this location</td></tr>';
+    document.getElementById('needsAttentionTable').innerHTML = '<tr><td colspan="4" class="text-center text-muted">No transactions for this location</td></tr>';
+    document.getElementById('needsAttentionBadge').textContent = '0';
+}
+</script>
+{% endblock %}

@@ -235,7 +235,7 @@
 {% block extra_scripts %}
 <script>
 async function sendInvoice() {
-    if (!confirm('Send this invoice to both Inventory and Accounting systems?')) {
+    if (!await showConfirm('Send this invoice to both Inventory and Accounting systems?')) {
         return;
     }
 
@@ -269,7 +269,7 @@ async function sendInvoice() {
 }
 
 async function retryInvoice(system) {
-    if (!confirm(`Retry sending to ${system}?`)) {
+    if (!await showConfirm(`Retry sending to ${system}?`)) {
         return;
     }
 

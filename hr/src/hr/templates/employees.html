@@ -359,6 +359,13 @@ function filterEmployees() {
         return true;
     });
 
+    // Sort employees alphabetically by first name, then last name
+    filteredEmployees.sort((a, b) => {
+        const aName = `${a.first_name} ${a.last_name}`.toLowerCase();
+        const bName = `${b.first_name} ${b.last_name}`.toLowerCase();
+        return aName.localeCompare(bName);
+    });
+
     renderEmployees();
 }
 

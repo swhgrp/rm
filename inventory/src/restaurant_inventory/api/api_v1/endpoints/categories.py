@@ -215,6 +215,8 @@ async def delete_category(
     current_user: User = Depends(require_manager_or_admin)
 ):
     """Delete a category (hard delete)"""
+    from restaurant_inventory.models.item import MasterItem
+
     category = db.query(Category).filter(Category.id == category_id).first()
     if not category:
         raise HTTPException(
@@ -222,7 +224,23 @@ async def delete_category(
             detail="Category not found"
         )
 
-    # Hard delete - subcategories will be deleted automatically due to CASCADE
+    # Check if any items are using this category
+    items_count = db.query(MasterItem).filter(MasterItem.category == category.name).count()
+    if items_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete category '{category.name}' because {items_count} item(s) are using it. Please reassign or delete those items first."
+        )
+
+    # Check if any subcategories exist
+    subcategories_count = db.query(Category).filter(Category.parent_id == category_id).count()
+    if subcategories_count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot delete category '{category.name}' because it has {subcategories_count} subcategory(ies). Please delete or reassign them first."
+        )
+
+    # Safe to delete
     db.delete(category)
     db.commit()
 

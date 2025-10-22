@@ -29,6 +29,23 @@
         </div>
     </div>
 
+    <!-- Search Bar -->
+    <div class="mb-3">
+        <div class="input-group" style="max-width: 500px;">
+            <span class="input-group-text bg-dark text-white border-dark">
+                <i class="bi bi-search"></i>
+            </span>
+            <input type="text"
+                   class="form-control"
+                   id="vendorItemSearch"
+                   placeholder="Search by product name, SKU, vendor, or master item..."
+                   oninput="filterVendorItems()">
+            <button class="btn btn-outline-secondary" onclick="clearVendorItemSearch()" title="Clear search">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-hover">
             <thead class="table-dark">
@@ -184,8 +201,8 @@
                             </select>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label for="viMasterItemId" class="form-label">Master Item *</label>
-                            <select class="form-select" id="viMasterItemId" required>
+                            <label for="viMasterItemId" class="form-label">Master Item <span class="text-muted">(optional - can link later)</span></label>
+                            <select class="form-select" id="viMasterItemId">
                                 <option value="">Select master item...</option>
                             </select>
                         </div>
@@ -203,17 +220,22 @@
                     </div>
 
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
                             <label for="viPurchaseUnitId" class="form-label">Purchase Unit *</label>
                             <select class="form-select" id="viPurchaseUnitId" required>
                                 <option value="">Select unit...</option>
                             </select>
-                            <small class="form-text text-muted">Select the unit the vendor sells in (conversion built-in to unit)</small>
+                            <small class="form-text text-muted">Unit the vendor sells in</small>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-4 mb-3">
+                            <label for="viConversionFactor" class="form-label">Conversion Factor</label>
+                            <input type="number" step="0.01" class="form-control" id="viConversionFactor" placeholder="1.0">
+                            <small class="form-text text-muted">How many master units per purchase unit (e.g., 25 for 25lb case)</small>
+                        </div>
+                        <div class="col-md-4 mb-3">
                             <label for="viUnitPrice" class="form-label">Last Price Paid</label>
                             <input type="number" step="0.01" class="form-control bg-secondary" id="viUnitPrice" readonly>
-                            <small class="form-text text-muted">Auto-updated from invoices (read-only)</small>
+                            <small class="form-text text-muted">Auto-updated from invoices</small>
                         </div>
                     </div>
 
@@ -284,36 +306,7 @@
         await loadVendorItems();
     });
 
-    // API helper
-    async function apiRequest(url, method = 'GET', data = null) {
-        const token = localStorage.getItem('access_token');
-        const options = {
-            method: method,
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        };
-
-        if (data && method !== 'GET') {
-            options.body = JSON.stringify(data);
-        }
-
-        const response = await fetch(url, options);
-
-        if (response.status === 401) {
-            localStorage.clear();
-            window.location.href = '/login';
-            throw new Error('Unauthorized');
-        }
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Request failed');
-        }
-
-        return response.json();
-    }
+    // Note: apiRequest is provided by auth.js globally
 
     // Show alert
     function showAlert(message, type) {
@@ -389,7 +382,34 @@
             return;
         }
 
-        tbody.innerHTML = vendorItems.map(vi => {
+        // Apply search filter
+        const searchTerm = document.getElementById('vendorItemSearch')?.value.toLowerCase() || '';
+        const filteredItems = vendorItems.filter(vi => {
+            if (!searchTerm) return true;
+
+            const searchableText = [
+                vi.vendor_name || '',
+                vi.master_item_name || '',
+                vi.vendor_sku || '',
+                vi.vendor_product_name || ''
+            ].join(' ').toLowerCase();
+
+            return searchableText.includes(searchTerm);
+        });
+
+        if (filteredItems.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center">No vendor items match your search</td></tr>';
+            return;
+        }
+
+        // Sort vendor items alphabetically by product name
+        filteredItems.sort((a, b) => {
+            const nameA = a.vendor_product_name || '';
+            const nameB = b.vendor_product_name || '';
+            return nameA.localeCompare(nameB);
+        });
+
+        tbody.innerHTML = filteredItems.map(vi => {
             const costPerMaster = vi.unit_price && vi.conversion_factor ?
                 (vi.unit_price / vi.conversion_factor).toFixed(2) : '-';
             const statusBadge = vi.is_active ?
@@ -398,13 +418,16 @@
             const preferredBadge = vi.is_preferred ?
                 '<span class="badge bg-primary ms-1">Preferred</span>' : '';
 
+            // Show "Not Linked" badge if no master item
+            const masterItemDisplay = vi.master_item_name || '<span class="badge bg-warning text-dark">Not Linked</span>';
+
             return `
                 <tr>
                     <td>${vi.vendor_name || '-'}</td>
-                    <td>${vi.master_item_name || '-'}</td>
+                    <td>${masterItemDisplay}</td>
                     <td>${vi.vendor_sku || '-'}</td>
                     <td>${vi.vendor_product_name}</td>
-                    <td>${vi.purchase_unit_name || '-'} ${vi.pack_size ? `(${vi.pack_size})` : ''}</td>
+                    <td>${vi.purchase_unit_name || '-'} ${vi.conversion_factor ? `(${parseFloat(vi.conversion_factor).toFixed(2)})` : ''}</td>
                     <td>${vi.unit_price ? '$' + parseFloat(vi.unit_price).toFixed(2) : '-'}</td>
                     <td>${costPerMaster !== '-' ? '$' + costPerMaster : '-'}</td>
                     <td>${statusBadge}${preferredBadge}</td>
@@ -421,6 +444,17 @@
         }).join('');
     }
 
+    // Filter vendor items based on search input
+    function filterVendorItems() {
+        displayVendorItems();
+    }
+
+    // Clear search input
+    function clearVendorItemSearch() {
+        document.getElementById('vendorItemSearch').value = '';
+        displayVendorItems();
+    }
+
     async function showVendorItemModal(vendorItemId = null) {
         currentEditVendorItemId = vendorItemId;
 
@@ -435,10 +469,13 @@
             const vendorItem = vendorItems.find(vi => vi.id === vendorItemId);
             if (vendorItem) {
                 document.getElementById('viVendorId').value = vendorItem.vendor_id;
-                document.getElementById('viMasterItemId').value = vendorItem.master_item_id;
+                document.getElementById('viMasterItemId').value = vendorItem.master_item_id || '';  // Handle null
                 document.getElementById('viVendorSku').value = vendorItem.vendor_sku || '';
                 document.getElementById('viVendorProductName').value = vendorItem.vendor_product_name;
                 document.getElementById('viPurchaseUnitId').value = vendorItem.purchase_unit_id;
+                // Format conversion factor to 2 decimal places
+                const conversionFactor = vendorItem.conversion_factor ? parseFloat(vendorItem.conversion_factor).toFixed(2) : '1.00';
+                document.getElementById('viConversionFactor').value = conversionFactor;
                 document.getElementById('viUnitPrice').value = vendorItem.unit_price || '';
                 document.getElementById('viMinOrderQty').value = vendorItem.minimum_order_quantity || '';
                 document.getElementById('viLeadTimeDays').value = vendorItem.lead_time_days || '';
@@ -466,6 +503,8 @@
         vendorFilter.innerHTML = '<option value="">All Vendors</option>';
 
         if (Array.isArray(vendorsResp)) {
+            // Sort vendors alphabetically by name
+            vendorsResp.sort((a, b) => a.name.localeCompare(b.name));
             vendorsResp.forEach(v => {
                 vendorSelect.innerHTML += `<option value="${v.id}">${v.name}</option>`;
                 vendorFilter.innerHTML += `<option value="${v.id}">${v.name}</option>`;
@@ -481,6 +520,8 @@
         itemFilter.innerHTML = '<option value="">All Master Items</option>';
 
         if (Array.isArray(itemsResp)) {
+            // Sort master items alphabetically by name
+            itemsResp.sort((a, b) => a.name.localeCompare(b.name));
             itemsResp.forEach(item => {
                 itemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
                 itemFilter.innerHTML += `<option value="${item.id}">${item.name}</option>`;
@@ -506,18 +547,26 @@
         const vendorProductName = document.getElementById('viVendorProductName').value;
         const purchaseUnitId = document.getElementById('viPurchaseUnitId').value;
 
-        if (!vendorId || !masterItemId || !vendorProductName || !purchaseUnitId) {
-            showAlert('Please fill in all required fields', 'warning');
+        const saveTimestamp = new Date().toISOString();
+        console.log(`[${saveTimestamp}] ===== SAVE VENDOR ITEM CALLED =====`);
+        console.log(`[${saveTimestamp}] Form Values:`, { vendorId, masterItemId, vendorProductName, purchaseUnitId, currentEditVendorItemId });
+
+        // Master Item is now optional - can be linked later
+        if (!vendorId || !vendorProductName || !purchaseUnitId) {
+            showAlert('Please fill in all required fields (Vendor, Product Name, Purchase Unit)', 'warning');
             return;
         }
 
+        const conversionFactorValue = document.getElementById('viConversionFactor').value;
+        const conversionFactor = conversionFactorValue ? parseFloat(conversionFactorValue) : 1.0;
+
         const data = {
             vendor_id: parseInt(vendorId),
-            master_item_id: parseInt(masterItemId),
+            master_item_id: masterItemId ? parseInt(masterItemId) : null,  // Allow null for "Not Linked"
             vendor_sku: document.getElementById('viVendorSku').value || null,
             vendor_product_name: vendorProductName,
             purchase_unit_id: parseInt(purchaseUnitId),
-            conversion_factor: 1.0,  // Default value - conversion is built into the UOM
+            conversion_factor: conversionFactor,  // Editable conversion factor
             minimum_order_quantity: document.getElementById('viMinOrderQty').value ? parseFloat(document.getElementById('viMinOrderQty').value) : null,
             lead_time_days: document.getElementById('viLeadTimeDays').value ? parseInt(document.getElementById('viLeadTimeDays').value) : null,
             is_preferred: document.getElementById('viIsPreferred').checked,
@@ -525,20 +574,33 @@
             is_active: true
         };
 
+        console.log(`[${saveTimestamp}] Sending data:`, JSON.stringify(data, null, 2));
+
         try {
             if (currentEditVendorItemId) {
-                await apiRequest(`api/vendor-items/${currentEditVendorItemId}`, 'PUT', data);
+                console.log(`[${saveTimestamp}] *** ABOUT TO CALL PUT api/vendor-items/${currentEditVendorItemId} ***`);
+                const result = await apiRequest(`api/vendor-items/${currentEditVendorItemId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+                console.log(`[${saveTimestamp}] *** PUT RESPONSE:`, result);
+                console.log(`[${saveTimestamp}] Response master_item_id: ${result.master_item_id}`);
                 showAlert('Vendor item updated successfully', 'success');
             } else {
-                await apiRequest('api/vendor-items/', 'POST', data);
+                console.log(`[${saveTimestamp}] Calling POST api/vendor-items/`);
+                const result = await apiRequest('api/vendor-items/', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                console.log(`[${saveTimestamp}] POST RESPONSE:`, result);
                 showAlert('Vendor item created successfully', 'success');
             }
 
             vendorItemModal.hide();
-            loadVendorItems();
+            await loadVendorItems();
         } catch (error) {
-            console.error('Error saving vendor item:', error);
-            showAlert('Failed to save vendor item', 'danger');
+            console.error(`[${saveTimestamp}] ERROR saving vendor item:`, error);
+            showAlert(`Failed to save vendor item: ${error.message || error}`, 'danger');
         }
     }
 
@@ -555,7 +617,7 @@
             `Are you sure you want to delete vendor item "${vendorItem.vendor_product_name}"?`,
             async () => {
                 try {
-                    await apiRequest(`api/vendor-items/${vendorItemId}`, 'DELETE');
+                    await apiRequest(`api/vendor-items/${vendorItemId}`, { method: 'DELETE' });
                     showAlert('Vendor item deleted successfully', 'success');
                     loadVendorItems();
                 } catch (error) {
@@ -783,10 +845,18 @@
                     </option>`
                 ).join('');
 
+                // Calculate conversion info if available
+                let packInfo = item.pack_size || '';
+                if (item.unit_size && item.pack_size) {
+                    // Show pack size with unit size: "6 × 5.0 LB = 30 LB"
+                    const total = parseFloat(item.pack_size) * parseFloat(item.unit_size);
+                    packInfo = `${item.pack_size} × ${item.unit_size} = ${total}`;
+                }
+
                 tr.innerHTML = `
                     <td>${item.vendor_item_code || ''}</td>
                     <td>${item.name || ''}</td>
-                    <td>${item.pack_size || ''}</td>
+                    <td>${packInfo}</td>
                     <td>${item.unit_cost ? '$' + parseFloat(item.unit_cost).toFixed(2) : ''}</td>
                     <td>${item.category || ''}</td>
                     <td>

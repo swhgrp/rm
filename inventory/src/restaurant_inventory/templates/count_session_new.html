@@ -1038,7 +1038,7 @@ async function completeCount() {
 
     message += 'After completing, you will need to review and approve the count to update inventory levels.';
 
-    if (!confirm(message)) return;
+    if (!await showConfirm(message)) return;
 
     try {
         await apiRequest(`api/count-sessions/${session.id}/complete`, { method: 'POST' });
@@ -1063,7 +1063,7 @@ async function approveCount() {
     }
     message += '\nThis action cannot be undone.';
 
-    if (!confirm(message)) return;
+    if (!await showConfirm(message)) return;
 
     try {
         const response = await apiRequest(`api/count-sessions/${session.id}/approve`, { method: 'POST' });
@@ -1089,7 +1089,7 @@ function exitCount() {
         message += 'This count has been approved and inventory has been updated.';
     }
 
-    if (confirm(message)) {
+    if (await showConfirm(message)) {
         window.location.href = '/inventory/count/history';
     }
 }

@@ -574,7 +574,7 @@ async function saveMapping() {
 }
 
 async function deleteMapping(mappingId) {
-    if (!confirm('Are you sure you want to delete this mapping?')) {
+    if (!await showConfirm('Are you sure you want to delete this mapping?')) {
         return;
     }
 

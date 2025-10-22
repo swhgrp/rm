@@ -17,6 +17,15 @@ class AccountType(str, enum.Enum):
     COGS = "COGS"  # Cost of Goods Sold
 
 
+class CashFlowClass(str, enum.Enum):
+    """Cash flow statement classification for accounts"""
+    OPERATING = "OPERATING"      # Operating activities (normal business operations)
+    INVESTING = "INVESTING"      # Investing activities (assets, investments)
+    FINANCING = "FINANCING"      # Financing activities (debt, equity)
+    NON_CASH = "NON_CASH"       # Non-cash items (depreciation, etc.)
+    NONE = "NONE"                # Not applicable to cash flow (e.g., cash accounts)
+
+
 class Account(Base):
     __tablename__ = "accounts"
 
@@ -29,6 +38,7 @@ class Account(Base):
     is_summary = Column(Boolean, default=False, nullable=False)  # True = parent/summary account, False = detail account
     description = Column(String(500))
     is_active = Column(Boolean, default=True)
+    cash_flow_class = Column(Enum(CashFlowClass), nullable=True)  # Cash flow statement classification
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

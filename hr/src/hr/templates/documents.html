@@ -507,7 +507,7 @@ async function downloadDocument(docId, fileName) {
 
 // Delete document
 async function deleteDocument(docId, fileName) {
-    if (!confirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) {
+    if (!await showConfirm(`Are you sure you want to delete "${fileName}"? This action cannot be undone.`)) {
         return;
     }
 

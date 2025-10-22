@@ -1,5 +1,5 @@
 """
-Reports API endpoints - Trial Balance, General Ledger, etc.
+Reports API endpoints - Trial Balance, General Ledger, Cash Flow Statement, etc.
 """
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
@@ -17,6 +17,8 @@ from accounting.models.user import User
 from accounting.models.area import Area
 from accounting.api.auth import require_auth
 from accounting.utils.pdf_generator import PDFReportGenerator
+from accounting.services.cash_flow_service import CashFlowStatementService
+from accounting.schemas.cash_flow import CashFlowStatementResponse
 from pydantic import BaseModel
 
 
@@ -1287,3 +1289,33 @@ async def export_balance_sheet_hierarchical_pdf(
             "Content-Disposition": f"attachment; filename={filename}"
         }
     )
+
+
+@router.get("/cash-flow-statement", response_model=CashFlowStatementResponse)
+def get_cash_flow_statement(
+    start_date: date = Query(..., description="Start date of period"),
+    end_date: date = Query(..., description="End date of period"),
+    area_id: Optional[int] = Query(None, description="Filter by location/area (null = all locations)"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
+    """
+    Generate Cash Flow Statement using the Indirect Method
+
+    The indirect method starts with net income from the P&L and reconciles to
+    cash from operations by adjusting for:
+    1. Non-cash expenses (depreciation, amortization)
+    2. Changes in working capital (AR, inventory, AP, accrued expenses)
+    3. Investing activities (asset purchases/sales)
+    4. Financing activities (loans, equity, distributions)
+
+    Multi-Location Support:
+    - If area_id is provided: Shows Cash Flow Statement for that specific location
+    - If area_id is null: Shows consolidated Cash Flow Statement for all locations
+
+    Returns:
+        CashFlowStatementResponse with complete cash flow statement broken down by
+        operating, investing, and financing activities
+    """
+    service = CashFlowStatementService(db)
+    return service.get_cash_flow_statement(start_date, end_date, area_id)

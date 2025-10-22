@@ -85,7 +85,7 @@ async def login(
 
     # Generate session token
     session_token = generate_session_token()
-    expires_at = datetime.utcnow() + timedelta(days=7)
+    expires_at = datetime.utcnow() + timedelta(minutes=30)
 
     # Create session
     session = UserSession(
@@ -104,7 +104,7 @@ async def login(
         key="accounting_session",
         value=session_token,
         httponly=True,
-        max_age=86400 * 7,  # 7 days
+        max_age=1800,  # 30 minutes (30 * 60 seconds)
         samesite="lax"
     )
 
@@ -155,7 +155,7 @@ async def sso_login(
 
     # Generate session token
     session_token = generate_session_token()
-    expires_at = datetime.utcnow() + timedelta(days=7)
+    expires_at = datetime.utcnow() + timedelta(minutes=30)
 
     # Create session
     session = UserSession(
@@ -174,7 +174,7 @@ async def sso_login(
         key="accounting_session",
         value=session_token,
         httponly=True,
-        max_age=86400 * 7,  # 7 days
+        max_age=1800,  # 30 minutes (30 * 60 seconds)
         samesite="lax"
     )
 
@@ -185,7 +185,7 @@ async def sso_login(
         key="accounting_session",
         value=session_token,
         httponly=True,
-        max_age=86400 * 7,
+        max_age=1800,  # 30 minutes
         samesite="lax"
     )
 

@@ -829,6 +829,7 @@
         </div>
         <ul class="sidebar-nav">
             <li><a href="/" title="Return to Portal"><i class="bi bi-house-door"></i> Portal Home</a></li>
+            <li><a href="/accounting/" class="{% block nav_dashboard %}{% endblock %}"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
 
             <!-- REPORTS SECTION -->
             <li>
@@ -837,8 +838,8 @@
                     <i class="bi bi-chevron-down float-end"></i>
                 </a>
                 <ul id="reportsSection" class="submenu">
-                    <li><a href="/accounting/" class="{% block nav_dashboard %}{% endblock %}"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
                     <li><a href="reports" class="{% block nav_reports %}{% endblock %}"><i class="bi bi-graph-up"></i> Financial Reports</a></li>
+                    <li><a href="cash-flow-statement" class="{% block nav_cash_flow %}{% endblock %}"><i class="bi bi-cash-stack"></i> Cash Flow Statement</a></li>
                 </ul>
             </li>
 
@@ -878,6 +879,20 @@
                 <ul id="arSection" class="submenu">
                     <li><a href="customers" class="{% block nav_customers %}{% endblock %}"><i class="bi bi-people"></i> Customers</a></li>
                     <li><a href="customer-invoices" class="{% block nav_customer_invoices %}{% endblock %}"><i class="bi bi-receipt"></i> Customer Invoices</a></li>
+                </ul>
+            </li>
+
+            <!-- BANKING SECTION -->
+            <li>
+                <a href="#" class="nav-section-toggle" onclick="toggleSection('bankingSection', event); return false;">
+                    <i class="bi bi-bank"></i> Banking
+                    <i class="bi bi-chevron-down float-end"></i>
+                </a>
+                <ul id="bankingSection" class="submenu">
+                    <li><a href="banking-dashboard" class="{% block nav_banking_dashboard %}{% endblock %}"><i class="bi bi-speedometer2"></i> Banking Dashboard</a></li>
+                    <li><a href="bank-accounts" class="{% block nav_bank_accounts %}{% endblock %}"><i class="bi bi-bank2"></i> Bank Accounts</a></li>
+                    <li><a href="bank-reconciliation" class="{% block nav_bank_reconciliation %}{% endblock %}"><i class="bi bi-arrow-left-right"></i> Daily Reconciliation</a></li>
+                    <li><a href="reconciliations" class="{% block nav_reconciliations %}{% endblock %}"><i class="bi bi-check2-square"></i> Monthly Reconciliation</a></li>
                 </ul>
             </li>
 
@@ -975,7 +990,7 @@
                 <div class="modal-body" id="confirmMessage"></div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="confirmOkBtn">Confirm</button>
+                    <button type="button" class="btn btn-primary" id="confirmOkBtn">OK</button>
                 </div>
             </div>
         </div>
@@ -1130,11 +1145,7 @@
             const urlParams = new URLSearchParams(window.location.search);
             const source = urlParams.get('source');
 
-            if (currentPath === '/accounting/' || currentPath === '/accounting') {
-                // Dashboard - open Reports section
-                sectionToOpen = document.getElementById('reportsSection');
-                toggleToOpen = document.querySelector('[onclick*="reportsSection"]');
-            } else if (currentPath.includes('/users') || currentPath.includes('/roles') || currentPath.includes('/locations') || currentPath.includes('/settings') || currentPath.includes('/periods')) {
+            if (currentPath.includes('/users') || currentPath.includes('/roles') || currentPath.includes('/locations') || currentPath.includes('/settings') || currentPath.includes('/periods')) {
                 sectionToOpen = document.getElementById('adminSection');
                 toggleToOpen = document.querySelector('[onclick*="adminSection"]');
             } else if (currentPath.includes('/vendors') || currentPath.includes('/vendor-bills')) {
@@ -1158,6 +1169,9 @@
             } else if (currentPath.includes('/reports')) {
                 sectionToOpen = document.getElementById('reportsSection');
                 toggleToOpen = document.querySelector('[onclick*="reportsSection"]');
+            } else if (currentPath.includes('/bank') || currentPath.includes('/reconciliation')) {
+                sectionToOpen = document.getElementById('bankingSection');
+                toggleToOpen = document.querySelector('[onclick*="bankingSection"]');
             }
 
             if (sectionToOpen) {
@@ -1196,12 +1210,12 @@
                 inactivityTimer = setTimeout(logout, INACTIVITY_TIMEOUT);
             }
 
-            function showWarning() {
+            async function showWarning() {
                 if (warningShown) return;
                 warningShown = true;
 
                 const remainingTime = Math.floor(WARNING_TIME / 60000); // Minutes
-                const proceed = confirm(
+                const proceed = await showConfirm(
                     `You will be automatically logged out in ${remainingTime} minutes due to inactivity.\n\n` +
                     `Click OK to stay logged in, or Cancel to logout now.`
                 );

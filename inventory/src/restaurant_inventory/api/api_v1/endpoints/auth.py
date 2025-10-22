@@ -101,23 +101,35 @@ async def sso_login(
 
     if not user:
         # Create user from Portal information
+        # Set role based on is_admin flag from portal
+        # Use "Admin" not "ADMIN" to match permission checks
+        role = "Admin" if portal_user.get("is_admin", False) else "Staff"
+
         user = User(
             username=portal_user["username"],
             email=portal_user["email"],
             full_name=portal_user["full_name"],
             hashed_password="",  # No password for SSO users
             is_active=True,
-            is_admin=portal_user.get("is_admin", False)
+            role=role
         )
         db.add(user)
         db.commit()
         db.refresh(user)
+    else:
+        # Update existing user from Portal information
+        # Always activate users who successfully authenticate via SSO
+        user.is_active = True
+        user.email = portal_user["email"]
+        user.full_name = portal_user["full_name"]
 
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Inactive user"
-        )
+        # Update role if user is admin in portal
+        # Use "Admin" not "ADMIN" to match permission checks
+        if portal_user.get("is_admin", False):
+            user.role = "Admin"
+
+        db.commit()
+        db.refresh(user)
 
     # Create access token for this system
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -142,6 +154,20 @@ async def sso_login(
     # Redirect to dashboard with token
     # We need to set the token in localStorage via JavaScript since the frontend expects it there
     from fastapi.responses import HTMLResponse
+    import json
+
+    # Create user response object
+    user_data = {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "full_name": user.full_name,
+        "role": user.role,
+        "is_active": user.is_active
+    }
+
+    # Convert to JSON string for embedding in JavaScript
+    user_json = json.dumps(user_data).replace("'", "\\'")
 
     html_content = f"""
     <!DOCTYPE html>
@@ -152,8 +178,10 @@ async def sso_login(
     <body>
         <p>Logging you in...</p>
         <script>
-            // Store token in localStorage for the frontend
+            // Store token and user in localStorage for the frontend
             localStorage.setItem('access_token', '{access_token}');
+            localStorage.setItem('user', '{user_json}');
+            localStorage.setItem('user_role', '{user_data["role"]}');
             // Redirect to dashboard
             window.location.href = '/inventory/';
         </script>

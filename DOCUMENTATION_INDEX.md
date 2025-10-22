@@ -1,6 +1,6 @@
 # Restaurant System Documentation Index
 
-**Last Updated:** 2025-10-19
+**Last Updated:** 2025-10-22
 
 ---
 
@@ -101,6 +101,87 @@
 
 ---
 
+## 🏦 Banking & Reconciliation
+
+### **Dashboard Documentation** ⭐ **NEW**
+- **[docs/status/GENERAL_DASHBOARD_IMPLEMENTATION.md](docs/status/GENERAL_DASHBOARD_IMPLEMENTATION.md)** ✅
+  - **General Accounting Dashboard - COMPLETE**
+  - 10 real-time widgets (Executive Summary, Sales, COGS, Bank, AP, Alerts, etc.)
+  - 6-month performance trends with Chart.js
+  - Location filtering and auto-refresh
+  - 4 new database tables, 6 API endpoints
+  - Code complete, awaiting data population
+
+- **[docs/status/DASHBOARD_FIXES_SUMMARY.md](docs/status/DASHBOARD_FIXES_SUMMARY.md)** ✅ **NEW**
+  - **User-reported issues and resolutions**
+  - Bank balance fix ($0 → $10,500)
+  - Top expenses fix (inflated → accurate)
+  - Accounting Health implementation
+  - All issues resolved ✅
+
+- **[docs/testing/DASHBOARD_TEST_RESULTS.md](docs/testing/DASHBOARD_TEST_RESULTS.md)** ✅
+  - Comprehensive dashboard testing
+  - All 4 API endpoints tested
+  - Performance metrics (avg 107ms)
+  - Data validation results
+
+- **[docs/banking/GENERAL_ACCOUNTING_DASHBOARD_SPEC.md](docs/banking/GENERAL_ACCOUNTING_DASHBOARD_SPEC.md)** ✅
+  - Technical specification (300+ lines)
+  - Widget requirements and calculations
+  - Alert types and thresholds
+  - Data refresh schedules
+
+- **[accounting/scripts/README_DASHBOARD_SCRIPTS.md](accounting/scripts/README_DASHBOARD_SCRIPTS.md)** ✅
+  - Data population scripts
+  - Nightly cron job setup
+  - Troubleshooting guide
+  - Performance optimization
+
+### **Decision Documents** ⭐
+- **[docs/banking/DECISION_SUMMARY.md](docs/banking/DECISION_SUMMARY.md)** ✅ UPDATED
+  - **Start here for banking decisions**
+  - Scope simplified (October 2025): No automated fee calculations
+  - User confirmed: Manual CC fees and delivery commissions
+  - Phase 1B approved: Statement reconciliation (2-3 weeks)
+  - Recommendation: Option A (Simplified Reconciliation)
+
+### **Implementation Progress** ⭐
+- **[docs/banking/PHASE_1B_COMPLETION_SUMMARY.md](docs/banking/PHASE_1B_COMPLETION_SUMMARY.md)** ✅ **NEW**
+  - **Phase 1B Week 1 & 2 Complete** (65% of Phase 1B done)
+  - Backend infrastructure 100% complete (composite matching)
+  - UI implementation 100% complete (reconciliation workspace)
+  - 1,260 lines of production code
+  - Ready for Week 3 testing and finalization
+
+### **Analysis & Validation**
+- [docs/banking/DSS_VALIDATION_REPORT.md](docs/banking/DSS_VALIDATION_REPORT.md) ⭐
+  - **Daily Sales Summary system validation** (✅ Production Ready)
+  - Confirms DSS → Bank Reconciliation integration is feasible
+  - Test results with real data
+  - Edge case analysis
+  - 100% validation score
+
+- [docs/banking/RECONCILIATION_GAP_ANALYSIS.md](docs/banking/RECONCILIATION_GAP_ANALYSIS.md)
+  - Technical gap analysis (current 30% vs. full spec 100%)
+  - Missing features breakdown
+  - Phase 1A/1B/1C implementation plan
+  - Architectural decisions
+
+- [docs/banking/RECONCILIATION_COMPARISON.md](docs/banking/RECONCILIATION_COMPARISON.md)
+  - User-friendly comparison guide
+  - Side-by-side current vs. target
+  - Three implementation options detailed
+  - Hybrid approach recommendation
+
+### **Testing & User Guides**
+- [/tmp/banking_user_test_guide.md](/tmp/banking_user_test_guide.md)
+  - 10 comprehensive test scenarios
+  - Step-by-step testing instructions
+  - Expected results and screenshots
+  - Edge case testing
+
+---
+
 ## 🔮 Planning & Future Work
 
 - [docs/planning/HR_IMPLEMENTATION_PLAN.md](docs/planning/HR_IMPLEMENTATION_PLAN.md)
@@ -159,10 +240,10 @@
 | **Integration Hub** | 🔄 70% | [Hub Status](docs/status/INTEGRATION_HUB_STATUS.md) |
 | **Accounts Payable** | 🔄 60% | [AP Progress](docs/status/ACCOUNTS_PAYABLE_PROGRESS.md) |
 | **Accounts Receivable** | 🔄 40% | [Status Doc](docs/status/ACCOUNTING_SYSTEM_STATUS.md) |
-| **Daily Sales** | 🔄 30% | [Status Doc](docs/status/ACCOUNTING_SYSTEM_STATUS.md) |
+| **Daily Sales** | ✅ 100% | [DSS Validation](docs/banking/DSS_VALIDATION_REPORT.md) |
 | **HR System** | 🔄 Planning | [HR Plan](docs/planning/HR_IMPLEMENTATION_PLAN.md) |
 | **Inventory Integration** | 🔄 70% | [Hub Status](docs/status/INTEGRATION_HUB_STATUS.md) |
-| **Banking/Reconciliation** | ❌ 0% | [Status Doc](docs/status/ACCOUNTING_SYSTEM_STATUS.md) |
+| **Banking/Reconciliation** | 🔄 50% → Week 3 Next | [Phase 1B Progress](docs/banking/PHASE_1B_COMPLETION_SUMMARY.md) ⭐ |
 
 ---
 
@@ -218,6 +299,32 @@
 ---
 
 ## 📅 Change Log
+
+### 2025-10-20 (Latest Update)
+- ✅ **Phase 1B Week 1 & 2 COMPLETE** (Banking & Reconciliation)
+  - ✅ Backend infrastructure 100% complete
+    - Database migration for composite matching
+    - SQLAlchemy models and relationships
+    - Pydantic schemas for API validation
+    - 4 API endpoints operational
+    - Automatic clearing journal entry generation
+  - ✅ UI implementation 100% complete
+    - Enhanced reconciliation workspace page
+    - Composite matching modal with real-time validation
+    - Multi-select table with filters
+    - Visual feedback and calculations
+  - 📊 **1,260 lines of production code** added
+  - 🎯 **Banking module now 50% complete** (was 30%)
+  - 📝 **Next:** Week 3 testing, adjustments, and finalization
+  - 📖 Created [PHASE_1B_COMPLETION_SUMMARY.md](docs/banking/PHASE_1B_COMPLETION_SUMMARY.md)
+
+### 2025-10-20 (Earlier)
+- ✅ **Banking & Reconciliation Scope Simplified**
+  - Updated DECISION_SUMMARY.md with simplified scope
+  - Removed automated credit card fee calculations (user handles manually)
+  - Removed delivery platform automation (user handles manually)
+  - Confirmed Phase 1B scope: Statement reconciliation + composite matching
+  - Timeline: 2-3 weeks for Phase 1B implementation
 
 ### 2025-10-19
 - ✅ **Documentation Cleanup**

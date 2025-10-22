@@ -1,0 +1,1474 @@
+{% extends "base.html" %}
+
+{% block title %}Reconciliation Workspace - {{ super() }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header with Reconciliation Info -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="d-flex align-items-center mb-2">
+                <a href="/accounting/reconciliations" class="btn btn-sm btn-outline-secondary me-3">
+                    <i class="bi bi-arrow-left me-1"></i>Back
+                </a>
+                <h2 class="mb-0" id="reconciliationTitle">
+                    <i class="bi bi-check2-square me-2"></i>
+                    <span class="placeholder-glow"><span class="placeholder col-6"></span></span>
+                </h2>
+            </div>
+            <p class="text-muted" id="reconciliationInfo">
+                <span class="placeholder-glow"><span class="placeholder col-4"></span></span>
+            </p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div id="reconciliationActions">
+                <button class="btn btn-success" onclick="autoMatch()" id="autoMatchBtn">
+                    <i class="bi bi-magic me-1"></i>Auto-Match
+                </button>
+                <button class="btn btn-primary" onclick="lockReconciliation()" id="lockBtn" disabled>
+                    <i class="bi bi-lock me-1"></i>Lock
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reconciliation Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted mb-1">Statement Balance</p>
+                    <h4 id="statementBalance" class="mb-0">
+                        <span class="placeholder-glow"><span class="placeholder col-8"></span></span>
+                    </h4>
+                    <small class="text-muted" id="statementDate"></small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted mb-1">Book Balance</p>
+                    <h4 id="bookBalance" class="mb-0">
+                        <span class="placeholder-glow"><span class="placeholder col-8"></span></span>
+                    </h4>
+                    <small class="text-muted">From GL</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted mb-1">Cleared Balance</p>
+                    <h4 id="clearedBalance" class="mb-0">
+                        <span class="placeholder-glow"><span class="placeholder col-8"></span></span>
+                    </h4>
+                    <small class="text-muted" id="clearedCount">0 items cleared</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card" id="differenceCard">
+                <div class="card-body">
+                    <p class="text-muted mb-1">Difference</p>
+                    <h4 id="difference" class="mb-0">
+                        <span class="placeholder-glow"><span class="placeholder col-8"></span></span>
+                    </h4>
+                    <small id="differenceStatus" class="text-muted"></small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Two-Panel Layout -->
+    <div class="row">
+        <!-- Left Panel: Bank Transactions -->
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Bank Transactions</h5>
+                    <div>
+                        <input type="text" id="bankSearchInput" class="form-control form-control-sm" placeholder="Search..." style="width: 200px; display: inline-block;">
+                        <span class="badge bg-secondary ms-2" id="bankCount">0</span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="sticky-top" style="top: 0; z-index: 10;">
+                                <tr>
+                                    <th width="5%">
+                                        <input type="checkbox" id="selectAllBank" onclick="selectAllBankTransactions()">
+                                    </th>
+                                    <th width="15%">Date</th>
+                                    <th width="45%">Description</th>
+                                    <th width="20%" class="text-end">Amount</th>
+                                    <th width="15%">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bankTransactionsBody">
+                                <tr>
+                                    <td colspan="5" class="text-center py-4">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                        <p class="text-muted mt-2 mb-0">Loading...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-sm btn-success" onclick="clearSelectedBank()">
+                        <i class="bi bi-check2 me-1"></i>Clear Selected
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="uncheckAllBank()">
+                        <i class="bi bi-x me-1"></i>Uncheck All
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: GL Entries -->
+        <div class="col-md-6">
+            <div class="card mb-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">General Ledger Entries</h5>
+                    <div>
+                        <input type="text" id="glSearchInput" class="form-control form-control-sm" placeholder="Search..." style="width: 200px; display: inline-block;">
+                        <span class="badge bg-secondary ms-2" id="glCount">0</span>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="sticky-top" style="top: 0; z-index: 10;">
+                                <tr>
+                                    <th width="5%">
+                                        <input type="checkbox" id="selectAllGL" onclick="selectAllGLEntries()">
+                                    </th>
+                                    <th width="15%">Date</th>
+                                    <th width="45%">Description</th>
+                                    <th width="20%" class="text-end">Amount</th>
+                                    <th width="15%">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="glEntriesBody">
+                                <tr>
+                                    <td colspan="5" class="text-center py-4">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                        <p class="text-muted mt-2 mb-0">Loading...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <button class="btn btn-sm btn-success" onclick="clearSelectedGL()">
+                        <i class="bi bi-check2 me-1"></i>Clear Selected
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="uncheckAllGL()">
+                        <i class="bi bi-x me-1"></i>Uncheck All
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Outstanding Items Section -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-file-earmark-check me-2"></i>Outstanding Checks</h6>
+                </div>
+                <div class="card-body">
+                    <div id="outstandingChecks" class="text-muted">No outstanding checks</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-arrow-down-circle me-2"></i>Deposits in Transit</h6>
+                </div>
+                <div class="card-body">
+                    <div id="depositsInTransit" class="text-muted">No deposits in transit</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Composite Matching Modal -->
+<div class="modal fade" id="compositeMatchModal" tabindex="-1" aria-labelledby="compositeMatchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="compositeMatchModalLabel">
+                    <i class="bi bi-link-45deg me-2"></i>Composite Match - Multiple Entries to One Deposit
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Bank Transaction Summary -->
+                <div class="card mb-3 border-primary">
+                    <div class="card-header bg-primary text-white">
+                        <h6 class="mb-0">Bank Deposit</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <strong>Date:</strong>
+                                <p id="compositeDepositDate" class="mb-0">-</p>
+                            </div>
+                            <div class="col-md-5">
+                                <strong>Description:</strong>
+                                <p id="compositeDepositDesc" class="mb-0">-</p>
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Amount:</strong>
+                                <h5 id="compositeDepositAmount" class="mb-0 text-success">$0.00</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="row g-2">
+                            <div class="col-md-3">
+                                <label class="form-label small">GL Account</label>
+                                <select id="compositeGLFilter" class="form-select form-select-sm">
+                                    <option value="">All Undeposited Accounts</option>
+                                    <option value="1090">1090 - Undeposited CC</option>
+                                    <option value="1091">1091 - Undeposited Cash</option>
+                                    <option value="1095">1095 - Undeposited Third Party</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">Start Date</label>
+                                <input type="date" id="compositeStartDate" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">End Date</label>
+                                <input type="date" id="compositeEndDate" class="form-control form-control-sm">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label small">&nbsp;</label>
+                                <button class="btn btn-sm btn-primary w-100" onclick="loadUndepositedLines()">
+                                    <i class="bi bi-search me-1"></i>Search
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Undeposited GL Lines Table -->
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Available GL Lines (Undeposited Funds)</h6>
+                        <span class="badge bg-secondary" id="undepositedLinesCount">0 lines</span>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead class="sticky-top" style="top: 0; background: var(--bs-body-bg); z-index: 10;">
+                                    <tr>
+                                        <th width="5%">
+                                            <input type="checkbox" id="selectAllUndeposited" onchange="toggleSelectAllUndeposited()">
+                                        </th>
+                                        <th width="12%">Date</th>
+                                        <th width="10%">JE #</th>
+                                        <th width="15%">Account</th>
+                                        <th width="10%">Area</th>
+                                        <th width="33%">Description</th>
+                                        <th width="15%" class="text-end">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="undepositedLinesBody">
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4">
+                                            <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                                            <p class="text-muted mt-2 mb-0">Loading undeposited lines...</p>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <span id="selectedLinesInfo" class="text-muted small">Select GL lines to match</span>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <strong>Selected Total:</strong>
+                                <span id="selectedTotal" class="ms-2 fs-5 text-primary">$0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Matching Summary -->
+                <div class="card mt-3 border-info">
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-4">
+                                <p class="mb-1 small text-muted">Bank Deposit Amount</p>
+                                <h5 id="summaryBankAmount" class="mb-0 text-success">$0.00</h5>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="mb-1 small text-muted">Selected GL Total</p>
+                                <h5 id="summarySelectedTotal" class="mb-0 text-primary">$0.00</h5>
+                            </div>
+                            <div class="col-md-4">
+                                <p class="mb-1 small text-muted">Difference</p>
+                                <h5 id="summaryDifference" class="mb-0">$0.00</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmCompositeMatchBtn" onclick="confirmCompositeMatch()" disabled>
+                    <i class="bi bi-check-circle me-1"></i>Confirm Match & Create Clearing Entry
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bank Adjustment Modal -->
+<div class="modal fade" id="bankAdjustmentModal" tabindex="-1" aria-labelledby="bankAdjustmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bankAdjustmentModalLabel">
+                    <i class="bi bi-plus-circle me-2"></i>Add Bank Adjustment
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Transaction:</strong> <span id="adjustmentBankDescription"></span><br>
+                    <strong>Amount:</strong> <span id="adjustmentBankAmount"></span>
+                </div>
+
+                <form id="adjustmentForm">
+                    <div class="mb-3">
+                        <label for="adjustmentType" class="form-label">Adjustment Type</label>
+                        <select class="form-select" id="adjustmentType" required onchange="updateAdjustmentGLAccount()">
+                            <option value="">-- Select Type --</option>
+                            <option value="bank_fee">Bank Fee</option>
+                            <option value="interest">Interest Income</option>
+                            <option value="nsf">NSF Charge</option>
+                            <option value="service_charge">Service Charge</option>
+                            <option value="wire_fee">Wire Transfer Fee</option>
+                            <option value="other_income">Other Income</option>
+                            <option value="other_expense">Other Expense</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="adjustmentGLAccount" class="form-label">GL Account</label>
+                        <select class="form-select" id="adjustmentGLAccount" required>
+                            <option value="">-- Select Account --</option>
+                        </select>
+                        <small class="form-text text-muted">The offsetting account (Checking account will be automatically debited/credited)</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="adjustmentDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="adjustmentDescription" rows="2" required></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="adjustmentDate" class="form-label">Transaction Date</label>
+                        <input type="date" class="form-control" id="adjustmentDate" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="adjustmentAmount" class="form-label">Amount</label>
+                        <input type="number" class="form-control" id="adjustmentAmount" step="0.01" required readonly>
+                    </div>
+                </form>
+
+                <div class="alert alert-secondary mt-3">
+                    <strong>Journal Entry Preview:</strong>
+                    <div id="adjustmentJEPreview" class="mt-2"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="confirmAdjustmentBtn" onclick="confirmAdjustment()">
+                    <i class="bi bi-check-circle me-1"></i>Create Adjustment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.transaction-row {
+    cursor: pointer;
+}
+
+.transaction-row:hover {
+    background-color: rgba(88, 166, 255, 0.1);
+}
+
+.transaction-row.matched {
+    background-color: rgba(40, 167, 69, 0.1);
+}
+
+.transaction-row.cleared {
+    background-color: rgba(23, 162, 184, 0.1);
+}
+
+.transaction-row.selected {
+    background-color: rgba(255, 193, 7, 0.2);
+    border-left: 3px solid #ffc107;
+}
+
+/* Composite matching styles */
+.undeposited-line-row {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.undeposited-line-row:hover {
+    background-color: rgba(88, 166, 255, 0.05);
+}
+
+.undeposited-line-row.table-primary {
+    background-color: rgba(13, 110, 253, 0.15) !important;
+}
+
+.btn-xs {
+    padding: 0.125rem 0.375rem;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    border-radius: 0.25rem;
+}
+
+/* Dark theme adjustments */
+@media (prefers-color-scheme: dark) {
+    .modal-content {
+        background-color: var(--bs-dark);
+        color: var(--bs-light);
+    }
+
+    .card {
+        background-color: var(--bs-dark);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .table {
+        color: var(--bs-light);
+    }
+
+    thead {
+        background-color: rgba(0, 0, 0, 0.3);
+    }
+}
+</style>
+
+<script>
+const reconciliationId = {{ reconciliation_id }};
+let reconciliation = null;
+let bankAccount = null;
+let bankTransactions = [];
+let glEntries = [];
+let clearedItems = [];
+
+// Composite matching state
+let currentBankTransaction = null;
+let undepositedLines = [];
+let selectedLineIds = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadReconciliationWorkspace();
+
+    // Setup search filters
+    document.getElementById('bankSearchInput').addEventListener('input', filterBankTransactions);
+    document.getElementById('glSearchInput').addEventListener('input', filterGLEntries);
+});
+
+async function loadReconciliationWorkspace() {
+    try {
+        const response = await fetch(`/accounting/api/bank-reconciliation/${reconciliationId}/workspace`, {
+            headers: {'Accept': 'application/json'}
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            reconciliation = data.reconciliation;
+            bankAccount = data.bank_account;
+            bankTransactions = data.unreconciled_transactions || [];
+            glEntries = data.unreconciled_gl_entries || [];
+            clearedItems = data.cleared_items || [];
+
+            console.log('Loaded workspace data:', data);
+            renderWorkspace();
+            calculateBalances();
+        } else {
+            const errorText = await response.text();
+            console.error('Failed to load workspace:', errorText);
+            throw new Error('Failed to load reconciliation workspace');
+        }
+    } catch (error) {
+        console.error('Error loading reconciliation workspace:', error);
+        showToast('Error', 'Failed to load reconciliation workspace', 'danger');
+    }
+}
+
+function renderWorkspace() {
+    // Update header
+    document.getElementById('reconciliationTitle').innerHTML = `
+        <i class="bi bi-check2-square me-2"></i>${bankAccount.account_name} Reconciliation
+        <span class="badge ${getStatusBadgeClass(reconciliation.status)} ms-2">${reconciliation.status}</span>
+    `;
+
+    document.getElementById('reconciliationInfo').textContent =
+        `Statement Date: ${new Date(reconciliation.statement_date).toLocaleDateString()} • Reconciliation Date: ${new Date(reconciliation.reconciliation_date).toLocaleDateString()}`;
+
+    // Update summary cards
+    document.getElementById('statementBalance').textContent =
+        `$${parseFloat(reconciliation.ending_balance).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    document.getElementById('statementDate').textContent =
+        `As of ${new Date(reconciliation.statement_date).toLocaleDateString()}`;
+
+    // Render transactions
+    renderBankTransactions();
+    renderGLEntries();
+    renderOutstandingItems();
+}
+
+function renderBankTransactions() {
+    const tbody = document.getElementById('bankTransactionsBody');
+    document.getElementById('bankCount').textContent = bankTransactions.length;
+
+    if (bankTransactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No unreconciled transactions</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = bankTransactions.map(txn => {
+        const isCleared = clearedItems.some(item => item.bank_transaction_id === txn.id);
+        const isDeposit = parseFloat(txn.amount) > 0;
+        const isCompositeMatch = txn.is_composite_match === true;
+
+        return `
+            <tr class="transaction-row ${isCleared ? 'cleared' : ''}"
+                data-txn-id="${txn.id}"
+                data-amount="${txn.amount}"
+                data-description="${txn.description?.toLowerCase() || ''}"
+                data-date="${txn.transaction_date}">
+                <td>
+                    <input type="checkbox" class="bank-checkbox" value="${txn.id}"
+                           ${isCleared ? 'checked disabled' : ''}
+                           onchange="onBankCheckboxChange(this)">
+                </td>
+                <td>${new Date(txn.transaction_date).toLocaleDateString()}</td>
+                <td>
+                    <small>${txn.description || '-'}</small>
+                    ${txn.check_number ? `<br><span class="badge bg-secondary">Check #${txn.check_number}</span>` : ''}
+                    ${isCompositeMatch ? `<br><span class="badge bg-primary"><i class="bi bi-link-45deg"></i> Composite</span>` : ''}
+                    ${isDeposit && !isCleared ? `<br><button class="btn btn-xs btn-outline-primary mt-1" onclick="openCompositeMatch(${txn.id})"><i class="bi bi-link-45deg me-1"></i>Match Composite</button>` : ''}
+                    ${!isCleared ? `<br><button class="btn btn-xs btn-outline-success mt-1" onclick="openBankAdjustment(${txn.id})"><i class="bi bi-plus-circle me-1"></i>Add Adjustment</button>` : ''}
+                </td>
+                <td class="text-end ${parseFloat(txn.amount) >= 0 ? 'text-success' : 'text-danger'}">
+                    $${Math.abs(parseFloat(txn.amount)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </td>
+                <td>
+                    ${isCleared ? '<span class="badge bg-info">Cleared</span>' : '<span class="badge bg-warning">Uncleared</span>'}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function renderGLEntries() {
+    const tbody = document.getElementById('glEntriesBody');
+    document.getElementById('glCount').textContent = glEntries.length;
+
+    if (glEntries.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No unreconciled GL entries</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = glEntries.map(entry => {
+        const isCleared = clearedItems.some(item => item.journal_entry_line_id === entry.id);
+        return `
+            <tr class="transaction-row ${isCleared ? 'cleared' : ''}"
+                data-line-id="${entry.id}"
+                data-amount="${entry.amount}"
+                data-description="${entry.journal_entry?.description?.toLowerCase() || ''}"
+                data-date="${entry.journal_entry?.entry_date}">
+                <td>
+                    <input type="checkbox" class="gl-checkbox" value="${entry.id}"
+                           ${isCleared ? 'checked disabled' : ''}
+                           onchange="onGLCheckboxChange(this)">
+                </td>
+                <td>${new Date(entry.journal_entry.entry_date).toLocaleDateString()}</td>
+                <td>
+                    <small>${entry.journal_entry.description || '-'}</small>
+                    <br><span class="text-muted small">JE-${entry.journal_entry.id}</span>
+                </td>
+                <td class="text-end ${parseFloat(entry.amount) >= 0 ? 'text-success' : 'text-danger'}">
+                    $${Math.abs(parseFloat(entry.amount)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </td>
+                <td>
+                    ${isCleared ? '<span class="badge bg-info">Cleared</span>' : '<span class="badge bg-warning">Uncleared</span>'}
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function renderOutstandingItems() {
+    const checks = bankTransactions.filter(t => t.check_number && !clearedItems.some(c => c.bank_transaction_id === t.id));
+    const deposits = bankTransactions.filter(t => parseFloat(t.amount) > 0 && !clearedItems.some(c => c.bank_transaction_id === t.id));
+
+    if (checks.length === 0) {
+        document.getElementById('outstandingChecks').innerHTML = '<p class="text-muted">No outstanding checks</p>';
+    } else {
+        const total = checks.reduce((sum, c) => sum + Math.abs(parseFloat(c.amount)), 0);
+        document.getElementById('outstandingChecks').innerHTML = `
+            <p><strong>Count:</strong> ${checks.length} | <strong>Total:</strong> $${total.toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
+            <ul class="list-unstyled mb-0">
+                ${checks.slice(0, 5).map(c => `<li><small>Check #${c.check_number}: $${Math.abs(parseFloat(c.amount)).toLocaleString('en-US', {minimumFractionDigits: 2})}</small></li>`).join('')}
+                ${checks.length > 5 ? `<li><small class="text-muted">...and ${checks.length - 5} more</small></li>` : ''}
+            </ul>
+        `;
+    }
+
+    if (deposits.length === 0) {
+        document.getElementById('depositsInTransit').innerHTML = '<p class="text-muted">No deposits in transit</p>';
+    } else {
+        const total = deposits.reduce((sum, d) => sum + parseFloat(d.amount), 0);
+        document.getElementById('depositsInTransit').innerHTML = `
+            <p><strong>Count:</strong> ${deposits.length} | <strong>Total:</strong> $${total.toLocaleString('en-US', {minimumFractionDigits: 2})}</p>
+        `;
+    }
+}
+
+function onBankCheckboxChange(checkbox) {
+    const row = checkbox.closest('tr');
+    if (checkbox.checked) {
+        row.classList.add('selected');
+    } else {
+        row.classList.remove('selected');
+    }
+    // Update real-time balance preview
+    updateBalancePreview();
+}
+
+function onGLCheckboxChange(checkbox) {
+    const row = checkbox.closest('tr');
+    if (checkbox.checked) {
+        row.classList.add('selected');
+    } else {
+        row.classList.remove('selected');
+    }
+    // Update real-time balance preview
+    updateBalancePreview();
+}
+
+// Real-time balance calculation based on selected (but not yet cleared) items
+function updateBalancePreview() {
+    // Get currently cleared balance from the display
+    const clearedBalanceText = document.getElementById('clearedBalance').textContent;
+    const currentClearedBalance = parseFloat(clearedBalanceText.replace(/[$,]/g, '')) || 0;
+
+    // Calculate selected but not cleared bank transactions
+    const selectedBankTxns = Array.from(document.querySelectorAll('.bank-checkbox:checked:not(:disabled)'))
+        .map(cb => {
+            const row = cb.closest('tr');
+            const amount = parseFloat(row.getAttribute('data-amount')) || 0;
+            return amount;
+        });
+
+    // Calculate selected but not cleared GL entries
+    const selectedGLEntries = Array.from(document.querySelectorAll('.gl-checkbox:checked:not(:disabled)'))
+        .map(cb => {
+            const row = cb.closest('tr');
+            const amount = parseFloat(row.getAttribute('data-amount')) || 0;
+            return amount;
+        });
+
+    // Calculate what the cleared balance WOULD BE if we cleared selected items
+    const selectedBankTotal = selectedBankTxns.reduce((sum, amt) => sum + amt, 0);
+    const selectedGLTotal = selectedGLEntries.reduce((sum, amt) => sum + amt, 0);
+
+    // Projected cleared balance = current + selected items
+    const projectedClearedBalance = currentClearedBalance + selectedBankTotal + selectedGLTotal;
+
+    // Get statement ending balance
+    const statementBalanceText = document.getElementById('statementBalance').textContent;
+    const statementBalance = parseFloat(statementBalanceText.replace(/[$,]/g, '')) || 0;
+
+    // Calculate projected difference
+    const projectedDifference = statementBalance - projectedClearedBalance;
+
+    // Update the difference display with preview
+    const diffElement = document.getElementById('difference');
+    const diffCard = document.getElementById('differenceCard');
+    const diffStatusElement = document.getElementById('differenceStatus');
+
+    // Check if there are any selected items
+    const hasSelections = selectedBankTxns.length > 0 || selectedGLEntries.length > 0;
+
+    if (hasSelections) {
+        // Show preview difference in blue to indicate it's a preview
+        diffElement.innerHTML = `
+            <span class="${Math.abs(projectedDifference) < 0.01 ? 'text-success' : 'text-primary'}">
+                $${Math.abs(projectedDifference).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+            </span>
+        `;
+
+        if (Math.abs(projectedDifference) < 0.01) {
+            diffStatusElement.innerHTML = `<i class="bi bi-check-circle text-success me-1"></i>Will balance (${selectedBankTxns.length + selectedGLEntries.length} selected)`;
+            diffCard.classList.add('border-success');
+            diffCard.classList.remove('border-primary');
+        } else {
+            diffStatusElement.innerHTML = `<i class="bi bi-info-circle text-primary me-1"></i>Preview (${selectedBankTxns.length + selectedGLEntries.length} selected)`;
+            diffCard.classList.add('border-primary');
+            diffCard.classList.remove('border-success');
+        }
+    } else {
+        // No selections - revert to actual difference
+        calculateBalances(); // Refresh actual balances
+    }
+}
+
+async function clearSelectedBank() {
+    const selected = Array.from(document.querySelectorAll('.bank-checkbox:checked:not(:disabled)'))
+        .map(cb => parseInt(cb.value));
+
+    if (selected.length === 0) {
+        showToast('Info', 'Please select transactions to clear', 'info');
+        return;
+    }
+
+    try {
+        for (const txnId of selected) {
+            const response = await fetch(`/accounting/api/bank-reconciliation/${reconciliationId}/clear-transaction/${txnId}`, {
+                method: 'POST',
+                headers: {'Accept': 'application/json'}
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to clear transaction');
+            }
+        }
+
+        showToast('Success', `Cleared ${selected.length} transaction(s)`, 'success');
+        loadReconciliationWorkspace();
+    } catch (error) {
+        console.error('Error clearing transactions:', error);
+        showToast('Error', 'Failed to clear transactions', 'danger');
+    }
+}
+
+async function clearSelectedGL() {
+    const selected = Array.from(document.querySelectorAll('.gl-checkbox:checked:not(:disabled)'))
+        .map(cb => parseInt(cb.value));
+
+    if (selected.length === 0) {
+        showToast('Info', 'Please select GL entries to clear', 'info');
+        return;
+    }
+
+    try {
+        for (const lineId of selected) {
+            const response = await fetch(`/accounting/api/bank-reconciliation/${reconciliationId}/clear-gl-entry/${lineId}`, {
+                method: 'POST',
+                headers: {'Accept': 'application/json'}
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to clear GL entry');
+            }
+        }
+
+        showToast('Success', `Cleared ${selected.length} GL entry(ies)`, 'success');
+        loadReconciliationWorkspace();
+    } catch (error) {
+        console.error('Error clearing GL entries:', error);
+        showToast('Error', 'Failed to clear GL entries', 'danger');
+    }
+}
+
+function selectAllBankTransactions() {
+    const checkbox = document.getElementById('selectAllBank');
+    document.querySelectorAll('.bank-checkbox:not(:disabled)').forEach(cb => {
+        cb.checked = checkbox.checked;
+        onBankCheckboxChange(cb);
+    });
+}
+
+function selectAllGLEntries() {
+    const checkbox = document.getElementById('selectAllGL');
+    document.querySelectorAll('.gl-checkbox:not(:disabled)').forEach(cb => {
+        cb.checked = checkbox.checked;
+        onGLCheckboxChange(cb);
+    });
+}
+
+function uncheckAllBank() {
+    document.querySelectorAll('.bank-checkbox:not(:disabled)').forEach(cb => {
+        cb.checked = false;
+        onBankCheckboxChange(cb);
+    });
+    document.getElementById('selectAllBank').checked = false;
+}
+
+function uncheckAllGL() {
+    document.querySelectorAll('.gl-checkbox:not(:disabled)').forEach(cb => {
+        cb.checked = false;
+        onGLCheckboxChange(cb);
+    });
+    document.getElementById('selectAllGL').checked = false;
+}
+
+function filterBankTransactions() {
+    const search = document.getElementById('bankSearchInput').value.toLowerCase();
+    document.querySelectorAll('#bankTransactionsBody tr[data-txn-id]').forEach(row => {
+        if (!search || row.dataset.description.includes(search)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+function filterGLEntries() {
+    const search = document.getElementById('glSearchInput').value.toLowerCase();
+    document.querySelectorAll('#glEntriesBody tr[data-line-id]').forEach(row => {
+        if (!search || row.dataset.description.includes(search)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+async function calculateBalances() {
+    try {
+        const response = await fetch(`/accounting/api/bank-reconciliation/${reconciliationId}/balance`, {
+            method: 'POST',
+            headers: {'Accept': 'application/json'}
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+
+            document.getElementById('bookBalance').textContent =
+                `$${parseFloat(data.book_balance || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+            document.getElementById('clearedBalance').textContent =
+                `$${parseFloat(data.cleared_balance || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+            document.getElementById('clearedCount').textContent =
+                `${data.cleared_count || 0} items cleared`;
+
+            const difference = parseFloat(data.difference || 0);
+            const diffCard = document.getElementById('differenceCard');
+
+            document.getElementById('difference').innerHTML = `
+                <span class="${Math.abs(difference) < 0.01 ? 'text-success' : 'text-danger'}">
+                    $${Math.abs(difference).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </span>
+            `;
+
+            if (Math.abs(difference) < 0.01) {
+                document.getElementById('differenceStatus').innerHTML = '<i class="bi bi-check-circle text-success me-1"></i>Balanced';
+                diffCard.classList.add('border-success');
+                document.getElementById('lockBtn').disabled = false;
+            } else {
+                document.getElementById('differenceStatus').innerHTML = '<i class="bi bi-exclamation-triangle text-danger me-1"></i>Not balanced';
+                diffCard.classList.remove('border-success');
+                document.getElementById('lockBtn').disabled = true;
+            }
+        }
+    } catch (error) {
+        console.error('Error calculating balances:', error);
+    }
+}
+
+async function autoMatch() {
+    if (!await showConfirm('This will automatically match high-confidence transactions. Continue?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/bank-accounts/${bankAccount.id}/auto-match`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ confidence_threshold: 95.0 })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showToast('Success', `Auto-matched ${result.matched_count || 0} transaction(s)`, 'success');
+            loadReconciliationWorkspace();
+        } else {
+            const error = await response.json();
+            showToast('Error', error.detail || 'Auto-match failed', 'danger');
+        }
+    } catch (error) {
+        console.error('Error auto-matching:', error);
+        showToast('Error', 'Auto-match failed', 'danger');
+    }
+}
+
+async function lockReconciliation() {
+    if (!await showConfirm('Lock this reconciliation? Once locked, it cannot be modified.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/bank-reconciliation/${reconciliationId}/lock`, {
+            method: 'POST',
+            headers: {'Accept': 'application/json'}
+        });
+
+        if (response.ok) {
+            showToast('Success', 'Reconciliation locked successfully', 'success');
+            setTimeout(() => {
+                window.location.href = '/accounting/reconciliations';
+            }, 1500);
+        } else {
+            const error = await response.json();
+            showToast('Error', error.detail || 'Failed to lock reconciliation', 'danger');
+        }
+    } catch (error) {
+        console.error('Error locking reconciliation:', error);
+        showToast('Error', 'Failed to lock reconciliation', 'danger');
+    }
+}
+
+function getStatusBadgeClass(status) {
+    switch(status) {
+        case 'draft': return 'bg-secondary';
+        case 'in_progress': return 'bg-info';
+        case 'balanced': return 'bg-success';
+        case 'locked': return 'bg-primary';
+        default: return 'bg-secondary';
+    }
+}
+
+function showToast(title, message, type) {
+    alert(`${title}: ${message}`);
+}
+
+// ============================================
+// COMPOSITE MATCHING FUNCTIONS (Phase 1B)
+// ============================================
+
+async function openCompositeMatch(bankTransactionId) {
+    // Find the transaction
+    currentBankTransaction = bankTransactions.find(t => t.id === bankTransactionId);
+    if (!currentBankTransaction) {
+        showToast('Error', 'Bank transaction not found', 'danger');
+        return;
+    }
+
+    // Reset state
+    selectedLineIds = [];
+    undepositedLines = [];
+
+    // Update modal with transaction info
+    document.getElementById('compositeDepositDate').textContent =
+        new Date(currentBankTransaction.transaction_date).toLocaleDateString();
+    document.getElementById('compositeDepositDesc').textContent =
+        currentBankTransaction.description || '-';
+
+    const amount = parseFloat(currentBankTransaction.amount);
+    document.getElementById('compositeDepositAmount').textContent =
+        `$${amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+    // Set summary amounts
+    document.getElementById('summaryBankAmount').textContent =
+        `$${amount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+    // Set default date range (7 days before deposit)
+    const depositDate = new Date(currentBankTransaction.transaction_date);
+    const startDate = new Date(depositDate);
+    startDate.setDate(startDate.getDate() - 7);
+
+    document.getElementById('compositeStartDate').valueAsDate = startDate;
+    document.getElementById('compositeEndDate').valueAsDate = depositDate;
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('compositeMatchModal'));
+    modal.show();
+
+    // Load undeposited lines
+    loadUndepositedLines();
+}
+
+async function loadUndepositedLines() {
+    try {
+        // Build query params
+        const params = new URLSearchParams();
+
+        const glFilter = document.getElementById('compositeGLFilter').value;
+        if (glFilter) {
+            params.append('account_ids', glFilter);
+        } else {
+            // Default to undeposited accounts
+            params.append('account_ids', '1090,1091,1095');
+        }
+
+        const startDate = document.getElementById('compositeStartDate').value;
+        if (startDate) params.append('start_date', startDate);
+
+        const endDate = document.getElementById('compositeEndDate').value;
+        if (endDate) params.append('end_date', endDate);
+
+        params.append('only_unmatched', 'true');
+
+        // Show loading
+        document.getElementById('undepositedLinesBody').innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center py-4">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+                    <p class="text-muted mt-2 mb-0">Loading...</p>
+                </td>
+            </tr>
+        `;
+
+        const response = await fetch(`/accounting/api/bank-transactions/undeposited-lines?${params}`, {
+            headers: {'Accept': 'application/json'}
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            undepositedLines = data.lines || [];
+            renderUndepositedLines();
+        } else {
+            throw new Error('Failed to load undeposited lines');
+        }
+    } catch (error) {
+        console.error('Error loading undeposited lines:', error);
+        showToast('Error', 'Failed to load undeposited lines', 'danger');
+        document.getElementById('undepositedLinesBody').innerHTML = `
+            <tr><td colspan="7" class="text-center py-4 text-danger">Error loading data</td></tr>
+        `;
+    }
+}
+
+function renderUndepositedLines() {
+    const tbody = document.getElementById('undepositedLinesBody');
+    document.getElementById('undepositedLinesCount').textContent = `${undepositedLines.length} lines`;
+
+    if (undepositedLines.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-muted">No undeposited lines found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = undepositedLines.map(line => `
+        <tr class="undeposited-line-row ${selectedLineIds.includes(line.id) ? 'table-primary' : ''}"
+            data-line-id="${line.id}"
+            onclick="toggleLineSelection(${line.id})">
+            <td>
+                <input type="checkbox" class="undeposited-checkbox"
+                       value="${line.id}"
+                       ${selectedLineIds.includes(line.id) ? 'checked' : ''}
+                       onchange="event.stopPropagation(); toggleLineSelection(${line.id})">
+            </td>
+            <td><small>${new Date(line.journal_entry_date).toLocaleDateString()}</small></td>
+            <td><small>${line.journal_entry_number}</small></td>
+            <td><small>${line.account_code} - ${line.account_name}</small></td>
+            <td><small>${line.area_name || '-'}</small></td>
+            <td><small>${line.description}</small></td>
+            <td class="text-end"><strong>$${parseFloat(line.amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+        </tr>
+    `).join('');
+
+    updateCompositeMatchSummary();
+}
+
+function toggleLineSelection(lineId) {
+    const index = selectedLineIds.indexOf(lineId);
+    if (index > -1) {
+        selectedLineIds.splice(index, 1);
+    } else {
+        selectedLineIds.push(lineId);
+    }
+    renderUndepositedLines();
+}
+
+function toggleSelectAllUndeposited() {
+    const checkbox = document.getElementById('selectAllUndeposited');
+    if (checkbox.checked) {
+        selectedLineIds = undepositedLines.map(line => line.id);
+    } else {
+        selectedLineIds = [];
+    }
+    renderUndepositedLines();
+}
+
+function updateCompositeMatchSummary() {
+    const selectedLines = undepositedLines.filter(line => selectedLineIds.includes(line.id));
+    const selectedTotal = selectedLines.reduce((sum, line) => sum + parseFloat(line.amount), 0);
+    const bankAmount = parseFloat(currentBankTransaction.amount);
+    const difference = bankAmount - selectedTotal;
+
+    // Update selected total displays
+    document.getElementById('selectedTotal').textContent =
+        `$${selectedTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+    document.getElementById('summarySelectedTotal').textContent =
+        `$${selectedTotal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+    // Update difference display
+    const diffElement = document.getElementById('summaryDifference');
+    diffElement.textContent = `$${Math.abs(difference).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+    if (Math.abs(difference) < 0.01) {
+        diffElement.className = 'mb-0 text-success';
+        document.getElementById('confirmCompositeMatchBtn').disabled = false;
+    } else {
+        diffElement.className = 'mb-0 text-danger';
+        document.getElementById('confirmCompositeMatchBtn').disabled = true;
+    }
+
+    // Update info text
+    if (selectedLineIds.length === 0) {
+        document.getElementById('selectedLinesInfo').textContent = 'Select GL lines to match';
+    } else if (Math.abs(difference) < 0.01) {
+        document.getElementById('selectedLinesInfo').innerHTML =
+            `<i class="bi bi-check-circle text-success me-1"></i>${selectedLineIds.length} lines selected - Perfect match!`;
+    } else {
+        document.getElementById('selectedLinesInfo').innerHTML =
+            `<i class="bi bi-exclamation-triangle text-warning me-1"></i>${selectedLineIds.length} lines selected - Difference: $${Math.abs(difference).toFixed(2)}`;
+    }
+}
+
+async function confirmCompositeMatch() {
+    if (selectedLineIds.length === 0) {
+        showToast('Error', 'Please select at least one GL line', 'warning');
+        return;
+    }
+
+    const selectedLines = undepositedLines.filter(line => selectedLineIds.includes(line.id));
+    const selectedTotal = selectedLines.reduce((sum, line) => sum + parseFloat(line.amount), 0);
+    const bankAmount = parseFloat(currentBankTransaction.amount);
+    const difference = Math.abs(bankAmount - selectedTotal);
+
+    if (difference >= 0.01) {
+        showToast('Error', `Cannot match - difference is $${difference.toFixed(2)}`, 'danger');
+        return;
+    }
+
+    if (!await showConfirm(`Create composite match?\n\nThis will:\n- Link ${selectedLineIds.length} GL lines to this bank deposit\n- Create a clearing journal entry\n- Mark the deposit as matched\n\nContinue?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/bank-transactions/${currentBankTransaction.id}/match-composite?user_id=1`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                bank_transaction_id: currentBankTransaction.id,
+                journal_entry_line_ids: selectedLineIds,
+                create_clearing_entry: true,
+                notes: `Composite match of ${selectedLineIds.length} GL lines to bank deposit`
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showToast('Success',
+                `Composite match created!\n- Matched ${result.matched_lines_count} lines\n- Created JE #${result.clearing_entry_number}`,
+                'success');
+
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('compositeMatchModal'));
+            modal.hide();
+
+            // Reload workspace
+            loadReconciliationWorkspace();
+        } else {
+            const error = await response.json();
+            showToast('Error', error.detail || 'Failed to create composite match', 'danger');
+        }
+    } catch (error) {
+        console.error('Error creating composite match:', error);
+        showToast('Error', 'Failed to create composite match', 'danger');
+    }
+}
+
+// ==========================================
+// Bank Adjustment Functions
+// ==========================================
+
+let currentAdjustmentTransaction = null;
+let glAccounts = [];
+
+// GL Account mapping for adjustment types
+const ADJUSTMENT_GL_MAPPINGS = {
+    'bank_fee': { account_number: '7425', name: 'Bank Charges' },
+    'interest': { account_number: '9330', name: 'Interest Income' },
+    'nsf': { account_number: '7525', name: 'Late Fees' },
+    'service_charge': { account_number: '7425', name: 'Bank Charges' },
+    'wire_fee': { account_number: '7425', name: 'Bank Charges' },
+    'other_income': { account_number: '9330', name: 'Interest Income' },
+    'other_expense': { account_number: '7140', name: 'Vendor delivery charge' }
+};
+
+async function openBankAdjustment(transactionId) {
+    // Find the transaction
+    currentAdjustmentTransaction = bankTransactions.find(t => t.id === transactionId);
+    if (!currentAdjustmentTransaction) {
+        showToast('Error', 'Transaction not found', 'danger');
+        return;
+    }
+
+    // Load GL accounts if not already loaded
+    if (glAccounts.length === 0) {
+        await loadGLAccounts();
+    }
+
+    // Populate modal
+    document.getElementById('adjustmentBankDescription').textContent = currentAdjustmentTransaction.description;
+    document.getElementById('adjustmentBankAmount').textContent =
+        `$${Math.abs(parseFloat(currentAdjustmentTransaction.amount)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+    document.getElementById('adjustmentAmount').value = Math.abs(parseFloat(currentAdjustmentTransaction.amount));
+    document.getElementById('adjustmentDate').value = currentAdjustmentTransaction.transaction_date;
+    document.getElementById('adjustmentDescription').value = currentAdjustmentTransaction.description || '';
+
+    // Reset form
+    document.getElementById('adjustmentType').value = '';
+    document.getElementById('adjustmentGLAccount').innerHTML = '<option value="">-- Select Account --</option>';
+    document.getElementById('adjustmentJEPreview').innerHTML = '<span class="text-muted">Select an adjustment type to see preview</span>';
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('bankAdjustmentModal'));
+    modal.show();
+}
+
+async function loadGLAccounts() {
+    try {
+        const response = await fetch('/accounting/api/accounts/?limit=1000');
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Loaded GL accounts:', data.length, 'accounts');
+            glAccounts = data;
+        } else {
+            console.error('Failed to load GL accounts. Status:', response.status);
+            showToast('Warning', 'Failed to load GL accounts', 'warning');
+        }
+    } catch (error) {
+        console.error('Error loading GL accounts:', error);
+        showToast('Error', 'Failed to load GL accounts: ' + error.message, 'danger');
+    }
+}
+
+function updateAdjustmentGLAccount() {
+    try {
+        const type = document.getElementById('adjustmentType').value;
+        const glAccountSelect = document.getElementById('adjustmentGLAccount');
+
+        if (!type) {
+            glAccountSelect.innerHTML = '<option value="">-- Select Account --</option>';
+            updateJEPreview();
+            return;
+        }
+
+        // Check if GL accounts are loaded
+        if (!glAccounts || glAccounts.length === 0) {
+            console.error('GL accounts not loaded');
+            glAccountSelect.innerHTML = '<option value="">Error: GL accounts not loaded</option>';
+            return;
+        }
+
+        // If custom, show all expense/income accounts
+        if (type === 'custom') {
+            const expenseIncomeAccounts = glAccounts.filter(a =>
+                a.account_type === 'EXPENSE' || a.account_type === 'REVENUE'
+            );
+            glAccountSelect.innerHTML = '<option value="">-- Select Account --</option>' +
+                expenseIncomeAccounts.map(a =>
+                    `<option value="${a.id}">${a.account_number} - ${a.account_name}</option>`
+                ).join('');
+        } else {
+            // Find the suggested GL account
+            const mapping = ADJUSTMENT_GL_MAPPINGS[type];
+            if (mapping) {
+                const matchingAccount = glAccounts.find(a =>
+                    a.account_number === mapping.account_number ||
+                    a.account_name.includes(mapping.name)
+                );
+
+                if (matchingAccount) {
+                    glAccountSelect.innerHTML =
+                        `<option value="${matchingAccount.id}" selected>${matchingAccount.account_number} - ${matchingAccount.account_name}</option>` +
+                        glAccounts.filter(a => a.id !== matchingAccount.id && (a.account_type === 'EXPENSE' || a.account_type === 'REVENUE'))
+                            .map(a => `<option value="${a.id}">${a.account_number} - ${a.account_name}</option>`).join('');
+                } else {
+                    // Fallback to all expense/income accounts
+                    const expenseIncomeAccounts = glAccounts.filter(a =>
+                        a.account_type === 'EXPENSE' || a.account_type === 'REVENUE'
+                    );
+                    glAccountSelect.innerHTML = '<option value="">-- Select Account --</option>' +
+                        expenseIncomeAccounts.map(a =>
+                            `<option value="${a.id}">${a.account_number} - ${a.account_name}</option>`
+                        ).join('');
+                }
+            }
+        }
+
+        updateJEPreview();
+    } catch (error) {
+        console.error('Error in updateAdjustmentGLAccount:', error);
+        showToast('Error', 'Failed to update GL account dropdown: ' + error.message, 'danger');
+    }
+}
+
+function updateJEPreview() {
+    try {
+        const type = document.getElementById('adjustmentType').value;
+        const glAccountId = document.getElementById('adjustmentGLAccount').value;
+        const amount = parseFloat(document.getElementById('adjustmentAmount').value);
+        const previewDiv = document.getElementById('adjustmentJEPreview');
+
+        if (!type || !glAccountId || !amount || isNaN(amount)) {
+            previewDiv.innerHTML = '<span class="text-muted">Select all fields to see preview</span>';
+            return;
+        }
+
+        const glAccount = glAccounts.find(a => a.id === parseInt(glAccountId));
+        if (!glAccount) {
+            previewDiv.innerHTML = '<span class="text-danger">Error: GL account not found</span>';
+            return;
+        }
+
+        if (!currentAdjustmentTransaction || !currentAdjustmentTransaction.amount) {
+            previewDiv.innerHTML = '<span class="text-danger">Error: Transaction amount not found</span>';
+            return;
+        }
+
+        const isExpense = parseFloat(currentAdjustmentTransaction.amount) < 0;
+        const checkingAccount = bankAccount; // From workspace data
+
+        let jeHTML = '<table class="table table-sm mb-0"><tbody>';
+
+        if (isExpense) {
+            // Negative bank transaction = expense
+            jeHTML += `
+                <tr>
+                    <td><strong>DR</strong> ${glAccount.account_number} - ${glAccount.account_name}</td>
+                    <td class="text-end">$${amount.toFixed(2)}</td>
+                </tr>
+                <tr>
+                    <td><strong>CR</strong> ${checkingAccount?.gl_account_number || '1010'} - Checking</td>
+                    <td class="text-end">$${amount.toFixed(2)}</td>
+                </tr>
+            `;
+        } else {
+            // Positive bank transaction = income
+            jeHTML += `
+                <tr>
+                    <td><strong>DR</strong> ${checkingAccount?.gl_account_number || '1010'} - Checking</td>
+                    <td class="text-end">$${amount.toFixed(2)}</td>
+                </tr>
+                <tr>
+                    <td><strong>CR</strong> ${glAccount.account_number} - ${glAccount.account_name}</td>
+                    <td class="text-end">$${amount.toFixed(2)}</td>
+                </tr>
+            `;
+        }
+
+        jeHTML += '</tbody></table>';
+        previewDiv.innerHTML = jeHTML;
+    } catch (error) {
+        console.error('Error in updateJEPreview:', error);
+        document.getElementById('adjustmentJEPreview').innerHTML =
+            `<span class="text-danger">Error generating preview: ${error.message}</span>`;
+    }
+}
+
+// Listen for changes to update preview
+document.addEventListener('DOMContentLoaded', function() {
+    const glAccountSelect = document.getElementById('adjustmentGLAccount');
+    if (glAccountSelect) {
+        glAccountSelect.addEventListener('change', updateJEPreview);
+    }
+});
+
+async function confirmAdjustment() {
+    const type = document.getElementById('adjustmentType').value;
+    const glAccountId = parseInt(document.getElementById('adjustmentGLAccount').value);
+    const description = document.getElementById('adjustmentDescription').value;
+    const date = document.getElementById('adjustmentDate').value;
+    const amount = parseFloat(document.getElementById('adjustmentAmount').value);
+
+    if (!type || !glAccountId || !description || !date || !amount) {
+        alert('Please fill in all fields');
+        return;
+    }
+
+    try {
+        // Build query parameters (API expects query params, not JSON body)
+        const params = new URLSearchParams({
+            bank_transaction_id: currentAdjustmentTransaction.id,
+            gl_account_id: glAccountId,
+            description: description,
+            transaction_date: date,
+            amount: amount,
+            adjustment_type: type
+        });
+
+        const response = await fetch(
+            `/accounting/api/bank-reconciliation/${reconciliationId}/create-adjustment?${params.toString()}`,
+            {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json'
+                }
+            }
+        );
+
+        if (response.ok) {
+            const result = await response.json();
+            alert(`Bank adjustment created!\nJournal Entry: ${result.journal_entry_number}\nTransaction marked as cleared`);
+
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('bankAdjustmentModal'));
+            modal.hide();
+
+            // Reload workspace
+            loadReconciliationWorkspace();
+        } else {
+            const error = await response.json();
+            console.error('API error:', error);
+            // Handle Pydantic validation errors
+            if (error.detail && Array.isArray(error.detail)) {
+                const errorMessages = error.detail.map(e => `${e.loc.join('.')}: ${e.msg}`).join('\n');
+                alert(`Validation Error:\n${errorMessages}`);
+            } else {
+                alert(`Error: ${error.detail || 'Failed to create adjustment'}`);
+            }
+        }
+    } catch (error) {
+        console.error('Error creating adjustment:', error);
+        alert('Failed to create adjustment: ' + error.message);
+    }
+}
+</script>
+{% endblock %}

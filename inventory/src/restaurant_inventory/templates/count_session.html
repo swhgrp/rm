@@ -752,7 +752,7 @@ function filterView(filter) {
 }
 
 async function completeCount() {
-    if (!confirm('Mark this count as completed? You can still edit it until it is approved.')) return;
+    if (!await showConfirm('Mark this count as completed? You can still edit it until it is approved.')) return;
 
     try {
         await apiRequest(`api/count-sessions/${currentSession.id}/complete`, {
@@ -820,7 +820,7 @@ function showReviewModal() {
 }
 
 async function proceedToApprove() {
-    if (!confirm('Approve this count and update inventory? This will lock the count and cannot be easily undone.')) return;
+    if (!await showConfirm('Approve this count and update inventory? This will lock the count and cannot be easily undone.')) return;
 
     try {
         await apiRequest(`api/count-sessions/${currentSession.id}/approve`, {
@@ -836,8 +836,8 @@ async function proceedToApprove() {
     }
 }
 
-function exitCount() {
-    if (confirm('Exit this count session?')) {
+async function exitCount() {
+    if (await showConfirm('Exit this count session?')) {
         window.location.href = '/inventory';
     }
 }

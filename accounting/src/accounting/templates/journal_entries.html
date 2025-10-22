@@ -384,6 +384,26 @@
     </form>
 </div>
 
+<!-- Journal Entry Details Modal -->
+<div class="modal fade" id="entryDetailsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-journal-text"></i> Entry Details
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="entryDetailsContent">
+                <!-- Content will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
 let entries = [];
 let accounts = [];
@@ -789,22 +809,115 @@ function viewEntry(entryId) {
     const entry = entries.find(e => e.id === entryId);
     if (!entry) return;
 
-    let details = `Entry Number: ${entry.entry_number}\n`;
-    details += `Date: ${entry.entry_date}\n`;
-    details += `Description: ${entry.description}\n`;
-    details += `Status: ${entry.status}\n\n`;
-    details += `Line Items:\n`;
-
-    entry.lines.forEach((line, i) => {
-        details += `${i+1}. ${line.account_number} - ${line.account_name}\n`;
-        if (line.debit_amount > 0) {
-            details += `   Debit: $${parseFloat(line.debit_amount).toFixed(2)}\n`;
-        } else {
-            details += `   Credit: $${parseFloat(line.credit_amount).toFixed(2)}\n`;
-        }
+    // Calculate totals
+    let totalDebit = 0;
+    let totalCredit = 0;
+    entry.lines.forEach(line => {
+        totalDebit += parseFloat(line.debit_amount || 0);
+        totalCredit += parseFloat(line.credit_amount || 0);
     });
 
-    showNotification(details, 'Entry Details');
+    // Build formatted HTML
+    let detailsHtml = `
+        <div class="journal-entry-details">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-2">Entry Information</h6>
+                    <table class="table table-sm table-borderless">
+                        <tr>
+                            <td class="text-muted" style="width: 120px;"><strong>Entry Number:</strong></td>
+                            <td>${entry.entry_number}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted"><strong>Date:</strong></td>
+                            <td>${new Date(entry.entry_date).toLocaleDateString()}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted"><strong>Status:</strong></td>
+                            <td><span class="badge bg-success">${entry.status}</span></td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-muted mb-2">Description</h6>
+                    <p class="mb-0">${entry.description}</p>
+                </div>
+            </div>
+
+            <h6 class="text-muted mb-2">
+                <i class="bi bi-list-ul"></i> Line Items
+                <span class="badge bg-secondary ms-2">${entry.lines.length}</span>
+            </h6>
+            <div class="table-responsive">
+                <table class="table table-hover table-sm">
+                    <thead class="table-light">
+                        <tr>
+                            <th width="5%">#</th>
+                            <th width="45%">Account</th>
+                            <th width="25%" class="text-end">Debit</th>
+                            <th width="25%" class="text-end">Credit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+    `;
+
+    entry.lines.forEach((line, i) => {
+        const debitAmount = parseFloat(line.debit_amount || 0);
+        const creditAmount = parseFloat(line.credit_amount || 0);
+
+        detailsHtml += `
+            <tr>
+                <td class="text-muted">${i + 1}</td>
+                <td>
+                    <strong>${line.account_number}</strong><br>
+                    <small class="text-muted">${line.account_name}</small>
+                </td>
+                <td class="text-end">
+                    ${debitAmount > 0 ?
+                        `<strong class="text-success">$${debitAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>` :
+                        '<span class="text-muted">-</span>'}
+                </td>
+                <td class="text-end">
+                    ${creditAmount > 0 ?
+                        `<strong class="text-danger">$${creditAmount.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>` :
+                        '<span class="text-muted">-</span>'}
+                </td>
+            </tr>
+        `;
+    });
+
+    detailsHtml += `
+                    </tbody>
+                    <tfoot class="table-light">
+                        <tr>
+                            <td colspan="2" class="text-end"><strong>Totals:</strong></td>
+                            <td class="text-end">
+                                <strong class="text-success">$${totalDebit.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+                            </td>
+                            <td class="text-end">
+                                <strong class="text-danger">$${totalCredit.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="text-end"><strong>Difference:</strong></td>
+                            <td colspan="2" class="text-end">
+                                <strong class="${Math.abs(totalDebit - totalCredit) < 0.01 ? 'text-success' : 'text-danger'}">
+                                    ${Math.abs(totalDebit - totalCredit) < 0.01 ?
+                                        '<i class="bi bi-check-circle-fill"></i> Balanced' :
+                                        '<i class="bi bi-exclamation-triangle-fill"></i> Out of Balance: $' + Math.abs(totalDebit - totalCredit).toFixed(2)}
+                                </strong>
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    `;
+
+    // Display in modal using innerHTML
+    document.getElementById('entryDetailsContent').innerHTML = detailsHtml;
+    const modal = new bootstrap.Modal(document.getElementById('entryDetailsModal'));
+    modal.show();
 }
 
 async function cancelEntry() {

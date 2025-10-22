@@ -564,7 +564,7 @@ async function deleteInventoryRecord(inventoryId) {
     const record = inventory.find(r => r.id === inventoryId);
     if (!record) return;
     
-    if (!confirm(`Remove "${record.item_name}" from ${record.location_name} inventory?`)) {
+    if (!await showConfirm(`Remove "${record.item_name}" from ${record.location_name} inventory?`)) {
         return;
     }
     
@@ -715,7 +715,7 @@ async function saveStorageArea() {
 }
 
 async function deleteStorageArea(id) {
-    if (!confirm('Are you sure you want to delete this storage area?')) return;
+    if (!await showConfirm('Are you sure you want to delete this storage area?')) return;
 
     try {
         await apiRequest(`api/storage-areas/${id}`, { method: 'DELETE' });

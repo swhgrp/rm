@@ -26,6 +26,12 @@ from accounting.api.daily_sales_summary import router as dss_router
 from accounting.api.vendors import router as vendors_router
 from accounting.api.customers import router as customers_router
 from accounting.api.customer_invoices import router as customer_invoices_router
+from accounting.api.bank_accounts import router as bank_accounts_router
+from accounting.api.bank_reconciliation import router as bank_reconciliation_router
+from accounting.api.bank_statements import router as bank_statements_router
+from accounting.api.composite_matching import router as composite_matching_router
+from accounting.api.banking_dashboard import router as banking_dashboard_router
+from accounting.api.general_dashboard import router as general_dashboard_router
 from accounting.models.user import User
 # Import all models to ensure they are registered
 import accounting.models  # noqa
@@ -67,17 +73,24 @@ app.include_router(ap_reports_router)
 app.include_router(customers_router)
 app.include_router(customer_invoices_router)
 app.include_router(dss_router)
+app.include_router(bank_accounts_router, prefix="/api/bank-accounts", tags=["Banking"])
+app.include_router(bank_reconciliation_router, prefix="/api/bank-reconciliation", tags=["Banking"])
+app.include_router(bank_statements_router, prefix="/api/bank-statements", tags=["Banking"])
+app.include_router(composite_matching_router, prefix="/api/bank-transactions", tags=["Banking - Composite Matching"])
+app.include_router(banking_dashboard_router, prefix="/api/banking-dashboard", tags=["Banking - Dashboard"])
+app.include_router(general_dashboard_router)
 
 
 # Custom exception handler for authentication redirects
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    """Handle HTTP exceptions - redirect 401 to login for HTML requests"""
+    """Handle HTTP exceptions - redirect 401 to Portal login for HTML requests"""
     if exc.status_code == status.HTTP_401_UNAUTHORIZED:
         # Check if this is an HTML request (not API)
         accept = request.headers.get("accept", "")
         if "text/html" in accept or "/accounting/" in request.url.path:
-            return RedirectResponse(url="/accounting/login", status_code=302)
+            # Redirect to Portal login instead of local login
+            return RedirectResponse(url="/portal/login?redirect=/accounting/", status_code=302)
     # For API requests or other errors, return JSON response
     from fastapi.responses import JSONResponse
     return JSONResponse(
@@ -123,8 +136,8 @@ async def dashboard(
     db: Session = Depends(get_db),
     user: User = Depends(require_auth)
 ):
-    """Dashboard page (protected)"""
-    return templates.TemplateResponse("dashboard.html", {
+    """Dashboard page (protected) - General Accounting Dashboard"""
+    return templates.TemplateResponse("general_dashboard.html", {
         "request": request,
         "current_user": user
     })
@@ -382,6 +395,18 @@ async def reports_page(
     })
 
 
+@app.get("/cash-flow-statement", response_class=HTMLResponse)
+async def cash_flow_statement_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Cash Flow Statement page"""
+    return templates.TemplateResponse("cash_flow_statement.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(
     request: Request,
@@ -401,6 +426,82 @@ async def settings_page(
     return templates.TemplateResponse("settings.html", {
         "request": request,
         "current_user": user
+    })
+
+
+@app.get("/bank-accounts", response_class=HTMLResponse)
+async def bank_accounts_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Bank Accounts page"""
+    return templates.TemplateResponse("bank_accounts.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
+@app.get("/bank-accounts/{account_id}", response_class=HTMLResponse)
+async def bank_account_detail_page(
+    account_id: int,
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Bank Account Detail page with transactions"""
+    return templates.TemplateResponse("bank_account_detail.html", {
+        "request": request,
+        "current_user": user,
+        "account_id": account_id
+    })
+
+
+@app.get("/banking-dashboard", response_class=HTMLResponse)
+async def banking_dashboard_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Banking dashboard overview - Phase 1 comprehensive dashboard"""
+    return templates.TemplateResponse("banking_dashboard_v2.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
+@app.get("/bank-reconciliation", response_class=HTMLResponse)
+async def bank_reconciliation_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Transaction-first bank reconciliation page"""
+    return templates.TemplateResponse("bank_reconciliation.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
+@app.get("/reconciliations", response_class=HTMLResponse)
+async def reconciliations_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Bank Reconciliations list page"""
+    return templates.TemplateResponse("reconciliations.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
+@app.get("/reconciliations/{reconciliation_id}", response_class=HTMLResponse)
+async def reconciliation_workspace_page(
+    reconciliation_id: int,
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Reconciliation workspace page"""
+    return templates.TemplateResponse("reconciliation_workspace.html", {
+        "request": request,
+        "current_user": user,
+        "reconciliation_id": reconciliation_id
     })
 
 

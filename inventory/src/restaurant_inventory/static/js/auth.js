@@ -86,14 +86,21 @@ function updateNavigation() {
         if (userRole) {
             const roleMap = {
                 'ADMIN': 'Admin',
+                'Admin': 'Admin',
+                'admin': 'Admin',
                 'MANAGER': 'Manager',
-                'STAFF': 'User'
+                'Manager': 'Manager',
+                'manager': 'Manager',
+                'STAFF': 'User',
+                'Staff': 'User',
+                'staff': 'User'
             };
             userRole.textContent = roleMap[user.role] || user.role;
         }
 
         // Show Settings link and dropdown admin options only to admins
-        const isAdmin = user.role === 'ADMIN' || user.role === 'admin';
+        // Support all case variations for backwards compatibility
+        const isAdmin = user.role === 'Admin' || user.role === 'ADMIN' || user.role === 'admin';
 
         if (adminSettingsLink) {
             adminSettingsLink.style.display = isAdmin ? 'block' : 'none';

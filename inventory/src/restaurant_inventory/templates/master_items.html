@@ -15,9 +15,14 @@
             <input type="text" class="form-control" id="itemSearch" placeholder="Search master items">
             <button class="btn btn-outline-secondary" onclick="clearItemSearch()">Clear</button>
         </div>
-        <button class="btn btn-primary" onclick="showCreateItemModal()">
-            <i class="bi bi-plus-circle"></i> Add Item
-        </button>
+        <div>
+            <button class="btn btn-outline-primary me-2" onclick="showMasterItemUploadModal()">
+                <i class="bi bi-upload"></i> Import Master Items
+            </button>
+            <button class="btn btn-primary" onclick="showCreateItemModal()">
+                <i class="bi bi-plus-circle"></i> Add Item
+            </button>
+        </div>
     </div>
 
     <div class="card">
@@ -101,6 +106,116 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 <a href="/vendor-items" class="btn btn-primary">Go to Vendor Items</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Master Item Upload Modal -->
+<div class="modal fade" id="masterItemUploadModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Import Master Item List</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Step 1: File Upload -->
+                <div id="masterUploadStep">
+                    <h6>Step 1: Upload File</h6>
+                    <p class="text-muted">Upload a CSV or Excel file containing your master items.</p>
+
+                    <div class="alert alert-info">
+                        <strong>Required:</strong> Name only. <strong>Optional:</strong> Description, Category, Unit, Secondary Unit,
+                        Conversion Factor, Par Level, Item Code/SKU
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="masterFileInput" class="form-label">Select File (CSV, XLS, XLSX)</label>
+                        <input type="file" class="form-control" id="masterFileInput" accept=".csv,.xlsx,.xls">
+                    </div>
+                    <button class="btn btn-primary" onclick="uploadMasterFile()">
+                        <i class="bi bi-upload"></i> Upload & Parse
+                    </button>
+                </div>
+
+                <!-- Step 2: Column Mapping -->
+                <div id="masterMappingStep" style="display: none;">
+                    <h6>Step 2: Map Columns</h6>
+                    <p class="text-muted">Map your file's columns to our system fields.</p>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <strong>Your Column</strong>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>Maps To</strong>
+                        </div>
+                    </div>
+
+                    <div id="masterColumnMapping">
+                        <!-- Column mapping will be generated here -->
+                    </div>
+
+                    <button class="btn btn-secondary me-2" onclick="backToMasterUpload()">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </button>
+                    <button class="btn btn-primary" onclick="previewMasterItems()">
+                        Preview Import <i class="bi bi-arrow-right"></i>
+                    </button>
+                </div>
+
+                <!-- Step 3: Preview & Unit Mapping -->
+                <div id="masterPreviewStep" style="display: none;">
+                    <h6>Step 3: Preview & Map Units</h6>
+                    <p class="text-muted">Review the items that will be imported and confirm unit mappings.</p>
+
+                    <div class="alert alert-warning" id="masterPreviewSummary">
+                        <!-- Summary will be inserted here -->
+                    </div>
+
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table class="table table-sm table-hover">
+                            <thead class="table-dark sticky-top">
+                                <tr>
+                                    <th>Row</th>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Unit</th>
+                                    <th>Secondary Unit</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="masterPreviewTableBody">
+                                <!-- Preview rows will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <button class="btn btn-secondary me-2" onclick="backToMasterMapping()">
+                        <i class="bi bi-arrow-left"></i> Back
+                    </button>
+                    <button class="btn btn-success" onclick="importMasterItems()">
+                        <i class="bi bi-check-circle"></i> Import Items
+                    </button>
+                </div>
+
+                <!-- Import Progress -->
+                <div id="masterImportingStep" style="display: none;">
+                    <div class="text-center py-5">
+                        <div class="spinner-border text-primary mb-3" role="status"></div>
+                        <p>Importing master items...</p>
+                    </div>
+                </div>
+
+                <!-- Import Complete -->
+                <div id="masterImportCompleteStep" style="display: none;">
+                    <div class="text-center py-4">
+                        <h5><i class="bi bi-check-circle text-success"></i> Import Complete!</h5>
+                        <div id="masterImportResults"></div>
+                    </div>
+                    <button class="btn btn-primary" onclick="closeMasterItemUploadModal()">Close</button>
+                </div>
             </div>
         </div>
     </div>
@@ -241,6 +356,13 @@
             return;
         }
 
+        // Sort master items alphabetically by name
+        displayList.sort((a, b) => {
+            const nameA = a.name || '';
+            const nameB = b.name || '';
+            return nameA.localeCompare(nameB);
+        });
+
         tbody.innerHTML = displayList.map(item => {
             const statusBadge = item.is_active
                 ? '<span class="badge bg-success">Active</span>'
@@ -329,10 +451,41 @@
 
     function populateCategoryDropdown() {
         const select = document.getElementById('itemCategory');
-        select.innerHTML = '<option value="">Select category...</option>' +
-            categories.filter(c => c.is_active).map(cat =>
-                `<option value="${cat.name}">${cat.name}</option>`
-            ).join('');
+
+        // Separate parent and child categories
+        const parentCategories = categories.filter(c => c.is_active && !c.parent_id);
+        const childCategories = categories.filter(c => c.is_active && c.parent_id);
+
+        // Build hierarchical options
+        let options = '<option value="">Select category...</option>';
+
+        // Add parent categories and their children
+        parentCategories
+            .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+            .forEach(parent => {
+                // Add parent
+                options += `<option value="${parent.name}">${parent.name}</option>`;
+
+                // Add children of this parent
+                childCategories
+                    .filter(child => child.parent_id === parent.id)
+                    .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+                    .forEach(child => {
+                        options += `<option value="${child.name}">&nbsp;&nbsp;&nbsp;&nbsp;↳ ${child.name}</option>`;
+                    });
+            });
+
+        // Add any orphaned child categories (shouldn't happen, but just in case)
+        const orphanedChildren = childCategories.filter(child =>
+            !parentCategories.find(p => p.id === child.parent_id)
+        );
+        if (orphanedChildren.length > 0) {
+            orphanedChildren.forEach(child => {
+                options += `<option value="${child.name}">${child.name}</option>`;
+            });
+        }
+
+        select.innerHTML = options;
     }
 
     function editItem(itemId) {
@@ -471,7 +624,23 @@
     async function loadCategories() {
         try {
             const response = await apiRequest('api/categories/');
-            categories = Array.isArray(response) ? response : [];
+
+            // Flatten the hierarchical structure
+            // API returns parents with subcategories nested inside
+            categories = [];
+            if (Array.isArray(response)) {
+                response.forEach(parent => {
+                    // Add parent category
+                    categories.push(parent);
+
+                    // Add subcategories if they exist
+                    if (parent.subcategories && Array.isArray(parent.subcategories)) {
+                        parent.subcategories.forEach(sub => {
+                            categories.push(sub);
+                        });
+                    }
+                });
+            }
         } catch (error) {
             console.error('Error loading categories:', error);
             showAlert('Error loading categories: ' + error.message, 'danger');
@@ -516,5 +685,323 @@
             }
         });
     });
+
+    // Master Item Upload Functions
+    let masterUploadData = {
+        file: null,
+        columns: [],
+        sampleRows: [],
+        totalRows: 0,
+        suggestedMapping: {},
+        columnMapping: {},
+        previewItems: [],
+        unitOptions: [],
+        unitMappings: {}
+    };
+
+    async function showMasterItemUploadModal() {
+        // Reset all steps
+        document.getElementById('masterUploadStep').style.display = 'block';
+        document.getElementById('masterMappingStep').style.display = 'none';
+        document.getElementById('masterPreviewStep').style.display = 'none';
+        document.getElementById('masterImportingStep').style.display = 'none';
+        document.getElementById('masterImportCompleteStep').style.display = 'none';
+
+        // Reset file input
+        document.getElementById('masterFileInput').value = '';
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('masterItemUploadModal'));
+        modal.show();
+    }
+
+    async function uploadMasterFile() {
+        const fileInput = document.getElementById('masterFileInput');
+        const file = fileInput.files[0];
+
+        if (!file) {
+            showAlert('Please select a file to upload', 'warning');
+            return;
+        }
+
+        try {
+            masterUploadData.file = file;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const token = localStorage.getItem('access_token');
+            const response = await fetch('api/items/parse-master-upload', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Upload failed');
+            }
+
+            const result = await response.json();
+
+            masterUploadData.columns = result.columns;
+            masterUploadData.sampleRows = result.sample_rows;
+            masterUploadData.totalRows = result.total_rows;
+            masterUploadData.suggestedMapping = result.suggested_mapping;
+            masterUploadData.columnMapping = {...result.suggested_mapping};
+
+            // Show mapping step
+            renderMasterColumnMapping();
+            document.getElementById('masterUploadStep').style.display = 'none';
+            document.getElementById('masterMappingStep').style.display = 'block';
+
+        } catch (error) {
+            showAlert('Error uploading file: ' + error.message, 'danger');
+        }
+    }
+
+    function renderMasterColumnMapping() {
+        const container = document.getElementById('masterColumnMapping');
+        container.innerHTML = '';
+
+        const ourFields = [
+            {value: '', label: '-- Skip This Column --'},
+            {value: 'name', label: 'Name (required)'},
+            {value: 'item_code', label: 'Item Code/SKU'},
+            {value: 'description', label: 'Description'},
+            {value: 'category', label: 'Category'},
+            {value: 'unit_of_measure', label: 'Unit of Measure'},
+            {value: 'secondary_unit', label: 'Secondary Unit'},
+            {value: 'conversion_factor', label: 'Conversion Factor'},
+            {value: 'par_level', label: 'Par Level'}
+        ];
+
+        masterUploadData.columns.forEach(col => {
+            const row = document.createElement('div');
+            row.className = 'row mb-2';
+
+            const colName = document.createElement('div');
+            colName.className = 'col-md-6';
+            colName.innerHTML = `<strong>${col}</strong>`;
+
+            const suggested = masterUploadData.suggestedMapping[col] || '';
+
+            const colSelect = document.createElement('div');
+            colSelect.className = 'col-md-6';
+            colSelect.innerHTML = `
+                <select class="form-select" data-vendor-col="${col}">
+                    ${ourFields.map(f => `<option value="${f.value}" ${f.value === suggested ? 'selected' : ''}>${f.label}</option>`).join('')}
+                </select>
+            `;
+
+            colSelect.querySelector('select').addEventListener('change', (e) => {
+                const vendorCol = e.target.dataset.vendorCol;
+                const ourField = e.target.value;
+                if (ourField) {
+                    masterUploadData.columnMapping[vendorCol] = ourField;
+                } else {
+                    delete masterUploadData.columnMapping[vendorCol];
+                }
+            });
+
+            row.appendChild(colName);
+            row.appendChild(colSelect);
+            container.appendChild(row);
+        });
+    }
+
+    function backToMasterUpload() {
+        document.getElementById('masterMappingStep').style.display = 'none';
+        document.getElementById('masterUploadStep').style.display = 'block';
+    }
+
+    async function previewMasterItems() {
+        // Show importing step temporarily
+        document.getElementById('masterMappingStep').style.display = 'none';
+        document.getElementById('masterImportingStep').style.display = 'block';
+
+        try {
+            const formData = new FormData();
+            formData.append('file', masterUploadData.file);
+            formData.append('column_mapping', JSON.stringify(masterUploadData.columnMapping));
+
+            const token = localStorage.getItem('access_token');
+            const response = await fetch('api/items/preview-master-items', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Preview failed');
+            }
+
+            const result = await response.json();
+
+            masterUploadData.previewItems = result.items;
+            masterUploadData.unitOptions = result.unit_options;
+            masterUploadData.unitMappings = {};
+
+            // Render preview
+            renderMasterPreview();
+
+            document.getElementById('masterImportingStep').style.display = 'none';
+            document.getElementById('masterPreviewStep').style.display = 'block';
+
+        } catch (error) {
+            document.getElementById('masterImportingStep').style.display = 'none';
+            document.getElementById('masterMappingStep').style.display = 'block';
+            showAlert('Error previewing items: ' + error.message, 'danger');
+        }
+    }
+
+    function renderMasterPreview() {
+        const tbody = document.getElementById('masterPreviewTableBody');
+        tbody.innerHTML = '';
+
+        let validCount = 0;
+        let invalidCount = 0;
+
+        masterUploadData.previewItems.forEach(item => {
+            if (item.valid) validCount++;
+            else invalidCount++;
+
+            // Auto-set matched units in unitMappings
+            if (item.matched_unit_id) {
+                masterUploadData.unitMappings[`${item.row_number}_unit`] = item.matched_unit_id;
+            }
+            if (item.matched_secondary_unit_id) {
+                masterUploadData.unitMappings[`${item.row_number}_secondary`] = item.matched_secondary_unit_id;
+            }
+
+            const row = document.createElement('tr');
+            row.className = item.valid ? 'table-success' : 'table-danger';
+
+            row.innerHTML = `
+                <td>${item.row_number}</td>
+                <td>${item.name || '<em>Missing</em>'}</td>
+                <td>${item.category || '-'}</td>
+                <td>
+                    ${item.unit_of_measure || '-'}
+                    <select class="form-select form-select-sm mt-1" data-row="${item.row_number}" data-type="unit">
+                        <option value="">-- Select Unit --</option>
+                        ${masterUploadData.unitOptions.map(u =>
+                            `<option value="${u.id}" ${u.id === item.matched_unit_id ? 'selected' : ''}>${u.name} (${u.abbreviation})</option>`
+                        ).join('')}
+                    </select>
+                </td>
+                <td>
+                    ${item.secondary_unit || '-'}
+                    ${item.secondary_unit ? `
+                        <select class="form-select form-select-sm mt-1" data-row="${item.row_number}" data-type="secondary">
+                            <option value="">-- Skip --</option>
+                            ${masterUploadData.unitOptions.map(u =>
+                                `<option value="${u.id}" ${u.id === item.matched_secondary_unit_id ? 'selected' : ''}>${u.name} (${u.abbreviation})</option>`
+                            ).join('')}
+                        </select>
+                    ` : '-'}
+                </td>
+                <td>
+                    ${item.valid ?
+                        '<span class="badge bg-success">Valid</span>' :
+                        `<span class="badge bg-danger" title="${item.errors.join(', ')}">Invalid</span>`
+                    }
+                </td>
+            `;
+
+            tbody.appendChild(row);
+        });
+
+        // Setup unit selection listeners
+        tbody.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', (e) => {
+                const row = e.target.dataset.row;
+                const type = e.target.dataset.type;
+                const unitId = e.target.value;
+                const key = `${row}_${type}`;
+
+                if (unitId) {
+                    masterUploadData.unitMappings[key] = parseInt(unitId);
+                } else {
+                    delete masterUploadData.unitMappings[key];
+                }
+            });
+        });
+
+        // Update summary
+        document.getElementById('masterPreviewSummary').innerHTML =
+            `Ready to import ${validCount} valid items. ${invalidCount > 0 ? `<strong>${invalidCount} items have errors and will be skipped.</strong>` : ''}`;
+    }
+
+    function backToMasterMapping() {
+        document.getElementById('masterPreviewStep').style.display = 'none';
+        document.getElementById('masterMappingStep').style.display = 'block';
+    }
+
+    async function importMasterItems() {
+        // Show importing step
+        document.getElementById('masterPreviewStep').style.display = 'none';
+        document.getElementById('masterImportingStep').style.display = 'block';
+
+        try {
+            const formData = new FormData();
+            formData.append('file', masterUploadData.file);
+            formData.append('column_mapping', JSON.stringify(masterUploadData.columnMapping));
+            formData.append('unit_mappings', JSON.stringify(masterUploadData.unitMappings));
+
+            const token = localStorage.getItem('access_token');
+            const response = await fetch('api/items/import-master-items', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Import failed');
+            }
+
+            const result = await response.json();
+
+            // Show completion step
+            document.getElementById('masterImportingStep').style.display = 'none';
+            document.getElementById('masterImportCompleteStep').style.display = 'block';
+
+            document.getElementById('masterImportResults').innerHTML = `
+                <div class="alert alert-success">
+                    <p><strong>Created:</strong> ${result.created} items</p>
+                    <p><strong>Updated:</strong> ${result.updated} items</p>
+                    <p><strong>Errors:</strong> ${result.errors} items</p>
+                    ${result.error_details.length > 0 ? `
+                        <hr>
+                        <strong>Error Details:</strong>
+                        <ul>
+                            ${result.error_details.slice(0, 10).map(e => `<li>${e}</li>`).join('')}
+                            ${result.error_details.length > 10 ? `<li><em>... and ${result.error_details.length - 10} more</em></li>` : ''}
+                        </ul>
+                    ` : ''}
+                </div>
+            `;
+
+            // Reload items table
+            await loadItems();
+
+        } catch (error) {
+            document.getElementById('masterImportingStep').style.display = 'none';
+            document.getElementById('masterPreviewStep').style.display = 'block';
+            showAlert('Error importing items: ' + error.message, 'danger');
+        }
+    }
+
+    function closeMasterItemUploadModal() {
+        bootstrap.Modal.getInstance(document.getElementById('masterItemUploadModal')).hide();
+    }
 </script>
 {% endblock %}

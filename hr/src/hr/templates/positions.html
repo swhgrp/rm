@@ -326,7 +326,7 @@ document.getElementById('positionForm').addEventListener('submit', async (e) => 
 
 // Delete position
 async function deletePosition(positionId, positionTitle) {
-    if (!confirm(`Are you sure you want to delete the position "${positionTitle}"? This action cannot be undone.`)) {
+    if (!await showConfirm(`Are you sure you want to delete the position "${positionTitle}"? This action cannot be undone.`)) {
         return;
     }
 

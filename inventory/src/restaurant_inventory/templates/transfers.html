@@ -394,7 +394,7 @@ ${transfer.notes ? '\nNotes: ' + transfer.notes : ''}
 }
 
 async function approveTransfer(transferId) {
-    if (!confirm('Approve this transfer request?')) {
+    if (!await showConfirm('Approve this transfer request?')) {
         return;
     }
 
@@ -413,7 +413,7 @@ async function approveTransfer(transferId) {
 }
 
 async function completeTransfer(transferId) {
-    if (!confirm('Complete this transfer? This will update inventory levels.')) {
+    if (!await showConfirm('Complete this transfer? This will update inventory levels.')) {
         return;
     }
 
@@ -432,7 +432,7 @@ async function completeTransfer(transferId) {
 }
 
 async function cancelTransfer(transferId) {
-    if (!confirm('Cancel this transfer request?')) {
+    if (!await showConfirm('Cancel this transfer request?')) {
         return;
     }
 
