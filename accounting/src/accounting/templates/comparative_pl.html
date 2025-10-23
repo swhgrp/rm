@@ -545,9 +545,19 @@ async function loadReport() {
         }
     } catch (error) {
         console.error('Error loading report:', error);
+        let errorMsg = error.message;
+        if (error.response) {
+            try {
+                const errorData = await error.response.json();
+                errorMsg = errorData.detail || errorMsg;
+            } catch (e) {
+                // Could not parse error response
+            }
+        }
         document.getElementById('reportContent').innerHTML = `
             <div class="loading-state" style="color: #f85149;">
-                <i class="bi bi-exclamation-triangle"></i> Error loading report: ${error.message}
+                <i class="bi bi-exclamation-triangle"></i> Error loading report: ${errorMsg}
+                <br><small>Check browser console for details</small>
             </div>
         `;
     } finally {
@@ -577,7 +587,15 @@ async function loadTwoPeriodReport() {
     });
 
     if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorText = await response.text();
+        let errorMsg = `HTTP ${response.status}`;
+        try {
+            const errorData = JSON.parse(errorText);
+            errorMsg = errorData.detail || errorMsg;
+        } catch (e) {
+            errorMsg = errorText || errorMsg;
+        }
+        throw new Error(errorMsg);
     }
 
     reportData = await response.json();
@@ -598,15 +616,31 @@ async function loadMultiPeriodReport() {
         params.append('area_id', areaId);
     }
 
-    const response = await fetch(`api/reports/multi-period-profit-loss?${params}`, {
+    console.log('Fetching multi-period report with params:', Object.fromEntries(params));
+    const url = `api/reports/multi-period-profit-loss?${params}`;
+    console.log('Full URL:', url);
+
+    const response = await fetch(url, {
         credentials: 'include'
     });
 
+    console.log('Response status:', response.status);
+
     if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        let errorMsg = `HTTP ${response.status}`;
+        try {
+            const errorData = JSON.parse(errorText);
+            errorMsg = errorData.detail || errorMsg;
+        } catch (e) {
+            errorMsg = errorText || errorMsg;
+        }
+        throw new Error(errorMsg);
     }
 
     reportData = await response.json();
+    console.log('Report data received:', reportData);
     displayMultiPeriodReport(reportData);
 }
 
