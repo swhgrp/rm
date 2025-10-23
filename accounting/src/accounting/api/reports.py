@@ -1032,6 +1032,283 @@ def get_comparative_profit_loss(
     )
 
 
+# Multi-Period Comparative Schemas
+class MultiPeriodAccountLine(BaseModel):
+    account_id: int
+    account_number: str
+    account_name: str
+    is_summary: bool
+    hierarchy_level: int
+    current_amount: Decimal  # Current period
+    prior_periods: List[Decimal]  # Array of prior period amounts
+    children: List['MultiPeriodAccountLine'] = []
+
+    class Config:
+        from_attributes = True
+
+
+MultiPeriodAccountLine.model_rebuild()
+
+
+class MultiPeriodSectionResponse(BaseModel):
+    section_name: str
+    accounts: List[MultiPeriodAccountLine]
+    current_total: Decimal
+    prior_totals: List[Decimal]
+
+
+class MultiPeriodProfitLossResponse(BaseModel):
+    current_start: date
+    current_end: date
+    current_label: str
+    prior_periods: List[dict]  # [{start, end, label}, ...]
+    area_id: Optional[int]
+    area_name: Optional[str]
+    revenue_section: MultiPeriodSectionResponse
+    cogs_section: MultiPeriodSectionResponse
+    gross_profit_current: Decimal
+    gross_profit_prior: List[Decimal]
+    expense_section: MultiPeriodSectionResponse
+    net_income_current: Decimal
+    net_income_prior: List[Decimal]
+
+
+@router.get("/multi-period-profit-loss", response_model=MultiPeriodProfitLossResponse)
+def get_multi_period_profit_loss(
+    current_start: date = Query(..., description="Start date for current period"),
+    current_end: date = Query(..., description="End date for current period"),
+    num_periods: int = Query(3, description="Number of prior periods to compare (1-12)", ge=1, le=12),
+    period_type: str = Query("month", description="Period type: month, quarter, year"),
+    area_id: Optional[int] = Query(None, description="Filter by location"),
+    hide_zero: bool = Query(False, description="Hide accounts with zero in all periods"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
+    """
+    Generate Multi-Period Comparative P&L showing current period vs N prior periods
+    Example: October 2025 vs (Sep, Aug, Jul, Jun, May, Apr)
+    """
+    from dateutil.relativedelta import relativedelta
+    from accounting.api.reports import get_profit_loss_hierarchical as get_pl
+
+    # Calculate prior period dates based on period_type
+    prior_period_dates = []
+
+    if period_type == "month":
+        delta = relativedelta(months=1)
+    elif period_type == "quarter":
+        delta = relativedelta(months=3)
+    elif period_type == "year":
+        delta = relativedelta(years=1)
+    else:
+        delta = relativedelta(months=1)
+
+    # Generate prior periods working backwards from current period
+    for i in range(1, num_periods + 1):
+        prior_start = current_start - (delta * i)
+        prior_end = current_end - (delta * i)
+
+        # Generate label
+        if period_type == "month":
+            label = prior_start.strftime("%B %Y")
+        elif period_type == "quarter":
+            quarter = (prior_start.month - 1) // 3 + 1
+            label = f"Q{quarter} {prior_start.year}"
+        else:
+            label = f"FY {prior_start.year}"
+
+        prior_period_dates.append({
+            "start": prior_start,
+            "end": prior_end,
+            "label": label
+        })
+
+    # Get current period P&L
+    current_pl = get_pl(
+        start_date=current_start,
+        end_date=current_end,
+        area_id=area_id,
+        hide_zero=False,
+        db=db,
+        user=user
+    )
+
+    # Get all prior period P&Ls
+    prior_pls = []
+    for period in prior_period_dates:
+        pl = get_pl(
+            start_date=period["start"],
+            end_date=period["end"],
+            area_id=area_id,
+            hide_zero=False,
+            db=db,
+            user=user
+        )
+        prior_pls.append(pl)
+
+    def merge_multi_period_trees(
+        current_nodes: List[HierarchicalPLAccountLine],
+        prior_nodes_list: List[List[HierarchicalPLAccountLine]]
+    ) -> List[MultiPeriodAccountLine]:
+        """Merge current period with multiple prior periods"""
+        # Create map for current period
+        current_map = {node.account_id: node for node in current_nodes}
+
+        # Create maps for each prior period
+        prior_maps = [{node.account_id: node for node in nodes} for nodes in prior_nodes_list]
+
+        # Collect all unique account IDs
+        all_ids = set(current_map.keys())
+        for prior_map in prior_maps:
+            all_ids.update(prior_map.keys())
+
+        result = []
+
+        # Process accounts from current period first (to preserve order)
+        for current_node in current_nodes:
+            # Get amounts from all prior periods
+            prior_amounts = []
+            for prior_map in prior_maps:
+                prior_node = prior_map.get(current_node.account_id)
+                prior_amounts.append(prior_node.amount if prior_node else Decimal('0'))
+
+            # Recursively merge children
+            children = []
+            if current_node.children:
+                prior_children_lists = []
+                for prior_map in prior_maps:
+                    prior_node = prior_map.get(current_node.account_id)
+                    prior_children_lists.append(prior_node.children if prior_node else [])
+                children = merge_multi_period_trees(current_node.children, prior_children_lists)
+
+            # Skip if hide_zero and all amounts are zero
+            if hide_zero:
+                all_zero = current_node.amount == 0 and all(amt == 0 for amt in prior_amounts) and not children
+                if all_zero:
+                    continue
+
+            result.append(MultiPeriodAccountLine(
+                account_id=current_node.account_id,
+                account_number=current_node.account_number,
+                account_name=current_node.account_name,
+                is_summary=current_node.is_summary,
+                hierarchy_level=current_node.hierarchy_level,
+                current_amount=current_node.amount,
+                prior_periods=prior_amounts,
+                children=children
+            ))
+
+        # Add accounts that only exist in prior periods
+        current_ids = {node.account_id for node in current_nodes}
+        for acc_id in all_ids - current_ids:
+            # Find first prior period that has this account
+            first_prior_node = None
+            for prior_map in prior_maps:
+                if acc_id in prior_map:
+                    first_prior_node = prior_map[acc_id]
+                    break
+
+            if not first_prior_node:
+                continue
+
+            # Get amounts from all prior periods
+            prior_amounts = []
+            for prior_map in prior_maps:
+                prior_node = prior_map.get(acc_id)
+                prior_amounts.append(prior_node.amount if prior_node else Decimal('0'))
+
+            # Process children
+            children = []
+            if first_prior_node.children:
+                prior_children_lists = []
+                for prior_map in prior_maps:
+                    prior_node = prior_map.get(acc_id)
+                    prior_children_lists.append(prior_node.children if prior_node else [])
+                children = merge_multi_period_trees([], prior_children_lists)
+
+            # Skip if hide_zero
+            if hide_zero and all(amt == 0 for amt in prior_amounts) and not children:
+                continue
+
+            result.append(MultiPeriodAccountLine(
+                account_id=first_prior_node.account_id,
+                account_number=first_prior_node.account_number,
+                account_name=first_prior_node.account_name,
+                is_summary=first_prior_node.is_summary,
+                hierarchy_level=first_prior_node.hierarchy_level,
+                current_amount=Decimal('0'),
+                prior_periods=prior_amounts,
+                children=children
+            ))
+
+        return result
+
+    # Merge revenue sections
+    revenue_accounts = merge_multi_period_trees(
+        current_pl.revenue_section.accounts,
+        [pl.revenue_section.accounts for pl in prior_pls]
+    )
+    revenue_prior_totals = [pl.revenue_section.total for pl in prior_pls]
+
+    # Merge COGS sections
+    cogs_accounts = merge_multi_period_trees(
+        current_pl.cogs_section.accounts,
+        [pl.cogs_section.accounts for pl in prior_pls]
+    )
+    cogs_prior_totals = [pl.cogs_section.total for pl in prior_pls]
+
+    # Merge expense sections
+    expense_accounts = merge_multi_period_trees(
+        current_pl.expense_section.accounts,
+        [pl.expense_section.accounts for pl in prior_pls]
+    )
+    expense_prior_totals = [pl.expense_section.total for pl in prior_pls]
+
+    # Calculate gross profit and net income for all periods
+    gp_prior = [pl.gross_profit for pl in prior_pls]
+    ni_prior = [pl.net_income for pl in prior_pls]
+
+    # Generate current period label
+    if period_type == "month":
+        current_label = current_start.strftime("%B %Y")
+    elif period_type == "quarter":
+        quarter = (current_start.month - 1) // 3 + 1
+        current_label = f"Q{quarter} {current_start.year}"
+    else:
+        current_label = f"FY {current_start.year}"
+
+    return MultiPeriodProfitLossResponse(
+        current_start=current_start,
+        current_end=current_end,
+        current_label=current_label,
+        prior_periods=prior_period_dates,
+        area_id=area_id,
+        area_name=current_pl.area_name,
+        revenue_section=MultiPeriodSectionResponse(
+            section_name="Revenue",
+            accounts=revenue_accounts,
+            current_total=current_pl.revenue_section.total,
+            prior_totals=revenue_prior_totals
+        ),
+        cogs_section=MultiPeriodSectionResponse(
+            section_name="Cost of Goods Sold",
+            accounts=cogs_accounts,
+            current_total=current_pl.cogs_section.total,
+            prior_totals=cogs_prior_totals
+        ),
+        gross_profit_current=current_pl.gross_profit,
+        gross_profit_prior=gp_prior,
+        expense_section=MultiPeriodSectionResponse(
+            section_name="Operating Expenses",
+            accounts=expense_accounts,
+            current_total=current_pl.expense_section.total,
+            prior_totals=expense_prior_totals
+        ),
+        net_income_current=current_pl.net_income,
+        net_income_prior=ni_prior
+    )
+
+
 @router.get("/balance-sheet", response_model=BalanceSheetResponse)
 def get_balance_sheet(
     as_of_date: date = Query(..., description="As of date for Balance Sheet"),
