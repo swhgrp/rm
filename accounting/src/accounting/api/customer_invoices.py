@@ -460,3 +460,69 @@ def get_next_invoice_number(
 
     # Fallback: use ID-based numbering
     return {"next_number": f"INV-{latest.id + 1:05d}"}
+
+
+@router.get("/aging-report")
+def ar_aging_report(
+    area_id: Optional[int] = Query(None),
+    as_of_date: Optional[date] = Query(None),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
+    """
+    Generate Accounts Receivable aging report
+    Shows outstanding invoices grouped by age
+    """
+    # Default to today if no date provided
+    if not as_of_date:
+        as_of_date = date.today()
+
+    # Query for unpaid/partially paid invoices
+    query = db.query(CustomerInvoice).filter(
+        CustomerInvoice.status.in_([InvoiceStatus.SENT, InvoiceStatus.PARTIAL])
+    )
+
+    # Filter by location if specified
+    if area_id:
+        query = query.filter(CustomerInvoice.area_id == area_id)
+
+    invoices = query.all()
+
+    # Initialize aging buckets
+    current = Decimal('0')  # 0-30 days
+    days_31_60 = Decimal('0')
+    days_61_90 = Decimal('0')
+    over_90 = Decimal('0')
+    total_outstanding = Decimal('0')
+
+    # Calculate aging for each invoice
+    for invoice in invoices:
+        # Calculate balance (total - paid)
+        balance = invoice.total_amount - invoice.paid_amount
+
+        if balance <= 0:
+            continue  # Skip fully paid invoices
+
+        # Calculate days overdue from due date
+        days_overdue = (as_of_date - invoice.due_date).days
+
+        # Add to appropriate bucket
+        if days_overdue <= 30:
+            current += balance
+        elif days_overdue <= 60:
+            days_31_60 += balance
+        elif days_overdue <= 90:
+            days_61_90 += balance
+        else:
+            over_90 += balance
+
+        total_outstanding += balance
+
+    return {
+        "as_of_date": as_of_date,
+        "current": float(current),
+        "days_31_60": float(days_31_60),
+        "days_61_90": float(days_61_90),
+        "over_90": float(over_90),
+        "total_outstanding": float(total_outstanding)
+    }

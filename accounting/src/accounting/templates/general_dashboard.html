@@ -687,16 +687,33 @@ async function loadAPAging() {
 }
 
 async function loadARAging() {
-    // TODO: Replace with actual AR aging API
-    const mockAging = {
-        '0-30': 8000,
-        '31-60': 3000,
-        '61-90': 1000,
-        '>90': 200
-    };
+    try {
+        const response = await fetch('api/customer-invoices/aging-report', {
+            credentials: 'include'
+        });
 
-    const total = Object.values(mockAging).reduce((sum, val) => sum + val, 0);
-    document.getElementById('totalOutstandingAR').textContent = formatCurrency(total);
+        if (!response.ok) {
+            console.warn('Failed to load AR aging:', response.status);
+            return;
+        }
+
+        const data = await response.json();
+
+        // Update aging buckets in the HTML
+        const agingBuckets = document.querySelectorAll('#arAging .aging-bucket');
+        if (agingBuckets.length >= 4) {
+            agingBuckets[0].querySelector('.aging-amount').textContent = formatCurrency(data.current || 0);
+            agingBuckets[1].querySelector('.aging-amount').textContent = formatCurrency(data.days_31_60 || 0);
+            agingBuckets[2].querySelector('.aging-amount').textContent = formatCurrency(data.days_61_90 || 0);
+            agingBuckets[3].querySelector('.aging-amount').textContent = formatCurrency(data.over_90 || 0);
+        }
+
+        // Update total outstanding
+        const totalOutstanding = data.total_outstanding || 0;
+        document.getElementById('totalOutstandingAR').textContent = formatCurrency(totalOutstanding);
+    } catch (error) {
+        console.error('Error loading AR aging:', error);
+    }
 }
 
 async function loadAlerts() {
