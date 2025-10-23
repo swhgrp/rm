@@ -1,0 +1,579 @@
+{% extends "base.html" %}
+
+{% block title %}Comparative P&L - Accounting{% endblock %}
+{% block nav_comparative_pl %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    .comparative-report {
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .report-header {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #30363d;
+    }
+
+    .report-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: #e6edf3;
+        margin-bottom: 10px;
+    }
+
+    .period-selector {
+        background: #0d1117;
+        border: 1px solid #30363d;
+        padding: 20px;
+        border-radius: 6px;
+        margin-bottom: 20px;
+    }
+
+    .period-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .form-label {
+        font-size: 12px;
+        color: #8b949e;
+        margin-bottom: 5px;
+        font-weight: 500;
+    }
+
+    .form-input, .form-select {
+        background: #161b22;
+        border: 1px solid #30363d;
+        color: #e6edf3;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 14px;
+    }
+
+    .form-input:focus, .form-select:focus {
+        outline: none;
+        border-color: #58a6ff;
+    }
+
+    .btn-generate {
+        background: #238636;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .btn-generate:hover {
+        background: #2ea043;
+    }
+
+    .btn-generate:disabled {
+        background: #30363d;
+        cursor: not-allowed;
+    }
+
+    .comparison-table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+
+    .comparison-table th {
+        background: #161b22;
+        color: #8b949e;
+        font-weight: 600;
+        text-align: right;
+        padding: 12px;
+        border-bottom: 2px solid #30363d;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .comparison-table th:first-child {
+        text-align: left;
+    }
+
+    .comparison-table td {
+        padding: 10px 12px;
+        border-bottom: 1px solid #21262d;
+        color: #e6edf3;
+        font-size: 14px;
+    }
+
+    .comparison-table tr:hover {
+        background: #161b22;
+    }
+
+    .comparison-table td:nth-child(2),
+    .comparison-table td:nth-child(3),
+    .comparison-table td:nth-child(4),
+    .comparison-table td:nth-child(5) {
+        text-align: right;
+        font-family: 'Courier New', monospace;
+    }
+
+    .account-name {
+        color: #e6edf3;
+    }
+
+    .account-indent-1 { padding-left: 20px; }
+    .account-indent-2 { padding-left: 40px; }
+    .account-indent-3 { padding-left: 60px; }
+    .account-indent-4 { padding-left: 80px; }
+
+    .section-header {
+        background: #161b22 !important;
+        font-weight: 700;
+        color: #58a6ff !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 13px;
+    }
+
+    .section-total {
+        background: #161b22 !important;
+        font-weight: 700;
+        border-top: 2px solid #30363d;
+        border-bottom: 2px solid #30363d;
+    }
+
+    .grand-total {
+        background: #238636 !important;
+        color: white !important;
+        font-weight: 700;
+        font-size: 15px;
+    }
+
+    .grand-total td {
+        border-bottom: none;
+    }
+
+    .variance-positive {
+        color: #3fb950;
+    }
+
+    .variance-negative {
+        color: #f85149;
+    }
+
+    .variance-neutral {
+        color: #8b949e;
+    }
+
+    .loading-state {
+        text-align: center;
+        padding: 40px;
+        color: #8b949e;
+    }
+
+    .quick-periods {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+        flex-wrap: wrap;
+    }
+
+    .quick-period-btn {
+        background: #21262d;
+        border: 1px solid #30363d;
+        color: #c9d1d9;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+    }
+
+    .quick-period-btn:hover {
+        background: #30363d;
+        border-color: #58a6ff;
+    }
+
+    @media (max-width: 768px) {
+        .comparison-table {
+            font-size: 12px;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 8px 6px;
+        }
+
+        .account-indent-1 { padding-left: 10px; }
+        .account-indent-2 { padding-left: 20px; }
+        .account-indent-3 { padding-left: 30px; }
+        .account-indent-4 { padding-left: 40px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="comparative-report">
+    <div class="report-header">
+        <h1 class="report-title"><i class="bi bi-bar-chart-line"></i> Comparative Profit & Loss</h1>
+        <p style="color: #8b949e;">Compare financial performance across two periods</p>
+    </div>
+
+    <div class="period-selector">
+        <div class="quick-periods">
+            <button class="quick-period-btn" onclick="loadMonthOverMonth()">Month over Month</button>
+            <button class="quick-period-btn" onclick="loadQuarterOverQuarter()">Quarter over Quarter</button>
+            <button class="quick-period-btn" onclick="loadYearOverYear()">Year over Year</button>
+            <button class="quick-period-btn" onclick="loadYTDComparison()">YTD Comparison</button>
+        </div>
+
+        <div class="period-row">
+            <div class="form-group">
+                <label class="form-label">Period 1 Label</label>
+                <input type="text" id="period1Label" class="form-input" value="Current Period" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Start Date</label>
+                <input type="date" id="period1Start" class="form-input" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">End Date</label>
+                <input type="date" id="period1End" class="form-input" />
+            </div>
+        </div>
+
+        <div class="period-row">
+            <div class="form-group">
+                <label class="form-label">Period 2 Label</label>
+                <input type="text" id="period2Label" class="form-input" value="Prior Period" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Start Date</label>
+                <input type="date" id="period2Start" class="form-input" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">End Date</label>
+                <input type="date" id="period2End" class="form-input" />
+            </div>
+        </div>
+
+        <div class="period-row">
+            <div class="form-group">
+                <label class="form-label">Location</label>
+                <select id="areaFilter" class="form-select">
+                    <option value="">All Locations (Consolidated)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Options</label>
+                <label style="color: #c9d1d9; margin-top: 8px;">
+                    <input type="checkbox" id="hideZero" style="margin-right: 5px;" />
+                    Hide zero balances
+                </label>
+            </div>
+            <div class="form-group" style="justify-content: flex-end;">
+                <button id="generateBtn" class="btn-generate" onclick="loadReport()">
+                    <i class="bi bi-play-fill"></i> Generate Report
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="reportContent">
+        <div class="loading-state">
+            <i class="bi bi-info-circle"></i> Select periods and click "Generate Report"
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let reportData = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadAreas();
+    setDefaultDates();
+});
+
+async function loadAreas() {
+    try {
+        const response = await fetch('api/areas/', {
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            const areas = await response.json();
+            const select = document.getElementById('areaFilter');
+
+            areas.forEach(area => {
+                const option = document.createElement('option');
+                option.value = area.id;
+                option.textContent = area.name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading areas:', error);
+    }
+}
+
+function setDefaultDates() {
+    const today = new Date();
+    const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const priorMonthFirst = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const priorMonthLast = new Date(today.getFullYear(), today.getMonth(), 0);
+
+    document.getElementById('period1Start').value = formatDate(firstOfMonth);
+    document.getElementById('period1End').value = formatDate(lastOfMonth);
+    document.getElementById('period2Start').value = formatDate(priorMonthFirst);
+    document.getElementById('period2End').value = formatDate(priorMonthLast);
+
+    document.getElementById('period1Label').value = firstOfMonth.toLocaleString('default', { month: 'long', year: 'numeric' });
+    document.getElementById('period2Label').value = priorMonthFirst.toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
+function formatDate(date) {
+    return date.toISOString().split('T')[0];
+}
+
+function loadMonthOverMonth() {
+    const today = new Date();
+    const currentMonthFirst = new Date(today.getFullYear(), today.getMonth(), 1);
+    const currentMonthLast = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const priorMonthFirst = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const priorMonthLast = new Date(today.getFullYear(), today.getMonth(), 0);
+
+    document.getElementById('period1Start').value = formatDate(currentMonthFirst);
+    document.getElementById('period1End').value = formatDate(currentMonthLast);
+    document.getElementById('period2Start').value = formatDate(priorMonthFirst);
+    document.getElementById('period2End').value = formatDate(priorMonthLast);
+
+    document.getElementById('period1Label').value = currentMonthFirst.toLocaleString('default', { month: 'long', year: 'numeric' });
+    document.getElementById('period2Label').value = priorMonthFirst.toLocaleString('default', { month: 'long', year: 'numeric' });
+}
+
+function loadQuarterOverQuarter() {
+    const today = new Date();
+    const currentQuarter = Math.floor(today.getMonth() / 3);
+    const currentQStart = new Date(today.getFullYear(), currentQuarter * 3, 1);
+    const currentQEnd = new Date(today.getFullYear(), currentQuarter * 3 + 3, 0);
+
+    const priorQStart = new Date(today.getFullYear(), (currentQuarter - 1) * 3, 1);
+    const priorQEnd = new Date(today.getFullYear(), currentQuarter * 3, 0);
+
+    document.getElementById('period1Start').value = formatDate(currentQStart);
+    document.getElementById('period1End').value = formatDate(currentQEnd);
+    document.getElementById('period2Start').value = formatDate(priorQStart);
+    document.getElementById('period2End').value = formatDate(priorQEnd);
+
+    document.getElementById('period1Label').value = `Q${currentQuarter + 1} ${today.getFullYear()}`;
+    document.getElementById('period2Label').value = `Q${currentQuarter} ${today.getFullYear()}`;
+}
+
+function loadYearOverYear() {
+    const today = new Date();
+    const currentYearStart = new Date(today.getFullYear(), 0, 1);
+    const currentYearEnd = new Date(today.getFullYear(), 11, 31);
+    const priorYearStart = new Date(today.getFullYear() - 1, 0, 1);
+    const priorYearEnd = new Date(today.getFullYear() - 1, 11, 31);
+
+    document.getElementById('period1Start').value = formatDate(currentYearStart);
+    document.getElementById('period1End').value = formatDate(currentYearEnd);
+    document.getElementById('period2Start').value = formatDate(priorYearStart);
+    document.getElementById('period2End').value = formatDate(priorYearEnd);
+
+    document.getElementById('period1Label').value = `FY ${today.getFullYear()}`;
+    document.getElementById('period2Label').value = `FY ${today.getFullYear() - 1}`;
+}
+
+function loadYTDComparison() {
+    const today = new Date();
+    const ytdStart = new Date(today.getFullYear(), 0, 1);
+    const priorYTDStart = new Date(today.getFullYear() - 1, 0, 1);
+    const priorYTDEnd = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+
+    document.getElementById('period1Start').value = formatDate(ytdStart);
+    document.getElementById('period1End').value = formatDate(today);
+    document.getElementById('period2Start').value = formatDate(priorYTDStart);
+    document.getElementById('period2End').value = formatDate(priorYTDEnd);
+
+    document.getElementById('period1Label').value = `YTD ${today.getFullYear()}`;
+    document.getElementById('period2Label').value = `YTD ${today.getFullYear() - 1}`;
+}
+
+async function loadReport() {
+    const btn = document.getElementById('generateBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Loading...';
+
+    try {
+        const params = new URLSearchParams({
+            period1_start: document.getElementById('period1Start').value,
+            period1_end: document.getElementById('period1End').value,
+            period2_start: document.getElementById('period2Start').value,
+            period2_end: document.getElementById('period2End').value,
+            period1_label: document.getElementById('period1Label').value,
+            period2_label: document.getElementById('period2Label').value,
+            hide_zero: document.getElementById('hideZero').checked
+        });
+
+        const areaId = document.getElementById('areaFilter').value;
+        if (areaId) {
+            params.append('area_id', areaId);
+        }
+
+        const response = await fetch(`api/reports/comparative-profit-loss?${params}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        reportData = await response.json();
+        displayReport(reportData);
+    } catch (error) {
+        console.error('Error loading report:', error);
+        document.getElementById('reportContent').innerHTML = `
+            <div class="loading-state" style="color: #f85149;">
+                <i class="bi bi-exclamation-triangle"></i> Error loading report: ${error.message}
+            </div>
+        `;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-play-fill"></i> Generate Report';
+    }
+}
+
+function displayReport(data) {
+    let html = `
+        <table class="comparison-table">
+            <thead>
+                <tr>
+                    <th>Account</th>
+                    <th>${data.period1_label}</th>
+                    <th>${data.period2_label}</th>
+                    <th>$ Variance</th>
+                    <th>% Variance</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    // Revenue Section
+    html += renderSection(data.revenue_section);
+
+    // COGS Section
+    html += renderSection(data.cogs_section);
+
+    // Gross Profit
+    html += `
+        <tr class="section-total">
+            <td><strong>GROSS PROFIT</strong></td>
+            <td>${formatCurrency(data.gross_profit_period1)}</td>
+            <td>${formatCurrency(data.gross_profit_period2)}</td>
+            <td class="${getVarianceClass(data.gross_profit_variance)}">${formatCurrency(data.gross_profit_variance)}</td>
+            <td class="${getVarianceClass(data.gross_profit_variance)}">${formatPercent(data.gross_profit_variance_percent)}</td>
+        </tr>
+    `;
+
+    // Expense Section
+    html += renderSection(data.expense_section);
+
+    // Net Income
+    html += `
+        <tr class="grand-total">
+            <td><strong>NET INCOME</strong></td>
+            <td>${formatCurrency(data.net_income_period1)}</td>
+            <td>${formatCurrency(data.net_income_period2)}</td>
+            <td>${formatCurrency(data.net_income_variance)}</td>
+            <td>${formatPercent(data.net_income_variance_percent)}</td>
+        </tr>
+    `;
+
+    html += '</tbody></table>';
+    document.getElementById('reportContent').innerHTML = html;
+}
+
+function renderSection(section) {
+    let html = `
+        <tr class="section-header">
+            <td colspan="5">${section.section_name}</td>
+        </tr>
+    `;
+
+    section.accounts.forEach(account => {
+        html += renderAccountRow(account);
+    });
+
+    html += `
+        <tr class="section-total">
+            <td><strong>Total ${section.section_name}</strong></td>
+            <td>${formatCurrency(section.period1_total)}</td>
+            <td>${formatCurrency(section.period2_total)}</td>
+            <td class="${getVarianceClass(section.variance_amount)}">${formatCurrency(section.variance_amount)}</td>
+            <td class="${getVarianceClass(section.variance_amount)}">${formatPercent(section.variance_percent)}</td>
+        </tr>
+    `;
+
+    return html;
+}
+
+function renderAccountRow(account) {
+    const indentClass = `account-indent-${account.hierarchy_level}`;
+    const nameStyle = account.is_summary ? 'font-weight: 600;' : '';
+
+    let html = `
+        <tr>
+            <td class="${indentClass}" style="${nameStyle}">
+                ${account.account_number} - ${account.account_name}
+            </td>
+            <td>${formatCurrency(account.period1_amount)}</td>
+            <td>${formatCurrency(account.period2_amount)}</td>
+            <td class="${getVarianceClass(account.variance_amount)}">${formatCurrency(account.variance_amount)}</td>
+            <td class="${getVarianceClass(account.variance_amount)}">${formatPercent(account.variance_percent)}</td>
+        </tr>
+    `;
+
+    if (account.children && account.children.length > 0) {
+        account.children.forEach(child => {
+            html += renderAccountRow(child);
+        });
+    }
+
+    return html;
+}
+
+function formatCurrency(amount) {
+    if (amount === null || amount === undefined) return '$0.00';
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(amount);
+}
+
+function formatPercent(percent) {
+    if (percent === null || percent === undefined) return 'N/A';
+    return `${percent > 0 ? '+' : ''}${parseFloat(percent).toFixed(1)}%`;
+}
+
+function getVarianceClass(variance) {
+    if (variance === null || variance === undefined || variance === 0) return 'variance-neutral';
+    return variance > 0 ? 'variance-positive' : 'variance-negative';
+}
+</script>
+{% endblock %}

@@ -473,6 +473,18 @@ async def reports_page(
     })
 
 
+@app.get("/comparative-pl", response_class=HTMLResponse)
+async def comparative_pl_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Comparative Profit & Loss report page"""
+    return templates.TemplateResponse("comparative_pl.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
 @app.get("/cash-flow-statement", response_class=HTMLResponse)
 async def cash_flow_statement_page(
     request: Request,

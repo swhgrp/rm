@@ -780,6 +780,235 @@ class HierarchicalBalanceSheetResponse(BaseModel):
     is_balanced: bool
 
 
+# Comparative Report Schemas
+class ComparativeAccountLine(BaseModel):
+    account_id: int
+    account_number: str
+    account_name: str
+    is_summary: bool
+    hierarchy_level: int
+    period1_amount: Decimal  # Current period
+    period2_amount: Decimal  # Comparison period
+    variance_amount: Decimal  # period1 - period2
+    variance_percent: Optional[Decimal]  # ((period1 - period2) / period2) * 100
+    children: List['ComparativeAccountLine'] = []
+
+    class Config:
+        from_attributes = True
+
+
+ComparativeAccountLine.model_rebuild()
+
+
+class ComparativeSectionResponse(BaseModel):
+    section_name: str
+    accounts: List[ComparativeAccountLine]
+    period1_total: Decimal
+    period2_total: Decimal
+    variance_amount: Decimal
+    variance_percent: Optional[Decimal]
+
+
+class ComparativeProfitLossResponse(BaseModel):
+    period1_start: date
+    period1_end: date
+    period2_start: date
+    period2_end: date
+    period1_label: str  # e.g., "Current Month", "Q1 2025"
+    period2_label: str  # e.g., "Prior Month", "Q1 2024"
+    area_id: Optional[int]
+    area_name: Optional[str]
+    revenue_section: ComparativeSectionResponse
+    cogs_section: ComparativeSectionResponse
+    gross_profit_period1: Decimal
+    gross_profit_period2: Decimal
+    gross_profit_variance: Decimal
+    gross_profit_variance_percent: Optional[Decimal]
+    expense_section: ComparativeSectionResponse
+    net_income_period1: Decimal
+    net_income_period2: Decimal
+    net_income_variance: Decimal
+    net_income_variance_percent: Optional[Decimal]
+
+
+@router.get("/comparative-profit-loss", response_model=ComparativeProfitLossResponse)
+def get_comparative_profit_loss(
+    period1_start: date = Query(..., description="Start date for current period"),
+    period1_end: date = Query(..., description="End date for current period"),
+    period2_start: date = Query(..., description="Start date for comparison period"),
+    period2_end: date = Query(..., description="End date for comparison period"),
+    period1_label: str = Query("Period 1", description="Label for current period"),
+    period2_label: str = Query("Period 2", description="Label for comparison period"),
+    area_id: Optional[int] = Query(None, description="Filter by location"),
+    hide_zero: bool = Query(False, description="Hide accounts with zero in both periods"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
+    """
+    Generate Comparative Profit & Loss report showing two periods side-by-side
+    Calculates variance amounts and percentages
+    """
+    # Get P&L for both periods using existing endpoint logic
+    from accounting.api.reports import get_profit_loss_hierarchical as get_pl
+
+    period1_pl = get_pl(
+        start_date=period1_start,
+        end_date=period1_end,
+        area_id=area_id,
+        hide_zero=False,
+        db=db,
+        user=user
+    )
+
+    period2_pl = get_pl(
+        start_date=period2_start,
+        end_date=period2_end,
+        area_id=area_id,
+        hide_zero=False,
+        db=db,
+        user=user
+    )
+
+    def calculate_variance_percent(current: Decimal, prior: Decimal) -> Optional[Decimal]:
+        """Calculate percentage variance"""
+        if prior == 0:
+            return None
+        return ((current - prior) / abs(prior)) * Decimal('100')
+
+    def merge_account_trees(
+        period1_nodes: List[HierarchicalPLAccountLine],
+        period2_nodes: List[HierarchicalPLAccountLine]
+    ) -> List[ComparativeAccountLine]:
+        """Merge two account trees into comparative structure"""
+        # Create maps by account_id
+        p1_map = {node.account_id: node for node in period1_nodes}
+        p2_map = {node.account_id: node for node in period2_nodes}
+
+        # Get all unique account IDs
+        all_ids = set(p1_map.keys()) | set(p2_map.keys())
+
+        result = []
+        for acc_id in sorted(all_ids):
+            p1_node = p1_map.get(acc_id)
+            p2_node = p2_map.get(acc_id)
+
+            # Use whichever exists for account info
+            node = p1_node or p2_node
+
+            p1_amount = p1_node.amount if p1_node else Decimal('0')
+            p2_amount = p2_node.amount if p2_node else Decimal('0')
+            variance = p1_amount - p2_amount
+            variance_pct = calculate_variance_percent(p1_amount, p2_amount)
+
+            # Merge children if both have them
+            children = []
+            if (p1_node and p1_node.children) or (p2_node and p2_node.children):
+                children = merge_account_trees(
+                    p1_node.children if p1_node else [],
+                    p2_node.children if p2_node else []
+                )
+
+            # Skip if hide_zero and both amounts are zero
+            if hide_zero and p1_amount == 0 and p2_amount == 0:
+                continue
+
+            result.append(ComparativeAccountLine(
+                account_id=node.account_id,
+                account_number=node.account_number,
+                account_name=node.account_name,
+                is_summary=node.is_summary,
+                hierarchy_level=node.hierarchy_level,
+                period1_amount=p1_amount,
+                period2_amount=p2_amount,
+                variance_amount=variance,
+                variance_percent=variance_pct,
+                children=children
+            ))
+
+        return result
+
+    # Merge revenue section
+    revenue_accounts = merge_account_trees(
+        period1_pl.revenue_section.accounts,
+        period2_pl.revenue_section.accounts
+    )
+    revenue_variance = period1_pl.revenue_section.total - period2_pl.revenue_section.total
+
+    # Merge COGS section
+    cogs_accounts = merge_account_trees(
+        period1_pl.cogs_section.accounts,
+        period2_pl.cogs_section.accounts
+    )
+    cogs_variance = period1_pl.cogs_section.total - period2_pl.cogs_section.total
+
+    # Merge expense section
+    expense_accounts = merge_account_trees(
+        period1_pl.expense_section.accounts,
+        period2_pl.expense_section.accounts
+    )
+    expense_variance = period1_pl.expense_section.total - period2_pl.expense_section.total
+
+    # Calculate gross profit variance
+    gp_variance = period1_pl.gross_profit - period2_pl.gross_profit
+    gp_variance_pct = calculate_variance_percent(period1_pl.gross_profit, period2_pl.gross_profit)
+
+    # Calculate net income variance
+    ni_variance = period1_pl.net_income - period2_pl.net_income
+    ni_variance_pct = calculate_variance_percent(period1_pl.net_income, period2_pl.net_income)
+
+    return ComparativeProfitLossResponse(
+        period1_start=period1_start,
+        period1_end=period1_end,
+        period2_start=period2_start,
+        period2_end=period2_end,
+        period1_label=period1_label,
+        period2_label=period2_label,
+        area_id=area_id,
+        area_name=period1_pl.area_name,
+        revenue_section=ComparativeSectionResponse(
+            section_name="Revenue",
+            accounts=revenue_accounts,
+            period1_total=period1_pl.revenue_section.total,
+            period2_total=period2_pl.revenue_section.total,
+            variance_amount=revenue_variance,
+            variance_percent=calculate_variance_percent(
+                period1_pl.revenue_section.total,
+                period2_pl.revenue_section.total
+            )
+        ),
+        cogs_section=ComparativeSectionResponse(
+            section_name="Cost of Goods Sold",
+            accounts=cogs_accounts,
+            period1_total=period1_pl.cogs_section.total,
+            period2_total=period2_pl.cogs_section.total,
+            variance_amount=cogs_variance,
+            variance_percent=calculate_variance_percent(
+                period1_pl.cogs_section.total,
+                period2_pl.cogs_section.total
+            )
+        ),
+        gross_profit_period1=period1_pl.gross_profit,
+        gross_profit_period2=period2_pl.gross_profit,
+        gross_profit_variance=gp_variance,
+        gross_profit_variance_percent=gp_variance_pct,
+        expense_section=ComparativeSectionResponse(
+            section_name="Operating Expenses",
+            accounts=expense_accounts,
+            period1_total=period1_pl.expense_section.total,
+            period2_total=period2_pl.expense_section.total,
+            variance_amount=expense_variance,
+            variance_percent=calculate_variance_percent(
+                period1_pl.expense_section.total,
+                period2_pl.expense_section.total
+            )
+        ),
+        net_income_period1=period1_pl.net_income,
+        net_income_period2=period2_pl.net_income,
+        net_income_variance=ni_variance,
+        net_income_variance_percent=ni_variance_pct
+    )
+
+
 @router.get("/balance-sheet", response_model=BalanceSheetResponse)
 def get_balance_sheet(
     as_of_date: date = Query(..., description="As of date for Balance Sheet"),
