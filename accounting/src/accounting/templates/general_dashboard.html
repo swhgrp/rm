@@ -598,43 +598,92 @@ async function loadEBITDA() {
 }
 
 async function loadCashPosition() {
-    // TODO: Replace with actual bank account API
-    const mockAccounts = [
-        { name: 'Operating Account', balance: 45230.50 },
-        { name: 'Payroll Account', balance: 12000.00 },
-        { name: 'Savings Account', balance: 25000.00 }
-    ];
+    try {
+        const response = await fetch('api/bank-accounts/', {
+            credentials: 'include'
+        });
 
-    let html = '';
-    let total = 0;
+        if (!response.ok) {
+            console.warn('Failed to load bank accounts:', response.status);
+            // Show error message
+            document.getElementById('cashCards').innerHTML = `
+                <div style="color: #8b949e; text-align: center; padding: 1rem;">
+                    <i class="bi bi-exclamation-circle"></i> Unable to load bank accounts
+                </div>
+            `;
+            return;
+        }
 
-    mockAccounts.forEach(account => {
-        total += account.balance;
-        html += `
-            <div class="cash-card">
-                <div class="cash-account">${account.name}</div>
-                <div class="cash-balance">${formatCurrency(account.balance)}</div>
+        const accounts = await response.json();
+
+        let html = '';
+        let total = 0;
+
+        if (accounts.length === 0) {
+            html = `
+                <div style="color: #8b949e; text-align: center; padding: 1rem;">
+                    <i class="bi bi-info-circle"></i> No bank accounts configured
+                </div>
+            `;
+        } else {
+            accounts.forEach(account => {
+                const balance = parseFloat(account.current_balance || 0);
+                total += balance;
+
+                // Show account name with location if available
+                const displayName = account.area_name
+                    ? `${account.account_name} - ${account.area_name}`
+                    : account.account_name;
+
+                html += `
+                    <div class="cash-card">
+                        <div class="cash-account">${displayName}</div>
+                        <div class="cash-balance">${formatCurrency(balance)}</div>
+                    </div>
+                `;
+            });
+        }
+
+        document.getElementById('cashCards').innerHTML = html;
+        document.getElementById('totalCash').textContent = formatCurrency(total);
+    } catch (error) {
+        console.error('Error loading cash position:', error);
+        document.getElementById('cashCards').innerHTML = `
+            <div style="color: #f85149; text-align: center; padding: 1rem;">
+                <i class="bi bi-x-circle"></i> Error loading bank accounts
             </div>
         `;
-    });
-
-    document.getElementById('cashCards').innerHTML = html;
-    document.getElementById('totalCash').textContent = formatCurrency(total);
+    }
 }
 
 async function loadAPAging() {
-    // TODO: Replace with actual AP aging API
-    const mockAging = {
-        '0-30': 15000,
-        '31-60': 5000,
-        '61-90': 2000,
-        '>90': 500
-    };
+    try {
+        const response = await fetch('api/vendor-bills/aging-report', {
+            credentials: 'include'
+        });
 
-    const total = Object.values(mockAging).reduce((sum, val) => sum + val, 0);
-    const overdue = mockAging['31-60'] + mockAging['61-90'] + mockAging['>90'];
+        if (!response.ok) {
+            console.warn('Failed to load AP aging:', response.status);
+            return;
+        }
 
-    document.getElementById('totalOverdueAP').textContent = formatCurrency(overdue);
+        const data = await response.json();
+
+        // Update aging buckets in the HTML
+        const agingBuckets = document.querySelectorAll('#apAging .aging-bucket');
+        if (agingBuckets.length >= 4) {
+            agingBuckets[0].querySelector('.aging-amount').textContent = formatCurrency(data.current || 0);
+            agingBuckets[1].querySelector('.aging-amount').textContent = formatCurrency(data.days_31_60 || 0);
+            agingBuckets[2].querySelector('.aging-amount').textContent = formatCurrency(data.days_61_90 || 0);
+            agingBuckets[3].querySelector('.aging-amount').textContent = formatCurrency(data.over_90 || 0);
+        }
+
+        // Calculate total overdue (everything except current/0-30)
+        const overdue = (data.days_31_60 || 0) + (data.days_61_90 || 0) + (data.over_90 || 0);
+        document.getElementById('totalOverdueAP').textContent = formatCurrency(overdue);
+    } catch (error) {
+        console.error('Error loading AP aging:', error);
+    }
 }
 
 async function loadARAging() {
