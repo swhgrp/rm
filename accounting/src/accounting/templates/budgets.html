@@ -159,6 +159,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     await loadBudgets();
     populateFiscalYears();
     setDefaultFiscalYear();
+
+    // Setup event listeners
+    setupEventListeners();
 });
 
 async function loadAreas() {
@@ -292,21 +295,22 @@ function setDefaultFiscalYear() {
     document.getElementById('fiscalYear').value = currentYear;
 }
 
-document.getElementById('createBudgetBtn').addEventListener('click', function() {
-    const modal = new bootstrap.Modal(document.getElementById('createBudgetModal'));
-    modal.show();
-});
+function setupEventListeners() {
+    document.getElementById('createBudgetBtn').addEventListener('click', function() {
+        const modal = new bootstrap.Modal(document.getElementById('createBudgetModal'));
+        modal.show();
+    });
 
-document.getElementById('copyFromBudget').addEventListener('change', function() {
-    const growthField = document.getElementById('growthRateField');
-    if (this.value) {
-        growthField.style.display = 'block';
-    } else {
-        growthField.style.display = 'none';
-    }
-});
+    document.getElementById('copyFromBudget').addEventListener('change', function() {
+        const growthField = document.getElementById('growthRateField');
+        if (this.value) {
+            growthField.style.display = 'block';
+        } else {
+            growthField.style.display = 'none';
+        }
+    });
 
-document.getElementById('saveBudgetBtn').addEventListener('click', async function() {
+    document.getElementById('saveBudgetBtn').addEventListener('click', async function() {
     const budgetData = {
         budget_name: document.getElementById('budgetName').value,
         fiscal_year: parseInt(document.getElementById('fiscalYear').value),
@@ -338,13 +342,14 @@ document.getElementById('saveBudgetBtn').addEventListener('click', async functio
             const error = await response.json();
             alert(`Error: ${error.detail || 'Unknown error'}`);
         }
-    } catch (error) {
-        console.error('Error creating budget:', error);
-        alert('Error creating budget. Please try again.');
-    }
-});
+        } catch (error) {
+            console.error('Error creating budget:', error);
+            alert('Error creating budget. Please try again.');
+        }
+    });
 
-document.getElementById('applyFilters').addEventListener('click', loadBudgets);
+    document.getElementById('applyFilters').addEventListener('click', loadBudgets);
+}
 
 function viewBudget(budgetId) {
     window.location.href = `/budgets/${budgetId}/vs-actual`;
