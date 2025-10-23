@@ -53,6 +53,16 @@ from accounting.models.general_dashboard import (
     ExpenseCategorySummary,
     DashboardAlertType
 )
+from accounting.models.payment import (
+    Payment,
+    PaymentApplication,
+    CheckBatch,
+    ACHBatch,
+    CheckNumberRegistry,
+    PaymentSchedule,
+    PaymentApproval,
+    PaymentDiscount
+)
 
 __all__ = [
     "Area",

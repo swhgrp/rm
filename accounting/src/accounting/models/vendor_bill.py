@@ -87,6 +87,8 @@ class VendorBill(Base):
     area = relationship("Area", back_populates="vendor_bills")
     line_items = relationship("VendorBillLine", back_populates="bill", cascade="all, delete-orphan")
     payments = relationship("BillPayment", back_populates="bill", cascade="all, delete-orphan")
+    payment_applications = relationship("PaymentApplication", back_populates="vendor_bill")
+    payment_discounts = relationship("PaymentDiscount", back_populates="vendor_bill")
     approver = relationship("User", foreign_keys=[approved_by])
     creator = relationship("User", foreign_keys=[created_by])
     journal_entry = relationship("JournalEntry", foreign_keys=[journal_entry_id])

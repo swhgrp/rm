@@ -59,6 +59,22 @@ class Vendor(Base):
     # Relationships
     # vendor_bills = relationship("VendorBill", back_populates="vendor")  # Will add after migration
     gl_mappings = relationship("VendorGLMapping", back_populates="vendor")
+    payments = relationship("Payment", back_populates="vendor")
+
+    # Add these properties for compatibility
+    @property
+    def name(self):
+        return self.vendor_name
+
+    @property
+    def bank_routing_number(self):
+        # TODO: Add these fields to vendor model in future migration
+        return None
+
+    @property
+    def bank_account_number(self):
+        # TODO: Add these fields to vendor model in future migration
+        return None
 
     def __repr__(self):
         return f"<Vendor {self.vendor_code or self.id}: {self.vendor_name}>"

@@ -44,6 +44,9 @@ class BankAccount(Base):
     transactions = relationship("BankTransaction", back_populates="bank_account", cascade="all, delete-orphan")
     imports = relationship("BankStatementImport", back_populates="bank_account", cascade="all, delete-orphan")
     reconciliations = relationship("BankReconciliation", back_populates="bank_account", cascade="all, delete-orphan")
+    payments = relationship("Payment", back_populates="bank_account")
+    check_batches = relationship("CheckBatch", back_populates="bank_account")
+    ach_batches = relationship("ACHBatch", back_populates="bank_account")
     matching_rules = relationship("BankMatchingRule", back_populates="bank_account", cascade="all, delete-orphan")
     statements = relationship("BankStatement", cascade="all, delete-orphan")
 

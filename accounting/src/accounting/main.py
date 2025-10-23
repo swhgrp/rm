@@ -32,6 +32,7 @@ from accounting.api.bank_statements import router as bank_statements_router
 from accounting.api.composite_matching import router as composite_matching_router
 from accounting.api.banking_dashboard import router as banking_dashboard_router
 from accounting.api.general_dashboard import router as general_dashboard_router
+from accounting.api.payments import router as payments_router
 from accounting.models.user import User
 # Import all models to ensure they are registered
 import accounting.models  # noqa
@@ -79,6 +80,7 @@ app.include_router(bank_statements_router, prefix="/api/bank-statements", tags=[
 app.include_router(composite_matching_router, prefix="/api/bank-transactions", tags=["Banking - Composite Matching"])
 app.include_router(banking_dashboard_router, prefix="/api/banking-dashboard", tags=["Banking - Dashboard"])
 app.include_router(general_dashboard_router)
+app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
 
 
 # Custom exception handler for authentication redirects
