@@ -183,7 +183,21 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 async function loadAreas() {
     try {
-        const response = await fetch('/api/areas/');
+        const response = await fetch('/api/areas/', {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            console.warn('Failed to load areas:', response.status);
+            return;
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            console.warn('Areas API returned non-JSON response');
+            return;
+        }
+
         areas = await response.json();
 
         const filterSelect = document.getElementById('filterArea');
@@ -226,7 +240,25 @@ async function loadBudgets() {
         if (status) params.append('status', status);
         if (areaId) params.append('area_id', areaId);
 
-        const response = await fetch(`/api/budgets/?${params}`);
+        const response = await fetch(`/api/budgets/?${params}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            console.warn('Failed to load budgets:', response.status);
+            loading.style.display = 'none';
+            noMessage.style.display = 'block';
+            return;
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            console.warn('Budgets API returned non-JSON response');
+            loading.style.display = 'none';
+            noMessage.style.display = 'block';
+            return;
+        }
+
         budgets = await response.json();
 
         loading.style.display = 'none';
@@ -387,21 +419,37 @@ function setupEventListeners() {
         const response = await fetch('/api/budgets/', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
             body: JSON.stringify(budgetData)
         });
 
         if (response.ok) {
-            alert('Budget created successfully!');
-            bootstrap.Modal.getInstance(document.getElementById('createBudgetModal')).hide();
-            await loadBudgets();
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                alert('Budget created successfully!');
+                const modal = bootstrap.Modal.getInstance(document.getElementById('createBudgetModal'));
+                if (modal) {
+                    modal.hide();
+                }
+                await loadBudgets();
+            } else {
+                console.warn('Budget creation returned non-JSON response');
+                alert('Unexpected response from server. Please refresh the page.');
+            }
         } else {
-            const error = await response.json();
-            alert(`Error: ${error.detail || 'Unknown error'}`);
+            // Try to parse error as JSON, but handle HTML responses
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+                const error = await response.json();
+                alert(`Error: ${error.detail || 'Unknown error'}`);
+            } else {
+                alert(`Error: Server returned status ${response.status}. Please check your authentication.`);
+            }
         }
-        } catch (error) {
-            console.error('Error creating budget:', error);
-            alert('Error creating budget. Please try again.');
-        }
+    } catch (error) {
+        console.error('Error creating budget:', error);
+        alert('Error creating budget. Please try again.');
+    }
     });
 
     document.getElementById('applyFilters').addEventListener('click', loadBudgets);

@@ -20,6 +20,7 @@ from accounting.schemas.budget import (
     BudgetVsActualReport
 )
 from accounting.services.budget_service import BudgetService
+from accounting.api.auth import require_auth
 
 router = APIRouter()
 
@@ -30,7 +31,8 @@ def list_budgets(
     status: Optional[str] = None,
     area_id: Optional[int] = None,
     budget_type: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
 ):
     """List all budgets with optional filters"""
     query = db.query(Budget).options(
@@ -71,16 +73,20 @@ def list_budgets(
 @router.post("/", response_model=BudgetResponse)
 def create_budget(
     budget: BudgetCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
 ):
     """Create a new budget"""
-    user_id = 1  # TODO: Get from session
     service = BudgetService(db)
-    return service.create_budget(budget, user_id)
+    return service.create_budget(budget, user.id)
 
 
 @router.get("/{budget_id}", response_model=BudgetResponse)
-def get_budget(budget_id: int, db: Session = Depends(get_db)):
+def get_budget(
+    budget_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
     """Get budget details"""
     budget = db.query(Budget).options(
         joinedload(Budget.area),
@@ -99,7 +105,8 @@ def get_budget(budget_id: int, db: Session = Depends(get_db)):
 def update_budget(
     budget_id: int,
     budget_update: BudgetUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
 ):
     """Update budget"""
     budget = db.query(Budget).filter(Budget.id == budget_id).first()
@@ -116,7 +123,11 @@ def update_budget(
 
 
 @router.delete("/{budget_id}")
-def delete_budget(budget_id: int, db: Session = Depends(get_db)):
+def delete_budget(
+    budget_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
     """Delete budget"""
     budget = db.query(Budget).filter(Budget.id == budget_id).first()
     if not budget:
@@ -134,7 +145,8 @@ def delete_budget(budget_id: int, db: Session = Depends(get_db)):
 def get_budget_lines(
     budget_id: int,
     period_id: Optional[int] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
 ):
     """Get budget lines for a budget"""
     query = db.query(BudgetLine).filter(BudgetLine.budget_id == budget_id)
@@ -151,7 +163,8 @@ def get_budget_lines(
 def update_budget_lines(
     budget_id: int,
     lines_update: BulkBudgetLineUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
 ):
     """Update all budget lines (bulk replace)"""
     service = BudgetService(db)
@@ -162,14 +175,14 @@ def update_budget_lines(
 def approve_budget(
     budget_id: int,
     approval: BudgetApprovalRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
 ):
     """Approve or reject budget"""
-    user_id = 1  # TODO: Get from session
     service = BudgetService(db)
 
     if approval.action == "approve":
-        return service.approve_budget(budget_id, user_id)
+        return service.approve_budget(budget_id, user.id)
     else:
         budget = db.query(Budget).filter(Budget.id == budget_id).first()
         if not budget:
@@ -188,7 +201,8 @@ def budget_vs_actual(
     period_id: Optional[int] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
 ):
     """Get budget vs actual report"""
     service = BudgetService(db)
@@ -200,14 +214,14 @@ def copy_budget(
     budget_id: int,
     new_fiscal_year: int = Query(...),
     growth_rate: float = Query(0),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
 ):
     """Copy budget to new fiscal year"""
     source_budget = db.query(Budget).filter(Budget.id == budget_id).first()
     if not source_budget:
         raise HTTPException(status_code=404, detail="Source budget not found")
 
-    user_id = 1  # TODO: Get from session
     service = BudgetService(db)
 
     # Create budget data from source
@@ -224,4 +238,4 @@ def copy_budget(
         growth_rate=growth_rate
     )
 
-    return service.create_budget(budget_data, user_id)
+    return service.create_budget(budget_data, user.id)

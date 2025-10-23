@@ -180,7 +180,21 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 async function loadBudgetInfo() {
     try {
-        const response = await fetch(`/api/budgets/${budgetId}`);
+        const response = await fetch(`/api/budgets/${budgetId}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            console.warn('Failed to load budget info:', response.status);
+            return;
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            console.warn('Budget info API returned non-JSON response');
+            return;
+        }
+
         const budget = await response.json();
 
         document.getElementById('budgetTitle').textContent =
@@ -218,7 +232,25 @@ async function loadReport() {
             ? `/api/budgets/${budgetId}/vs-actual?period_id=${periodId}`
             : `/api/budgets/${budgetId}/vs-actual`;
 
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            console.warn('Failed to load report:', response.status);
+            loading.style.display = 'none';
+            alert(`Error loading report: Server returned status ${response.status}`);
+            return;
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            console.warn('Report API returned non-JSON response');
+            loading.style.display = 'none';
+            alert('Error: Server returned an unexpected response format.');
+            return;
+        }
+
         report = await response.json();
 
         loading.style.display = 'none';
