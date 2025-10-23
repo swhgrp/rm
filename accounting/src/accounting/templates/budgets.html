@@ -155,13 +155,30 @@ let budgets = [];
 let areas = [];
 
 document.addEventListener('DOMContentLoaded', async function() {
-    await loadAreas();
-    await loadBudgets();
-    populateFiscalYears();
-    setDefaultFiscalYear();
+    console.log('DOM Content Loaded - Budget Management');
 
-    // Setup event listeners
+    // Setup event listeners FIRST (before data loading)
     setupEventListeners();
+
+    // Then load data
+    try {
+        await loadAreas();
+    } catch (error) {
+        console.error('Error loading areas:', error);
+    }
+
+    try {
+        await loadBudgets();
+    } catch (error) {
+        console.error('Error loading budgets:', error);
+    }
+
+    try {
+        populateFiscalYears();
+        setDefaultFiscalYear();
+    } catch (error) {
+        console.error('Error setting up fiscal years:', error);
+    }
 });
 
 async function loadAreas() {
@@ -296,13 +313,15 @@ function setDefaultFiscalYear() {
 }
 
 function setupEventListeners() {
-    console.log('Setting up event listeners...');
+    console.log('=== Setting up event listeners ===');
     const createBtn = document.getElementById('createBudgetBtn');
-    console.log('Create button found:', createBtn);
+    console.log('Create button element:', createBtn);
+    console.log('Create button ID:', createBtn ? createBtn.id : 'NOT FOUND');
 
     if (createBtn) {
+        console.log('Adding click listener to button...');
         createBtn.addEventListener('click', function(e) {
-            console.log('Create Budget button clicked!');
+            console.log('=== Create Budget button clicked! ===');
             e.preventDefault();
 
             const modalElement = document.getElementById('createBudgetModal');
