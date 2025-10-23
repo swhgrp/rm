@@ -296,10 +296,47 @@ function setDefaultFiscalYear() {
 }
 
 function setupEventListeners() {
-    document.getElementById('createBudgetBtn').addEventListener('click', function() {
-        const modal = new bootstrap.Modal(document.getElementById('createBudgetModal'));
-        modal.show();
-    });
+    console.log('Setting up event listeners...');
+    const createBtn = document.getElementById('createBudgetBtn');
+    console.log('Create button found:', createBtn);
+
+    if (createBtn) {
+        createBtn.addEventListener('click', function(e) {
+            console.log('Create Budget button clicked!');
+            e.preventDefault();
+
+            const modalElement = document.getElementById('createBudgetModal');
+            console.log('Modal element:', modalElement);
+
+            if (!modalElement) {
+                console.error('Modal element not found!');
+                alert('Error: Modal not found. Please refresh the page.');
+                return;
+            }
+
+            if (typeof bootstrap === 'undefined') {
+                console.error('Bootstrap is not loaded!');
+                // Fallback: manually show modal
+                modalElement.classList.add('show');
+                modalElement.style.display = 'block';
+                modalElement.setAttribute('aria-modal', 'true');
+                modalElement.removeAttribute('aria-hidden');
+                document.body.classList.add('modal-open');
+
+                // Add backdrop
+                const backdrop = document.createElement('div');
+                backdrop.className = 'modal-backdrop fade show';
+                backdrop.id = 'modalBackdrop';
+                document.body.appendChild(backdrop);
+            } else {
+                const modal = new bootstrap.Modal(modalElement);
+                console.log('Modal instance created:', modal);
+                modal.show();
+            }
+        });
+    } else {
+        console.error('Create Budget button not found!');
+    }
 
     document.getElementById('copyFromBudget').addEventListener('change', function() {
         const growthField = document.getElementById('growthRateField');
@@ -349,6 +386,27 @@ function setupEventListeners() {
     });
 
     document.getElementById('applyFilters').addEventListener('click', loadBudgets);
+
+    // Add close button handlers for manual modal
+    const closeButtons = document.querySelectorAll('[data-bs-dismiss="modal"]');
+    closeButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            const modalElement = document.getElementById('createBudgetModal');
+            if (modalElement) {
+                modalElement.classList.remove('show');
+                modalElement.style.display = 'none';
+                modalElement.removeAttribute('aria-modal');
+                modalElement.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('modal-open');
+
+                // Remove backdrop
+                const backdrop = document.getElementById('modalBackdrop');
+                if (backdrop) {
+                    backdrop.remove();
+                }
+            }
+        });
+    });
 }
 
 function viewBudget(budgetId) {
