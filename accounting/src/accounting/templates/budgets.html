@@ -1,0 +1,353 @@
+{% extends "base.html" %}
+
+{% block title %}Budget Management - Accounting System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-calculator"></i> Budget Management</h2>
+                    <p class="text-muted mb-0">Create and manage budgets for planning and variance analysis</p>
+                </div>
+                <button class="btn btn-primary" id="createBudgetBtn">
+                    <i class="bi bi-plus-circle"></i> Create Budget
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Fiscal Year</label>
+                    <select class="form-select" id="filterFiscalYear">
+                        <option value="">All Years</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="filterStatus">
+                        <option value="">All Status</option>
+                        <option value="DRAFT">Draft</option>
+                        <option value="PENDING_APPROVAL">Pending Approval</option>
+                        <option value="APPROVED">Approved</option>
+                        <option value="ACTIVE">Active</option>
+                        <option value="CLOSED">Closed</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select class="form-select" id="filterArea">
+                        <option value="">All Locations</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button class="btn btn-primary w-100" id="applyFilters">
+                        <i class="bi bi-funnel"></i> Apply Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Budgets Table -->
+    <div class="card">
+        <div class="card-body">
+            <div id="budgetsLoading" class="text-center py-5" style="display: none;">
+                <div class="spinner-border text-primary"></div>
+                <p class="mt-3 text-muted">Loading budgets...</p>
+            </div>
+
+            <div id="noBudgetsMessage" style="display: none;">
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox text-muted" style="font-size: 4rem;"></i>
+                    <h4 class="mt-3">No Budgets Found</h4>
+                    <p class="text-muted">Create your first budget to get started.</p>
+                </div>
+            </div>
+
+            <div id="budgetsTableContainer" class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Budget Name</th>
+                            <th>Fiscal Year</th>
+                            <th>Type</th>
+                            <th>Location</th>
+                            <th>Revenue</th>
+                            <th>Expenses</th>
+                            <th>Net Income</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="budgetsTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Budget Modal -->
+<div class="modal fade" id="createBudgetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Budget</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createBudgetForm">
+                    <div class="mb-3">
+                        <label class="form-label">Budget Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="budgetName" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Fiscal Year <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="fiscalYear" required min="2020" max="2100">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Budget Type</label>
+                            <select class="form-select" id="budgetType">
+                                <option value="OPERATING">Operating</option>
+                                <option value="CAPITAL">Capital</option>
+                                <option value="CASH_FLOW">Cash Flow</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Location</label>
+                        <select class="form-select" id="budgetArea">
+                            <option value="">Consolidated (All Locations)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Copy from existing budget?</label>
+                        <select class="form-select" id="copyFromBudget">
+                            <option value="">Start from scratch</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="growthRateField" style="display: none;">
+                        <label class="form-label">Growth Rate (%)</label>
+                        <input type="number" class="form-control" id="growthRate" step="0.1" value="0">
+                        <small class="text-muted">Apply percentage increase/decrease to copied budget</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveBudgetBtn">Create Budget</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let budgets = [];
+let areas = [];
+
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadAreas();
+    await loadBudgets();
+    populateFiscalYears();
+    setDefaultFiscalYear();
+});
+
+async function loadAreas() {
+    try {
+        const response = await fetch('/api/areas/');
+        areas = await response.json();
+
+        const filterSelect = document.getElementById('filterArea');
+        const budgetSelect = document.getElementById('budgetArea');
+
+        areas.forEach(area => {
+            const option1 = document.createElement('option');
+            option1.value = area.id;
+            option1.textContent = area.name;
+            filterSelect.appendChild(option1);
+
+            const option2 = document.createElement('option');
+            option2.value = area.id;
+            option2.textContent = area.name;
+            budgetSelect.appendChild(option2);
+        });
+    } catch (error) {
+        console.error('Error loading areas:', error);
+    }
+}
+
+async function loadBudgets() {
+    const loading = document.getElementById('budgetsLoading');
+    const noMessage = document.getElementById('noBudgetsMessage');
+    const tableContainer = document.getElementById('budgetsTableContainer');
+    const tableBody = document.getElementById('budgetsTableBody');
+
+    loading.style.display = 'block';
+    noMessage.style.display = 'none';
+    tableContainer.style.display = 'none';
+    tableBody.innerHTML = '';
+
+    try {
+        const params = new URLSearchParams();
+        const fiscalYear = document.getElementById('filterFiscalYear').value;
+        const status = document.getElementById('filterStatus').value;
+        const areaId = document.getElementById('filterArea').value;
+
+        if (fiscalYear) params.append('fiscal_year', fiscalYear);
+        if (status) params.append('status', status);
+        if (areaId) params.append('area_id', areaId);
+
+        const response = await fetch(`/api/budgets/?${params}`);
+        budgets = await response.json();
+
+        loading.style.display = 'none';
+
+        if (budgets.length === 0) {
+            noMessage.style.display = 'block';
+            return;
+        }
+
+        tableContainer.style.display = 'block';
+
+        budgets.forEach(budget => {
+            const row = createBudgetRow(budget);
+            tableBody.appendChild(row);
+        });
+
+        // Populate copy dropdown
+        const copySelect = document.getElementById('copyFromBudget');
+        copySelect.innerHTML = '<option value="">Start from scratch</option>';
+        budgets.forEach(budget => {
+            const option = document.createElement('option');
+            option.value = budget.id;
+            option.textContent = `${budget.budget_name} (FY${budget.fiscal_year})`;
+            copySelect.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error('Error loading budgets:', error);
+        loading.style.display = 'none';
+    }
+}
+
+function createBudgetRow(budget) {
+    const tr = document.createElement('tr');
+
+    const statusColors = {
+        'DRAFT': 'secondary',
+        'PENDING_APPROVAL': 'warning',
+        'APPROVED': 'success',
+        'ACTIVE': 'primary',
+        'CLOSED': 'dark',
+        'REJECTED': 'danger'
+    };
+
+    tr.innerHTML = `
+        <td><strong>${budget.budget_name}</strong></td>
+        <td>${budget.fiscal_year}</td>
+        <td>${budget.budget_type}</td>
+        <td>${budget.area_name || 'Consolidated'}</td>
+        <td class="text-success">$${budget.total_revenue.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+        <td class="text-danger">$${budget.total_expenses.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+        <td class="${budget.net_income >= 0 ? 'text-success' : 'text-danger'}">$${budget.net_income.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+        <td><span class="badge bg-${statusColors[budget.status]}">${budget.status.replace('_', ' ')}</span></td>
+        <td>
+            <div class="btn-group btn-group-sm">
+                <a href="/budgets/${budget.id}/vs-actual" class="btn btn-outline-primary" title="Budget vs Actual">
+                    <i class="bi bi-graph-up"></i>
+                </a>
+                <button class="btn btn-outline-secondary" onclick="viewBudget(${budget.id})" title="View Details">
+                    <i class="bi bi-eye"></i>
+                </button>
+            </div>
+        </td>
+    `;
+
+    return tr;
+}
+
+function populateFiscalYears() {
+    const select = document.getElementById('filterFiscalYear');
+    const currentYear = new Date().getFullYear();
+
+    for (let year = currentYear - 2; year <= currentYear + 2; year++) {
+        const option = document.createElement('option');
+        option.value = year;
+        option.textContent = `FY ${year}`;
+        select.appendChild(option);
+    }
+}
+
+function setDefaultFiscalYear() {
+    const currentYear = new Date().getFullYear();
+    document.getElementById('fiscalYear').value = currentYear;
+}
+
+document.getElementById('createBudgetBtn').addEventListener('click', function() {
+    const modal = new bootstrap.Modal(document.getElementById('createBudgetModal'));
+    modal.show();
+});
+
+document.getElementById('copyFromBudget').addEventListener('change', function() {
+    const growthField = document.getElementById('growthRateField');
+    if (this.value) {
+        growthField.style.display = 'block';
+    } else {
+        growthField.style.display = 'none';
+    }
+});
+
+document.getElementById('saveBudgetBtn').addEventListener('click', async function() {
+    const budgetData = {
+        budget_name: document.getElementById('budgetName').value,
+        fiscal_year: parseInt(document.getElementById('fiscalYear').value),
+        budget_type: document.getElementById('budgetType').value,
+        area_id: document.getElementById('budgetArea').value ? parseInt(document.getElementById('budgetArea').value) : null,
+        start_date: `${document.getElementById('fiscalYear').value}-01-01`,
+        end_date: `${document.getElementById('fiscalYear').value}-12-31`,
+        create_periods: true
+    };
+
+    const copyFrom = document.getElementById('copyFromBudget').value;
+    if (copyFrom) {
+        budgetData.copy_from_budget_id = parseInt(copyFrom);
+        budgetData.growth_rate = parseFloat(document.getElementById('growthRate').value);
+    }
+
+    try {
+        const response = await fetch('/api/budgets/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(budgetData)
+        });
+
+        if (response.ok) {
+            alert('Budget created successfully!');
+            bootstrap.Modal.getInstance(document.getElementById('createBudgetModal')).hide();
+            await loadBudgets();
+        } else {
+            const error = await response.json();
+            alert(`Error: ${error.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error creating budget:', error);
+        alert('Error creating budget. Please try again.');
+    }
+});
+
+document.getElementById('applyFilters').addEventListener('click', loadBudgets);
+
+function viewBudget(budgetId) {
+    window.location.href = `/budgets/${budgetId}/vs-actual`;
+}
+</script>
+{% endblock %}

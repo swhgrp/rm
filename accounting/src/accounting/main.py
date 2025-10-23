@@ -33,6 +33,7 @@ from accounting.api.composite_matching import router as composite_matching_route
 from accounting.api.banking_dashboard import router as banking_dashboard_router
 from accounting.api.general_dashboard import router as general_dashboard_router
 from accounting.api.payments import router as payments_router
+from accounting.api.budgets import router as budgets_router
 from accounting.models.user import User
 # Import all models to ensure they are registered
 import accounting.models  # noqa
@@ -81,6 +82,7 @@ app.include_router(composite_matching_router, prefix="/api/bank-transactions", t
 app.include_router(banking_dashboard_router, prefix="/api/banking-dashboard", tags=["Banking - Dashboard"])
 app.include_router(general_dashboard_router)
 app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
+app.include_router(budgets_router, prefix="/api/budgets", tags=["Budgets"])
 
 
 # Custom exception handler for authentication redirects
@@ -430,6 +432,32 @@ async def daily_sales_detail_page(
         "request": request,
         "current_user": user,
         "dss_id": dss_id
+    })
+
+
+@app.get("/budgets", response_class=HTMLResponse)
+async def budgets_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Budget Management page"""
+    return templates.TemplateResponse("budgets.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
+@app.get("/budgets/{budget_id}/vs-actual", response_class=HTMLResponse)
+async def budget_vs_actual_page(
+    budget_id: int,
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Budget vs Actual Report page"""
+    return templates.TemplateResponse("budget_vs_actual.html", {
+        "request": request,
+        "current_user": user,
+        "budget_id": budget_id
     })
 
 
