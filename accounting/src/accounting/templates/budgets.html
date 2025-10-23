@@ -454,22 +454,45 @@ function setupEventListeners() {
 
     document.getElementById('applyFilters').addEventListener('click', loadBudgets);
 
+    // Handle modal hidden event to return focus and prevent aria-hidden warning
+    const modalElement = document.getElementById('createBudgetModal');
+    modalElement.addEventListener('hidden.bs.modal', function() {
+        // Return focus to Create Budget button when modal closes
+        const createBtn = document.getElementById('createBudgetBtn');
+        if (createBtn) {
+            createBtn.focus();
+        }
+    });
+
     // Add close button handlers for manual modal
     const closeButtons = document.querySelectorAll('[data-bs-dismiss="modal"]');
     closeButtons.forEach(btn => {
         btn.addEventListener('click', function() {
             const modalElement = document.getElementById('createBudgetModal');
             if (modalElement) {
-                modalElement.classList.remove('show');
-                modalElement.style.display = 'none';
-                modalElement.removeAttribute('aria-modal');
-                modalElement.setAttribute('aria-hidden', 'true');
-                document.body.classList.remove('modal-open');
+                // Use Bootstrap's hide method if available
+                const bsModal = bootstrap.Modal.getInstance(modalElement);
+                if (bsModal) {
+                    bsModal.hide();
+                } else {
+                    // Manual cleanup
+                    modalElement.classList.remove('show');
+                    modalElement.style.display = 'none';
+                    modalElement.removeAttribute('aria-modal');
+                    modalElement.setAttribute('aria-hidden', 'true');
+                    document.body.classList.remove('modal-open');
 
-                // Remove backdrop
-                const backdrop = document.getElementById('modalBackdrop');
-                if (backdrop) {
-                    backdrop.remove();
+                    // Remove backdrop
+                    const backdrop = document.getElementById('modalBackdrop');
+                    if (backdrop) {
+                        backdrop.remove();
+                    }
+
+                    // Return focus to Create Budget button to avoid aria-hidden warning
+                    const createBtn = document.getElementById('createBudgetBtn');
+                    if (createBtn) {
+                        createBtn.focus();
+                    }
                 }
             }
         });
