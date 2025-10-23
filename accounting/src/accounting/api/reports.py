@@ -879,51 +879,74 @@ def get_comparative_profit_loss(
         period1_nodes: List[HierarchicalPLAccountLine],
         period2_nodes: List[HierarchicalPLAccountLine]
     ) -> List[ComparativeAccountLine]:
-        """Merge two account trees into comparative structure"""
-        # Create maps by account_id
-        p1_map = {node.account_id: node for node in period1_nodes}
+        """Merge two account trees into comparative structure preserving hierarchy"""
+        # Create maps by account_id for quick lookup
         p2_map = {node.account_id: node for node in period2_nodes}
 
-        # Get all unique account IDs
-        all_ids = set(p1_map.keys()) | set(p2_map.keys())
-
         result = []
-        for acc_id in sorted(all_ids):
-            p1_node = p1_map.get(acc_id)
-            p2_node = p2_map.get(acc_id)
 
-            # Use whichever exists for account info
-            node = p1_node or p2_node
+        # Iterate through period1 nodes to preserve order and hierarchy
+        for p1_node in period1_nodes:
+            p2_node = p2_map.get(p1_node.account_id)
 
-            p1_amount = p1_node.amount if p1_node else Decimal('0')
+            p1_amount = p1_node.amount
             p2_amount = p2_node.amount if p2_node else Decimal('0')
             variance = p1_amount - p2_amount
             variance_pct = calculate_variance_percent(p1_amount, p2_amount)
 
-            # Merge children if both have them
+            # Recursively merge children
             children = []
-            if (p1_node and p1_node.children) or (p2_node and p2_node.children):
-                children = merge_account_trees(
-                    p1_node.children if p1_node else [],
-                    p2_node.children if p2_node else []
-                )
+            if p1_node.children:
+                p2_children = p2_node.children if p2_node else []
+                children = merge_account_trees(p1_node.children, p2_children)
 
-            # Skip if hide_zero and both amounts are zero
-            if hide_zero and p1_amount == 0 and p2_amount == 0:
+            # Skip if hide_zero and both amounts are zero and no children to show
+            if hide_zero and p1_amount == 0 and p2_amount == 0 and not children:
                 continue
 
             result.append(ComparativeAccountLine(
-                account_id=node.account_id,
-                account_number=node.account_number,
-                account_name=node.account_name,
-                is_summary=node.is_summary,
-                hierarchy_level=node.hierarchy_level,
+                account_id=p1_node.account_id,
+                account_number=p1_node.account_number,
+                account_name=p1_node.account_name,
+                is_summary=p1_node.is_summary,
+                hierarchy_level=p1_node.hierarchy_level,
                 period1_amount=p1_amount,
                 period2_amount=p2_amount,
                 variance_amount=variance,
                 variance_percent=variance_pct,
                 children=children
             ))
+
+        # Now add any accounts that exist only in period2
+        p1_ids = {node.account_id for node in period1_nodes}
+        for p2_node in period2_nodes:
+            if p2_node.account_id not in p1_ids:
+                p1_amount = Decimal('0')
+                p2_amount = p2_node.amount
+                variance = p1_amount - p2_amount
+                variance_pct = calculate_variance_percent(p1_amount, p2_amount)
+
+                # Recursively process children
+                children = []
+                if p2_node.children:
+                    children = merge_account_trees([], p2_node.children)
+
+                # Skip if hide_zero and both amounts are zero
+                if hide_zero and p1_amount == 0 and p2_amount == 0 and not children:
+                    continue
+
+                result.append(ComparativeAccountLine(
+                    account_id=p2_node.account_id,
+                    account_number=p2_node.account_number,
+                    account_name=p2_node.account_name,
+                    is_summary=p2_node.is_summary,
+                    hierarchy_level=p2_node.hierarchy_level,
+                    period1_amount=p1_amount,
+                    period2_amount=p2_amount,
+                    variance_amount=variance,
+                    variance_percent=variance_pct,
+                    children=children
+                ))
 
         return result
 
