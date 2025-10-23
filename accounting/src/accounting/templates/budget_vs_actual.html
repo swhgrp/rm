@@ -180,7 +180,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 async function loadBudgetInfo() {
     try {
-        const response = await fetch(`/api/budgets/${budgetId}`, {
+        const response = await fetch(`../api/budgets/${budgetId}`, {
             credentials: 'include'
         });
 
@@ -229,8 +229,8 @@ async function loadReport() {
     try {
         const periodId = document.getElementById('periodSelect').value;
         const url = periodId
-            ? `/api/budgets/${budgetId}/vs-actual?period_id=${periodId}`
-            : `/api/budgets/${budgetId}/vs-actual`;
+            ? `../api/budgets/${budgetId}/vs-actual?period_id=${periodId}`
+            : `../api/budgets/${budgetId}/vs-actual`;
 
         const response = await fetch(url, {
             credentials: 'include'
