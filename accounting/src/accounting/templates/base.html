@@ -840,6 +840,7 @@
                 <ul id="reportsSection" class="submenu">
                     <li><a href="reports" class="{% block nav_reports %}{% endblock %}"><i class="bi bi-graph-up"></i> Financial Reports</a></li>
                     <li><a href="cash-flow-statement" class="{% block nav_cash_flow %}{% endblock %}"><i class="bi bi-cash-stack"></i> Cash Flow Statement</a></li>
+                    <li><a href="budgets" class="{% block nav_budgets %}{% endblock %}"><i class="bi bi-calculator"></i> Budget Management</a></li>
                 </ul>
             </li>
 
@@ -1170,7 +1171,7 @@
                 // General journal entries or accounts - open GL section
                 sectionToOpen = document.getElementById('glSection');
                 toggleToOpen = document.querySelector('[onclick*="glSection"]');
-            } else if (currentPath.includes('/reports')) {
+            } else if (currentPath.includes('/reports') || currentPath.includes('/budget')) {
                 sectionToOpen = document.getElementById('reportsSection');
                 toggleToOpen = document.querySelector('[onclick*="reportsSection"]');
             } else if (currentPath.includes('/bank') || currentPath.includes('/reconciliation')) {

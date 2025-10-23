@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block title %}Budget vs Actual - Accounting System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-graph-up"></i> Budget vs Actual</h2>
+                    <p class="text-muted mb-0" id="budgetTitle">Loading...</p>
+                </div>
+                <div>
+                    <a href="/budgets" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Budgets
+                    </a>
+                    <button class="btn btn-outline-primary" onclick="window.print()">
+                        <i class="bi bi-printer"></i> Print
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Period Selector -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">View Period</label>
+                    <select class="form-select" id="periodSelect">
+                        <option value="">Full Year</option>
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-end">
+                    <button class="btn btn-primary w-100" id="loadReport">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh Report
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="reportLoading" class="text-center py-5" style="display: none;">
+        <div class="spinner-border text-primary"></div>
+        <p class="mt-3 text-muted">Loading budget vs actual report...</p>
+    </div>
+
+    <!-- Summary Cards -->
+    <div id="summaryCards" class="row mb-4" style="display: none;">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Revenue</h6>
+                    <div class="row">
+                        <div class="col-6">
+                            <small class="text-muted">Budget</small>
+                            <div class="fs-5" id="revenueBudget">$0</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Actual</small>
+                            <div class="fs-5" id="revenueActual">$0</div>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">Variance</small>
+                        <div class="fs-6" id="revenueVariance">$0 (0%)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Expenses</h6>
+                    <div class="row">
+                        <div class="col-6">
+                            <small class="text-muted">Budget</small>
+                            <div class="fs-5" id="expensesBudget">$0</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Actual</small>
+                            <div class="fs-5" id="expensesActual">$0</div>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">Variance</small>
+                        <div class="fs-6" id="expensesVariance">$0 (0%)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h6 class="text-muted mb-2">Net Income</h6>
+                    <div class="row">
+                        <div class="col-6">
+                            <small class="text-muted">Budget</small>
+                            <div class="fs-5" id="netIncomeBudget">$0</div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">Actual</small>
+                            <div class="fs-5" id="netIncomeActual">$0</div>
+                        </div>
+                    </div>
+                    <div class="mt-2">
+                        <small class="text-muted">Variance</small>
+                        <div class="fs-6" id="netIncomeVariance">$0 (0%)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue Detail -->
+    <div id="revenueSection" class="card mb-4" style="display: none;">
+        <div class="card-header bg-success text-white">
+            <h5 class="mb-0"><i class="bi bi-cash-stack"></i> Revenue</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th class="text-end">Budget</th>
+                            <th class="text-end">Actual</th>
+                            <th class="text-end">Variance</th>
+                            <th class="text-end">Variance %</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="revenueTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Expense Detail -->
+    <div id="expenseSection" class="card mb-4" style="display: none;">
+        <div class="card-header bg-danger text-white">
+            <h5 class="mb-0"><i class="bi bi-receipt"></i> Expenses</h5>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Account</th>
+                            <th class="text-end">Budget</th>
+                            <th class="text-end">Actual</th>
+                            <th class="text-end">Variance</th>
+                            <th class="text-end">Variance %</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expenseTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const budgetId = {{ budget_id }};
+let report = null;
+let periods = [];
+
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadBudgetInfo();
+    await loadReport();
+});
+
+async function loadBudgetInfo() {
+    try {
+        const response = await fetch(`/api/budgets/${budgetId}`);
+        const budget = await response.json();
+
+        document.getElementById('budgetTitle').textContent =
+            `${budget.budget_name} - FY${budget.fiscal_year} (${budget.start_date} to ${budget.end_date})`;
+
+        // Load periods
+        if (budget.periods && budget.periods.length > 0) {
+            const periodSelect = document.getElementById('periodSelect');
+            budget.periods.forEach(period => {
+                const option = document.createElement('option');
+                option.value = period.id;
+                option.textContent = period.period_name;
+                periodSelect.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading budget info:', error);
+    }
+}
+
+async function loadReport() {
+    const loading = document.getElementById('reportLoading');
+    const summaryCards = document.getElementById('summaryCards');
+    const revenueSection = document.getElementById('revenueSection');
+    const expenseSection = document.getElementById('expenseSection');
+
+    loading.style.display = 'block';
+    summaryCards.style.display = 'none';
+    revenueSection.style.display = 'none';
+    expenseSection.style.display = 'none';
+
+    try {
+        const periodId = document.getElementById('periodSelect').value;
+        const url = periodId
+            ? `/api/budgets/${budgetId}/vs-actual?period_id=${periodId}`
+            : `/api/budgets/${budgetId}/vs-actual`;
+
+        const response = await fetch(url);
+        report = await response.json();
+
+        loading.style.display = 'none';
+        displayReport(report);
+
+    } catch (error) {
+        console.error('Error loading report:', error);
+        loading.style.display = 'none';
+        alert('Error loading report. Please try again.');
+    }
+}
+
+function displayReport(data) {
+    // Summary cards
+    document.getElementById('revenueBudget').textContent = formatCurrency(data.total_revenue_budget);
+    document.getElementById('revenueActual').textContent = formatCurrency(data.total_revenue_actual);
+    document.getElementById('revenueVariance').innerHTML = formatVariance(
+        data.total_revenue_variance,
+        data.total_revenue_variance_percent,
+        data.total_revenue_variance > 0  // Revenue over budget is good
+    );
+
+    document.getElementById('expensesBudget').textContent = formatCurrency(data.total_expenses_budget);
+    document.getElementById('expensesActual').textContent = formatCurrency(data.total_expenses_actual);
+    document.getElementById('expensesVariance').innerHTML = formatVariance(
+        data.total_expenses_variance,
+        data.total_expenses_variance_percent,
+        data.total_expenses_variance < 0  // Expenses under budget is good
+    );
+
+    document.getElementById('netIncomeBudget').textContent = formatCurrency(data.net_income_budget);
+    document.getElementById('netIncomeActual').textContent = formatCurrency(data.net_income_actual);
+    document.getElementById('netIncomeVariance').innerHTML = formatVariance(
+        data.net_income_variance,
+        data.net_income_variance_percent,
+        data.net_income_variance > 0  // Net income over budget is good
+    );
+
+    document.getElementById('summaryCards').style.display = 'flex';
+
+    // Revenue detail
+    if (data.revenue_lines && data.revenue_lines.length > 0) {
+        const revenueBody = document.getElementById('revenueTableBody');
+        revenueBody.innerHTML = '';
+
+        data.revenue_lines.forEach(line => {
+            const row = createDetailRow(line);
+            revenueBody.appendChild(row);
+        });
+
+        document.getElementById('revenueSection').style.display = 'block';
+    }
+
+    // Expense detail
+    if (data.expense_lines && data.expense_lines.length > 0) {
+        const expenseBody = document.getElementById('expenseTableBody');
+        expenseBody.innerHTML = '';
+
+        data.expense_lines.forEach(line => {
+            const row = createDetailRow(line);
+            expenseBody.appendChild(row);
+        });
+
+        document.getElementById('expenseSection').style.display = 'block';
+    }
+}
+
+function createDetailRow(line) {
+    const tr = document.createElement('tr');
+
+    const statusIcon = line.is_favorable
+        ? '<i class="bi bi-check-circle-fill text-success"></i>'
+        : '<i class="bi bi-exclamation-triangle-fill text-warning"></i>';
+
+    tr.innerHTML = `
+        <td>${line.account_number} - ${line.account_name}</td>
+        <td class="text-end">${formatCurrency(line.budget_amount)}</td>
+        <td class="text-end">${formatCurrency(line.actual_amount)}</td>
+        <td class="text-end ${line.variance >= 0 ? 'text-success' : 'text-danger'}">
+            ${formatCurrency(line.variance)}
+        </td>
+        <td class="text-end ${line.variance >= 0 ? 'text-success' : 'text-danger'}">
+            ${line.variance_percent.toFixed(1)}%
+        </td>
+        <td class="text-center">${statusIcon}</td>
+    `;
+
+    return tr;
+}
+
+function formatCurrency(amount) {
+    return '$' + parseFloat(amount).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+function formatVariance(variance, percent, isFavorable) {
+    const color = isFavorable ? 'text-success' : 'text-danger';
+    const icon = isFavorable ? '▲' : '▼';
+    return `<span class="${color}"><strong>${formatCurrency(variance)}</strong> (${icon} ${Math.abs(percent).toFixed(1)}%)</span>`;
+}
+
+document.getElementById('loadReport').addEventListener('click', loadReport);
+</script>
+{% endblock %}
