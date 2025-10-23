@@ -1,0 +1,620 @@
+{% extends "base.html" %}
+
+{% block title %}Create Payment - Accounting System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .payment-method-card {
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 2px solid transparent;
+    }
+
+    .payment-method-card:hover {
+        border-color: var(--bs-primary);
+        transform: translateY(-2px);
+    }
+
+    .payment-method-card.selected {
+        border-color: var(--bs-primary);
+        background-color: rgba(13, 110, 253, 0.1);
+    }
+
+    .bill-row {
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .bill-row:hover {
+        background-color: rgba(13, 110, 253, 0.1);
+    }
+
+    .bill-row.selected {
+        background-color: rgba(13, 110, 253, 0.15);
+    }
+
+    .method-icon {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .discount-badge {
+        background-color: #28a745;
+        color: white;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.75rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-cash-coin"></i> Create Payment</h2>
+                    <p class="text-muted mb-0">Pay vendor bills via check, ACH, or other methods</p>
+                </div>
+                <div>
+                    <a href="/payment-history" class="btn btn-outline-secondary">
+                        <i class="bi bi-clock-history"></i> Payment History
+                    </a>
+                    <a href="/check-batches" class="btn btn-outline-primary">
+                        <i class="bi bi-receipt"></i> Check Batches
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Form -->
+    <form id="paymentForm">
+        <!-- Step 1: Select Vendor -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-1-circle-fill text-primary"></i> Select Vendor</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <label class="form-label">Vendor <span class="text-danger">*</span></label>
+                        <select class="form-select" id="vendorSelect" required>
+                            <option value="">Choose vendor...</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Location/Area</label>
+                        <select class="form-select" id="areaSelect">
+                            <option value="">All Locations</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2: Select Bills to Pay -->
+        <div class="card mb-4" id="billsCard" style="display: none;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-2-circle-fill text-primary"></i> Select Bills to Pay</h5>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="selectAllBills">
+                    <i class="bi bi-check-all"></i> Select All
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="billsLoading" class="text-center py-4" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Loading unpaid bills...</p>
+                </div>
+
+                <div id="noBillsMessage" style="display: none;">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> No unpaid bills found for this vendor.
+                    </div>
+                </div>
+
+                <div id="billsTableContainer" style="display: none;">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th width="50">
+                                        <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
+                                    </th>
+                                    <th>Bill #</th>
+                                    <th>Date</th>
+                                    <th>Due Date</th>
+                                    <th>Amount</th>
+                                    <th>Paid</th>
+                                    <th>Balance</th>
+                                    <th>Discount Available</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="billsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <div class="alert alert-info">
+                                <strong>Selected Bills:</strong> <span id="selectedCount">0</span><br>
+                                <strong>Total Amount:</strong> $<span id="selectedTotal">0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Payment Method -->
+        <div class="card mb-4" id="paymentMethodCard" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-3-circle-fill text-primary"></i> Payment Method</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3" id="paymentMethodsContainer">
+                    <div class="col-md-3">
+                        <div class="card payment-method-card text-center" data-method="CHECK">
+                            <div class="card-body">
+                                <i class="bi bi-receipt method-icon text-primary"></i>
+                                <h6>Check</h6>
+                                <small class="text-muted">Print physical check</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card payment-method-card text-center" data-method="ACH">
+                            <div class="card-body">
+                                <i class="bi bi-bank method-icon text-success"></i>
+                                <h6>ACH</h6>
+                                <small class="text-muted">Electronic bank transfer</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card payment-method-card text-center" data-method="WIRE">
+                            <div class="card-body">
+                                <i class="bi bi-lightning-charge method-icon text-warning"></i>
+                                <h6>Wire Transfer</h6>
+                                <small class="text-muted">Same-day wire</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card payment-method-card text-center" data-method="CREDIT_CARD">
+                            <div class="card-body">
+                                <i class="bi bi-credit-card method-icon text-info"></i>
+                                <h6>Credit Card</h6>
+                                <small class="text-muted">Pay by card</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" id="paymentMethod" required>
+            </div>
+        </div>
+
+        <!-- Step 4: Payment Details -->
+        <div class="card mb-4" id="paymentDetailsCard" style="display: none;">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-4-circle-fill text-primary"></i> Payment Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Payment Date <span class="text-danger">*</span></label>
+                        <input type="date" class="form-control" id="paymentDate" required>
+                    </div>
+
+                    <div class="col-md-4">
+                        <label class="form-label">Bank Account <span class="text-danger">*</span></label>
+                        <select class="form-select" id="bankAccountSelect" required>
+                            <option value="">Choose account...</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4" id="checkNumberField" style="display: none;">
+                        <label class="form-label">Check Number</label>
+                        <input type="number" class="form-control" id="checkNumber" placeholder="Auto-assigned">
+                        <small class="text-muted">Leave blank for auto-assign</small>
+                    </div>
+
+                    <div class="col-md-4" id="referenceNumberField" style="display: none;">
+                        <label class="form-label">Reference Number</label>
+                        <input type="text" class="form-control" id="referenceNumber" placeholder="Transaction reference">
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label">Memo/Notes</label>
+                        <textarea class="form-control" id="paymentMemo" rows="2" placeholder="Optional payment notes..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Payment Summary -->
+                <div class="row mt-4">
+                    <div class="col-md-6 offset-md-6">
+                        <div class="card bg-light">
+                            <div class="card-body">
+                                <h6 class="card-title">Payment Summary</h6>
+                                <hr>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Subtotal:</span>
+                                    <strong>$<span id="summarySubtotal">0.00</span></strong>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2 text-success">
+                                    <span>Discounts:</span>
+                                    <strong>-$<span id="summaryDiscount">0.00</span></strong>
+                                </div>
+                                <hr>
+                                <div class="d-flex justify-content-between">
+                                    <strong>Total Payment:</strong>
+                                    <strong class="text-primary fs-5">$<span id="summaryTotal">0.00</span></strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='/vendor-bills'">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+                    <div>
+                        <button type="button" class="btn btn-primary me-2" id="saveDraftBtn" style="display: none;">
+                            <i class="bi bi-save"></i> Save as Draft
+                        </button>
+                        <button type="submit" class="btn btn-success" id="submitPaymentBtn" style="display: none;">
+                            <i class="bi bi-check-circle"></i> Create Payment
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let selectedBills = [];
+let selectedVendor = null;
+let selectedMethod = null;
+let vendors = [];
+let areas = [];
+let bankAccounts = [];
+
+// Load vendors, areas, and bank accounts on page load
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadVendors();
+    await loadAreas();
+    await loadBankAccounts();
+    setDefaultDate();
+});
+
+async function loadVendors() {
+    try {
+        const response = await fetch('/api/vendors/');
+        vendors = await response.json();
+        const select = document.getElementById('vendorSelect');
+        vendors.forEach(vendor => {
+            const option = document.createElement('option');
+            option.value = vendor.id;
+            option.textContent = vendor.vendor_name;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading vendors:', error);
+    }
+}
+
+async function loadAreas() {
+    try {
+        const response = await fetch('/api/areas/');
+        areas = await response.json();
+        const select = document.getElementById('areaSelect');
+        areas.forEach(area => {
+            const option = document.createElement('option');
+            option.value = area.id;
+            option.textContent = area.name;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading areas:', error);
+    }
+}
+
+async function loadBankAccounts() {
+    try {
+        const response = await fetch('/api/bank-accounts/');
+        bankAccounts = await response.json();
+        const select = document.getElementById('bankAccountSelect');
+        bankAccounts.forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.id;
+            option.textContent = `${account.account_name} - ${account.account_number}`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading bank accounts:', error);
+    }
+}
+
+function setDefaultDate() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('paymentDate').value = today;
+}
+
+// Vendor selection handler
+document.getElementById('vendorSelect').addEventListener('change', async function() {
+    const vendorId = this.value;
+    if (!vendorId) {
+        document.getElementById('billsCard').style.display = 'none';
+        return;
+    }
+
+    selectedVendor = vendors.find(v => v.id == vendorId);
+    await loadVendorBills(vendorId);
+    document.getElementById('billsCard').style.display = 'block';
+});
+
+async function loadVendorBills(vendorId) {
+    const billsLoading = document.getElementById('billsLoading');
+    const noBillsMessage = document.getElementById('noBillsMessage');
+    const billsTableContainer = document.getElementById('billsTableContainer');
+    const tableBody = document.getElementById('billsTableBody');
+
+    billsLoading.style.display = 'block';
+    noBillsMessage.style.display = 'none';
+    billsTableContainer.style.display = 'none';
+    tableBody.innerHTML = '';
+
+    try {
+        const response = await fetch(`/api/vendor-bills/?vendor_id=${vendorId}&status=approved,partially_paid`);
+        const bills = await response.json();
+
+        billsLoading.style.display = 'none';
+
+        if (bills.length === 0) {
+            noBillsMessage.style.display = 'block';
+            return;
+        }
+
+        billsTableContainer.style.display = 'block';
+
+        bills.forEach(bill => {
+            const row = createBillRow(bill);
+            tableBody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('Error loading bills:', error);
+        billsLoading.style.display = 'none';
+        alert('Error loading bills. Please try again.');
+    }
+}
+
+function createBillRow(bill) {
+    const tr = document.createElement('tr');
+    tr.className = 'bill-row';
+    tr.dataset.billId = bill.id;
+
+    const dueDate = new Date(bill.due_date);
+    const today = new Date();
+    const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+
+    // Calculate discount if available (simplified - should come from API)
+    const discountAvailable = daysUntilDue > 0 && daysUntilDue <= 10 ? bill.total_amount * 0.02 : 0;
+
+    tr.innerHTML = `
+        <td><input type="checkbox" class="form-check-input bill-checkbox" data-bill-id="${bill.id}"></td>
+        <td>${bill.bill_number || 'N/A'}</td>
+        <td>${formatDate(bill.bill_date)}</td>
+        <td>${formatDate(bill.due_date)}</td>
+        <td>$${bill.total_amount.toFixed(2)}</td>
+        <td>$${(bill.total_amount - bill.balance_due).toFixed(2)}</td>
+        <td><strong>$${bill.balance_due.toFixed(2)}</strong></td>
+        <td>${discountAvailable > 0 ? `<span class="discount-badge">$${discountAvailable.toFixed(2)}</span>` : '-'}</td>
+        <td><span class="badge bg-${getStatusColor(bill.status)}">${bill.status}</span></td>
+    `;
+
+    // Click row to toggle checkbox
+    tr.addEventListener('click', function(e) {
+        if (e.target.type !== 'checkbox') {
+            const checkbox = tr.querySelector('.bill-checkbox');
+            checkbox.checked = !checkbox.checked;
+            checkbox.dispatchEvent(new Event('change'));
+        }
+    });
+
+    // Checkbox change handler
+    tr.querySelector('.bill-checkbox').addEventListener('change', function() {
+        if (this.checked) {
+            selectedBills.push({
+                id: bill.id,
+                amount: bill.balance_due,
+                discount: discountAvailable
+            });
+            tr.classList.add('selected');
+        } else {
+            selectedBills = selectedBills.filter(b => b.id !== bill.id);
+            tr.classList.remove('selected');
+        }
+        updateSelectedSummary();
+        checkFormProgress();
+    });
+
+    return tr;
+}
+
+// Select all bills
+document.getElementById('selectAllBills').addEventListener('click', function() {
+    const checkboxes = document.querySelectorAll('.bill-checkbox');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+
+    checkboxes.forEach(cb => {
+        cb.checked = !allChecked;
+        cb.dispatchEvent(new Event('change'));
+    });
+});
+
+document.getElementById('selectAllCheckbox').addEventListener('change', function() {
+    const checkboxes = document.querySelectorAll('.bill-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = this.checked;
+        cb.dispatchEvent(new Event('change'));
+    });
+});
+
+function updateSelectedSummary() {
+    const count = selectedBills.length;
+    const total = selectedBills.reduce((sum, bill) => sum + bill.amount, 0);
+    const discount = selectedBills.reduce((sum, bill) => sum + bill.discount, 0);
+
+    document.getElementById('selectedCount').textContent = count;
+    document.getElementById('selectedTotal').textContent = total.toFixed(2);
+
+    document.getElementById('summarySubtotal').textContent = total.toFixed(2);
+    document.getElementById('summaryDiscount').textContent = discount.toFixed(2);
+    document.getElementById('summaryTotal').textContent = (total - discount).toFixed(2);
+}
+
+function checkFormProgress() {
+    // Show payment method card if bills are selected
+    if (selectedBills.length > 0) {
+        document.getElementById('paymentMethodCard').style.display = 'block';
+    } else {
+        document.getElementById('paymentMethodCard').style.display = 'none';
+        document.getElementById('paymentDetailsCard').style.display = 'none';
+    }
+
+    // Show payment details if method is selected
+    if (selectedMethod && selectedBills.length > 0) {
+        document.getElementById('paymentDetailsCard').style.display = 'block';
+        document.getElementById('saveDraftBtn').style.display = 'inline-block';
+        document.getElementById('submitPaymentBtn').style.display = 'inline-block';
+    } else {
+        document.getElementById('paymentDetailsCard').style.display = 'none';
+        document.getElementById('saveDraftBtn').style.display = 'none';
+        document.getElementById('submitPaymentBtn').style.display = 'none';
+    }
+}
+
+// Payment method selection
+document.querySelectorAll('.payment-method-card').forEach(card => {
+    card.addEventListener('click', function() {
+        document.querySelectorAll('.payment-method-card').forEach(c => c.classList.remove('selected'));
+        this.classList.add('selected');
+        selectedMethod = this.dataset.method;
+        document.getElementById('paymentMethod').value = selectedMethod;
+
+        // Show/hide method-specific fields
+        if (selectedMethod === 'CHECK') {
+            document.getElementById('checkNumberField').style.display = 'block';
+            document.getElementById('referenceNumberField').style.display = 'none';
+        } else {
+            document.getElementById('checkNumberField').style.display = 'none';
+            document.getElementById('referenceNumberField').style.display = 'block';
+        }
+
+        checkFormProgress();
+    });
+});
+
+// Form submission
+document.getElementById('paymentForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    if (selectedBills.length === 0) {
+        alert('Please select at least one bill to pay.');
+        return;
+    }
+
+    const paymentData = {
+        vendor_id: parseInt(document.getElementById('vendorSelect').value),
+        payment_method: selectedMethod,
+        payment_date: document.getElementById('paymentDate').value,
+        bank_account_id: parseInt(document.getElementById('bankAccountSelect').value),
+        area_id: document.getElementById('areaSelect').value ? parseInt(document.getElementById('areaSelect').value) : null,
+        memo: document.getElementById('paymentMemo').value,
+        applications: selectedBills.map(bill => ({
+            vendor_bill_id: bill.id,
+            amount_applied: bill.amount,
+            discount_taken: bill.discount
+        }))
+    };
+
+    // Add method-specific fields
+    if (selectedMethod === 'CHECK') {
+        const checkNum = document.getElementById('checkNumber').value;
+        if (checkNum) paymentData.check_number = parseInt(checkNum);
+    } else {
+        const refNum = document.getElementById('referenceNumber').value;
+        if (refNum) paymentData.reference_number = refNum;
+    }
+
+    // Calculate totals
+    paymentData.amount = selectedBills.reduce((sum, bill) => sum + bill.amount, 0);
+    paymentData.discount_amount = selectedBills.reduce((sum, bill) => sum + bill.discount, 0);
+
+    try {
+        const response = await fetch('/api/payments/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(paymentData)
+        });
+
+        if (response.ok) {
+            const payment = await response.json();
+            alert(`Payment created successfully! Payment #${payment.payment_number}`);
+
+            if (selectedMethod === 'CHECK') {
+                // Redirect to check batch page
+                window.location.href = '/check-batches';
+            } else {
+                // Redirect to payment history
+                window.location.href = '/payment-history';
+            }
+        } else {
+            const error = await response.json();
+            alert(`Error creating payment: ${error.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error creating payment:', error);
+        alert('Error creating payment. Please try again.');
+    }
+});
+
+// Save as draft
+document.getElementById('saveDraftBtn').addEventListener('click', function() {
+    alert('Save as draft functionality coming soon!');
+});
+
+// Helper functions
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function getStatusColor(status) {
+    const colors = {
+        'DRAFT': 'secondary',
+        'APPROVED': 'success',
+        'PARTIALLY_PAID': 'warning',
+        'PAID': 'info',
+        'OVERDUE': 'danger'
+    };
+    return colors[status] || 'secondary';
+}
+</script>
+{% endblock %}

@@ -346,6 +346,54 @@ async def vendor_bill_detail_page(
     })
 
 
+@app.get("/payments", response_class=HTMLResponse)
+async def payments_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Create Payment page"""
+    return templates.TemplateResponse("payments.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
+@app.get("/payment-history", response_class=HTMLResponse)
+async def payment_history_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Payment History page"""
+    return templates.TemplateResponse("payment_history.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
+@app.get("/check-batches", response_class=HTMLResponse)
+async def check_batches_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Check Batches page"""
+    return templates.TemplateResponse("check_batches.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
+@app.get("/ach-batches", response_class=HTMLResponse)
+async def ach_batches_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """ACH Batches page"""
+    return templates.TemplateResponse("ach_batches.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
 @app.get("/daily-sales", response_class=HTMLResponse)
 async def daily_sales_page(
     request: Request,

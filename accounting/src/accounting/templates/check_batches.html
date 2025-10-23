@@ -1,0 +1,545 @@
+{% extends "base.html" %}
+
+{% block title %}Check Batches - Accounting System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .batch-card {
+        transition: transform 0.2s;
+    }
+
+    .batch-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .check-preview {
+        border: 2px dashed #dee2e6;
+        padding: 1rem;
+        background: white;
+        min-height: 400px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-receipt"></i> Check Batches</h2>
+                    <p class="text-muted mb-0">Manage and print check batches</p>
+                </div>
+                <div>
+                    <a href="/payments" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> New Payment
+                    </a>
+                    <button class="btn btn-success" id="createBatchBtn">
+                        <i class="bi bi-collection"></i> Create Batch
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Bank Account</label>
+                    <select class="form-select" id="filterBankAccount">
+                        <option value="">All Accounts</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="filterStatus">
+                        <option value="">All Status</option>
+                        <option value="DRAFT">Draft</option>
+                        <option value="PRINTED">Printed</option>
+                        <option value="COMPLETED">Completed</option>
+                        <option value="VOIDED">Voided</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" id="filterFromDate">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" id="filterToDate">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-primary w-100" id="applyFilters">
+                        <i class="bi bi-funnel"></i> Apply Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batches List -->
+    <div id="batchesLoading" class="text-center py-5" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-3 text-muted">Loading check batches...</p>
+    </div>
+
+    <div id="noBatchesMessage" class="card" style="display: none;">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-inbox text-muted" style="font-size: 4rem;"></i>
+            <h4 class="mt-3">No Check Batches Found</h4>
+            <p class="text-muted">Create your first check batch to get started.</p>
+            <button class="btn btn-primary" onclick="document.getElementById('createBatchBtn').click()">
+                <i class="bi bi-plus-circle"></i> Create First Batch
+            </button>
+        </div>
+    </div>
+
+    <div id="batchesContainer" class="row g-4">
+        <!-- Batches will be loaded here -->
+    </div>
+</div>
+
+<!-- Create Batch Modal -->
+<div class="modal fade" id="createBatchModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-collection"></i> Create Check Batch</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createBatchForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Bank Account <span class="text-danger">*</span></label>
+                            <select class="form-select" id="batchBankAccount" required>
+                                <option value="">Choose account...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Batch Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="batchDate" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Select Unprinted Checks</label>
+                            <div id="unprintedChecksLoading" class="text-center py-3" style="display: none;">
+                                <div class="spinner-border spinner-border-sm" role="status"></div>
+                                <span class="ms-2">Loading unprinted checks...</span>
+                            </div>
+                            <div id="unprintedChecksList" class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                                <!-- Checks will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="createBatchSubmit">
+                    <i class="bi bi-check-circle"></i> Create Batch
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Check Preview Modal -->
+<div class="modal fade" id="checkPreviewModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-eye"></i> Check Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="checkPreviewContent" class="check-preview">
+                    <iframe id="checkPreviewFrame" style="width: 100%; height: 600px; border: none;"></iframe>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="printChecksBtn">
+                    <i class="bi bi-printer"></i> Print Checks
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let batches = [];
+let bankAccounts = [];
+let currentBatchId = null;
+
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadBankAccounts();
+    await loadBatches();
+    setDefaultDate();
+});
+
+async function loadBankAccounts() {
+    try {
+        const response = await fetch('/api/bank-accounts/');
+        bankAccounts = await response.json();
+
+        // Populate filter dropdown
+        const filterSelect = document.getElementById('filterBankAccount');
+        bankAccounts.forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.id;
+            option.textContent = `${account.account_name} - ${account.account_number}`;
+            filterSelect.appendChild(option);
+        });
+
+        // Populate batch creation dropdown
+        const batchSelect = document.getElementById('batchBankAccount');
+        bankAccounts.forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.id;
+            option.textContent = `${account.account_name} - ${account.account_number}`;
+            batchSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading bank accounts:', error);
+    }
+}
+
+async function loadBatches() {
+    const container = document.getElementById('batchesContainer');
+    const loading = document.getElementById('batchesLoading');
+    const noMessage = document.getElementById('noBatchesMessage');
+
+    loading.style.display = 'block';
+    container.innerHTML = '';
+    noMessage.style.display = 'none';
+
+    try {
+        const response = await fetch('/api/payments/check-batches/');
+        batches = await response.json();
+
+        loading.style.display = 'none';
+
+        if (batches.length === 0) {
+            noMessage.style.display = 'block';
+            return;
+        }
+
+        batches.forEach(batch => {
+            const card = createBatchCard(batch);
+            container.appendChild(card);
+        });
+    } catch (error) {
+        console.error('Error loading batches:', error);
+        loading.style.display = 'none';
+        alert('Error loading check batches. Please try again.');
+    }
+}
+
+function createBatchCard(batch) {
+    const col = document.createElement('div');
+    col.className = 'col-md-6 col-lg-4';
+
+    const statusColors = {
+        'DRAFT': 'secondary',
+        'PRINTED': 'primary',
+        'COMPLETED': 'success',
+        'VOIDED': 'danger'
+    };
+
+    col.innerHTML = `
+        <div class="card batch-card">
+            <div class="card-header bg-${statusColors[batch.status] || 'secondary'} text-white">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Batch #${batch.batch_number}</h6>
+                    <span class="badge bg-white text-${statusColors[batch.status] || 'secondary'}">${batch.status}</span>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <small class="text-muted">Date:</small>
+                    <div><strong>${formatDate(batch.batch_date)}</strong></div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Bank Account:</small>
+                    <div>${batch.bank_account?.account_name || 'N/A'}</div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Checks:</small>
+                    <div><strong>${batch.check_count}</strong> checks</div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Check Numbers:</small>
+                    <div>${batch.starting_check_number} - ${batch.ending_check_number || 'TBD'}</div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">Total Amount:</small>
+                    <div class="fs-5 text-success"><strong>$${batch.total_amount.toFixed(2)}</strong></div>
+                </div>
+            </div>
+            <div class="card-footer">
+                <div class="btn-group w-100" role="group">
+                    ${batch.status === 'DRAFT' ? `
+                        <button class="btn btn-sm btn-outline-primary" onclick="previewBatch(${batch.id})">
+                            <i class="bi bi-eye"></i> Preview
+                        </button>
+                        <button class="btn btn-sm btn-primary" onclick="printBatch(${batch.id})">
+                            <i class="bi bi-printer"></i> Print
+                        </button>
+                    ` : ''}
+                    ${batch.status === 'PRINTED' ? `
+                        <button class="btn btn-sm btn-success" onclick="completeBatch(${batch.id})">
+                            <i class="bi bi-check-circle"></i> Mark Complete
+                        </button>
+                    ` : ''}
+                    ${batch.status === 'COMPLETED' ? `
+                        <button class="btn btn-sm btn-outline-secondary" onclick="viewBatch(${batch.id})">
+                            <i class="bi bi-file-text"></i> View Details
+                        </button>
+                    ` : ''}
+                    ${batch.status === 'DRAFT' ? `
+                        <button class="btn btn-sm btn-outline-danger" onclick="voidBatch(${batch.id})">
+                            <i class="bi bi-x-circle"></i> Void
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        </div>
+    `;
+
+    return col;
+}
+
+function setDefaultDate() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('batchDate').value = today;
+}
+
+// Create batch button
+document.getElementById('createBatchBtn').addEventListener('click', function() {
+    const modal = new bootstrap.Modal(document.getElementById('createBatchModal'));
+    modal.show();
+});
+
+// Load unprinted checks when bank account is selected
+document.getElementById('batchBankAccount').addEventListener('change', async function() {
+    const bankAccountId = this.value;
+    if (!bankAccountId) return;
+
+    const loading = document.getElementById('unprintedChecksLoading');
+    const list = document.getElementById('unprintedChecksList');
+
+    loading.style.display = 'block';
+    list.innerHTML = '';
+
+    try {
+        const response = await fetch(`/api/payments/?payment_method=CHECK&status=DRAFT&bank_account_id=${bankAccountId}`);
+        const payments = await response.json();
+
+        loading.style.display = 'none';
+
+        if (payments.length === 0) {
+            list.innerHTML = '<div class="alert alert-info">No unprinted checks found for this account.</div>';
+            return;
+        }
+
+        payments.forEach(payment => {
+            const div = document.createElement('div');
+            div.className = 'form-check mb-2';
+            div.innerHTML = `
+                <input class="form-check-input" type="checkbox" value="${payment.id}" id="check_${payment.id}" checked>
+                <label class="form-check-label w-100" for="check_${payment.id}">
+                    <div class="d-flex justify-content-between">
+                        <span><strong>${payment.payment_number}</strong> - ${payment.vendor_name}</span>
+                        <span class="text-success"><strong>$${payment.amount.toFixed(2)}</strong></span>
+                    </div>
+                    <small class="text-muted">Date: ${formatDate(payment.payment_date)}</small>
+                </label>
+            `;
+            list.appendChild(div);
+        });
+    } catch (error) {
+        console.error('Error loading unprinted checks:', error);
+        loading.style.display = 'none';
+        list.innerHTML = '<div class="alert alert-danger">Error loading checks. Please try again.</div>';
+    }
+});
+
+// Create batch submit
+document.getElementById('createBatchSubmit').addEventListener('click', async function() {
+    const bankAccountId = document.getElementById('batchBankAccount').value;
+    const batchDate = document.getElementById('batchDate').value;
+    const selectedChecks = Array.from(document.querySelectorAll('#unprintedChecksList input:checked')).map(cb => parseInt(cb.value));
+
+    if (!bankAccountId || !batchDate) {
+        alert('Please fill in all required fields.');
+        return;
+    }
+
+    if (selectedChecks.length === 0) {
+        alert('Please select at least one check.');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/payments/check-batches/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                bank_account_id: parseInt(bankAccountId),
+                batch_date: batchDate,
+                payment_ids: selectedChecks
+            })
+        });
+
+        if (response.ok) {
+            const batch = await response.json();
+            alert(`Check batch created successfully! Batch #${batch.batch_number}`);
+            bootstrap.Modal.getInstance(document.getElementById('createBatchModal')).hide();
+            await loadBatches();
+        } else {
+            const error = await response.json();
+            alert(`Error creating batch: ${error.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error creating batch:', error);
+        alert('Error creating batch. Please try again.');
+    }
+});
+
+async function previewBatch(batchId) {
+    currentBatchId = batchId;
+    const modal = new bootstrap.Modal(document.getElementById('checkPreviewModal'));
+
+    try {
+        const response = await fetch(`/api/payments/check-batches/${batchId}/preview`);
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            document.getElementById('checkPreviewFrame').src = url;
+            modal.show();
+        } else {
+            alert('Error loading preview. Please try again.');
+        }
+    } catch (error) {
+        console.error('Error previewing batch:', error);
+        alert('Error loading preview. Please try again.');
+    }
+}
+
+async function printBatch(batchId) {
+    if (!confirm('Are you ready to print this check batch? This will mark all checks as PRINTED.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/payments/check-batches/${batchId}/print`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+
+            // Open print dialog
+            const printWindow = window.open(url, '_blank');
+            printWindow.onload = function() {
+                printWindow.print();
+            };
+
+            alert('Checks sent to printer. Please verify print quality before mailing.');
+            await loadBatches();
+        } else {
+            const error = await response.json();
+            alert(`Error printing checks: ${error.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error printing batch:', error);
+        alert('Error printing checks. Please try again.');
+    }
+}
+
+async function completeBatch(batchId) {
+    if (!confirm('Mark this batch as complete? This confirms all checks have been mailed.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/payments/check-batches/${batchId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                status: 'COMPLETED'
+            })
+        });
+
+        if (response.ok) {
+            alert('Batch marked as complete!');
+            await loadBatches();
+        } else {
+            const error = await response.json();
+            alert(`Error: ${error.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error completing batch:', error);
+        alert('Error completing batch. Please try again.');
+    }
+}
+
+async function voidBatch(batchId) {
+    if (!confirm('Void this check batch? All checks will be voided and GL entries reversed.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/payments/check-batches/${batchId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            alert('Batch voided successfully!');
+            await loadBatches();
+        } else {
+            const error = await response.json();
+            alert(`Error: ${error.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error voiding batch:', error);
+        alert('Error voiding batch. Please try again.');
+    }
+}
+
+function viewBatch(batchId) {
+    window.location.href = `/check-batches/${batchId}`;
+}
+
+// Apply filters
+document.getElementById('applyFilters').addEventListener('click', function() {
+    // Filtering logic would go here
+    loadBatches();
+});
+
+// Print checks from preview modal
+document.getElementById('printChecksBtn').addEventListener('click', function() {
+    if (currentBatchId) {
+        bootstrap.Modal.getInstance(document.getElementById('checkPreviewModal')).hide();
+        printBatch(currentBatchId);
+    }
+});
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+</script>
+{% endblock %}

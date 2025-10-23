@@ -866,7 +866,11 @@
                 <ul id="apSection" class="submenu">
                     <li><a href="vendors" class="{% block nav_vendors %}{% endblock %}"><i class="bi bi-people"></i> Vendors</a></li>
                     <li><a href="vendor-bills" class="{% block nav_vendor_bills %}{% endblock %}"><i class="bi bi-receipt"></i> Vendor Bills</a></li>
-                    <li><a href="journal-entries?source=bill" class="{% block nav_bill_journal %}{% endblock %}"><i class="bi bi-receipt-cutoff"></i> Bill Journal Entries</a></li>
+                    <li><a href="payments" class="{% block nav_payments %}{% endblock %}"><i class="bi bi-cash-coin"></i> Create Payment</a></li>
+                    <li><a href="payment-history" class="{% block nav_payment_history %}{% endblock %}"><i class="bi bi-clock-history"></i> Payment History</a></li>
+                    <li><a href="check-batches" class="{% block nav_check_batches %}{% endblock %}"><i class="bi bi-receipt-cutoff"></i> Check Batches</a></li>
+                    <li><a href="ach-batches" class="{% block nav_ach_batches %}{% endblock %}"><i class="bi bi-bank"></i> ACH Batches</a></li>
+                    <li><a href="journal-entries?source=bill" class="{% block nav_bill_journal %}{% endblock %}"><i class="bi bi-journal-text"></i> Bill Journal Entries</a></li>
                 </ul>
             </li>
 
@@ -1148,7 +1152,7 @@
             if (currentPath.includes('/users') || currentPath.includes('/roles') || currentPath.includes('/locations') || currentPath.includes('/settings') || currentPath.includes('/periods')) {
                 sectionToOpen = document.getElementById('adminSection');
                 toggleToOpen = document.querySelector('[onclick*="adminSection"]');
-            } else if (currentPath.includes('/vendors') || currentPath.includes('/vendor-bills')) {
+            } else if (currentPath.includes('/vendors') || currentPath.includes('/vendor-bills') || currentPath.includes('/payment') || currentPath.includes('/check-batch') || currentPath.includes('/ach-batch')) {
                 sectionToOpen = document.getElementById('apSection');
                 toggleToOpen = document.querySelector('[onclick*="apSection"]');
             } else if (currentPath.includes('/customers') || currentPath.includes('/customer-invoices')) {

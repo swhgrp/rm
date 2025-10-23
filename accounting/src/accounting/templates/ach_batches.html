@@ -1,0 +1,411 @@
+{% extends "base.html" %}
+
+{% block title %}ACH Batches - Accounting System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-bank"></i> ACH Batches</h2>
+                    <p class="text-muted mb-0">Manage ACH/electronic payment batches</p>
+                </div>
+                <div>
+                    <a href="/payments" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> New Payment
+                    </a>
+                    <button class="btn btn-success" id="createBatchBtn">
+                        <i class="bi bi-collection"></i> Create ACH Batch
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batches List -->
+    <div id="batchesLoading" class="text-center py-5" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-3 text-muted">Loading ACH batches...</p>
+    </div>
+
+    <div id="noBatchesMessage" class="card" style="display: none;">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-inbox text-muted" style="font-size: 4rem;"></i>
+            <h4 class="mt-3">No ACH Batches Found</h4>
+            <p class="text-muted">Create your first ACH batch to get started.</p>
+            <button class="btn btn-primary" onclick="document.getElementById('createBatchBtn').click()">
+                <i class="bi bi-plus-circle"></i> Create First Batch
+            </button>
+        </div>
+    </div>
+
+    <div id="batchesContainer">
+        <!-- Batches table will be loaded here -->
+    </div>
+</div>
+
+<!-- Create ACH Batch Modal -->
+<div class="modal fade" id="createBatchModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-bank"></i> Create ACH Batch</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createBatchForm">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Bank Account <span class="text-danger">*</span></label>
+                            <select class="form-select" id="batchBankAccount" required>
+                                <option value="">Choose account...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Effective Date <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control" id="effectiveDate" required>
+                            <small class="text-muted">Date funds will be transferred</small>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Select ACH Payments</label>
+                            <div id="achPaymentsLoading" class="text-center py-3" style="display: none;">
+                                <div class="spinner-border spinner-border-sm" role="status"></div>
+                                <span class="ms-2">Loading ACH payments...</span>
+                            </div>
+                            <div id="achPaymentsList" class="border rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                                <!-- Payments will be loaded here -->
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="createBatchSubmit">
+                    <i class="bi bi-check-circle"></i> Create Batch
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let batches = [];
+let bankAccounts = [];
+
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadBankAccounts();
+    await loadBatches();
+    setDefaultDate();
+});
+
+async function loadBankAccounts() {
+    try {
+        const response = await fetch('/api/bank-accounts/');
+        bankAccounts = await response.json();
+
+        const batchSelect = document.getElementById('batchBankAccount');
+        bankAccounts.forEach(account => {
+            const option = document.createElement('option');
+            option.value = account.id;
+            option.textContent = `${account.account_name} - ${account.account_number}`;
+            batchSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Error loading bank accounts:', error);
+    }
+}
+
+async function loadBatches() {
+    const container = document.getElementById('batchesContainer');
+    const loading = document.getElementById('batchesLoading');
+    const noMessage = document.getElementById('noBatchesMessage');
+
+    loading.style.display = 'block';
+    container.innerHTML = '';
+    noMessage.style.display = 'none';
+
+    try {
+        const response = await fetch('/api/payments/ach-batches/');
+        batches = await response.json();
+
+        loading.style.display = 'none';
+
+        if (batches.length === 0) {
+            noMessage.style.display = 'block';
+            return;
+        }
+
+        const table = createBatchesTable(batches);
+        container.appendChild(table);
+    } catch (error) {
+        console.error('Error loading batches:', error);
+        loading.style.display = 'none';
+        alert('Error loading ACH batches. Please try again.');
+    }
+}
+
+function createBatchesTable(batches) {
+    const card = document.createElement('div');
+    card.className = 'card';
+
+    const statusColors = {
+        'DRAFT': 'secondary',
+        'SUBMITTED': 'primary',
+        'COMPLETED': 'success',
+        'RETURNED': 'danger'
+    };
+
+    card.innerHTML = `
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Batch #</th>
+                            <th>Date</th>
+                            <th>Effective Date</th>
+                            <th>Bank Account</th>
+                            <th>Payments</th>
+                            <th>Total Amount</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${batches.map(batch => `
+                            <tr>
+                                <td><strong>${batch.batch_number}</strong></td>
+                                <td>${formatDate(batch.batch_date)}</td>
+                                <td>${formatDate(batch.effective_date)}</td>
+                                <td>${batch.bank_account?.account_name || 'N/A'}</td>
+                                <td>${batch.payment_count}</td>
+                                <td class="text-success"><strong>$${batch.total_amount.toFixed(2)}</strong></td>
+                                <td><span class="badge bg-${statusColors[batch.status] || 'secondary'}">${batch.status}</span></td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        ${batch.status === 'DRAFT' ? `
+                                            <button class="btn btn-outline-primary" onclick="generateNachaFile(${batch.id})">
+                                                <i class="bi bi-download"></i> Generate NACHA
+                                            </button>
+                                        ` : ''}
+                                        ${batch.status === 'SUBMITTED' ? `
+                                            <button class="btn btn-outline-success" onclick="completeBatch(${batch.id})">
+                                                <i class="bi bi-check-circle"></i> Complete
+                                            </button>
+                                        ` : ''}
+                                        ${batch.nacha_file_path ? `
+                                            <button class="btn btn-outline-secondary" onclick="downloadNachaFile(${batch.id})">
+                                                <i class="bi bi-file-earmark-text"></i> Download
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    `;
+
+    return card;
+}
+
+function setDefaultDate() {
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    document.getElementById('effectiveDate').value = tomorrow.toISOString().split('T')[0];
+}
+
+// Create batch button
+document.getElementById('createBatchBtn').addEventListener('click', function() {
+    const modal = new bootstrap.Modal(document.getElementById('createBatchModal'));
+    modal.show();
+});
+
+// Load ACH payments when bank account is selected
+document.getElementById('batchBankAccount').addEventListener('change', async function() {
+    const bankAccountId = this.value;
+    if (!bankAccountId) return;
+
+    const loading = document.getElementById('achPaymentsLoading');
+    const list = document.getElementById('achPaymentsList');
+
+    loading.style.display = 'block';
+    list.innerHTML = '';
+
+    try {
+        const response = await fetch(`/api/payments/?payment_method=ACH&status=DRAFT&bank_account_id=${bankAccountId}`);
+        const payments = await response.json();
+
+        loading.style.display = 'none';
+
+        if (payments.length === 0) {
+            list.innerHTML = '<div class="alert alert-info">No pending ACH payments found for this account.</div>';
+            return;
+        }
+
+        payments.forEach(payment => {
+            const div = document.createElement('div');
+            div.className = 'form-check mb-2';
+            div.innerHTML = `
+                <input class="form-check-input" type="checkbox" value="${payment.id}" id="ach_${payment.id}" checked>
+                <label class="form-check-label w-100" for="ach_${payment.id}">
+                    <div class="d-flex justify-content-between">
+                        <span><strong>${payment.payment_number}</strong> - ${payment.vendor_name}</span>
+                        <span class="text-success"><strong>$${payment.amount.toFixed(2)}</strong></span>
+                    </div>
+                    <small class="text-muted">Date: ${formatDate(payment.payment_date)}</small>
+                </label>
+            `;
+            list.appendChild(div);
+        });
+    } catch (error) {
+        console.error('Error loading ACH payments:', error);
+        loading.style.display = 'none';
+        list.innerHTML = '<div class="alert alert-danger">Error loading payments. Please try again.</div>';
+    }
+});
+
+// Create batch submit
+document.getElementById('createBatchSubmit').addEventListener('click', async function() {
+    const bankAccountId = document.getElementById('batchBankAccount').value;
+    const effectiveDate = document.getElementById('effectiveDate').value;
+    const selectedPayments = Array.from(document.querySelectorAll('#achPaymentsList input:checked')).map(cb => parseInt(cb.value));
+
+    if (!bankAccountId || !effectiveDate) {
+        alert('Please fill in all required fields.');
+        return;
+    }
+
+    if (selectedPayments.length === 0) {
+        alert('Please select at least one payment.');
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/payments/ach-batches/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                bank_account_id: parseInt(bankAccountId),
+                effective_date: effectiveDate,
+                payment_ids: selectedPayments
+            })
+        });
+
+        if (response.ok) {
+            const batch = await response.json();
+            alert(`ACH batch created successfully! Batch #${batch.batch_number}`);
+            bootstrap.Modal.getInstance(document.getElementById('createBatchModal')).hide();
+            await loadBatches();
+        } else {
+            const error = await response.json();
+            alert(`Error creating batch: ${error.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error creating batch:', error);
+        alert('Error creating batch. Please try again.');
+    }
+});
+
+async function generateNachaFile(batchId) {
+    if (!confirm('Generate NACHA file for this batch? This will mark the batch as SUBMITTED.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/payments/ach-batches/${batchId}/generate`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ACH_Batch_${batchId}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            alert('NACHA file generated successfully! Upload this file to your bank portal.');
+            await loadBatches();
+        } else {
+            const error = await response.json();
+            alert(`Error generating NACHA file: ${error.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error generating NACHA file:', error);
+        alert('Error generating file. Please try again.');
+    }
+}
+
+async function completeBatch(batchId) {
+    if (!confirm('Mark this batch as complete? This confirms all ACH payments have been processed.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/payments/ach-batches/${batchId}`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                status: 'COMPLETED'
+            })
+        });
+
+        if (response.ok) {
+            alert('Batch marked as complete!');
+            await loadBatches();
+        } else {
+            const error = await response.json();
+            alert(`Error: ${error.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error completing batch:', error);
+        alert('Error completing batch. Please try again.');
+    }
+}
+
+async function downloadNachaFile(batchId) {
+    try {
+        const response = await fetch(`/api/payments/ach-batches/${batchId}/download`);
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `ACH_Batch_${batchId}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        } else {
+            alert('File not found.');
+        }
+    } catch (error) {
+        console.error('Error downloading file:', error);
+        alert('Error downloading file. Please try again.');
+    }
+}
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+</script>
+{% endblock %}

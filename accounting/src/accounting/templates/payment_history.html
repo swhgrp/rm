@@ -1,0 +1,502 @@
+{% extends "base.html" %}
+
+{% block title %}Payment History - Accounting System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2><i class="bi bi-clock-history"></i> Payment History</h2>
+                    <p class="text-muted mb-0">View all payment transactions</p>
+                </div>
+                <div>
+                    <button class="btn btn-outline-secondary" onclick="exportPayments()">
+                        <i class="bi bi-download"></i> Export
+                    </button>
+                    <a href="/payments" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> New Payment
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Payment Method</label>
+                    <select class="form-select" id="filterMethod">
+                        <option value="">All Methods</option>
+                        <option value="CHECK">Check</option>
+                        <option value="ACH">ACH</option>
+                        <option value="WIRE">Wire Transfer</option>
+                        <option value="CREDIT_CARD">Credit Card</option>
+                        <option value="CASH">Cash</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="filterStatus">
+                        <option value="">All Status</option>
+                        <option value="DRAFT">Draft</option>
+                        <option value="PRINTED">Printed</option>
+                        <option value="SUBMITTED">Submitted</option>
+                        <option value="CLEARED">Cleared</option>
+                        <option value="VOIDED">Voided</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">From Date</label>
+                    <input type="date" class="form-control" id="filterFromDate">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">To Date</label>
+                    <input type="date" class="form-control" id="filterToDate">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button class="btn btn-primary w-100" id="applyFilters">
+                        <i class="bi bi-funnel"></i> Apply
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Total Payments</p>
+                            <h4 class="mb-0" id="totalPayments">0</h4>
+                        </div>
+                        <i class="bi bi-cash-stack text-primary" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Total Amount</p>
+                            <h4 class="mb-0 text-success" id="totalAmount">$0.00</h4>
+                        </div>
+                        <i class="bi bi-currency-dollar text-success" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Pending</p>
+                            <h4 class="mb-0 text-warning" id="pendingCount">0</h4>
+                        </div>
+                        <i class="bi bi-clock text-warning" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted mb-1">Cleared</p>
+                            <h4 class="mb-0 text-info" id="clearedCount">0</h4>
+                        </div>
+                        <i class="bi bi-check-circle text-info" style="font-size: 2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payments Table -->
+    <div class="card">
+        <div class="card-body">
+            <div id="paymentsLoading" class="text-center py-5" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3 text-muted">Loading payments...</p>
+            </div>
+
+            <div id="noPaymentsMessage" style="display: none;">
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox text-muted" style="font-size: 4rem;"></i>
+                    <h4 class="mt-3">No Payments Found</h4>
+                    <p class="text-muted">Create your first payment to get started.</p>
+                </div>
+            </div>
+
+            <div id="paymentsTableContainer" class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Payment #</th>
+                            <th>Date</th>
+                            <th>Vendor</th>
+                            <th>Method</th>
+                            <th>Reference</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="paymentsTableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <div>
+                    <small class="text-muted">Showing <span id="showingCount">0</span> of <span id="totalCount">0</span> payments</small>
+                </div>
+                <nav>
+                    <ul class="pagination pagination-sm mb-0" id="pagination">
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Detail Modal -->
+<div class="modal fade" id="paymentDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-file-text"></i> Payment Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="paymentDetailContent">
+                <!-- Payment details will be loaded here -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" id="voidPaymentBtn" style="display: none;">
+                    <i class="bi bi-x-circle"></i> Void Payment
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let payments = [];
+let currentPage = 1;
+let pageSize = 25;
+let currentPaymentId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    setDefaultDates();
+    loadPayments();
+});
+
+function setDefaultDates() {
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    document.getElementById('filterFromDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+    document.getElementById('filterToDate').value = today.toISOString().split('T')[0];
+}
+
+async function loadPayments() {
+    const loading = document.getElementById('paymentsLoading');
+    const noMessage = document.getElementById('noPaymentsMessage');
+    const tableContainer = document.getElementById('paymentsTableContainer');
+    const tableBody = document.getElementById('paymentsTableBody');
+
+    loading.style.display = 'block';
+    noMessage.style.display = 'none';
+    tableContainer.style.display = 'none';
+    tableBody.innerHTML = '';
+
+    // Build query params
+    const params = new URLSearchParams();
+    const method = document.getElementById('filterMethod').value;
+    const status = document.getElementById('filterStatus').value;
+    const fromDate = document.getElementById('filterFromDate').value;
+    const toDate = document.getElementById('filterToDate').value;
+
+    if (method) params.append('payment_method', method);
+    if (status) params.append('status', status);
+    if (fromDate) params.append('start_date', fromDate);
+    if (toDate) params.append('end_date', toDate);
+    params.append('limit', pageSize);
+    params.append('offset', (currentPage - 1) * pageSize);
+
+    try {
+        const response = await fetch(`/api/payments/?${params}`);
+        payments = await response.json();
+
+        loading.style.display = 'none';
+
+        if (payments.length === 0) {
+            noMessage.style.display = 'block';
+            updateSummary([]);
+            return;
+        }
+
+        tableContainer.style.display = 'block';
+
+        payments.forEach(payment => {
+            const row = createPaymentRow(payment);
+            tableBody.appendChild(row);
+        });
+
+        updateSummary(payments);
+        updatePagination();
+    } catch (error) {
+        console.error('Error loading payments:', error);
+        loading.style.display = 'none';
+        alert('Error loading payments. Please try again.');
+    }
+}
+
+function createPaymentRow(payment) {
+    const tr = document.createElement('tr');
+
+    const methodIcons = {
+        'CHECK': 'receipt',
+        'ACH': 'bank',
+        'WIRE': 'lightning-charge',
+        'CREDIT_CARD': 'credit-card',
+        'CASH': 'cash-coin'
+    };
+
+    const statusColors = {
+        'DRAFT': 'secondary',
+        'SCHEDULED': 'info',
+        'PRINTED': 'primary',
+        'SUBMITTED': 'primary',
+        'CLEARED': 'success',
+        'VOIDED': 'danger',
+        'CANCELLED': 'dark'
+    };
+
+    const reference = payment.payment_method === 'CHECK'
+        ? `#${payment.check_number || 'N/A'}`
+        : payment.reference_number || '-';
+
+    tr.innerHTML = `
+        <td><strong>${payment.payment_number}</strong></td>
+        <td>${formatDate(payment.payment_date)}</td>
+        <td>${payment.vendor_name || 'N/A'}</td>
+        <td>
+            <i class="bi bi-${methodIcons[payment.payment_method] || 'cash'}"></i>
+            ${payment.payment_method}
+        </td>
+        <td>${reference}</td>
+        <td class="text-success"><strong>$${payment.amount.toFixed(2)}</strong></td>
+        <td><span class="badge bg-${statusColors[payment.status] || 'secondary'}">${payment.status}</span></td>
+        <td>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-primary" onclick="viewPayment(${payment.id})">
+                    <i class="bi bi-eye"></i>
+                </button>
+                ${['DRAFT', 'SCHEDULED'].includes(payment.status) ? `
+                    <button class="btn btn-outline-danger" onclick="confirmVoidPayment(${payment.id})">
+                        <i class="bi bi-x-circle"></i>
+                    </button>
+                ` : ''}
+            </div>
+        </td>
+    `;
+
+    return tr;
+}
+
+function updateSummary(payments) {
+    document.getElementById('totalPayments').textContent = payments.length;
+
+    const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+    document.getElementById('totalAmount').textContent = `$${totalAmount.toFixed(2)}`;
+
+    const pendingCount = payments.filter(p => ['DRAFT', 'SCHEDULED', 'PRINTED', 'SUBMITTED'].includes(p.status)).length;
+    document.getElementById('pendingCount').textContent = pendingCount;
+
+    const clearedCount = payments.filter(p => p.status === 'CLEARED').length;
+    document.getElementById('clearedCount').textContent = clearedCount;
+}
+
+function updatePagination() {
+    const pagination = document.getElementById('pagination');
+    pagination.innerHTML = '';
+
+    document.getElementById('showingCount').textContent = payments.length;
+    document.getElementById('totalCount').textContent = payments.length;
+}
+
+async function viewPayment(paymentId) {
+    currentPaymentId = paymentId;
+
+    try {
+        const response = await fetch(`/api/payments/${paymentId}`);
+        const payment = await response.json();
+
+        const modal = new bootstrap.Modal(document.getElementById('paymentDetailModal'));
+        const content = document.getElementById('paymentDetailContent');
+
+        content.innerHTML = `
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label text-muted">Payment Number</label>
+                    <div class="fw-bold">${payment.payment_number}</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted">Status</label>
+                    <div><span class="badge bg-${getStatusColor(payment.status)}">${payment.status}</span></div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted">Vendor</label>
+                    <div class="fw-bold">${payment.vendor_name}</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted">Payment Date</label>
+                    <div>${formatDate(payment.payment_date)}</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted">Payment Method</label>
+                    <div>${payment.payment_method}</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label text-muted">Amount</label>
+                    <div class="fs-5 text-success fw-bold">$${payment.amount.toFixed(2)}</div>
+                </div>
+                ${payment.memo ? `
+                    <div class="col-12">
+                        <label class="form-label text-muted">Memo</label>
+                        <div>${payment.memo}</div>
+                    </div>
+                ` : ''}
+            </div>
+
+            ${payment.applications && payment.applications.length > 0 ? `
+                <hr>
+                <h6>Applied to Bills</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Bill #</th>
+                                <th>Amount Applied</th>
+                                <th>Discount Taken</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${payment.applications.map(app => `
+                                <tr>
+                                    <td>${app.bill_number}</td>
+                                    <td>$${app.amount_applied.toFixed(2)}</td>
+                                    <td>$${app.discount_taken.toFixed(2)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            ` : ''}
+        `;
+
+        // Show void button for draft/scheduled payments
+        const voidBtn = document.getElementById('voidPaymentBtn');
+        if (['DRAFT', 'SCHEDULED'].includes(payment.status)) {
+            voidBtn.style.display = 'inline-block';
+        } else {
+            voidBtn.style.display = 'none';
+        }
+
+        modal.show();
+    } catch (error) {
+        console.error('Error loading payment details:', error);
+        alert('Error loading payment details. Please try again.');
+    }
+}
+
+function confirmVoidPayment(paymentId) {
+    if (confirm('Are you sure you want to void this payment? This action cannot be undone.')) {
+        voidPayment(paymentId);
+    }
+}
+
+async function voidPayment(paymentId) {
+    try {
+        const response = await fetch(`/api/payments/${paymentId}/void`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                void_reason: 'Voided by user'
+            })
+        });
+
+        if (response.ok) {
+            alert('Payment voided successfully!');
+            loadPayments();
+
+            // Close modal if open
+            const modalEl = document.getElementById('paymentDetailModal');
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        } else {
+            const error = await response.json();
+            alert(`Error voiding payment: ${error.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        console.error('Error voiding payment:', error);
+        alert('Error voiding payment. Please try again.');
+    }
+}
+
+function exportPayments() {
+    alert('Export functionality coming soon!');
+}
+
+// Apply filters
+document.getElementById('applyFilters').addEventListener('click', function() {
+    currentPage = 1;
+    loadPayments();
+});
+
+// Void payment from modal
+document.getElementById('voidPaymentBtn').addEventListener('click', function() {
+    if (currentPaymentId) {
+        confirmVoidPayment(currentPaymentId);
+    }
+});
+
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function getStatusColor(status) {
+    const colors = {
+        'DRAFT': 'secondary',
+        'SCHEDULED': 'info',
+        'PRINTED': 'primary',
+        'SUBMITTED': 'primary',
+        'CLEARED': 'success',
+        'VOIDED': 'danger',
+        'CANCELLED': 'dark'
+    };
+    return colors[status] || 'secondary';
+}
+</script>
+{% endblock %}
