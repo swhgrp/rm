@@ -47,6 +47,7 @@ class Area(Base):
     daily_sales_summaries = relationship("DailySalesSummary", back_populates="area")
     bank_accounts = relationship("BankAccount", back_populates="area")
     budgets = relationship("Budget", back_populates="area")
+    pos_configuration = relationship("POSConfiguration", back_populates="area", uselist=False)
 
     def __repr__(self):
         return f"<Area {self.code}: {self.name}>"

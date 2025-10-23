@@ -74,6 +74,11 @@ from accounting.models.budget import (
     BudgetStatus,
     BudgetPeriodType
 )
+from accounting.models.pos import (
+    POSConfiguration,
+    POSDailySalesCache,
+    POSCategoryGLMapping
+)
 
 __all__ = [
     "Area",
@@ -153,4 +158,7 @@ __all__ = [
     "BudgetAlert",
     "BudgetStatus",
     "BudgetPeriodType",
+    "POSConfiguration",
+    "POSDailySalesCache",
+    "POSCategoryGLMapping",
 ]
