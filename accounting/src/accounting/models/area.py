@@ -46,6 +46,7 @@ class Area(Base):
     vendor_bills = relationship("VendorBill", back_populates="area")
     daily_sales_summaries = relationship("DailySalesSummary", back_populates="area")
     bank_accounts = relationship("BankAccount", back_populates="area")
+    budgets = relationship("Budget", back_populates="area")
 
     def __repr__(self):
         return f"<Area {self.code}: {self.name}>"

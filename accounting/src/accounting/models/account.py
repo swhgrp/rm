@@ -47,6 +47,7 @@ class Account(Base):
     account_group = relationship("AccountGroup", back_populates="accounts")
     journal_entry_lines = relationship("JournalEntryLine", back_populates="account", lazy="dynamic")
     balances = relationship("AccountBalance", back_populates="account", lazy="dynamic")
+    budget_lines = relationship("BudgetLine", back_populates="account")
 
     def get_hierarchy_level(self):
         """Get the depth level in the account hierarchy (0 = top level)"""

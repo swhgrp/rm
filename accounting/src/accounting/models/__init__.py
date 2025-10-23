@@ -63,6 +63,17 @@ from accounting.models.payment import (
     PaymentApproval,
     PaymentDiscount
 )
+from accounting.models.budget import (
+    Budget,
+    BudgetPeriod,
+    BudgetLine,
+    BudgetTemplate,
+    BudgetTemplateLine,
+    BudgetRevision,
+    BudgetAlert,
+    BudgetStatus,
+    BudgetPeriodType
+)
 
 __all__ = [
     "Area",
@@ -125,4 +136,21 @@ __all__ = [
     "DashboardAlert",
     "ExpenseCategorySummary",
     "DashboardAlertType",
+    "Payment",
+    "PaymentApplication",
+    "CheckBatch",
+    "ACHBatch",
+    "CheckNumberRegistry",
+    "PaymentSchedule",
+    "PaymentApproval",
+    "PaymentDiscount",
+    "Budget",
+    "BudgetPeriod",
+    "BudgetLine",
+    "BudgetTemplate",
+    "BudgetTemplateLine",
+    "BudgetRevision",
+    "BudgetAlert",
+    "BudgetStatus",
+    "BudgetPeriodType",
 ]
