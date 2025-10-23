@@ -177,10 +177,58 @@
         font-size: 1.25rem;
         font-weight: 700;
         color: #c9d1d9;
-        margin: 2rem 0 1rem 0;
+        margin: 2.5rem 0 1.5rem 0;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid #30363d;
         display: flex;
         align-items: center;
         gap: 0.5rem;
+    }
+
+    .section-title:first-of-type {
+        margin-top: 0;
+    }
+
+    .expense-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background-color: #21262d;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+        transition: background-color 0.2s;
+    }
+
+    .expense-item:hover {
+        background-color: #30363d;
+    }
+
+    .expense-label {
+        font-size: 0.875rem;
+        color: #c9d1d9;
+        font-weight: 500;
+    }
+
+    .expense-amount {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #c9d1d9;
+    }
+
+    .expense-bar {
+        height: 4px;
+        background-color: #30363d;
+        border-radius: 2px;
+        margin-top: 0.5rem;
+        overflow: hidden;
+    }
+
+    .expense-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #f85149, #d29922);
+        border-radius: 2px;
+        transition: width 0.5s ease;
     }
 
     @media (max-width: 768px) {
@@ -192,6 +240,27 @@
         }
         .period-tab {
             flex: 1 1 45%;
+        }
+        .section-title {
+            font-size: 1.1rem;
+            margin: 2rem 0 1rem 0;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .metric-card {
+            padding: 1rem;
+        }
+        .metric-value {
+            font-size: 1.25rem;
+        }
+        .cash-balance {
+            font-size: 1.25rem;
+        }
+        .period-tab {
+            flex: 1 1 45%;
+            padding: 0.4rem 0.75rem;
+            font-size: 0.8rem;
         }
     }
 </style>
@@ -210,14 +279,14 @@
         </div>
     </div>
 
-    <!-- Core Financial Metrics -->
+    <!-- Executive Financial Summary -->
     <div class="section-title">
-        <i class="bi bi-graph-up"></i> Core Financial Metrics
+        <i class="bi bi-graph-up"></i> Executive Financial Summary
     </div>
 
     <div class="row">
         <!-- Net Sales -->
-        <div class="col-lg-6 col-md-12">
+        <div class="col-lg-4 col-md-6 col-sm-12">
             <div class="metric-card">
                 <div class="metric-header">
                     <div>
@@ -226,13 +295,12 @@
                         <span class="metric-change positive" id="netSalesChange">+0% vs prior</span>
                     </div>
                 </div>
-                <canvas id="netSalesChart" height="100"></canvas>
-                <div id="netSalesBreakdown" class="mt-3"></div>
+                <canvas id="netSalesChart" height="80"></canvas>
             </div>
         </div>
 
         <!-- Gross Profit Margin -->
-        <div class="col-lg-6 col-md-12">
+        <div class="col-lg-4 col-md-6 col-sm-12">
             <div class="metric-card">
                 <div class="metric-header">
                     <div>
@@ -241,14 +309,12 @@
                         <span class="metric-change" id="grossProfitChange">+0% vs prior</span>
                     </div>
                 </div>
-                <canvas id="grossProfitChart" height="100"></canvas>
+                <canvas id="grossProfitChart" height="80"></canvas>
             </div>
         </div>
-    </div>
 
-    <div class="row">
         <!-- Operating Profit / EBITDA -->
-        <div class="col-lg-6 col-md-12">
+        <div class="col-lg-4 col-md-12 col-sm-12">
             <div class="metric-card">
                 <div class="metric-header">
                     <div>
@@ -257,10 +323,38 @@
                         <span class="metric-change" id="ebitdaChange">+0% vs prior</span>
                     </div>
                 </div>
-                <canvas id="ebitdaChart" height="100"></canvas>
+                <canvas id="ebitdaChart" height="80"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Revenue & Expense Breakdown -->
+    <div class="row">
+        <!-- Sales Breakdown -->
+        <div class="col-lg-6 col-md-12">
+            <div class="metric-card">
+                <div class="metric-title mb-3"><i class="bi bi-pie-chart"></i> Sales Breakdown</div>
+                <div id="netSalesBreakdown"></div>
             </div>
         </div>
 
+        <!-- Top 5 Expenses -->
+        <div class="col-lg-6 col-md-12">
+            <div class="metric-card">
+                <div class="metric-title mb-3"><i class="bi bi-cash-stack"></i> Top 5 Expenses</div>
+                <div id="topExpenses">
+                    <!-- Will be dynamically generated -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cash & Working Capital -->
+    <div class="section-title">
+        <i class="bi bi-bank"></i> Cash & Working Capital
+    </div>
+
+    <div class="row">
         <!-- Cash Position -->
         <div class="col-lg-6 col-md-12">
             <div class="metric-card">
@@ -278,9 +372,7 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    <div class="row">
         <!-- AP Aging -->
         <div class="col-lg-6 col-md-12">
             <div class="metric-card">
@@ -310,7 +402,9 @@
                 </div>
             </div>
         </div>
+    </div>
 
+    <div class="row">
         <!-- AR Aging -->
         <div class="col-lg-6 col-md-12">
             <div class="metric-card">
@@ -386,6 +480,7 @@ async function loadDashboardData() {
             loadNetSales(),
             loadGrossProfit(),
             loadEBITDA(),
+            loadTopExpenses(),
             loadCashPosition(),
             loadAPAging(),
             loadARAging(),
@@ -419,13 +514,17 @@ async function loadNetSales() {
     changeEl.textContent = `${mockData.change > 0 ? '+' : ''}${mockData.change.toFixed(1)}% vs prior`;
     changeEl.className = `metric-change ${mockData.change >= 0 ? 'positive' : 'negative'}`;
 
-    // Breakdown
+    // Breakdown - moved to separate section
     let breakdownHtml = '';
     for (const [category, amount] of Object.entries(mockData.breakdown)) {
+        const percentage = ((amount / mockData.value) * 100).toFixed(1);
         breakdownHtml += `
             <div class="breakdown-item">
                 <span>${category}</span>
-                <strong>${formatCurrency(amount)}</strong>
+                <div style="text-align: right;">
+                    <strong>${formatCurrency(amount)}</strong>
+                    <div style="font-size: 0.75rem; color: #8b949e;">${percentage}%</div>
+                </div>
             </div>
         `;
     }
@@ -433,6 +532,37 @@ async function loadNetSales() {
 
     // Chart
     createLineChart('netSalesChart', mockData.trend, 'Net Sales', '#3fb950');
+}
+
+async function loadTopExpenses() {
+    // TODO: Replace with actual API call
+    const mockExpenses = [
+        { category: 'Cost of Goods Sold', amount: 5642.30 },
+        { category: 'Labor & Payroll', amount: 4123.50 },
+        { category: 'Rent & Occupancy', amount: 2500.00 },
+        { category: 'Utilities', amount: 892.45 },
+        { category: 'Marketing & Advertising', amount: 650.00 }
+    ];
+
+    const maxAmount = Math.max(...mockExpenses.map(e => e.amount));
+
+    let html = '';
+    mockExpenses.forEach(expense => {
+        const percentage = ((expense.amount / maxAmount) * 100).toFixed(1);
+        html += `
+            <div class="expense-item">
+                <div style="flex: 1;">
+                    <div class="expense-label">${expense.category}</div>
+                    <div class="expense-bar">
+                        <div class="expense-bar-fill" style="width: ${percentage}%"></div>
+                    </div>
+                </div>
+                <div class="expense-amount ms-3">${formatCurrency(expense.amount)}</div>
+            </div>
+        `;
+    });
+
+    document.getElementById('topExpenses').innerHTML = html;
 }
 
 async function loadGrossProfit() {
