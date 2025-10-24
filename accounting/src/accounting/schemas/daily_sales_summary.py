@@ -78,8 +78,12 @@ class DailySalesSummaryBase(BaseModel):
     total_collected: Decimal = Decimal("0.00")
     payment_breakdown: Optional[Dict[str, Any]] = None
     category_breakdown: Optional[Dict[str, Any]] = None
+    discount_breakdown: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
     imported_from: Optional[str] = None
+    imported_from_pos: Optional[bool] = False
+    pos_sync_date: Optional[datetime] = None
+    pos_transaction_count: Optional[int] = None
 
 
 class DailySalesSummaryCreate(DailySalesSummaryBase):
@@ -104,6 +108,7 @@ class DailySalesSummaryUpdate(BaseModel):
     total_collected: Optional[Decimal] = None
     payment_breakdown: Optional[Dict[str, Any]] = None
     category_breakdown: Optional[Dict[str, Any]] = None
+    discount_breakdown: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
     line_items: Optional[List[SalesLineItemCreate]] = None
     payments: Optional[List[SalesPaymentCreate]] = None
@@ -121,6 +126,14 @@ class DailySalesSummary(DailySalesSummaryBase):
     posted_by: Optional[int] = None
     posted_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+    # Cash reconciliation fields
+    expected_cash_deposit: Optional[Decimal] = None
+    actual_cash_deposit: Optional[Decimal] = None
+    cash_variance: Optional[Decimal] = None
+    cash_reconciled_by: Optional[int] = None
+    cash_reconciled_at: Optional[datetime] = None
+    deposit_amount: Optional[Decimal] = None
 
     # Nested relationships
     line_items: List[SalesLineItem] = []
@@ -144,6 +157,13 @@ class DailySalesSummaryList(BaseModel):
     journal_entry_id: Optional[int] = None
     created_at: datetime
 
+    # Cash reconciliation fields
+    expected_cash_deposit: Optional[Decimal] = None
+    actual_cash_deposit: Optional[Decimal] = None
+    cash_variance: Optional[Decimal] = None
+    cash_reconciled_by: Optional[int] = None
+    cash_reconciled_at: Optional[datetime] = None
+
     class Config:
         from_attributes = True
 
@@ -162,6 +182,9 @@ class DSSPostRequest(BaseModel):
     category_account_mapping: Optional[Dict[str, int]] = None
     # Mapping of payment types to asset account IDs (cash, bank, etc.)
     payment_account_mapping: Optional[Dict[str, int]] = None
+    # Variance adjustment (for rounding differences)
+    variance_account_id: Optional[int] = None
+    variance_amount: Optional[Decimal] = None
 
 
 # ============================================================================

@@ -79,6 +79,8 @@ from accounting.models.pos import (
     POSDailySalesCache,
     POSCategoryGLMapping
 )
+from accounting.models.system_setting import SystemSetting
+from accounting.models.safe_transaction import SafeTransaction
 
 __all__ = [
     "Area",
@@ -161,4 +163,6 @@ __all__ = [
     "POSConfiguration",
     "POSDailySalesCache",
     "POSCategoryGLMapping",
+    "SystemSetting",
+    "SafeTransaction",
 ]

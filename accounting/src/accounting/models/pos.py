@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-from accounting.models.base import Base
+from accounting.db.database import Base
 
 
 class POSConfiguration(Base):
@@ -22,7 +22,7 @@ class POSConfiguration(Base):
     access_token = Column(Text)  # Should be encrypted in production
     api_environment = Column(String(20), nullable=False, default="production")  # sandbox or production
     auto_sync_enabled = Column(Boolean, nullable=False, default=False)
-    sync_frequency_minutes = Column(Integer, nullable=False, default=60)
+    sync_time = Column(String(5), nullable=False, default="02:00")  # HH:MM format for daily sync time
     last_sync_date = Column(DateTime)
     is_active = Column(Boolean, nullable=False, default=True, index=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -30,7 +30,12 @@ class POSConfiguration(Base):
 
     # Relationships
     area = relationship("Area", back_populates="pos_configuration")
-    daily_sales_cache = relationship("POSDailySalesCache", back_populates="configuration", cascade="all, delete-orphan")
+    daily_sales_cache = relationship(
+        "POSDailySalesCache",
+        foreign_keys="[POSDailySalesCache.area_id]",
+        primaryjoin="POSConfiguration.area_id == POSDailySalesCache.area_id",
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<POSConfiguration(area_id={self.area_id}, provider={self.provider}, merchant_id={self.merchant_id})>"
@@ -50,13 +55,15 @@ class POSDailySalesCache(Base):
     total_tax = Column(Numeric(12, 2), nullable=False, default=0)
     total_tips = Column(Numeric(12, 2), nullable=False, default=0)
     total_discounts = Column(Numeric(12, 2), nullable=False, default=0)
+    total_refunds = Column(Numeric(12, 2), nullable=False, default=0)  # Total refunded amount
     gross_sales = Column(Numeric(12, 2), nullable=False, default=0)  # Grand total (sales + tax + tips)
     transaction_count = Column(Integer, nullable=False, default=0)
 
     # JSON breakdown fields
     order_types = Column(JSONB)  # {"dine-in": 1200.50, "takeout": 800.00, "delivery": 300.00}
     payment_methods = Column(JSONB)  # {"credit_card": 1800.00, "cash": 500.50}
-    categories = Column(JSONB)  # [{"name": "Food", "sales": 1500.00}, {"name": "Beverages", "sales": 800.50}]
+    categories = Column(JSONB)  # {"Food": 1500.00, "Beverages": 800.50}
+    discounts = Column(JSONB)  # {"Employee Discount": 50.00, "Happy Hour": 100.00}
 
     # Metadata
     synced_at = Column(DateTime, nullable=False, default=datetime.utcnow)
@@ -64,8 +71,7 @@ class POSDailySalesCache(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
     # Relationships
-    area = relationship("Area")
-    configuration = relationship("POSConfiguration", back_populates="daily_sales_cache")
+    area = relationship("Area", overlaps="daily_sales_cache")
 
     def __repr__(self):
         return f"<POSDailySalesCache(area_id={self.area_id}, date={self.sale_date}, sales={self.total_sales})>"
@@ -91,3 +97,43 @@ class POSCategoryGLMapping(Base):
 
     def __repr__(self):
         return f"<POSCategoryGLMapping(category={self.pos_category}, revenue_account_id={self.revenue_account_id})>"
+
+
+class POSDiscountGLMapping(Base):
+    """Mapping from POS discounts to GL accounts"""
+    __tablename__ = "pos_discount_gl_mappings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    area_id = Column(Integer, ForeignKey("areas.id", ondelete="CASCADE"), index=True)
+    pos_discount_name = Column(String(255), nullable=False)  # e.g., "Employee Discount", "Happy Hour"
+    discount_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False)  # Contra-revenue or expense account
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    area = relationship("Area")
+    discount_account = relationship("Account", foreign_keys=[discount_account_id])
+
+    def __repr__(self):
+        return f"<POSDiscountGLMapping(discount={self.pos_discount_name}, account_id={self.discount_account_id})>"
+
+
+class POSPaymentGLMapping(Base):
+    """Mapping from POS payment types to GL deposit accounts"""
+    __tablename__ = "pos_payment_gl_mappings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    area_id = Column(Integer, ForeignKey("areas.id", ondelete="CASCADE"), index=True)
+    pos_payment_type = Column(String(255), nullable=False)  # e.g., "CASH", "CREDIT_CARD", "GIFT_CARD"
+    deposit_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="RESTRICT"), nullable=False)  # Asset account (Cash, Bank)
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    area = relationship("Area")
+    deposit_account = relationship("Account", foreign_keys=[deposit_account_id])
+
+    def __repr__(self):
+        return f"<POSPaymentGLMapping(payment={self.pos_payment_type}, account_id={self.deposit_account_id})>"

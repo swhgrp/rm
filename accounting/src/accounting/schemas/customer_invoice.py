@@ -141,3 +141,20 @@ class CustomerInvoiceRead(CustomerInvoiceBase):
 
     class Config:
         from_attributes = True
+
+
+# ============================================================================
+# AR Aging Report Schema
+# ============================================================================
+
+class ARAgingReportResponse(BaseModel):
+    """AR Aging Report response"""
+    as_of_date: date
+    current: float = Field(description="Outstanding balance 0-30 days")
+    days_31_60: float = Field(description="Outstanding balance 31-60 days")
+    days_61_90: float = Field(description="Outstanding balance 61-90 days")
+    over_90: float = Field(description="Outstanding balance over 90 days")
+    total_outstanding: float = Field(description="Total outstanding balance")
+
+    class Config:
+        from_attributes = True

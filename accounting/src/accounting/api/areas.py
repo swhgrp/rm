@@ -90,7 +90,9 @@ def create_area(
         # Contact information
         phone=area_data.phone,
         email=area_data.email,
-        website=area_data.website
+        website=area_data.website,
+        # GL Account Configuration
+        safe_account_id=area_data.safe_account_id
     )
 
     db.add(new_area)
@@ -186,6 +188,10 @@ def update_area(
 
     if area_data.website is not None:
         area.website = area_data.website
+
+    # GL Account Configuration
+    if area_data.safe_account_id is not None:
+        area.safe_account_id = area_data.safe_account_id
 
     db.commit()
     db.refresh(area)

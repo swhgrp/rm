@@ -155,7 +155,7 @@ let budgets = [];
 let areas = [];
 
 document.addEventListener('DOMContentLoaded', async function() {
-    console.log('DOM Content Loaded - Budget Management');
+    debug.log('DOM Content Loaded - Budget Management');
 
     // Setup event listeners FIRST (before data loading)
     setupEventListeners();
@@ -188,13 +188,13 @@ async function loadAreas() {
         });
 
         if (!response.ok) {
-            console.warn('Failed to load areas:', response.status);
+            debug.warn('Failed to load areas:', response.status);
             return;
         }
 
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
-            console.warn('Areas API returned non-JSON response');
+            debug.warn('Areas API returned non-JSON response');
             return;
         }
 
@@ -245,7 +245,7 @@ async function loadBudgets() {
         });
 
         if (!response.ok) {
-            console.warn('Failed to load budgets:', response.status);
+            debug.warn('Failed to load budgets:', response.status);
             loading.style.display = 'none';
             noMessage.style.display = 'block';
             return;
@@ -253,7 +253,7 @@ async function loadBudgets() {
 
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
-            console.warn('Budgets API returned non-JSON response');
+            debug.warn('Budgets API returned non-JSON response');
             loading.style.display = 'none';
             noMessage.style.display = 'block';
             return;
@@ -345,19 +345,19 @@ function setDefaultFiscalYear() {
 }
 
 function setupEventListeners() {
-    console.log('=== Setting up event listeners ===');
+    debug.log('=== Setting up event listeners ===');
     const createBtn = document.getElementById('createBudgetBtn');
-    console.log('Create button element:', createBtn);
-    console.log('Create button ID:', createBtn ? createBtn.id : 'NOT FOUND');
+    debug.log('Create button element:', createBtn);
+    debug.log('Create button ID:', createBtn ? createBtn.id : 'NOT FOUND');
 
     if (createBtn) {
-        console.log('Adding click listener to button...');
+        debug.log('Adding click listener to button...');
         createBtn.addEventListener('click', function(e) {
-            console.log('=== Create Budget button clicked! ===');
+            debug.log('=== Create Budget button clicked! ===');
             e.preventDefault();
 
             const modalElement = document.getElementById('createBudgetModal');
-            console.log('Modal element:', modalElement);
+            debug.log('Modal element:', modalElement);
 
             if (!modalElement) {
                 console.error('Modal element not found!');
@@ -381,7 +381,7 @@ function setupEventListeners() {
                 document.body.appendChild(backdrop);
             } else {
                 const modal = new bootstrap.Modal(modalElement);
-                console.log('Modal instance created:', modal);
+                debug.log('Modal instance created:', modal);
                 modal.show();
             }
         });
@@ -433,7 +433,7 @@ function setupEventListeners() {
                 }
                 await loadBudgets();
             } else {
-                console.warn('Budget creation returned non-JSON response');
+                debug.warn('Budget creation returned non-JSON response');
                 alert('Unexpected response from server. Please refresh the page.');
             }
         } else {

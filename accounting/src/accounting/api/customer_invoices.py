@@ -18,7 +18,7 @@ from accounting.models.customer_invoice import (
 from accounting.schemas.customer_invoice import (
     CustomerInvoiceCreate, CustomerInvoiceUpdate, CustomerInvoiceRead,
     CustomerInvoiceLineCreate, InvoicePaymentCreate, InvoicePaymentRead,
-    PaymentMethod
+    PaymentMethod, ARAgingReportResponse
 )
 from accounting.api.auth import require_auth
 
@@ -462,7 +462,7 @@ def get_next_invoice_number(
     return {"next_number": f"INV-{latest.id + 1:05d}"}
 
 
-@router.get("/aging-report")
+@router.get("/aging-report", response_model=ARAgingReportResponse)
 def ar_aging_report(
     area_id: Optional[int] = Query(None),
     as_of_date: Optional[date] = Query(None),
@@ -518,11 +518,11 @@ def ar_aging_report(
 
         total_outstanding += balance
 
-    return {
-        "as_of_date": as_of_date,
-        "current": float(current),
-        "days_31_60": float(days_31_60),
-        "days_61_90": float(days_61_90),
-        "over_90": float(over_90),
-        "total_outstanding": float(total_outstanding)
-    }
+    return ARAgingReportResponse(
+        as_of_date=as_of_date,
+        current=float(current),
+        days_31_60=float(days_31_60),
+        days_61_90=float(days_61_90),
+        over_90=float(over_90),
+        total_outstanding=float(total_outstanding)
+    )

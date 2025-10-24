@@ -1,0 +1,1662 @@
+{% extends "base.html" %}
+
+{% block title %}POS Integration Settings - SW Hospitality Group - Accounting{% endblock %}
+{% block nav_pos_settings %}active{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-shop"></i> POS Integration Settings</h2>
+    </div>
+
+    <!-- Location Selector -->
+    <div class="mb-4">
+        <label for="locationFilter" class="form-label">Location</label>
+        <select id="locationFilter" class="form-select" style="max-width: 300px;">
+            <option value="">-- Select Location --</option>
+        </select>
+    </div>
+
+    <!-- Configuration Section (shown when location is selected) -->
+    <div id="configSection" style="display: none;">
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-3" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="config-tab" data-bs-toggle="tab" data-bs-target="#config" type="button" role="tab">
+                    <i class="bi bi-gear"></i> Configuration
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="sync-tab" data-bs-toggle="tab" data-bs-target="#sync" type="button" role="tab">
+                    <i class="bi bi-arrow-repeat"></i> Sync Sales
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="mappings-tab" data-bs-toggle="tab" data-bs-target="#mappings" type="button" role="tab">
+                    <i class="bi bi-diagram-3"></i> Category Mappings
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="discount-mappings-tab" data-bs-toggle="tab" data-bs-target="#discount-mappings" type="button" role="tab">
+                    <i class="bi bi-tag"></i> Discount Mappings
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="payment-mappings-tab" data-bs-toggle="tab" data-bs-target="#payment-mappings" type="button" role="tab">
+                    <i class="bi bi-credit-card"></i> Payment Mappings
+                </button>
+            </li>
+        </ul>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- Configuration Tab -->
+            <div class="tab-pane fade show active" id="config" role="tabpanel">
+                <form id="configForm">
+                    <input type="hidden" id="configAreaId">
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="provider" class="form-label">POS Provider</label>
+                            <select id="provider" class="form-select" required>
+                                <option value="clover">Clover</option>
+                                <option value="square" disabled>Square (Coming Soon)</option>
+                                <option value="toast" disabled>Toast (Coming Soon)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="apiEnvironment" class="form-label">API Environment</label>
+                            <select id="apiEnvironment" class="form-select" required>
+                                <option value="production">Production</option>
+                                <option value="sandbox">Sandbox</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="merchantId" class="form-label">Merchant/Location ID</label>
+                            <input type="text" id="merchantId" class="form-control" required>
+                            <small class="text-muted">From POS provider dashboard</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="accessToken" class="form-label">API Access Token</label>
+                            <input type="password" id="accessToken" class="form-control" required>
+                            <small class="text-muted">API token from POS provider</small>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input type="checkbox" id="autoSyncEnabled" class="form-check-input">
+                                <label class="form-check-label" for="autoSyncEnabled">
+                                    Enable Automatic Daily Sync
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="syncTime" class="form-label">Daily Sync Time</label>
+                            <input type="time" id="syncTime" class="form-control" value="02:00">
+                            <small class="text-muted">Time to sync sales data (24-hour format)</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="lastSyncInfo" style="display: none;">
+                        <strong>Last Sync:</strong> <span id="lastSyncDate"></span>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Save Configuration
+                        </button>
+                        <button type="button" id="testConnectionBtn" class="btn btn-secondary">
+                            <i class="bi bi-wifi"></i> Test Connection
+                        </button>
+                        <button type="button" id="deleteConfigBtn" class="btn btn-danger" style="display: none;">
+                            <i class="bi bi-trash"></i> Delete Configuration
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Sync Sales Tab -->
+            <div class="tab-pane fade" id="sync" role="tabpanel">
+                <form id="syncForm">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label for="syncStartDate" class="form-label">Start Date</label>
+                            <input type="date" id="syncStartDate" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="syncEndDate" class="form-label">End Date</label>
+                            <input type="date" id="syncEndDate" class="form-control" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">&nbsp;</label>
+                            <div>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="bi bi-arrow-repeat"></i> Sync Sales
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+
+                <div id="syncResults" style="display: none;" class="mt-4">
+                    <h4>Sync Results</h4>
+                    <div class="alert alert-info">
+                        <strong>Synced:</strong> <span id="syncedCount">0</span> days<br>
+                        <strong>Updated:</strong> <span id="updatedCount">0</span> days<br>
+                        <strong>Errors:</strong> <span id="errorCount">0</span>
+                    </div>
+                    <div id="syncErrors"></div>
+                </div>
+
+                <div class="mt-4">
+                    <h4>Cached Sales Data</h4>
+                    <div class="table-responsive">
+                        <table class="table table-hover" id="salesCacheTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Total Sales</th>
+                                    <th>Tax</th>
+                                    <th>Tips</th>
+                                    <th>Gross Sales</th>
+                                    <th>Transactions</th>
+                                    <th>Synced At</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="salesCacheBody">
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted">No cached sales data</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category Mappings Tab -->
+            <div class="tab-pane fade" id="mappings" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4>POS Category to GL Account Mappings</h4>
+                    <div>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadCloverCategories()">
+                            <i class="bi bi-download"></i> Load from Clover
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="showAddMappingModal()">
+                            <i class="bi bi-plus-circle"></i> Add Manual Mapping
+                        </button>
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>Tip:</strong> Click "Load from Clover" to fetch actual categories from your POS system and map them to GL accounts.
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover" id="mappingsTable">
+                        <thead>
+                            <tr>
+                                <th>POS Category</th>
+                                <th>Revenue Account</th>
+                                <th>Tax Account</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mappingsBody">
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">No category mappings configured</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Discount Mappings Tab -->
+            <div class="tab-pane fade" id="discount-mappings" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4>POS Discount to GL Account Mappings</h4>
+                    <div>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadCloverDiscounts()">
+                            <i class="bi bi-download"></i> Load from Clover
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="showAddDiscountMappingModal()">
+                            <i class="bi bi-plus-circle"></i> Add Discount Mapping
+                        </button>
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>Tip:</strong> Map discount types from your POS to the appropriate GL accounts (typically contra-revenue accounts).
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover" id="discountMappingsTable">
+                        <thead>
+                            <tr>
+                                <th>POS Discount Name</th>
+                                <th>GL Account</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="discountMappingsBody">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No discount mappings configured</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Payment Mappings Tab -->
+            <div class="tab-pane fade" id="payment-mappings" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4>POS Payment Type to GL Account Mappings</h4>
+                    <div>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="loadCloverPaymentTypes()">
+                            <i class="bi bi-download"></i> Load from Clover
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="showAddPaymentMappingModal()">
+                            <i class="bi bi-plus-circle"></i> Add Payment Mapping
+                        </button>
+                    </div>
+                </div>
+
+                <div class="alert alert-info">
+                    <strong>Tip:</strong> Map payment types from your POS to the appropriate deposit accounts (asset accounts like Cash, Bank, etc.).
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover" id="paymentMappingsTable">
+                        <thead>
+                            <tr>
+                                <th>POS Payment Type</th>
+                                <th>Deposit Account</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="paymentMappingsBody">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">No payment mappings configured</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Mapping Modal -->
+<div class="modal fade" id="mappingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="mappingModalTitle">Add Category Mapping</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="mappingForm">
+                    <input type="hidden" id="mappingId">
+
+                    <div class="mb-3">
+                        <label for="posCategory" class="form-label">POS Category Name</label>
+                        <select id="posCategorySelect" class="form-select" style="display: none;">
+                            <option value="">-- Select from Clover --</option>
+                        </select>
+                        <input type="text" id="posCategory" class="form-control" required
+                               placeholder="e.g., Food, Beverages, Alcohol">
+                        <small class="text-muted">Type manually or select from Clover categories</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="revenueAccountId" class="form-label">Revenue GL Account</label>
+                        <select id="revenueAccountId" class="form-select" required>
+                            <option value="">-- Select Account --</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="taxAccountId" class="form-label">Sales Tax Account (Optional)</label>
+                        <select id="taxAccountId" class="form-select">
+                            <option value="">-- Select Account --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input type="checkbox" id="mappingIsActive" class="form-check-input" checked>
+                        <label class="form-check-label" for="mappingIsActive">
+                            Active
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveCategoryMapping()">Save Mapping</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Discount Mapping Modal -->
+<div class="modal fade" id="discountMappingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="discountMappingModalTitle">Add Discount Mapping</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="discountMappingForm">
+                    <input type="hidden" id="discountMappingId">
+
+                    <div class="mb-3">
+                        <label for="posDiscountName" class="form-label">POS Discount Name</label>
+                        <input type="text" id="posDiscountName" class="form-control" required
+                               placeholder="e.g., Employee Discount, Happy Hour, Senior Discount">
+                        <small class="text-muted">Enter the exact name as it appears in your POS system</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="discountAccountId" class="form-label">Discount GL Account</label>
+                        <select id="discountAccountId" class="form-select" required>
+                            <option value="">-- Select Account --</option>
+                        </select>
+                        <small class="text-muted">Typically a contra-revenue account (4xxx)</small>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input type="checkbox" id="discountMappingIsActive" class="form-check-input" checked>
+                        <label class="form-check-label" for="discountMappingIsActive">
+                            Active
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveDiscountMapping()">Save Mapping</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Payment Mapping Modal -->
+<div class="modal fade" id="paymentMappingModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="paymentMappingModalTitle">Add Payment Mapping</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="paymentMappingForm">
+                    <input type="hidden" id="paymentMappingId">
+
+                    <div class="mb-3">
+                        <label for="posPaymentType" class="form-label">POS Payment Type</label>
+                        <input type="text" id="posPaymentType" class="form-control" required
+                               placeholder="e.g., CASH, CREDIT_CARD, GIFT_CARD">
+                        <small class="text-muted">Enter the payment type name from your POS system</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="depositAccountId" class="form-label">Deposit Account</label>
+                        <select id="depositAccountId" class="form-select" required>
+                            <option value="">-- Select Account --</option>
+                        </select>
+                        <small class="text-muted">The asset account where funds are deposited (e.g., Cash, Bank Account)</small>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input type="checkbox" id="paymentMappingIsActive" class="form-check-input" checked>
+                        <label class="form-check-label" for="paymentMappingIsActive">
+                            Active
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="savePaymentMapping()">Save Mapping</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentAreaId = null;
+let accounts = [];
+let configurations = [];
+let mappings = [];
+let discountMappings = [];
+let paymentMappings = [];
+
+// Track unmapped items from Clover (persist across reloads)
+let unmappedDiscounts = [];
+let unmappedPaymentTypes = [];
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadLocations();
+    await loadAccounts();
+
+    // Set default dates for sync form
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('syncStartDate').value = today;
+    document.getElementById('syncEndDate').value = today;
+
+    // Setup form handlers
+    document.getElementById('configForm').addEventListener('submit', saveConfiguration);
+    document.getElementById('syncForm').addEventListener('submit', syncSales);
+    document.getElementById('testConnectionBtn').addEventListener('click', testConnection);
+    document.getElementById('deleteConfigBtn').addEventListener('click', deleteConfiguration);
+    document.getElementById('locationFilter').addEventListener('change', onLocationChange);
+});
+
+// Load locations
+async function loadLocations() {
+    try {
+        const response = await fetch('/accounting/api/areas/', {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to load locations');
+
+        const data = await response.json();
+        const select = document.getElementById('locationFilter');
+
+        data.forEach(area => {
+            const option = document.createElement('option');
+            option.value = area.id;
+            option.textContent = `${area.code} - ${area.name}`;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        showNotification('Error loading locations: ' + error.message);
+    }
+}
+
+// Load GL accounts for mapping dropdowns
+async function loadAccounts() {
+    try {
+        const response = await fetch('/accounting/api/accounts/?limit=1000', {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to load accounts');
+
+        accounts = await response.json();
+
+        // Populate revenue account dropdown (4000-4999 range)
+        const revenueSelect = document.getElementById('revenueAccountId');
+        const taxSelect = document.getElementById('taxAccountId');
+
+        accounts.forEach(account => {
+            if (account.account_number >= 4000 && account.account_number < 5000) {
+                const option = document.createElement('option');
+                option.value = account.id;
+                option.textContent = `${account.account_number} - ${account.account_name}`;
+                revenueSelect.appendChild(option);
+            }
+
+            // Tax accounts (typically 2000-2999 range)
+            if (account.account_number >= 2000 && account.account_number < 3000) {
+                const option = document.createElement('option');
+                option.value = account.id;
+                option.textContent = `${account.account_number} - ${account.account_name}`;
+                taxSelect.appendChild(option);
+            }
+        });
+    } catch (error) {
+        console.error('Error loading accounts:', error);
+    }
+}
+
+// Handle location change
+async function onLocationChange(event) {
+    currentAreaId = event.target.value;
+
+    if (!currentAreaId) {
+        document.getElementById('configSection').style.display = 'none';
+        return;
+    }
+
+    document.getElementById('configSection').style.display = 'block';
+    await loadConfiguration(currentAreaId);
+    await loadCategoryMappings(currentAreaId);
+    await loadDiscountMappings(currentAreaId);
+    await loadPaymentMappings(currentAreaId);
+    await loadSalesCache(currentAreaId);
+}
+
+// Load POS configuration for location
+async function loadConfiguration(areaId) {
+    try {
+        const response = await fetch(`/accounting/api/pos/configurations/${areaId}`, {
+            credentials: 'include'
+        });
+
+        if (response.status === 404) {
+            // No configuration exists, reset form
+            resetConfigForm();
+            return;
+        }
+
+        if (!response.ok) throw new Error('Failed to load configuration');
+
+        const config = await response.json();
+
+        // Populate form
+        document.getElementById('configAreaId').value = config.area_id;
+        document.getElementById('provider').value = config.provider;
+        document.getElementById('merchantId').value = config.merchant_id || '';
+        document.getElementById('accessToken').value = config.access_token || '';
+        document.getElementById('apiEnvironment').value = config.api_environment;
+        document.getElementById('autoSyncEnabled').checked = config.auto_sync_enabled;
+        document.getElementById('syncTime').value = config.sync_time || '02:00';
+
+        if (config.last_sync_date) {
+            document.getElementById('lastSyncInfo').style.display = 'block';
+            document.getElementById('lastSyncDate').textContent = new Date(config.last_sync_date).toLocaleString();
+        }
+
+        document.getElementById('deleteConfigBtn').style.display = 'inline-block';
+    } catch (error) {
+        console.error('Error loading configuration:', error);
+    }
+}
+
+// Reset configuration form
+function resetConfigForm() {
+    document.getElementById('configForm').reset();
+    document.getElementById('configAreaId').value = currentAreaId;
+    document.getElementById('provider').value = 'clover';
+    document.getElementById('apiEnvironment').value = 'production';
+    document.getElementById('syncTime').value = '02:00';
+    document.getElementById('lastSyncInfo').style.display = 'none';
+    document.getElementById('deleteConfigBtn').style.display = 'none';
+}
+
+// Save configuration
+async function saveConfiguration(event) {
+    event.preventDefault();
+
+    const data = {
+        area_id: parseInt(currentAreaId),
+        provider: document.getElementById('provider').value,
+        merchant_id: document.getElementById('merchantId').value,
+        access_token: document.getElementById('accessToken').value,
+        api_environment: document.getElementById('apiEnvironment').value,
+        auto_sync_enabled: document.getElementById('autoSyncEnabled').checked,
+        sync_time: document.getElementById('syncTime').value
+    };
+
+    try {
+        // Check if configuration exists
+        const checkResponse = await fetch(`/accounting/api/pos/configurations/${currentAreaId}`, {
+            credentials: 'include'
+        });
+
+        let response;
+        if (checkResponse.status === 404) {
+            // Create new configuration
+            response = await fetch('/accounting/api/pos/configurations', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                credentials: 'include',
+                body: JSON.stringify(data)
+            });
+        } else {
+            // Update existing configuration
+            response = await fetch(`/accounting/api/pos/configurations/${currentAreaId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                credentials: 'include',
+                body: JSON.stringify(data)
+            });
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save configuration');
+        }
+
+        showNotification('POS configuration saved successfully!');
+        await loadConfiguration(currentAreaId);
+    } catch (error) {
+        showNotification('Error saving configuration: ' + error.message);
+    }
+}
+
+// Test POS connection
+async function testConnection() {
+    if (!currentAreaId) {
+        showNotification('Please select a location first');
+        return;
+    }
+
+    const btn = document.getElementById('testConnectionBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Testing...';
+
+    try {
+        const response = await fetch(`/accounting/api/pos/configurations/${currentAreaId}/test`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Test failed');
+
+        const result = await response.json();
+
+        if (result.success) {
+            showNotification('✅ Connection successful! Connected to ' + result.provider);
+        } else {
+            showNotification('❌ Connection failed: ' + result.message);
+        }
+    } catch (error) {
+        showNotification('Error testing connection: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-wifi"></i> Test Connection';
+    }
+}
+
+// Delete configuration
+async function deleteConfiguration() {
+    const confirmed = await showConfirm('Are you sure you want to delete this POS configuration? This will also delete all cached sales data.');
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/accounting/api/pos/configurations/${currentAreaId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete configuration');
+
+        showNotification('Configuration deleted successfully');
+        resetConfigForm();
+        document.getElementById('salesCacheBody').innerHTML = '<tr><td colspan="8" class="text-center text-muted">No cached sales data</td></tr>';
+    } catch (error) {
+        showNotification('Error deleting configuration: ' + error.message);
+    }
+}
+
+// Sync sales
+async function syncSales(event) {
+    event.preventDefault();
+
+    if (!currentAreaId) {
+        showNotification('Please select a location first');
+        return;
+    }
+
+    const startDate = document.getElementById('syncStartDate').value;
+    const endDate = document.getElementById('syncEndDate').value;
+
+    const btn = event.submitter;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Syncing...';
+
+    try {
+        const response = await fetch(`/accounting/api/pos/sync/${currentAreaId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify({
+                start_date: startDate,
+                end_date: endDate
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Sync failed');
+        }
+
+        const result = await response.json();
+
+        // Show results
+        document.getElementById('syncedCount').textContent = result.synced_count;
+        document.getElementById('updatedCount').textContent = result.updated_count;
+        document.getElementById('errorCount').textContent = result.error_count;
+        document.getElementById('syncResults').style.display = 'block';
+
+        // Show errors if any
+        const errorsDiv = document.getElementById('syncErrors');
+        if (result.errors && result.errors.length > 0) {
+            errorsDiv.innerHTML = '<div class="alert alert-danger"><strong>Errors:</strong><ul>' +
+                result.errors.map(e => `<li>${e.date}: ${e.error}</li>`).join('') +
+                '</ul></div>';
+        } else {
+            errorsDiv.innerHTML = '';
+        }
+
+        showNotification('Sync completed successfully!');
+        await loadSalesCache(currentAreaId);
+        await loadConfiguration(currentAreaId);
+    } catch (error) {
+        showNotification('Error syncing sales: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Sync Sales';
+    }
+}
+
+// Load sales cache
+async function loadSalesCache(areaId) {
+    try {
+        const response = await fetch(`/accounting/api/pos/daily-sales-cache?area_id=${areaId}&limit=30`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to load sales cache');
+
+        const data = await response.json();
+        const tbody = document.getElementById('salesCacheBody');
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No cached sales data</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(sale => {
+            // Parse date without timezone conversion (sale_date is already in local time)
+            const dateParts = sale.sale_date.split('-');
+            const displayDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]).toLocaleDateString();
+
+            return `
+            <tr>
+                <td>${displayDate}</td>
+                <td>$${parseFloat(sale.total_sales).toFixed(2)}</td>
+                <td>$${parseFloat(sale.total_tax).toFixed(2)}</td>
+                <td>$${parseFloat(sale.total_tips).toFixed(2)}</td>
+                <td>$${parseFloat(sale.gross_sales).toFixed(2)}</td>
+                <td>${sale.transaction_count}</td>
+                <td>${new Date(sale.synced_at).toLocaleString()}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="importToDaily(${areaId}, '${sale.sale_date}')">
+                        <i class="bi bi-download"></i> Import to DSS
+                    </button>
+                </td>
+            </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading sales cache:', error);
+    }
+}
+
+// Load category mappings
+async function loadCategoryMappings(areaId) {
+    try {
+        const response = await fetch(`/accounting/api/pos/category-mappings?area_id=${areaId}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to load mappings');
+
+        mappings = await response.json();
+        const tbody = document.getElementById('mappingsBody');
+
+        if (mappings.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No category mappings configured</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = mappings.map(mapping => {
+            const revenueAccount = accounts.find(a => a.id === mapping.revenue_account_id);
+            const taxAccount = mapping.tax_account_id ? accounts.find(a => a.id === mapping.tax_account_id) : null;
+
+            return `
+                <tr>
+                    <td><strong>${mapping.pos_category}</strong></td>
+                    <td>${revenueAccount ? `${revenueAccount.account_number} - ${revenueAccount.account_name}` : 'N/A'}</td>
+                    <td>${taxAccount ? `${taxAccount.account_number} - ${taxAccount.account_name}` : 'N/A'}</td>
+                    <td>
+                        <span class="badge ${mapping.is_active ? 'badge-success' : 'badge-secondary'}">
+                            ${mapping.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary" onclick="editMapping(${mapping.id})">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteMapping(${mapping.id})">
+                            <i class="bi bi-trash"></i> Delete
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading mappings:', error);
+    }
+}
+
+// Show add mapping modal
+function showAddMappingModal() {
+    if (!currentAreaId) {
+        showNotification('Please select a location first');
+        return;
+    }
+
+    document.getElementById('mappingModalTitle').textContent = 'Add Category Mapping';
+    document.getElementById('mappingForm').reset();
+    document.getElementById('mappingId').value = '';
+    document.getElementById('mappingIsActive').checked = true;
+
+    const modal = new bootstrap.Modal(document.getElementById('mappingModal'));
+    modal.show();
+}
+
+// Edit mapping
+function editMapping(id) {
+    const mapping = mappings.find(m => m.id === id);
+    if (!mapping) return;
+
+    document.getElementById('mappingModalTitle').textContent = 'Edit Category Mapping';
+    document.getElementById('mappingId').value = mapping.id;
+    document.getElementById('posCategory').value = mapping.pos_category;
+    document.getElementById('revenueAccountId').value = mapping.revenue_account_id;
+    document.getElementById('taxAccountId').value = mapping.tax_account_id || '';
+    document.getElementById('mappingIsActive').checked = mapping.is_active;
+
+    const modal = new bootstrap.Modal(document.getElementById('mappingModal'));
+    modal.show();
+}
+
+// Save category mapping
+async function saveCategoryMapping() {
+    const mappingId = document.getElementById('mappingId').value;
+    const data = {
+        area_id: parseInt(currentAreaId),
+        pos_category: document.getElementById('posCategory').value,
+        revenue_account_id: parseInt(document.getElementById('revenueAccountId').value),
+        tax_account_id: document.getElementById('taxAccountId').value ? parseInt(document.getElementById('taxAccountId').value) : null,
+        is_active: document.getElementById('mappingIsActive').checked
+    };
+
+    try {
+        let response;
+        if (mappingId) {
+            // Update existing
+            response = await fetch(`/accounting/api/pos/category-mappings/${mappingId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                credentials: 'include',
+                body: JSON.stringify(data)
+            });
+        } else {
+            // Create new
+            response = await fetch('/accounting/api/pos/category-mappings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                credentials: 'include',
+                body: JSON.stringify(data)
+            });
+        }
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save mapping');
+        }
+
+        showNotification('Category mapping saved successfully!');
+        bootstrap.Modal.getInstance(document.getElementById('mappingModal')).hide();
+        await loadCategoryMappings(currentAreaId);
+    } catch (error) {
+        showNotification('Error saving mapping: ' + error.message);
+    }
+}
+
+// Delete mapping
+async function deleteMapping(id) {
+    const confirmed = await showConfirm('Are you sure you want to delete this category mapping?');
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/accounting/api/pos/category-mappings/${id}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete mapping');
+
+        showNotification('Mapping deleted successfully');
+        await loadCategoryMappings(currentAreaId);
+    } catch (error) {
+        showNotification('Error deleting mapping: ' + error.message);
+    }
+}
+
+// Load Clover Categories
+async function loadCloverCategories() {
+    if (!currentAreaId) {
+        showNotification('Please select a location first');
+        return;
+    }
+
+    try {
+        showNotification('Loading categories from Clover POS...', 'Please Wait');
+
+        const response = await fetch(`/accounting/api/pos/clover-categories/${currentAreaId}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to load Clover categories');
+        }
+
+        const data = await response.json();
+        const categories = data.categories;
+
+        if (categories.length === 0) {
+            showNotification('No categories found in Clover POS');
+            return;
+        }
+
+        // Show bulk mapping interface
+        showBulkMappingModal(categories);
+
+    } catch (error) {
+        showNotification('Error loading Clover categories: ' + error.message);
+    }
+}
+
+// Show bulk mapping modal
+function showBulkMappingModal(categories) {
+    // Create a modal for bulk mapping
+    const modalHtml = `
+        <div class="modal fade" id="bulkMappingModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Map Clover Categories to GL Accounts</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted">Found ${categories.length} categories in Clover. Select GL revenue account for each:</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>Clover Category</th>
+                                        <th>Revenue GL Account</th>
+                                        <th>Map?</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bulkMappingBody">
+                                    ${categories.map(cat => `
+                                        <tr>
+                                            <td><strong>${cat.name}</strong></td>
+                                            <td>
+                                                <select class="form-select form-select-sm revenue-select" data-category="${cat.name}">
+                                                    <option value="">-- Select Account --</option>
+                                                    ${accounts.filter(a => a.account_number >= 4000 && a.account_number < 5000)
+                                                        .map(acc => `<option value="${acc.id}">${acc.account_number} - ${acc.account_name}</option>`)
+                                                        .join('')}
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <input type="checkbox" class="form-check-input map-checkbox" data-category="${cat.name}" checked>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="saveBulkMappings()">
+                            <i class="bi bi-save"></i> Create Mappings
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Remove existing modal if any
+    const existingModal = document.getElementById('bulkMappingModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // Add modal to DOM
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('bulkMappingModal'));
+    modal.show();
+}
+
+// Save bulk mappings
+async function saveBulkMappings() {
+    try {
+        const checkboxes = document.querySelectorAll('.map-checkbox:checked');
+        const taxAccountId = accounts.find(a => a.account_number === '2300')?.id || null;
+
+        if (checkboxes.length === 0) {
+            await showAlert('Please select at least one category to map.');
+            return;
+        }
+
+        let successCount = 0;
+        let errorCount = 0;
+        let errorMessages = [];
+
+        for (const checkbox of checkboxes) {
+            const category = checkbox.dataset.category;
+            const select = document.querySelector(`.revenue-select[data-category="${category}"]`);
+            const revenueAccountId = select.value;
+
+            if (!revenueAccountId) {
+                errorMessages.push(`${category}: No revenue account selected`);
+                errorCount++;
+                continue;
+            }
+
+            try {
+                const response = await fetch('/accounting/api/pos/category-mappings', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        area_id: parseInt(currentAreaId),
+                        pos_category: category,
+                        revenue_account_id: parseInt(revenueAccountId),
+                        tax_account_id: taxAccountId,
+                        is_active: true
+                    })
+                });
+
+                if (response.ok) {
+                    successCount++;
+                } else {
+                    const errorData = await response.json().catch(() => ({}));
+                    errorMessages.push(`${category}: ${errorData.detail || 'Failed to create mapping'}`);
+                    errorCount++;
+                }
+            } catch (error) {
+                console.error(`Error mapping ${category}:`, error);
+                errorMessages.push(`${category}: ${error.message}`);
+                errorCount++;
+            }
+        }
+
+        // Close modal
+        const modalEl = document.getElementById('bulkMappingModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) {
+            modal.hide();
+        }
+
+        // Show results
+        let message = `Successfully created ${successCount} mapping(s).`;
+        if (errorCount > 0) {
+            message += `\n\n${errorCount} error(s):\n${errorMessages.join('\n')}`;
+        }
+
+        await showAlert(message);
+
+        // Reload mappings table
+        if (successCount > 0) {
+            await loadCategoryMappings(currentAreaId);
+        }
+    } catch (error) {
+        console.error('Error in saveBulkMappings:', error);
+        await showAlert('Error saving mappings: ' + error.message);
+    }
+}
+
+// Import to Daily Sales
+async function importToDaily(areaId, saleDate) {
+    const confirmed = await showConfirm(
+        `Import POS sales for ${saleDate} to Daily Sales Summary?\n\n` +
+        `This will create a new Daily Sales entry that you can review and post to the General Ledger.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/accounting/api/pos/import-to-dss/${areaId}/${saleDate}`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Import failed');
+        }
+
+        const result = await response.json();
+
+        showNotification(
+            `✅ Successfully imported sales for ${saleDate}!\n\n` +
+            `DSS ID: ${result.dss_id}\n` +
+            `Net Sales: $${result.net_sales.toFixed(2)}\n` +
+            `Tax: $${result.tax_collected.toFixed(2)}\n` +
+            `Tips: $${result.tips.toFixed(2)}\n\n` +
+            `You can now review and post this entry in Daily Sales.`,
+            'Import Successful'
+        );
+
+        // Optionally reload the cache table to show updated status
+        await loadSalesCache(areaId);
+
+    } catch (error) {
+        showNotification('Error importing to Daily Sales: ' + error.message, 'Import Failed');
+    }
+}
+
+// ============================================================================
+// DISCOUNT MAPPINGS
+// ============================================================================
+
+async function loadDiscountMappings(areaId) {
+    try {
+        const response = await fetch(`/accounting/api/pos/discount-mappings?area_id=${areaId}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to load discount mappings');
+
+        discountMappings = await response.json();
+
+        const tbody = document.getElementById('discountMappingsBody');
+        tbody.innerHTML = '';
+
+        if (discountMappings.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No discount mappings configured</td></tr>';
+            return;
+        }
+
+        discountMappings.forEach(mapping => {
+            const account = accounts.find(a => a.id === mapping.discount_account_id);
+            const accountDisplay = account ? `${account.account_number} - ${account.account_name}` : 'N/A';
+
+            const row = `
+                <tr>
+                    <td>${mapping.pos_discount_name}</td>
+                    <td>${accountDisplay}</td>
+                    <td>
+                        <span class="badge ${mapping.is_active ? 'bg-success' : 'bg-secondary'}">
+                            ${mapping.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="editDiscountMapping(${mapping.id})">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteDiscountMapping(${mapping.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
+
+        // Add unmapped discounts at the end
+        const mappedNames = new Set(discountMappings.map(m => m.pos_discount_name));
+        const stillUnmapped = unmappedDiscounts.filter(d => !mappedNames.has(d));
+
+        stillUnmapped.forEach(discountName => {
+            const escapedName = discountName.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const row = `
+                <tr class="table-warning">
+                    <td>${discountName}</td>
+                    <td><span class="badge bg-warning">Not Mapped</span></td>
+                    <td><span class="badge bg-secondary">Inactive</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="showEditDiscountForm('${escapedName}')">
+                            <i class="bi bi-pencil"></i> Map to Account
+                        </button>
+                    </td>
+                </tr>
+            `;
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
+
+    } catch (error) {
+        console.error('Error loading discount mappings:', error);
+    }
+}
+
+function showAddDiscountMappingModal() {
+    document.getElementById('discountMappingId').value = '';
+    document.getElementById('posDiscountName').value = '';
+    document.getElementById('discountAccountId').value = '';
+    document.getElementById('discountMappingIsActive').checked = true;
+    document.getElementById('discountMappingModalTitle').textContent = 'Add Discount Mapping';
+
+    // Populate account dropdown with revenue/expense accounts
+    const select = document.getElementById('discountAccountId');
+    select.innerHTML = '<option value="">-- Select Account --</option>';
+    accounts
+        .filter(a => a.account_type === 'REVENUE' || a.account_type === 'EXPENSE')
+        .forEach(account => {
+            select.innerHTML += `<option value="${account.id}">${account.account_number} - ${account.account_name}</option>`;
+        });
+
+    const modal = new bootstrap.Modal(document.getElementById('discountMappingModal'));
+    modal.show();
+}
+
+async function saveDiscountMapping() {
+    const id = document.getElementById('discountMappingId').value;
+    const data = {
+        area_id: parseInt(currentAreaId),
+        pos_discount_name: document.getElementById('posDiscountName').value.trim(),
+        discount_account_id: parseInt(document.getElementById('discountAccountId').value),
+        is_active: document.getElementById('discountMappingIsActive').checked
+    };
+
+    if (!data.pos_discount_name || !data.discount_account_id) {
+        showNotification('Please fill in all required fields');
+        return;
+    }
+
+    try {
+        const url = id
+            ? `/accounting/api/pos/discount-mappings/${id}`
+            : '/accounting/api/pos/discount-mappings';
+        const method = id ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save mapping');
+        }
+
+        showNotification('Discount mapping saved successfully');
+        bootstrap.Modal.getInstance(document.getElementById('discountMappingModal')).hide();
+        await loadDiscountMappings(currentAreaId);
+    } catch (error) {
+        showNotification('Error saving discount mapping: ' + error.message);
+    }
+}
+
+async function editDiscountMapping(id) {
+    const mapping = discountMappings.find(m => m.id === id);
+    if (!mapping) return;
+
+    document.getElementById('discountMappingId').value = mapping.id;
+    document.getElementById('posDiscountName').value = mapping.pos_discount_name;
+    document.getElementById('discountAccountId').value = mapping.discount_account_id;
+    document.getElementById('discountMappingIsActive').checked = mapping.is_active;
+    document.getElementById('discountMappingModalTitle').textContent = 'Edit Discount Mapping';
+
+    // Populate account dropdown
+    const select = document.getElementById('discountAccountId');
+    select.innerHTML = '<option value="">-- Select Account --</option>';
+    accounts
+        .filter(a => a.account_type === 'REVENUE' || a.account_type === 'EXPENSE')
+        .forEach(account => {
+            select.innerHTML += `<option value="${account.id}">${account.account_number} - ${account.account_name}</option>`;
+        });
+
+    const modal = new bootstrap.Modal(document.getElementById('discountMappingModal'));
+    modal.show();
+}
+
+async function deleteDiscountMapping(id) {
+    if (!confirm('Delete this discount mapping?')) return;
+
+    try {
+        const response = await fetch(`/accounting/api/pos/discount-mappings/${id}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete mapping');
+
+        showNotification('Discount mapping deleted successfully');
+        await loadDiscountMappings(currentAreaId);
+    } catch (error) {
+        showNotification('Error deleting discount mapping: ' + error.message);
+    }
+}
+
+// ============================================================================
+// PAYMENT MAPPINGS
+// ============================================================================
+
+async function loadPaymentMappings(areaId) {
+    try {
+        const response = await fetch(`/accounting/api/pos/payment-mappings?area_id=${areaId}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to load payment mappings');
+
+        paymentMappings = await response.json();
+
+        const tbody = document.getElementById('paymentMappingsBody');
+        tbody.innerHTML = '';
+
+        if (paymentMappings.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No payment mappings configured</td></tr>';
+            return;
+        }
+
+        paymentMappings.forEach(mapping => {
+            const account = accounts.find(a => a.id === mapping.deposit_account_id);
+            const accountDisplay = account ? `${account.account_number} - ${account.account_name}` : 'N/A';
+
+            const row = `
+                <tr>
+                    <td>${mapping.pos_payment_type}</td>
+                    <td>${accountDisplay}</td>
+                    <td>
+                        <span class="badge ${mapping.is_active ? 'bg-success' : 'bg-secondary'}">
+                            ${mapping.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="editPaymentMapping(${mapping.id})">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deletePaymentMapping(${mapping.id})">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
+
+        // Add unmapped payment types at the end
+        const mappedTypes = new Set(paymentMappings.map(m => m.pos_payment_type));
+        const stillUnmapped = unmappedPaymentTypes.filter(pt => !mappedTypes.has(pt));
+
+        stillUnmapped.forEach(paymentType => {
+            const row = `
+                <tr class="table-warning">
+                    <td>${paymentType}</td>
+                    <td><span class="badge bg-warning">Not Mapped</span></td>
+                    <td><span class="badge bg-secondary">Inactive</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="showEditPaymentForm('${paymentType}')">
+                            <i class="bi bi-pencil"></i> Map to Account
+                        </button>
+                    </td>
+                </tr>
+            `;
+            tbody.insertAdjacentHTML('beforeend', row);
+        });
+
+    } catch (error) {
+        console.error('Error loading payment mappings:', error);
+    }
+}
+
+function showAddPaymentMappingModal() {
+    document.getElementById('paymentMappingId').value = '';
+    document.getElementById('posPaymentType').value = '';
+    document.getElementById('depositAccountId').value = '';
+    document.getElementById('paymentMappingIsActive').checked = true;
+    document.getElementById('paymentMappingModalTitle').textContent = 'Add Payment Mapping';
+
+    // Populate account dropdown with asset accounts
+    const select = document.getElementById('depositAccountId');
+    select.innerHTML = '<option value="">-- Select Account --</option>';
+    accounts
+        .filter(a => a.account_type === 'ASSET')
+        .forEach(account => {
+            select.innerHTML += `<option value="${account.id}">${account.account_number} - ${account.account_name}</option>`;
+        });
+
+    const modal = new bootstrap.Modal(document.getElementById('paymentMappingModal'));
+    modal.show();
+}
+
+async function savePaymentMapping() {
+    const id = document.getElementById('paymentMappingId').value;
+    const data = {
+        area_id: parseInt(currentAreaId),
+        pos_payment_type: document.getElementById('posPaymentType').value.trim(),
+        deposit_account_id: parseInt(document.getElementById('depositAccountId').value),
+        is_active: document.getElementById('paymentMappingIsActive').checked
+    };
+
+    if (!data.pos_payment_type || !data.deposit_account_id) {
+        showNotification('Please fill in all required fields');
+        return;
+    }
+
+    try {
+        const url = id
+            ? `/accounting/api/pos/payment-mappings/${id}`
+            : '/accounting/api/pos/payment-mappings';
+        const method = id ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {'Content-Type': 'application/json'},
+            credentials: 'include',
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save mapping');
+        }
+
+        showNotification('Payment mapping saved successfully');
+        bootstrap.Modal.getInstance(document.getElementById('paymentMappingModal')).hide();
+        await loadPaymentMappings(currentAreaId);
+    } catch (error) {
+        showNotification('Error saving payment mapping: ' + error.message);
+    }
+}
+
+async function editPaymentMapping(id) {
+    const mapping = paymentMappings.find(m => m.id === id);
+    if (!mapping) return;
+
+    document.getElementById('paymentMappingId').value = mapping.id;
+    document.getElementById('posPaymentType').value = mapping.pos_payment_type;
+    document.getElementById('depositAccountId').value = mapping.deposit_account_id;
+    document.getElementById('paymentMappingIsActive').checked = mapping.is_active;
+    document.getElementById('paymentMappingModalTitle').textContent = 'Edit Payment Mapping';
+
+    // Populate account dropdown
+    const select = document.getElementById('depositAccountId');
+    select.innerHTML = '<option value="">-- Select Account --</option>';
+    accounts
+        .filter(a => a.account_type === 'ASSET')
+        .forEach(account => {
+            select.innerHTML += `<option value="${account.id}">${account.account_number} - ${account.account_name}</option>`;
+        });
+
+    const modal = new bootstrap.Modal(document.getElementById('paymentMappingModal'));
+    modal.show();
+}
+
+async function deletePaymentMapping(id) {
+    if (!confirm('Delete this payment mapping?')) return;
+
+    try {
+        const response = await fetch(`/accounting/api/pos/payment-mappings/${id}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to delete mapping');
+
+        showNotification('Payment mapping deleted successfully');
+        await loadPaymentMappings(currentAreaId);
+    } catch (error) {
+        showNotification('Error deleting payment mapping: ' + error.message);
+    }
+}
+
+// Load Discounts from Clover
+async function loadCloverDiscounts() {
+    if (!currentAreaId) {
+        alert('Please select a location first');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/pos/clover-discounts/${currentAreaId}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to load discounts from Clover');
+
+        const data = await response.json();
+        const discounts = data.discounts || [];
+
+        if (discounts.length === 0) {
+            alert('No discounts found in recent Clover orders (last 30 days).');
+            return;
+        }
+
+        // Get existing mappings to avoid duplicates
+        const existingMappings = await fetch(`/accounting/api/pos/discount-mappings?area_id=${currentAreaId}`, {
+            credentials: 'include'
+        }).then(r => r.json());
+
+        const existingNames = new Set(existingMappings.map(m => m.pos_discount_name));
+
+        // Filter out discounts that already have mappings
+        const newDiscounts = discounts.filter(d => !existingNames.has(d));
+
+        if (newDiscounts.length === 0) {
+            alert('All discovered discounts already have mappings.');
+            return;
+        }
+
+        // Store unmapped discounts in global variable so they persist
+        unmappedDiscounts = newDiscounts;
+
+        // Show message
+        const message = `Found ${newDiscounts.length} new discount(s) from Clover:\n\n${newDiscounts.join('\n')}\n\nThese have been added to the table below. Please select a GL account for each.`;
+        alert(message);
+
+        // Reload the discount mappings table (which will include unmapped items)
+        await loadDiscountMappings(currentAreaId);
+
+    } catch (error) {
+        alert('Error loading Clover discounts: ' + error.message);
+    }
+}
+
+// Helper function to show edit form for unmapped discount
+function showEditDiscountForm(discountName) {
+    // Pre-fill the modal with the discount name
+    document.getElementById('discountMappingId').value = '';
+    document.getElementById('posDiscountName').value = discountName;
+    document.getElementById('discountAccountId').value = '';
+    document.getElementById('discountMappingIsActive').checked = true;
+    document.getElementById('discountMappingModalTitle').textContent = 'Map Discount to GL Account';
+
+    // Populate account dropdown with revenue/expense accounts
+    const select = document.getElementById('discountAccountId');
+    select.innerHTML = '<option value="">-- Select Account --</option>';
+    accounts
+        .filter(a => a.account_type === 'REVENUE' || a.account_type === 'EXPENSE')
+        .forEach(account => {
+            select.innerHTML += `<option value="${account.id}">${account.account_number} - ${account.account_name}</option>`;
+        });
+
+    const modal = new bootstrap.Modal(document.getElementById('discountMappingModal'));
+    modal.show();
+}
+
+// Load Payment Types from Clover
+async function loadCloverPaymentTypes() {
+    if (!currentAreaId) {
+        alert('Please select a location first');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/pos/clover-payment-types/${currentAreaId}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Failed to load payment types from Clover');
+
+        const data = await response.json();
+        const paymentTypes = data.payment_types || [];
+
+        if (paymentTypes.length === 0) {
+            alert('No payment types found in recent Clover orders (last 30 days).');
+            return;
+        }
+
+        // Get existing mappings to avoid duplicates
+        const existingMappings = await fetch(`/accounting/api/pos/payment-mappings?area_id=${currentAreaId}`, {
+            credentials: 'include'
+        }).then(r => r.json());
+
+        const existingTypes = new Set(existingMappings.map(m => m.pos_payment_type));
+
+        // Filter out payment types that already have mappings
+        const newPaymentTypes = paymentTypes.filter(pt => !existingTypes.has(pt));
+
+        if (newPaymentTypes.length === 0) {
+            alert('All discovered payment types already have mappings.');
+            return;
+        }
+
+        // Store unmapped payment types in global variable so they persist
+        unmappedPaymentTypes = newPaymentTypes;
+
+        // Show message
+        const message = `Found ${newPaymentTypes.length} new payment type(s) from Clover:\n\n${newPaymentTypes.join('\n')}\n\nThese have been added to the table below. Please select a deposit account for each.`;
+        alert(message);
+
+        // Reload the payment mappings table (which will include unmapped items)
+        await loadPaymentMappings(currentAreaId);
+
+    } catch (error) {
+        alert('Error loading Clover payment types: ' + error.message);
+    }
+}
+
+// Helper function to show edit form for unmapped payment type
+function showEditPaymentForm(paymentType) {
+    // Pre-fill the modal with the payment type
+    document.getElementById('paymentMappingId').value = '';
+    document.getElementById('posPaymentType').value = paymentType;
+    document.getElementById('depositAccountId').value = '';
+    document.getElementById('paymentMappingIsActive').checked = true;
+    document.getElementById('paymentMappingModalTitle').textContent = 'Map Payment Type to Deposit Account';
+
+    // Populate account dropdown with asset accounts (bank/cash accounts)
+    const select = document.getElementById('depositAccountId');
+    select.innerHTML = '<option value="">-- Select Account --</option>';
+    accounts
+        .filter(a => a.account_type === 'ASSET')
+        .forEach(account => {
+            select.innerHTML += `<option value="${account.id}">${account.account_number} - ${account.account_name}</option>`;
+        });
+
+    const modal = new bootstrap.Modal(document.getElementById('paymentMappingModal'));
+    modal.show();
+}
+</script>
+{% endblock %}

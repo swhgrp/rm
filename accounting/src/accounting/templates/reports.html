@@ -1349,7 +1349,7 @@
                 url += `&area_id=${areaId}`;
             }
 
-            console.log('Fetching aging report from:', url);
+            debug.log('Fetching aging report from:', url);
             const response = await fetch(url);
 
             if (!response.ok) {
@@ -1364,7 +1364,7 @@
             }
 
             const data = await response.json();
-            console.log('Aging report data:', data);
+            debug.log('Aging report data:', data);
 
             renderAPAging(data);
             document.getElementById('aging-actions').style.display = 'flex';

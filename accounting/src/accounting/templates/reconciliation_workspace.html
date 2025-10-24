@@ -513,7 +513,7 @@ async function loadReconciliationWorkspace() {
             glEntries = data.unreconciled_gl_entries || [];
             clearedItems = data.cleared_items || [];
 
-            console.log('Loaded workspace data:', data);
+            debug.log('Loaded workspace data:', data);
             renderWorkspace();
             calculateBalances();
         } else {
@@ -1267,7 +1267,7 @@ async function loadGLAccounts() {
         const response = await fetch('/accounting/api/accounts/?limit=1000');
         if (response.ok) {
             const data = await response.json();
-            console.log('Loaded GL accounts:', data.length, 'accounts');
+            debug.log('Loaded GL accounts:', data.length, 'accounts');
             glAccounts = data;
         } else {
             console.error('Failed to load GL accounts. Status:', response.status);

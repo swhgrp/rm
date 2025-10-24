@@ -91,10 +91,14 @@ class GeneralDashboardService:
         # Revenue by location
         revenue_by_location = self._get_revenue_by_location(month_start, as_of_date)
 
+        # Revenue by category
+        revenue_categories = self._get_revenue_by_category(month_start, as_of_date, area_id)
+
         return ExecutiveSummaryResponse(
             metrics=metrics,
             top_expenses=top_expenses,
             revenue_by_location=revenue_by_location,
+            revenue_categories=revenue_categories,
             as_of_date=as_of_date
         )
 
@@ -270,14 +274,27 @@ class GeneralDashboardService:
     # ========================================================================
 
     def _get_revenue(self, start_date: date, end_date: date, area_id: Optional[int]) -> Decimal:
-        """Get total revenue for period"""
-        return self._get_account_type_balance(
+        """Get total revenue for period (net of discounts/contra-revenue)"""
+        # Get revenue credits (gross sales)
+        revenue_credits = self._get_account_type_balance(
             AccountType.REVENUE,
             start_date,
             end_date,
             area_id,
             is_credit=True
         )
+
+        # Get revenue debits (discounts, comps, employee meals, waste - contra-revenue)
+        revenue_debits = self._get_account_type_balance(
+            AccountType.REVENUE,
+            start_date,
+            end_date,
+            area_id,
+            is_credit=False
+        )
+
+        # Net revenue = Credits - Debits
+        return revenue_credits - revenue_debits
 
     def _get_cogs(self, start_date: date, end_date: date, area_id: Optional[int]) -> Decimal:
         """Get total COGS for period"""
@@ -304,9 +321,9 @@ class GeneralDashboardService:
         query = self.db.query(
             func.sum(JournalEntryLine.debit_amount).label('total')
         ).join(
-            JournalEntry
+            JournalEntry, JournalEntryLine.journal_entry_id == JournalEntry.id
         ).join(
-            Account
+            Account, JournalEntryLine.account_id == Account.id
         ).filter(
             Account.account_type == AccountType.EXPENSE,
             Account.account_name.ilike('%labor%') | Account.account_name.ilike('%payroll%') | Account.account_name.ilike('%wage%'),
@@ -340,9 +357,9 @@ class GeneralDashboardService:
         query = self.db.query(
             func.sum(JournalEntryLine.credit_amount if is_credit else JournalEntryLine.debit_amount).label('total')
         ).join(
-            JournalEntry
+            JournalEntry, JournalEntryLine.journal_entry_id == JournalEntry.id
         ).join(
-            Account
+            Account, JournalEntryLine.account_id == Account.id
         ).filter(
             Account.account_type == account_type,
             JournalEntry.status == JournalEntryStatus.POSTED,
@@ -361,32 +378,34 @@ class GeneralDashboardService:
     # ========================================================================
 
     def _get_daily_sales_metrics(self, as_of_date: date, area_id: Optional[int]) -> DailySalesMetrics:
-        """Get daily sales metrics"""
-        # Get today's sales from daily financial snapshots
+        """Get daily sales metrics from Daily Sales Summary (posted entries)"""
+        # Get today's sales from posted DSS entries
         today_query = self.db.query(
-            func.sum(DailyFinancialSnapshot.total_sales).label('total')
+            func.sum(DailySalesSummary.net_sales).label('total')
         ).filter(
-            DailyFinancialSnapshot.snapshot_date == as_of_date
+            DailySalesSummary.business_date == as_of_date,
+            DailySalesSummary.status == 'posted'
         )
 
         if area_id:
-            today_query = today_query.filter(DailyFinancialSnapshot.area_id == area_id)
+            today_query = today_query.filter(DailySalesSummary.area_id == area_id)
 
         today_sales = today_query.scalar() or Decimal('0.00')
 
         # MTD sales
         month_start = date(as_of_date.year, as_of_date.month, 1)
         mtd_query = self.db.query(
-            func.sum(DailyFinancialSnapshot.total_sales).label('total'),
-            func.count(func.distinct(DailyFinancialSnapshot.snapshot_date)).label('days'),
-            func.sum(DailyFinancialSnapshot.transaction_count).label('transactions')
+            func.sum(DailySalesSummary.net_sales).label('total'),
+            func.count(func.distinct(DailySalesSummary.business_date)).label('days'),
+            func.sum(DailySalesSummary.pos_transaction_count).label('transactions')
         ).filter(
-            DailyFinancialSnapshot.snapshot_date >= month_start,
-            DailyFinancialSnapshot.snapshot_date <= as_of_date
+            DailySalesSummary.business_date >= month_start,
+            DailySalesSummary.business_date <= as_of_date,
+            DailySalesSummary.status == 'posted'
         )
 
         if area_id:
-            mtd_query = mtd_query.filter(DailyFinancialSnapshot.area_id == area_id)
+            mtd_query = mtd_query.filter(DailySalesSummary.area_id == area_id)
 
         mtd_result = mtd_query.first()
         mtd_sales = Decimal(str(mtd_result[0])) if mtd_result[0] else Decimal('0.00')
@@ -399,13 +418,14 @@ class GeneralDashboardService:
         # Prior day
         prior_day = as_of_date - timedelta(days=1)
         prior_day_query = self.db.query(
-            func.sum(DailyFinancialSnapshot.total_sales)
+            func.sum(DailySalesSummary.net_sales)
         ).filter(
-            DailyFinancialSnapshot.snapshot_date == prior_day
+            DailySalesSummary.business_date == prior_day,
+            DailySalesSummary.status == 'posted'
         )
 
         if area_id:
-            prior_day_query = prior_day_query.filter(DailyFinancialSnapshot.area_id == area_id)
+            prior_day_query = prior_day_query.filter(DailySalesSummary.area_id == area_id)
 
         prior_day_sales = prior_day_query.scalar() or Decimal('0.00')
 
@@ -697,9 +717,9 @@ class GeneralDashboardService:
         ).join(
             JournalEntryLine, Area.id == JournalEntryLine.area_id
         ).join(
-            JournalEntry
+            JournalEntry, JournalEntryLine.journal_entry_id == JournalEntry.id
         ).join(
-            Account
+            Account, JournalEntryLine.account_id == Account.id
         ).filter(
             Account.account_type == AccountType.REVENUE,
             JournalEntry.status == JournalEntryStatus.POSTED,
@@ -723,6 +743,67 @@ class GeneralDashboardService:
             ))
 
         return locations
+
+    def _get_revenue_by_category(self, start_date: date, end_date: date, area_id: Optional[int]) -> List:
+        """Get revenue by category (net of discounts)"""
+        from accounting.schemas.general_dashboard import RevenueCategory
+        import logging
+        logger = logging.getLogger(__name__)
+
+        logger.info(f"Getting revenue by category: start={start_date}, end={end_date}, area_id={area_id}")
+
+        # Get revenue credits (gross) by account
+        query = self.db.query(
+            Account.account_name,
+            func.sum(JournalEntryLine.credit_amount).label('credits'),
+            func.sum(JournalEntryLine.debit_amount).label('debits')
+        ).join(
+            JournalEntryLine, Account.id == JournalEntryLine.account_id
+        ).join(
+            JournalEntry, JournalEntry.id == JournalEntryLine.journal_entry_id
+        ).filter(
+            Account.account_type == AccountType.REVENUE,
+            JournalEntry.status == JournalEntryStatus.POSTED,
+            JournalEntry.entry_date >= start_date,
+            JournalEntry.entry_date <= end_date
+        )
+
+        if area_id:
+            query = query.filter(JournalEntryLine.area_id == area_id)
+
+        query = query.group_by(Account.account_name)
+        results = query.all()
+
+        logger.info(f"Query returned {len(results)} results")
+
+        # Calculate net amounts (credits - debits) and total
+        category_amounts = []
+        total_revenue = Decimal('0.00')
+
+        for account_name, credits, debits in results:
+            credits_dec = Decimal(str(credits)) if credits else Decimal('0.00')
+            debits_dec = Decimal(str(debits)) if debits else Decimal('0.00')
+            net_amount = credits_dec - debits_dec
+
+            if net_amount > 0:  # Only include positive net revenue (exclude contra-revenue with net negative)
+                category_amounts.append((account_name, net_amount))
+                total_revenue += net_amount
+
+        # Sort by amount descending
+        category_amounts.sort(key=lambda x: x[1], reverse=True)
+
+        # Build response
+        categories = []
+        for category_name, amount in category_amounts:
+            pct_of_total = (amount / total_revenue * 100) if total_revenue > 0 else Decimal('0.00')
+            categories.append(RevenueCategory(
+                category_name=category_name,
+                amount=amount,
+                pct_of_total=pct_of_total
+            ))
+
+        logger.info(f"Returning {len(categories)} revenue categories, total revenue: {total_revenue}")
+        return categories
 
     def _determine_trend(self, values: List[Decimal]) -> str:
         """Determine if trend is up, down, or flat"""

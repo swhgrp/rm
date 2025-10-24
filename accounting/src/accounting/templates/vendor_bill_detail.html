@@ -683,7 +683,7 @@ function renderActionButtons(bill) {
 
     // Normalize status to lowercase for comparison
     const status = bill.status.toLowerCase();
-    console.log('Bill status:', bill.status, '→ normalized:', status);
+    debug.log('Bill status:', bill.status, '→ normalized:', status);
 
     if (status === 'draft') {
         buttonsHtml.push(`
@@ -694,7 +694,7 @@ function renderActionButtons(bill) {
     }
 
     if (status === 'pending_approval') {
-        console.log('Rendering approval buttons');
+        debug.log('Rendering approval buttons');
         buttonsHtml.push(`
             <button class="btn btn-success" onclick="approveBill()">
                 <i class="bi bi-check-circle"></i> Approve

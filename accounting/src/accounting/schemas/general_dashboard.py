@@ -56,11 +56,22 @@ class LocationRevenue(BaseModel):
         from_attributes = True
 
 
+class RevenueCategory(BaseModel):
+    """Revenue by category"""
+    category_name: str
+    amount: Decimal
+    pct_of_total: Decimal
+
+    class Config:
+        from_attributes = True
+
+
 class ExecutiveSummaryResponse(BaseModel):
     """Complete executive summary"""
     metrics: ExecutiveSummaryMetrics
     top_expenses: List[TopExpenseCategory]
     revenue_by_location: List[LocationRevenue]
+    revenue_categories: List[RevenueCategory]
     as_of_date: date
 
     class Config:

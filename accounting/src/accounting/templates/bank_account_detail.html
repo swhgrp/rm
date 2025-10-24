@@ -789,7 +789,7 @@ async function unmatchTransaction() {
 }
 
 async function performUnmatch(currentTxnId) {
-    console.log('performUnmatch called with ID:', currentTxnId);
+    debug.log('performUnmatch called with ID:', currentTxnId);
     try {
         const response = await fetch(`/accounting/api/bank-accounts/transactions/unmatch`, {
             method: 'POST',
@@ -802,7 +802,7 @@ async function performUnmatch(currentTxnId) {
             })
         });
 
-        console.log('Unmatch response status:', response.status);
+        debug.log('Unmatch response status:', response.status);
         if (response.ok) {
             showToast('Success', 'Transaction unmatched successfully', 'success');
             bootstrap.Modal.getInstance(document.getElementById('transactionModal')).hide();

@@ -65,7 +65,7 @@
 
         .sidebar-nav {
             list-style: none;
-            padding: 0;
+            padding: 0 0 100px 0;  /* Added 100px bottom padding for easier access to last items */
             margin: 0;
         }
 
@@ -845,6 +845,19 @@
                 </ul>
             </li>
 
+            <!-- SALES SECTION -->
+            <li>
+                <a href="#" class="nav-section-toggle" onclick="toggleSection('salesSection', event); return false;">
+                    <i class="bi bi-cart-check"></i> Sales
+                    <i class="bi bi-chevron-down float-end"></i>
+                </a>
+                <ul id="salesSection" class="submenu">
+                    <li><a href="daily-sales" class="{% block nav_daily_sales %}{% endblock %}"><i class="bi bi-cash-coin"></i> Daily Sales Summary</a></li>
+                    <li><a href="cash-reconciliation" class="{% block nav_cash_recon %}{% endblock %}"><i class="bi bi-calculator"></i> Deposit Reconciliation</a></li>
+                    <li><a href="safe-management" class="{% block nav_safe %}{% endblock %}"><i class="bi bi-safe"></i> Safe Management</a></li>
+                </ul>
+            </li>
+
             <!-- GENERAL LEDGER SECTION -->
             <li>
                 <a href="#" class="nav-section-toggle" onclick="toggleSection('glSection', event); return false;">
@@ -854,7 +867,6 @@
                 <ul id="glSection" class="submenu">
                     <li><a href="accounts" class="{% block nav_accounts %}{% endblock %}"><i class="bi bi-list-ul"></i> GL Accounts</a></li>
                     <li><a href="journal-entries" class="{% block nav_journal %}{% endblock %}"><i class="bi bi-journal-text"></i> Journal Entries</a></li>
-                    <li><a href="daily-sales" class="{% block nav_daily_sales %}{% endblock %}"><i class="bi bi-cash-coin"></i> Daily Sales Summary</a></li>
                     <li><a href="journal-entries?source=sale" class="{% block nav_dss_journal %}{% endblock %}"><i class="bi bi-receipt-cutoff"></i> DSS Journal Entries</a></li>
                 </ul>
             </li>
@@ -914,6 +926,7 @@
                     <li><a href="roles" class="{% block nav_roles %}{% endblock %}"><i class="bi bi-person-badge"></i> Roles</a></li>
                     <li><a href="locations" class="{% block nav_locations %}{% endblock %}"><i class="bi bi-geo-alt"></i> Locations</a></li>
                     <li><a href="periods" class="{% block nav_periods %}{% endblock %}"><i class="bi bi-calendar3"></i> Fiscal Periods</a></li>
+                    <li><a href="pos-settings" class="{% block nav_pos_settings %}{% endblock %}"><i class="bi bi-shop"></i> POS Integration</a></li>
                     <li><a href="settings" class="{% block nav_settings %}{% endblock %}"><i class="bi bi-sliders"></i> Settings</a></li>
                 </ul>
             </li>
@@ -1006,6 +1019,36 @@
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 
+    <!-- Debug Mode Configuration -->
+    <script>
+        // Global debug configuration
+        // Set to false in production to disable console.log and console.warn
+        window.DEBUG_MODE = true;
+
+        // Debug helper functions
+        window.debug = {
+            log: function(...args) {
+                if (window.DEBUG_MODE) {
+                    console.log(...args);
+                }
+            },
+            warn: function(...args) {
+                if (window.DEBUG_MODE) {
+                    console.warn(...args);
+                }
+            },
+            error: function(...args) {
+                // Always show errors, even in production
+                console.error(...args);
+            },
+            trace: function(...args) {
+                if (window.DEBUG_MODE) {
+                    console.trace(...args);
+                }
+            }
+        };
+    </script>
+
     <!-- Custom Notification System -->
     <script>
         // Custom notification function to replace alert()
@@ -1019,7 +1062,7 @@
         // Custom confirm function to replace confirm()
         function showConfirm(message, title = 'Confirm Action') {
             return new Promise((resolve) => {
-                console.log('showConfirm called with:', message, title);
+                debug.log('showConfirm called with:', message, title);
                 document.getElementById('confirmTitle').textContent = title;
                 document.getElementById('confirmMessage').textContent = message;
 
@@ -1151,7 +1194,7 @@
             const urlParams = new URLSearchParams(window.location.search);
             const source = urlParams.get('source');
 
-            if (currentPath.includes('/users') || currentPath.includes('/roles') || currentPath.includes('/locations') || currentPath.includes('/settings') || currentPath.includes('/periods')) {
+            if (currentPath.includes('/users') || currentPath.includes('/roles') || currentPath.includes('/locations') || currentPath.includes('/settings') || currentPath.includes('/periods') || currentPath.includes('/pos-settings')) {
                 sectionToOpen = document.getElementById('adminSection');
                 toggleToOpen = document.querySelector('[onclick*="adminSection"]');
             } else if (currentPath.includes('/vendors') || currentPath.includes('/vendor-bills') || currentPath.includes('/payment') || currentPath.includes('/check-batch') || currentPath.includes('/ach-batch')) {
@@ -1165,10 +1208,14 @@
                 sectionToOpen = document.getElementById('apSection');
                 toggleToOpen = document.querySelector('[onclick*="apSection"]');
             } else if (currentPath.includes('/journal-entries') && source === 'sale') {
-                // Daily Sales Journal Entries - open GL section (DSS is under GL)
+                // Daily Sales Journal Entries - open GL section (DSS Journal Entries is under GL)
                 sectionToOpen = document.getElementById('glSection');
                 toggleToOpen = document.querySelector('[onclick*="glSection"]');
-            } else if (currentPath.includes('/accounts') || currentPath.includes('/journal-entries') || currentPath.includes('/daily-sales')) {
+            } else if (currentPath.includes('/daily-sales') || currentPath.includes('/cash-reconciliation') || currentPath.includes('/safe-management')) {
+                // Daily Sales Summary, Deposit Reconciliation, and Safe Management - open Sales section
+                sectionToOpen = document.getElementById('salesSection');
+                toggleToOpen = document.querySelector('[onclick*="salesSection"]');
+            } else if (currentPath.includes('/accounts') || currentPath.includes('/journal-entries')) {
                 // General journal entries or accounts - open GL section
                 sectionToOpen = document.getElementById('glSection');
                 toggleToOpen = document.querySelector('[onclick*="glSection"]');
@@ -1253,13 +1300,13 @@
             });
 
             // Start the timer when page loads
-            console.log('Auto-logout initialized - will logout after 30 minutes of inactivity');
+            debug.log('Auto-logout initialized - will logout after 30 minutes of inactivity');
             resetTimer();
 
             // Also reset timer on visibility change (user switches tabs)
             document.addEventListener('visibilitychange', function() {
                 if (!document.hidden) {
-                    console.log('Tab became visible - resetting inactivity timer');
+                    debug.log('Tab became visible - resetting inactivity timer');
                     resetTimer();
                 }
             });

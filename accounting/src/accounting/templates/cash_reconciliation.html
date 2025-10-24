@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block title %}Deposit Reconciliation{% endblock %}
+
+{% block nav_cash_recon %}active{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-calculator"></i> Deposit Reconciliation</h2>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select class="form-select" id="locationFilter" onchange="loadCashRecords()">
+                        <option value="">All Locations</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="statusFilter" onchange="loadCashRecords()">
+                        <option value="">All Statuses</option>
+                        <option value="pending">Pending Reconciliation</option>
+                        <option value="reconciled">Reconciled</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" class="form-control" id="startDate" onchange="loadCashRecords()">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">End Date</label>
+                    <input type="date" class="form-control" id="endDate" onchange="loadCashRecords()">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cash Records Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Business Date</th>
+                            <th>Location</th>
+                            <th class="text-end">Expected Cash</th>
+                            <th class="text-end">Actual Cash</th>
+                            <th class="text-end">Variance</th>
+                            <th>Status</th>
+                            <th>Reconciled By</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cashRecordsTable">
+                        <tr>
+                            <td colspan="8" class="text-center text-muted">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cash Reconciliation Modal -->
+<div class="modal fade" id="reconcileModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Cash Reconciliation</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="reconcileDssId">
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Business Date:</strong></label>
+                    <div id="reconcileDate" class="form-control-plaintext"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Location:</strong></label>
+                    <div id="reconcileLocation" class="form-control-plaintext"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Expected Cash Deposit:</strong></label>
+                    <div id="reconcileExpected" class="form-control-plaintext fs-5 text-primary"></div>
+                    <small class="text-muted">From POS system</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Actual Cash Deposited:</strong></label>
+                    <input type="number" step="0.01" class="form-control form-control-lg" id="reconcileActual" placeholder="0.00" oninput="calculateCashVariance()">
+                    <small class="text-muted">Enter the actual amount of cash deposited</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label"><strong>Cash Variance (Over/Short):</strong></label>
+                    <div id="reconcileVariance" class="form-control-plaintext fs-4 fw-bold"></div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Notes (optional):</label>
+                    <textarea class="form-control" id="reconcileNotes" rows="3" placeholder="Add any notes about the variance..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveReconciliation()">
+                    <i class="bi bi-check-circle"></i> Save Reconciliation
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let areas = [];
+let cashRecords = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadAreas();
+    setDefaultDates();
+});
+
+async function loadAreas() {
+    try {
+        const response = await fetch('/accounting/api/areas/');
+        areas = await response.json();
+
+        const select = document.getElementById('locationFilter');
+        areas.forEach(area => {
+            const option = document.createElement('option');
+            option.value = area.id;
+            option.textContent = area.name;
+            select.appendChild(option);
+        });
+
+        loadCashRecords();
+    } catch (error) {
+        console.error('Error loading areas:', error);
+        showNotification('Error loading locations', 'Error');
+    }
+}
+
+function setDefaultDates() {
+    const today = new Date();
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+
+    document.getElementById('endDate').valueAsDate = today;
+    document.getElementById('startDate').valueAsDate = thirtyDaysAgo;
+}
+
+async function loadCashRecords() {
+    try {
+        const locationId = document.getElementById('locationFilter').value;
+        const statusFilter = document.getElementById('statusFilter').value;
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+
+        let url = '/accounting/api/daily-sales/?';
+        if (locationId) url += `area_id=${locationId}&`;
+        if (startDate) url += `start_date=${startDate}&`;
+        if (endDate) url += `end_date=${endDate}&`;
+
+        const response = await fetch(url);
+        const allRecords = await response.json();
+
+        // Filter for cash reconciliation
+        cashRecords = allRecords.filter(record => {
+            if (statusFilter === 'pending') {
+                return !record.cash_reconciled_at;
+            } else if (statusFilter === 'reconciled') {
+                return !!record.cash_reconciled_at;
+            }
+            return true;
+        });
+
+        renderCashRecords();
+    } catch (error) {
+        console.error('Error loading cash records:', error);
+        showNotification('Error loading cash records', 'Error');
+    }
+}
+
+function renderCashRecords() {
+    const tbody = document.getElementById('cashRecordsTable');
+
+    if (cashRecords.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No records found</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = cashRecords.map(record => {
+        const expectedCash = record.expected_cash_deposit || 0;
+        const actualCash = record.actual_cash_deposit || 0;
+        const variance = record.cash_variance || 0;
+        const isReconciled = !!record.cash_reconciled_at;
+
+        const varianceClass = variance > 0 ? 'text-success' : variance < 0 ? 'text-danger' : 'text-muted';
+        const statusBadge = isReconciled ?
+            '<span class="badge bg-success">Reconciled</span>' :
+            '<span class="badge bg-warning">Pending</span>';
+
+        const area = areas.find(a => a.id === record.area_id);
+
+        return `
+            <tr>
+                <td>${record.business_date}</td>
+                <td>${area ? area.name : 'Unknown'}</td>
+                <td class="text-end">${formatCurrency(expectedCash)}</td>
+                <td class="text-end">${isReconciled ? formatCurrency(actualCash) : '<span class="text-muted">-</span>'}</td>
+                <td class="text-end ${varianceClass}">${isReconciled ? formatCurrency(variance) : '<span class="text-muted">-</span>'}</td>
+                <td>${statusBadge}</td>
+                <td>${isReconciled ? (record.cash_reconciled_by || '-') : '-'}</td>
+                <td>
+                    <button class="btn btn-sm btn-primary" onclick="openReconcileModal(${record.id})">
+                        <i class="bi bi-pencil"></i> ${isReconciled ? 'Edit' : 'Reconcile'}
+                    </button>
+                    <button class="btn btn-sm btn-danger ms-1" onclick="deleteDSS(${record.id}, '${record.business_date}')">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function openReconcileModal(dssId) {
+    const record = cashRecords.find(r => r.id === dssId);
+    if (!record) return;
+
+    const area = areas.find(a => a.id === record.area_id);
+
+    document.getElementById('reconcileDssId').value = record.id;
+    document.getElementById('reconcileDate').textContent = record.business_date;
+    document.getElementById('reconcileLocation').textContent = area ? area.name : 'Unknown';
+    document.getElementById('reconcileExpected').textContent = formatCurrency(record.expected_cash_deposit || 0);
+    document.getElementById('reconcileActual').value = record.actual_cash_deposit || '';
+    document.getElementById('reconcileNotes').value = '';
+
+    calculateCashVariance();
+
+    const modal = new bootstrap.Modal(document.getElementById('reconcileModal'));
+    modal.show();
+}
+
+function calculateCashVariance() {
+    const expected = parseFloat(document.getElementById('reconcileExpected').textContent.replace(/[$,]/g, '')) || 0;
+    const actual = parseFloat(document.getElementById('reconcileActual').value) || 0;
+    const variance = actual - expected;
+
+    const varianceDiv = document.getElementById('reconcileVariance');
+    varianceDiv.textContent = formatCurrency(variance);
+
+    if (variance > 0) {
+        varianceDiv.className = 'form-control-plaintext fs-4 fw-bold text-success';
+    } else if (variance < 0) {
+        varianceDiv.className = 'form-control-plaintext fs-4 fw-bold text-danger';
+    } else {
+        varianceDiv.className = 'form-control-plaintext fs-4 fw-bold text-muted';
+    }
+}
+
+async function saveReconciliation() {
+    const dssId = document.getElementById('reconcileDssId').value;
+    const actualCash = parseFloat(document.getElementById('reconcileActual').value);
+    const notes = document.getElementById('reconcileNotes').value;
+
+    if (!actualCash && actualCash !== 0) {
+        showNotification('Please enter the actual cash deposited', 'Error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/daily-sales/${dssId}/reconcile-cash`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                actual_cash_deposit: actualCash,
+                notes: notes
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save reconciliation');
+        }
+
+        showNotification('Cash reconciliation saved successfully', 'Success');
+
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('reconcileModal'));
+        modal.hide();
+
+        // Reload records
+        loadCashRecords();
+    } catch (error) {
+        console.error('Error saving reconciliation:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(amount);
+}
+
+async function deleteDSS(dssId, businessDate) {
+    if (!confirm(`Are you sure you want to delete the Daily Sales Summary for ${businessDate}?\n\nThis action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/daily-sales/${dssId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete DSS');
+        }
+
+        showNotification('Daily Sales Summary deleted successfully', 'Success');
+        loadCashRecords();
+    } catch (error) {
+        console.error('Error deleting DSS:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+function showNotification(message, type) {
+    // You can implement a toast notification here
+    if (type === 'Error') {
+        alert('Error: ' + message);
+    } else {
+        alert(message);
+    }
+}
+</script>
+
+<style>
+.table th {
+    background-color: #161b22;
+    color: #c9d1d9;
+    border-color: #30363d;
+}
+
+.table td {
+    border-color: #30363d;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #161b22;
+}
+</style>
+{% endblock %}

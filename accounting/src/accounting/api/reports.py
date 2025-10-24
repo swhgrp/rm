@@ -612,12 +612,9 @@ def get_profit_loss_hierarchical(
             for child in node['children']:
                 total += calculate_recursive_balance(child)
 
-            # For summary accounts, use sum of children
-            # For leaf accounts with children (shouldn't happen but just in case), add own balance
-            if node['account'].is_summary:
-                node['total_balance'] = total
-            else:
-                node['total_balance'] = node['direct_balance'] + total
+            # Always include direct balance plus children
+            # This handles cases where summary accounts have direct transactions (e.g., sales posted to parent category)
+            node['total_balance'] = node['direct_balance'] + total
 
             return node['total_balance']
 
@@ -1588,12 +1585,9 @@ def get_balance_sheet_hierarchical(
             for child in node['children']:
                 total += calculate_recursive_balance(child)
 
-            # For summary accounts, use sum of children
-            # For leaf accounts with children (shouldn't happen but just in case), add own balance
-            if node['account'].is_summary:
-                node['total_balance'] = total
-            else:
-                node['total_balance'] = node['direct_balance'] + total
+            # Always include direct balance plus children
+            # This handles cases where summary accounts have direct transactions (e.g., sales posted to parent category)
+            node['total_balance'] = node['direct_balance'] + total
 
             return node['total_balance']
 

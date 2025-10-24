@@ -201,6 +201,18 @@
 
                     <hr class="my-4">
 
+                    <!-- GL Account Configuration -->
+                    <h6 class="mb-3"><i class="bi bi-calculator"></i> GL Account Configuration</h6>
+                    <div class="mb-3">
+                        <label for="safeAccountId" class="form-label">Safe GL Account</label>
+                        <select class="form-select" id="safeAccountId">
+                            <option value="">Select Safe Account...</option>
+                        </select>
+                        <small class="text-muted">GL account for tracking safe cash at this location</small>
+                    </div>
+
+                    <hr class="my-4">
+
                     <!-- Status -->
                     <div class="mb-3">
                         <div class="form-check form-switch">
@@ -255,6 +267,7 @@
 {% block extra_scripts %}
 <script>
 let locations = [];
+let accounts = [];
 let editingLocationId = null;
 let deletingLocationId = null;
 let locationModal, deleteModal;
@@ -269,6 +282,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     loadLocations();
+    loadAccounts();
 });
 
 async function loadLocations() {
@@ -284,6 +298,60 @@ async function loadLocations() {
         console.error('Error loading locations:', error);
         showNotification('Error loading locations', 'error');
     }
+}
+
+async function loadAccounts() {
+    try {
+        const response = await fetch('/accounting/api/accounts/?limit=1000');
+        if (!response.ok) {
+            throw new Error('Failed to load accounts');
+        }
+
+        accounts = await response.json();
+        populateAccountDropdown();
+    } catch (error) {
+        console.error('Error loading accounts:', error);
+    }
+}
+
+function populateAccountDropdown() {
+    const select = document.getElementById('safeAccountId');
+
+    // Keep the default option
+    select.innerHTML = '<option value="">Select Safe Account...</option>';
+
+    // Filter for asset accounts and organize by account type
+    const assetAccounts = accounts.filter(acc =>
+        acc.account_type === 'ASSET' && acc.is_active
+    ).sort((a, b) => {
+        // Sort by account number
+        return a.account_number.localeCompare(b.account_number);
+    });
+
+    // Group accounts by parent for better organization
+    let currentParent = null;
+    assetAccounts.forEach(account => {
+        // Add group header for summary accounts
+        if (account.is_summary) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = `${account.account_number} - ${account.account_name}`;
+            select.appendChild(optgroup);
+            currentParent = optgroup;
+        } else {
+            const option = document.createElement('option');
+            option.value = account.id;
+
+            // Indent child accounts
+            const indent = account.parent_account_id ? '  ' : '';
+            option.textContent = `${indent}${account.account_number} - ${account.account_name}`;
+
+            if (currentParent && account.parent_account_id) {
+                currentParent.appendChild(option);
+            } else {
+                select.appendChild(option);
+            }
+        }
+    });
 }
 
 function renderLocationsTable() {
@@ -366,6 +434,9 @@ function editLocation(id) {
     document.getElementById('email').value = location.email || '';
     document.getElementById('website').value = location.website || '';
 
+    // GL Account Configuration
+    document.getElementById('safeAccountId').value = location.safe_account_id || '';
+
     document.getElementById('locationActive').checked = location.is_active;
 
     locationModal.show();
@@ -391,6 +462,8 @@ async function saveLocation() {
         return;
     }
 
+    const safeAccountValue = document.getElementById('safeAccountId').value;
+
     const data = {
         code: code,
         name: name,
@@ -407,6 +480,7 @@ async function saveLocation() {
         phone: document.getElementById('phone').value.trim() || null,
         email: document.getElementById('email').value.trim() || null,
         website: document.getElementById('website').value.trim() || null,
+        safe_account_id: safeAccountValue ? parseInt(safeAccountValue) : null,
         is_active: document.getElementById('locationActive').checked
     };
 

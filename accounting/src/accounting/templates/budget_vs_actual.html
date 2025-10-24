@@ -185,13 +185,13 @@ async function loadBudgetInfo() {
         });
 
         if (!response.ok) {
-            console.warn('Failed to load budget info:', response.status);
+            debug.warn('Failed to load budget info:', response.status);
             return;
         }
 
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
-            console.warn('Budget info API returned non-JSON response');
+            debug.warn('Budget info API returned non-JSON response');
             return;
         }
 
@@ -237,7 +237,7 @@ async function loadReport() {
         });
 
         if (!response.ok) {
-            console.warn('Failed to load report:', response.status);
+            debug.warn('Failed to load report:', response.status);
             loading.style.display = 'none';
             alert(`Error loading report: Server returned status ${response.status}`);
             return;
@@ -245,7 +245,7 @@ async function loadReport() {
 
         const contentType = response.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
-            console.warn('Report API returned non-JSON response');
+            debug.warn('Report API returned non-JSON response');
             loading.style.display = 'none';
             alert('Error: Server returned an unexpected response format.');
             return;

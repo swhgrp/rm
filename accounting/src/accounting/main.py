@@ -34,6 +34,9 @@ from accounting.api.banking_dashboard import router as banking_dashboard_router
 from accounting.api.general_dashboard import router as general_dashboard_router
 from accounting.api.payments import router as payments_router
 from accounting.api.budgets import router as budgets_router
+from accounting.api.pos import router as pos_router
+from accounting.api.settings import router as settings_router
+from accounting.api.safe import router as safe_router
 from accounting.models.user import User
 # Import all models to ensure they are registered
 import accounting.models  # noqa
@@ -83,6 +86,9 @@ app.include_router(banking_dashboard_router, prefix="/api/banking-dashboard", ta
 app.include_router(general_dashboard_router)
 app.include_router(payments_router, prefix="/api/payments", tags=["Payments"])
 app.include_router(budgets_router, prefix="/api/budgets", tags=["Budgets"])
+app.include_router(pos_router)
+app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
+app.include_router(safe_router)
 
 
 # Custom exception handler for authentication redirects
@@ -435,6 +441,30 @@ async def daily_sales_detail_page(
     })
 
 
+@app.get("/cash-reconciliation", response_class=HTMLResponse)
+async def cash_reconciliation_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Cash Reconciliation page for managers"""
+    return templates.TemplateResponse("cash_reconciliation.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
+@app.get("/safe-management", response_class=HTMLResponse)
+async def safe_management_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Safe Management page for managers"""
+    return templates.TemplateResponse("safe_management.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
 @app.get("/budgets", response_class=HTMLResponse)
 async def budgets_page(
     request: Request,
@@ -592,6 +622,28 @@ async def reconciliation_workspace_page(
         "request": request,
         "current_user": user,
         "reconciliation_id": reconciliation_id
+    })
+
+
+@app.get("/pos-settings", response_class=HTMLResponse)
+async def pos_settings_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """POS Integration Settings page (admin only)"""
+    from accounting.api.auth import require_admin
+    # Check admin access
+    try:
+        require_admin(user)
+    except HTTPException:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required to access POS settings"
+        )
+
+    return templates.TemplateResponse("pos_settings.html", {
+        "request": request,
+        "current_user": user
     })
 
 

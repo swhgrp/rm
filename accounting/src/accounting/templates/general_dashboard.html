@@ -269,16 +269,22 @@
 {% block content %}
 <div class="container-fluid">
     <!-- Header -->
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
         <h2 class="mb-0"><i class="bi bi-speedometer2"></i> Financial Dashboard</h2>
-        <div class="period-tabs" id="periodTabs">
-            <div class="period-tab active" data-period="today">Today</div>
-            <div class="period-tab" data-period="wtd">WTD</div>
-            <div class="period-tab" data-period="mtd">MTD</div>
-            <div class="period-tab" data-period="ytd">YTD</div>
+        <div class="d-flex gap-3 align-items-center">
+            <!-- Location Filter -->
+            <select id="locationFilter" class="form-select form-select-sm" style="width: 200px;">
+                <option value="">All Locations</option>
+            </select>
+            <!-- Period Tabs -->
+            <div class="period-tabs" id="periodTabs">
+                <div class="period-tab active" data-period="yesterday">Yesterday</div>
+                <div class="period-tab" data-period="wtd">WTD</div>
+                <div class="period-tab" data-period="mtd">MTD</div>
+                <div class="period-tab" data-period="ytd">YTD</div>
+            </div>
         </div>
     </div>
-
     <!-- Executive Financial Summary -->
     <div class="section-title">
         <i class="bi bi-graph-up"></i> Executive Financial Summary
@@ -453,14 +459,44 @@
 
 {% block extra_scripts %}
 <script>
-let currentPeriod = 'today';
+let currentPeriod = 'yesterday';
+let currentAreaId = null;
 let charts = {};
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
     initPeriodTabs();
+    loadLocations();
     loadDashboardData();
 });
+
+async function loadLocations() {
+    try {
+        const response = await fetch('/accounting/api/areas/', {
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            const locations = await response.json();
+            const select = document.getElementById('locationFilter');
+
+            locations.forEach(location => {
+                const option = document.createElement('option');
+                option.value = location.id;
+                option.textContent = location.name;
+                select.appendChild(option);
+            });
+
+            // Add change event listener
+            select.addEventListener('change', function() {
+                currentAreaId = this.value ? parseInt(this.value) : null;
+                loadDashboardData();
+            });
+        }
+    } catch (error) {
+        console.error('Error loading locations:', error);
+    }
+}
 
 function initPeriodTabs() {
     document.querySelectorAll('.period-tab').forEach(tab => {
@@ -492,109 +528,165 @@ async function loadDashboardData() {
 }
 
 async function loadNetSales() {
-    // TODO: Replace with actual API call
-    // For now, using mock data
-    const mockData = {
-        value: 15234.50,
-        change: 8.5,
-        trend: [12000, 13500, 14200, 15234],
-        breakdown: {
-            'Food': 8500,
-            'Beverage': 3200,
-            'Wine': 1800,
-            'Beer': 900,
-            'Liquor': 634.50,
-            'Retail': 200
+    try {
+        const url = new URL('/accounting/api/dashboard/summary', window.location.origin);
+        if (currentAreaId) {
+            url.searchParams.append('area_id', currentAreaId);
         }
-    };
+        const response = await fetch(url, {
+            credentials: 'include'
+        });
 
-    document.getElementById('netSalesValue').textContent = formatCurrency(mockData.value);
+        if (!response.ok) {
+            console.error('Failed to load dashboard summary');
+            // Show $0 if no data
+            document.getElementById('netSalesValue').textContent = formatCurrency(0);
+            document.getElementById('netSalesBreakdown').innerHTML = '<div style="color: #8b949e; padding: 1rem; text-align: center;">No sales data available</div>';
+            return;
+        }
 
-    const changeEl = document.getElementById('netSalesChange');
-    changeEl.textContent = `${mockData.change > 0 ? '+' : ''}${mockData.change.toFixed(1)}% vs prior`;
-    changeEl.className = `metric-change ${mockData.change >= 0 ? 'positive' : 'negative'}`;
+        const data = await response.json();
+        const netSales = parseFloat(data.metrics?.total_revenue_mtd || 0);
+        const revenueChange = parseFloat(data.metrics?.revenue_vs_prior_month || 0);
 
-    // Breakdown - moved to separate section
-    let breakdownHtml = '';
-    for (const [category, amount] of Object.entries(mockData.breakdown)) {
-        const percentage = ((amount / mockData.value) * 100).toFixed(1);
-        breakdownHtml += `
-            <div class="breakdown-item">
-                <span>${category}</span>
-                <div style="text-align: right;">
-                    <strong>${formatCurrency(amount)}</strong>
-                    <div style="font-size: 0.75rem; color: #8b949e;">${percentage}%</div>
-                </div>
-            </div>
-        `;
+        document.getElementById('netSalesValue').textContent = formatCurrency(netSales);
+
+        const changeEl = document.getElementById('netSalesChange');
+        changeEl.textContent = `${revenueChange > 0 ? '+' : ''}${revenueChange.toFixed(1)}% vs prior`;
+        changeEl.className = `metric-change ${revenueChange >= 0 ? 'positive' : 'negative'}`;
+
+        // Sales breakdown by category
+        let breakdownHtml = '';
+        if (data.revenue_categories && data.revenue_categories.length > 0) {
+            for (const cat of data.revenue_categories) {
+                const amount = parseFloat(cat.amount || 0);
+                const percentage = parseFloat(cat.pct_of_total || 0).toFixed(1);
+                breakdownHtml += `
+                    <div class="breakdown-item">
+                        <span>${cat.category_name}</span>
+                        <div style="text-align: right;">
+                            <strong>${formatCurrency(amount)}</strong>
+                            <div style="font-size: 0.75rem; color: #8b949e;">${percentage}%</div>
+                        </div>
+                    </div>
+                `;
+            }
+        } else {
+            breakdownHtml = '<div style="color: #8b949e; padding: 1rem; text-align: center;">No sales data available</div>';
+        }
+        document.getElementById('netSalesBreakdown').innerHTML = breakdownHtml;
+
+        // Trend chart - simple placeholder for now
+        const trend = [netSales];
+        createLineChart('netSalesChart', trend, 'Net Sales', '#3fb950');
+    } catch (error) {
+        console.error('Error loading net sales:', error);
+        document.getElementById('netSalesValue').textContent = formatCurrency(0);
     }
-    document.getElementById('netSalesBreakdown').innerHTML = breakdownHtml;
-
-    // Chart
-    createLineChart('netSalesChart', mockData.trend, 'Net Sales', '#3fb950');
 }
 
 async function loadTopExpenses() {
-    // TODO: Replace with actual API call
-    const mockExpenses = [
-        { category: 'Cost of Goods Sold', amount: 5642.30 },
-        { category: 'Labor & Payroll', amount: 4123.50 },
-        { category: 'Rent & Occupancy', amount: 2500.00 },
-        { category: 'Utilities', amount: 892.45 },
-        { category: 'Marketing & Advertising', amount: 650.00 }
-    ];
+    try {
+        const response = await fetch('/accounting/api/dashboard/summary', {
+            credentials: 'include'
+        });
 
-    const maxAmount = Math.max(...mockExpenses.map(e => e.amount));
+        if (!response.ok) {
+            document.getElementById('topExpenses').innerHTML = '<div style="color: #8b949e; padding: 1rem; text-align: center;">No expense data available</div>';
+            return;
+        }
 
-    let html = '';
-    mockExpenses.forEach(expense => {
-        const percentage = ((expense.amount / maxAmount) * 100).toFixed(1);
-        html += `
-            <div class="expense-item">
-                <div style="flex: 1;">
-                    <div class="expense-label">${expense.category}</div>
-                    <div class="expense-bar">
-                        <div class="expense-bar-fill" style="width: ${percentage}%"></div>
+        const data = await response.json();
+        const expenses = data.top_expenses || [];
+
+        if (expenses.length === 0) {
+            document.getElementById('topExpenses').innerHTML = '<div style="color: #8b949e; padding: 1rem; text-align: center;">No expense data available</div>';
+            return;
+        }
+
+        const maxAmount = Math.max(...expenses.map(e => parseFloat(e.amount || 0)));
+
+        let html = '';
+        expenses.forEach(expense => {
+            const amount = parseFloat(expense.amount || 0);
+            const percentage = maxAmount > 0 ? ((amount / maxAmount) * 100).toFixed(1) : 0;
+            html += `
+                <div class="expense-item">
+                    <div style="flex: 1;">
+                        <div class="expense-label">${expense.category_name}</div>
+                        <div class="expense-bar">
+                            <div class="expense-bar-fill" style="width: ${percentage}%"></div>
+                        </div>
                     </div>
+                    <div class="expense-amount ms-3">${formatCurrency(amount)}</div>
                 </div>
-                <div class="expense-amount ms-3">${formatCurrency(expense.amount)}</div>
-            </div>
-        `;
-    });
+            `;
+        });
 
-    document.getElementById('topExpenses').innerHTML = html;
+        document.getElementById('topExpenses').innerHTML = html;
+    } catch (error) {
+        console.error('Error loading top expenses:', error);
+        document.getElementById('topExpenses').innerHTML = '<div style="color: #8b949e; padding: 1rem; text-align: center;">Error loading expenses</div>';
+    }
 }
 
 async function loadGrossProfit() {
-    const mockData = {
-        value: 62.5,
-        change: 2.1,
-        trend: [58, 60, 61, 62.5]
-    };
+    try {
+        const response = await fetch('/accounting/api/dashboard/summary', {
+            credentials: 'include'
+        });
 
-    document.getElementById('grossProfitValue').textContent = mockData.value.toFixed(1) + '%';
+        if (!response.ok) {
+            document.getElementById('grossProfitValue').textContent = '0.0%';
+            return;
+        }
 
-    const changeEl = document.getElementById('grossProfitChange');
-    changeEl.textContent = `${mockData.change > 0 ? '+' : ''}${mockData.change.toFixed(1)}% vs prior`;
-    changeEl.className = `metric-change ${mockData.change >= 0 ? 'positive' : 'negative'}`;
+        const data = await response.json();
+        const grossMargin = parseFloat(data.metrics?.gross_profit_margin || 0);
 
-    createLineChart('grossProfitChart', mockData.trend, 'Gross Profit %', '#58a6ff');
+        document.getElementById('grossProfitValue').textContent = grossMargin.toFixed(1) + '%';
+
+        const changeEl = document.getElementById('grossProfitChange');
+        changeEl.textContent = `0.0% vs prior`; // TODO: Add prior period comparison
+        changeEl.className = `metric-change positive`;
+
+        const trend = [grossMargin];
+        createLineChart('grossProfitChart', trend, 'Gross Profit %', '#58a6ff');
+    } catch (error) {
+        console.error('Error loading gross profit:', error);
+        document.getElementById('grossProfitValue').textContent = '0.0%';
+    }
 }
 
 async function loadEBITDA() {
-    const mockData = {
-        value: 4532.25,
-        change: -3.2,
-        trend: [5000, 4800, 4700, 4532]
-    };
+    try {
+        const response = await fetch('/accounting/api/dashboard/summary', {
+            credentials: 'include'
+        });
 
-    document.getElementById('ebitdaValue').textContent = formatCurrency(mockData.value);
+        if (!response.ok) {
+            document.getElementById('ebitdaValue').textContent = formatCurrency(0);
+            return;
+        }
 
-    const changeEl = document.getElementById('ebitdaChange');
-    changeEl.textContent = `${mockData.change > 0 ? '+' : ''}${mockData.change.toFixed(1)}% vs prior`;
-    changeEl.className = `metric-change ${mockData.change >= 0 ? 'positive' : 'negative'}`;
+        const data = await response.json();
+        // Operating profit = revenue - COGS - expenses
+        const revenue = parseFloat(data.metrics?.total_revenue_mtd || 0);
+        const operatingMargin = parseFloat(data.metrics?.operating_margin || 0);
+        const operatingProfit = revenue * (operatingMargin / 100);
 
-    createLineChart('ebitdaChart', mockData.trend, 'Operating Profit', '#d29922');
+        document.getElementById('ebitdaValue').textContent = formatCurrency(operatingProfit);
+
+        const changeEl = document.getElementById('ebitdaChange');
+        changeEl.textContent = `0.0% vs prior`; // TODO: Add prior period comparison
+        changeEl.className = `metric-change positive`;
+
+        const trend = [operatingProfit];
+        createLineChart('ebitdaChart', trend, 'Operating Profit', '#d29922');
+    } catch (error) {
+        console.error('Error loading EBITDA:', error);
+        document.getElementById('ebitdaValue').textContent = formatCurrency(0);
+    }
 }
 
 async function loadCashPosition() {
@@ -604,7 +696,7 @@ async function loadCashPosition() {
         });
 
         if (!response.ok) {
-            console.warn('Failed to load bank accounts:', response.status);
+            debug.warn('Failed to load bank accounts:', response.status);
             // Show error message
             document.getElementById('cashCards').innerHTML = `
                 <div style="color: #8b949e; text-align: center; padding: 1rem;">
@@ -658,12 +750,16 @@ async function loadCashPosition() {
 
 async function loadAPAging() {
     try {
-        const response = await fetch('api/vendor-bills/aging-report', {
+        const url = new URL('/accounting/api/vendor-bills/aging-report', window.location.origin);
+        if (currentAreaId) {
+            url.searchParams.append('area_id', currentAreaId);
+        }
+        const response = await fetch(url, {
             credentials: 'include'
         });
 
         if (!response.ok) {
-            console.warn('Failed to load AP aging:', response.status);
+            debug.warn('Failed to load AP aging:', response.status);
             return;
         }
 
@@ -688,12 +784,16 @@ async function loadAPAging() {
 
 async function loadARAging() {
     try {
-        const response = await fetch('api/customer-invoices/aging-report', {
+        const url = new URL('/accounting/api/customer-invoices/aging-report', window.location.origin);
+        if (currentAreaId) {
+            url.searchParams.append('area_id', currentAreaId);
+        }
+        const response = await fetch(url, {
             credentials: 'include'
         });
 
         if (!response.ok) {
-            console.warn('Failed to load AR aging:', response.status);
+            debug.warn('Failed to load AR aging:', response.status);
             return;
         }
 

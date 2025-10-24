@@ -1,7 +1,7 @@
 """
 Daily Sales Summary models for POS integration
 """
-from sqlalchemy import Column, Integer, String, Date, DateTime, Numeric, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, DateTime, Numeric, Text, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
@@ -34,6 +34,16 @@ class DailySalesSummary(Base):
     category_breakdown = Column(JSONB, nullable=True)
     # Example: {"food": 1200.00, "beverage": 400.00, "alcohol": 200.00}
 
+    discount_breakdown = Column(JSONB, nullable=True)
+    # Example: {"employee_discount": 50.00, "happy_hour": 100.00}
+
+    # Cash reconciliation fields
+    expected_cash_deposit = Column(Numeric(15, 2), nullable=True)  # Expected cash from POS
+    actual_cash_deposit = Column(Numeric(15, 2), nullable=True)  # Actual cash deposited (manager entry)
+    cash_variance = Column(Numeric(15, 2), nullable=True)  # Actual - Expected
+    cash_reconciled_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    cash_reconciled_at = Column(DateTime, nullable=True)
+
     # Status workflow: draft -> verified -> posted
     status = Column(String(20), nullable=False, server_default="draft", index=True)
 
@@ -41,6 +51,11 @@ class DailySalesSummary(Base):
     notes = Column(Text, nullable=True)
     imported_from = Column(String(100), nullable=True)  # Source system/file
     imported_at = Column(DateTime, nullable=True)
+
+    # POS integration fields
+    imported_from_pos = Column(Boolean, nullable=False, server_default="false")
+    pos_sync_date = Column(DateTime, nullable=True)
+    pos_transaction_count = Column(Integer, nullable=True)
 
     # Audit fields
     created_by = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)

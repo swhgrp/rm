@@ -233,7 +233,7 @@ async function loadSummaries() {
                 <tr>
                     <td>${dss.business_date}</td>
                     <td>${area ? area.name : dss.area_id}</td>
-                    <td>${dss.pos_system === 'POS_IMPORT' ? 'POS Import' : 'Manual'}</td>
+                    <td>${dss.pos_system ? dss.pos_system.charAt(0).toUpperCase() + dss.pos_system.slice(1) + ' POS' : 'Manual'}</td>
                     <td style="text-align: right;">${formatCurrency(dss.net_sales)}</td>
                     <td style="text-align: right;">${formatCurrency(dss.tax_collected)}</td>
                     <td style="text-align: right;">${formatCurrency(dss.tips)}</td>
@@ -244,8 +244,8 @@ async function loadSummaries() {
                         <button class="btn btn-sm btn-outline-primary" onclick="viewDSS(${dss.id})">
                             <i class="bi bi-eye"></i>
                         </button>
-                        ${dss.status === 'draft' ? `
-                            <button class="btn btn-sm btn-outline-danger" onclick="deleteDSS(${dss.id})">
+                        ${dss.status !== 'posted' ? `
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteDSS(${dss.id})" title="${dss.status === 'draft' ? 'Delete entry' : 'Delete entry (admin only)'}">
                                 <i class="bi bi-trash"></i>
                             </button>
                         ` : ''}

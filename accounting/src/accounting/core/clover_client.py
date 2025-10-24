@@ -101,32 +101,21 @@ class CloverAPIClient:
         params = {
             "limit": limit,
             "offset": offset,
-            "expand": "lineItems,payments,discounts,refunds"  # Include all order details
+            "expand": "lineItems.item.categories,lineItems.discounts,payments.cardTransaction,payments.tender,discounts,refunds"  # Include all order details with payment card data and discounts
         }
 
         # Add date filters if provided
-        # Clover API doesn't support AND operator, so we can only filter by start OR end
-        # When both dates are provided and the range is small (<=7 days), use end_date filter
-        # to get older orders, then filter by start_date manually in calling code
-        if start_date and end_date:
-            # Calculate day difference
-            day_diff = (end_date - start_date).days
-            if day_diff <= 7:
-                # Short date range - use end_date filter to get older orders
-                end_ms = int(datetime.combine(end_date, datetime.max.time()).timestamp() * 1000)
-                params["filter"] = f"createdTime<={end_ms}"
-            else:
-                # Long date range - use start_date filter
-                start_ms = int(datetime.combine(start_date, datetime.min.time()).timestamp() * 1000)
-                params["filter"] = f"createdTime>={start_ms}"
-        elif start_date:
-            # Only start date provided
+        # Clover uses millisecond timestamps for filtering
+        # Note: Clover API doesn't support AND operations in filters
+        # We can only filter by one condition, so we use start_date and filter end_date manually
+        if start_date:
+            # Use clientCreatedTime which is when order was placed at the POS device
             start_ms = int(datetime.combine(start_date, datetime.min.time()).timestamp() * 1000)
-            params["filter"] = f"createdTime>={start_ms}"
+            params["filter"] = f"clientCreatedTime>={start_ms}"
         elif end_date:
-            # Only end date provided
+            # Only use end_date filter if no start_date
             end_ms = int(datetime.combine(end_date, datetime.max.time()).timestamp() * 1000)
-            params["filter"] = f"createdTime<={end_ms}"
+            params["filter"] = f"clientCreatedTime<={end_ms}"
 
         return await self._make_request("GET", "orders", params=params)
 
@@ -158,6 +147,23 @@ class CloverAPIClient:
     async def get_item(self, item_id: str) -> Dict[str, Any]:
         """Get a single inventory item by ID"""
         return await self._make_request("GET", f"items/{item_id}")
+
+    async def get_categories(self, limit: int = 100) -> Dict[str, Any]:
+        """
+        Get item categories from Clover
+
+        Returns:
+            Dictionary with 'elements' list of categories
+        """
+        return await self._make_request(
+            "GET",
+            "categories",
+            params={"limit": limit}
+        )
+
+    async def get_category(self, category_id: str) -> Dict[str, Any]:
+        """Get a single category by ID"""
+        return await self._make_request("GET", f"categories/{category_id}")
 
     async def get_payments(
         self,
@@ -192,6 +198,42 @@ class CloverAPIClient:
             params["filter"] = f"createdTime>={start_ms}"
 
         return await self._make_request("GET", "payments", params=params)
+
+    async def get_cash_events(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        limit: int = 1000
+    ) -> Dict[str, Any]:
+        """
+        Get cash events from Clover (includes payouts, cash adjustments, etc.)
+
+        Cash events include:
+        - CASH_ADJUSTMENT: Manual cash add/remove (payouts, drops, etc.)
+        - SALE: Cash from sales
+        - REFUND: Cash refunds
+
+        Args:
+            start_date: Filter cash events from this date
+            end_date: Filter cash events until this date
+            limit: Maximum number of events to return
+
+        Returns:
+            Dictionary with 'elements' list of cash events
+        """
+        limit = min(limit, 1000)
+
+        params = {
+            "limit": limit,
+            "expand": "employee"  # Include employee who made the adjustment
+        }
+
+        # Add date filters if provided
+        if start_date:
+            start_ms = int(datetime.combine(start_date, datetime.min.time()).timestamp() * 1000)
+            params["filter"] = f"timestamp>={start_ms}"
+
+        return await self._make_request("GET", "cash_events", params=params)
 
     async def test_connection(self) -> bool:
         """

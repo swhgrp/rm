@@ -338,7 +338,7 @@
     // ========== ITEMS ==========
     async function loadItems() {
         try {
-            const response = await apiRequest('api/items/');
+            const response = await apiRequest('api/items/?limit=1000');
             items = Array.isArray(response) ? response : [];
             displayItems();
         } catch (error) {

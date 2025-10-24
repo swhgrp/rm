@@ -2,7 +2,7 @@
 Area/Location model for accounting system
 Areas represent different business units, locations, or departments
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from accounting.db.database import Base
@@ -36,6 +36,9 @@ class Area(Base):
     email = Column(String(100), nullable=True)
     website = Column(String(200), nullable=True)
 
+    # Safe GL account for this location
+    safe_account_id = Column(Integer, ForeignKey('accounts.id', ondelete='SET NULL'), nullable=True)
+
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
     updated_at = Column(DateTime, nullable=True, onupdate=func.now())
@@ -48,6 +51,8 @@ class Area(Base):
     bank_accounts = relationship("BankAccount", back_populates="area")
     budgets = relationship("Budget", back_populates="area")
     pos_configuration = relationship("POSConfiguration", back_populates="area", uselist=False)
+    safe_transactions = relationship("SafeTransaction", back_populates="area")
+    safe_account = relationship("Account", foreign_keys=[safe_account_id])
 
     def __repr__(self):
         return f"<Area {self.code}: {self.name}>"

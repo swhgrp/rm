@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, and_, or_
 from typing import List, Optional
 from datetime import date, datetime
+from decimal import Decimal
 
 from accounting.db.database import get_db
 from accounting.models.user import User
@@ -92,13 +93,15 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
                         detail=f"No deposit account specified for payment type: {payment.payment_type}"
                     )
 
+                # Tips are excluded from journal entry because they are paid out daily
+                # Only the payment amount (not tips) goes to the deposit account
                 lines.append(JournalEntryLine(
                     journal_entry_id=je.id,
                     line_number=line_number,
                     account_id=account_id,
                     area_id=dss.area_id,
                     description=f"{payment.payment_type} deposits",
-                    debit_amount=payment.amount + payment.tips,  # Include tips in deposit
+                    debit_amount=payment.amount,  # Exclude tips - they're paid out daily
                     credit_amount=Decimal("0.00")
                 ))
                 line_number += 1
@@ -221,7 +224,7 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
     if dss.tax_collected > 0:
         tax_account = db.query(Account).filter(
             Account.account_type == "LIABILITY",
-            Account.name.ilike("%tax%payable%")
+            Account.account_name.ilike("%tax%payable%")
         ).first()
 
         if not tax_account:
@@ -238,6 +241,75 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
         ))
         line_number += 1
 
+    # DEBIT: Discounts (contra-revenue or expense accounts)
+    if dss.discount_breakdown:
+        # Import POSDiscountGLMapping to get mapped accounts
+        from accounting.models.pos import POSDiscountGLMapping
+
+        # Get discount mappings for this area
+        discount_mappings = db.query(POSDiscountGLMapping).filter(
+            POSDiscountGLMapping.area_id == dss.area_id,
+            POSDiscountGLMapping.is_active == True
+        ).all()
+
+        # Create a lookup dictionary
+        discount_map = {m.pos_discount_name: m.discount_account_id for m in discount_mappings}
+
+        for discount_name, amount in dss.discount_breakdown.items():
+            discount_amount = abs(Decimal(str(amount)))  # Convert negative to positive
+            if discount_amount > 0:
+                # Get account from mapping
+                account_id = discount_map.get(discount_name)
+
+                if not account_id:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"No discount account mapped for discount: {discount_name}. Please configure in POS Settings."
+                    )
+
+                lines.append(JournalEntryLine(
+                    journal_entry_id=je.id,
+                    line_number=line_number,
+                    account_id=account_id,
+                    area_id=dss.area_id,
+                    description=f"{discount_name}",
+                    debit_amount=discount_amount,
+                    credit_amount=Decimal("0.00")
+                ))
+                line_number += 1
+
+    # DEBIT: Refunds (contra-revenue account - Sales Returns & Allowances)
+    if dss.refunds and dss.refunds > 0:
+        # Find or create Sales Returns & Allowances account (contra-revenue)
+        refund_account = db.query(Account).filter(
+            Account.account_type == "REVENUE",
+            Account.account_name.ilike("%return%")
+        ).first()
+
+        if not refund_account:
+            # Try to find any contra-revenue account
+            refund_account = db.query(Account).filter(
+                Account.account_type == "REVENUE",
+                Account.account_name.ilike("%allowance%")
+            ).first()
+
+        if not refund_account:
+            raise HTTPException(
+                status_code=400,
+                detail="No Sales Returns & Allowances account found. Please create a contra-revenue account."
+            )
+
+        lines.append(JournalEntryLine(
+            journal_entry_id=je.id,
+            line_number=line_number,
+            account_id=refund_account.id,
+            area_id=dss.area_id,
+            description="Sales refunds",
+            debit_amount=dss.refunds,
+            credit_amount=Decimal("0.00")
+        ))
+        line_number += 1
+
     # Add all lines to JE
     je.lines = lines
 
@@ -245,6 +317,61 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
     total_debits = sum(line.debit_amount for line in lines)
     total_credits = sum(line.credit_amount for line in lines)
 
+    variance = total_debits - total_credits
+
+    # If there's a variance and user provided variance adjustment
+    if abs(variance) > Decimal("0.01"):
+        if post_request.variance_account_id and post_request.variance_amount is not None:
+            # Verify the variance amount matches
+            if abs(abs(post_request.variance_amount) - abs(variance)) > Decimal("0.01"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Variance amount mismatch: calculated {variance}, provided {post_request.variance_amount}"
+                )
+
+            # Add variance adjustment line
+            variance_account = db.query(Account).filter(Account.id == post_request.variance_account_id).first()
+            if not variance_account:
+                raise HTTPException(status_code=400, detail="Variance account not found")
+
+            # If debits > credits, we need to credit the variance account
+            # If credits > debits, we need to debit the variance account
+            if variance > 0:
+                # Debits exceed credits, credit the variance account
+                lines.append(JournalEntryLine(
+                    journal_entry_id=je.id,
+                    line_number=line_number,
+                    account_id=variance_account.id,
+                    area_id=dss.area_id,
+                    description="Rounding/variance adjustment",
+                    debit_amount=Decimal("0.00"),
+                    credit_amount=abs(variance)
+                ))
+            else:
+                # Credits exceed debits, debit the variance account
+                lines.append(JournalEntryLine(
+                    journal_entry_id=je.id,
+                    line_number=line_number,
+                    account_id=variance_account.id,
+                    area_id=dss.area_id,
+                    description="Rounding/variance adjustment",
+                    debit_amount=abs(variance),
+                    credit_amount=Decimal("0.00")
+                ))
+
+            line_number += 1
+            je.lines = lines
+
+            # Recalculate totals
+            total_debits = sum(line.debit_amount for line in lines)
+            total_credits = sum(line.credit_amount for line in lines)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Journal entry doesn't balance: DR={total_debits}, CR={total_credits}. Please specify a variance account."
+            )
+
+    # Final balance check
     if abs(total_debits - total_credits) > Decimal("0.01"):
         raise HTTPException(
             status_code=400,
@@ -432,7 +559,11 @@ def delete_daily_sales_summary(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_auth)
 ):
-    """Delete a daily sales summary (only if status is draft)"""
+    """Delete a daily sales summary
+
+    - Draft entries: can be deleted by anyone with daily_sales:delete permission
+    - Verified/Posted entries: can only be deleted by users with daily_sales:reopen permission (admins)
+    """
     require_permission(current_user, 'daily_sales:delete')
 
     dss = db.query(DailySalesSummary).filter(DailySalesSummary.id == dss_id).first()
@@ -440,11 +571,17 @@ def delete_daily_sales_summary(
     if not dss:
         raise HTTPException(status_code=404, detail="Daily sales summary not found")
 
+    # Only draft entries can be deleted by regular users
+    # Verified/Posted entries require admin permission
     if dss.status != "draft":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot delete DSS in status: {dss.status}. Only draft DSS can be deleted."
-        )
+        # Check if user has reopen permission (admin-level)
+        try:
+            require_permission(current_user, 'daily_sales:reopen')
+        except HTTPException:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Cannot delete DSS in status: {dss.status}. Only draft DSS can be deleted, or you need admin permission to delete verified/posted entries."
+            )
 
     db.delete(dss)
     db.commit()
@@ -475,6 +612,9 @@ def verify_daily_sales_summary(
             status_code=400,
             detail=f"Cannot verify DSS in status: {dss.status}. Only draft DSS can be verified."
         )
+
+    # Note: Cash variance is now handled separately through the Cash Reconciliation system
+    # Managers reconcile actual cash deposits, and any variance creates a cash over/short JE
 
     # Update status
     dss.status = "verified"
@@ -547,6 +687,141 @@ def post_daily_sales_summary(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error posting DSS: {str(e)}")
+
+
+@router.post("/{dss_id}/reconcile-cash", response_model=DSSSchema)
+def reconcile_cash(
+    dss_id: int,
+    reconcile_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """Reconcile actual cash deposit for a DSS entry (manager function)"""
+    # Managers need daily_sales:edit or cash_reconciliation permission
+    try:
+        require_permission(current_user, 'cash_reconciliation')
+    except HTTPException:
+        # Fallback to daily_sales:edit if cash_reconciliation permission doesn't exist
+        require_permission(current_user, 'daily_sales:edit')
+
+    dss = db.query(DailySalesSummary).filter(DailySalesSummary.id == dss_id).first()
+
+    if not dss:
+        raise HTTPException(status_code=404, detail="Daily sales summary not found")
+
+    # Get actual cash deposit from request
+    actual_cash = Decimal(str(reconcile_data.get('actual_cash_deposit', 0)))
+    notes = reconcile_data.get('notes', '')
+
+    # Update cash reconciliation fields
+    expected_cash = dss.expected_cash_deposit or Decimal('0')
+    dss.actual_cash_deposit = actual_cash
+    dss.cash_variance = actual_cash - expected_cash
+    dss.cash_reconciled_by = current_user.id
+    dss.cash_reconciled_at = datetime.now()
+
+    # Add notes if provided
+    if notes:
+        if dss.notes:
+            dss.notes += f"\n\nCash Reconciliation Notes: {notes}"
+        else:
+            dss.notes = f"Cash Reconciliation Notes: {notes}"
+
+    # Create journal entry for cash variance if variance exists
+    if abs(dss.cash_variance) > Decimal('0.01'):
+        # Get cash over/short account from settings
+        from accounting.models.system_setting import SystemSetting
+        cash_over_short_setting = db.query(SystemSetting).filter(
+            SystemSetting.setting_key == 'cash_over_short_account_id'
+        ).first()
+
+        if not cash_over_short_setting:
+            raise HTTPException(status_code=500, detail="Cash Over/Short account not configured in system settings")
+
+        cash_over_short_account_id = int(cash_over_short_setting.setting_value)
+
+        # Get the cash account from the CASH payment line
+        cash_payment = next((p for p in dss.payments if p.payment_type == 'CASH'), None)
+        if not cash_payment or not cash_payment.deposit_account_id:
+            raise HTTPException(status_code=400, detail="No cash deposit account found for this DSS")
+
+        cash_account_id = cash_payment.deposit_account_id
+
+        # Generate entry number
+        from accounting.api.journal_entries import generate_entry_number
+        entry_number = generate_entry_number(db, dss.business_date)
+
+        # Create journal entry for the variance
+        je = JournalEntry(
+            entry_date=dss.business_date,
+            entry_number=entry_number,
+            description=f"Cash Over/Short - {dss.business_date}",
+            reference_type="CASH_RECONCILIATION",
+            reference_id=dss.id,
+            status=JournalEntryStatus.POSTED,
+            created_by=current_user.id,
+            posted_at=datetime.now()
+        )
+        db.add(je)
+        db.flush()
+
+        # Determine if cash is over or short
+        if dss.cash_variance < 0:
+            # CASH SHORT: actual < expected
+            # DR: Cash Over/Short (Expense)
+            # CR: Cash
+            lines = [
+                JournalEntryLine(
+                    journal_entry_id=je.id,
+                    line_number=1,
+                    account_id=cash_over_short_account_id,
+                    area_id=dss.area_id,
+                    description=f"Cash short - expected ${expected_cash}, actual ${actual_cash}",
+                    debit_amount=abs(dss.cash_variance),
+                    credit_amount=Decimal('0.00')
+                ),
+                JournalEntryLine(
+                    journal_entry_id=je.id,
+                    line_number=2,
+                    account_id=cash_account_id,
+                    area_id=dss.area_id,
+                    description=f"Cash short adjustment",
+                    debit_amount=Decimal('0.00'),
+                    credit_amount=abs(dss.cash_variance)
+                )
+            ]
+        else:
+            # CASH OVER: actual > expected
+            # DR: Cash
+            # CR: Cash Over/Short (Income)
+            lines = [
+                JournalEntryLine(
+                    journal_entry_id=je.id,
+                    line_number=1,
+                    account_id=cash_account_id,
+                    area_id=dss.area_id,
+                    description=f"Cash over adjustment",
+                    debit_amount=dss.cash_variance,
+                    credit_amount=Decimal('0.00')
+                ),
+                JournalEntryLine(
+                    journal_entry_id=je.id,
+                    line_number=2,
+                    account_id=cash_over_short_account_id,
+                    area_id=dss.area_id,
+                    description=f"Cash over - expected ${expected_cash}, actual ${actual_cash}",
+                    debit_amount=Decimal('0.00'),
+                    credit_amount=dss.cash_variance
+                )
+            ]
+
+        je.lines = lines
+        db.add_all(lines)
+
+    db.commit()
+    db.refresh(dss)
+
+    return dss
 
 
 @router.post("/{dss_id}/reopen", response_model=DSSSchema)

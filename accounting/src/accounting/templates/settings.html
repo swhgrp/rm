@@ -147,6 +147,41 @@
     </form>
 </div>
 
+<!-- Account Assignment Settings -->
+<div class="card">
+    <h3><i class="bi bi-bank"></i> Account Assignments</h3>
+    <hr>
+    <form id="accountSettingsForm">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="cashOverShortAccount" class="form-label">Cash Over/Short Account</label>
+                <div class="position-relative">
+                    <input type="text"
+                           class="form-control"
+                           id="cashOverShortAccountSearch"
+                           placeholder="Type to search accounts..."
+                           autocomplete="off"
+                           onfocus="showCashOverShortDropdown()"
+                           oninput="filterCashOverShortAccounts(this.value)">
+                    <input type="hidden" id="cashOverShortAccountId" value="">
+                    <div id="cashOverShortAccountDropdown"
+                         class="position-absolute w-100 bg-dark border border-secondary rounded mt-1"
+                         style="display: none; max-height: 300px; overflow-y: auto; z-index: 1000;">
+                    </div>
+                </div>
+                <small class="text-muted">GL account for cash reconciliation variances</small>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <button type="button" class="btn btn-primary" onclick="saveAccountSettings()">
+                    <i class="bi bi-save"></i> Save Account Settings
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
 <!-- Integration Settings -->
 <div class="card">
     <h3><i class="bi bi-diagram-3"></i> Integration Settings</h3>
@@ -295,7 +330,146 @@
         }
     }
 
-    // Load stats on page load
-    document.addEventListener('DOMContentLoaded', loadSystemStats);
+    // ========== ACCOUNT ASSIGNMENTS ==========
+    let accounts = [];
+    let settingsData = {};
+
+    // Load stats, accounts, and settings on page load
+    document.addEventListener('DOMContentLoaded', async function() {
+        loadSystemStats(); // Load system stats
+        await loadAccountsForSettings(); // Wait for accounts to load first
+        await loadSettingsData(); // Then load settings
+    });
+
+    async function loadAccountsForSettings() {
+        try {
+            const response = await fetch('/accounting/api/accounts/?limit=1000');
+            accounts = await response.json();
+
+            // Filter for expense accounts for Cash Over/Short and sort alphabetically
+            const expenseAccounts = accounts.filter(a =>
+                a.account_type === 'EXPENSE' && a.is_active
+            ).sort((a, b) => a.account_number.localeCompare(b.account_number));
+
+            // Store filtered accounts globally
+            window.expenseAccountsForSettings = expenseAccounts;
+        } catch (error) {
+            console.error('Error loading accounts:', error);
+            alert('Error loading accounts: ' + error.message);
+        }
+    }
+
+    function showCashOverShortDropdown() {
+        filterCashOverShortAccounts('');
+    }
+
+    function hideCashOverShortDropdown() {
+        setTimeout(() => {
+            document.getElementById('cashOverShortAccountDropdown').style.display = 'none';
+        }, 200);
+    }
+
+    function filterCashOverShortAccounts(searchTerm) {
+        if (!window.expenseAccountsForSettings) {
+            return;
+        }
+
+        const dropdown = document.getElementById('cashOverShortAccountDropdown');
+        const filtered = window.expenseAccountsForSettings.filter(account => {
+            const searchStr = `${account.account_number} ${account.account_name}`.toLowerCase();
+            return searchStr.includes(searchTerm.toLowerCase());
+        });
+
+        dropdown.innerHTML = '';
+        filtered.forEach(account => {
+            const div = document.createElement('div');
+            div.className = 'p-2 hover-bg-secondary cursor-pointer';
+            div.style.cursor = 'pointer';
+            div.textContent = `${account.account_number} - ${account.account_name}`;
+            div.onclick = () => selectCashOverShortAccount(account.id, account.account_number, account.account_name);
+            div.onmouseover = function() { this.style.backgroundColor = '#2d333b'; };
+            div.onmouseout = function() { this.style.backgroundColor = 'transparent'; };
+            dropdown.appendChild(div);
+        });
+
+        dropdown.style.display = filtered.length > 0 ? 'block' : 'none';
+    }
+
+    function selectCashOverShortAccount(accountId, accountNumber, accountName) {
+        document.getElementById('cashOverShortAccountId').value = accountId;
+        document.getElementById('cashOverShortAccountSearch').value = `${accountNumber} - ${accountName}`;
+        hideCashOverShortDropdown();
+    }
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const searchInput = document.getElementById('cashOverShortAccountSearch');
+        const dropdown = document.getElementById('cashOverShortAccountDropdown');
+        if (searchInput && dropdown && !searchInput.contains(event.target) && !dropdown.contains(event.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    async function loadSettingsData() {
+        try {
+            const response = await fetch('/accounting/api/settings/');
+            const allSettings = await response.json();
+
+            // Convert array to object keyed by setting_key
+            settingsData = {};
+            allSettings.forEach(s => {
+                settingsData[s.setting_key] = s;
+            });
+
+            // Set Cash Over/Short account value
+            if (settingsData['cash_over_short_account_id']) {
+                const accountId = settingsData['cash_over_short_account_id'].setting_value;
+                document.getElementById('cashOverShortAccountId').value = accountId;
+
+                // Find the account and set the display text
+                const account = accounts.find(a => a.id == accountId);
+                if (account) {
+                    document.getElementById('cashOverShortAccountSearch').value =
+                        `${account.account_number} - ${account.account_name}`;
+                }
+            }
+        } catch (error) {
+            console.error('Error loading settings:', error);
+            alert('Error loading settings: ' + error.message);
+        }
+    }
+
+    async function saveAccountSettings() {
+        try {
+            const cashOverShortAccountId = document.getElementById('cashOverShortAccountId').value;
+
+            if (!cashOverShortAccountId) {
+                alert('Please select a Cash Over/Short account');
+                return;
+            }
+
+            // Update Cash Over/Short account setting
+            const response = await fetch('/accounting/api/settings/cash_over_short_account_id', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    setting_value: cashOverShortAccountId
+                })
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save settings');
+            }
+
+            alert('Account settings saved successfully!');
+            await loadSettingsData(); // Reload to show updated values
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            alert('Error: ' + error.message);
+        }
+    }
 </script>
 {% endblock %}

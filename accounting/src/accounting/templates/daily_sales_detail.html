@@ -3,6 +3,45 @@
 {% block title %}Daily Sales Entry - Accounting{% endblock %}
 {% block nav_daily_sales %}active{% endblock %}
 
+{% block extra_head %}
+<style>
+    /* Dark theme for readonly inputs */
+    input[readonly],
+    input:read-only,
+    .form-control[readonly],
+    .form-control:read-only {
+        background-color: #21262d !important;
+        border-color: #30363d !important;
+        color: #c9d1d9 !important;
+        opacity: 1 !important;
+        font-weight: 500;
+    }
+
+    /* Special highlighting for key totals */
+    #netSales {
+        background-color: #1f6feb !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+    }
+
+    #totalCollected {
+        background-color: #238636 !important;
+        color: #ffffff !important;
+        font-weight: 600 !important;
+        font-size: 1.1em !important;
+    }
+
+    #variance {
+        background-color: #9a6700 !important;
+        color: #ffffff !important;
+    }
+
+    #variance.negative {
+        background-color: #da3633 !important;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid mt-4">
     <input type="hidden" id="dssId" value="{{ dss_id }}">
@@ -43,6 +82,11 @@
             </button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link" id="discounts-tab-btn" data-bs-toggle="tab" data-bs-target="#discounts-tab" type="button">
+                Discounts
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link" id="journal-tab" data-bs-toggle="tab" data-bs-target="#journal" type="button">
                 Journal Entry
             </button>
@@ -79,8 +123,7 @@
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label class="form-label">Gross Sales</label>
-                            <input type="number" step="0.01" class="form-control" id="grossSales" readonly
-                                   style="background-color: #f0f0f0;">
+                            <input type="number" step="0.01" class="form-control" id="grossSales" readonly>
                             <small class="text-muted">Calculated from categories</small>
                         </div>
                         <div class="col-md-4">
@@ -96,8 +139,7 @@
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label class="form-label">Net Sales</label>
-                            <input type="number" step="0.01" class="form-control" id="netSales" readonly
-                                   style="background-color: #e8f4f8; font-weight: bold;">
+                            <input type="number" step="0.01" class="form-control" id="netSales" readonly>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Tax Collected</label>
@@ -105,8 +147,7 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Tips</label>
-                            <input type="number" step="0.01" class="form-control" id="tips" readonly
-                                   style="background-color: #f0f0f0;">
+                            <input type="number" step="0.01" class="form-control" id="tips" readonly>
                             <small class="text-muted">Calculated from payments</small>
                         </div>
                     </div>
@@ -114,21 +155,24 @@
                     <div class="row mb-3">
                         <div class="col-md-4">
                             <label class="form-label"><strong>Total Collected</strong></label>
-                            <input type="number" step="0.01" class="form-control" id="totalCollected" readonly
-                                   style="background-color: #d4edda; font-weight: bold; font-size: 1.1em;">
+                            <input type="number" step="0.01" class="form-control" id="totalCollected" readonly>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Deposit Amount</label>
-                            <input type="number" step="0.01" class="form-control" id="depositAmount" readonly
-                                   style="background-color: #f0f0f0;">
+                            <input type="number" step="0.01" class="form-control" id="depositAmount" readonly>
                             <small class="text-muted">Calculated from payments</small>
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Variance</label>
-                            <input type="number" step="0.01" class="form-control" id="variance" readonly
-                                   style="background-color: #fff3cd;">
+                            <input type="number" step="0.01" class="form-control" id="variance" readonly>
                             <small class="text-muted">Deposit - Total Collected</small>
                         </div>
+                    </div>
+
+                    <div id="varianceWarning" class="alert alert-danger" style="display: none;">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Variance Detected!</strong> You must resolve the variance before verifying this entry.
+                        The deposit amount must match the total collected. Check your payment amounts for accuracy.
                     </div>
 
                     <div class="row">
@@ -227,6 +271,45 @@
             </div>
         </div>
 
+        <!-- DISCOUNTS TAB -->
+        <div class="tab-pane fade" id="discounts-tab" role="tabpanel">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Discounts</h5>
+                    <button class="btn btn-sm btn-primary" onclick="addDiscountLine()">
+                        <i class="bi bi-plus"></i> Add Discount
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40%;">Discount Name</th>
+                                    <th style="width: 40%;">GL Account</th>
+                                    <th style="width: 15%; text-align: right;">Amount</th>
+                                    <th style="width: 5%;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="discountLines">
+                                <!-- Discount lines will be added here -->
+                            </tbody>
+                            <tfoot>
+                                <tr style="font-weight: bold; background-color: #f8f9fa;">
+                                    <td colspan="2" style="text-align: right;">TOTAL DISCOUNTS:</td>
+                                    <td style="text-align: right;" id="discountTotal">$0.00</td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div class="mt-2 text-muted small">
+                        <i class="bi bi-info-circle"></i> Discount totals update the Discounts field on the Totals tab
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- JOURNAL ENTRY TAB -->
         <div class="tab-pane fade" id="journal" role="tabpanel">
             <div class="card">
@@ -272,11 +355,22 @@
 </div>
 
 <script>
+// Ensure debug object exists (defined in base.html, but may not be loaded yet)
+if (typeof window.debug === 'undefined') {
+    window.debug = {
+        log: function() { if (window.DEBUG_MODE) console.log(...arguments); },
+        warn: function() { if (window.DEBUG_MODE) console.warn(...arguments); },
+        error: function() { console.error(...arguments); },
+        trace: function() { if (window.DEBUG_MODE) console.trace(...arguments); }
+    };
+}
+
 let dss = null;
 let areas = [];
 let accounts = [];
 let categoryLines = [];
 let paymentLines = [];
+let discountLines = [];
 
 // Standard category names
 const STANDARD_CATEGORIES = [
@@ -345,6 +439,7 @@ async function loadInitialData() {
         }
 
         updateUI();
+        generateJournalEntryPreview();
     } catch (error) {
         console.error('Error loading data:', error);
         showNotification('Error loading page data: ' + error.message, 'Error');
@@ -358,6 +453,45 @@ async function loadDSS(id) {
 
         dss = await response.json();
 
+        // Load POS mappings if this is a POS-imported entry
+        let paymentMappings = {};
+        let discountMappings = {};
+        let categoryMappings = {};
+        if (dss.imported_from_pos && dss.area_id) {
+            try {
+                // Fetch payment mappings
+                const paymentResp = await fetch(`/accounting/api/pos/payment-mappings?area_id=${dss.area_id}`);
+                if (paymentResp.ok) {
+                    const mappings = await paymentResp.json();
+                    paymentMappings = Object.fromEntries(
+                        mappings.filter(m => m.is_active).map(m => [m.pos_payment_type, m.deposit_account_id])
+                    );
+                    debug.log('Loaded payment mappings:', paymentMappings);
+                }
+
+                // Fetch category mappings
+                const categoryResp = await fetch(`/accounting/api/pos/category-mappings?area_id=${dss.area_id}`);
+                if (categoryResp.ok) {
+                    const mappings = await categoryResp.json();
+                    categoryMappings = Object.fromEntries(
+                        mappings.filter(m => m.is_active).map(m => [m.pos_category, m.revenue_account_id])
+                    );
+                    debug.log('Loaded category mappings:', categoryMappings);
+                }
+
+                // Fetch discount mappings
+                const discountResp = await fetch(`/accounting/api/pos/discount-mappings?area_id=${dss.area_id}`);
+                if (discountResp.ok) {
+                    const mappings = await discountResp.json();
+                    discountMappings = Object.fromEntries(
+                        mappings.filter(m => m.is_active).map(m => [m.pos_discount_name, m.discount_account_id])
+                    );
+                }
+            } catch (err) {
+                console.error('Error loading POS mappings:', err);
+            }
+        }
+
         // Populate form
         document.getElementById('businessDate').value = dss.business_date;
         document.getElementById('areaId').value = dss.area_id;
@@ -367,13 +501,113 @@ async function loadDSS(id) {
         document.getElementById('taxCollected').value = dss.tax_collected;
         document.getElementById('notes').value = dss.notes || '';
 
-        // Load line items
-        categoryLines = dss.line_items || [];
+        // Load line items - convert from category_breakdown if no line_items exist
+        if (dss.line_items && dss.line_items.length > 0) {
+            categoryLines = dss.line_items;
+        } else if (dss.category_breakdown) {
+            // Convert category_breakdown object to line items
+            categoryLines = [];
+            for (const [category, amount] of Object.entries(dss.category_breakdown)) {
+                // Look up mapped revenue account for this category
+                const mappedAccountId = categoryMappings[category] || null;
+                debug.log(`Category ${category}: looking up mapping, found account ID: ${mappedAccountId}`);
+
+                categoryLines.push({
+                    category: category,
+                    revenue_account_id: mappedAccountId,
+                    net_amount: parseFloat(amount),
+                    tax_amount: 0
+                });
+            }
+        } else {
+            categoryLines = [];
+        }
         renderCategoryLines();
 
-        // Load payments
-        paymentLines = dss.payments || [];
+        // Load payments - convert from payment_breakdown if no payments exist
+        if (dss.payments && dss.payments.length > 0) {
+            paymentLines = dss.payments;
+        } else if (dss.payment_breakdown) {
+            // Convert payment_breakdown object to payment lines
+            paymentLines = [];
+
+            for (const [paymentType, paymentData] of Object.entries(dss.payment_breakdown)) {
+                // Check if payment_breakdown has new structure with amount and tips
+                console.log(`Processing ${paymentType}:`, paymentData, 'Type:', typeof paymentData);
+                let paymentAmount, paymentTips;
+
+                if (typeof paymentData === 'object' && paymentData !== null && 'amount' in paymentData) {
+                    // New structure: {"CARD": {"amount": 1960.27, "tips": 339.47}}
+                    console.log(`${paymentType}: Using NEW structure - amount=${paymentData.amount}, tips=${paymentData.tips}`);
+                    paymentAmount = parseFloat(paymentData.amount) || 0;
+                    paymentTips = parseFloat(paymentData.tips) || 0;
+                } else {
+                    // Old structure: {"CARD": 1960.27} - distribute tips proportionally
+                    console.log(`${paymentType}: Using OLD proportional distribution`);
+                    paymentAmount = parseFloat(paymentData) || 0;
+                    const totalPayments = Object.values(dss.payment_breakdown).reduce((sum, amt) => {
+                        return sum + (typeof amt === 'object' ? parseFloat(amt.amount || 0) : parseFloat(amt || 0));
+                    }, 0);
+                    const paymentPct = paymentAmount / totalPayments;
+                    paymentTips = dss.tips ? (dss.tips * paymentPct) : 0;
+                    console.log(`${paymentType}: paymentPct=${paymentPct}, calculated tips=${paymentTips}`);
+                }
+
+                // Look up mapped account for this payment type
+                const mappedAccountId = paymentMappings[paymentType] || null;
+                debug.log(`Payment ${paymentType}: amount=${paymentAmount}, tips=${paymentTips}, mapped account=${mappedAccountId}`);
+
+                paymentLines.push({
+                    payment_type: paymentType.charAt(0).toUpperCase() + paymentType.slice(1), // Capitalize first letter
+                    deposit_account_id: mappedAccountId,
+                    amount: paymentAmount,
+                    tips: parseFloat(paymentTips.toFixed(2))
+                });
+            }
+        } else {
+            paymentLines = [];
+        }
         renderPaymentLines();
+
+        // Load discounts - convert from discount_breakdown if present
+        debug.log('DSS discount_breakdown:', dss.discount_breakdown);
+        if (dss.discount_breakdown) {
+            discountLines = [];
+            for (const [discountName, amount] of Object.entries(dss.discount_breakdown)) {
+                const discountAmount = Math.abs(parseFloat(amount)); // Convert negative to positive
+                debug.log(`Processing discount: ${discountName} = ${amount} -> ${discountAmount}`);
+                // Only add non-zero discounts
+                if (discountAmount > 0) {
+                    // Look up mapped account for this discount
+                    const mappedAccountId = discountMappings[discountName] || null;
+
+                    discountLines.push({
+                        discount_name: discountName,
+                        discount_account_id: mappedAccountId,
+                        amount: discountAmount
+                    });
+                }
+            }
+        } else {
+            discountLines = [];
+            debug.log('No discount_breakdown in DSS response');
+        }
+        debug.log('Final discountLines:', discountLines);
+        renderDiscountLines();
+
+        // Make fields read-only for POS-imported entries
+        if (dss.imported_from_pos || dss.pos_system) {
+            document.getElementById('businessDate').readOnly = true;
+            document.getElementById('areaId').disabled = true;
+            document.getElementById('posSystem').disabled = true;
+
+            // Update posSystem to show the actual POS provider
+            if (dss.pos_system) {
+                const posSystemSelect = document.getElementById('posSystem');
+                const posLabel = dss.pos_system.charAt(0).toUpperCase() + dss.pos_system.slice(1) + ' POS';
+                posSystemSelect.innerHTML = `<option value="${dss.pos_system}">${posLabel}</option>`;
+            }
+        }
 
         calculateTotals();
     } catch (error) {
@@ -486,11 +720,13 @@ function renderCategoryLines() {
 function updateCategoryLine(index, field, value) {
     categoryLines[index][field] = value;
     renderCategoryLines();
+    generateJournalEntryPreview();
 }
 
 function removeCategoryLine(index) {
     categoryLines.splice(index, 1);
     renderCategoryLines();
+    generateJournalEntryPreview();
 }
 
 function calculateCategoryTotals() {
@@ -590,11 +826,13 @@ function renderPaymentLines() {
 function updatePaymentLine(index, field, value) {
     paymentLines[index][field] = value;
     renderPaymentLines();
+    generateJournalEntryPreview();
 }
 
 function removePaymentLine(index) {
     paymentLines.splice(index, 1);
     renderPaymentLines();
+    generateJournalEntryPreview();
 }
 
 function calculatePaymentTotals() {
@@ -613,6 +851,117 @@ function calculatePaymentTotals() {
     // Update tips and deposit amount
     document.getElementById('tips').value = totalTips.toFixed(2);
     document.getElementById('depositAmount').value = (totalAmount + totalTips).toFixed(2);
+
+    calculateTotals();
+}
+
+// ==================== DISCOUNT LINE MANAGEMENT ====================
+
+function addDiscountLine() {
+    discountLines.push({
+        discount_name: '',
+        discount_account_id: null,
+        amount: 0
+    });
+    renderDiscountLines();
+}
+
+function renderDiscountLines() {
+    debug.log('renderDiscountLines called, discountLines:', discountLines);
+    console.trace('Stack trace for renderDiscountLines');
+    const tbody = document.getElementById('discountLines');
+    if (!tbody) {
+        console.error('discountLines tbody not found!');
+        return;
+    }
+    debug.log('Found discountLines tbody, clearing it');
+    tbody.innerHTML = '';
+
+    debug.log('About to render', discountLines.length, 'discount lines');
+    discountLines.forEach((line, index) => {
+        debug.log(`Rendering discount line ${index}:`, line);
+        const tr = document.createElement('tr');
+
+        // Filter accounts for contra-revenue (4xxx with credit normal balance) or expense accounts
+        const discountAccounts = accounts.filter(a =>
+            a.account_type === 'REVENUE' || a.account_type === 'EXPENSE'
+        );
+        debug.log(`Found ${discountAccounts.length} discount accounts`);
+
+        tr.innerHTML = `
+            <td>
+                <input type="text" class="form-control form-control-sm"
+                       value="${line.discount_name || ''}"
+                       onchange="updateDiscountLine(${index}, 'discount_name', this.value)"
+                       placeholder="Discount name...">
+            </td>
+            <td>
+                <select class="form-select form-select-sm"
+                        onchange="updateDiscountLine(${index}, 'discount_account_id', parseInt(this.value))">
+                    <option value="">Select Account...</option>
+                    ${discountAccounts.map(acc => `
+                        <option value="${acc.id}" ${acc.id === line.discount_account_id ? 'selected' : ''}>
+                            ${acc.account_number} - ${acc.account_name}
+                        </option>
+                    `).join('')}
+                </select>
+            </td>
+            <td>
+                <input type="number" step="0.01" class="form-control form-control-sm text-end"
+                       value="${line.amount}"
+                       onchange="updateDiscountLine(${index}, 'amount', parseFloat(this.value) || 0)">
+            </td>
+            <td>
+                <button class="btn btn-sm btn-outline-danger" onclick="removeDiscountLine(${index})">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        `;
+
+        debug.log('Appending tr to tbody');
+        tbody.appendChild(tr);
+        debug.log('tbody.children.length after append:', tbody.children.length);
+    });
+
+    debug.log('Finished rendering, tbody.children.length:', tbody.children.length);
+    debug.log('tbody HTML:', tbody.innerHTML.substring(0, 200));
+
+    // Check if tbody is actually visible
+    const discountsTab = document.getElementById('discounts-tab');
+    debug.log('Discounts tab classes:', discountsTab ? discountsTab.className : 'TAB NOT FOUND');
+    debug.log('tbody display style:', tbody.style.display);
+    debug.log('tbody computed display:', window.getComputedStyle(tbody).display);
+    debug.log('tbody parent (table) display:', window.getComputedStyle(tbody.parentElement).display);
+
+    calculateDiscountTotals();
+}
+
+function updateDiscountLine(index, field, value) {
+    discountLines[index][field] = value;
+    renderDiscountLines();
+    generateJournalEntryPreview();
+}
+
+function removeDiscountLine(index) {
+    discountLines.splice(index, 1);
+    renderDiscountLines();
+    generateJournalEntryPreview();
+}
+
+function calculateDiscountTotals() {
+    debug.log('calculateDiscountTotals called with', discountLines.length, 'lines');
+    let totalDiscounts = 0;
+
+    discountLines.forEach(line => {
+        totalDiscounts += parseFloat(line.amount) || 0;
+        debug.log(`Adding discount ${line.discount_name}: ${line.amount}, running total: ${totalDiscounts}`);
+    });
+
+    debug.log('Setting discountTotal to', formatCurrency(totalDiscounts));
+    document.getElementById('discountTotal').textContent = formatCurrency(totalDiscounts);
+
+    // Update discounts field on Totals tab
+    document.getElementById('discounts').value = totalDiscounts.toFixed(2);
 
     calculateTotals();
 }
@@ -637,15 +986,260 @@ function calculateTotals() {
     const variance = deposit - totalCollected;
     document.getElementById('variance').value = variance.toFixed(2);
 
-    // Color code variance
+    // Add negative class if variance is negative
     const varianceInput = document.getElementById('variance');
-    if (Math.abs(variance) < 0.01) {
-        varianceInput.style.backgroundColor = '#d4edda'; // Green
-    } else if (Math.abs(variance) <= 5.00) {
-        varianceInput.style.backgroundColor = '#fff3cd'; // Yellow
+    if (variance < 0) {
+        varianceInput.classList.add('negative');
     } else {
-        varianceInput.style.backgroundColor = '#f8d7da'; // Red
+        varianceInput.classList.remove('negative');
     }
+
+    // Show/hide variance warning
+    const varianceWarning = document.getElementById('varianceWarning');
+    if (Math.abs(variance) > 0.01) {
+        varianceWarning.style.display = 'block';
+    } else {
+        varianceWarning.style.display = 'none';
+    }
+
+    // Update journal entry preview
+    generateJournalEntryPreview();
+
+    // Update verify button state
+    updateUI();
+}
+
+function generateJournalEntryPreview() {
+    const preview = document.getElementById('journalEntryPreview');
+
+    if (!dss) {
+        preview.innerHTML = '<p class="text-muted">Loading...</p>';
+        return;
+    }
+
+    if (dss.status === 'draft') {
+        preview.innerHTML = '<p class="text-muted">Journal entry will be created when this sales summary is verified and posted.</p>';
+        return;
+    }
+
+    // Calculate journal entry lines
+    const lines = [];
+    let lineNum = 1;
+
+    // Get totals
+    const netSales = parseFloat(document.getElementById('netSales').value) || 0;
+    const tax = parseFloat(document.getElementById('taxCollected').value) || 0;
+    const tips = parseFloat(document.getElementById('tips').value) || 0;
+    const totalCollected = parseFloat(document.getElementById('totalCollected').value) || 0;
+    const discounts = parseFloat(document.getElementById('discounts').value) || 0;
+
+    // DEBIT: Cash/Bank accounts (from payment lines)
+    // NOTE: Tips are excluded because they are paid out daily and don't hit the GL
+    let totalDebits = 0;
+    paymentLines.forEach(payment => {
+        const amount = parseFloat(payment.amount) || 0;
+        // Don't include tips in the journal entry - they're paid out daily
+
+        if (amount > 0) {
+            const account = accounts.find(a => a.id === payment.deposit_account_id);
+            lines.push({
+                line: lineNum++,
+                account: account ? `${account.account_number} - ${account.account_name}` : 'Not Mapped',
+                description: `${payment.payment_type} deposits`,
+                debit: amount,
+                credit: 0
+            });
+            totalDebits += amount;
+        }
+    });
+
+    // CREDIT: Revenue accounts (from category lines)
+    let totalCredits = 0;
+    categoryLines.forEach(category => {
+        const amount = parseFloat(category.net_amount) || 0;
+        if (amount > 0) {
+            const account = accounts.find(a => a.id === category.revenue_account_id);
+            lines.push({
+                line: lineNum++,
+                account: account ? `${account.account_number} - ${account.account_name}` : 'Not Mapped',
+                description: category.category,
+                debit: 0,
+                credit: amount
+            });
+            totalCredits += amount;
+        }
+    });
+
+    // DEBIT: Discount accounts (from discount lines)
+    discountLines.forEach(discount => {
+        const amount = parseFloat(discount.amount) || 0;
+        if (amount > 0) {
+            const account = accounts.find(a => a.id === discount.discount_account_id);
+            lines.push({
+                line: lineNum++,
+                account: account ? `${account.account_number} - ${account.account_name}` : 'Not Mapped',
+                description: discount.discount_name,
+                debit: amount,
+                credit: 0
+            });
+            totalDebits += amount;
+        }
+    });
+
+    // DEBIT: Refunds (Sales Returns & Allowances)
+    const refunds = parseFloat(document.getElementById('refunds')?.value) || 0;
+    if (refunds > 0) {
+        // Find Sales Returns & Allowances account (account 4900)
+        const refundAccount = accounts.find(a => a.account_name.includes('Returns') || a.account_name.includes('Allowances'));
+        lines.push({
+            line: lineNum++,
+            account: refundAccount ? `${refundAccount.account_number} - ${refundAccount.account_name}` : '4900 - Sales Returns & Allowances',
+            description: 'Sales refunds',
+            debit: refunds,
+            credit: 0
+        });
+        totalDebits += refunds;
+    }
+
+    // CREDIT: Sales Tax Payable
+    if (tax > 0) {
+        lines.push({
+            line: lineNum++,
+            account: 'Sales Tax Payable',
+            description: 'Sales tax collected',
+            debit: 0,
+            credit: tax
+        });
+        totalCredits += tax;
+    }
+
+    // Calculate variance
+    const variance = totalDebits - totalCredits;
+    const hasVariance = Math.abs(variance) > 0.01;
+
+    // Build HTML
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-sm table-hover">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th>Account</th>
+                        <th>Description</th>
+                        <th class="text-end" style="width: 120px;">Debit</th>
+                        <th class="text-end" style="width: 120px;">Credit</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    lines.forEach(line => {
+        html += `
+            <tr>
+                <td>${line.line}</td>
+                <td>${line.account}</td>
+                <td>${line.description}</td>
+                <td class="text-end">${line.debit > 0 ? formatCurrency(line.debit) : ''}</td>
+                <td class="text-end">${line.credit > 0 ? formatCurrency(line.credit) : ''}</td>
+            </tr>
+        `;
+    });
+
+    // Add variance row if needed
+    if (hasVariance) {
+        html += `
+            <tr id="varianceRow" class="table-warning">
+                <td>${lineNum}</td>
+                <td>
+                    <div class="position-relative">
+                        <input type="text"
+                               id="varianceAccountSearch"
+                               class="form-control form-control-sm"
+                               placeholder="Type to search accounts..."
+                               style="min-width: 300px;"
+                               autocomplete="off"
+                               oninput="filterVarianceAccounts(this.value)"
+                               onfocus="showVarianceAccountDropdown()"
+                               onblur="hideVarianceAccountDropdown()">
+                        <input type="hidden" id="varianceAccountId" value="">
+                        <div id="varianceAccountDropdown" class="position-absolute w-100 bg-white border rounded shadow-sm" style="max-height: 200px; overflow-y: auto; z-index: 1000; display: none;">
+        `;
+
+        // Add expense accounts for variance (typically "Cash Over/Short" or "Rounding")
+        // Sort by account number
+        const expenseAccounts = accounts
+            .filter(a => a.account_type === 'EXPENSE')
+            .sort((a, b) => a.account_number.localeCompare(b.account_number));
+
+        expenseAccounts.forEach(acc => {
+            html += `
+                            <div class="variance-account-option p-2 hover-bg-light cursor-pointer"
+                                 data-account-id="${acc.id}"
+                                 data-account-number="${acc.account_number}"
+                                 data-account-name="${acc.account_name}"
+                                 onmousedown="selectVarianceAccount(${acc.id}, '${acc.account_number} - ${acc.account_name}')">
+                                ${acc.account_number} - ${acc.account_name}
+                            </div>
+            `;
+        });
+
+        html += `
+                        </div>
+                    </div>
+                </td>
+                <td>Rounding/variance adjustment</td>
+                <td class="text-end">${variance < 0 ? formatCurrency(Math.abs(variance)) : ''}</td>
+                <td class="text-end">${variance > 0 ? formatCurrency(Math.abs(variance)) : ''}</td>
+            </tr>
+        `;
+    }
+
+    // Totals row
+    const finalDebits = totalDebits + (variance < 0 ? Math.abs(variance) : 0);
+    const finalCredits = totalCredits + (variance > 0 ? Math.abs(variance) : 0);
+
+    html += `
+                </tbody>
+                <tfoot>
+                    <tr class="fw-bold">
+                        <td colspan="3" class="text-end">TOTALS:</td>
+                        <td class="text-end">${formatCurrency(finalDebits)}</td>
+                        <td class="text-end">${formatCurrency(finalCredits)}</td>
+                    </tr>
+    `;
+
+    if (hasVariance) {
+        html += `
+                    <tr class="${Math.abs(finalDebits - finalCredits) > 0.01 ? 'table-danger' : 'table-success'}">
+                        <td colspan="3" class="text-end">
+                            <span class="badge ${Math.abs(finalDebits - finalCredits) > 0.01 ? 'bg-danger' : 'bg-success'}">
+                                ${Math.abs(finalDebits - finalCredits) > 0.01 ? 'OUT OF BALANCE' : 'BALANCED'}
+                            </span>
+                        </td>
+                        <td colspan="2" class="text-end">
+                            Variance: ${formatCurrency(Math.abs(finalDebits - finalCredits))}
+                        </td>
+                    </tr>
+        `;
+    }
+
+    html += `
+                </tfoot>
+            </table>
+        </div>
+    `;
+
+    if (hasVariance) {
+        html += `
+            <div class="alert alert-warning mt-3">
+                <i class="bi bi-exclamation-triangle"></i>
+                <strong>Balance Variance Detected:</strong> There is a ${formatCurrency(Math.abs(variance))} difference between debits and credits.
+                This is typically due to rounding. Please select a variance account above (e.g., "Cash Over/Short" or "Rounding") before posting.
+            </div>
+        `;
+    }
+
+    preview.innerHTML = html;
 }
 
 function updateUI() {
@@ -661,7 +1255,21 @@ function updateUI() {
     if (status === 'draft') {
         statusBadge.innerHTML = '<span class="badge status-draft">DRAFT</span>';
         document.getElementById('saveBtn').style.display = 'inline-block';
-        document.getElementById('verifyBtn').style.display = 'inline-block';
+
+        // Check for variance before allowing verify
+        const variance = parseFloat(document.getElementById('variance').value) || 0;
+        const verifyBtn = document.getElementById('verifyBtn');
+        verifyBtn.style.display = 'inline-block';
+
+        if (Math.abs(variance) > 0.01) {
+            verifyBtn.disabled = true;
+            verifyBtn.title = 'Cannot verify with variance. Deposit amount must match total collected.';
+            verifyBtn.classList.add('disabled');
+        } else {
+            verifyBtn.disabled = false;
+            verifyBtn.title = 'Verify this sales summary';
+            verifyBtn.classList.remove('disabled');
+        }
     } else if (status === 'verified') {
         statusBadge.innerHTML = '<span class="badge status-verified">VERIFIED</span>';
         document.getElementById('saveBtn').style.display = 'none';
@@ -898,7 +1506,7 @@ async function verifyDSS() {
 }
 
 async function postDSS() {
-    console.log('postDSS called');
+    debug.log('postDSS called');
 
     if (!dss) {
         showNotification('Please save the entry first', 'Error');
@@ -906,7 +1514,7 @@ async function postDSS() {
     }
 
     const confirmed = await showConfirm('Post this sales summary? This will create a journal entry and cannot be undone.', 'Post Sales');
-    console.log('Confirm result:', confirmed);
+    debug.log('Confirm result:', confirmed);
 
     if (!confirmed) {
         return;
@@ -929,10 +1537,52 @@ async function postDSS() {
             }
         });
 
-        console.log('Category Mapping:', categoryMapping);
-        console.log('Payment Mapping:', paymentMapping);
-        console.log('Category Lines:', categoryLines);
-        console.log('Payment Lines:', paymentLines);
+        debug.log('Category Mapping:', categoryMapping);
+        debug.log('Payment Mapping:', paymentMapping);
+        debug.log('Category Lines:', categoryLines);
+        debug.log('Payment Lines:', paymentLines);
+
+        // Calculate variance and get variance account if needed
+        let totalDebits = 0;
+        let totalCredits = 0;
+
+        // Sum payment debits (exclude tips - they're paid out daily)
+        paymentLines.forEach(payment => {
+            const amount = parseFloat(payment.amount) || 0;
+            // Don't include tips - they're paid out daily and don't hit the GL
+            totalDebits += amount;
+        });
+
+        // Sum discount debits
+        discountLines.forEach(discount => {
+            totalDebits += parseFloat(discount.amount) || 0;
+        });
+
+        // Sum category credits
+        categoryLines.forEach(category => {
+            totalCredits += parseFloat(category.net_amount) || 0;
+        });
+
+        // Add tax credit
+        const tax = parseFloat(document.getElementById('taxCollected').value) || 0;
+        totalCredits += tax;
+
+        const variance = totalDebits - totalCredits;
+        const hasVariance = Math.abs(variance) > 0.01;
+
+        // If there's a variance, check that variance account is selected
+        let varianceAccountId = null;
+        let varianceAmount = null;
+
+        if (hasVariance) {
+            const varianceAccountIdInput = document.getElementById('varianceAccountId');
+            if (!varianceAccountIdInput || !varianceAccountIdInput.value) {
+                showNotification('Please select a variance account on the Journal Entry tab before posting.', 'Error');
+                return;
+            }
+            varianceAccountId = parseInt(varianceAccountIdInput.value);
+            varianceAmount = variance;
+        }
 
         const response = await fetch(`/accounting/api/daily-sales/${dss.id}/post`, {
             method: 'POST',
@@ -940,7 +1590,9 @@ async function postDSS() {
             body: JSON.stringify({
                 notes: null,
                 category_account_mapping: categoryMapping,
-                payment_account_mapping: paymentMapping
+                payment_account_mapping: paymentMapping,
+                variance_account_id: varianceAccountId,
+                variance_amount: varianceAmount
             })
         });
 
@@ -964,7 +1616,7 @@ async function postDSS() {
 }
 
 async function reopenDSS() {
-    console.log('reopenDSS called');
+    debug.log('reopenDSS called');
 
     if (!dss) {
         showNotification('No sales entry found', 'Error');
@@ -1005,14 +1657,67 @@ async function reopenDSS() {
 }
 
 // Log when page loads
-console.log('Daily Sales Detail page loaded');
-console.log('DSS ID:', document.getElementById('dssId').value);
+debug.log('Daily Sales Detail page loaded');
+debug.log('DSS ID:', document.getElementById('dssId').value);
 
 function formatCurrency(amount) {
     return new Intl.NumberFormat('en-US', {
         style: 'currency',
         currency: 'USD'
     }).format(amount);
+}
+
+// Variance account search functions
+function showVarianceAccountDropdown() {
+    const dropdown = document.getElementById('varianceAccountDropdown');
+    if (dropdown) {
+        dropdown.style.display = 'block';
+    }
+}
+
+function hideVarianceAccountDropdown() {
+    // Delay to allow click event to fire
+    setTimeout(() => {
+        const dropdown = document.getElementById('varianceAccountDropdown');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+        }
+    }, 200);
+}
+
+function filterVarianceAccounts(searchText) {
+    const dropdown = document.getElementById('varianceAccountDropdown');
+    if (!dropdown) return;
+
+    const options = dropdown.querySelectorAll('.variance-account-option');
+    const search = searchText.toLowerCase();
+
+    options.forEach(option => {
+        const text = option.textContent.toLowerCase();
+        if (text.includes(search)) {
+            option.style.display = 'block';
+        } else {
+            option.style.display = 'none';
+        }
+    });
+
+    dropdown.style.display = 'block';
+}
+
+function selectVarianceAccount(accountId, accountText) {
+    const searchInput = document.getElementById('varianceAccountSearch');
+    const hiddenInput = document.getElementById('varianceAccountId');
+    const dropdown = document.getElementById('varianceAccountDropdown');
+
+    if (searchInput) {
+        searchInput.value = accountText;
+    }
+    if (hiddenInput) {
+        hiddenInput.value = accountId;
+    }
+    if (dropdown) {
+        dropdown.style.display = 'none';
+    }
 }
 </script>
 
@@ -1050,6 +1755,25 @@ function formatCurrency(amount) {
 
 .table td {
     border-color: #30363d;
+}
+
+/* Variance account dropdown styles */
+.variance-account-option {
+    cursor: pointer;
+    border-bottom: 1px solid #30363d;
+}
+
+.variance-account-option:hover {
+    background-color: #161b22 !important;
+    color: #58a6ff !important;
+}
+
+.variance-account-option:last-child {
+    border-bottom: none;
+}
+
+.cursor-pointer {
+    cursor: pointer;
 }
 </style>
 {% endblock %}

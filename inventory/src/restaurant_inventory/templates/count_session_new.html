@@ -454,6 +454,25 @@ function convertUnit(value, fromUnit, toUnit) {
     return value; // No conversion available, return original value
 }
 
+// API request helper function
+async function apiRequest(url, options = {}) {
+    const defaultOptions = {
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        credentials: 'same-origin' // Include cookies for authentication
+    };
+
+    const response = await fetch(url, { ...defaultOptions, ...options });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API request failed: ${response.status} - ${errorText}`);
+    }
+
+    return await response.json();
+}
+
 async function init() {
     try {
         [locations, storageAreas, categories, allItems] = await Promise.all([

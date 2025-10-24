@@ -29,6 +29,9 @@ class AreaBase(BaseModel):
     email: Optional[str] = Field(None, max_length=100)
     website: Optional[str] = Field(None, max_length=200)
 
+    # GL Account Configuration
+    safe_account_id: Optional[int] = Field(None, description="GL account for safe transactions")
+
 
 class AreaCreate(AreaBase):
     pass
@@ -57,6 +60,9 @@ class AreaUpdate(BaseModel):
     phone: Optional[str] = Field(None, max_length=20)
     email: Optional[str] = Field(None, max_length=100)
     website: Optional[str] = Field(None, max_length=200)
+
+    # GL Account Configuration
+    safe_account_id: Optional[int] = None
 
 
 class AreaResponse(AreaBase):
