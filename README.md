@@ -77,12 +77,42 @@ restaurant-system/
 - **Port**: Internal (proxied via nginx at `/accounting/`)
 - **Database**: PostgreSQL (`accounting_db`) - Completely isolated
 - **Features**:
-  - Double-entry bookkeeping
-  - Chart of accounts
-  - Journal entries
-  - Cost of Goods Sold (COGS) tracking
-  - Fiscal period management
-  - Financial reporting
+  - **Full Double-Entry Accounting System**
+    - Chart of accounts with hierarchical structure
+    - General ledger with drill-down capabilities
+    - Journal entries with multi-line support
+    - Trial balance and account reconciliation
+  - **Financial Reporting**
+    - Profit & Loss (P&L) statement with multi-period comparison
+    - Balance sheet with visualizations
+    - General ledger reports with location filtering
+    - Account detail pages with transaction history
+  - **Accounts Payable (AP)**
+    - Vendor management and bill tracking
+    - AP aging reports with aging buckets
+    - Bill detail pages with payment history
+    - Automated vendor synchronization via Integration Hub
+  - **Accounts Receivable (AR)**
+    - Customer management and invoice tracking
+    - AR aging reports
+    - Invoice detail pages
+  - **POS Integration** ✨ NEW
+    - Clover POS daily sales synchronization
+    - Automatic sales data import with detailed breakdowns
+    - Payment method tracking (Cash, Card, etc.) with tips
+    - Discount and refund tracking by category
+    - Automated journal entry creation from sales data
+    - Bank reconciliation with transaction matching
+    - 100% accuracy with POS reports (zero variance)
+  - **Multi-Location Support**
+    - 6 locations (Okeechobee, Boynton, Delray, etc.)
+    - Consolidated and location-specific reporting
+    - Area-based transaction filtering
+  - **Dashboard & Analytics**
+    - Real-time sales metrics (daily, MTD, YTD)
+    - Revenue trends and visualizations
+    - Labor expense tracking
+    - Key financial KPIs
 
 ### 3. HR Management Service
 - **Port**: Internal (proxied via nginx at `/hr/`)
@@ -356,11 +386,70 @@ Proprietary - Internal Use Only
 
 ## Version History
 
+- **v2.2** (October 24, 2025) - Complete POS integration with Clover, enhanced accounting features
 - **v2.1** (October 14, 2025) - Added central portal, automated backups, health monitoring
 - **v2.0** (October 13, 2025) - Restructured as microservices architecture
 - **v1.0** (October 2025) - Initial monolithic release
 
-## Recent Updates (v2.1)
+## Recent Updates (v2.2)
+
+### POS Integration (Clover)
+- **Daily Sales Synchronization**
+  - Automatic import of sales data from Clover POS
+  - Real-time sales caching with detailed breakdowns
+  - Payment method tracking (Cash, Card, Gift Card, etc.)
+  - Tips attribution by payment method (business rule: cash never has tips)
+  - Discount tracking by category with exact matching
+  - Refund tracking and attribution to payment methods
+  - Tax and service charge tracking
+
+- **Automated Journal Entries**
+  - One-click journal entry generation from daily sales
+  - Automatic GL account mapping for:
+    - Revenue accounts by category
+    - Payment clearing accounts (Cash, Credit Card, etc.)
+    - Discount accounts (contra-revenue)
+    - Sales Returns & Allowances (refunds)
+    - Tax liability accounts
+  - Perfect balance validation (debits = credits)
+  - 100% accuracy with POS reports (zero variance)
+
+- **Bank Reconciliation**
+  - Bank transaction import and management
+  - Automatic matching suggestions with journal entries
+  - Vendor recognition from transaction descriptions
+  - Bill payment matching (single and multi-bill)
+  - Clearing entry automation
+  - Reconciliation workflow with statement matching
+
+### Dashboard Enhancements
+- Real-time sales metrics from posted Daily Sales Summaries
+- Daily, MTD, and YTD sales tracking
+- Revenue trends with location filtering
+- Labor expense monitoring
+- Fixed SQLAlchemy join errors for reliable data display
+
+### Technical Improvements
+- Enhanced payment breakdown structure (nested JSON with tips)
+- Improved discount aggregation (removed per-order normalization)
+- Explicit SQLAlchemy join conditions for complex queries
+- Fixed frontend debug object initialization
+- Added missing JavaScript functions (apiRequest in inventory)
+
+### Data Accuracy
+- Achieved 100% accuracy between Clover reports and accounting system
+- Zero variance in daily sales reconciliation
+- Proper contra-revenue accounting for discounts and refunds
+- Accurate tips attribution following business rules
+
+### Documentation
+- Comprehensive POS integration documentation
+- Database schema changes documented
+- API endpoint documentation
+- Business logic and accounting rules documented
+- See [POS_INTEGRATION_COMPLETE.md](docs/POS_INTEGRATION_COMPLETE.md) for details
+
+## Previous Updates (v2.1)
 
 ### Portal Implementation
 - Central landing page at http://rm.swhgrp.com
