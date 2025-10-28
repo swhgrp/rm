@@ -135,6 +135,24 @@ async def get_calendar_events(
     return events
 
 
+@router.get("/venues")
+async def list_venues(
+    db: Session = Depends(get_db),
+):
+    """Get all venues"""
+    venues = db.query(Venue).order_by(Venue.name).all()
+    return [{"id": str(v.id), "name": v.name, "address": v.address} for v in venues]
+
+
+@router.get("/clients")
+async def list_clients(
+    db: Session = Depends(get_db),
+):
+    """Get all clients"""
+    clients = db.query(Client).order_by(Client.name).all()
+    return [{"id": str(c.id), "name": c.name, "email": c.email, "phone": c.phone} for c in clients]
+
+
 @router.get("/{event_id}", response_model=EventResponse)
 async def get_event(
     event_id: UUID,
@@ -252,24 +270,6 @@ async def confirm_event(
     # TODO: Audit log
 
     return event
-
-
-@router.get("/venues")
-async def list_venues(
-    db: Session = Depends(get_db),
-):
-    """Get all venues"""
-    venues = db.query(Venue).order_by(Venue.name).all()
-    return [{"id": str(v.id), "name": v.name, "address": v.address} for v in venues]
-
-
-@router.get("/clients")
-async def list_clients(
-    db: Session = Depends(get_db),
-):
-    """Get all clients"""
-    clients = db.query(Client).order_by(Client.name).all()
-    return [{"id": str(c.id), "name": c.name, "email": c.email, "phone": c.phone} for c in clients]
 
 
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
