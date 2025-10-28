@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <base href="/events/">
+    <title>{% block title %}SW Hospitality Group - Events Management{% endblock %}</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <!-- Auth check via session cookie -->
+    <script>
+        (async function() {
+            const currentPath = window.location.pathname;
+            if (!currentPath.endsWith('/login') && !currentPath.includes('/public/')) {
+                try {
+                    const response = await fetch('/events/api/auth/me', {
+                        credentials: 'include'
+                    });
+                    if (!response.ok) {
+                        // Not authenticated, redirect to portal
+                        window.location.replace('/portal/');
+                        throw new Error('Redirecting to login');
+                    }
+                } catch (e) {
+                    // Network error or not authenticated
+                    if (!e.message.includes('Redirecting')) {
+                        window.location.replace('/portal/');
+                        throw new Error('Redirecting to login');
+                    }
+                }
+            }
+        })();
+    </script>
+
+    {% block head %}{% endblock %}
+
+    <style>
+        /* Dark theme matching portal */
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 260px;
+            background-color: #161b22;
+            padding-top: 20px;
+            z-index: 1000;
+            overflow-y: auto;
+            overflow-x: hidden;
+            border-right: 1px solid #30363d;
+            transition: transform 0.3s ease-in-out;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-260px);
+        }
+
+        .sidebar-toggle {
+            display: none;
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 1001;
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 10px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 44px;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sidebar-toggle:hover {
+            background-color: #21262d;
+            color: #58a6ff;
+        }
+
+        .sidebar-toggle i {
+            font-size: 20px;
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.6);
+            z-index: 999;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        .sidebar-brand {
+            padding: 20px 15px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #c9d1d9;
+            text-decoration: none;
+            border-bottom: 1px solid #30363d;
+            margin-bottom: 20px;
+        }
+
+        .sidebar-brand i {
+            font-size: 26px;
+            color: #58a6ff;
+        }
+
+        .sidebar-brand-text {
+            font-weight: 600;
+            font-size: 17px;
+        }
+
+        .sidebar-nav {
+            list-style: none;
+            padding: 0 10px;
+            margin: 0;
+        }
+
+        .sidebar-nav li {
+            margin-bottom: 4px;
+        }
+
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 15px;
+            color: #8b949e;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-size: 14px;
+            min-height: 44px;
+        }
+
+        .sidebar-nav a:hover {
+            background-color: #21262d;
+            color: #c9d1d9;
+        }
+
+        .sidebar-nav a.active {
+            background-color: #21262d;
+            color: #58a6ff;
+            font-weight: 500;
+        }
+
+        .sidebar-nav a i {
+            font-size: 18px;
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .sidebar-footer {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            padding: 15px;
+            border-top: 1px solid #30363d;
+            background-color: #161b22;
+        }
+
+        .sidebar-footer a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            color: #8b949e;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-size: 14px;
+            min-height: 44px;
+        }
+
+        .sidebar-footer a:hover {
+            background-color: #21262d;
+            color: #c9d1d9;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 260px;
+            min-height: 100vh;
+            transition: margin-left 0.3s ease-in-out;
+        }
+
+        .main-content.expanded {
+            margin-left: 0;
+        }
+
+        .top-bar {
+            background-color: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            flex-wrap: wrap;
+            gap: 12px;
+            min-height: 64px;
+        }
+
+        .top-bar-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #c9d1d9;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .top-bar-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background-color: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+
+        .user-info i {
+            color: #58a6ff;
+            font-size: 16px;
+        }
+
+        .user-name {
+            display: inline;
+        }
+
+        .container-custom {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Buttons - Mobile Friendly */
+        .btn-primary-custom,
+        .btn-secondary-custom,
+        .btn-danger-custom {
+            padding: 10px 18px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            white-space: nowrap;
+            min-height: 44px;
+            text-align: center;
+        }
+
+        .btn-primary-custom {
+            background-color: #238636;
+            color: white;
+            border: 1px solid #2ea043;
+        }
+
+        .btn-primary-custom:hover {
+            background-color: #2ea043;
+            color: white;
+        }
+
+        .btn-secondary-custom {
+            background-color: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+        }
+
+        .btn-secondary-custom:hover {
+            background-color: #30363d;
+            color: #c9d1d9;
+        }
+
+        .btn-danger-custom {
+            background-color: #da3633;
+            color: white;
+            border: 1px solid #f85149;
+        }
+
+        .btn-danger-custom:hover {
+            background-color: #f85149;
+            color: white;
+        }
+
+        /* Cards */
+        .card-custom {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card-custom-header {
+            font-size: 16px;
+            font-weight: 600;
+            color: #c9d1d9;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        /* Tables - Mobile Responsive */
+        .table-custom {
+            width: 100%;
+            border-collapse: collapse;
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            overflow: hidden;
+            display: table;
+        }
+
+        .table-custom thead {
+            background-color: #21262d;
+        }
+
+        .table-custom th {
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 14px;
+            font-weight: 600;
+            color: #c9d1d9;
+            border-bottom: 1px solid #30363d;
+            white-space: nowrap;
+        }
+
+        .table-custom td {
+            padding: 12px 16px;
+            font-size: 14px;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .table-custom tbody tr:hover {
+            background-color: #21262d;
+        }
+
+        /* Form Controls - Mobile Friendly */
+        .form-control-custom {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 12px 14px;
+            border-radius: 6px;
+            font-size: 16px;
+            width: 100%;
+            transition: border-color 0.2s;
+            min-height: 44px;
+        }
+
+        .form-control-custom:focus {
+            outline: none;
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+        }
+
+        .form-label-custom {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #c9d1d9;
+        }
+
+        select.form-control-custom {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 40px;
+        }
+
+        /* Alerts */
+        .alert-custom {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .alert-success {
+            background-color: #1f6feb;
+            color: #c9d1d9;
+            border: 1px solid #388bfd;
+        }
+
+        .alert-error {
+            background-color: #da3633;
+            color: white;
+            border: 1px solid #f85149;
+        }
+
+        .alert-warning {
+            background-color: #9e6a03;
+            color: white;
+            border: 1px solid #bb8009;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-260px);
+                width: 260px;
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .sidebar-toggle {
+                display: flex !important;
+            }
+
+            .main-content {
+                margin-left: 0;
+            }
+
+            .top-bar {
+                padding: 12px 15px 12px 60px;
+            }
+
+            .top-bar-title {
+                font-size: 16px;
+            }
+
+            .top-bar-actions {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .user-name {
+                display: none;
+            }
+
+            .container-custom {
+                padding: 15px;
+            }
+
+            .card-custom {
+                padding: 15px;
+            }
+
+            /* Stack buttons on mobile */
+            .btn-group-mobile {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                width: 100%;
+            }
+
+            .btn-group-mobile .btn-primary-custom,
+            .btn-group-mobile .btn-secondary-custom,
+            .btn-group-mobile .btn-danger-custom {
+                width: 100%;
+            }
+
+            /* Responsive tables */
+            .table-custom {
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .table-custom thead {
+                display: none;
+            }
+
+            .table-custom,
+            .table-custom tbody,
+            .table-custom tr,
+            .table-custom td {
+                display: block;
+                width: 100%;
+            }
+
+            .table-custom tr {
+                margin-bottom: 15px;
+                background-color: #161b22;
+                border: 1px solid #30363d;
+                border-radius: 6px;
+                padding: 12px;
+            }
+
+            .table-custom td {
+                padding: 8px 0;
+                border-bottom: none;
+                text-align: left;
+                position: relative;
+                padding-left: 50%;
+            }
+
+            .table-custom td:before {
+                content: attr(data-label);
+                position: absolute;
+                left: 0;
+                width: 45%;
+                padding-right: 10px;
+                font-weight: 600;
+                color: #c9d1d9;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .top-bar-title {
+                font-size: 15px;
+            }
+
+            .btn-primary-custom,
+            .btn-secondary-custom,
+            .btn-danger-custom {
+                padding: 10px 14px;
+                font-size: 13px;
+            }
+
+            .form-control-custom {
+                font-size: 16px; /* Prevent zoom on iOS */
+            }
+        }
+
+        /* Tablet and larger */
+        @media (min-width: 769px) {
+            .sidebar-toggle {
+                display: none !important;
+            }
+        }
+
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+    <!-- Sidebar Toggle Button (Mobile) -->
+    <button class="sidebar-toggle" onclick="toggleSidebar()">
+        <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Sidebar Overlay (Mobile) -->
+    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <a href="/portal" class="sidebar-brand">
+            <i class="bi bi-calendar-event"></i>
+            <span class="sidebar-brand-text">Events</span>
+        </a>
+
+        <ul class="sidebar-nav">
+            <li><a href="/events/" class="{% if request.path == '/events/' or request.path == '/events' %}active{% endif %}">
+                <i class="bi bi-grid"></i>
+                <span>Dashboard</span>
+            </a></li>
+            <li><a href="/events/events" class="{% if 'events/events' in request.path %}active{% endif %}">
+                <i class="bi bi-calendar3"></i>
+                <span>All Events</span>
+            </a></li>
+            <li><a href="/events/calendar" class="{% if 'calendar' in request.path %}active{% endif %}">
+                <i class="bi bi-calendar-week"></i>
+                <span>Calendar View</span>
+            </a></li>
+            <li><a href="/events/tasks" class="{% if 'tasks' in request.path %}active{% endif %}">
+                <i class="bi bi-check2-square"></i>
+                <span>Tasks</span>
+            </a></li>
+            <li><a href="/events/public/intake">
+                <i class="bi bi-file-earmark-text"></i>
+                <span>Public Intake Form</span>
+            </a></li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <a href="/portal">
+                <i class="bi bi-arrow-left"></i>
+                <span>Back to Portal</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <!-- Top Bar -->
+        <div class="top-bar">
+            <div class="top-bar-title">{% block page_title %}Events Management{% endblock %}</div>
+            <div class="top-bar-actions">
+                {% block top_bar_actions %}{% endblock %}
+                <div class="user-info" id="userInfo">
+                    <i class="bi bi-person-circle"></i>
+                    <span class="user-name" id="userName">User</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page Content -->
+        <div class="container-custom">
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Common Scripts -->
+    <script>
+        // Toggle sidebar on mobile
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.querySelector('.sidebar-overlay');
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
+        // Close sidebar when clicking a link on mobile
+        document.querySelectorAll('.sidebar-nav a').forEach(link => {
+            link.addEventListener('click', () => {
+                if (window.innerWidth <= 768) {
+                    toggleSidebar();
+                }
+            });
+        });
+
+        // Load user info from session
+        async function loadUserInfo() {
+            try {
+                const response = await fetch('/events/api/auth/me', {
+                    credentials: 'include'
+                });
+                if (response.ok) {
+                    const user = await response.json();
+                    document.getElementById('userName').textContent = user.full_name || user.email || 'User';
+                } else {
+                    document.getElementById('userName').textContent = 'User';
+                }
+            } catch (e) {
+                console.error('Failed to load user info:', e);
+                document.getElementById('userName').textContent = 'User';
+            }
+        }
+
+        // Call on page load
+        loadUserInfo();
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

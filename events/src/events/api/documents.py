@@ -1,0 +1,146 @@
+"""Document generation API endpoints"""
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
+from sqlalchemy.orm import Session
+from uuid import UUID
+from datetime import datetime
+
+from events.core.database import get_db
+from events.models import Event, Document, DocumentType
+from events.services.pdf_service import PDFService
+
+router = APIRouter()
+pdf_service = PDFService()
+
+
+@router.get("/events/{event_id}/beo-pdf")
+async def generate_beo_pdf(
+    event_id: UUID,
+    download: bool = True,
+    db: Session = Depends(get_db)
+):
+    """
+    Generate BEO (Banquet Event Order) PDF for an event
+
+    - **event_id**: Event UUID
+    - **download**: If true, returns as downloadable file (default: true)
+    """
+    from sqlalchemy.orm import joinedload
+
+    # Get event with related data
+    event = db.query(Event).options(
+        joinedload(Event.client),
+        joinedload(Event.venue)
+    ).filter(Event.id == event_id).first()
+
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found"
+        )
+
+    # Generate PDF
+    try:
+        pdf_bytes = pdf_service.generate_beo_pdf(
+            event=event,
+            client=event.client,
+            venue=event.venue
+        )
+
+        # Create document record
+        document = Document(
+            event_id=event_id,
+            document_type=DocumentType.BEO,
+            title=f"BEO - {event.title}",
+            file_path=f"beo_{event_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+            file_size=len(pdf_bytes)
+        )
+        db.add(document)
+        db.commit()
+
+        # Return PDF
+        filename = f"BEO_{event.title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+
+        headers = {
+            'Content-Disposition': f'{"attachment" if download else "inline"}; filename="{filename}"'
+        }
+
+        return Response(
+            content=pdf_bytes,
+            media_type='application/pdf',
+            headers=headers
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate PDF: {str(e)}"
+        )
+
+
+@router.get("/events/{event_id}/summary-pdf")
+async def generate_event_summary_pdf(
+    event_id: UUID,
+    download: bool = True,
+    db: Session = Depends(get_db)
+):
+    """
+    Generate event summary PDF with task list
+
+    - **event_id**: Event UUID
+    - **download**: If true, returns as downloadable file (default: true)
+    """
+    from sqlalchemy.orm import joinedload
+    from events.models import Task
+
+    # Get event with related data
+    event = db.query(Event).options(
+        joinedload(Event.client),
+        joinedload(Event.venue)
+    ).filter(Event.id == event_id).first()
+
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found"
+        )
+
+    # Get tasks for the event
+    tasks = db.query(Task).filter(Task.event_id == event_id).all()
+
+    # Generate PDF
+    try:
+        pdf_bytes = pdf_service.generate_event_summary_pdf(
+            event=event,
+            tasks=tasks
+        )
+
+        # Create document record
+        document = Document(
+            event_id=event_id,
+            document_type=DocumentType.SUMMARY,
+            title=f"Event Summary - {event.title}",
+            file_path=f"summary_{event_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+            file_size=len(pdf_bytes)
+        )
+        db.add(document)
+        db.commit()
+
+        # Return PDF
+        filename = f"Summary_{event.title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+
+        headers = {
+            'Content-Disposition': f'{"attachment" if download else "inline"}; filename="{filename}"'
+        }
+
+        return Response(
+            content=pdf_bytes,
+            media_type='application/pdf',
+            headers=headers
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate PDF: {str(e)}"
+        )

@@ -2,6 +2,65 @@
 
 {% block title %}POS Item Mapping - Restaurant Inventory{% endblock %}
 
+{% block head %}
+<!-- Select2 for searchable dropdowns -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<style>
+    /* Select2 dark theme styling */
+    .select2-container--bootstrap-5 .select2-selection {
+        background-color: #0d1117 !important;
+        border-color: #30363d !important;
+        color: #c9d1d9 !important;
+    }
+
+    .select2-container--bootstrap-5 .select2-selection__rendered {
+        color: #c9d1d9 !important;
+    }
+
+    .select2-container--bootstrap-5 .select2-selection__placeholder {
+        color: #8b949e !important;
+    }
+
+    .select2-container--bootstrap-5 .select2-dropdown {
+        background-color: #161b22 !important;
+        border-color: #30363d !important;
+    }
+
+    .select2-container--bootstrap-5 .select2-results__option {
+        color: #c9d1d9 !important;
+        background-color: #161b22 !important;
+    }
+
+    .select2-container--bootstrap-5 .select2-results__option--highlighted {
+        background-color: #21262d !important;
+        color: #58a6ff !important;
+    }
+
+    .select2-container--bootstrap-5 .select2-results__option--selected {
+        background-color: #0d1117 !important;
+        color: #58a6ff !important;
+    }
+
+    .select2-container--bootstrap-5 .select2-search__field {
+        background-color: #0d1117 !important;
+        border-color: #30363d !important;
+        color: #c9d1d9 !important;
+    }
+
+    /* Fix the single select display */
+    .select2-container--bootstrap-5.select2-container--focus .select2-selection,
+    .select2-container--bootstrap-5.select2-container--open .select2-selection {
+        border-color: #58a6ff !important;
+    }
+
+    .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
+        color: #c9d1d9 !important;
+        line-height: 36px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <!-- Toast notification container -->
 <div class="position-fixed top-0 end-0 p-3" style="z-index: 9999">
@@ -80,8 +139,14 @@
     <!-- Unmapped Items Tab -->
     <div class="tab-pane fade show active" id="unmapped" role="tabpanel">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Items Needing Mapping</h5>
+                <div class="input-group" style="max-width: 300px;">
+                    <input type="text" class="form-control form-control-sm" id="unmappedSearch" placeholder="Search items...">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="clearUnmappedSearch()">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
@@ -110,8 +175,14 @@
     <!-- Mapped Items Tab -->
     <div class="tab-pane fade" id="mapped" role="tabpanel">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">Mapped Items</h5>
+                <div class="input-group" style="max-width: 300px;">
+                    <input type="text" class="form-control form-control-sm" id="mappedSearch" placeholder="Search items...">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="clearMappedSearch()">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
@@ -206,6 +277,10 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 let unmappedItems = [];
 let mappedItems = [];
@@ -271,6 +346,44 @@ async function apiRequest(url, options = {}) {
     return response.json();
 }
 
+// Initialize Select2 on a dropdown
+function initializeSelect2(selector) {
+    // Destroy existing Select2 if it exists
+    if ($(selector).hasClass('select2-hidden-accessible')) {
+        $(selector).select2('destroy');
+    }
+
+    // Initialize Select2 with dark theme
+    $(selector).select2({
+        theme: 'bootstrap-5',
+        dropdownParent: $('#mappingModal'),
+        placeholder: 'Search and select...',
+        width: '100%',
+        allowClear: true
+    });
+}
+
+// Search functions
+function searchUnmappedItems() {
+    const searchTerm = document.getElementById('unmappedSearch').value;
+    displayUnmappedItems(searchTerm);
+}
+
+function clearUnmappedSearch() {
+    document.getElementById('unmappedSearch').value = '';
+    displayUnmappedItems();
+}
+
+function searchMappedItems() {
+    const searchTerm = document.getElementById('mappedSearch').value;
+    displayMappedItems(searchTerm);
+}
+
+function clearMappedSearch() {
+    document.getElementById('mappedSearch').value = '';
+    displayMappedItems();
+}
+
 // Load data on page load
 document.addEventListener('DOMContentLoaded', async function() {
     await loadLocations();
@@ -283,6 +396,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         currentLocationId = this.value || null;
         loadData();
     });
+
+    // Add event listeners for search inputs
+    document.getElementById('unmappedSearch').addEventListener('input', searchUnmappedItems);
+    document.getElementById('mappedSearch').addEventListener('input', searchMappedItems);
 
     // Add event listener for mapping type
     document.getElementById('mappingType').addEventListener('change', function() {
@@ -323,6 +440,10 @@ async function loadLocations() {
 async function loadMasterItems() {
     try {
         masterItems = await apiRequest('api/items/');
+
+        // Sort items alphabetically by name
+        masterItems.sort((a, b) => a.name.localeCompare(b.name));
+
         const select = document.getElementById('masterItemId');
         select.innerHTML = '<option value="">Select inventory item...</option>';
 
@@ -332,6 +453,9 @@ async function loadMasterItems() {
             option.textContent = `${item.name} (${item.category || 'No category'})`;
             select.appendChild(option);
         });
+
+        // Initialize Select2 for searchable dropdown
+        initializeSelect2('#masterItemId');
     } catch (error) {
         console.error('Error loading master items:', error);
     }
@@ -340,6 +464,10 @@ async function loadMasterItems() {
 async function loadRecipes() {
     try {
         recipes = await apiRequest('api/recipes/');
+
+        // Sort recipes alphabetically by name
+        recipes.sort((a, b) => a.name.localeCompare(b.name));
+
         const select = document.getElementById('recipeId');
         select.innerHTML = '<option value="">Select recipe...</option>';
 
@@ -349,6 +477,9 @@ async function loadRecipes() {
             option.textContent = `${recipe.name} (${recipe.category || 'No category'})`;
             select.appendChild(option);
         });
+
+        // Initialize Select2 for searchable dropdown
+        initializeSelect2('#recipeId');
     } catch (error) {
         console.error('Error loading recipes:', error);
         // It's OK if no recipes exist yet
@@ -371,31 +502,47 @@ async function loadUnmappedItems() {
         }
 
         unmappedItems = await apiRequest(url);
-
-        const tbody = document.getElementById('unmappedTableBody');
-
-        if (unmappedItems.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">All items are mapped! 🎉</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = unmappedItems.map(item => `
-            <tr>
-                <td><strong>${item.item_name}</strong></td>
-                <td>${item.category || '-'}</td>
-                <td>${new Date(item.last_sold).toLocaleDateString()}</td>
-                <td>
-                    <button class="btn btn-sm btn-primary" onclick="showMappingModal('${item.pos_item_id}', '${item.item_name.replace(/'/g, "\\'")}')">
-                        <i class="bi bi-plus-circle"></i> Map
-                    </button>
-                </td>
-            </tr>
-        `).join('');
+        displayUnmappedItems();
     } catch (error) {
         console.error('Error loading unmapped items:', error);
         document.getElementById('unmappedTableBody').innerHTML =
             '<tr><td colspan="4" class="text-center text-danger">Error loading unmapped items</td></tr>';
     }
+}
+
+function displayUnmappedItems(searchTerm = '') {
+    const tbody = document.getElementById('unmappedTableBody');
+
+    // Filter items based on search term
+    let filteredItems = unmappedItems;
+    if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        filteredItems = unmappedItems.filter(item =>
+            item.item_name.toLowerCase().includes(search) ||
+            (item.category && item.category.toLowerCase().includes(search))
+        );
+    }
+
+    if (filteredItems.length === 0) {
+        const message = searchTerm
+            ? `No items match "${searchTerm}"`
+            : 'All items are mapped! 🎉';
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-muted">${message}</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filteredItems.map(item => `
+        <tr>
+            <td><strong>${item.item_name}</strong></td>
+            <td>${item.category || '-'}</td>
+            <td>${new Date(item.last_sold).toLocaleDateString()}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="showMappingModal('${item.pos_item_id}', '${item.item_name.replace(/'/g, "\\'")}')">
+                    <i class="bi bi-plus-circle"></i> Map
+                </button>
+            </td>
+        </tr>
+    `).join('');
 }
 
 async function loadMappedItems() {
@@ -406,44 +553,61 @@ async function loadMappedItems() {
         }
 
         mappedItems = await apiRequest(url);
-
-        const tbody = document.getElementById('mappedTableBody');
-
-        if (mappedItems.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No items mapped yet</td></tr>';
-            return;
-        }
-
-        tbody.innerHTML = mappedItems.map(item => {
-            const mappedTo = item.recipe_name || item.master_item_name || 'Unknown';
-            const mappingType = item.recipe_id ? 'Recipe' : 'Inventory Item';
-            const statusBadge = item.is_active
-                ? '<span class="badge bg-success">Active</span>'
-                : '<span class="badge bg-secondary">Inactive</span>';
-
-            return `
-                <tr>
-                    <td><strong>${item.pos_item_name}</strong></td>
-                    <td>${mappedTo}</td>
-                    <td><span class="badge bg-info">${mappingType}</span></td>
-                    <td>${item.portion_multiplier}x</td>
-                    <td>${statusBadge}</td>
-                    <td>
-                        <button class="btn btn-sm btn-outline-primary" onclick="editMapping(${item.id})">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteMapping(${item.id})">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </td>
-                </tr>
-            `;
-        }).join('');
+        displayMappedItems();
     } catch (error) {
         console.error('Error loading mapped items:', error);
         document.getElementById('mappedTableBody').innerHTML =
             '<tr><td colspan="6" class="text-center text-danger">Error loading mapped items</td></tr>';
     }
+}
+
+function displayMappedItems(searchTerm = '') {
+    const tbody = document.getElementById('mappedTableBody');
+
+    // Filter items based on search term
+    let filteredItems = mappedItems;
+    if (searchTerm) {
+        const search = searchTerm.toLowerCase();
+        filteredItems = mappedItems.filter(item => {
+            const mappedTo = item.recipe_name || item.master_item_name || '';
+            return item.pos_item_name.toLowerCase().includes(search) ||
+                   mappedTo.toLowerCase().includes(search);
+        });
+    }
+
+    if (filteredItems.length === 0) {
+        const message = searchTerm
+            ? `No items match "${searchTerm}"`
+            : 'No items mapped yet';
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-muted">${message}</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = filteredItems.map(item => {
+        const mappedTo = item.recipe_name || item.master_item_name || 'Unknown';
+        const mappingType = item.recipe_id ? 'Recipe' : 'Inventory Item';
+        const statusBadge = item.is_active
+            ? '<span class="badge bg-success">Active</span>'
+            : '<span class="badge bg-secondary">Inactive</span>';
+
+        return `
+            <tr>
+                <td><strong>${item.pos_item_name}</strong></td>
+                <td>${mappedTo}</td>
+                <td><span class="badge bg-info">${mappingType}</span></td>
+                <td>${item.portion_multiplier}x</td>
+                <td>${statusBadge}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="editMapping(${item.id})">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteMapping(${item.id})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 function updateStatistics() {
@@ -465,8 +629,8 @@ function showMappingModal(posItemId, posItemName) {
     document.getElementById('posItemId').value = posItemId;
     document.getElementById('posItemName').value = posItemName;
     document.getElementById('mappingType').value = '';
-    document.getElementById('masterItemId').value = '';
-    document.getElementById('recipeId').value = '';
+    $('#masterItemId').val('').trigger('change');
+    $('#recipeId').val('').trigger('change');
     document.getElementById('portionMultiplier').value = '1.0';
     document.getElementById('isActive').checked = true;
     document.getElementById('masterItemSection').style.display = 'none';
@@ -489,12 +653,12 @@ async function editMapping(mappingId) {
 
     if (mapping.recipe_id) {
         document.getElementById('mappingType').value = 'recipe';
-        document.getElementById('recipeId').value = mapping.recipe_id;
+        $('#recipeId').val(mapping.recipe_id).trigger('change');
         document.getElementById('recipeSection').style.display = 'block';
         document.getElementById('masterItemSection').style.display = 'none';
     } else if (mapping.master_item_id) {
         document.getElementById('mappingType').value = 'master_item';
-        document.getElementById('masterItemId').value = mapping.master_item_id;
+        $('#masterItemId').val(mapping.master_item_id).trigger('change');
         document.getElementById('masterItemSection').style.display = 'block';
         document.getElementById('recipeSection').style.display = 'none';
     }

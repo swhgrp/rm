@@ -48,6 +48,14 @@ class EmployeeBase(BaseModel):
 
 class EmployeeCreate(EmployeeBase):
     """Schema for creating a new employee"""
+    # Override optional fields to make them required for new employees
+    date_of_birth: date
+    phone_number: str
+    street_address: str
+    city: str
+    state: str
+    zip_code: str
+
     location_ids: Optional[List[int]] = []  # List of location IDs to assign
     create_inventory_user: bool = False  # For Phase 5 integration
 

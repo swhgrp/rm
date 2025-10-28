@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <title>Event Request - SW Hospitality Events</title>
+
+    <!-- Bootstrap Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background-color: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+            color: white;
+            padding: clamp(30px, 8vw, 50px) 30px;
+            text-align: center;
+        }
+
+        .header-icon {
+            font-size: clamp(40px, 10vw, 60px);
+            margin-bottom: 15px;
+            display: block;
+        }
+
+        .header h1 {
+            font-size: clamp(24px, 5vw, 32px);
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            opacity: 0.95;
+            font-size: clamp(14px, 3vw, 18px);
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            font-size: 14px;
+            margin-bottom: 20px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+        }
+
+        .back-link:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .form-content {
+            padding: clamp(20px, 5vw, 40px);
+        }
+
+        .section {
+            margin-bottom: 35px;
+        }
+
+        .section-title {
+            font-size: clamp(18px, 4vw, 22px);
+            color: #c9d1d9;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #30363d;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section-title i {
+            color: #238636;
+            font-size: clamp(20px, 4vw, 24px);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-row.two-cols {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        @media (max-width: 768px) {
+            .form-row.two-cols {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-weight: 600;
+            color: #c9d1d9;
+            margin-bottom: 8px;
+            font-size: clamp(14px, 3vw, 15px);
+        }
+
+        label .required {
+            color: #f85149;
+        }
+
+        input[type="text"],
+        input[type="email"],
+        input[type="tel"],
+        input[type="number"],
+        input[type="datetime-local"],
+        select,
+        textarea {
+            padding: 12px 15px;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            font-size: 16px;
+            font-family: inherit;
+            transition: all 0.2s;
+            background-color: #0d1117;
+            color: #c9d1d9;
+            min-height: 44px;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #238636;
+            box-shadow: 0 0 0 3px rgba(35, 134, 54, 0.15);
+        }
+
+        input::placeholder,
+        textarea::placeholder {
+            color: #6e7681;
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 40px;
+            cursor: pointer;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+        }
+
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            background-color: #0d1117;
+            padding: 10px 15px;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            transition: all 0.2s;
+            min-height: 44px;
+        }
+
+        .checkbox-item:hover {
+            border-color: #238636;
+            background-color: #161b22;
+        }
+
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #238636;
+        }
+
+        .checkbox-item label {
+            margin: 0;
+            font-weight: 500;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .captcha-container {
+            margin: 30px 0;
+            display: flex;
+            justify-content: center;
+            background-color: #0d1117;
+            padding: 20px;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: clamp(15px, 3vw, 18px);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-height: 54px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(35, 134, 54, 0.3);
+        }
+
+        .submit-btn:disabled {
+            background: #21262d;
+            color: #6e7681;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .alert {
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            display: none;
+            font-size: 15px;
+            border: 1px solid;
+        }
+
+        .alert.success {
+            background-color: #1a7f37;
+            color: #aff5b4;
+            border-color: #2ea043;
+        }
+
+        .alert.error {
+            background-color: #da3633;
+            color: #ffdcd7;
+            border-color: #f85149;
+        }
+
+        .alert.show {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .alert i {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 3px solid #30363d;
+            border-top: 3px solid #238636;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .help-text {
+            font-size: 13px;
+            color: #8b949e;
+            margin-top: 6px;
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+        }
+
+        .help-text i {
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .footer {
+            background-color: #0d1117;
+            padding: 25px 30px;
+            text-align: center;
+            color: #8b949e;
+            font-size: clamp(13px, 3vw, 15px);
+            border-top: 1px solid #30363d;
+        }
+
+        .footer a {
+            color: #58a6ff;
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+
+        .footer i {
+            color: #238636;
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                border-radius: 8px;
+            }
+
+            .form-content {
+                padding: 20px 15px;
+            }
+
+            .checkbox-group {
+                gap: 10px;
+            }
+
+            .checkbox-item {
+                padding: 8px 12px;
+            }
+        }
+    </style>
+    <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="/events" class="back-link">
+                <i class="bi bi-arrow-left"></i>
+                Back to Events Dashboard
+            </a>
+            <i class="bi bi-calendar-event header-icon"></i>
+            <h1>Event Request Form</h1>
+            <p>Tell us about your upcoming event</p>
+        </div>
+
+        <div class="form-content">
+            <div id="alertSuccess" class="alert success">
+                <i class="bi bi-check-circle-fill"></i>
+                <div>
+                    <strong>Success!</strong> Your event request has been submitted. We'll contact you within 24 hours.
+                </div>
+            </div>
+            <div id="alertError" class="alert error">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                <div>
+                    <strong>Error!</strong> <span id="errorMessage">Something went wrong. Please try again.</span>
+                </div>
+            </div>
+
+            <div id="loadingIndicator" class="loading">
+                <div class="spinner"></div>
+                <p style="color: #8b949e;">Submitting your request...</p>
+            </div>
+
+            <form id="eventForm">
+                <!-- Client Information Section -->
+                <div class="section">
+                    <h2 class="section-title">
+                        <i class="bi bi-person-circle"></i>
+                        Contact Information
+                    </h2>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="fullName">Full Name <span class="required">*</span></label>
+                            <input type="text" id="fullName" name="fullName" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row two-cols">
+                        <div class="form-group">
+                            <label for="email">Email Address <span class="required">*</span></label>
+                            <input type="email" id="email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="phone">Phone Number <span class="required">*</span></label>
+                            <input type="tel" id="phone" name="phone" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="company">Company/Organization</label>
+                            <input type="text" id="company" name="company" placeholder="Optional">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Event Details Section -->
+                <div class="section">
+                    <h2 class="section-title">
+                        <i class="bi bi-calendar-event"></i>
+                        Event Details
+                    </h2>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="eventTitle">Event Title <span class="required">*</span></label>
+                            <input type="text" id="eventTitle" name="eventTitle" required
+                                   placeholder="e.g., Annual Corporate Gala">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="eventType">Event Type <span class="required">*</span></label>
+                            <select id="eventType" name="eventType" required>
+                                <option value="">Select event type...</option>
+                                <option value="wedding_standard">Wedding</option>
+                                <option value="corporate_lunch">Corporate Event</option>
+                                <option value="birthday">Birthday Party</option>
+                                <option value="conference">Conference</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row two-cols">
+                        <div class="form-group">
+                            <label for="eventDate">Event Date & Time <span class="required">*</span></label>
+                            <input type="datetime-local" id="eventDate" name="eventDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="attendeeCount">Expected Attendees <span class="required">*</span></label>
+                            <input type="number" id="attendeeCount" name="attendeeCount" min="1" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="duration">Estimated Duration (hours)</label>
+                            <input type="number" id="duration" name="duration" min="1" step="0.5"
+                                   placeholder="e.g., 4">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Menu & Dietary Section -->
+                <div class="section">
+                    <h2 class="section-title">
+                        <i class="bi bi-cup-hot"></i>
+                        Menu Preferences
+                    </h2>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Meal Type</label>
+                            <div class="checkbox-group">
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="breakfast" name="mealTypes" value="breakfast">
+                                    <label for="breakfast">Breakfast</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="lunch" name="mealTypes" value="lunch">
+                                    <label for="lunch">Lunch</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="dinner" name="mealTypes" value="dinner">
+                                    <label for="dinner">Dinner</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="cocktails" name="mealTypes" value="cocktails">
+                                    <label for="cocktails">Cocktail Hour</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="dietaryRestrictions">Dietary Restrictions & Allergies</label>
+                            <textarea id="dietaryRestrictions" name="dietaryRestrictions"
+                                      placeholder="Please list any dietary restrictions, allergies, or special menu requests..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Beverage Service</label>
+                            <div class="checkbox-group">
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="bar" name="beverages" value="bar">
+                                    <label for="bar">Full Bar</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="wine" name="beverages" value="wine">
+                                    <label for="wine">Wine Only</label>
+                                </div>
+                                <div class="checkbox-item">
+                                    <input type="checkbox" id="nonalcoholic" name="beverages" value="nonalcoholic">
+                                    <label for="nonalcoholic">Non-Alcoholic Only</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Additional Requirements Section -->
+                <div class="section">
+                    <h2 class="section-title">
+                        <i class="bi bi-card-checklist"></i>
+                        Additional Requirements
+                    </h2>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="specialRequirements">Special Requirements & Notes</label>
+                            <textarea id="specialRequirements" name="specialRequirements"
+                                      placeholder="Please describe any special setup requirements, AV needs, decorations, entertainment, or other details..."></textarea>
+                            <p class="help-text">
+                                <i class="bi bi-info-circle"></i>
+                                Include details about setup, AV equipment, decorations, entertainment, parking, etc.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="budget">Budget Range (Optional)</label>
+                            <select id="budget" name="budget">
+                                <option value="">Prefer not to say</option>
+                                <option value="under_5k">Under $5,000</option>
+                                <option value="5k_10k">$5,000 - $10,000</option>
+                                <option value="10k_25k">$10,000 - $25,000</option>
+                                <option value="25k_50k">$25,000 - $50,000</option>
+                                <option value="over_50k">Over $50,000</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- hCaptcha -->
+                <div class="captcha-container">
+                    <div class="h-captcha" data-sitekey="10000000-ffff-ffff-ffff-000000000001"></div>
+                </div>
+
+                <button type="submit" class="submit-btn" id="submitBtn">
+                    <i class="bi bi-send-fill"></i>
+                    Submit Event Request
+                </button>
+            </form>
+        </div>
+
+        <div class="footer">
+            <p>
+                <i class="bi bi-question-circle"></i>
+                Questions? Contact us at <a href="mailto:events@swhgrp.com">events@swhgrp.com</a> or call <a href="tel:+15551234567">(555) 123-4567</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('eventForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const alertSuccess = document.getElementById('alertSuccess');
+        const alertError = document.getElementById('alertError');
+        const errorMessage = document.getElementById('errorMessage');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Hide any previous alerts
+            alertSuccess.classList.remove('show');
+            alertError.classList.remove('show');
+
+            // Get hCaptcha response
+            const hcaptchaResponse = hcaptcha.getResponse();
+            if (!hcaptchaResponse) {
+                errorMessage.textContent = 'Please complete the CAPTCHA verification.';
+                alertError.classList.add('show');
+                return;
+            }
+
+            // Disable submit button and show loading
+            submitBtn.disabled = true;
+            form.style.display = 'none';
+            loadingIndicator.classList.add('show');
+
+            // Collect form data
+            const formData = {
+                hcaptcha_token: hcaptchaResponse,
+                eventTemplateKey: document.getElementById('eventType').value,
+                client: {
+                    full_name: document.getElementById('fullName').value,
+                    email: document.getElementById('email').value,
+                    phone: document.getElementById('phone').value,
+                    company: document.getElementById('company').value || null
+                },
+                event: {
+                    title: document.getElementById('eventTitle').value,
+                    start_at: new Date(document.getElementById('eventDate').value).toISOString(),
+                    attendee_count: parseInt(document.getElementById('attendeeCount').value),
+                    duration_hours: parseFloat(document.getElementById('duration').value) || null,
+                    menu_preferences: collectCheckboxValues('mealTypes'),
+                    dietary_restrictions: document.getElementById('dietaryRestrictions').value || null,
+                    beverage_preferences: collectCheckboxValues('beverages'),
+                    special_requirements: document.getElementById('specialRequirements').value || null,
+                    budget_range: document.getElementById('budget').value || null
+                }
+            };
+
+            try {
+                const response = await fetch('/events/public/beo-intake', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Success!
+                    loadingIndicator.classList.remove('show');
+                    alertSuccess.classList.add('show');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+                    // Reset form after 5 seconds
+                    setTimeout(() => {
+                        form.reset();
+                        hcaptcha.reset();
+                        alertSuccess.classList.remove('show');
+                        form.style.display = 'block';
+                        submitBtn.disabled = false;
+                    }, 5000);
+                } else {
+                    // Error from server
+                    throw new Error(data.detail || 'Request failed');
+                }
+            } catch (error) {
+                loadingIndicator.classList.remove('show');
+                form.style.display = 'block';
+                errorMessage.textContent = error.message;
+                alertError.classList.add('show');
+                submitBtn.disabled = false;
+                hcaptcha.reset();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        });
+
+        function collectCheckboxValues(name) {
+            const checkboxes = document.querySelectorAll(`input[name="${name}"]:checked`);
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+    </script>
+</body>
+</html>

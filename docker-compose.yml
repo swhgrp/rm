@@ -201,6 +201,61 @@ services:
       - restaurant-network
 
   # ============================================================================
+  # EVENTS SERVICE
+  # ============================================================================
+
+  events-db:
+    image: postgres:15
+    container_name: events-db
+    environment:
+      POSTGRES_USER: events_user
+      POSTGRES_PASSWORD: events_pass
+      POSTGRES_DB: events_db
+    volumes:
+      - events_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U events_user -d events_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - restaurant-network
+
+  events-redis:
+    image: redis:7-alpine
+    container_name: events-redis
+    volumes:
+      - events_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - restaurant-network
+
+  events-app:
+    build: ./events
+    container_name: events-app
+    volumes:
+      - ./events/src:/app/src
+    env_file:
+      - ./events/.env
+    environment:
+      - DATABASE_URL=postgresql://events_user:events_pass@events-db:5432/events_db
+      - REDIS_URL=redis://events-redis:6379/0
+    depends_on:
+      events-db:
+        condition: service_healthy
+      events-redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - restaurant-network
+
+  # ============================================================================
   # PORTAL SERVICE
   # ============================================================================
 
@@ -247,6 +302,7 @@ services:
     depends_on:
       - inventory-app
       - accounting-app
+      - events-app
       - hr-app
       - integration-hub
       - portal-app
@@ -282,6 +338,10 @@ volumes:
     name: restaurant-integration-hub_data
   hr_data:
     name: restaurant-hr_data
+  events_data:
+    name: restaurant-events_data
+  events_redis_data:
+    name: restaurant-events_redis_data
 
 # ============================================================================
 # NETWORKS

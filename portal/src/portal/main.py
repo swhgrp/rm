@@ -59,6 +59,7 @@ class User(Base):
     can_access_accounting = Column(Boolean, default=True)
     can_access_integration_hub = Column(Boolean, default=True)
     can_access_hr = Column(Boolean, default=True)
+    can_access_events = Column(Boolean, default=True)
     accounting_role_id = Column(Integer, nullable=True)
 
 
@@ -167,6 +168,15 @@ async def home(request: Request, db: Session = Depends(get_db)):
             "url": "/hr/",
             "icon": "👥",
             "system_key": "hr"
+        })
+
+    if user.can_access_events:
+        systems.append({
+            "name": "Events & Catering",
+            "description": "Event planning, BEO management, and task tracking",
+            "url": "/events/",
+            "icon": "🎉",
+            "system_key": "events"
         })
 
     return templates.TemplateResponse(
@@ -296,6 +306,7 @@ async def update_user_permissions(
     user.can_access_accounting = form_data.get("can_access_accounting") == "on"
     user.can_access_integration_hub = form_data.get("can_access_integration_hub") == "on"
     user.can_access_hr = form_data.get("can_access_hr") == "on"
+    user.can_access_events = form_data.get("can_access_events") == "on"
 
     # Update accounting role if provided
     accounting_role = form_data.get("accounting_role_id")
@@ -322,6 +333,8 @@ async def generate_system_token(
         raise HTTPException(status_code=403, detail="No access to HR system")
     elif system == "hub" and not user.can_access_integration_hub:
         raise HTTPException(status_code=403, detail="No access to Integration Hub")
+    elif system == "events" and not user.can_access_events:
+        raise HTTPException(status_code=403, detail="No access to Events system")
 
     # Create a short-lived token (5 minutes) for system authentication
     token_data = {

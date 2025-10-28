@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Event - {{ event.title }}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f5f7fa;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+        <tr>
+            <td style="padding: 40px 20px;">
+                <!-- Container -->
+                <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);" width="100%" cellspacing="0" cellpadding="0" border="0">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700;">
+                                🎉 New Event Notification
+                            </h1>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px 30px;">
+                            <p style="margin: 0 0 20px; font-size: 16px; color: #2d3748; line-height: 1.6;">
+                                A new event has been added to the system and requires your attention.
+                            </p>
+
+                            <!-- Event Details Box -->
+                            <table role="presentation" style="width: 100%; background-color: #f7fafc; border-left: 4px solid #667eea; border-radius: 6px; margin: 25px 0;" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <h2 style="margin: 0 0 15px; font-size: 20px; color: #2d3748;">
+                                            {{ event.title }}
+                                        </h2>
+
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="padding: 8px 0; font-size: 14px; color: #4a5568;">
+                                                    <strong style="color: #2d3748;">📅 Date:</strong>
+                                                </td>
+                                                <td style="padding: 8px 0; font-size: 14px; color: #2d3748; text-align: right;">
+                                                    {{ event.start_at.strftime('%A, %B %d, %Y at %I:%M %p') }}
+                                                </td>
+                                            </tr>
+
+                                            {% if event.event_type %}
+                                            <tr>
+                                                <td style="padding: 8px 0; font-size: 14px; color: #4a5568;">
+                                                    <strong style="color: #2d3748;">🎯 Type:</strong>
+                                                </td>
+                                                <td style="padding: 8px 0; font-size: 14px; color: #2d3748; text-align: right;">
+                                                    {{ event.event_type }}
+                                                </td>
+                                            </tr>
+                                            {% endif %}
+
+                                            {% if event.attendee_count %}
+                                            <tr>
+                                                <td style="padding: 8px 0; font-size: 14px; color: #4a5568;">
+                                                    <strong style="color: #2d3748;">👥 Guests:</strong>
+                                                </td>
+                                                <td style="padding: 8px 0; font-size: 14px; color: #2d3748; text-align: right;">
+                                                    {{ event.attendee_count }} people
+                                                </td>
+                                            </tr>
+                                            {% endif %}
+
+                                            {% if venue %}
+                                            <tr>
+                                                <td style="padding: 8px 0; font-size: 14px; color: #4a5568;">
+                                                    <strong style="color: #2d3748;">📍 Venue:</strong>
+                                                </td>
+                                                <td style="padding: 8px 0; font-size: 14px; color: #2d3748; text-align: right;">
+                                                    {{ venue.name }}
+                                                </td>
+                                            </tr>
+                                            {% endif %}
+
+                                            {% if client %}
+                                            <tr>
+                                                <td style="padding: 8px 0; font-size: 14px; color: #4a5568;">
+                                                    <strong style="color: #2d3748;">👤 Client:</strong>
+                                                </td>
+                                                <td style="padding: 8px 0; font-size: 14px; color: #2d3748; text-align: right;">
+                                                    {{ client.name }}
+                                                </td>
+                                            </tr>
+                                            {% endif %}
+
+                                            <tr>
+                                                <td style="padding: 8px 0; font-size: 14px; color: #4a5568;">
+                                                    <strong style="color: #2d3748;">📊 Status:</strong>
+                                                </td>
+                                                <td style="padding: 8px 0; font-size: 14px; text-align: right;">
+                                                    <span style="background-color: #d1fae5; color: #065f46; padding: 4px 12px; border-radius: 12px; font-weight: 600; font-size: 12px;">
+                                                        {{ event.status.upper() }}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Special Requirements -->
+                            {% if event.requirements_json and event.requirements_json.special_notes %}
+                            <div style="margin: 25px 0;">
+                                <h3 style="margin: 0 0 10px; font-size: 16px; color: #2d3748;">
+                                    📝 Special Requirements:
+                                </h3>
+                                <p style="margin: 0; padding: 15px; background-color: #fef3c7; border-left: 4px solid #fbbf24; border-radius: 6px; font-size: 14px; color: #78350f; line-height: 1.6;">
+                                    {{ event.requirements_json.special_notes }}
+                                </p>
+                            </div>
+                            {% endif %}
+
+                            <!-- Action Button -->
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 30px 0;">
+                                <tr>
+                                    <td style="text-align: center;">
+                                        <a href="{{ app_url }}/events/event/{{ event.id }}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
+                                            View Event Details →
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Tasks Info -->
+                            <div style="margin: 25px 0; padding: 20px; background-color: #eff6ff; border-radius: 6px;">
+                                <h3 style="margin: 0 0 10px; font-size: 16px; color: #1e40af;">
+                                    ✓ Action Required
+                                </h3>
+                                <p style="margin: 0; font-size: 14px; color: #1e3a8a; line-height: 1.6;">
+                                    Tasks have been automatically generated for this event. Please review your assigned tasks and update their status as you progress.
+                                </p>
+                                <p style="margin: 10px 0 0; font-size: 14px;">
+                                    <a href="{{ app_url }}/events/tasks" style="color: #1e40af; text-decoration: none; font-weight: 600;">
+                                        View My Tasks →
+                                    </a>
+                                </p>
+                            </div>
+
+                            <!-- Footer Note -->
+                            <p style="margin: 25px 0 0; font-size: 14px; color: #718096; line-height: 1.6;">
+                                If you have any questions about this event, please contact the Events Manager or review the complete event details in the system.
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 30px; background-color: #f7fafc; border-top: 1px solid #e2e8f0; text-align: center; border-radius: 0 0 12px 12px;">
+                            <p style="margin: 0 0 10px; font-size: 14px; color: #718096;">
+                                <strong>SW Hospitality Group</strong><br>
+                                Event Planning & Catering Services
+                            </p>
+                            <p style="margin: 0; font-size: 12px; color: #a0aec0;">
+                                This is an automated notification from the Events Management System
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

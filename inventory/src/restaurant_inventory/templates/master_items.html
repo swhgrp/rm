@@ -293,8 +293,26 @@
         }
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Request failed');
+            // Try to parse JSON error, but handle non-JSON responses
+            let errorMessage = 'Request failed';
+            try {
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const error = await response.json();
+                    errorMessage = error.detail || error.message || 'Request failed';
+                } else {
+                    // Non-JSON response (like HTML error page)
+                    const text = await response.text();
+                    if (text.includes('Internal Server Error')) {
+                        errorMessage = 'Internal server error. Please check if this item is being used elsewhere (recipes, POS mappings, etc.)';
+                    } else {
+                        errorMessage = `Server error (${response.status})`;
+                    }
+                }
+            } catch (e) {
+                errorMessage = `Server error (${response.status})`;
+            }
+            throw new Error(errorMessage);
         }
 
         return response.json();

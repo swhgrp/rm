@@ -53,8 +53,13 @@ async def get_master_items(
     result = []
     for item in items:
         item_dict = MasterItemResponse.from_orm(item).dict()
-        item_dict['unit_name'] = item.unit.name if item.unit else item.unit_of_measure
+        # Populate unit_of_measure with the actual unit name from the relationship
+        # This ensures backward compatibility with frontend that uses unit_of_measure field
+        unit_name = item.unit.name if item.unit else item.unit_of_measure
+        item_dict['unit_of_measure'] = unit_name
+        item_dict['unit_name'] = unit_name
         item_dict['secondary_unit_name'] = item.secondary_unit_rel.name if item.secondary_unit_rel else item.secondary_unit
+        item_dict['secondary_unit'] = item.secondary_unit_rel.name if item.secondary_unit_rel else item.secondary_unit
 
         # Get last price paid from preferred vendor item, or most recent vendor item
         preferred_vendor_item = db.query(VendorItem).filter(
@@ -76,10 +81,7 @@ async def get_master_items(
             cost_per_master_unit = float(preferred_vendor_item.unit_price) / float(preferred_vendor_item.conversion_factor)
             item_dict['last_price_paid'] = cost_per_master_unit
             # Use the master item's unit of measure, not the vendor's purchase unit
-            if item.unit_of_measure:
-                item_dict['last_price_unit'] = item.unit_of_measure
-            else:
-                item_dict['last_price_unit'] = None
+            item_dict['last_price_unit'] = unit_name
         else:
             item_dict['last_price_paid'] = None
             item_dict['last_price_unit'] = None
@@ -241,14 +243,57 @@ async def delete_master_item(
             detail="Master item not found"
         )
 
-    # Check if item has inventory records
+    # Check if item is being used in other tables
     from restaurant_inventory.models.inventory import Inventory
-    inventory_count = db.query(Inventory).filter(Inventory.master_item_id == item_id).count()
+    from restaurant_inventory.models.pos_sale import POSItemMapping
+    from restaurant_inventory.models.recipe import RecipeIngredient
+    from restaurant_inventory.models.waste import WasteRecord
+    from restaurant_inventory.models.count_session import CountSessionItem
+    from restaurant_inventory.models.invoice import InvoiceItem
+    from restaurant_inventory.models.inventory_transaction import InventoryTransaction
 
+    blocking_items = []
+
+    # Check inventory records
+    inventory_count = db.query(Inventory).filter(Inventory.master_item_id == item_id).count()
     if inventory_count > 0:
+        blocking_items.append(f"{inventory_count} inventory record(s)")
+
+    # Check POS item mappings
+    pos_mapping_count = db.query(POSItemMapping).filter(POSItemMapping.master_item_id == item_id).count()
+    if pos_mapping_count > 0:
+        blocking_items.append(f"{pos_mapping_count} POS item mapping(s)")
+
+    # Check recipe ingredients
+    recipe_count = db.query(RecipeIngredient).filter(RecipeIngredient.master_item_id == item_id).count()
+    if recipe_count > 0:
+        blocking_items.append(f"{recipe_count} recipe ingredient(s)")
+
+    # Check waste records
+    waste_count = db.query(WasteRecord).filter(WasteRecord.master_item_id == item_id).count()
+    if waste_count > 0:
+        blocking_items.append(f"{waste_count} waste record(s)")
+
+    # Check count session items
+    count_count = db.query(CountSessionItem).filter(CountSessionItem.master_item_id == item_id).count()
+    if count_count > 0:
+        blocking_items.append(f"{count_count} count session item(s)")
+
+    # Check invoice items
+    invoice_count = db.query(InvoiceItem).filter(InvoiceItem.master_item_id == item_id).count()
+    if invoice_count > 0:
+        blocking_items.append(f"{invoice_count} invoice item(s)")
+
+    # Check inventory transactions
+    transaction_count = db.query(InventoryTransaction).filter(InventoryTransaction.master_item_id == item_id).count()
+    if transaction_count > 0:
+        blocking_items.append(f"{transaction_count} inventory transaction(s)")
+
+    if blocking_items:
+        detail = f"Cannot delete '{item.name}' because it is being used in: {', '.join(blocking_items)}. Please remove these references first."
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete item with {inventory_count} inventory records. Please remove inventory first."
+            detail=detail
         )
 
     # Log before deletion

@@ -1,0 +1,533 @@
+{% extends "base.html" %}
+
+{% block title %}Tasks - SW Hospitality Events{% endblock %}
+
+{% block page_title %}Task Management{% endblock %}
+
+{% block top_bar_actions %}
+<div style="display: flex; gap: 10px;">
+    <button id="viewKanban" class="btn-secondary-custom" onclick="switchView('kanban')">
+        <i class="bi bi-kanban"></i> Kanban
+    </button>
+    <button id="viewList" class="btn-secondary-custom" onclick="switchView('list')">
+        <i class="bi bi-list-ul"></i> List
+    </button>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filters-bar {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 15px 20px;
+        margin-bottom: 20px;
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .filter-item {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+        min-width: 150px;
+    }
+
+    .filter-item label {
+        font-size: 12px;
+        color: #8b949e;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Stats Cards */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+
+    .stat-card {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 15px;
+        text-align: center;
+    }
+
+    .stat-label {
+        font-size: 12px;
+        color: #8b949e;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 8px;
+    }
+
+    .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        color: #c9d1d9;
+    }
+
+    /* Kanban View */
+    .kanban-board {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+
+    .kanban-column {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 15px;
+        min-height: 400px;
+    }
+
+    .column-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid #30363d;
+    }
+
+    .column-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #c9d1d9;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .column-count {
+        background-color: #21262d;
+        color: #8b949e;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .task-card {
+        background-color: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 12px;
+        margin-bottom: 10px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .task-card:hover {
+        border-color: #58a6ff;
+        transform: translateY(-2px);
+    }
+
+    .task-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: #c9d1d9;
+        margin-bottom: 8px;
+    }
+
+    .task-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        font-size: 12px;
+        color: #8b949e;
+        margin-bottom: 8px;
+    }
+
+    .task-meta-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .task-meta-item i {
+        color: #58a6ff;
+    }
+
+    .priority-badge {
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .priority-urgent {
+        background-color: #da3633;
+        color: #ffa198;
+    }
+
+    .priority-high {
+        background-color: #f0883e;
+        color: #ffc680;
+    }
+
+    .priority-medium {
+        background-color: #9e6a03;
+        color: #ffd33d;
+    }
+
+    .priority-low {
+        background-color: #0969da;
+        color: #79c0ff;
+    }
+
+    .task-overdue {
+        border-left: 3px solid #da3633;
+    }
+
+    /* List View */
+    .list-view {
+        display: none;
+    }
+
+    .list-view.active {
+        display: block;
+    }
+
+    .kanban-view.active {
+        display: grid;
+    }
+
+    .loading {
+        text-align: center;
+        padding: 40px;
+        color: #8b949e;
+    }
+
+    .spinner {
+        border: 3px solid #21262d;
+        border-top: 3px solid #58a6ff;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 15px;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .empty-column {
+        text-align: center;
+        padding: 40px 20px;
+        color: #8b949e;
+        font-size: 14px;
+    }
+
+    @media (max-width: 992px) {
+        .kanban-board {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Stats -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Total Tasks</div>
+        <div class="stat-value" id="statTotal">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Pending</div>
+        <div class="stat-value" id="statPending">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">In Progress</div>
+        <div class="stat-value" id="statInProgress">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Completed</div>
+        <div class="stat-value" id="statCompleted">0</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Overdue</div>
+        <div class="stat-value" id="statOverdue" style="color: #f85149;">0</div>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="filters-bar">
+    <div class="filter-item">
+        <label>Department</label>
+        <select id="filterDepartment" class="form-control-custom" onchange="filterTasks()">
+            <option value="">All Departments</option>
+            <option value="kitchen">Kitchen</option>
+            <option value="bar">Bar</option>
+            <option value="service">Service</option>
+            <option value="events">Events</option>
+            <option value="admin">Admin</option>
+        </select>
+    </div>
+
+    <div class="filter-item">
+        <label>Priority</label>
+        <select id="filterPriority" class="form-control-custom" onchange="filterTasks()">
+            <option value="">All Priorities</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+        </select>
+    </div>
+
+    <div class="filter-item" style="flex: 1; min-width: 250px;">
+        <label>Search</label>
+        <input type="text" id="searchQuery" class="form-control-custom" placeholder="Search tasks..." oninput="filterTasks()">
+    </div>
+</div>
+
+<!-- Loading -->
+<div id="loading" class="loading">
+    <div class="spinner"></div>
+    <div>Loading tasks...</div>
+</div>
+
+<!-- Kanban View -->
+<div id="kanbanView" class="kanban-board kanban-view" style="display: none;">
+    <div class="kanban-column">
+        <div class="column-header">
+            <span class="column-title">Pending</span>
+            <span class="column-count" id="countPending">0</span>
+        </div>
+        <div id="columnPending"></div>
+    </div>
+
+    <div class="kanban-column">
+        <div class="column-header">
+            <span class="column-title">In Progress</span>
+            <span class="column-count" id="countInProgress">0</span>
+        </div>
+        <div id="columnInProgress"></div>
+    </div>
+
+    <div class="kanban-column">
+        <div class="column-header">
+            <span class="column-title">Completed</span>
+            <span class="column-count" id="countCompleted">0</span>
+        </div>
+        <div id="columnCompleted"></div>
+    </div>
+
+    <div class="kanban-column">
+        <div class="column-header">
+            <span class="column-title">Canceled</span>
+            <span class="column-count" id="countCanceled">0</span>
+        </div>
+        <div id="columnCanceled"></div>
+    </div>
+</div>
+
+<!-- List View -->
+<div id="listView" class="list-view">
+    <table class="table-custom">
+        <thead>
+            <tr>
+                <th>Task</th>
+                <th>Event</th>
+                <th>Department</th>
+                <th>Priority</th>
+                <th>Due Date</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="listViewBody">
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allTasks = [];
+    let currentView = 'kanban';
+
+    async function loadTasks() {
+        try {
+            const response = await fetch('/events/api/tasks/all');
+            allTasks = await response.json();
+
+            document.getElementById('loading').style.display = 'none';
+            updateStats();
+            filterTasks();
+        } catch (error) {
+            console.error('Error loading tasks:', error);
+            document.getElementById('loading').innerHTML = `
+                <i class="bi bi-exclamation-triangle" style="font-size: 48px; color: #da3633; margin-bottom: 15px; display: block;"></i>
+                <div style="color: #da3633;">Failed to load tasks</div>
+            `;
+        }
+    }
+
+    function updateStats() {
+        const now = new Date();
+        const stats = {
+            total: allTasks.length,
+            pending: allTasks.filter(t => t.status === 'pending').length,
+            in_progress: allTasks.filter(t => t.status === 'in_progress').length,
+            completed: allTasks.filter(t => t.status === 'completed').length,
+            overdue: allTasks.filter(t => {
+                if (t.status === 'completed' || !t.due_at) return false;
+                return new Date(t.due_at) < now;
+            }).length
+        };
+
+        document.getElementById('statTotal').textContent = stats.total;
+        document.getElementById('statPending').textContent = stats.pending;
+        document.getElementById('statInProgress').textContent = stats.in_progress;
+        document.getElementById('statCompleted').textContent = stats.completed;
+        document.getElementById('statOverdue').textContent = stats.overdue;
+    }
+
+    function filterTasks() {
+        const department = document.getElementById('filterDepartment').value.toLowerCase();
+        const priority = document.getElementById('filterPriority').value.toLowerCase();
+        const search = document.getElementById('searchQuery').value.toLowerCase();
+
+        const filtered = allTasks.filter(task => {
+            if (department && task.department.toLowerCase() !== department) return false;
+            if (priority && task.priority.toLowerCase() !== priority) return false;
+            if (search && !task.title.toLowerCase().includes(search)) return false;
+            return true;
+        });
+
+        if (currentView === 'kanban') {
+            renderKanban(filtered);
+        } else {
+            renderList(filtered);
+        }
+    }
+
+    function renderKanban(tasks) {
+        const columns = {
+            pending: document.getElementById('columnPending'),
+            in_progress: document.getElementById('columnInProgress'),
+            completed: document.getElementById('columnCompleted'),
+            canceled: document.getElementById('columnCanceled')
+        };
+
+        const counts = {
+            pending: 0,
+            in_progress: 0,
+            completed: 0,
+            canceled: 0
+        };
+
+        Object.values(columns).forEach(col => col.innerHTML = '');
+
+        tasks.forEach(task => {
+            const column = columns[task.status];
+            if (column) {
+                column.appendChild(createTaskCard(task));
+                counts[task.status]++;
+            }
+        });
+
+        document.getElementById('countPending').textContent = counts.pending;
+        document.getElementById('countInProgress').textContent = counts.in_progress;
+        document.getElementById('countCompleted').textContent = counts.completed;
+        document.getElementById('countCanceled').textContent = counts.canceled;
+
+        // Show empty state for empty columns
+        Object.entries(columns).forEach(([status, column]) => {
+            if (counts[status] === 0) {
+                column.innerHTML = '<div class="empty-column">No tasks</div>';
+            }
+        });
+    }
+
+    function createTaskCard(task) {
+        const card = document.createElement('div');
+        card.className = 'task-card';
+
+        const now = new Date();
+        const isOverdue = task.due_at && new Date(task.due_at) < now && task.status !== 'completed';
+        if (isOverdue) card.classList.add('task-overdue');
+
+        const dueDate = task.due_at ? new Date(task.due_at).toLocaleDateString() : 'No due date';
+
+        card.innerHTML = `
+            <div class="task-title">${task.title}</div>
+            <div class="task-meta">
+                <div class="task-meta-item">
+                    <i class="bi bi-calendar3"></i>
+                    <span>${dueDate}</span>
+                </div>
+                ${task.event_title ? `
+                <div class="task-meta-item">
+                    <i class="bi bi-calendar-event"></i>
+                    <span>${task.event_title}</span>
+                </div>
+                ` : ''}
+                <div class="task-meta-item">
+                    <i class="bi bi-building"></i>
+                    <span>${task.department}</span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <span class="priority-badge priority-${task.priority}">${task.priority}</span>
+                ${task.assigned_to_name ? `
+                <span style="font-size: 12px; color: #8b949e;">
+                    <i class="bi bi-person"></i> ${task.assigned_to_name}
+                </span>
+                ` : ''}
+            </div>
+        `;
+
+        return card;
+    }
+
+    function renderList(tasks) {
+        const tbody = document.getElementById('listViewBody');
+        tbody.innerHTML = '';
+
+        tasks.forEach(task => {
+            const row = document.createElement('tr');
+            const dueDate = task.due_at ? new Date(task.due_at).toLocaleDateString() : 'N/A';
+            const now = new Date();
+            const isOverdue = task.due_at && new Date(task.due_at) < now && task.status !== 'completed';
+
+            row.innerHTML = `
+                <td style="color: #c9d1d9; font-weight: 500;">${task.title}</td>
+                <td>${task.event_title || 'N/A'}</td>
+                <td>${task.department}</td>
+                <td><span class="priority-badge priority-${task.priority}">${task.priority}</span></td>
+                <td ${isOverdue ? 'style="color: #f85149;"' : ''}>${dueDate} ${isOverdue ? '⚠️' : ''}</td>
+                <td>${task.status.replace('_', ' ')}</td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    function switchView(view) {
+        currentView = view;
+
+        document.getElementById('viewKanban').className = view === 'kanban' ? 'btn-primary-custom' : 'btn-secondary-custom';
+        document.getElementById('viewList').className = view === 'list' ? 'btn-primary-custom' : 'btn-secondary-custom';
+
+        document.getElementById('kanbanView').style.display = view === 'kanban' ? 'grid' : 'none';
+        document.getElementById('listView').classList.toggle('active', view === 'list');
+
+        filterTasks();
+    }
+
+    // Load tasks on page load
+    loadTasks();
+    switchView('kanban');
+</script>
+{% endblock %}
