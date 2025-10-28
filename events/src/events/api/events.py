@@ -260,7 +260,7 @@ async def list_venues(
 ):
     """Get all venues"""
     venues = db.query(Venue).order_by(Venue.name).all()
-    return [{"id": str(v.id), "name": v.name, "capacity": v.capacity} for v in venues]
+    return [{"id": str(v.id), "name": v.name, "address": v.address} for v in venues]
 
 
 @router.get("/clients")
