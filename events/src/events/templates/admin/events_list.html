@@ -363,7 +363,7 @@
     async function loadEvents() {
         try {
             const [eventsRes, venuesRes] = await Promise.all([
-                fetch('/events/api/events'),
+                fetch('/events/api/events/'),
                 fetch('/events/api/events/venues')
             ]);
 

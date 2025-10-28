@@ -1,9 +1,11 @@
 """Main FastAPI application"""
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.base import BaseHTTPMiddleware
 from events.core.config import settings
 from events.api import public, events, tasks, documents, auth
 import logging
@@ -23,7 +25,20 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
+    root_path="/events",  # Behind reverse proxy at /events/ path
 )
+
+# Middleware to handle proxy headers (X-Forwarded-Proto, X-Forwarded-Host)
+class ProxyHeaderMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Trust X-Forwarded-Proto from nginx proxy
+        forwarded_proto = request.headers.get("X-Forwarded-Proto")
+        if forwarded_proto:
+            request.scope["scheme"] = forwarded_proto
+        response = await call_next(request)
+        return response
+
+app.add_middleware(ProxyHeaderMiddleware)
 
 # CORS middleware
 app.add_middleware(
