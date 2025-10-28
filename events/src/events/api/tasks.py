@@ -33,7 +33,7 @@ async def list_all_tasks(
 
     query = db.query(Task).options(
         joinedload(Task.event),
-        joinedload(Task.assigned_to),
+        joinedload(Task.assignee),
         joinedload(Task.checklist_items)
     )
 
@@ -57,12 +57,12 @@ async def list_all_tasks(
             "status": task.status,
             "priority": task.priority,
             "department": task.department,
-            "assigned_to_id": task.assigned_to_id,
+            "assigned_to_id": task.assignee_user_id,
             "due_at": task.due_at,
             "completed_at": task.completed_at,
             "created_at": task.created_at,
             "event_title": task.event.title if task.event else None,
-            "assigned_to_name": task.assigned_to.full_name if task.assigned_to else None,
+            "assigned_to_name": task.assignee.full_name if task.assignee else None,
             "checklist_items": [
                 {
                     "id": item.id,
