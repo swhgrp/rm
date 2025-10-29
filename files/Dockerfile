@@ -2,9 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including LibreOffice for document conversion
 RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
+    libreoffice \
+    libreoffice-writer \
+    libreoffice-calc \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy and install Python dependencies

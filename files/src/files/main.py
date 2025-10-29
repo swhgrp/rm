@@ -47,6 +47,18 @@ async def index(request: Request, user: User = Depends(get_current_user)):
     )
 
 
+@app.get("/share/{share_token}", response_class=HTMLResponse)
+async def public_share(request: Request, share_token: str):
+    """Public share access page"""
+    return templates.TemplateResponse(
+        "public_share.html",
+        {
+            "request": request,
+            "share_token": share_token
+        }
+    )
+
+
 @app.get("/health")
 async def health():
     """Health check"""

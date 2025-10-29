@@ -8,7 +8,7 @@ The Files system provides centralized file storage, folder organization, and doc
 
 ## Status: 100% Production Ready ✅
 
-**LAST UPDATED:** 2025-10-28
+**LAST UPDATED:** 2025-10-29
 
 The Files system is fully implemented and actively used in production.
 
@@ -24,18 +24,23 @@ The Files system is fully implemented and actively used in production.
 ## Core Features
 
 ### ✅ File Management
-- **Upload Files:** Single and bulk file uploads
+- **Upload Files:** Single and bulk file uploads with drag-and-drop
 - **Download Files:** Direct download and streaming support
+- **File Preview:** In-browser preview for PDFs, images, and Office documents
 - **Delete Files:** Remove files with permission checking
+- **Copy/Move Files:** Organize files across folders
+- **Rename Files:** Update filenames in-place
 - **File Metadata:** Track file size, type, owner, timestamps
 - **MIME Type Detection:** Automatic content-type detection
+- **Bulk Selection:** Multi-select files and folders for batch operations
 
 ### ✅ Folder Organization
 - **Create Folders:** Hierarchical folder structure
-- **Nested Folders:** Support for parent/child relationships
-- **Folder Permissions:** Per-user read/write/delete permissions
-- **Public Folders:** Share folders with all users
-- **Private Folders:** User-specific storage areas
+- **Nested Folders:** Support for parent/child relationships with CASCADE delete
+- **Folder Navigation:** Breadcrumb navigation and back button support
+- **Dashboard View:** Home page with recent files and stats
+- **My Files View:** Traditional folder browser with full hierarchy
+- **Shared Views:** Dedicated pages for "Shared with Me" and "Shared by Me"
 
 ### ✅ Permissions & Security
 - **User-Based Storage:** Each user gets isolated storage (`user_{id}/`)
@@ -45,10 +50,20 @@ The Files system is fully implemented and actively used in production.
 - **Permission Inheritance:** Folder permissions apply to contents
 
 ### ✅ File Sharing
-- **Share with Users:** Grant specific users access to folders
-- **Public Sharing:** Make folders accessible to all authenticated users
-- **Permission Levels:** Granular read/write/delete controls
-- **Owner Controls:** File owners maintain full control
+- **Internal Sharing:** Share files/folders with specific users
+- **Public Share Links:** Generate shareable links with optional passwords
+- **Username Autocomplete:** Search and select users by full name
+- **Granular Permissions:** View, edit, upload, download, share, comment controls
+- **Share Management:** View and manage all shares in one place
+- **Share Tracking:** Visual badges show shared items
+- **Expiration Support:** Set expiration dates for public links
+
+### ✅ Document Preview & Conversion
+- **PDF Preview:** Native browser preview for PDF documents
+- **Image Preview:** Display images directly in browser
+- **Office Document Conversion:** Convert Word/Excel/PowerPoint to PDF for preview
+- **LibreOffice Integration:** Headless document conversion service
+- **Supported Formats:** .pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx, images
 
 ## Database Schema
 
@@ -81,16 +96,42 @@ Organizes files into hierarchical folders.
 | `is_public` | Boolean | Public access flag |
 | `created_at` | DateTime | Creation timestamp |
 
-### FolderPermissions Table (Many-to-Many)
-Junction table for user-folder permissions.
+### InternalShare Table
+Manages internal sharing between users.
 
 | Column | Type | Description |
 |--------|------|-------------|
-| `folder_id` | Integer | Foreign key to Folder |
-| `user_id` | Integer | Foreign key to User |
-| `can_read` | Boolean | Read permission |
-| `can_write` | Boolean | Write permission |
-| `can_delete` | Boolean | Delete permission |
+| `id` | Integer | Primary key |
+| `resource_type` | Enum | 'file' or 'folder' |
+| `file_id` | Integer | Shared file (nullable) |
+| `folder_id` | Integer | Shared folder (nullable) |
+| `owner_id` | Integer | User who shared the resource |
+| `shared_with_user_id` | Integer | User receiving access |
+| `can_view` | Boolean | View permission |
+| `can_edit` | Boolean | Edit permission |
+| `can_upload` | Boolean | Upload permission (folders) |
+| `can_download` | Boolean | Download permission |
+| `can_share` | Boolean | Re-share permission |
+| `can_comment` | Boolean | Comment permission |
+| `is_active` | Boolean | Share status |
+| `created_at` | DateTime | Share creation timestamp |
+
+### ShareLink Table
+Public share links with optional passwords.
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | Integer | Primary key |
+| `resource_type` | Enum | 'file' or 'folder' |
+| `file_id` | Integer | Shared file (nullable) |
+| `folder_id` | Integer | Shared folder (nullable) |
+| `owner_id` | Integer | User who created the link |
+| `share_token` | String | Unique share token (UUID) |
+| `password_hash` | String | Bcrypt hashed password (nullable) |
+| `expires_at` | DateTime | Expiration date (nullable) |
+| `is_active` | Boolean | Link status |
+| `access_count` | Integer | Number of accesses |
+| `created_at` | DateTime | Link creation timestamp |
 
 ### User Table (from HR Database)
 Users are authenticated via HR database.
@@ -111,18 +152,36 @@ Users are authenticated via HR database.
 - `POST /api/auth/verify` - Verify JWT token
 
 ### File Endpoints (`/api/files`)
+- `GET /api/files/dashboard` - Get dashboard with recent files and stats
 - `GET /api/files/folders` - List accessible folders
 - `POST /api/files/folders` - Create new folder
-- `DELETE /api/files/folders/{folder_id}` - Delete folder
-- `GET /api/files/list?folder_id={id}` - List files in folder
+- `DELETE /api/files/folders/{folder_id}` - Delete folder (CASCADE)
+- `GET /api/files/folders/{folder_id}/files` - List files in folder
 - `POST /api/files/upload` - Upload file(s)
 - `GET /api/files/download/{file_id}` - Download file
+- `GET /api/files/preview/{file_id}` - Preview file (PDF/images/Office docs)
 - `DELETE /api/files/{file_id}` - Delete file
-- `POST /api/files/share` - Share folder with user
+- `PUT /api/files/{file_id}/rename` - Rename file
+- `PUT /api/files/{file_id}/move` - Move file to different folder
+- `POST /api/files/{file_id}/copy` - Copy file to folder
+- `GET /api/files/users` - Get list of users for sharing autocomplete
+
+### Share Endpoints (`/api/shares`)
+- `POST /api/shares/internal` - Create internal share with user
+- `GET /api/shares/internal/by-resource` - Get shares for a file/folder
+- `GET /api/shares/internal/shared-with-me` - Get items shared with current user
+- `GET /api/shares/internal/shared-by-me` - Get items shared by current user
+- `DELETE /api/shares/internal/{share_id}` - Remove internal share
+- `POST /api/shares/public` - Create public share link
+- `GET /api/shares/public/by-resource` - Get public links for file/folder
+- `DELETE /api/shares/public/{link_id}` - Delete public share link
+- `GET /api/shares/public/{token}` - Access public share (no auth required)
 
 ### Frontend Pages
-- `/` - File manager interface (authenticated)
+- `/` - Dashboard with recent files and stats
+- `/share/{token}` - Public share access page
 - `/health` - Health check endpoint
+- `/api/docs` - Interactive API documentation (Swagger UI)
 
 ## Directory Structure
 
@@ -135,7 +194,8 @@ files/
 │       ├── init_db.py                 # Database initialization
 │       ├── api/
 │       │   ├── auth.py                # Authentication endpoints
-│       │   └── filemanager.py         # File management endpoints
+│       │   ├── filemanager.py         # File management endpoints
+│       │   └── shares.py              # Sharing endpoints
 │       ├── core/
 │       │   ├── config.py              # Configuration settings
 │       │   ├── deps.py                # Dependency injection
@@ -144,9 +204,11 @@ files/
 │       │   └── database.py            # Database connections
 │       ├── models/
 │       │   ├── file_metadata.py       # File/Folder models
+│       │   ├── shares.py              # Share models (InternalShare, ShareLink)
 │       │   └── user.py                # User model
 │       └── templates/
-│           └── filemanager.html       # File browser UI
+│           ├── filemanager.html       # File browser UI
+│           └── public_share.html      # Public share access page
 ├── storage/                           # File storage directory
 │   └── user_{id}/                     # Per-user storage
 ├── logs/                              # Application logs
@@ -403,7 +465,6 @@ docker exec files-app du -sh /app/storage/user_*
 ## Future Enhancements
 
 - [ ] File versioning (track file history)
-- [ ] File preview (images, PDFs in browser)
 - [ ] Search functionality (filename, content)
 - [ ] Trash/recycle bin (soft delete)
 - [ ] Storage quotas per user
@@ -412,6 +473,8 @@ docker exec files-app du -sh /app/storage/user_*
 - [ ] Activity logs (who accessed what)
 - [ ] WebDAV support
 - [ ] Mobile app support
+- [ ] Commenting on files
+- [ ] Email notifications for shares
 
 ## Support
 
@@ -423,11 +486,27 @@ For issues or questions:
 
 ## Version History
 
+### v1.2.0 (2025-10-29)
+- **Dashboard View:** Home page with recent files, stats, and shared items
+- **My Files View:** Separate traditional folder browser view
+- **Username Autocomplete:** Search users by full name when sharing
+- **Share Management:** View all shares in dedicated "Shared with Me" and "Shared by Me" pages
+- **Share Badges:** Visual indicators showing share status on files/folders
+- **Bug Fixes:** Fixed folder CASCADE delete, share counting, and view refresh issues
+
+### v1.1.0 (2025-10-28)
+- **File Preview:** In-browser preview for PDFs, images, and Office documents
+- **LibreOffice Integration:** Convert Word/Excel/PowerPoint to PDF for preview
+- **Internal Sharing:** Share files/folders with specific users
+- **Public Share Links:** Generate shareable links with optional passwords
+- **Granular Permissions:** View, edit, upload, download, share, comment controls
+- **Bulk Operations:** Multi-select files and folders for batch actions
+- **File Operations:** Copy, move, and rename files
+
 ### v1.0.0 (2025-10-28)
 - Initial production release
 - File upload/download functionality
 - Folder organization with hierarchical structure
-- Permission-based sharing
 - JWT authentication via Portal
 - Local filesystem storage
 - Admin and owner-based access control

@@ -2,6 +2,15 @@
 
 Complete API reference for advanced file sharing features in the SW Restaurant Management Files System.
 
+**Last Updated:** 2025-10-29
+
+## Recent Updates (v1.2.0)
+- Username autocomplete when creating internal shares
+- Share badges visible on files/folders
+- Dedicated "Shared with Me" and "Shared by Me" pages
+- Improved share management UI
+- Fixed share counting to only include active shares
+
 ## Base URL
 
 ```

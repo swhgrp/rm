@@ -185,9 +185,277 @@
             margin-bottom: 20px;
             opacity: 0.5;
         }
+
+        .drag-drop-zone {
+            border: 2px dashed #30363d;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            background-color: #0d1117;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .drag-drop-zone:hover {
+            border-color: #58a6ff;
+            background-color: #161b22;
+        }
+
+        .drag-drop-zone.drag-over {
+            border-color: #58a6ff;
+            background-color: #161b22;
+            border-style: solid;
+        }
+
+        .drag-drop-zone i {
+            font-size: 48px;
+            color: #58a6ff;
+            margin-bottom: 15px;
+        }
+
+        .upload-queue {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .upload-item {
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+
+        .upload-item .file-name {
+            font-weight: 500;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .upload-item .progress {
+            height: 6px;
+            background-color: #21262d;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .upload-item .progress-bar {
+            background-color: #58a6ff;
+            height: 100%;
+            transition: width 0.3s;
+        }
+
+        .upload-item .status {
+            font-size: 12px;
+            color: #8b949e;
+            margin-top: 5px;
+        }
+
+        .upload-item.success {
+            border-color: #3fb950;
+        }
+
+        .upload-item.error {
+            border-color: #f85149;
+        }
+
+        .file-list.drag-over {
+            background-color: #161b22;
+            border: 2px dashed #58a6ff;
+        }
+
+        /* Toast Notifications */
+        .toast-container {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            z-index: 9999;
+        }
+
+        .toast {
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: none;
+            border-left: 3px solid;
+            min-width: 300px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .toast.show {
+            display: block;
+        }
+
+        .toast-success {
+            background: #003d1a;
+            color: #3fb950;
+            border-left-color: #3fb950;
+        }
+
+        .toast-error {
+            background: #3d1a1a;
+            color: #f85149;
+            border-left-color: #f85149;
+        }
+
+        .toast-warning {
+            background: #3d2a1a;
+            color: #f0883e;
+            border-left-color: #f0883e;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        /* Confirmation Modal */
+        .confirm-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 9998;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .confirm-overlay.show {
+            display: flex;
+        }
+
+        .confirm-dialog {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 25px;
+            max-width: 450px;
+            width: 90%;
+        }
+
+        .confirm-dialog h5 {
+            margin-bottom: 15px;
+            color: #c9d1d9;
+        }
+
+        .confirm-dialog p {
+            color: #8b949e;
+            margin-bottom: 20px;
+        }
+
+        .confirm-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        /* Bulk Selection */
+        .selection-checkbox {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            margin-right: 8px;
+        }
+
+        .file-item.selected,
+        .folder-item.selected {
+            background-color: #1a2d3d;
+            border-left: 3px solid #58a6ff;
+        }
+
+        .bulk-actions-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #161b22;
+            border-top: 1px solid #30363d;
+            padding: 15px 30px;
+            display: none;
+            align-items: center;
+            gap: 15px;
+            z-index: 1000;
+            box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        .bulk-actions-bar.show {
+            display: flex;
+        }
+
+        .bulk-actions-bar .selection-count {
+            color: #58a6ff;
+            font-weight: 500;
+        }
+
+        .bulk-actions-bar .actions {
+            display: flex;
+            gap: 10px;
+            margin-left: auto;
+        }
     </style>
 </head>
 <body>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Confirmation Overlay -->
+    <div class="confirm-overlay" id="confirmOverlay">
+        <div class="confirm-dialog">
+            <h5 id="confirmTitle">Confirm</h5>
+            <p id="confirmMessage"></p>
+            <div class="confirm-buttons">
+                <button class="btn btn-custom" onclick="hideConfirm(false)">Cancel</button>
+                <button class="btn btn-primary-custom" onclick="hideConfirm(true)">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Preview Modal -->
+    <div class="modal fade" id="previewModal" tabindex="-1" data-bs-backdrop="static">
+        <div class="modal-dialog modal-xl" style="max-width: 90vw; height: 90vh; margin: 5vh auto;">
+            <div class="modal-content" style="height: 100%;">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-eye"></i> <span id="previewFileName">Preview</span>
+                    </h5>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-custom" id="prevFileBtn" onclick="navigatePreview(-1)" title="Previous File">
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-custom" id="nextFileBtn" onclick="navigatePreview(1)" title="Next File">
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-custom" onclick="downloadCurrentPreview()" title="Download">
+                            <i class="bi bi-download"></i>
+                        </button>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                </div>
+                <div class="modal-body" style="height: calc(100% - 60px); overflow: auto; padding: 0;">
+                    <!-- Preview content will be loaded here -->
+                    <div id="previewContent" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #0d1117;">
+                        <div class="spinner-border text-light" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <nav class="navbar navbar-custom">
         <div class="container-fluid">
             <a class="navbar-brand d-flex align-items-center gap-2" href="#">
@@ -212,6 +480,14 @@
                     <i class="bi bi-folder"></i>
                     <span>My Files</span>
                 </a>
+                <a href="#" class="sidebar-item" onclick="loadSharedWithMe(); return false;">
+                    <i class="bi bi-people"></i>
+                    <span>Shared with Me</span>
+                </a>
+                <a href="#" class="sidebar-item" onclick="loadSharedByMe(); return false;">
+                    <i class="bi bi-share"></i>
+                    <span>Shared by Me</span>
+                </a>
                 <a href="#" class="sidebar-item" onclick="showNewFolderModal(); return false;">
                     <i class="bi bi-folder-plus"></i>
                     <span>New Folder</span>
@@ -228,6 +504,88 @@
                         <li class="breadcrumb-item active">Home</li>
                     </ol>
                 </nav>
+
+                <!-- Search and Filter Bar -->
+                <div class="search-filter-bar" style="margin-bottom: 20px;">
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <!-- Search Input -->
+                        <div style="flex: 1; min-width: 300px; position: relative;">
+                            <input type="text" id="searchInput" class="form-control" placeholder="Search files and folders..." style="padding-right: 40px;">
+                            <button onclick="clearSearch()" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #8b949e; cursor: pointer; display: none;" id="clearSearchBtn">
+                                <i class="bi bi-x-circle"></i>
+                            </button>
+                        </div>
+
+                        <!-- Quick Filters -->
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-secondary btn-sm active" onclick="applyQuickFilter('all')" id="filter-all">
+                                <i class="bi bi-files"></i> All
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="applyQuickFilter('recent')" id="filter-recent">
+                                <i class="bi bi-clock-history"></i> Recent
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" onclick="applyQuickFilter('large')" id="filter-large">
+                                <i class="bi bi-hdd"></i> Large Files
+                            </button>
+                        </div>
+
+                        <!-- Advanced Filters Button -->
+                        <button class="btn btn-outline-secondary btn-sm" onclick="toggleAdvancedFilters()">
+                            <i class="bi bi-funnel"></i> Filters
+                        </button>
+                    </div>
+
+                    <!-- Advanced Filters Panel (Initially Hidden) -->
+                    <div id="advancedFilters" style="display: none; margin-top: 15px; padding: 15px; background: #161b22; border: 1px solid #30363d; border-radius: 6px;">
+                        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                            <div style="flex: 1; min-width: 200px;">
+                                <label class="form-label small">File Type</label>
+                                <select id="filterFileType" class="form-select form-select-sm" onchange="applyFilters()">
+                                    <option value="">All Types</option>
+                                    <option value="folder">Folders</option>
+                                    <option value="document">Documents (PDF, DOC, TXT)</option>
+                                    <option value="image">Images (PNG, JPG, GIF)</option>
+                                    <option value="video">Videos (MP4, AVI, MOV)</option>
+                                    <option value="audio">Audio (MP3, WAV)</option>
+                                    <option value="archive">Archives (ZIP, RAR)</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 200px;">
+                                <label class="form-label small">Date Range</label>
+                                <select id="filterDateRange" class="form-select form-select-sm" onchange="applyFilters()">
+                                    <option value="">Any Time</option>
+                                    <option value="today">Today</option>
+                                    <option value="week">Last 7 Days</option>
+                                    <option value="month">Last 30 Days</option>
+                                    <option value="year">Last Year</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 200px;">
+                                <label class="form-label small">Size Range</label>
+                                <select id="filterSizeRange" class="form-select form-select-sm" onchange="applyFilters()">
+                                    <option value="">Any Size</option>
+                                    <option value="small">Small (< 1 MB)</option>
+                                    <option value="medium">Medium (1-10 MB)</option>
+                                    <option value="large">Large (10-100 MB)</option>
+                                    <option value="xlarge">Very Large (> 100 MB)</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1; min-width: 200px;">
+                                <label class="form-label small">Owner</label>
+                                <select id="filterOwner" class="form-select form-select-sm" onchange="applyFilters()">
+                                    <option value="">Anyone</option>
+                                    <option value="me">My Files</option>
+                                    <option value="shared">Shared With Me</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="margin-top: 10px;">
+                            <button class="btn btn-sm btn-custom" onclick="clearAllFilters()">
+                                <i class="bi bi-x-circle"></i> Clear All Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
 
                 <div class="toolbar">
                     <button class="btn btn-custom" onclick="showUploadModal()">
@@ -285,29 +643,229 @@
         </div>
     </div>
 
+    <!-- Bulk Actions Bar -->
+    <div class="bulk-actions-bar" id="bulkActionsBar">
+        <input type="checkbox" id="selectAllCheckbox" class="selection-checkbox" onchange="toggleSelectAll()" title="Select All">
+        <span class="selection-count" id="selectionCount">0 selected</span>
+        <div class="actions">
+            <button class="btn btn-custom" onclick="bulkMove()">
+                <i class="bi bi-folder-symlink"></i> Move
+            </button>
+            <button class="btn btn-custom" onclick="bulkCopy()">
+                <i class="bi bi-files"></i> Copy
+            </button>
+            <button class="btn btn-custom" onclick="bulkDelete()">
+                <i class="bi bi-trash"></i> Delete
+            </button>
+            <button class="btn btn-custom" onclick="clearSelection()">
+                <i class="bi bi-x"></i> Clear
+            </button>
+        </div>
+    </div>
+
     <!-- Upload File Modal -->
     <div class="modal fade" id="uploadModal" tabindex="-1">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="bi bi-upload"></i> Upload File</h5>
+                    <h5 class="modal-title"><i class="bi bi-upload"></i> Upload Files</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="fileInput" class="form-label">Choose File</label>
-                        <input type="file" class="form-control" id="fileInput">
+                    <!-- Drag & Drop Zone -->
+                    <div class="drag-drop-zone" id="dragDropZone" onclick="document.getElementById('fileInput').click()">
+                        <i class="bi bi-cloud-upload"></i>
+                        <h5>Drag & Drop Files or Folders Here</h5>
+                        <p class="text-muted mb-0">or click to browse</p>
+                        <input type="file" class="d-none" id="fileInput" multiple webkitdirectory directory onchange="handleFileSelect(event)">
                     </div>
-                    <div id="uploadProgress" style="display:none;">
-                        <div class="progress">
-                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
-                        </div>
+
+                    <div class="mt-3 text-center">
+                        <button type="button" class="btn btn-sm btn-custom" onclick="switchToFileMode()">
+                            <i class="bi bi-file-earmark"></i> Select Files
+                        </button>
+                        <button type="button" class="btn btn-sm btn-custom" onclick="switchToFolderMode()">
+                            <i class="bi bi-folder"></i> Select Folder
+                        </button>
+                    </div>
+
+                    <!-- Selected Files Info -->
+                    <div id="selectedFilesInfo" class="mt-3 text-muted" style="display:none;">
+                        <small><span id="fileCount">0</span> file(s) selected</small>
+                    </div>
+
+                    <!-- Upload Queue -->
+                    <div id="uploadQueue" class="upload-queue" style="display:none;">
+                        <!-- Upload items will be added here dynamically -->
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-custom" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary-custom" onclick="uploadFile()">
-                        <i class="bi bi-upload"></i> Upload
+                    <button type="button" class="btn btn-primary-custom" id="uploadBtn" onclick="startUpload()" disabled>
+                        <i class="bi bi-upload"></i> Upload <span id="uploadCount"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div class="modal fade" id="shareModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-share"></i> Share <span id="shareResourceName"></span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="link-tab" data-bs-toggle="tab" data-bs-target="#link-panel" type="button">
+                                <i class="bi bi-link-45deg"></i> Share Link
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="internal-tab" data-bs-toggle="tab" data-bs-target="#internal-panel" type="button">
+                                <i class="bi bi-people"></i> Share with Users
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="manage-tab" data-bs-toggle="tab" data-bs-target="#manage-panel" type="button">
+                                <i class="bi bi-gear"></i> Manage Shares
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <!-- Share Link Tab -->
+                        <div class="tab-pane fade show active" id="link-panel">
+                            <p class="text-muted mb-3">Create a public link that anyone can use to access this resource</p>
+
+                            <div class="mb-3">
+                                <label for="shareAccessType" class="form-label">Access Type</label>
+                                <select class="form-control" id="shareAccessType">
+                                    <option value="read_only">Read Only - View and download</option>
+                                    <option value="upload_only">Upload Only - Can upload new files</option>
+                                    <option value="read_write">Read & Write - View, download, and upload</option>
+                                    <option value="edit">Edit - Full editing permissions</option>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="sharePassword" class="form-label">Password (Optional)</label>
+                                <input type="text" class="form-control" id="sharePassword" placeholder="Leave blank for no password">
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="shareExpires" class="form-label">Expiration (Optional)</label>
+                                <input type="datetime-local" class="form-control" id="shareExpires">
+                            </div>
+
+                            <div class="d-grid">
+                                <button class="btn btn-primary-custom" onclick="createShareLink()">
+                                    <i class="bi bi-plus-circle"></i> Create Share Link
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Internal Share Tab -->
+                        <div class="tab-pane fade" id="internal-panel">
+                            <p class="text-muted mb-3">Share with other users in your organization</p>
+
+                            <div class="mb-3 position-relative">
+                                <label for="shareUsername" class="form-label">Username</label>
+                                <input type="text" class="form-control" id="shareUsername" placeholder="Enter or select username" autocomplete="off">
+                                <div id="usernameDropdown" class="dropdown-menu" style="position: absolute; top: 100%; left: 0; width: 100%; max-height: 200px; overflow-y: auto; display: none; z-index: 1050; margin-top: 0;">
+                                    <!-- Users will be loaded here dynamically -->
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Permissions</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="permRead" checked disabled>
+                                    <label class="form-check-label" for="permRead">Read - View files and folders</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="permWrite">
+                                    <label class="form-check-label" for="permWrite">Write - Upload and modify files</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="permDelete">
+                                    <label class="form-check-label" for="permDelete">Delete - Delete files and folders</label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="permShare">
+                                    <label class="form-check-label" for="permShare">Share - Share with others</label>
+                                </div>
+                            </div>
+
+                            <div class="d-grid">
+                                <button class="btn btn-primary-custom" onclick="createInternalShare()">
+                                    <i class="bi bi-person-plus"></i> Share with User
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Manage Shares Tab -->
+                        <div class="tab-pane fade" id="manage-panel">
+                            <div id="existingSharesList">
+                                <p class="text-muted">Loading existing shares...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Modal -->
+    <div class="modal fade" id="renameModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-pencil"></i> Rename <span id="renameType"></span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="newName" class="form-label">New Name</label>
+                        <input type="text" class="form-control" id="newName" placeholder="Enter new name">
+                    </div>
+                    <input type="hidden" id="renameResourceType">
+                    <input type="hidden" id="renameResourceId">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-custom" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary-custom" onclick="performRename()">
+                        <i class="bi bi-check"></i> Rename
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Move Modal -->
+    <div class="modal fade" id="moveModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-folder-symlink"></i> Move <span id="moveResourceName"></span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted">Select destination folder:</p>
+                    <div id="folderTree" class="border border-secondary rounded p-3" style="max-height: 300px; overflow-y: auto;">
+                        <p class="text-muted">Loading folders...</p>
+                    </div>
+                    <input type="hidden" id="moveResourceType">
+                    <input type="hidden" id="moveResourceId">
+                    <input type="hidden" id="moveTargetFolderId">
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-custom" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary-custom" onclick="performMove()">
+                        <i class="bi bi-check"></i> Move Here
                     </button>
                 </div>
             </div>
@@ -316,41 +874,273 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Toast notification system
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+
+            // Trigger animation
+            setTimeout(() => toast.classList.add('show'), 10);
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            showToast(message, 'success');
+        }
+
+        function showError(message) {
+            showToast(message, 'error');
+        }
+
+        function showWarning(message) {
+            showToast(message, 'warning');
+        }
+
+        function showInfo(message) {
+            showToast(message, 'info');
+        }
+
+        // Confirmation dialog system
+        let confirmCallback = null;
+
+        function showConfirm(message, title = 'Confirm Action') {
+            return new Promise((resolve) => {
+                document.getElementById('confirmTitle').textContent = title;
+                document.getElementById('confirmMessage').textContent = message;
+                document.getElementById('confirmOverlay').classList.add('show');
+                confirmCallback = resolve;
+            });
+        }
+
+        function hideConfirm(confirmed) {
+            document.getElementById('confirmOverlay').classList.remove('show');
+            if (confirmCallback) {
+                confirmCallback(confirmed);
+                confirmCallback = null;
+            }
+        }
+
         let currentFolderId = null;
         let folderStack = [];
 
         async function loadRootFolders() {
             try {
-                const response = await fetch('/files/api/files/folders');
+                // Load dashboard data for Home page
+                const response = await fetch(`/files/api/files/dashboard?_=${Date.now()}`);
                 const data = await response.json();
-                displayFolders(data.folders, []);
+                displayDashboard(data);
                 currentFolderId = null;
                 folderStack = [];
                 updateBreadcrumb([{name: 'Home', id: null}]);
+
+                // Update URL
+                window.history.pushState({folderId: null}, '', '/files/');
+
+                // Clear selection when navigating to root
+                if (typeof clearSelection === 'function') {
+                    clearSelection();
+                }
             } catch (error) {
-                console.error('Error loading folders:', error);
-                alert('Failed to load folders');
+                console.error('Error loading dashboard:', error);
+                showError('Failed to load dashboard');
             }
         }
 
         async function loadMyFiles() {
-            loadRootFolders();
+            try {
+                // Load full folder browser for My Files
+                const response = await fetch(`/files/api/files/folders?_=${Date.now()}`);
+                const data = await response.json();
+                displayFolders(data.folders, []);
+                currentFolderId = null;
+                folderStack = [];
+                updateBreadcrumb([{name: 'My Files', id: null}]);
+
+                // Update URL
+                window.history.pushState({folderId: null}, '', '/files/');
+
+                // Clear selection when navigating to root
+                if (typeof clearSelection === 'function') {
+                    clearSelection();
+                }
+            } catch (error) {
+                console.error('Error loading folders:', error);
+                showError('Failed to load folders');
+            }
         }
 
-        async function loadFolder(folderId, folderName) {
+        async function loadFolder(folderId, folderName, skipStackPush = false) {
             try {
                 const response = await fetch(`/files/api/files/folders/${folderId}/files`);
                 const data = await response.json();
-                
+
                 currentFolderId = folderId;
-                folderStack.push({id: folderId, name: folderName});
-                
+
+                // Only push to stack if this is a new navigation (not a refresh or restore)
+                if (!skipStackPush) {
+                    folderStack.push({id: folderId, name: folderName});
+                }
+
                 displayFiles(data.files, data.folder);
                 updateBreadcrumb([{name: 'Home', id: null}, ...folderStack]);
+
+                // Update URL
+                window.history.pushState({folderId: folderId}, '', `/files/?folder=${folderId}`);
+
+                // Clear selection when navigating to a new folder
+                if (typeof clearSelection === 'function') {
+                    clearSelection();
+                }
             } catch (error) {
                 console.error('Error loading folder:', error);
-                alert('Failed to load folder');
+                showError('Failed to load folder');
             }
+        }
+
+        function displayDashboard(data) {
+            const fileList = document.getElementById('fileList');
+            const { recent_files, shared_with_me, stats } = data;
+
+            let html = `
+                <div class="dashboard-container" style="padding: 20px;">
+                    <!-- Stats Cards -->
+                    <div class="row mb-4">
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-dark border-secondary">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-file-earmark" style="font-size: 2rem; color: #58a6ff;"></i>
+                                    <h3 class="mt-2 mb-0">${stats.total_files}</h3>
+                                    <p class="text-muted mb-0">Total Files</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-dark border-secondary">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-hdd" style="font-size: 2rem; color: #58a6ff;"></i>
+                                    <h3 class="mt-2 mb-0">${formatBytes(stats.total_storage)}</h3>
+                                    <p class="text-muted mb-0">Storage Used</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-dark border-secondary">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-share" style="font-size: 2rem; color: #58a6ff;"></i>
+                                    <h3 class="mt-2 mb-0">${stats.items_shared_by_me}</h3>
+                                    <p class="text-muted mb-0">Shared by Me</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <div class="card bg-dark border-secondary">
+                                <div class="card-body text-center">
+                                    <i class="bi bi-people" style="font-size: 2rem; color: #58a6ff;"></i>
+                                    <h3 class="mt-2 mb-0">${stats.items_shared_with_me}</h3>
+                                    <p class="text-muted mb-0">Shared with Me</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Files Section -->
+                    <div class="mb-4">
+                        <h5 class="mb-3"><i class="bi bi-clock-history"></i> Recent Files</h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body p-0">
+            `;
+
+            if (recent_files.length === 0) {
+                html += `
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox"></i>
+                        <p class="mt-2 mb-0">No recent files</p>
+                    </div>
+                `;
+            } else {
+                recent_files.forEach(file => {
+                    // Build share indicator badges
+                    let shareBadges = '';
+                    if (file.share_status && file.share_status.is_shared) {
+                        if (file.share_status.has_public_link) {
+                            shareBadges += `<span class="badge bg-primary ms-2" title="Public share link active"><i class="bi bi-link-45deg"></i> ${file.share_status.public_share_count}</span> `;
+                        }
+                        if (file.share_status.has_internal_shares) {
+                            shareBadges += `<span class="badge bg-info ms-1" title="Shared with ${file.share_status.internal_share_count} user(s)"><i class="bi bi-people"></i> ${file.share_status.internal_share_count}</span>`;
+                        }
+                    }
+
+                    html += `
+                        <div class="file-item file-item-preview border-bottom" data-type="file" data-id="${file.id}" data-name="${file.name}" data-mime="${file.mime_type}" style="padding: 12px 15px; border-bottom: 1px solid #30363d;">
+                            <i class="bi bi-file-earmark file-icon"></i>
+                            <span class="file-name">${file.name} ${shareBadges}</span>
+                            <span class="file-size">${formatBytes(file.size)}</span>
+                            <button class="btn btn-sm btn-custom preview-btn" style="display:none;" onclick="event.stopPropagation(); showFilePreview(${file.id}, '${file.name}', '${file.mime_type}')" title="Preview">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); downloadFile(${file.id}, '${file.name}')" title="Download">
+                                <i class="bi bi-download"></i>
+                            </button>
+                        </div>
+                    `;
+                });
+            }
+
+            html += `
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Shared with Me Section -->
+                    <div class="mb-4">
+                        <h5 class="mb-3"><i class="bi bi-people"></i> Shared with Me</h5>
+                        <div class="card bg-dark border-secondary">
+                            <div class="card-body p-0">
+            `;
+
+            if (shared_with_me.length === 0) {
+                html += `
+                    <div class="text-center text-muted py-4">
+                        <i class="bi bi-inbox"></i>
+                        <p class="mt-2 mb-0">No items shared with you</p>
+                    </div>
+                `;
+            } else {
+                shared_with_me.forEach(item => {
+                    const icon = item.resource_type === 'folder' ? 'bi-folder' : 'bi-file-earmark';
+                    const clickAction = item.resource_type === 'folder'
+                        ? `loadFolder(${item.resource_id}, '${item.resource_name}')`
+                        : `downloadFile(${item.resource_id}, '${item.resource_name}')`;
+
+                    html += `
+                        <div class="file-item border-bottom" style="padding: 12px 15px; border-bottom: 1px solid #30363d; cursor: pointer;" onclick="${clickAction}">
+                            <i class="bi ${icon} file-icon"></i>
+                            <span class="file-name">${item.resource_name}</span>
+                            <span class="file-size">Shared by ${item.owner_name}</span>
+                        </div>
+                    `;
+                });
+            }
+
+            html += `
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            fileList.innerHTML = html;
+
+            // Initialize preview buttons for recent files
+            setupPreviewButtons();
         }
 
         function displayFolders(folders, files) {
@@ -370,33 +1160,111 @@
             let html = '';
             
             folders.forEach(folder => {
+                // Build share indicator badges
+                let shareBadges = '';
+                if (folder.share_status && folder.share_status.is_shared) {
+                    if (folder.share_status.has_public_link) {
+                        shareBadges += `<span class="badge bg-primary ms-2" title="Public share link active"><i class="bi bi-link-45deg"></i> ${folder.share_status.public_share_count}</span> `;
+                    }
+                    if (folder.share_status.has_internal_shares) {
+                        shareBadges += `<span class="badge bg-info ms-1" title="Shared with ${folder.share_status.internal_share_count} user(s)"><i class="bi bi-people"></i> ${folder.share_status.internal_share_count}</span>`;
+                    }
+                }
+
                 html += `
-                    <div class="folder-item" onclick="loadFolder(${folder.id}, '${folder.name}')">
+                    <div class="folder-item" data-type="folder" data-id="${folder.id}" data-name="${folder.name}" onclick="loadFolder(${folder.id}, '${folder.name}')">
+                        <input type="checkbox" class="selection-checkbox" onchange="toggleItemSelection('folder', ${folder.id}, '${folder.name}', this.checked)" onclick="event.stopPropagation()">
                         <i class="bi bi-folder folder-icon"></i>
-                        <span class="folder-name">${folder.name}</span>
+                        <span class="folder-name">${folder.name} ${shareBadges}</span>
                         <span class="file-size">${folder.owner}</span>
+                        <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); showRenameModal('folder', ${folder.id}, '${folder.name}')" title="Rename">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); showMoveModal('folder', ${folder.id}, '${folder.name}')" title="Move">
+                            <i class="bi bi-folder-symlink"></i>
+                        </button>
+                        <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); showShareModal('folder', ${folder.id}, '${folder.name}')" title="Share">
+                            <i class="bi bi-share"></i>
+                        </button>
                         ${folder.can_delete ? `<button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); deleteFolder(${folder.id})"><i class="bi bi-trash"></i></button>` : ''}
                     </div>
                 `;
             });
             
             files.forEach(file => {
+                // Build share indicator badges
+                let shareBadges = '';
+                if (file.share_status && file.share_status.is_shared) {
+                    if (file.share_status.has_public_link) {
+                        shareBadges += `<span class="badge bg-primary ms-2" title="Public share link active"><i class="bi bi-link-45deg"></i> ${file.share_status.public_share_count}</span> `;
+                    }
+                    if (file.share_status.has_internal_shares) {
+                        shareBadges += `<span class="badge bg-info ms-1" title="Shared with ${file.share_status.internal_share_count} user(s)"><i class="bi bi-people"></i> ${file.share_status.internal_share_count}</span>`;
+                    }
+                }
+
                 html += `
-                    <div class="file-item">
+                    <div class="file-item file-item-preview" data-type="file" data-id="${file.id}" data-name="${file.name}" data-mime="${file.mime_type}">
+                        <input type="checkbox" class="selection-checkbox" onchange="toggleItemSelection('file', ${file.id}, '${file.name}', this.checked)" onclick="event.stopPropagation()">
                         <i class="bi bi-file-earmark file-icon"></i>
-                        <span class="file-name">${file.name}</span>
+                        <span class="file-name">${file.name} ${shareBadges}</span>
                         <span class="file-size">${formatBytes(file.size)}</span>
-                        <button class="btn btn-sm btn-custom" onclick="downloadFile(${file.id}, '${file.name}')">
+                        <button class="btn btn-sm btn-custom preview-btn" style="display:none;" onclick="event.stopPropagation(); showFilePreview(${file.id}, '${file.name}', '${file.mime_type}')" title="Preview">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); downloadFile(${file.id}, '${file.name}')" title="Download">
                             <i class="bi bi-download"></i>
                         </button>
-                        <button class="btn btn-sm btn-custom" onclick="deleteFile(${file.id})">
+                        <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); showRenameModal('file', ${file.id}, '${file.name}')" title="Rename">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); showMoveModal('file', ${file.id}, '${file.name}')" title="Move">
+                            <i class="bi bi-folder-symlink"></i>
+                        </button>
+                        <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); copyFile(${file.id}, currentFolderId)" title="Copy">
+                            <i class="bi bi-files"></i>
+                        </button>
+                        <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); showShareModal('file', ${file.id}, '${file.name}')" title="Share">
+                            <i class="bi bi-share"></i>
+                        </button>
+                        <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); deleteFile(${file.id})" title="Delete">
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>
                 `;
             });
-            
+
             fileList.innerHTML = html;
+
+            // Setup preview functionality after DOM is updated
+            setupPreviewButtons();
+        }
+
+        function setupPreviewButtons() {
+            // Find all file items and enable preview for supported types
+            document.querySelectorAll('.file-item-preview').forEach(fileItem => {
+                const fileName = fileItem.dataset.name;
+                const mimeType = fileItem.dataset.mime;
+                const fileId = parseInt(fileItem.dataset.id);
+
+                if (canPreviewFile(fileName, mimeType)) {
+                    // Show preview button
+                    const previewBtn = fileItem.querySelector('.preview-btn');
+                    if (previewBtn) {
+                        previewBtn.style.display = 'inline-block';
+                    }
+
+                    // Make file item clickable
+                    fileItem.style.cursor = 'pointer';
+                    fileItem.addEventListener('click', function(e) {
+                        // Don't trigger if clicking on a button or checkbox
+                        if (e.target.closest('button') || e.target.closest('.selection-checkbox')) {
+                            return;
+                        }
+                        showFilePreview(fileId, fileName, mimeType);
+                    });
+                }
+            });
         }
 
         function displayFiles(files, folder) {
@@ -429,7 +1297,8 @@
             } else {
                 const folder = folderStack[index - 1];
                 folderStack = folderStack.slice(0, index);
-                loadFolder(folder.id, folder.name);
+                // Load folder without pushing to stack (skipStackPush = true)
+                loadFolder(folder.id, folder.name, true);
             }
         }
 
@@ -443,7 +1312,7 @@
 
         function showUploadModal() {
             if (currentFolderId === null) {
-                alert('Please select a folder first');
+                showWarning('Please select a folder first');
                 return;
             }
             const modal = new bootstrap.Modal(document.getElementById('uploadModal'));
@@ -455,7 +1324,7 @@
             const isPublic = document.getElementById('isPublic').checked;
             
             if (!folderName) {
-                alert('Please enter a folder name');
+                showWarning('Please enter a folder name');
                 return;
             }
             
@@ -479,48 +1348,226 @@
                     refreshFiles();
                 } else {
                     const error = await response.json();
-                    alert(error.detail || 'Failed to create folder');
+                    showError(error.detail || 'Failed to create folder');
                 }
             } catch (error) {
                 console.error('Error creating folder:', error);
-                alert('Failed to create folder');
+                showError('Failed to create folder');
             }
         }
 
-        async function uploadFile() {
+        // Upload functionality with drag & drop and multiple files
+        let selectedFiles = [];
+        let uploadMode = 'files'; // 'files' or 'folder'
+
+        function switchToFileMode() {
+            uploadMode = 'files';
             const fileInput = document.getElementById('fileInput');
-            const file = fileInput.files[0];
-            
-            if (!file) {
-                alert('Please select a file');
-                return;
+            fileInput.removeAttribute('webkitdirectory');
+            fileInput.removeAttribute('directory');
+            fileInput.setAttribute('multiple', 'multiple');
+            fileInput.click();
+        }
+
+        function switchToFolderMode() {
+            uploadMode = 'folder';
+            const fileInput = document.getElementById('fileInput');
+            fileInput.setAttribute('webkitdirectory', '');
+            fileInput.setAttribute('directory', '');
+            fileInput.removeAttribute('multiple');
+            fileInput.click();
+        }
+
+        function initDragDrop() {
+            const dragDropZone = document.getElementById('dragDropZone');
+            const fileList = document.getElementById('fileList');
+
+            // Drag drop on the upload modal zone
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dragDropZone.addEventListener(eventName, preventDefaults, false);
+            });
+
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
             }
-            
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dragDropZone.addEventListener(eventName, () => {
+                    dragDropZone.classList.add('drag-over');
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                dragDropZone.addEventListener(eventName, () => {
+                    dragDropZone.classList.remove('drag-over');
+                });
+            });
+
+            dragDropZone.addEventListener('drop', handleDrop);
+
+            // Drag drop directly on file list
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                fileList.addEventListener(eventName, preventDefaults, false);
+            });
+
+            ['dragenter', 'dragover'].forEach(eventName => {
+                fileList.addEventListener(eventName, () => {
+                    if (currentFolderId !== null) {
+                        fileList.classList.add('drag-over');
+                    }
+                });
+            });
+
+            ['dragleave', 'drop'].forEach(eventName => {
+                fileList.addEventListener(eventName, () => {
+                    fileList.classList.remove('drag-over');
+                });
+            });
+
+            fileList.addEventListener('drop', handleDirectDrop);
+        }
+
+        function handleDrop(e) {
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        }
+
+        function handleDirectDrop(e) {
             if (currentFolderId === null) {
-                alert('Please select a folder first');
+                showWarning('Please select a folder first');
                 return;
             }
-            
+            const files = e.dataTransfer.files;
+            selectedFiles = Array.from(files);
+            startUpload();
+        }
+
+        function handleFileSelect(e) {
+            const files = e.target.files;
+            handleFiles(files);
+        }
+
+        function handleFiles(files) {
+            selectedFiles = Array.from(files);
+            updateFileList();
+        }
+
+        function updateFileList() {
+            const fileCountElem = document.getElementById('fileCount');
+            const selectedFilesInfo = document.getElementById('selectedFilesInfo');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const uploadCount = document.getElementById('uploadCount');
+
+            if (selectedFiles.length > 0) {
+                fileCountElem.textContent = selectedFiles.length;
+                selectedFilesInfo.style.display = 'block';
+                uploadBtn.disabled = false;
+                uploadCount.textContent = `(${selectedFiles.length})`;
+            } else {
+                selectedFilesInfo.style.display = 'none';
+                uploadBtn.disabled = true;
+                uploadCount.textContent = '';
+            }
+        }
+
+        async function startUpload() {
+            if (currentFolderId === null) {
+                showWarning('Please select a folder first');
+                return;
+            }
+
+            if (selectedFiles.length === 0) {
+                showWarning('Please select files to upload');
+                return;
+            }
+
+            const uploadQueue = document.getElementById('uploadQueue');
+            uploadQueue.style.display = 'block';
+            uploadQueue.innerHTML = '';
+
+            const uploadBtn = document.getElementById('uploadBtn');
+            uploadBtn.disabled = true;
+
+            // Upload files one by one
+            for (let i = 0; i < selectedFiles.length; i++) {
+                const file = selectedFiles[i];
+                await uploadSingleFile(file, i);
+            }
+
+            // All uploads complete
+            setTimeout(() => {
+                bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
+                selectedFiles = [];
+                document.getElementById('fileInput').value = '';
+                uploadQueue.innerHTML = '';
+                uploadQueue.style.display = 'none';
+                refreshFiles();
+            }, 1000);
+        }
+
+        async function uploadSingleFile(file, index) {
+            const uploadQueue = document.getElementById('uploadQueue');
+
+            // Create upload item UI
+            const uploadItem = document.createElement('div');
+            uploadItem.className = 'upload-item';
+            uploadItem.id = `upload-item-${index}`;
+            uploadItem.innerHTML = `
+                <div class="file-name">
+                    <span><i class="bi bi-file-earmark"></i> ${file.name}</span>
+                    <span class="badge bg-secondary">${formatBytes(file.size)}</span>
+                </div>
+                <div class="progress">
+                    <div class="progress-bar" style="width: 0%"></div>
+                </div>
+                <div class="status">Uploading...</div>
+            `;
+            uploadQueue.appendChild(uploadItem);
+
             const formData = new FormData();
             formData.append('file', file);
-            
+
             try {
-                const response = await fetch(`/files/api/files/folders/${currentFolderId}/upload`, {
-                    method: 'POST',
-                    body: formData
+                const xhr = new XMLHttpRequest();
+
+                // Progress tracking
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percentComplete = (e.loaded / e.total) * 100;
+                        const progressBar = uploadItem.querySelector('.progress-bar');
+                        progressBar.style.width = percentComplete + '%';
+                    }
                 });
-                
-                if (response.ok) {
-                    bootstrap.Modal.getInstance(document.getElementById('uploadModal')).hide();
-                    fileInput.value = '';
-                    refreshFiles();
-                } else {
-                    const error = await response.json();
-                    alert(error.detail || 'Failed to upload file');
-                }
+
+                // Upload complete
+                await new Promise((resolve, reject) => {
+                    xhr.addEventListener('load', () => {
+                        if (xhr.status === 200) {
+                            uploadItem.classList.add('success');
+                            uploadItem.querySelector('.status').textContent = 'Upload complete';
+                            uploadItem.querySelector('.status').style.color = '#3fb950';
+                            resolve();
+                        } else {
+                            uploadItem.classList.add('error');
+                            uploadItem.querySelector('.status').textContent = 'Upload failed';
+                            uploadItem.querySelector('.status').style.color = '#f85149';
+                            reject();
+                        }
+                    });
+
+                    xhr.addEventListener('error', () => {
+                        uploadItem.classList.add('error');
+                        uploadItem.querySelector('.status').textContent = 'Upload failed';
+                        uploadItem.querySelector('.status').style.color = '#f85149';
+                        reject();
+                    });
+
+                    xhr.open('POST', `/files/api/files/folders/${currentFolderId}/upload`);
+                    xhr.send(formData);
+                });
             } catch (error) {
                 console.error('Error uploading file:', error);
-                alert('Failed to upload file');
             }
         }
 
@@ -529,55 +1576,297 @@
         }
 
         async function deleteFile(fileId) {
-            if (!confirm('Are you sure you want to delete this file?')) {
+            const confirmed = await showConfirm('Are you sure you want to delete this file?', 'Delete File');
+            if (!confirmed) {
                 return;
             }
-            
+
             try {
                 const response = await fetch(`/files/api/files/files/${fileId}`, {
                     method: 'DELETE'
                 });
-                
+
                 if (response.ok) {
+                    showSuccess('File deleted successfully');
                     refreshFiles();
                 } else {
-                    alert('Failed to delete file');
+                    showError('Failed to delete file');
                 }
             } catch (error) {
                 console.error('Error deleting file:', error);
-                alert('Failed to delete file');
+                showError('Failed to delete file');
             }
         }
 
         async function deleteFolder(folderId) {
-            if (!confirm('Are you sure you want to delete this folder and all its contents?')) {
+            const confirmed = await showConfirm('Are you sure you want to delete this folder and all its contents?', 'Delete Folder');
+            if (!confirmed) {
                 return;
             }
-            
+
             try {
                 const response = await fetch(`/files/api/files/folders/${folderId}`, {
                     method: 'DELETE'
                 });
-                
+
                 if (response.ok) {
+                    showSuccess('Folder deleted successfully');
                     refreshFiles();
                 } else {
-                    alert('Failed to delete folder');
+                    showError('Failed to delete folder');
                 }
             } catch (error) {
                 console.error('Error deleting folder:', error);
-                alert('Failed to delete folder');
+                showError('Failed to delete folder');
             }
         }
 
-        function refreshFiles() {
+        // Rename functionality
+        function showRenameModal(resourceType, resourceId, currentName) {
+            document.getElementById('renameType').textContent = resourceType === 'folder' ? 'Folder' : 'File';
+            document.getElementById('newName').value = currentName;
+            document.getElementById('renameResourceType').value = resourceType;
+            document.getElementById('renameResourceId').value = resourceId;
+
+            const modal = new bootstrap.Modal(document.getElementById('renameModal'));
+            modal.show();
+
+            // Focus and select the name for easy editing
+            setTimeout(() => {
+                const input = document.getElementById('newName');
+                input.focus();
+                input.select();
+            }, 200);
+        }
+
+        async function performRename() {
+            const resourceType = document.getElementById('renameResourceType').value;
+            const resourceId = document.getElementById('renameResourceId').value;
+            const newName = document.getElementById('newName').value.trim();
+
+            if (!newName) {
+                showWarning('Please enter a new name');
+                return;
+            }
+
+            const endpoint = resourceType === 'folder'
+                ? `/files/api/files/folders/${resourceId}/rename`
+                : `/files/api/files/files/${resourceId}/rename`;
+
+            try {
+                const response = await fetch(endpoint + `?new_name=${encodeURIComponent(newName)}`, {
+                    method: 'PATCH'
+                });
+
+                if (response.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('renameModal')).hide();
+                    showSuccess('Renamed successfully');
+                    refreshFiles();
+                } else {
+                    const error = await response.json();
+                    showError(error.detail || 'Failed to rename');
+                }
+            } catch (error) {
+                console.error('Error renaming:', error);
+                showError('Failed to rename');
+            }
+        }
+
+        // Move functionality
+        function showMoveModal(resourceType, resourceId, resourceName) {
+            document.getElementById('moveResourceName').textContent = `"${resourceName}"`;
+            document.getElementById('moveResourceType').value = resourceType;
+            document.getElementById('moveResourceId').value = resourceId;
+            document.getElementById('moveTargetFolderId').value = '';
+
+            // Load folder tree
+            loadFolderTree();
+
+            const modal = new bootstrap.Modal(document.getElementById('moveModal'));
+            modal.show();
+        }
+
+        async function loadFolderTree() {
+            const folderTree = document.getElementById('folderTree');
+            folderTree.innerHTML = '<p class="text-muted">Loading folders...</p>';
+
+            try {
+                const response = await fetch('/files/api/files/folders');
+                const data = await response.json();
+
+                let html = `
+                    <div class="folder-tree-item p-2 rounded" style="cursor: pointer;"
+                         onclick="selectMoveTarget(null, 'Root')"
+                         onmouseover="this.style.backgroundColor='#21262d'"
+                         onmouseout="this.style.backgroundColor='transparent'">
+                        <i class="bi bi-house-door"></i> Root
+                    </div>
+                `;
+
+                function buildTree(folders, level = 0) {
+                    folders.forEach(folder => {
+                        const indent = '&nbsp;'.repeat(level * 4);
+                        html += `
+                            <div class="folder-tree-item p-2 rounded" style="cursor: pointer;"
+                                 onclick="selectMoveTarget(${folder.id}, '${folder.name}')"
+                                 onmouseover="this.style.backgroundColor='#21262d'"
+                                 onmouseout="this.style.backgroundColor='transparent'">
+                                ${indent}<i class="bi bi-folder"></i> ${folder.name}
+                            </div>
+                        `;
+                    });
+                }
+
+                buildTree(data.folders);
+                folderTree.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading folder tree:', error);
+                folderTree.innerHTML = '<p class="text-danger">Failed to load folders</p>';
+            }
+        }
+
+        function selectMoveTarget(folderId, folderName) {
+            document.getElementById('moveTargetFolderId').value = folderId || '';
+            // Highlight selected
+            document.querySelectorAll('.folder-tree-item').forEach(item => {
+                item.style.backgroundColor = 'transparent';
+            });
+            event.target.closest('.folder-tree-item').style.backgroundColor = '#30363d';
+        }
+
+        async function performMove() {
+            const targetFolderId = document.getElementById('moveTargetFolderId').value;
+
+            if (targetFolderId === '') {
+                showWarning('Please select a destination folder');
+                return;
+            }
+
+            // Check if this is a bulk move
+            if (window.bulkMoveItems && window.bulkMoveItems.length > 0) {
+                let successCount = 0;
+                let errorCount = 0;
+
+                for (const item of window.bulkMoveItems) {
+                    try {
+                        const endpoint = item.type === 'folder'
+                            ? `/files/api/files/folders/${item.id}/move`
+                            : `/files/api/files/files/${item.id}/move`;
+
+                        const params = targetFolderId
+                            ? `?target_${item.type === 'folder' ? 'parent' : 'folder'}_id=${targetFolderId}`
+                            : '';
+
+                        const response = await fetch(endpoint + params, {
+                            method: 'POST'
+                        });
+
+                        if (response.ok) {
+                            successCount++;
+                        } else {
+                            errorCount++;
+                        }
+                    } catch (error) {
+                        console.error('Error moving item:', error);
+                        errorCount++;
+                    }
+                }
+
+                bootstrap.Modal.getInstance(document.getElementById('moveModal')).hide();
+
+                if (successCount > 0) {
+                    showSuccess(`Moved ${successCount} item(s) successfully`);
+                    refreshCurrentFolder();
+                }
+                if (errorCount > 0) {
+                    showError(`Failed to move ${errorCount} item(s)`);
+                }
+
+                clearSelection();
+                window.bulkMoveItems = null;
+                return;
+            }
+
+            // Single item move
+            const resourceType = document.getElementById('moveResourceType').value;
+            const resourceId = document.getElementById('moveResourceId').value;
+
+            const endpoint = resourceType === 'folder'
+                ? `/files/api/files/folders/${resourceId}/move`
+                : `/files/api/files/files/${resourceId}/move`;
+
+            const params = targetFolderId
+                ? `?target_${resourceType === 'folder' ? 'parent' : 'folder'}_id=${targetFolderId}`
+                : '';
+
+            try {
+                const response = await fetch(endpoint + params, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    bootstrap.Modal.getInstance(document.getElementById('moveModal')).hide();
+                    showSuccess('Moved successfully');
+                    refreshFiles();
+                } else {
+                    const error = await response.json();
+                    showError(error.detail || 'Failed to move');
+                }
+            } catch (error) {
+                console.error('Error moving:', error);
+                showError('Failed to move');
+            }
+        }
+
+        // Copy functionality
+        async function copyFile(fileId, targetFolderId) {
+            if (!targetFolderId) {
+                showWarning('Cannot copy to root. Please navigate to a folder first.');
+                return;
+            }
+
+            const confirmed = await showConfirm('Copy this file to the current folder?', 'Copy File');
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/files/api/files/files/${fileId}/copy?target_folder_id=${targetFolderId}`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    showSuccess('File copied successfully');
+                    refreshFiles();
+                } else {
+                    const error = await response.json();
+                    showError(error.detail || 'Failed to copy file');
+                }
+            } catch (error) {
+                console.error('Error copying file:', error);
+                showError('Failed to copy file');
+            }
+        }
+
+        async function refreshFiles() {
             if (currentFolderId === null) {
                 loadRootFolders();
             } else {
-                const currentFolder = folderStack[folderStack.length - 1];
-                loadFolder(currentFolder.id, currentFolder.name);
+                // Reload current folder without adding to stack
+                try {
+                    const response = await fetch(`/files/api/files/folders/${currentFolderId}/files`);
+                    const data = await response.json();
+                    displayFiles(data.files, data.folder);
+                    updateBreadcrumb([{name: 'Home', id: null}, ...folderStack]);
+                } catch (error) {
+                    console.error('Error refreshing folder:', error);
+                    showError('Failed to refresh folder');
+                }
             }
         }
+
+        // Alias for consistency
+        const refreshCurrentFolder = refreshFiles;
 
         function formatBytes(bytes) {
             if (bytes === 0) return '0 Bytes';
@@ -587,9 +1876,1235 @@
             return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
         }
 
+        // Bulk selection functionality
+        let selectedItems = [];
+
+        function toggleItemSelection(type, id, name, checked) {
+            const itemKey = `${type}:${id}`;
+
+            if (checked) {
+                if (!selectedItems.find(item => item.key === itemKey)) {
+                    selectedItems.push({ type, id, name, key: itemKey });
+                }
+                // Highlight the item
+                const item = document.querySelector(`[data-type="${type}"][data-id="${id}"]`);
+                if (item) item.classList.add('selected');
+            } else {
+                selectedItems = selectedItems.filter(item => item.key !== itemKey);
+                // Remove highlight
+                const item = document.querySelector(`[data-type="${type}"][data-id="${id}"]`);
+                if (item) item.classList.remove('selected');
+            }
+
+            updateSelectionUI();
+        }
+
+        function toggleSelectAll() {
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            const allCheckboxes = document.querySelectorAll('.selection-checkbox:not(#selectAllCheckbox)');
+
+            allCheckboxes.forEach(checkbox => {
+                checkbox.checked = selectAllCheckbox.checked;
+                const event = new Event('change');
+                checkbox.dispatchEvent(event);
+            });
+        }
+
+        function updateSelectionUI() {
+            const bulkActionsBar = document.getElementById('bulkActionsBar');
+            const selectionCount = document.getElementById('selectionCount');
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+
+            if (selectedItems.length > 0) {
+                bulkActionsBar.style.display = 'flex';
+                selectionCount.textContent = `${selectedItems.length} selected`;
+
+                // Update select all checkbox state
+                const allCheckboxes = document.querySelectorAll('.selection-checkbox:not(#selectAllCheckbox)');
+                const checkedCheckboxes = document.querySelectorAll('.selection-checkbox:not(#selectAllCheckbox):checked');
+                selectAllCheckbox.checked = allCheckboxes.length === checkedCheckboxes.length;
+            } else {
+                bulkActionsBar.style.display = 'none';
+                selectAllCheckbox.checked = false;
+            }
+        }
+
+        function clearSelection() {
+            selectedItems = [];
+            const allCheckboxes = document.querySelectorAll('.selection-checkbox');
+            allCheckboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            document.querySelectorAll('.selected').forEach(item => {
+                item.classList.remove('selected');
+            });
+            updateSelectionUI();
+        }
+
+        async function bulkMove() {
+            if (selectedItems.length === 0) {
+                showWarning('No items selected');
+                return;
+            }
+
+            // Show move modal with folder picker
+            const modal = new bootstrap.Modal(document.getElementById('moveModal'));
+            document.getElementById('moveResourceName').textContent = `${selectedItems.length} item(s)`;
+
+            // Store current selection for bulk move
+            window.bulkMoveItems = selectedItems;
+
+            // Load folder tree
+            loadFolderTree('moveFolderTree');
+            modal.show();
+        }
+
+        async function bulkCopy() {
+            if (selectedItems.length === 0) {
+                showWarning('No items selected');
+                return;
+            }
+
+            const confirmed = await showConfirm(
+                `Copy ${selectedItems.length} item(s) to the current folder?`,
+                'Bulk Copy'
+            );
+
+            if (!confirmed) return;
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const item of selectedItems) {
+                try {
+                    const endpoint = item.type === 'folder'
+                        ? `/files/api/files/folders/${item.id}/copy`
+                        : `/files/api/files/files/${item.id}/copy`;
+
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ target_folder_id: currentFolderId })
+                    });
+
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                    }
+                } catch (error) {
+                    console.error('Error copying item:', error);
+                    errorCount++;
+                }
+            }
+
+            if (successCount > 0) {
+                showSuccess(`Copied ${successCount} item(s) successfully`);
+                refreshCurrentFolder();
+            }
+            if (errorCount > 0) {
+                showError(`Failed to copy ${errorCount} item(s)`);
+            }
+
+            clearSelection();
+        }
+
+        async function bulkDelete() {
+            if (selectedItems.length === 0) {
+                showWarning('No items selected');
+                return;
+            }
+
+            const confirmed = await showConfirm(
+                `Are you sure you want to delete ${selectedItems.length} item(s)? This action cannot be undone.`,
+                'Bulk Delete'
+            );
+
+            if (!confirmed) return;
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const item of selectedItems) {
+                try {
+                    const endpoint = item.type === 'folder'
+                        ? `/files/api/files/folders/${item.id}`
+                        : `/files/api/files/files/${item.id}`;
+
+                    const response = await fetch(endpoint, {
+                        method: 'DELETE'
+                    });
+
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                    }
+                } catch (error) {
+                    console.error('Error deleting item:', error);
+                    errorCount++;
+                }
+            }
+
+            if (successCount > 0) {
+                showSuccess(`Deleted ${successCount} item(s) successfully`);
+                refreshCurrentFolder();
+            }
+            if (errorCount > 0) {
+                showError(`Failed to delete ${errorCount} item(s)`);
+            }
+
+            clearSelection();
+        }
+
+        // Sharing functionality
+        let shareResourceType = null;
+        let shareResourceId = null;
+        let shareResourceName = null;
+
+        let allUsers = [];
+        let selectedUser = null;  // Store the selected user object
+        let autocompleteInitialized = false;
+
+        async function loadUsers() {
+            try {
+                const response = await fetch('/files/api/files/users');
+
+                if (response.ok) {
+                    allUsers = await response.json();
+                    console.log('Loaded users:', allUsers);
+
+                    if (!autocompleteInitialized) {
+                        setupUsernameAutocomplete();
+                        autocompleteInitialized = true;
+                    }
+
+                    // Show all users initially
+                    filterUsers('');
+                }
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        function setupUsernameAutocomplete() {
+            const input = document.getElementById('shareUsername');
+            const dropdown = document.getElementById('usernameDropdown');
+
+            if (!input || !dropdown) {
+                console.error('Username input or dropdown not found');
+                return;
+            }
+
+            // Show dropdown on focus
+            input.addEventListener('focus', function() {
+                console.log('Input focused, showing dropdown');
+                filterUsers(this.value);
+            });
+
+            // Filter users as user types
+            input.addEventListener('input', function() {
+                console.log('Input changed:', this.value);
+                // Clear selected user when typing
+                if (selectedUser && this.value !== selectedUser.full_name) {
+                    selectedUser = null;
+                }
+                filterUsers(this.value);
+            });
+
+            // Hide dropdown when clicking outside
+            document.addEventListener('click', function(e) {
+                if (e.target !== input && e.target.closest('#usernameDropdown') === null) {
+                    dropdown.style.display = 'none';
+                    dropdown.classList.remove('show');
+                }
+            });
+        }
+
+        function filterUsers(searchTerm) {
+            const dropdown = document.getElementById('usernameDropdown');
+            if (!dropdown) {
+                console.error('Dropdown not found');
+                return;
+            }
+
+            const lowerSearch = (searchTerm || '').toLowerCase();
+            console.log('Filtering users with search term:', searchTerm, 'Total users:', allUsers.length);
+
+            // Filter users
+            const filteredUsers = allUsers.filter(user =>
+                user.username.toLowerCase().includes(lowerSearch) ||
+                (user.full_name && user.full_name.toLowerCase().includes(lowerSearch))
+            );
+
+            console.log('Filtered users count:', filteredUsers.length);
+
+            // Clear dropdown
+            dropdown.innerHTML = '';
+
+            if (filteredUsers.length === 0) {
+                dropdown.style.display = 'none';
+                dropdown.classList.remove('show');
+                return;
+            }
+
+            // Add filtered users to dropdown
+            filteredUsers.forEach(user => {
+                const item = document.createElement('a');
+                item.className = 'dropdown-item';
+                item.href = '#';
+                item.style.cursor = 'pointer';
+                item.style.whiteSpace = 'normal';
+                item.style.padding = '8px 16px';
+                item.innerHTML = `
+                    <div style="line-height: 1.4;">
+                        <div><strong>${user.username}</strong></div>
+                        <small class="text-muted">${user.full_name || 'No name'}</small>
+                    </div>
+                `;
+
+                item.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    selectedUser = user;  // Store the selected user
+                    document.getElementById('shareUsername').value = user.full_name;  // Display full name
+                    dropdown.style.display = 'none';
+                    dropdown.classList.remove('show');
+                });
+
+                dropdown.appendChild(item);
+            });
+
+            console.log('Showing dropdown with', filteredUsers.length, 'items');
+            dropdown.style.display = 'block';
+            dropdown.classList.add('show');
+        }
+
+        function showShareModal(resourceType, resourceId, resourceName) {
+            shareResourceType = resourceType;
+            shareResourceId = resourceId;
+            shareResourceName = resourceName;
+
+            document.getElementById('shareResourceName').textContent = `"${resourceName}"`;
+
+            // Clear selected user and input
+            selectedUser = null;
+            document.getElementById('shareUsername').value = '';
+
+            // Load users for autocomplete
+            loadUsers();
+
+            // Load existing shares
+            loadExistingShares();
+
+            const modal = new bootstrap.Modal(document.getElementById('shareModal'));
+            modal.show();
+        }
+
+        async function createShareLink() {
+            const accessType = document.getElementById('shareAccessType').value;
+            const password = document.getElementById('sharePassword').value;
+            const expiresInput = document.getElementById('shareExpires').value;
+
+            const payload = {
+                resource_type: shareResourceType,
+                resource_id: shareResourceId,
+                access_type: accessType
+            };
+
+            if (password) {
+                payload.password = password;
+            }
+
+            if (expiresInput) {
+                payload.expires_at = new Date(expiresInput).toISOString();
+            }
+
+            try {
+                const response = await fetch('/files/api/shares/links', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const shareUrl = `${window.location.origin}/files/share/${data.share_token}`;
+
+                    // Show success with copy button
+                    alert(`Share link created!\n\n${shareUrl}\n\nClick OK to copy to clipboard.`);
+                    navigator.clipboard.writeText(shareUrl);
+
+                    // Reset form
+                    document.getElementById('sharePassword').value = '';
+                    document.getElementById('shareExpires').value = '';
+
+                    // Reload shares list
+                    loadExistingShares();
+                } else {
+                    const error = await response.json();
+                    showError(error.detail || 'Failed to create share link');
+                }
+            } catch (error) {
+                console.error('Error creating share link:', error);
+                showError('Failed to create share link');
+            }
+        }
+
+        async function createInternalShare() {
+            const displayName = document.getElementById('shareUsername').value.trim();
+
+            if (!displayName) {
+                showWarning('Please select a user');
+                return;
+            }
+
+            if (!selectedUser) {
+                showWarning('Please select a user from the dropdown');
+                return;
+            }
+
+            const permissions = {
+                can_view: true,
+                can_write: document.getElementById('permWrite').checked,
+                can_delete: document.getElementById('permDelete').checked,
+                can_share: document.getElementById('permShare').checked,
+                can_upload: document.getElementById('permWrite').checked,
+                can_download: true,
+                can_edit: document.getElementById('permWrite').checked
+            };
+
+            const payload = {
+                resource_type: shareResourceType,
+                resource_id: shareResourceId,
+                shared_with_user_id: selectedUser.id,  // Send user ID instead of username
+                ...permissions
+            };
+
+            try {
+                const response = await fetch('/files/api/shares/internal', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    showSuccess(`Successfully shared with ${selectedUser.full_name}`);
+                    document.getElementById('shareUsername').value = '';
+                    selectedUser = null;  // Clear the selected user
+                    loadExistingShares();
+                } else {
+                    const error = await response.json();
+                    showError(error.detail || 'Failed to create internal share');
+                }
+            } catch (error) {
+                console.error('Error creating internal share:', error);
+                showError('Failed to create internal share');
+            }
+        }
+
+        async function loadExistingShares() {
+            const container = document.getElementById('existingSharesList');
+            container.innerHTML = '<p class="text-muted">Loading...</p>';
+
+            try {
+                // Load share links
+                const linksResponse = await fetch(`/files/api/shares/links?resource_type=${shareResourceType}&resource_id=${shareResourceId}`);
+                const linksData = await linksResponse.json();
+
+                // Load internal shares
+                const internalResponse = await fetch(`/files/api/shares/internal/by-resource?resource_type=${shareResourceType}&resource_id=${shareResourceId}`);
+                const internalData = await internalResponse.json();
+
+                let html = '';
+
+                // Display share links
+                if (linksData.share_links && linksData.share_links.length > 0) {
+                    html += '<h6 class="mb-3"><i class="bi bi-link-45deg"></i> Public Share Links</h6>';
+                    linksData.share_links.forEach(link => {
+                        const shareUrl = `${window.location.origin}/files/share/${link.share_token}`;
+                        const expiresText = link.expires_at ? `Expires: ${new Date(link.expires_at).toLocaleString()}` : 'Never expires';
+                        const passwordText = link.password_hash ? '<i class="bi bi-lock-fill text-warning"></i> Password protected' : '';
+
+                        html += `
+                            <div class="border border-secondary rounded p-3 mb-2">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <code class="text-info">${shareUrl}</code>
+                                        <div class="small text-muted mt-1">
+                                            Access: ${link.access_type} | ${expiresText} ${passwordText}
+                                        </div>
+                                        <div class="small text-muted">
+                                            Views: ${link.access_count} | Created: ${new Date(link.created_at).toLocaleString()}
+                                        </div>
+                                    </div>
+                                    <div class="btn-group btn-group-sm">
+                                        <button class="btn btn-custom" onclick="copyShareLink('${shareUrl}')">
+                                            <i class="bi bi-clipboard"></i>
+                                        </button>
+                                        <button class="btn btn-custom" onclick="deleteShareLink(${link.id})">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                // Display internal shares
+                if (internalData.shares && internalData.shares.length > 0) {
+                    html += '<h6 class="mb-3 mt-4"><i class="bi bi-people"></i> Shared with Users</h6>';
+                    internalData.shares.forEach(share => {
+                        const perms = [];
+                        if (share.can_write) perms.push('Write');
+                        if (share.can_delete) perms.push('Delete');
+                        if (share.can_share) perms.push('Share');
+                        const permText = perms.length > 0 ? perms.join(', ') : 'Read only';
+
+                        html += `
+                            <div class="border border-secondary rounded p-3 mb-2">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>${share.shared_with_username}</strong>
+                                        <div class="small text-muted">Permissions: ${permText}</div>
+                                        <div class="small text-muted">Shared: ${new Date(share.shared_at).toLocaleString()}</div>
+                                    </div>
+                                    <button class="btn btn-sm btn-custom" onclick="deleteInternalShare(${share.id})">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                if (html === '') {
+                    html = '<p class="text-muted">No active shares for this resource</p>';
+                }
+
+                container.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading shares:', error);
+                container.innerHTML = '<p class="text-danger">Failed to load shares</p>';
+            }
+        }
+
+        async function deleteShareLink(linkId) {
+            const confirmed = await showConfirm('Delete this share link? Anyone with the link will lose access.', 'Delete Share Link');
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/files/api/shares/links/${linkId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showSuccess('Share link deleted');
+                    loadExistingShares();
+                } else {
+                    showError('Failed to delete share link');
+                }
+            } catch (error) {
+                console.error('Error deleting share link:', error);
+                showError('Failed to delete share link');
+            }
+        }
+
+        async function deleteInternalShare(shareId) {
+            const confirmed = await showConfirm('Remove this user\'s access?', 'Remove Access');
+            if (!confirmed) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/files/api/shares/internal/${shareId}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    showSuccess('User access removed');
+
+                    // Refresh the appropriate view based on current context
+                    const breadcrumb = document.querySelector('.breadcrumb');
+                    if (breadcrumb && breadcrumb.textContent.includes('Shared by Me')) {
+                        // If we're on the "Shared by Me" page, reload it
+                        loadSharedByMe();
+                    } else if (breadcrumb && breadcrumb.textContent.includes('Shared with Me')) {
+                        // If we're on the "Shared with Me" page, reload it
+                        loadSharedWithMe();
+                    } else {
+                        // Otherwise refresh current folder view and reload shares in modal if open
+                        refreshFiles();
+                        if (document.getElementById('shareModal').classList.contains('show')) {
+                            loadExistingShares();
+                        }
+                    }
+                } else {
+                    showError('Failed to remove user access');
+                }
+            } catch (error) {
+                console.error('Error removing user access:', error);
+                showError('Failed to remove user access');
+            }
+        }
+
+        function copyShareLink(url) {
+            navigator.clipboard.writeText(url);
+            showSuccess('Share link copied to clipboard!');
+        }
+
+        async function loadSharedWithMe() {
+            try {
+                const response = await fetch('/files/api/shares/internal/with-me');
+                const data = await response.json();
+
+                const fileList = document.getElementById('fileList');
+                updateBreadcrumb([{name: 'Shared with Me', id: null}]);
+
+                if (!data.shares || data.shares.length === 0) {
+                    fileList.innerHTML = `
+                        <div class="empty-state">
+                            <i class="bi bi-inbox"></i>
+                            <p>No files shared with you</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = '';
+                data.shares.forEach(share => {
+                    const perms = [];
+                    if (share.can_write) perms.push('Write');
+                    if (share.can_delete) perms.push('Delete');
+                    if (share.can_share) perms.push('Share');
+                    const permText = perms.length > 0 ? perms.join(', ') : 'Read only';
+
+                    const icon = share.resource_type === 'folder' ? 'bi-folder' : 'bi-file-earmark';
+                    const resourceName = share.folder_name || share.file_name || 'Unknown';
+
+                    html += `
+                        <div class="file-item">
+                            <i class="bi ${icon} file-icon"></i>
+                            <span class="file-name">${resourceName}</span>
+                            <span class="file-size">Shared by: ${share.shared_by_username}</span>
+                            <span class="file-size">Permissions: ${permText}</span>
+                            ${share.resource_type === 'folder' ? `<button class="btn btn-sm btn-custom" onclick="loadFolder(${share.folder_id}, '${resourceName}')"><i class="bi bi-folder-open"></i> Open</button>` : ''}
+                            ${share.resource_type === 'file' && share.can_download ? `<button class="btn btn-sm btn-custom" onclick="downloadFile(${share.file_id}, '${resourceName}')"><i class="bi bi-download"></i></button>` : ''}
+                        </div>
+                    `;
+                });
+
+                fileList.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading shared items:', error);
+                showError('Failed to load shared items');
+            }
+        }
+
+        async function loadSharedByMe() {
+            try {
+                // Load share links
+                const linksResponse = await fetch('/files/api/shares/links');
+                const linksData = await linksResponse.json();
+
+                // Load internal shares
+                const internalResponse = await fetch('/files/api/shares/internal/shared-by-me');
+                const internalShares = await internalResponse.json();
+
+                const fileList = document.getElementById('fileList');
+                updateBreadcrumb([{name: 'Shared by Me', id: null}]);
+
+                let html = '';
+
+                if (linksData.share_links && linksData.share_links.length > 0) {
+                    html += '<h5 class="mb-3"><i class="bi bi-link-45deg"></i> Public Share Links</h5>';
+                    linksData.share_links.forEach(link => {
+                        const shareUrl = `${window.location.origin}/files/share/${link.share_token}`;
+                        const resourceName = link.folder_name || link.file_name || 'Unknown';
+                        const icon = link.resource_type === 'folder' ? 'bi-folder' : 'bi-file-earmark';
+
+                        html += `
+                            <div class="file-item">
+                                <i class="bi ${icon} file-icon"></i>
+                                <span class="file-name">${resourceName}</span>
+                                <span class="file-size">Access: ${link.access_type}</span>
+                                <span class="file-size">Views: ${link.access_count}</span>
+                                <button class="btn btn-sm btn-custom" onclick="copyShareLink('${shareUrl}')">
+                                    <i class="bi bi-clipboard"></i> Copy
+                                </button>
+                                <button class="btn btn-sm btn-custom" onclick="deleteShareLink(${link.id})">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        `;
+                    });
+                }
+
+                if (internalShares && internalShares.length > 0) {
+                    html += '<h5 class="mb-3 mt-4"><i class="bi bi-people"></i> Shared with Users</h5>';
+                    internalShares.forEach(share => {
+                        const resourceName = share.resource_name || 'Unknown';
+                        const icon = share.resource_type === 'folder' ? 'bi-folder' : 'bi-file-earmark';
+                        const sharedWith = share.shared_with_user || share.shared_with_department || 'Unknown';
+
+                        html += `
+                            <div class="file-item">
+                                <i class="bi ${icon} file-icon"></i>
+                                <span class="file-name">${resourceName}</span>
+                                <span class="file-size">Shared with: ${sharedWith}</span>
+                                <span class="file-size">Shared: ${new Date(share.shared_at).toLocaleString()}</span>
+                                <button class="btn btn-sm btn-custom" onclick="deleteInternalShare(${share.id})">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        `;
+                    });
+                }
+
+                if (html === '') {
+                    html = `
+                        <div class="empty-state">
+                            <i class="bi bi-inbox"></i>
+                            <p>You haven't shared anything yet</p>
+                        </div>
+                    `;
+                }
+
+                fileList.innerHTML = html;
+            } catch (error) {
+                console.error('Error loading shared by me:', error);
+                showError('Failed to load your shares');
+            }
+        }
+
+        // Build folder stack from path
+        function buildFolderStackFromPath(folderPath, folderId) {
+            // Path format: "folder1/folder2/folder3"
+            if (!folderPath || folderPath === '/') {
+                return [];
+            }
+
+            const parts = folderPath.split('/').filter(p => p);
+            const stack = [];
+
+            // We don't have IDs for parent folders from the path alone
+            // So we'll just use the folder names
+            // The breadcrumb will still work for display purposes
+            for (let i = 0; i < parts.length; i++) {
+                stack.push({
+                    id: null,  // We don't know parent IDs
+                    name: parts[i]
+                });
+            }
+
+            // Replace the last item with the actual folder ID
+            if (stack.length > 0) {
+                stack[stack.length - 1].id = folderId;
+            }
+
+            return stack;
+        }
+
+        // Restore folder state from URL
+        async function restoreFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const folderId = urlParams.get('folder');
+
+            if (folderId) {
+                try {
+                    // Load the folder without pushing to stack
+                    const response = await fetch(`/files/api/files/folders/${folderId}/files`);
+                    const data = await response.json();
+
+                    currentFolderId = parseInt(folderId);
+                    folderStack = buildFolderStackFromPath(data.folder.path, currentFolderId);
+
+                    displayFiles(data.files, data.folder);
+                    updateBreadcrumb([{name: 'Home', id: null}, ...folderStack]);
+                } catch (error) {
+                    console.error('Error restoring folder state:', error);
+                    // Fall back to root
+                    loadRootFolders();
+                }
+            } else {
+                loadRootFolders();
+            }
+        }
+
+        // File Preview functionality
+        let currentPreviewFileId = null;
+        let currentPreviewFiles = [];
+        let currentPreviewIndex = -1;
+
+        function canPreviewFile(filename, mimeType) {
+            if (!filename) return false;
+
+            const ext = filename.toLowerCase().split('.').pop();
+
+            // Images
+            if (mimeType && mimeType.startsWith('image/')) return true;
+            if (['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext)) return true;
+
+            // PDFs
+            if (mimeType === 'application/pdf' || ext === 'pdf') return true;
+
+            // Microsoft Office Documents (will be converted to PDF)
+            if (mimeType && (mimeType.startsWith('application/vnd.openxmlformats-officedocument') ||
+                             mimeType.startsWith('application/msword') ||
+                             mimeType.startsWith('application/vnd.ms-excel'))) return true;
+            if (['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) return true;
+
+            // Text files
+            if (mimeType && mimeType.startsWith('text/')) return true;
+            if (['txt', 'md', 'json', 'xml', 'csv', 'log', 'js', 'py', 'html', 'css', 'sql'].includes(ext)) return true;
+
+            // Videos
+            if (mimeType && mimeType.startsWith('video/')) return true;
+            if (['mp4', 'webm', 'ogg', 'mov'].includes(ext)) return true;
+
+            // Audio
+            if (mimeType && mimeType.startsWith('audio/')) return true;
+            if (['mp3', 'wav', 'ogg', 'flac', 'm4a'].includes(ext)) return true;
+
+            return false;
+        }
+
+        async function showFilePreview(fileId, fileName, mimeType) {
+            currentPreviewFileId = fileId;
+
+            // Build list of previewable files from current view
+            const allFileItems = Array.from(document.querySelectorAll('.file-item[data-type="file"]'));
+            currentPreviewFiles = allFileItems
+                .filter(item => canPreviewFile(item.dataset.name, item.dataset.mime))
+                .map(item => ({
+                    id: parseInt(item.dataset.id),
+                    name: item.dataset.name,
+                    mime: item.dataset.mime
+                }));
+
+            currentPreviewIndex = currentPreviewFiles.findIndex(f => f.id === fileId);
+
+            // Update navigation buttons
+            updatePreviewNavigation();
+
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+            modal.show();
+
+            // Load preview
+            await loadPreviewContent(fileId, fileName, mimeType);
+        }
+
+        function updatePreviewNavigation() {
+            const prevBtn = document.getElementById('prevFileBtn');
+            const nextBtn = document.getElementById('nextFileBtn');
+
+            prevBtn.disabled = currentPreviewIndex <= 0;
+            nextBtn.disabled = currentPreviewIndex >= currentPreviewFiles.length - 1;
+        }
+
+        async function navigatePreview(direction) {
+            const newIndex = currentPreviewIndex + direction;
+
+            if (newIndex < 0 || newIndex >= currentPreviewFiles.length) return;
+
+            currentPreviewIndex = newIndex;
+            const file = currentPreviewFiles[currentPreviewIndex];
+            currentPreviewFileId = file.id;
+
+            updatePreviewNavigation();
+            await loadPreviewContent(file.id, file.name, file.mime);
+        }
+
+        async function loadPreviewContent(fileId, fileName, mimeType) {
+            const previewContent = document.getElementById('previewContent');
+            const previewFileName = document.getElementById('previewFileName');
+
+            previewFileName.textContent = fileName;
+
+            // Show loading spinner
+            previewContent.innerHTML = `
+                <div class="spinner-border text-light" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+            `;
+
+            try {
+                const ext = fileName.toLowerCase().split('.').pop();
+                const previewUrl = `/files/api/files/files/${fileId}/preview`;
+
+                // Images
+                if (mimeType && mimeType.startsWith('image/')) {
+                    previewContent.innerHTML = `
+                        <img src="${previewUrl}" alt="${fileName}"
+                             style="max-width: 100%; max-height: 100%; object-fit: contain;"
+                             onload="this.style.display='block'"
+                             onerror="this.parentElement.innerHTML='<p class=\\'text-danger\\'>Failed to load image</p>'" />
+                    `;
+                }
+                // PDFs (including Office documents converted to PDF)
+                else if (mimeType === 'application/pdf' || ext === 'pdf' ||
+                         mimeType.startsWith('application/vnd.openxmlformats-officedocument') ||
+                         mimeType.startsWith('application/msword') ||
+                         mimeType.startsWith('application/vnd.ms-excel') ||
+                         ['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext)) {
+                    previewContent.innerHTML = `
+                        <iframe src="${previewUrl}"
+                                style="width: 100%; height: 100%; border: none;"
+                                title="${fileName}">
+                        </iframe>
+                    `;
+                }
+                // Videos
+                else if (mimeType && mimeType.startsWith('video/')) {
+                    previewContent.innerHTML = `
+                        <video controls style="max-width: 100%; max-height: 100%;">
+                            <source src="${previewUrl}" type="${mimeType}">
+                            Your browser does not support the video tag.
+                        </video>
+                    `;
+                }
+                // Audio
+                else if (mimeType && mimeType.startsWith('audio/')) {
+                    previewContent.innerHTML = `
+                        <div style="padding: 40px;">
+                            <div style="text-align: center; margin-bottom: 30px;">
+                                <i class="bi bi-music-note-beamed" style="font-size: 80px; color: #58a6ff;"></i>
+                                <h4 style="color: #c9d1d9; margin-top: 20px;">${fileName}</h4>
+                            </div>
+                            <audio controls style="width: 100%;">
+                                <source src="${previewUrl}" type="${mimeType}">
+                                Your browser does not support the audio tag.
+                            </audio>
+                        </div>
+                    `;
+                }
+                // Text files
+                else if (mimeType && mimeType.startsWith('text/') ||
+                         ['txt', 'md', 'json', 'xml', 'csv', 'log', 'js', 'py', 'html', 'css', 'sql'].includes(ext)) {
+                    const response = await fetch(previewUrl);
+                    const text = await response.text();
+
+                    // Escape HTML
+                    const escapedText = text
+                        .replace(/&/g, '&amp;')
+                        .replace(/</g, '&lt;')
+                        .replace(/>/g, '&gt;');
+
+                    previewContent.innerHTML = `
+                        <pre style="background: #0d1117; color: #c9d1d9; padding: 20px; margin: 0;
+                                    height: 100%; overflow: auto; font-family: 'Courier New', monospace;
+                                    white-space: pre-wrap; word-wrap: break-word;">${escapedText}</pre>
+                    `;
+                }
+                else {
+                    previewContent.innerHTML = `
+                        <div style="padding: 40px; text-align: center; color: #8b949e;">
+                            <i class="bi bi-file-earmark" style="font-size: 80px;"></i>
+                            <h4 style="margin-top: 20px;">Preview not available</h4>
+                            <p>This file type cannot be previewed.</p>
+                            <button class="btn btn-primary-custom mt-3" onclick="downloadCurrentPreview()">
+                                <i class="bi bi-download"></i> Download File
+                            </button>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading preview:', error);
+                previewContent.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: #f85149;">
+                        <i class="bi bi-exclamation-triangle" style="font-size: 80px;"></i>
+                        <h4 style="margin-top: 20px;">Error loading preview</h4>
+                        <p>${error.message || 'An error occurred'}</p>
+                    </div>
+                `;
+            }
+        }
+
+        function downloadCurrentPreview() {
+            if (currentPreviewFileId) {
+                const file = currentPreviewFiles[currentPreviewIndex];
+                downloadFile(currentPreviewFileId, file.name);
+            }
+        }
+
+        // Search and Filter functionality
+        let searchTimeout = null;
+        let currentQuickFilter = 'all';
+        let isSearchMode = false;
+
+        // Setup search input listener
+        function setupSearchListener() {
+            const searchInput = document.getElementById('searchInput');
+            const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.trim();
+
+                // Show/hide clear button
+                clearSearchBtn.style.display = query ? 'block' : 'none';
+
+                // Debounce search
+                clearTimeout(searchTimeout);
+                if (query.length >= 2) {
+                    searchTimeout = setTimeout(() => performSearch(query), 500);
+                } else if (query.length === 0) {
+                    clearSearch();
+                }
+            });
+
+            searchInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const query = e.target.value.trim();
+                    if (query.length >= 2) {
+                        clearTimeout(searchTimeout);
+                        performSearch(query);
+                    }
+                }
+            });
+        }
+
+        async function performSearch(query) {
+            try {
+                isSearchMode = true;
+
+                // Get filter values
+                const fileType = document.getElementById('filterFileType').value;
+                const dateRange = document.getElementById('filterDateRange').value;
+                const sizeRange = document.getElementById('filterSizeRange').value;
+                const ownerFilter = document.getElementById('filterOwner').value;
+
+                // Build query params
+                const params = new URLSearchParams({
+                    query: query
+                });
+
+                if (fileType) params.append('file_type', fileType);
+                if (dateRange) params.append('date_range', dateRange);
+                if (sizeRange) params.append('size_range', sizeRange);
+                if (ownerFilter) params.append('owner_filter', ownerFilter);
+
+                const response = await fetch(`/files/api/files/search?${params.toString()}`);
+                const data = await response.json();
+
+                displaySearchResults(data);
+            } catch (error) {
+                console.error('Error searching:', error);
+                showError('Failed to search files');
+            }
+        }
+
+        function displaySearchResults(data) {
+            const fileList = document.getElementById('fileList');
+
+            if (data.total === 0) {
+                fileList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-search"></i>
+                        <p>No results found for "${data.query}"</p>
+                        <small>Try different keywords or filters</small>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = `<div style="margin-bottom: 15px; padding: 10px; background: #161b22; border: 1px solid #30363d; border-radius: 6px;">
+                <i class="bi bi-search"></i> Found ${data.total} result(s) for "<strong>${data.query}</strong>"
+            </div>`;
+
+            // Display folders
+            data.folders.forEach(folder => {
+                let shareBadges = '';
+                if (folder.share_status && folder.share_status.is_shared) {
+                    if (folder.share_status.has_public_link) {
+                        shareBadges += `<span class="badge bg-primary ms-2"><i class="bi bi-link-45deg"></i> ${folder.share_status.public_share_count}</span> `;
+                    }
+                    if (folder.share_status.has_internal_shares) {
+                        shareBadges += `<span class="badge bg-info ms-1"><i class="bi bi-people"></i> ${folder.share_status.internal_share_count}</span>`;
+                    }
+                }
+
+                html += `
+                    <div class="folder-item" data-type="folder" data-id="${folder.id}" data-name="${folder.name}">
+                        <input type="checkbox" class="selection-checkbox" onchange="toggleItemSelection('folder', ${folder.id}, '${folder.name}', this.checked)" onclick="event.stopPropagation()">
+                        <i class="bi bi-folder folder-icon"></i>
+                        <span class="folder-name">${folder.name} ${shareBadges}</span>
+                        <span class="file-size"><i class="bi bi-folder"></i> ${folder.path || '/'}</span>
+                        <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); showShareModal('folder', ${folder.id}, '${folder.name}')" title="Share">
+                            <i class="bi bi-share"></i>
+                        </button>
+                    </div>
+                `;
+            });
+
+            // Display files
+            data.files.forEach(file => {
+                let shareBadges = '';
+                if (file.share_status && file.share_status.is_shared) {
+                    if (file.share_status.has_public_link) {
+                        shareBadges += `<span class="badge bg-primary ms-2"><i class="bi bi-link-45deg"></i> ${file.share_status.public_share_count}</span> `;
+                    }
+                    if (file.share_status.has_internal_shares) {
+                        shareBadges += `<span class="badge bg-info ms-1"><i class="bi bi-people"></i> ${file.share_status.internal_share_count}</span>`;
+                    }
+                }
+
+                html += `
+                    <div class="file-item file-item-preview" data-type="file" data-id="${file.id}" data-name="${file.name}" data-mime="${file.mime_type}">
+                        <input type="checkbox" class="selection-checkbox" onchange="toggleItemSelection('file', ${file.id}, '${file.name}', this.checked)" onclick="event.stopPropagation()">
+                        <i class="bi bi-file-earmark file-icon"></i>
+                        <span class="file-name">${file.name} ${shareBadges}</span>
+                        <span class="file-size">${formatBytes(file.size)} • <i class="bi bi-folder"></i> ${file.folder_path || '/'}</span>
+                        <button class="btn btn-sm btn-custom preview-btn" style="display:none;" onclick="event.stopPropagation(); showFilePreview(${file.id}, '${file.name}', '${file.mime_type}')" title="Preview">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); downloadFile(${file.id}, '${file.name}')" title="Download">
+                            <i class="bi bi-download"></i>
+                        </button>
+                        <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); showShareModal('file', ${file.id}, '${file.name}')" title="Share">
+                            <i class="bi bi-share"></i>
+                        </button>
+                    </div>
+                `;
+            });
+
+            fileList.innerHTML = html;
+
+            // Setup preview functionality after DOM is updated
+            setupPreviewButtons();
+        }
+
+        function clearSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const clearSearchBtn = document.getElementById('clearSearchBtn');
+
+            searchInput.value = '';
+            clearSearchBtn.style.display = 'none';
+            isSearchMode = false;
+
+            // Reload current view
+            refreshFiles();
+        }
+
+        function toggleAdvancedFilters() {
+            const panel = document.getElementById('advancedFilters');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function applyFilters() {
+            const searchInput = document.getElementById('searchInput');
+            const query = searchInput.value.trim();
+
+            if (query.length >= 2) {
+                performSearch(query);
+            }
+        }
+
+        function applyQuickFilter(filterType) {
+            currentQuickFilter = filterType;
+
+            // Update button states
+            ['all', 'recent', 'large'].forEach(type => {
+                const btn = document.getElementById(`filter-${type}`);
+                if (type === filterType) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            if (filterType === 'all') {
+                // Clear filters and show all
+                clearAllFilters();
+            } else if (filterType === 'recent') {
+                // Set date range to last 7 days
+                document.getElementById('filterDateRange').value = 'week';
+                // If in search mode, re-run search
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput.value.trim().length >= 2) {
+                    performSearch(searchInput.value.trim());
+                } else {
+                    // Show recent files without search
+                    performQuickFilter('recent');
+                }
+            } else if (filterType === 'large') {
+                // Set size range to large
+                document.getElementById('filterSizeRange').value = 'large';
+                // If in search mode, re-run search
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput.value.trim().length >= 2) {
+                    performSearch(searchInput.value.trim());
+                } else {
+                    // Show large files without search
+                    performQuickFilter('large');
+                }
+            }
+        }
+
+        async function performQuickFilter(filterType) {
+            try {
+                isSearchMode = true;
+                const params = new URLSearchParams({ query: '' });
+
+                if (filterType === 'recent') {
+                    params.append('date_range', 'week');
+                } else if (filterType === 'large') {
+                    params.append('size_range', 'large');
+                }
+
+                const response = await fetch(`/files/api/files/search?${params.toString()}`);
+                const data = await response.json();
+
+                const title = filterType === 'recent' ? 'Recent Files (Last 7 Days)' : 'Large Files (> 10 MB)';
+                data.query = title;
+                displaySearchResults(data);
+            } catch (error) {
+                console.error('Error applying quick filter:', error);
+                showError('Failed to apply filter');
+            }
+        }
+
+        function clearAllFilters() {
+            document.getElementById('filterFileType').value = '';
+            document.getElementById('filterDateRange').value = '';
+            document.getElementById('filterSizeRange').value = '';
+            document.getElementById('filterOwner').value = '';
+
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput.value.trim().length >= 2) {
+                performSearch(searchInput.value.trim());
+            } else {
+                clearSearch();
+            }
+        }
+
+        // Handle browser back/forward buttons
+        window.addEventListener('popstate', (event) => {
+            if (event.state && event.state.folderId !== undefined) {
+                if (event.state.folderId === null) {
+                    // Going back to root
+                    currentFolderId = null;
+                    folderStack = [];
+                    fetch('/files/api/files/folders')
+                        .then(res => res.json())
+                        .then(data => {
+                            displayFolders(data.folders, []);
+                            updateBreadcrumb([{name: 'Home', id: null}]);
+                        });
+                } else {
+                    // Going back to a folder
+                    restoreFromURL();
+                }
+            }
+        });
+
         // Load root folders on page load
         document.addEventListener('DOMContentLoaded', () => {
-            loadRootFolders();
+            restoreFromURL();
+            initDragDrop();
+            setupSearchListener();
         });
     </script>
 </body>

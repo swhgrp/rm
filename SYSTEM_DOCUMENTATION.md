@@ -682,49 +682,58 @@ Document management, file storage, and secure file sharing for the restaurant sy
 
 **Storage:** Local filesystem at `/app/storage` with per-user isolation
 
-**Python Files:** 11 | **Templates:** 1
+**Document Conversion:** LibreOffice (headless) for Office document preview
+
+**Python Files:** 11 | **Templates:** 2
 
 **Access:** https://rm.swhgrp.com/files/
 
 ### Core Features
 
 **File Management:**
-✅ Upload files (single and bulk)
+✅ Upload files (single and bulk with drag-and-drop)
 ✅ Download files (direct and streaming)
-✅ Delete files with permission checking
+✅ File preview (PDFs, images, Office documents)
+✅ Delete, rename, copy, and move files
 ✅ File metadata tracking (size, type, owner, timestamps)
 ✅ MIME type detection
+✅ Bulk selection for batch operations
 
 **Folder Organization:**
 ✅ Create folders with hierarchical structure
-✅ Nested folders (parent/child relationships)
-✅ Folder permissions (read/write/delete)
-✅ Public and private folders
-✅ User-specific storage areas
+✅ Nested folders with CASCADE delete
+✅ Breadcrumb navigation and back button
+✅ Dashboard view with recent files and stats
+✅ My Files view with traditional folder browser
+✅ Shared views ("Shared with Me" and "Shared by Me")
 
 **Security & Permissions:**
 ✅ User-based storage isolation (`user_{id}/`)
 ✅ Role-based access control (Admin, Owner, Shared)
 ✅ JWT authentication via Portal
-✅ Granular permission levels (read/write/delete)
+✅ Granular permission levels (view, edit, upload, download, share, comment)
 ✅ Permission inheritance from folders
 
 **Sharing:**
-✅ Share folders with specific users
-✅ Public folder sharing
-✅ Permission level controls
-✅ Owner maintains full control
+✅ Internal sharing with specific users
+✅ Public share links with optional passwords
+✅ Username autocomplete with full name display
+✅ Share badges showing share status
+✅ Expiration dates for public links
+✅ Granular permission controls
+✅ Dedicated share management pages
 
 ### Database Schema
 
 **Tables:**
 - `file_metadata` - File information and metadata
 - `folders` - Hierarchical folder structure
-- `folder_permissions` - User-folder permission mappings
+- `internal_shares` - User-to-user sharing with permissions
+- `share_links` - Public share links with tokens and passwords
 - `users` - From HR database (authentication)
 
 **Key Models:**
-- FileMetadata, Folder, FolderPermissions, User
+- FileMetadata, Folder, InternalShare, ShareLink, User
 
 **Integration Points:**
 - **Portal System:** JWT authentication and user permissions

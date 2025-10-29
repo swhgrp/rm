@@ -35,4 +35,8 @@ def get_db():
 
 def get_hr_db():
     """Get HR database session (alias for get_db)"""
-    return get_db()
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

@@ -545,6 +545,66 @@ async def get_shared_by_me(
     return results
 
 
+@router.get("/internal/by-resource")
+async def get_internal_shares_by_resource(
+    resource_type: str,
+    resource_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get all internal shares for a specific resource"""
+
+    # Verify user owns or has access to the resource
+    if resource_type == "folder":
+        from files.models.file_metadata import Folder
+        resource = db.query(Folder).filter(Folder.id == resource_id).first()
+        if not resource or resource.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to view shares for this resource")
+    else:
+        from files.models.file_metadata import FileMetadata
+        resource = db.query(FileMetadata).filter(FileMetadata.id == resource_id).first()
+        if not resource or resource.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Not authorized to view shares for this resource")
+
+    # Get shares for this resource
+    query = db.query(InternalShare).filter(
+        InternalShare.resource_type == resource_type,
+        InternalShare.is_active == True
+    )
+
+    if resource_type == "folder":
+        query = query.filter(InternalShare.folder_id == resource_id)
+    else:
+        query = query.filter(InternalShare.file_id == resource_id)
+
+    shares = query.all()
+
+    # Format response
+    results = []
+    for share in shares:
+        shared_with_name = None
+        if share.shared_with_user_id:
+            user = share.shared_with_user
+            shared_with_name = user.full_name if user else "Unknown"
+
+        results.append({
+            "id": share.id,
+            "resource_type": share.resource_type,
+            "shared_with_user_id": share.shared_with_user_id,
+            "shared_with_username": shared_with_name,
+            "can_view": share.can_view,
+            "can_download": share.can_download,
+            "can_upload": share.can_upload,
+            "can_edit": share.can_edit,
+            "can_delete": share.can_delete,
+            "can_share": share.can_share,
+            "can_comment": share.can_comment,
+            "shared_at": share.shared_at.isoformat() if share.shared_at else None
+        })
+
+    return {"shares": results}
+
+
 @router.delete("/internal/{share_id}")
 async def revoke_internal_share(
     share_id: int,

@@ -29,7 +29,7 @@ class ShareLink(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # What is being shared
-    resource_type = Column(SQLEnum(ShareLinkType), nullable=False)
+    resource_type = Column(SQLEnum(ShareLinkType, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     folder_id = Column(Integer, ForeignKey('folders.id', ondelete='CASCADE'), nullable=True)
     file_id = Column(Integer, ForeignKey('file_metadata.id', ondelete='CASCADE'), nullable=True)
 
@@ -137,7 +137,7 @@ class InternalShare(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # What is being shared
-    resource_type = Column(SQLEnum(ShareLinkType), nullable=False)
+    resource_type = Column(SQLEnum(ShareLinkType, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     folder_id = Column(Integer, ForeignKey('folders.id', ondelete='CASCADE'), nullable=True)
     file_id = Column(Integer, ForeignKey('file_metadata.id', ondelete='CASCADE'), nullable=True)
 
