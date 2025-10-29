@@ -112,6 +112,17 @@ restaurant-system/
 │   ├── .env
 │   └── README.md       # Integration Hub documentation
 │
+├── files/              # Files Management Service
+│   ├── src/            # FastAPI application code (11 Python files)
+│   ├── alembic/        # Database migrations
+│   ├── templates/      # File manager interface
+│   ├── storage/        # User file storage (isolated per user)
+│   ├── logs/           # Application logs
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   ├── .env
+│   └── README.md       # Files system documentation (340 lines)
+│
 ├── shared/             # Shared Infrastructure
 │   ├── nginx/          # Reverse proxy configuration
 │   │   └── conf.d/     # Site configurations
