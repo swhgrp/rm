@@ -60,6 +60,7 @@ class User(Base):
     can_access_integration_hub = Column(Boolean, default=True)
     can_access_hr = Column(Boolean, default=True)
     can_access_events = Column(Boolean, default=True)
+    can_access_nextcloud = Column(Boolean, default=True)
     accounting_role_id = Column(Integer, nullable=True)
 
 
@@ -179,6 +180,15 @@ async def home(request: Request, db: Session = Depends(get_db)):
             "system_key": "events"
         })
 
+    if user.can_access_nextcloud:
+        systems.append({
+            "name": "Files",
+            "description": "Access your files, calendar, and collaborate with your team",
+            "url": "/files/",
+            "icon": "📁",
+            "system_key": "files"
+        })
+
     return templates.TemplateResponse(
         "home.html",
         {
@@ -187,6 +197,19 @@ async def home(request: Request, db: Session = Depends(get_db)):
             "systems": systems
         }
     )
+
+
+@app.get("/debug")
+async def debug_user(request: Request, db: Session = Depends(get_db)):
+    """Debug endpoint to check user attributes"""
+    user = get_current_user(request, db)
+    if not user:
+        return {"error": "Not logged in"}
+    return {
+        "username": user.username,
+        "can_access_nextcloud": getattr(user, 'can_access_nextcloud', 'ATTRIBUTE_MISSING'),
+        "all_attrs": [attr for attr in dir(user) if attr.startswith('can_access')]
+    }
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -307,6 +330,7 @@ async def update_user_permissions(
     user.can_access_integration_hub = form_data.get("can_access_integration_hub") == "on"
     user.can_access_hr = form_data.get("can_access_hr") == "on"
     user.can_access_events = form_data.get("can_access_events") == "on"
+    user.can_access_nextcloud = form_data.get("can_access_nextcloud") == "on"
 
     # Update accounting role if provided
     accounting_role = form_data.get("accounting_role_id")
@@ -335,6 +359,8 @@ async def generate_system_token(
         raise HTTPException(status_code=403, detail="No access to Integration Hub")
     elif system == "events" and not user.can_access_events:
         raise HTTPException(status_code=403, detail="No access to Events system")
+    elif system == "files" and not user.can_access_nextcloud:
+        raise HTTPException(status_code=403, detail="No access to Files system")
 
     # Create a short-lived token (5 minutes) for system authentication
     token_data = {

@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Files - SW Restaurant System{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mt-5">
+        <div class="col-12 text-center">
+            <h1><i class="bi bi-cloud"></i> Files & Calendar</h1>
+            <p class="lead">Access your files and calendar</p>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body text-center p-5">
+                    <i class="bi bi-folder display-1 text-primary"></i>
+                    <h3 class="mt-3">Files</h3>
+                    <p>Browse, upload, and manage your Nextcloud files</p>
+                    <a href="/nextcloud/files" class="btn btn-primary">Open Files</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body text-center p-5">
+                    <i class="bi bi-calendar display-1 text-success"></i>
+                    <h3 class="mt-3">Calendar</h3>
+                    <p>View and manage your calendar events</p>
+                    <a href="/nextcloud/calendar" class="btn btn-success">Open Calendar</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12 text-center">
+            <a href="/nextcloud/setup" class="btn btn-outline-secondary">
+                <i class="bi bi-gear"></i> Setup Nextcloud Connection
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}

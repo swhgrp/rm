@@ -240,6 +240,7 @@
                         <th style="text-align: center;">Integration Hub</th>
                         <th style="text-align: center;">HR</th>
                         <th style="text-align: center;">Events</th>
+                        <th style="text-align: center;">Files</th>
                         <th style="text-align: center;">Actions</th>
                     </tr>
                 </thead>
@@ -304,6 +305,14 @@
                                 <input type="checkbox"
                                        name="can_access_events"
                                        {% if u.can_access_events %}checked{% endif %}
+                                       {% if u.is_admin %}disabled{% endif %}>
+                            </div>
+                        </td>
+                        <td style="text-align: center;">
+                            <div class="checkbox-group">
+                                <input type="checkbox"
+                                       name="can_access_nextcloud"
+                                       {% if u.can_access_nextcloud %}checked{% endif %}
                                        {% if u.is_admin %}disabled{% endif %}>
                             </div>
                         </td>

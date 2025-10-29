@@ -78,7 +78,7 @@ async def tasks_page(request: Request):
     return templates.TemplateResponse("admin/tasks.html", {"request": request})
 
 # Events list page
-@app.get("/events", response_class=HTMLResponse)
+@app.get("/list", response_class=HTMLResponse)
 async def events_list_page(request: Request):
     """Serve the events list/dashboard page"""
     return templates.TemplateResponse("admin/events_list.html", {"request": request})

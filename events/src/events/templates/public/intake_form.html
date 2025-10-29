@@ -468,6 +468,16 @@
                         </div>
                     </div>
 
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="venue">Venue <span class="required">*</span></label>
+                            <select id="venue" name="venue" required>
+                                <option value="">Loading venues...</option>
+                            </select>
+                            <small id="venueError" style="color: #dc3545; display: none;">Failed to load venues. Please refresh the page.</small>
+                        </div>
+                    </div>
+
                     <div class="form-row two-cols">
                         <div class="form-group">
                             <label for="eventDate">Event Date & Time <span class="required">*</span></label>
@@ -609,6 +619,43 @@
         const alertError = document.getElementById('alertError');
         const errorMessage = document.getElementById('errorMessage');
         const loadingIndicator = document.getElementById('loadingIndicator');
+        const venueSelect = document.getElementById('venue');
+
+        // Load venues on page load
+        async function loadVenues() {
+            const venueError = document.getElementById('venueError');
+            try {
+                const response = await fetch('/events/api/events/venues');
+                if (response.ok) {
+                    const venues = await response.json();
+                    // Clear loading message
+                    venueSelect.innerHTML = '<option value="">Select venue...</option>';
+
+                    if (venues.length === 0) {
+                        venueError.textContent = 'No venues available. Please contact support.';
+                        venueError.style.display = 'block';
+                    } else {
+                        venues.forEach(venue => {
+                            const option = document.createElement('option');
+                            option.value = venue.id;
+                            option.textContent = venue.name;
+                            venueSelect.appendChild(option);
+                        });
+                    }
+                } else {
+                    console.error('Failed to load venues:', response.status, response.statusText);
+                    venueSelect.innerHTML = '<option value="">Failed to load venues</option>';
+                    venueError.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('Failed to load venues:', error);
+                venueSelect.innerHTML = '<option value="">Failed to load venues</option>';
+                venueError.style.display = 'block';
+            }
+        }
+
+        // Load venues when page loads
+        loadVenues();
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -631,25 +678,37 @@
             loadingIndicator.classList.add('show');
 
             // Collect form data
+            const eventDateValue = document.getElementById('eventDate').value;
+            const startAt = new Date(eventDateValue);
+            const durationHours = parseFloat(document.getElementById('duration').value) || 4; // Default 4 hours
+            const endAt = new Date(startAt.getTime() + durationHours * 60 * 60 * 1000);
+
             const formData = {
                 hcaptcha_token: hcaptchaResponse,
                 eventTemplateKey: document.getElementById('eventType').value,
                 client: {
-                    full_name: document.getElementById('fullName').value,
+                    name: document.getElementById('fullName').value,
                     email: document.getElementById('email').value,
                     phone: document.getElementById('phone').value,
-                    company: document.getElementById('company').value || null
+                    org: document.getElementById('company').value || null
                 },
                 event: {
                     title: document.getElementById('eventTitle').value,
-                    start_at: new Date(document.getElementById('eventDate').value).toISOString(),
-                    attendee_count: parseInt(document.getElementById('attendeeCount').value),
-                    duration_hours: parseFloat(document.getElementById('duration').value) || null,
-                    menu_preferences: collectCheckboxValues('mealTypes'),
-                    dietary_restrictions: document.getElementById('dietaryRestrictions').value || null,
-                    beverage_preferences: collectCheckboxValues('beverages'),
-                    special_requirements: document.getElementById('specialRequirements').value || null,
-                    budget_range: document.getElementById('budget').value || null
+                    event_type: document.getElementById('eventType').value,
+                    date: eventDateValue,
+                    start_at: startAt.toISOString(),
+                    end_at: endAt.toISOString(),
+                    guest_count: parseInt(document.getElementById('attendeeCount').value),
+                    venue_id: document.getElementById('venue').value,
+                    menu_json: {
+                        preferences: collectCheckboxValues('mealTypes'),
+                        dietary_restrictions: document.getElementById('dietaryRestrictions').value || null,
+                        beverages: collectCheckboxValues('beverages')
+                    },
+                    requirements_json: {
+                        special_requirements: document.getElementById('specialRequirements').value || null
+                    },
+                    budget_estimate: document.getElementById('budget').value ? parseFloat(document.getElementById('budget').value) : null
                 }
             };
 
@@ -680,7 +739,20 @@
                     }, 5000);
                 } else {
                     // Error from server
-                    throw new Error(data.detail || 'Request failed');
+                    let errorMsg = 'Request failed';
+                    if (data.detail) {
+                        if (Array.isArray(data.detail)) {
+                            // Handle FastAPI validation errors (array of objects)
+                            errorMsg = data.detail.map(e => e.msg || JSON.stringify(e)).join(', ');
+                        } else if (typeof data.detail === 'object') {
+                            // Handle other object errors
+                            errorMsg = JSON.stringify(data.detail);
+                        } else {
+                            // Handle string errors
+                            errorMsg = data.detail;
+                        }
+                    }
+                    throw new Error(errorMsg);
                 }
             } catch (error) {
                 loadingIndicator.classList.remove('show');

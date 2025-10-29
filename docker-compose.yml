@@ -282,6 +282,26 @@ services:
       - restaurant-network
 
   # ============================================================================
+  # FILES SERVICE
+  # ============================================================================
+
+  files-app:
+    build: ./files
+    container_name: files-app
+    volumes:
+      - ./files/src:/app/src
+      - ./files/logs:/app/logs
+      - ./files/storage:/app/storage
+    env_file:
+      - ./files/.env
+    depends_on:
+      hr-db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - restaurant-network
+
+  # ============================================================================
   # SHARED INFRASTRUCTURE
   # ============================================================================
 
@@ -306,6 +326,7 @@ services:
       - hr-app
       - integration-hub
       - portal-app
+      - files-app
     restart: unless-stopped
     networks:
       - restaurant-network
