@@ -771,9 +771,12 @@ Document management, file storage, and secure file sharing for the restaurant sy
 - **Firewall:** UFW configured
 
 ### Network Architecture
+
+**IMPORTANT:** This shows the **routing architecture**. Portal provides **SSO authentication** (JWT tokens), but does NOT proxy traffic. Each service is accessed directly through Nginx.
+
 ```
 Internet → Nginx (ports 80/443) → Reverse Proxy → Microservices
-                                                    ├─ Portal (8000)
+                                                    ├─ Portal (8000) [SSO Auth]
                                                     ├─ Inventory (8000)
                                                     ├─ HR (8000)
                                                     ├─ Accounting (8000)
@@ -782,14 +785,37 @@ Internet → Nginx (ports 80/443) → Reverse Proxy → Microservices
                                                     └─ Files (8000)
 ```
 
-### Nginx Routing
-- `/portal/` → portal-app:8000
+### Nginx Routing (Direct to Services)
+- `/portal/` → portal-app:8000 **(Authentication/SSO)**
 - `/inventory/` → inventory-app:8000
 - `/hr/` → hr-app:8000
 - `/accounting/` → accounting-app:8000
 - `/events/` → events-app:8000
 - `/hub/` → integration-hub:8000
 - `/files/` → files-app:8000
+
+### Authentication Flow (SSO)
+
+```
+1. User visits rm.swhgrp.com
+2. Nginx redirects to /portal/ (login page)
+3. User enters credentials
+4. Portal validates against HR database
+5. Portal issues JWT token (stored in secure cookie)
+6. User sees dashboard with accessible systems
+7. User clicks system (e.g., "Inventory")
+8. Browser navigates to /inventory/
+9. Nginx routes directly to inventory-app:8000
+10. Inventory app validates JWT token from cookie
+11. If valid: Show interface | If invalid: Redirect to /portal/login
+```
+
+**Key Architecture Points:**
+- **Portal Role:** Authentication provider (SSO), NOT traffic proxy
+- **Nginx Role:** SSL termination and routing to services
+- **Service Independence:** Each service validates JWT independently
+- **No Bottleneck:** Traffic does NOT flow through Portal
+- **Shared Secret:** All services share Portal's JWT secret key for validation
 
 ### Database Strategy
 Each system has its own PostgreSQL 15 database for true microservices isolation:

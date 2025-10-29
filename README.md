@@ -133,37 +133,88 @@ restaurant-system/
 
 ### Network Architecture
 
+**Important:** This diagram shows the **routing architecture**. All services use the Portal for **SSO authentication** (JWT tokens), but traffic is routed directly from Nginx to each service.
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │              Nginx Reverse Proxy (SSL/TLS)              │
 │              rm.swhgrp.com (172.233.172.92)             │
+│                                                          │
+│  Routes:                                                 │
+│  /portal/     → portal-app:8000    (SSO Auth)          │
+│  /inventory/  → inventory-app:8000                      │
+│  /accounting/ → accounting-app:8000                     │
+│  /hr/         → hr-app:8000                             │
+│  /events/     → events-app:8000                         │
+│  /hub/        → integration-hub:8000                    │
+│  /files/      → files-app:8000                          │
 └─────────────────────────────────────────────────────────┘
-                          │
-        ┌─────────────────┼─────────────────────────┐
-        │                 │                         │
-    ┌───▼───┐      ┌──────▼──────┐           ┌─────▼──────┐
-    │Portal │      │  Inventory  │           │     HR     │
-    │  SSO  │      │ Management  │           │   System   │
-    │8000   │      │   8000      │           │    8000    │
-    └───┬───┘      └──────┬──────┘           └─────┬──────┘
-        │                 │                         │
-        │     PostgreSQL 15 (per service)          │
-        │                 │                         │
-    ┌───▼──────────┬──────▼──────────┬──────────────▼─────┐
-    │  Accounting  │     Events      │  Integration Hub   │
-    │    8000      │     8000        │       8000         │
-    └──────┬───────┴──────┬──────────┴──────────┬─────────┘
-           │              │                     │
-           │         Redis 7                    │
-           │              │                     │
-           └──────────────┼─────────────────────┘
-                          │
-                    ┌─────▼──────┐
-                    │   Files    │
-                    │  Storage   │
-                    │  /files/   │
-                    └────────────┘
+         │           │           │           │
+         ▼           ▼           ▼           ▼
+    ┌────────┐  ┌──────────┐  ┌────┐  ┌──────────┐
+    │Portal  │  │Inventory │  │ HR │  │Accounting│
+    │  SSO   │  │Management│  │Sys │  │  System  │
+    │ :8000  │  │  :8000   │  │8000│  │  :8000   │
+    └────────┘  └──────────┘  └────┘  └──────────┘
+         │           │           │           │
+         └───────────┴───────────┴───────────┘
+                     │
+              ┌──────▼───────┐
+              │  PostgreSQL  │
+              │  15 Cluster  │
+              │ (per-service │
+              │  databases)  │
+              └──────┬───────┘
+                     │
+         ┌───────────┼───────────┐
+         ▼           ▼           ▼
+    ┌────────┐  ┌────────┐  ┌──────────────┐
+    │Events  │  │  Hub   │  │    Files     │
+    │ :8000  │  │ :8000  │  │   Storage    │
+    └────────┘  └────────┘  └──────────────┘
+         │           │
+         └─────┬─────┘
+               ▼
+          ┌────────┐
+          │Redis 7 │
+          │ Cache  │
+          └────────┘
 ```
+
+### Authentication Flow
+
+```
+1. User visits https://rm.swhgrp.com/
+   ↓
+2. Nginx redirects to /portal/
+   ↓
+3. Portal displays login page
+   ↓
+4. User enters credentials
+   ↓
+5. Portal validates against HR database
+   ↓
+6. Portal issues JWT token (stored in cookie)
+   ↓
+7. Portal displays dashboard with accessible systems
+   ↓
+8. User clicks "Inventory Management"
+   ↓
+9. Browser navigates to /inventory/
+   ↓
+10. Nginx routes to inventory-app:8000
+    ↓
+11. Inventory app validates JWT token from cookie
+    ↓
+12. If valid: Show inventory interface
+    If invalid: Redirect to /portal/login
+```
+
+**Key Points:**
+- **Portal = SSO Provider** (issues JWT tokens)
+- **Nginx = Traffic Router** (routes to microservices)
+- **Each Service = Independent** (validates JWT, has own database)
+- **No Traffic Through Portal** (direct Nginx → Service routing)
 
 ---
 
