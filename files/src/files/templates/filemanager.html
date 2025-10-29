@@ -405,6 +405,318 @@
             gap: 10px;
             margin-left: auto;
         }
+
+        /* Mobile Responsive Styles */
+        @media (max-width: 768px) {
+            /* Hide sidebar on mobile by default */
+            .sidebar {
+                position: fixed;
+                left: -100%;
+                top: 56px;
+                width: 80%;
+                max-width: 300px;
+                height: calc(100vh - 56px);
+                z-index: 1040;
+                transition: left 0.3s ease;
+                overflow-y: auto;
+            }
+
+            .sidebar.show {
+                left: 0;
+            }
+
+            /* Mobile menu overlay */
+            .mobile-overlay {
+                position: fixed;
+                top: 56px;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 1030;
+                display: none;
+            }
+
+            .mobile-overlay.show {
+                display: block;
+            }
+
+            /* Mobile menu button */
+            .mobile-menu-btn {
+                display: inline-block !important;
+                padding: 8px 12px;
+                border: none;
+                background: transparent;
+                color: #c9d1d9;
+                font-size: 24px;
+                cursor: pointer;
+            }
+
+            /* Main content full width on mobile */
+            .main-content {
+                padding: 15px;
+                width: 100%;
+            }
+
+            /* Toolbar adjustments */
+            .toolbar {
+                padding: 10px;
+                gap: 8px;
+            }
+
+            .btn-custom {
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+
+            .btn-custom span {
+                display: none;
+            }
+
+            .btn-custom i {
+                margin: 0 !important;
+            }
+
+            /* File/Folder items mobile layout */
+            .file-item, .folder-item {
+                flex-wrap: wrap;
+                padding: 12px 10px;
+                gap: 8px;
+            }
+
+            .file-icon, .folder-icon {
+                font-size: 20px;
+            }
+
+            .file-name, .folder-name {
+                flex: 1 1 100%;
+                order: 1;
+                font-size: 14px;
+            }
+
+            .file-size {
+                order: 2;
+                font-size: 12px;
+                flex: 1;
+            }
+
+            /* Hide some action buttons on mobile, show in context menu */
+            .file-item .btn-custom:not(.preview-btn):not(:first-of-type):not(:last-of-type),
+            .folder-item .btn-custom:not(:first-of-type):not(:last-of-type) {
+                display: none;
+            }
+
+            /* Keep only essential buttons visible */
+            .file-item .btn-custom,
+            .folder-item .btn-custom {
+                padding: 6px 8px;
+                font-size: 16px;
+            }
+
+            /* Dashboard cards stack on mobile */
+            .dashboard-container .row {
+                margin: 0 -8px;
+            }
+
+            .dashboard-container .col-md-3 {
+                padding: 0 8px;
+            }
+
+            .dashboard-container .card {
+                margin-bottom: 12px;
+            }
+
+            .dashboard-container h5 {
+                font-size: 16px;
+            }
+
+            /* Breadcrumb smaller on mobile */
+            .breadcrumb-custom {
+                font-size: 13px;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+
+            .breadcrumb-custom .breadcrumb-item {
+                display: inline-block;
+            }
+
+            /* Modals full screen on mobile */
+            .modal-dialog {
+                margin: 0;
+                max-width: 100%;
+                height: 100vh;
+            }
+
+            .modal-content {
+                height: 100%;
+                border-radius: 0;
+                border: none;
+            }
+
+            .modal-body {
+                overflow-y: auto;
+            }
+
+            /* Form controls larger touch targets */
+            .form-control, .form-select {
+                font-size: 16px;
+                padding: 12px;
+            }
+
+            /* Toast notifications smaller on mobile */
+            .toast-container {
+                right: 10px;
+                left: 10px;
+                top: 70px;
+            }
+
+            .toast {
+                min-width: auto;
+                width: 100%;
+                padding: 12px 15px;
+                font-size: 14px;
+            }
+
+            /* Bulk actions bar mobile */
+            .bulk-actions-bar {
+                padding: 12px 15px;
+                flex-wrap: wrap;
+            }
+
+            .bulk-actions-bar .selection-count {
+                font-size: 14px;
+            }
+
+            .bulk-actions-bar .actions {
+                width: 100%;
+                margin-left: 0;
+                margin-top: 10px;
+                justify-content: space-between;
+            }
+
+            /* Search bar full width on mobile */
+            .toolbar input[type="search"] {
+                min-width: 100%;
+                flex: 1 1 100%;
+            }
+
+            /* Drag and drop zone mobile */
+            .drag-drop-zone {
+                padding: 30px 20px;
+            }
+
+            .drag-drop-zone i {
+                font-size: 36px;
+            }
+
+            /* Upload queue mobile */
+            .upload-queue {
+                max-height: 200px;
+            }
+
+            /* Tabs mobile */
+            .nav-tabs {
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                border-bottom: 1px solid #30363d;
+            }
+
+            .nav-tabs .nav-link {
+                white-space: nowrap;
+                font-size: 14px;
+                padding: 8px 12px;
+            }
+
+            /* Share modal specific */
+            #usernameDropdown {
+                max-height: 150px !important;
+            }
+
+            /* Preview modal */
+            #previewModal .modal-dialog {
+                margin: 0;
+            }
+
+            #previewModal iframe,
+            #previewModal img {
+                max-height: calc(100vh - 120px);
+            }
+
+            /* File list padding */
+            .file-list {
+                padding: 10px;
+            }
+
+            /* Empty state smaller on mobile */
+            .empty-state {
+                padding: 40px 20px;
+            }
+
+            .empty-state i {
+                font-size: 48px;
+            }
+
+            /* Stats cards mobile */
+            .card-body h3 {
+                font-size: 1.5rem;
+            }
+
+            .card-body i {
+                font-size: 1.5rem !important;
+            }
+
+            /* Selection checkbox larger on mobile */
+            .selection-checkbox {
+                width: 20px;
+                height: 20px;
+                margin-right: 12px;
+            }
+        }
+
+        /* Tablet adjustments (768px - 992px) */
+        @media (min-width: 768px) and (max-width: 992px) {
+            .main-content {
+                padding: 20px;
+            }
+
+            .sidebar {
+                padding: 15px;
+            }
+
+            .file-item .btn-custom span,
+            .folder-item .btn-custom span {
+                display: none;
+            }
+
+            .dashboard-container .col-md-3 {
+                flex: 0 0 50%;
+                max-width: 50%;
+            }
+        }
+
+        /* Hide mobile menu button on desktop */
+        @media (min-width: 769px) {
+            .mobile-menu-btn {
+                display: none !important;
+            }
+        }
+
+        /* Touch-friendly improvements for all mobile devices */
+        @media (hover: none) and (pointer: coarse) {
+            .btn-custom,
+            .sidebar-item,
+            .file-item,
+            .folder-item {
+                min-height: 44px;
+            }
+
+            .selection-checkbox {
+                min-width: 24px;
+                min-height: 24px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -458,20 +770,31 @@
 
     <nav class="navbar navbar-custom">
         <div class="container-fluid">
-            <a class="navbar-brand d-flex align-items-center gap-2" href="#">
-                <i class="bi bi-folder"></i>
-                Files Management
-            </a>
+            <div class="d-flex align-items-center gap-2">
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()" style="display: none;">
+                    <i class="bi bi-list"></i>
+                </button>
+                <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+                    <i class="bi bi-folder"></i>
+                    Files Management
+                </a>
+            </div>
             <div class="d-flex align-items-center gap-3">
-                <span class="text-light">{{ user.full_name }}</span>
-                <a href="/portal/" class="btn btn-custom">Back to Portal</a>
+                <span class="text-light d-none d-sm-inline">{{ user.full_name }}</span>
+                <a href="/portal/" class="btn btn-custom">
+                    <i class="bi bi-box-arrow-left"></i>
+                    <span class="d-none d-sm-inline">Back to Portal</span>
+                </a>
             </div>
         </div>
     </nav>
 
+    <!-- Mobile Menu Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
+
     <div class="container-fluid">
         <div class="row">
-            <div class="col-md-2 sidebar">
+            <div class="col-md-2 col-12 sidebar">
                 <a href="#" class="sidebar-item" onclick="loadRootFolders(); return false;">
                     <i class="bi bi-house-door"></i>
                     <span>Home</span>
@@ -498,7 +821,7 @@
                 </a>
             </div>
 
-            <div class="col-md-10 main-content">
+            <div class="col-md-10 col-12 main-content">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb breadcrumb-custom" id="breadcrumb">
                         <li class="breadcrumb-item active">Home</li>
@@ -874,6 +1197,29 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Mobile menu toggle
+        function toggleMobileMenu() {
+            const sidebar = document.querySelector('.sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+
+            if (sidebar && overlay) {
+                sidebar.classList.toggle('show');
+                overlay.classList.toggle('show');
+            }
+        }
+
+        // Close mobile menu when clicking on a sidebar item
+        document.addEventListener('DOMContentLoaded', function() {
+            const sidebarItems = document.querySelectorAll('.sidebar-item');
+            sidebarItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        toggleMobileMenu();
+                    }
+                });
+            });
+        });
+
         // Toast notification system
         function showToast(message, type = 'info') {
             const container = document.getElementById('toastContainer');
