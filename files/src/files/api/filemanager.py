@@ -22,9 +22,20 @@ STORAGE_PATH.mkdir(parents=True, exist_ok=True)
 
 
 def get_user_folder_path(user_id: int, folder_path: str = "") -> Path:
-    """Get the full filesystem path for a user's folder"""
+    """Get the full filesystem path for a user's folder
+
+    Note: This function creates directories, so folder_path should be a directory path,
+    not a file path. If you need a file path, create the folder first, then append the filename.
+    """
     user_path = STORAGE_PATH / f"user_{user_id}" / folder_path
-    user_path.mkdir(parents=True, exist_ok=True)
+
+    # Only create directory if the path doesn't already exist as a file
+    if not user_path.exists():
+        user_path.mkdir(parents=True, exist_ok=True)
+    elif user_path.is_file():
+        # If it's a file, only create the parent directory
+        user_path.parent.mkdir(parents=True, exist_ok=True)
+
     return user_path
 
 
