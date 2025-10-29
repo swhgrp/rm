@@ -670,36 +670,93 @@ Central integration point for third-party vendor APIs, data synchronization, and
 ## FILES SYSTEM
 
 ### Purpose
-Document management, file storage, and team collaboration.
+Document management, file storage, and secure file sharing for the restaurant system.
 
 ### Implementation Status: 100% Complete ✅
 
 **Technology:** FastAPI with local file storage
 
-**Integration:** SSO via Portal system
+**Integration:** SSO via Portal system (✅ Complete)
 
-**Features:**
-✅ File storage and organization
-✅ File sharing (internal/external)
-✅ Collaborative editing
-✅ Calendar
-✅ Contacts
-✅ Tasks/To-dos
-✅ Photo gallery
-✅ Mobile apps available
-✅ Desktop sync clients
+**Database:** PostgreSQL 15 (HR database for users, local DB for file metadata)
+
+**Storage:** Local filesystem at `/app/storage` with per-user isolation
+
+**Python Files:** 11 | **Templates:** 1
 
 **Access:** https://rm.swhgrp.com/files/
 
-**Storage:** Persistent volume on server
+### Core Features
 
-**Authentication:** Currently standalone, SSO integration planned
+**File Management:**
+✅ Upload files (single and bulk)
+✅ Download files (direct and streaming)
+✅ Delete files with permission checking
+✅ File metadata tracking (size, type, owner, timestamps)
+✅ MIME type detection
 
-**Needs:**
-- SSO integration with Portal
-- User provisioning automation
-- Backup configuration
-- Usage monitoring
+**Folder Organization:**
+✅ Create folders with hierarchical structure
+✅ Nested folders (parent/child relationships)
+✅ Folder permissions (read/write/delete)
+✅ Public and private folders
+✅ User-specific storage areas
+
+**Security & Permissions:**
+✅ User-based storage isolation (`user_{id}/`)
+✅ Role-based access control (Admin, Owner, Shared)
+✅ JWT authentication via Portal
+✅ Granular permission levels (read/write/delete)
+✅ Permission inheritance from folders
+
+**Sharing:**
+✅ Share folders with specific users
+✅ Public folder sharing
+✅ Permission level controls
+✅ Owner maintains full control
+
+### Database Schema
+
+**Tables:**
+- `file_metadata` - File information and metadata
+- `folders` - Hierarchical folder structure
+- `folder_permissions` - User-folder permission mappings
+- `users` - From HR database (authentication)
+
+**Key Models:**
+- FileMetadata, Folder, FolderPermissions, User
+
+**Integration Points:**
+- **Portal System:** JWT authentication and user permissions
+- **HR System:** User data and authentication
+- **Future:** Events (BEO attachments), HR (employee documents), Accounting (receipts), Inventory (product images)
+
+### API Structure
+
+**Endpoints:**
+- `GET /api/files/folders` - List accessible folders
+- `POST /api/files/folders` - Create new folder
+- `DELETE /api/files/folders/{id}` - Delete folder
+- `GET /api/files/list` - List files in folder
+- `POST /api/files/upload` - Upload file(s)
+- `GET /api/files/download/{id}` - Download file
+- `DELETE /api/files/{id}` - Delete file
+- `POST /api/files/share` - Share folder with user
+
+**Frontend:**
+- `/` - File manager interface
+- `/health` - Health check endpoint
+
+### Future Enhancements
+- [ ] File versioning (track history)
+- [ ] File preview (images, PDFs in browser)
+- [ ] Search functionality
+- [ ] Trash/recycle bin
+- [ ] Storage quotas per user
+- [ ] Bulk download (zip archives)
+- [ ] File tagging
+- [ ] Activity logs
+- [ ] WebDAV support
 
 ---
 

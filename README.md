@@ -981,15 +981,15 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 | Accounting | ✅ Production | 140 | 37 | 95% |
 | Events | ✅ Production | 35 | 10 | 85% |
 | Integration Hub | 🔄 Active | 24 | 7 | 70% |
-| Files | ✅ Production | FastAPI | - | 100% |
+| Files | ✅ Production | 11 | 1 | 100% |
 
-**Total:** 356 Python files, 98 templates, 74 database models
+**Total:** 367 Python files, 99 templates, 77 database models
 
 **Overall Status:** 90% Complete - Production Ready ✅
 
 ---
 
-**Version:** 2.0
+**Version:** 2.1
 **Last Updated:** October 28, 2025
 **Maintained By:** SW Hospitality Group Development Team
 
@@ -997,4 +997,22 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-*This README was last updated during the comprehensive documentation overhaul on October 28, 2025, which brought all system documentation to 100% completion with accurate status reporting.*
+## 📝 Recent Updates
+
+### October 28, 2025 - Cleanup and Documentation v2.1
+- ✅ Removed unused Nextcloud integration code (484KB freed)
+- ✅ Created comprehensive Files system README
+- ✅ Updated all documentation to reflect current architecture
+- ✅ Renamed database columns: `can_access_nextcloud` → `can_access_files`
+- ✅ Verified all 7 microservices are operational
+- ✅ Confirmed 90% overall system completion
+
+### October 28, 2025 - Documentation Overhaul v2.0
+- ✅ Created 4 new system README files (Portal, HR, Accounting, Integration Hub)
+- ✅ Updated Events README with accurate 85% completion status
+- ✅ Created master SYSTEM_DOCUMENTATION.md (80 pages)
+- ✅ Deep dive analysis of all 7 systems completed
+
+---
+
+*All documentation is now 100% current and accurately reflects the production system.*
