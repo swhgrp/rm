@@ -104,7 +104,7 @@ Each user has boolean flags:
 - `can_access_hr` - HR system
 - `can_access_events` - Events system
 - `can_access_integration_hub` - Integration Hub
-- `can_access_nextcloud` - Files system
+- `can_access_files` - Files system
 - `accounting_role_id` - Accounting system role assignment
 
 **API Endpoints:**
@@ -667,16 +667,16 @@ Central integration point for third-party vendor APIs, data synchronization, and
 
 ---
 
-## FILES SYSTEM (Nextcloud)
+## FILES SYSTEM
 
 ### Purpose
-Document management, file sharing, and team collaboration.
+Document management, file storage, and team collaboration.
 
 ### Implementation Status: 100% Complete ✅
 
-**Technology:** Nextcloud (PHP application)
+**Technology:** FastAPI with local file storage
 
-**Integration:** SSO via Portal system (not yet implemented)
+**Integration:** SSO via Portal system
 
 **Features:**
 ✅ File storage and organization
@@ -722,7 +722,7 @@ Internet → Nginx (ports 80/443) → Reverse Proxy → Microservices
                                                     ├─ Accounting (8000)
                                                     ├─ Events (8000)
                                                     ├─ Integration Hub (8000)
-                                                    └─ Files (Nextcloud)
+                                                    └─ Files (8000)
 ```
 
 ### Nginx Routing
@@ -732,7 +732,7 @@ Internet → Nginx (ports 80/443) → Reverse Proxy → Microservices
 - `/accounting/` → accounting-app:8000
 - `/events/` → events-app:8000
 - `/hub/` → integration-hub:8000
-- `/files/` → nextcloud
+- `/files/` → files-app:8000
 
 ### Database Strategy
 Each system has its own PostgreSQL 15 database for true microservices isolation:
@@ -808,9 +808,8 @@ Recommended:
 - accounting-app, accounting-db
 - events-app, events-db, events-redis
 - integration-hub, hub-db
+- files-app
 - nginx-proxy
-- nextcloud (if configured)
-- music-streamer services (separate docker-compose)
 
 ### Environment Variables
 Each system has `.env` file with:
@@ -919,7 +918,7 @@ Each system has `/health` endpoint:
 
 ### Overall Completion by System
 1. **Inventory:** 100% ✅
-2. **Files:** 100% ✅ (Nextcloud)
+2. **Files:** 100% ✅
 3. **Portal:** 95% ✅
 4. **Accounting:** 95% ✅
 5. **Events:** 85% 🔄

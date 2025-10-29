@@ -14,5 +14,5 @@ class User(Base):
     full_name = Column(String)
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
-    can_access_nextcloud = Column(Boolean, default=True)
+    can_access_files = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

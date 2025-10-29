@@ -107,7 +107,7 @@ class User:
     can_access_hr: bool
     can_access_events: bool
     can_access_integration_hub: bool
-    can_access_nextcloud: bool
+    can_access_files: bool
 
     # System-specific roles
     accounting_role_id: int (nullable)
@@ -163,7 +163,7 @@ class User:
 - `hr`
 - `events`
 - `hub` (Integration Hub)
-- `files` (Nextcloud)
+- `files`
 
 **GET /portal/health**
 - Health check endpoint

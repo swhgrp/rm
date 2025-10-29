@@ -160,7 +160,7 @@ restaurant-system/
                           │
                     ┌─────▼──────┐
                     │   Files    │
-                    │ (Nextcloud)│
+                    │  Storage   │
                     │  /files/   │
                     └────────────┘
 ```
@@ -484,7 +484,7 @@ restaurant-system/
 **Document management and team collaboration**
 
 - **URL:** https://rm.swhgrp.com/files/
-- **Technology:** Nextcloud (PHP application)
+- **Technology:** FastAPI with local file storage
 - **Storage:** Persistent volume on server
 - **Status:** Fully operational
 
@@ -967,7 +967,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 - Chart.js - Data visualization
 - WeasyPrint - PDF generation
 - Celery - Distributed task queue
-- Nextcloud - File collaboration platform
+- Local File Storage - Document management
 
 ---
 
@@ -981,7 +981,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 | Accounting | ✅ Production | 140 | 37 | 95% |
 | Events | ✅ Production | 35 | 10 | 85% |
 | Integration Hub | 🔄 Active | 24 | 7 | 70% |
-| Files | ✅ Production | Nextcloud | - | 100% |
+| Files | ✅ Production | FastAPI | - | 100% |
 
 **Total:** 356 Python files, 98 templates, 74 database models
 
