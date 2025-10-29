@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from files.core.config import settings
 from files.core.deps import get_current_user
-from files.api import auth, filemanager
+from files.api import auth, filemanager, shares
 from files.models.user import User
 
 # Create FastAPI app
@@ -32,6 +32,7 @@ templates = Jinja2Templates(directory="src/files/templates")
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(filemanager.router)
+app.include_router(shares.router)
 
 
 @app.get("/", response_class=HTMLResponse)
