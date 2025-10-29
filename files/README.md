@@ -10,7 +10,7 @@ The Files system provides centralized file storage, folder organization, and doc
 
 **LAST UPDATED:** 2025-10-29
 
-The Files system is fully implemented and actively used in production.
+The Files system is fully implemented, mobile-friendly, and actively used in production.
 
 ## Technology Stack
 
@@ -64,6 +64,16 @@ The Files system is fully implemented and actively used in production.
 - **Office Document Conversion:** Convert Word/Excel/PowerPoint to PDF for preview
 - **LibreOffice Integration:** Headless document conversion service
 - **Supported Formats:** .pdf, .doc, .docx, .xls, .xlsx, .ppt, .pptx, images
+
+### ✅ Mobile-Friendly Design
+- **Responsive Layout:** Optimized for phones, tablets, and desktops
+- **Mobile Navigation:** Slide-out hamburger menu with touch overlay
+- **Touch-Optimized:** Minimum 44px touch targets, larger checkboxes
+- **Full-Screen Modals:** Mobile modals use full screen for better UX
+- **Icon-Only Buttons:** Compact toolbar buttons on mobile
+- **Responsive Dashboard:** Stats cards stack on mobile devices
+- **Auto-Close Menu:** Sidebar automatically closes after navigation
+- **Mobile Breakpoints:** ≤768px mobile, 768-992px tablet, ≥992px desktop
 
 ## Database Schema
 
@@ -485,6 +495,17 @@ For issues or questions:
 - Review JWT token validity
 
 ## Version History
+
+### v1.2.1 (2025-10-29)
+- **Mobile Responsive Design:** Complete mobile optimization
+  - Slide-out hamburger menu for mobile navigation
+  - Touch-optimized UI with 44px minimum touch targets
+  - Full-screen modals on mobile devices
+  - Responsive dashboard with stacked cards
+  - Icon-only toolbar buttons on small screens
+  - Mobile-friendly public share pages
+- **Responsive Breakpoints:** Mobile (≤768px), Tablet (768-992px), Desktop (≥992px)
+- **Touch Improvements:** Larger checkboxes, better spacing, prevent zoom on forms
 
 ### v1.2.0 (2025-10-29)
 - **Dashboard View:** Home page with recent files, stats, and shared items
