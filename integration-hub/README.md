@@ -1,248 +1,279 @@
-# Integration Hub - Third-Party Integration Manager
+# Integration Hub - Invoice Processing & GL Mapping
 
 ## Overview
 
-The Integration Hub is the central integration point for all third-party vendor APIs, data synchronization, and webhook management. It handles automated data sync with food distributors, payment processors, and other external services.
+The Integration Hub is an **invoice processing and general ledger (GL) mapping system** that receives vendor invoices, maps line items to inventory items and GL accounts, and routes the processed invoices to both the Inventory and Accounting systems.
 
-## Status: 70% Production Ready 🔄
+## Status: Production Ready (Core Features) ✅
+
+**Note:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
 ## Purpose
 
-- Vendor API integration management
-- Automated product catalog synchronization
-- Pricing and inventory updates from vendors
-- Webhook endpoint management
-- Data mapping and transformation
-- Sync scheduling and monitoring
-- Integration error handling and retry logic
-- OAuth2 authentication for vendor connections
+- Receive vendor invoices (manual upload or API)
+- Map invoice line items to inventory items
+- Map items to general ledger accounts (Asset, COGS, Waste, Revenue)
+- Send mapped invoices to Inventory system via REST API
+- Create and send journal entries to Accounting system via REST API
+- Manage vendor master data across systems
+- Track invoice processing status and errors
 
 ## Technology Stack
 
-- **Framework:** Django 4.2 (Python)
+- **Framework:** FastAPI (Python async)
 - **Database:** PostgreSQL 15
-- **Task Queue:** Celery with Redis
-- **API Client:** httpx (async HTTP)
-- **Authentication:** OAuth2, API keys
-- **Data Processing:** pandas (for large datasets)
+- **HTTP Client:** httpx (async)
+- **Frontend:** Bootstrap 5, jQuery
+- **Authentication:** Portal SSO integration (JWT tokens)
+- **Server:** Uvicorn (ASGI)
 
 ## Features
 
-### ✅ Implemented (70%)
+### ✅ IMPLEMENTED
 
-**Vendor Connection Management:**
-- [x] Vendor connection registration
-- [x] OAuth2 authentication flow
-- [x] API credential storage (encrypted)
-- [x] Connection status monitoring
-- [x] Connection health checks
-- [x] Multiple vendor support
-- [x] Credential rotation
+**Invoice Processing:**
+- ✅ Manual invoice upload (PDF/data entry)
+- ✅ API endpoint for invoice creation
+- ✅ Invoice storage with vendor info, date, total amount
+- ✅ Line item tracking (description, quantity, price, extended amount)
+- ✅ Invoice status workflow (unmapped → ready → sent/partial/error)
 
-**Data Synchronization:**
-- [x] Product catalog sync (from vendors to Inventory)
-- [x] Pricing updates
-- [x] Stock level updates
-- [x] Order status tracking
-- [x] Scheduled sync jobs (Celery)
-- [x] Manual sync triggers
-- [x] Incremental sync (delta updates)
-- [x] Full sync (complete refresh)
+**Item Mapping:**
+- ✅ Manual mapping of invoice items to inventory items
+- ✅ GL account assignment (Asset, COGS, Waste, Revenue accounts)
+- ✅ Mapping confidence tracking (Manual, Category Default, etc.)
+- ✅ Category-level GL mapping fallbacks
+- ✅ Unmapped items review UI
+- ✅ Bulk mapping operations
 
-**Webhook Management (Partial - 50%):**
-- [x] Webhook endpoint registration
-- [x] Payload validation
-- [x] Event routing to appropriate handlers
-- [x] Signature verification
-- [ ] Automatic retry logic ❌
-- [ ] Dead letter queue for failed webhooks ❌
-- [ ] Webhook event history and replay ❌
+**System Integration:**
+- ✅ Send invoices to Inventory system (REST API)
+  - Creates/updates vendors
+  - Creates invoice records
+  - Links items to inventory master data
+- ✅ Send journal entries to Accounting system (REST API)
+  - Groups items by GL asset account
+  - Creates balanced journal entries (Dr = Cr)
+  - Sends to accounting API
+- ✅ Parallel sending to both systems
+- ✅ Retry logic for failed sends
+- ✅ Status tracking (sent_to_inventory, sent_to_accounting)
 
-**Sync Logging:**
-- [x] Sync attempt tracking
-- [x] Success/failure logs
-- [x] Error details and stack traces
-- [x] Sync duration monitoring
-- [x] Data volume metrics
-- [x] Sync history and audit trail
+**Vendor Management:**
+- ✅ Vendor master data storage (name, email, phone, addresses)
+- ✅ Vendor sync from Inventory system
+- ✅ Vendor sync from Accounting system
+- ✅ Bi-directional vendor sync (Hub → systems where missing)
+- ✅ Duplicate detection by name matching
+- ✅ Cross-reference tracking (inventory_vendor_id, accounting_vendor_id)
 
-**Data Mapping:**
-- [x] Field mapping configuration
-- [x] Data transformation rules
-- [x] Unit conversion (e.g., case to each)
-- [x] Category mapping
-- [x] Custom mapping functions
+**Category GL Mappings:**
+- ✅ Define GL accounts by invoice item category
+- ✅ Fallback mapping when item not found in inventory
+- ✅ Four GL account types:
+  - Asset Account (Dr on receipt)
+  - COGS Account (Dr when used/sold)
+  - Waste Account (Dr when wasted)
+  - Revenue Account (Cr when sold)
 
-**Supported Vendors:**
-- [x] US Foods - Full integration ✅
-- [x] Sysco - Full integration ✅
-- [x] Restaurant Depot - Partial (70%)
-- [ ] Shamrock Foods - Planned ❌
-- [ ] Performance Food Group (PFG) - Planned ❌
-- [ ] Gordon Food Service - Planned ❌
+**User Interface:**
+- ✅ Dashboard with invoice statistics
+- ✅ Invoice list view with filters
+- ✅ Invoice detail view with line item mapping
+- ✅ Unmapped items review page
+- ✅ Category GL mapping management
+- ✅ Vendor management UI
+- ✅ Bootstrap 5 responsive design
+- ✅ Dark GitHub theme styling
 
-**API Management:**
-- [x] Rate limiting per vendor
-- [x] Request throttling
-- [x] Timeout management
-- [x] Request/response logging
-- [x] Error handling and reporting
-- [x] Circuit breaker pattern (basic)
+**Security & Authentication:**
+- ✅ Portal SSO integration
+- ✅ JWT token validation
+- ✅ User session management
+- ✅ Role-based access (via Portal)
 
-**Admin Interface:**
-- [x] Connection dashboard
-- [x] Sync status monitoring
-- [x] Manual sync triggers
-- [x] Sync log viewer
-- [x] Error notification
-- [x] Configuration management
+### ❌ NOT IMPLEMENTED
 
-### ❌ Missing (30%)
+**Vendor API Integrations (Claimed but NOT Real):**
+- ❌ US Foods API integration - Does NOT exist
+- ❌ Sysco API integration - Does NOT exist
+- ❌ Restaurant Depot API integration - Does NOT exist
+- ❌ Any third-party vendor product catalog sync - NOT implemented
+- ❌ Automated pricing updates from vendors - NOT implemented
+- ❌ Vendor order submission - NOT implemented
+- ❌ OAuth2 vendor authentication - NOT implemented
+
+**Background Jobs & Scheduling:**
+- ❌ Celery task queue - NOT installed
+- ❌ Redis - NOT used
+- ❌ Scheduled sync jobs - NOT implemented
+- ❌ Automated background processing - NOT implemented
+- Note: All operations are synchronous/async within FastAPI process
+
+**Webhook System:**
+- ❌ Webhook endpoint registration - NOT implemented
+- ❌ Email invoice webhook - Stub only, not functional
+- ❌ Payload validation - NOT implemented
+- ❌ Event routing - NOT implemented
+- ❌ Signature verification - NOT implemented
+- Note: Only a placeholder endpoint exists
+
+**Advanced Data Sync:**
+- ❌ Product catalog sync from vendors - NOT applicable
+- ❌ Inventory level updates - NOT implemented
+- ❌ Pricing feeds - NOT implemented
+- ❌ Order status tracking - NOT implemented
+- ❌ Sync logging database tables - NOT implemented
 
 **Advanced Features:**
-- [ ] Webhook retry logic with exponential backoff
-- [ ] Dead letter queue for failed events
-- [ ] Advanced conflict resolution
-- [ ] Bi-directional sync (push to vendors)
-- [ ] More vendor integrations
-- [ ] Real-time event streaming
-- [ ] Advanced data validation
-- [ ] Automated testing framework for integrations
-
-**Payment Integration:**
-- [ ] Stripe integration
-- [ ] Square integration
-- [ ] Toast POS integration
-- [ ] Payment reconciliation
-
-**Reporting:**
-- [ ] Sync analytics dashboard
-- [ ] Cost savings reporting
-- [ ] Data quality metrics
-- [ ] Vendor comparison tools
+- ❌ Rate limiting per vendor - NOT implemented
+- ❌ Request throttling - NOT implemented
+- ❌ Circuit breaker pattern - NOT implemented
+- ❌ Advanced data transformation - NOT implemented
+- ❌ Fuzzy matching for items - NOT implemented
+- ❌ Machine learning suggestions - NOT implemented
 
 ## Architecture
 
-### Database Schema (5 Models)
+### Database Schema (4 Models)
 
-**Core Tables:**
-- `vendor_connections` - Vendor API connections
-- `vendor_types` - Supported vendor categories
-- `sync_logs` - Sync attempt tracking
-- `sync_status` - Current sync state
-- `webhook_endpoints` - Registered webhooks
-- `webhook_events` - Incoming webhook events
-- `api_credentials` - Encrypted API keys
-- `data_mappings` - Field mapping rules
+**Implemented Tables:**
+- `hub_invoice` - Invoice headers (vendor, date, amounts, status)
+- `hub_invoice_item` - Invoice line items with mapping data
+- `item_gl_mapping` - Master GL account mappings for inventory items
+- `category_gl_mapping` - Fallback GL mappings by category
+- `vendor` - Vendor master data with system cross-references
 
-### Key Django Models
+**Key Models:**
 
 ```python
-class VendorConnection:
-    vendor_type: str  # 'us_foods', 'sysco', etc.
+class HubInvoice:
+    """Invoice header"""
+    id: int
+    vendor_id: int  # FK to Vendor
+    invoice_number: str
+    invoice_date: date
+    total_amount: Decimal
+    status: str  # 'unmapped', 'ready', 'sent', 'partial', 'error'
+    sent_to_inventory: bool
+    sent_to_accounting: bool
+    inventory_invoice_id: int (nullable)
+    accounting_invoice_id: int (nullable)
+    error_message: str (nullable)
+
+class HubInvoiceItem:
+    """Invoice line item with mapping"""
+    id: int
+    invoice_id: int  # FK to HubInvoice
+    line_number: int
+    description: str
+    quantity: Decimal
+    unit_price: Decimal
+    extended_amount: Decimal
+    inventory_item_id: int (nullable)
+    gl_asset_account: str (nullable)
+    gl_cogs_account: str (nullable)
+    gl_waste_account: str (nullable)
+    gl_revenue_account: str (nullable)
+    mapping_confidence: str  # 'Manual', 'Category Default', etc.
+    mapping_method: str (nullable)
+
+class ItemGLMapping:
+    """Master GL mapping for inventory items"""
+    id: int
+    inventory_item_id: int (unique)
+    inventory_item_name: str
+    gl_asset_account: str
+    gl_cogs_account: str
+    gl_waste_account: str
+    gl_revenue_account: str
+    last_updated: datetime
+
+class CategoryGLMapping:
+    """Fallback GL mapping by category"""
+    id: int
+    category_name: str (unique)
+    gl_asset_account: str
+    gl_cogs_account: str
+    gl_waste_account: str
+    gl_revenue_account: str
+
+class Vendor:
+    """Vendor master data"""
+    id: int
     name: str
-    is_active: bool
-    auth_type: str  # 'oauth2', 'api_key', 'basic'
-    credentials: dict  # encrypted JSON
-    last_sync: datetime
-    sync_frequency: str  # 'hourly', 'daily', 'weekly'
-
-class SyncLog:
-    connection: ForeignKey(VendorConnection)
-    sync_type: str  # 'product', 'pricing', 'inventory'
-    status: str  # 'success', 'failed', 'partial'
-    started_at: datetime
-    completed_at: datetime
-    records_processed: int
-    errors_count: int
-    error_details: JSONField
-
-class WebhookEndpoint:
-    vendor: ForeignKey(VendorConnection)
-    url: str
-    event_types: list
-    is_active: bool
-    secret: str  # for signature verification
-
-class DataMapping:
-    vendor: ForeignKey(VendorConnection)
-    source_field: str
-    target_field: str
-    transformation: str  # Python function or expression
+    email: str (nullable)
+    phone: str (nullable)
+    address: str (nullable)
+    city: str (nullable)
+    state: str (nullable)
+    zip_code: str (nullable)
+    inventory_vendor_id: int (nullable)
+    accounting_vendor_id: int (nullable)
 ```
 
 ## API Endpoints
 
-### Vendor Connections
+### HTML Pages (FastAPI Templates)
 
-**GET /hub/api/connections/**
-- List all vendor connections
+**GET /**
+- Dashboard with invoice statistics
 
-**POST /hub/api/connections/**
-- Create new vendor connection
+**GET /invoices**
+- Invoice list view
 
-**GET /hub/api/connections/{id}/**
-- Get connection details
+**GET /invoices/{invoice_id}**
+- Invoice detail with item mapping UI
 
-**PUT /hub/api/connections/{id}/**
-- Update connection
+**POST /invoices/upload**
+- Upload new invoice
 
-**DELETE /hub/api/connections/{id}/**
-- Remove connection
+**GET /unmapped-items**
+- Review all unmapped items across invoices
 
-**POST /hub/api/connections/{id}/test/**
-- Test connection
+**GET /category-mappings**
+- Manage category GL mappings
 
-### Synchronization
+**GET /vendors**
+- Vendor management page
 
-**POST /hub/api/sync/{connection_id}/trigger/**
-- Manually trigger sync
-- Body: `{"sync_type": "product", "full_sync": false}`
+### API Endpoints (JSON)
 
-**GET /hub/api/sync/{connection_id}/status/**
-- Get current sync status
+**POST /api/items/{item_id}/map**
+- Map invoice item to inventory + GL accounts
+- Body: `{"inventory_item_id": 123, "gl_asset": "1200", "gl_cogs": "5000", ...}`
 
-**GET /hub/api/sync/logs/**
-- List sync logs
-- Query: `?connection=X&status=failed&start_date=YYYY-MM-DD`
+**GET /api/items/{item_id}/suggestions**
+- Get mapping suggestions (TODO - not implemented)
 
-**GET /hub/api/sync/logs/{log_id}/**
-- Get detailed sync log
+**POST /api/category-mappings**
+- Create/update category GL mapping
+- Body: `{"category": "Produce", "gl_asset": "1210", ...}`
 
-**POST /hub/api/sync/{connection_id}/cancel/**
-- Cancel running sync
+**POST /api/invoices/{invoice_id}/send**
+- Send invoice to both Inventory and Accounting systems
+- Returns: `{"status": "sent|partial|error", ...}`
 
-### Webhooks
+**POST /api/invoices/{invoice_id}/retry**
+- Retry failed invoice send
 
-**POST /hub/webhooks/{vendor}/{event_type}/**
-- Receive webhook from vendor
-- Validates signature
-- Routes to appropriate handler
+**GET /api/vendors/**
+- List all vendors
 
-**GET /hub/api/webhooks/**
-- List webhook endpoints
+**POST /api/vendors/**
+- Create new vendor
+- Body: `{"name": "US Foods", "email": "...", ...}`
 
-**POST /hub/api/webhooks/**
-- Register webhook endpoint
+**POST /api/vendors/sync**
+- Sync vendors from Inventory and Accounting systems
+- Returns: `{"synced": 15, "created": 3, "updated": 2}`
 
-**DELETE /hub/api/webhooks/{id}/**
-- Remove webhook
+**GET /api/auth/sso-login**
+- Portal SSO login endpoint
+- Query params: `?token=<jwt_token>`
 
-### Data Mapping
-
-**GET /hub/api/mappings/{connection_id}/**
-- Get mappings for connection
-
-**POST /hub/api/mappings/**
-- Create data mapping
-
-**PUT /hub/api/mappings/{id}/**
-- Update mapping
-
-### Health
-
-**GET /hub/health**
-- System health check
+**GET /health**
+- Health check endpoint
 
 ## Configuration
 
@@ -250,46 +281,18 @@ class DataMapping:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://hub_user:password@hub-db:5432/hub_db
+DATABASE_URL=postgresql://integration_user:password@integration-db:5432/integration_db
 
-# Django Settings
-SECRET_KEY=your-django-secret-key
-DEBUG=False
-ALLOWED_HOSTS=rm.swhgrp.com,integration-hub
+# Portal Integration
+PORTAL_URL=https://rm.swhgrp.com/portal
+PORTAL_SECRET_KEY=same-as-portal-secret
 
-# Celery (Background Jobs)
-CELERY_BROKER_URL=redis://hub-redis:6379/0
-CELERY_RESULT_BACKEND=redis://hub-redis:6379/0
+# System URLs (internal Docker network)
+INVENTORY_URL=http://inventory-app:8000
+ACCOUNTING_URL=http://accounting-app:8001
 
-# Vendor API Credentials
-USFOOD_API_KEY=your-usfood-api-key
-USFOOD_API_SECRET=your-secret
-SYSCO_API_KEY=your-sysco-key
-SYSCO_API_SECRET=your-secret
-RESTAURANT_DEPOT_USERNAME=your-username
-RESTAURANT_DEPOT_PASSWORD=your-password
-
-# Integration System URLs
-INVENTORY_API_URL=http://inventory-app:8000
-ACCOUNTING_API_URL=http://accounting-app:8000
-
-# Sync Settings
-DEFAULT_SYNC_FREQUENCY=daily
-MAX_RETRY_ATTEMPTS=3
-SYNC_TIMEOUT_SECONDS=300
-
-# Webhook Settings
-WEBHOOK_SECRET_KEY=your-webhook-secret
-WEBHOOK_VERIFY_SIGNATURES=True
-
-# Rate Limiting
-REQUESTS_PER_MINUTE=60
-REQUESTS_PER_HOUR=1000
-
-# Logging
-ENABLE_DETAILED_LOGGING=True
-LOG_API_REQUESTS=True
-LOG_API_RESPONSES=False  # Can be large
+# Internal Service Authentication
+X_PORTAL_AUTH=your-internal-service-secret
 ```
 
 ## Installation & Setup
@@ -297,249 +300,239 @@ LOG_API_RESPONSES=False  # Can be large
 ### Prerequisites
 - Docker and Docker Compose
 - PostgreSQL 15
-- Redis 7
-- Vendor API credentials
 
 ### Quick Start
 
-1. **Set up environment:**
+1. **Environment setup:**
 ```bash
 cd /opt/restaurant-system/integration-hub
 cp .env.example .env
-# Edit .env with vendor credentials
+# Edit .env with your configuration
 ```
 
 2. **Build and start:**
 ```bash
-docker compose up -d integration-hub hub-db hub-redis hub-celery
+docker compose up -d integration-hub integration-db
 ```
 
 3. **Run migrations:**
 ```bash
-docker compose exec integration-hub python manage.py migrate
+docker compose exec integration-hub alembic upgrade head
 ```
 
-4. **Load vendor types:**
-```bash
-docker compose exec integration-hub python manage.py loaddata vendor_types
-```
-
-5. **Create superuser:**
-```bash
-docker compose exec integration-hub python manage.py createsuperuser
-```
-
-6. **Access system:**
+4. **Access system:**
 ```
 https://rm.swhgrp.com/hub/
 ```
 
 ## Usage
 
-### Adding a Vendor Connection
+### Processing an Invoice
 
-1. Navigate to https://rm.swhgrp.com/hub/connections/
-2. Click "Add Connection"
-3. Select vendor type (US Foods, Sysco, etc.)
-4. Enter connection name
-5. Choose authentication type
-6. Enter API credentials
-7. Set sync frequency (hourly, daily, weekly)
-8. Test connection
-9. Activate
+1. Navigate to https://rm.swhgrp.com/hub/
+2. Click "Upload Invoice" or use API to create invoice
+3. System creates invoice record with line items
+4. Go to "Unmapped Items" to map items:
+   - Select inventory item from dropdown
+   - GL accounts auto-populate from ItemGLMapping
+   - Or manually enter GL account codes
+5. Once all items mapped, invoice status → "ready"
+6. Click "Send to Systems" button
+7. Hub sends invoice to Inventory system (creates vendor + invoice)
+8. Hub creates journal entry and sends to Accounting system
+9. Status updates to "sent" (or "partial" if one system fails)
 
-### Running a Manual Sync
+### Managing Category Mappings
 
-1. Go to Connections dashboard
-2. Find the vendor connection
-3. Click "Sync Now"
-4. Select sync type:
-   - Product Catalog
-   - Pricing Updates
-   - Inventory Levels
-5. Choose full or incremental sync
-6. Monitor progress in Sync Logs
-
-### Viewing Sync Logs
-
-1. Navigate to Sync Logs
-2. Filter by:
-   - Connection
-   - Status (success/failed)
-   - Date range
-   - Sync type
-3. Click log entry for details
-4. View:
-   - Records processed
-   - Errors encountered
-   - Execution time
-   - Data changes
-
-### Configuring Data Mappings
-
-1. Go to Data Mappings
-2. Select vendor connection
-3. Add field mapping:
-   - Source field (vendor field name)
-   - Target field (Inventory field name)
-   - Transformation (if needed)
-4. Test mapping with sample data
+1. Go to "Category Mappings" page
+2. Click "Add Category Mapping"
+3. Enter category name (e.g., "Produce")
+4. Enter GL account codes:
+   - Asset Account (e.g., "1210" - Produce Inventory)
+   - COGS Account (e.g., "5010" - Food Cost - Produce)
+   - Waste Account (e.g., "5900" - Waste)
+   - Revenue Account (e.g., "4000" - Food Sales)
 5. Save
+6. When invoice items don't match inventory, system uses category mapping as fallback
 
-### Setting Up Webhooks
+### Syncing Vendors
 
-1. Navigate to Webhooks
-2. Click "Register Webhook"
-3. Select vendor
-4. Choose event types to subscribe to
-5. Generate webhook secret
-6. Provide webhook URL to vendor
-7. Test webhook delivery
+1. Go to "Vendors" page
+2. Click "Sync Vendors from Systems"
+3. Hub fetches vendors from Inventory and Accounting APIs
+4. Matches vendors by name
+5. Creates Hub vendor records
+6. Updates cross-references (inventory_vendor_id, accounting_vendor_id)
+7. Pushes Hub vendors back to systems where missing
+
+## Integration with Other Systems
+
+### Inventory System Integration
+
+Hub sends invoices to Inventory via POST request:
+
+**Endpoint:** `POST {INVENTORY_URL}/api/invoices/from-hub`
+
+**Payload:**
+```json
+{
+  "hub_invoice_id": 123,
+  "vendor": {
+    "name": "US Foods",
+    "email": "orders@usfoods.com"
+  },
+  "invoice_number": "INV-12345",
+  "invoice_date": "2025-10-30",
+  "total_amount": 1234.56,
+  "items": [
+    {
+      "hub_item_id": 456,
+      "inventory_item_id": 789,
+      "description": "Roma Tomatoes",
+      "quantity": 10,
+      "unit_price": 2.50,
+      "extended_amount": 25.00
+    }
+  ]
+}
+```
+
+**Response:**
+```json
+{
+  "inventory_invoice_id": 789,
+  "status": "created"
+}
+```
+
+### Accounting System Integration
+
+Hub creates journal entries for Accounting via POST request:
+
+**Endpoint:** `POST {ACCOUNTING_URL}/api/journal-entries/from-hub`
+
+**Payload:**
+```json
+{
+  "hub_invoice_id": 123,
+  "invoice_number": "INV-12345",
+  "invoice_date": "2025-10-30",
+  "vendor_name": "US Foods",
+  "description": "Invoice INV-12345 from US Foods",
+  "lines": [
+    {
+      "account": "1210",
+      "description": "Produce inventory",
+      "debit": 250.00,
+      "credit": 0
+    },
+    {
+      "account": "2000",
+      "description": "Accounts Payable - US Foods",
+      "debit": 0,
+      "credit": 250.00
+    }
+  ]
+}
+```
+
+**Business Logic:**
+- Groups invoice items by GL asset account
+- Creates one Dr line per asset account (total extended amount)
+- Creates one Cr line to Accounts Payable (total invoice amount)
+- Validates Dr = Cr before sending
+
+**Response:**
+```json
+{
+  "journal_entry_id": 456,
+  "status": "posted"
+}
+```
+
+### Portal Integration
+
+- Users authenticate via Portal SSO
+- Portal generates JWT token
+- User clicks "Integration Hub" link in Portal
+- Link includes `?token=<jwt>` query parameter
+- Hub validates token with Portal
+- Creates/updates local user session
 
 ## File Structure
 
 ```
 integration-hub/
 ├── src/
-│   └── hub/
-│       ├── models/              # 5 model files
-│       │   ├── vendor_connection.py
-│       │   ├── sync_log.py
-│       │   ├── webhook.py
-│       │   ├── data_mapping.py
-│       │   └── api_credential.py
-│       ├── api/                 # 2 API files
-│       │   ├── connections.py
-│       │   └── sync.py
-│       ├── services/            # 5 service files
-│       │   ├── sync_service.py
-│       │   ├── usfood_service.py
-│       │   ├── sysco_service.py
-│       │   ├── webhook_service.py
-│       │   └── mapping_service.py
-│       ├── tasks/               # Celery tasks
-│       │   ├── sync_tasks.py
-│       │   └── webhook_tasks.py
-│       ├── templates/           # 7 HTML templates
-│       │   ├── connections/
-│       │   ├── sync_logs/
-│       │   └── webhooks/
-│       ├── static/
-│       ├── core/
-│       ├── main.py
+│   └── integration_hub/
+│       ├── models/              # SQLAlchemy models (4 files)
+│       │   ├── hub_invoice.py
+│       │   ├── hub_invoice_item.py
+│       │   ├── item_gl_mapping.py  (includes CategoryGLMapping)
+│       │   └── vendor.py
+│       ├── services/            # Business logic (5 files)
+│       │   ├── inventory_sender.py    (180 lines)
+│       │   ├── accounting_sender.py   (223 lines)
+│       │   ├── auto_send.py           (290 lines)
+│       │   ├── vendor_sync.py         (310 lines)
+│       │   └── __init__.py
+│       ├── templates/           # Jinja2 HTML templates (7 files)
+│       │   ├── base.html
+│       │   ├── dashboard.html
+│       │   ├── invoices.html
+│       │   ├── invoice_detail.html
+│       │   ├── unmapped_items.html
+│       │   ├── category_mappings.html
+│       │   └── vendors.html
+│       ├── static/              # CSS, JS, images
+│       ├── database.py          # Database connection
+│       ├── main.py              # FastAPI application (511 lines)
 │       └── __init__.py
-├── celerybeat-schedule/         # Scheduled tasks
+├── migrations/                  # Alembic migrations
 ├── Dockerfile
 ├── requirements.txt
 ├── .env
 └── README.md
 ```
 
-## Vendor Integrations
-
-### US Foods Integration
-
-**Capabilities:**
-- Product catalog download
-- Pricing updates
-- Order submission
-- Order status tracking
-- Invoice retrieval
-
-**Authentication:** API Key
-**Endpoint:** https://api.usfoods.com/v1/
-**Sync Frequency:** Daily
-**Data Volume:** ~10,000 products
-
-### Sysco Integration
-
-**Capabilities:**
-- Product catalog download
-- Real-time pricing
-- Order submission
-- Delivery tracking
-- Account statements
-
-**Authentication:** OAuth2
-**Endpoint:** https://api.sysco.com/v2/
-**Sync Frequency:** Daily
-**Data Volume:** ~15,000 products
-
-### Restaurant Depot Integration
-
-**Capabilities:**
-- Product catalog (partial)
-- Price lookup
-- Basic order history
-
-**Authentication:** Username/Password
-**Status:** 70% complete
-**Endpoint:** Custom scraping API
-**Limitations:** No official API, limited data
-
-## Integration with Other Systems
-
-### Inventory System
-
-**Sends to Inventory:**
-- Product catalog data
-- SKU numbers
-- Product descriptions
-- Unit of measure
-- Pricing information
-- Stock availability
-- Vendor item codes
-
-**Receives from Inventory:**
-- Purchase order data
-- Reorder requests
-- Stock count results
-
-### Accounting System
-
-**Sends to Accounting:**
-- Vendor invoice data
-- Payment status
-- Order totals
-- Tax information
-
-**Receives from Accounting:**
-- Payment confirmations
-- Reconciliation data
-
 ## Troubleshooting
 
-### Issue: Sync fails with authentication error
+### Issue: Invoice won't send - stuck in "ready" status
 **Solution:**
-- Check API credentials are valid
-- Verify credentials haven't expired
-- Test connection manually
-- Check vendor API status
-- Rotate credentials if needed
+- Check all items are mapped (inventory_item_id set)
+- Check all items have GL accounts assigned
+- Review error_message field on invoice record
+- Check Inventory and Accounting systems are running
+- Verify API URLs in .env are correct
 
-### Issue: Sync completes but no data updated
+### Issue: Journal entry not balanced
 **Solution:**
-- Check data mappings are correct
-- Verify target system API is accessible
-- Review sync log for errors
-- Check data format compatibility
-- Verify permission to update target system
+- Total debits must equal total credits
+- Check invoice total_amount matches sum of line item extended_amounts
+- Review accounting_sender.py logic for grouping by asset account
+- Check for rounding errors in decimal calculations
 
-### Issue: Webhook not receiving events
+### Issue: Vendor sync not finding matches
 **Solution:**
-- Verify webhook URL is accessible from internet
-- Check webhook secret matches
-- Verify signature validation
-- Check vendor webhook configuration
-- Review webhook logs for attempts
+- Vendor names must match exactly (case-sensitive)
+- Check vendor exists in both Inventory and Accounting systems
+- Try manual vendor creation in Hub first
+- Review vendor_sync.py logs for errors
 
-### Issue: High sync failure rate
+### Issue: Can't access via Portal SSO
 **Solution:**
-- Check vendor API rate limits
-- Verify network connectivity
-- Review error patterns in logs
-- Adjust timeout settings
-- Implement circuit breaker
+- Verify PORTAL_SECRET_KEY matches Portal .env
+- Check JWT token is valid (not expired)
+- Ensure user exists in HR system
+- Check Portal URL is correct in .env
+
+### Issue: Items not auto-mapping to GL accounts
+**Solution:**
+- Check if inventory_item_id exists in item_gl_mapping table
+- If not, either:
+  - Create ItemGLMapping record manually, or
+  - Create CategoryGLMapping for the item's category
+- Review mapping_confidence and mapping_method fields for debugging
 
 ## Development
 
@@ -547,49 +540,26 @@ integration-hub/
 
 ```bash
 cd /opt/restaurant-system/integration-hub
+
+# Create virtual environment
 python -m venv venv
 source venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
 
-# Set up database
-python manage.py migrate
-python manage.py loaddata vendor_types
+# Run migrations
+alembic upgrade head
 
-# Start Celery worker
-celery -A hub worker -l info
-
-# Start Celery beat (scheduler)
-celery -A hub beat -l info
-
-# Run server
-python manage.py runserver
+# Run development server
+uvicorn integration_hub.main:app --reload --port 8000
 ```
 
-### Adding a New Vendor Integration
-
-1. Create vendor service:
-```python
-# services/new_vendor_service.py
-class NewVendorService:
-    def authenticate(self, credentials):
-        # Authentication logic
-        pass
-
-    def sync_products(self, connection):
-        # Sync logic
-        pass
-```
-
-2. Register vendor type in fixtures
-3. Create data mappings
-4. Add to supported vendors list
-5. Test integration
-6. Document in README
-
-### Running Tests
+### Creating Migrations
 
 ```bash
-python manage.py test
+alembic revision --autogenerate -m "Description of changes"
+alembic upgrade head
 ```
 
 ## Monitoring
@@ -599,79 +569,88 @@ python manage.py test
 curl https://rm.swhgrp.com/hub/health
 ```
 
-### Celery Status
-```bash
-docker compose exec hub-celery celery -A hub inspect active
-```
-
-### Sync Monitoring
-Dashboard at: https://rm.swhgrp.com/hub/dashboard/
-
 ### Logs
 ```bash
 docker compose logs -f integration-hub
-docker compose logs -f hub-celery
 ```
 
 ## Dependencies
 
-Key packages (see requirements.txt):
-- Django 4.2
-- djangorestframework
-- celery
-- redis
-- httpx (async HTTP client)
-- cryptography (credential encryption)
-- pandas (data processing)
-- python-jose (JWT handling)
+Key packages (see requirements.txt for complete list):
+- fastapi==0.104.1
+- uvicorn[standard]==0.24.0
+- sqlalchemy==2.0.23
+- httpx==0.25.2 (async HTTP client)
+- pydantic==2.5.0
+- python-jose[cryptography]==3.3.0
+- jinja2==3.1.2
+- alembic (database migrations)
+
+**Note:** Does NOT include Celery, Redis, pandas, or OAuth2 libraries despite previous claims.
 
 ## Security
 
-**Implemented:**
-- Encrypted credential storage
-- Webhook signature verification
-- API rate limiting
-- Request throttling
-- HTTPS enforcement
-- Audit logging
+**Authentication:**
+- Portal SSO via JWT tokens
+- Internal service authentication with X-Portal-Auth header
 
-**Best Practices:**
-- Rotate API credentials regularly
-- Use separate credentials per environment
-- Monitor for unusual API activity
-- Implement IP whitelisting where possible
-- Regular security audits
+**Data Protection:**
+- SQL injection prevention (SQLAlchemy ORM)
+- XSS protection (Jinja2 auto-escaping)
+- HTTPS only (via Nginx reverse proxy)
+
+**Network Security:**
+- Internal Docker network for service communication
+- Public access only via Nginx reverse proxy
+- No direct database access from outside
 
 ## Future Enhancements
 
-### Short-Term
-- [ ] Complete webhook retry logic
-- [ ] Add more vendor integrations
-- [ ] Improve error handling
-- [ ] Enhanced monitoring dashboard
+### Potential Features
 
-### Medium-Term
-- [ ] Payment processor integrations
-- [ ] POS system integration
-- [ ] Real-time event streaming
-- [ ] Advanced data validation
-- [ ] Bi-directional sync
+**Email Invoice Processing:**
+- [ ] Email webhook implementation (currently stub only)
+- [ ] PDF parsing for automatic line item extraction
+- [ ] OCR for scanned invoices
+- [ ] Email forwarding rules
 
-### Long-Term
-- [ ] AI-powered data matching
-- [ ] Predictive ordering
-- [ ] Cost optimization recommendations
-- [ ] Blockchain-based audit trail
-- [ ] GraphQL API support
+**Automation:**
+- [ ] Background job queue (Celery + Redis)
+- [ ] Scheduled invoice processing
+- [ ] Automated vendor matching
+- [ ] Auto-send when fully mapped
+
+**Advanced Mapping:**
+- [ ] Fuzzy matching for inventory items
+- [ ] Machine learning suggestions
+- [ ] Mapping history and learning
+- [ ] Bulk import of mappings
+
+**Vendor API Integrations (Not Currently Implemented):**
+- [ ] US Foods API - Product catalog, pricing, order submission
+- [ ] Sysco API - Product catalog, pricing, order submission
+- [ ] Restaurant Depot - Product catalog
+- [ ] EDI (Electronic Data Interchange) for invoices
+- [ ] Automated invoice receipt from vendor systems
+
+**Reporting:**
+- [ ] Invoice processing analytics
+- [ ] Mapping accuracy metrics
+- [ ] GL distribution reports
+- [ ] Vendor spending analysis
+
+**Webhook System:**
+- [ ] Generic webhook registration
+- [ ] Event routing
+- [ ] Retry logic with exponential backoff
+- [ ] Webhook event history
 
 ## Support
 
 For issues or questions:
 - Check logs: `docker compose logs integration-hub`
-- Celery status: `docker compose logs hub-celery`
 - Health check: https://rm.swhgrp.com/hub/health
-- Vendor API status pages
-- Contact: Development Team / Vendor Support
+- Contact: Development Team
 
 ## License
 
