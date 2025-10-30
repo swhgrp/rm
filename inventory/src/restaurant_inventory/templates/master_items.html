@@ -33,7 +33,6 @@
                         <th>Name</th>
                         <th>Category</th>
                         <th>Unit</th>
-                        <th>Description</th>
                         <th>Last Price Paid</th>
                         <th>Status</th>
                         <th style="width: 100px;">Actions</th>
@@ -41,7 +40,7 @@
                 </thead>
                 <tbody id="itemsTableBody">
                     <tr>
-                        <td colspan="7" class="text-center">
+                        <td colspan="6" class="text-center">
                             <div class="spinner-border spinner-border-sm" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
@@ -370,7 +369,7 @@
         const displayList = filteredItems || items;
 
         if (displayList.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No items found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No items found</td></tr>';
             return;
         }
 
@@ -400,7 +399,6 @@
                     <td>${item.name}</td>
                     <td>${item.category || '-'}</td>
                     <td>${item.unit_of_measure || '-'}</td>
-                    <td>${item.description || '-'}</td>
                     <td>${lastPrice}</td>
                     <td>${statusBadge}</td>
                     <td class="text-end">
@@ -423,8 +421,7 @@
         const search = document.getElementById('itemSearch').value.toLowerCase();
         const filtered = items.filter(i =>
             i.name.toLowerCase().includes(search) ||
-            (i.category && i.category.toLowerCase().includes(search)) ||
-            (i.description && i.description.toLowerCase().includes(search))
+            (i.category && i.category.toLowerCase().includes(search))
         );
         displayItems(filtered);
     }
@@ -788,7 +785,6 @@
             {value: '', label: '-- Skip This Column --'},
             {value: 'name', label: 'Name (required)'},
             {value: 'item_code', label: 'Item Code/SKU'},
-            {value: 'description', label: 'Description'},
             {value: 'category', label: 'Category'},
             {value: 'unit_of_measure', label: 'Unit of Measure'},
             {value: 'secondary_unit', label: 'Secondary Unit'},

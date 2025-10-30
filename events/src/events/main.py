@@ -7,7 +7,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 from events.core.config import settings
-from events.api import public, events, tasks, documents, auth
+from events.api import public, events, tasks, documents, auth, settings as settings_api
 import logging
 import os
 
@@ -77,6 +77,12 @@ async def tasks_page(request: Request):
     """Serve the task management page"""
     return templates.TemplateResponse("admin/tasks.html", {"request": request})
 
+# Settings page
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    """Serve the settings page"""
+    return templates.TemplateResponse("admin/settings.html", {"request": request})
+
 # Events list page
 @app.get("/list", response_class=HTMLResponse)
 async def events_list_page(request: Request):
@@ -95,6 +101,7 @@ app.include_router(public.router, prefix="/public", tags=["Public"])
 app.include_router(events.router, prefix="/api/events", tags=["Events"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
+app.include_router(settings_api.router, prefix="/api/settings", tags=["Settings"])
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):

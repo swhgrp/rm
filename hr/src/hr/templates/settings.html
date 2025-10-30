@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="content-header">
+    <h1><i class="bi bi-gear"></i> System Settings</h1>
+    <div class="header-actions">
+        <button class="btn btn-secondary" onclick="location.href='/hr/'">
+            <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </button>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <!-- Alert Messages -->
+    <div id="alertSuccess" class="alert alert-success" style="display: none;">
+        <i class="bi bi-check-circle-fill"></i> <span id="successMessage"></span>
+    </div>
+    <div id="alertError" class="alert alert-danger" style="display: none;">
+        <i class="bi bi-exclamation-triangle-fill"></i> <span id="errorMessage"></span>
+    </div>
+
+    <!-- SMTP Settings Card -->
+    <div class="card" style="background-color: #161b22; border: 1px solid #30363d;">
+        <div class="card-header" style="background-color: #21262d; border-bottom: 1px solid #30363d; color: #c9d1d9;">
+            <h5 class="mb-0"><i class="bi bi-envelope"></i> Email (SMTP) Settings</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Configure SMTP settings for sending email notifications for new hires and terminations.</p>
+            
+            <form id="smtpForm">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="smtp_host" class="form-label" style="color: #c9d1d9; font-weight: 600;">SMTP Host <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="smtp_host" name="smtp_host" required style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9;">
+                        <small class="form-text text-muted">e.g., mail.swhgrp.com</small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="smtp_port" class="form-label" style="color: #c9d1d9; font-weight: 600;">SMTP Port <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="smtp_port" name="smtp_port" required style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9;">
+                        <small class="form-text text-muted">Usually 587 for TLS or 465 for SSL</small>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="smtp_user" class="form-label" style="color: #c9d1d9; font-weight: 600;">SMTP Username <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="smtp_user" name="smtp_user" required style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9;">
+                        <small class="form-text text-muted">Email address or username</small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="smtp_password" class="form-label" style="color: #c9d1d9; font-weight: 600;">SMTP Password <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="smtp_password" name="smtp_password" placeholder="Leave blank to keep existing" style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9;">
+                        <small class="form-text text-muted">Leave blank to keep existing password</small>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="smtp_from_name" class="form-label" style="color: #c9d1d9; font-weight: 600;">From Name</label>
+                        <input type="text" class="form-control" id="smtp_from_name" name="smtp_from_name" style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9;">
+                        <small class="form-text text-muted">Display name in sent emails</small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="smtp_from_email" class="form-label" style="color: #c9d1d9; font-weight: 600;">From Email Address</label>
+                        <input type="email" class="form-control" id="smtp_from_email" name="smtp_from_email" style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9;">
+                        <small class="form-text text-muted">Email address shown as sender</small>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="smtp_hr_recipient" class="form-label" style="color: #c9d1d9; font-weight: 600;">HR Recipient Email</label>
+                        <input type="email" class="form-control" id="smtp_hr_recipient" name="smtp_hr_recipient" style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9;">
+                        <small class="form-text text-muted">Where to send new hire/termination notifications</small>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="smtp_use_tls" class="form-label" style="color: #c9d1d9; font-weight: 600;">Use TLS</label>
+                        <select class="form-control" id="smtp_use_tls" name="smtp_use_tls" style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9;">
+                            <option value="true">Yes (Recommended)</option>
+                            <option value="false">No</option>
+                        </select>
+                        <small class="form-text text-muted">Enable TLS encryption</small>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Save Settings
+                    </button>
+                    <button type="button" class="btn btn-info" onclick="testEmail()">
+                        <i class="bi bi-send"></i> Send Test Email
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Test Email Modal -->
+<div class="modal fade" id="testEmailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content" style="background-color: #161b22; border: 1px solid #30363d; color: #c9d1d9;">
+            <div class="modal-header" style="border-bottom: 1px solid #30363d;">
+                <h5 class="modal-title">Send Test Email</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Enter an email address to send a test email and verify your SMTP configuration.</p>
+                <div class="mb-3">
+                    <label for="testEmail" class="form-label" style="color: #c9d1d9; font-weight: 600;">Test Email Address</label>
+                    <input type="email" class="form-control" id="testEmail" placeholder="your@email.com" required style="background-color: #0d1117; border: 1px solid #30363d; color: #c9d1d9;">
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #30363d;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="sendTestEmail()">
+                    <i class="bi bi-send"></i> Send Test
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let testEmailModal;
+
+document.addEventListener('DOMContentLoaded', function() {
+    testEmailModal = new bootstrap.Modal(document.getElementById('testEmailModal'));
+    loadSettings();
+});
+
+async function loadSettings() {
+    try {
+        const response = await fetch('/hr/api/settings/smtp');
+        if (!response.ok) throw new Error('Failed to load settings');
+        
+        const settings = await response.json();
+        settings.forEach(setting => {
+            const input = document.getElementById(setting.key);
+            if (input && setting.value) {
+                input.value = setting.value;
+            }
+        });
+    } catch (error) {
+        showError('Failed to load settings: ' + error.message);
+    }
+}
+
+document.getElementById('smtpForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const updates = [];
+    
+    for (const [key, value] of formData.entries()) {
+        if (value) {  // Only update if value is provided
+            updates.push({key, value});
+        }
+    }
+    
+    try {
+        // Update each setting
+        for (const {key, value} of updates) {
+            const response = await fetch(`/hr/api/settings/smtp/${key}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({value})
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to update settings');
+            }
+        }
+        
+        showSuccess('SMTP settings saved successfully!');
+        loadSettings();  // Reload to show updated values
+    } catch (error) {
+        showError('Failed to save settings: ' + error.message);
+    }
+});
+
+function testEmail() {
+    testEmailModal.show();
+}
+
+async function sendTestEmail() {
+    const emailInput = document.getElementById('testEmail');
+    const testEmail = emailInput.value.trim();
+    
+    if (!testEmail) {
+        alert('Please enter an email address');
+        return;
+    }
+    
+    try {
+        const response = await fetch('/hr/api/settings/smtp/test', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({test_email: testEmail})
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            testEmailModal.hide();
+            showSuccess(result.message || 'Test email sent successfully!');
+            emailInput.value = '';
+        } else {
+            throw new Error(result.detail || 'Failed to send test email');
+        }
+    } catch (error) {
+        showError('Test email failed: ' + error.message);
+    }
+}
+
+function showSuccess(message) {
+    const alert = document.getElementById('alertSuccess');
+    document.getElementById('successMessage').textContent = message;
+    alert.style.display = 'block';
+    setTimeout(() => alert.style.display = 'none', 5000);
+    
+    // Scroll to top to show message
+    window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function showError(message) {
+    const alert = document.getElementById('alertError');
+    document.getElementById('errorMessage').textContent = message;
+    alert.style.display = 'block';
+    setTimeout(() => alert.style.display = 'none', 8000);
+    
+    // Scroll to top to show message
+    window.scrollTo({top: 0, behavior: 'smooth'});
+}
+</script>
+
+<style>
+.content-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.content-header h1 {
+    margin: 0;
+    font-size: 1.75rem;
+    color: #c9d1d9;
+}
+
+.header-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.alert {
+    margin-bottom: 1.5rem;
+}
+
+.form-control:focus {
+    background-color: #0d1117;
+    border-color: #58a6ff;
+    color: #c9d1d9;
+    box-shadow: 0 0 0 0.25rem rgba(88, 166, 255, 0.25);
+}
+
+.form-control::placeholder {
+    color: #6e7681;
+}
+
+select.form-control option {
+    background-color: #0d1117;
+    color: #c9d1d9;
+}
+</style>
+{% endblock %}

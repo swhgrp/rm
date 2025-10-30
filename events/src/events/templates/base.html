@@ -592,7 +592,12 @@
             <span class="sidebar-brand-text">Events</span>
         </a>
 
+
         <ul class="sidebar-nav">
+            <li><a href="/portal/">
+                <i class="bi bi-house-door"></i>
+                <span>Portal Home</span>
+            </a></li>
             <li><a href="/events/" class="{% if request.path == '/events/' or request.path == '/events' %}active{% endif %}">
                 <i class="bi bi-grid"></i>
                 <span>Dashboard</span>
@@ -609,20 +614,16 @@
                 <i class="bi bi-check2-square"></i>
                 <span>Tasks</span>
             </a></li>
+            <li><a href="/events/settings" class="{% if 'settings' in request.path %}active{% endif %}">
+                <i class="bi bi-gear"></i>
+                <span>Settings</span>
+            </a></li>
             <li><a href="/events/public/intake">
                 <i class="bi bi-file-earmark-text"></i>
                 <span>Public Intake Form</span>
             </a></li>
         </ul>
-
-        <div class="sidebar-footer">
-            <a href="/portal">
-                <i class="bi bi-arrow-left"></i>
-                <span>Back to Portal</span>
-            </a>
-        </div>
     </div>
-
     <!-- Main Content -->
     <div class="main-content" id="mainContent">
         <!-- Top Bar -->
@@ -688,5 +689,6 @@
     </script>
 
     {% block extra_js %}{% endblock %}
+    <script src="/events/static/js/inactivity-warning.js"></script>
 </body>
 </html>

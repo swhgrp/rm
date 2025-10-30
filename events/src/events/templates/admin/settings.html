@@ -1,0 +1,570 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - SW Hospitality Events{% endblock %}
+
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="settings-container">
+    <!-- Tabs Navigation -->
+    <ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="locations-tab" data-bs-toggle="tab" data-bs-target="#locations" type="button" role="tab">
+                <i class="bi bi-geo-alt"></i> Locations
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="event-types-tab" data-bs-toggle="tab" data-bs-target="#event-types" type="button" role="tab">
+                <i class="bi bi-calendar3"></i> Event Types
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="beverage-tab" data-bs-toggle="tab" data-bs-target="#beverage" type="button" role="tab">
+                <i class="bi bi-cup-straw"></i> Beverage Services
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="meal-types-tab" data-bs-toggle="tab" data-bs-target="#meal-types" type="button" role="tab">
+                <i class="bi bi-egg-fried"></i> Meal Types
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="settingsTabContent">
+        <!-- Locations Tab -->
+        <div class="tab-pane fade show active" id="locations" role="tabpanel">
+            <div class="settings-header">
+                <h3>Manage Locations</h3>
+                <button class="btn-primary-custom" onclick="showAddModal('location')">
+                    <i class="bi bi-plus-circle"></i> Add Location
+                </button>
+            </div>
+            <div id="locationsTable" class="settings-table"></div>
+        </div>
+
+        <!-- Event Types Tab -->
+        <div class="tab-pane fade" id="event-types" role="tabpanel">
+            <div class="settings-header">
+                <h3>Manage Event Types</h3>
+                <button class="btn-primary-custom" onclick="showAddModal('eventType')">
+                    <i class="bi bi-plus-circle"></i> Add Event Type
+                </button>
+            </div>
+            <div id="eventTypesTable" class="settings-table"></div>
+        </div>
+
+        <!-- Beverage Services Tab -->
+        <div class="tab-pane fade" id="beverage" role="tabpanel">
+            <div class="settings-header">
+                <h3>Manage Beverage Services</h3>
+                <button class="btn-primary-custom" onclick="showAddModal('beverage')">
+                    <i class="bi bi-plus-circle"></i> Add Beverage Service
+                </button>
+            </div>
+            <div id="beverageTable" class="settings-table"></div>
+        </div>
+
+        <!-- Meal Types Tab -->
+        <div class="tab-pane fade" id="meal-types" role="tabpanel">
+            <div class="settings-header">
+                <h3>Manage Meal Types</h3>
+                <button class="btn-primary-custom" onclick="showAddModal('mealType')">
+                    <i class="bi bi-plus-circle"></i> Add Meal Type
+                </button>
+            </div>
+            <div id="mealTypesTable" class="settings-table"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Add/Edit -->
+<div class="modal fade" id="settingsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">Add Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="settingsForm">
+                    <input type="hidden" id="itemId">
+                    <input type="hidden" id="itemType">
+                    
+                    <div class="mb-3">
+                        <label for="itemName" class="form-label">Name *</label>
+                        <input type="text" class="form-control-custom" id="itemName" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="itemDescription" class="form-label">Description</label>
+                        <textarea class="form-control-custom" id="itemDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="itemSortOrder" class="form-label">Sort Order</label>
+                        <input type="number" class="form-control-custom" id="itemSortOrder" value="0" min="0">
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="itemActive" checked>
+                        <label class="form-check-label" for="itemActive">Active</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary-custom" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-primary-custom" onclick="saveItem()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-container {
+        max-width: 1200px;
+    }
+
+    .nav-tabs {
+        border-bottom: 1px solid #30363d;
+    }
+
+    .nav-tabs .nav-link {
+        color: #8b949e;
+        border: none;
+        padding: 12px 20px;
+        margin-right: 8px;
+        border-radius: 6px 6px 0 0;
+        transition: all 0.2s;
+    }
+
+    .nav-tabs .nav-link:hover {
+        color: #c9d1d9;
+        background-color: #21262d;
+    }
+
+    .nav-tabs .nav-link.active {
+        color: #58a6ff;
+        background-color: #0d1117;
+        border-bottom: 2px solid #58a6ff;
+    }
+
+    .nav-tabs .nav-link i {
+        margin-right: 6px;
+    }
+
+    .settings-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .settings-header h3 {
+        color: #c9d1d9;
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .settings-table {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        overflow: hidden;
+    }
+
+    .settings-table table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .settings-table th {
+        background-color: #21262d;
+        color: #8b949e;
+        padding: 12px 15px;
+        text-align: left;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid #30363d;
+    }
+
+    .settings-table td {
+        padding: 12px 15px;
+        color: #c9d1d9;
+        border-bottom: 1px solid #30363d;
+    }
+
+    .settings-table tr:last-child td {
+        border-bottom: none;
+    }
+
+    .settings-table tr:hover {
+        background-color: #0d1117;
+    }
+
+    .badge-active {
+        background-color: #238636;
+        color: #4ac26b;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .badge-inactive {
+        background-color: #6e7681;
+        color: #c9d1d9;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-icon {
+        background: none;
+        border: none;
+        color: #8b949e;
+        cursor: pointer;
+        padding: 6px;
+        border-radius: 4px;
+        transition: all 0.2s;
+        font-size: 16px;
+    }
+
+    .btn-icon:hover {
+        color: #58a6ff;
+        background-color: #21262d;
+    }
+
+    .btn-icon.delete:hover {
+        color: #f85149;
+    }
+
+    .modal-content {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        color: #c9d1d9;
+    }
+
+    .modal-header {
+        border-bottom: 1px solid #30363d;
+    }
+
+    .modal-footer {
+        border-top: 1px solid #30363d;
+    }
+
+    .btn-close {
+        filter: invert(1);
+    }
+
+    .form-label {
+        color: #8b949e;
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 8px;
+    }
+
+    .form-check-input {
+        background-color: #21262d;
+        border: 1px solid #30363d;
+    }
+
+    .form-check-input:checked {
+        background-color: #238636;
+        border-color: #238636;
+    }
+
+    .form-check-label {
+        color: #c9d1d9;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: #8b949e;
+    }
+
+    .empty-state i {
+        font-size: 48px;
+        opacity: 0.3;
+        margin-bottom: 15px;
+        display: block;
+    }
+
+    @media (max-width: 768px) {
+        .settings-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .nav-tabs .nav-link {
+            font-size: 13px;
+            padding: 10px 12px;
+        }
+
+        .settings-table {
+            overflow-x: auto;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentType = '';
+    let settingsData = {
+        locations: [],
+        eventTypes: [],
+        beverageServices: [],
+        mealTypes: []
+    };
+
+    const apiEndpoints = {
+        location: '/events/api/settings/locations',
+        eventType: '/events/api/settings/event-types',
+        beverage: '/events/api/settings/beverage-services',
+        mealType: '/events/api/settings/meal-types'
+    };
+
+    const tableContainers = {
+        location: 'locationsTable',
+        eventType: 'eventTypesTable',
+        beverage: 'beverageTable',
+        mealType: 'mealTypesTable'
+    };
+
+    // Load all settings on page load
+    async function loadAllSettings() {
+        await Promise.all([
+            loadSettings('location'),
+            loadSettings('eventType'),
+            loadSettings('beverage'),
+            loadSettings('mealType')
+        ]);
+    }
+
+    async function loadSettings(type) {
+        try {
+            const response = await fetch(apiEndpoints[type] + '?include_inactive=true', {
+                credentials: 'include'
+            });
+            const data = await response.json();
+            
+            if (type === 'location') settingsData.locations = data;
+            else if (type === 'eventType') settingsData.eventTypes = data;
+            else if (type === 'beverage') settingsData.beverageServices = data;
+            else if (type === 'mealType') settingsData.mealTypes = data;
+            
+            renderTable(type, data);
+        } catch (error) {
+            console.error(`Error loading ${type}:`, error);
+            showError(`Failed to load ${type}s`);
+        }
+    }
+
+    function renderTable(type, data) {
+        const container = document.getElementById(tableContainers[type]);
+        
+        if (data.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="bi bi-inbox"></i>
+                    <div>No items found. Click "Add" to create one.</div>
+                </div>
+            `;
+            return;
+        }
+
+        const table = `
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Sort Order</th>
+                        <th>Status</th>
+                        <th style="width: 120px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${data.map(item => `
+                        <tr>
+                            <td style="font-weight: 600;">${item.name}</td>
+                            <td style="color: #8b949e;">${item.description || '-'}</td>
+                            <td>${item.sort_order}</td>
+                            <td>
+                                <span class="badge-${item.is_active ? 'active' : 'inactive'}">
+                                    ${item.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                            </td>
+                            <td>
+                                <div class="action-buttons">
+                                    <button class="btn-icon" onclick="editItem('${type}', '${item.id}')" title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                    <button class="btn-icon delete" onclick="deleteItem('${type}', '${item.id}', '${item.name}')" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+        
+        container.innerHTML = table;
+    }
+
+    function showAddModal(type) {
+        currentType = type;
+        document.getElementById('modalTitle').textContent = `Add ${getTypeLabel(type)}`;
+        document.getElementById('itemId').value = '';
+        document.getElementById('itemType').value = type;
+        document.getElementById('itemName').value = '';
+        document.getElementById('itemDescription').value = '';
+        document.getElementById('itemSortOrder').value = '0';
+        document.getElementById('itemActive').checked = true;
+        
+        const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+        modal.show();
+    }
+
+    function editItem(type, id) {
+        currentType = type;
+        let item;
+        if (type === 'location') item = settingsData.locations.find(i => i.id === id);
+        else if (type === 'eventType') item = settingsData.eventTypes.find(i => i.id === id);
+        else if (type === 'beverage') item = settingsData.beverageServices.find(i => i.id === id);
+        else if (type === 'mealType') item = settingsData.mealTypes.find(i => i.id === id);
+        
+        if (!item) return;
+        
+        document.getElementById('modalTitle').textContent = `Edit ${getTypeLabel(type)}`;
+        document.getElementById('itemId').value = item.id;
+        document.getElementById('itemType').value = type;
+        document.getElementById('itemName').value = item.name;
+        document.getElementById('itemDescription').value = item.description || '';
+        document.getElementById('itemSortOrder').value = item.sort_order;
+        document.getElementById('itemActive').checked = item.is_active;
+        
+        const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+        modal.show();
+    }
+
+    async function saveItem() {
+        const id = document.getElementById('itemId').value;
+        const type = document.getElementById('itemType').value;
+        const name = document.getElementById('itemName').value.trim();
+        const description = document.getElementById('itemDescription').value.trim();
+        const sortOrder = parseInt(document.getElementById('itemSortOrder').value);
+        const isActive = document.getElementById('itemActive').checked;
+        
+        if (!name) {
+            alert('Name is required');
+            return;
+        }
+        
+        const data = {
+            name,
+            description: description || null,
+            sort_order: sortOrder,
+            is_active: isActive
+        };
+        
+        try {
+            let response;
+            if (id) {
+                // Update
+                response = await fetch(`${apiEndpoints[type]}/${id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(data)
+                });
+            } else {
+                // Create
+                response = await fetch(apiEndpoints[type], {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(data)
+                });
+            }
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save');
+            }
+            
+            // Close modal and reload
+            bootstrap.Modal.getInstance(document.getElementById('settingsModal')).hide();
+            await loadSettings(type);
+            showSuccess(`${getTypeLabel(type)} saved successfully`);
+        } catch (error) {
+            console.error('Error saving:', error);
+            alert(error.message);
+        }
+    }
+
+    async function deleteItem(type, id, name) {
+        if (!confirm(`Are you sure you want to delete "${name}"?`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`${apiEndpoints[type]}/${id}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to delete');
+            }
+            
+            await loadSettings(type);
+            showSuccess(`${getTypeLabel(type)} deleted successfully`);
+        } catch (error) {
+            console.error('Error deleting:', error);
+            alert('Failed to delete item');
+        }
+    }
+
+    function getTypeLabel(type) {
+        const labels = {
+            location: 'Location',
+            eventType: 'Event Type',
+            beverage: 'Beverage Service',
+            mealType: 'Meal Type'
+        };
+        return labels[type] || type;
+    }
+
+    function showSuccess(message) {
+        // Simple success notification (could be enhanced with a toast component)
+        console.log('Success:', message);
+    }
+
+    function showError(message) {
+        console.error('Error:', message);
+    }
+
+    // Load settings on page load
+    loadAllSettings();
+</script>
+{% endblock %}

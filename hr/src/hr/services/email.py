@@ -19,7 +19,41 @@ class EmailService:
 
     @staticmethod
     def get_smtp_config():
-        """Get SMTP configuration from environment variables"""
+        """Get SMTP configuration from database or environment variables"""
+        from hr.db.database import SessionLocal
+        from hr.models.settings import SystemSettings
+        from hr.core.encryption import decrypt_value
+        
+        # Try to get settings from database first
+        try:
+            db = SessionLocal()
+            settings = db.query(SystemSettings).filter(
+                SystemSettings.category == "smtp"
+            ).all()
+            
+            if settings:
+                config = {}
+                for setting in settings:
+                    value = decrypt_value(setting.value) if setting.is_encrypted and setting.value else setting.value
+                    # Map database keys to config keys
+                    key_name = setting.key.replace("smtp_", "")
+                    config[key_name] = value
+                
+                db.close()
+                
+                # Ensure all required keys exist
+                if 'host' in config and 'user' in config:
+                    # Convert port to int and use_tls to boolean
+                    config['port'] = int(config.get('port', 587))
+                    config['use_tls'] = config.get('use_tls', 'true').lower() == 'true'
+                    config['hr_recipient'] = config.get('hr_recipient', 'hr@swhgrp.com')
+                    return config
+            
+            db.close()
+        except Exception as e:
+            logger.warning(f"Could not load SMTP settings from database: {e}")
+        
+        # Fall back to environment variables
         return {
             'host': os.getenv('SMTP_HOST', 'smtp.gmail.com'),
             'port': int(os.getenv('SMTP_PORT', '587')),
@@ -113,17 +147,7 @@ class EmailService:
 
     @staticmethod
     def send_new_hire_email(employee_data: dict, created_by: str, position_info: Optional[dict] = None) -> bool:
-        """
-        Send notification email when new employee is created.
-
-        Args:
-            employee_data: Dictionary containing employee information
-            created_by: Name/email of user who created the employee
-            position_info: Optional dictionary with position and location info
-
-        Returns:
-            True if email sent successfully
-        """
+        """Send notification email when new employee is created."""
         config = EmailService.get_smtp_config()
 
         # Format employee data
@@ -196,18 +220,7 @@ Date/Time: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
         position_info: Optional[dict] = None,
         attachment_path: Optional[str] = None
     ) -> bool:
-        """
-        Send notification email when employee is terminated.
-
-        Args:
-            employee_data: Dictionary containing employee information
-            processed_by: Name/email of user who processed the termination
-            position_info: Optional dictionary with position info at termination
-            attachment_path: Optional path to supporting documentation
-
-        Returns:
-            True if email sent successfully
-        """
+        """Send notification email when employee is terminated."""
         config = EmailService.get_smtp_config()
 
         # Format employee data

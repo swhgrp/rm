@@ -458,12 +458,16 @@
                         <div class="form-group">
                             <label for="eventType">Event Type <span class="required">*</span></label>
                             <select id="eventType" name="eventType" required>
-                                <option value="">Select event type...</option>
-                                <option value="wedding_standard">Wedding</option>
-                                <option value="corporate_lunch">Corporate Event</option>
-                                <option value="birthday">Birthday Party</option>
-                                <option value="conference">Conference</option>
-                                <option value="other">Other</option>
+                                <option value="">Loading event types...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="location">Location <span class="required">*</span></label>
+                            <select id="location" name="location" required>
+                                <option value="">Loading locations...</option>
                             </select>
                         </div>
                     </div>
@@ -508,23 +512,8 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Meal Type</label>
-                            <div class="checkbox-group">
-                                <div class="checkbox-item">
-                                    <input type="checkbox" id="breakfast" name="mealTypes" value="breakfast">
-                                    <label for="breakfast">Breakfast</label>
-                                </div>
-                                <div class="checkbox-item">
-                                    <input type="checkbox" id="lunch" name="mealTypes" value="lunch">
-                                    <label for="lunch">Lunch</label>
-                                </div>
-                                <div class="checkbox-item">
-                                    <input type="checkbox" id="dinner" name="mealTypes" value="dinner">
-                                    <label for="dinner">Dinner</label>
-                                </div>
-                                <div class="checkbox-item">
-                                    <input type="checkbox" id="cocktails" name="mealTypes" value="cocktails">
-                                    <label for="cocktails">Cocktail Hour</label>
-                                </div>
+                            <div class="checkbox-group" id="mealTypesContainer">
+                                <!-- Will be populated dynamically -->
                             </div>
                         </div>
                     </div>
@@ -540,19 +529,8 @@
                     <div class="form-row">
                         <div class="form-group">
                             <label>Beverage Service</label>
-                            <div class="checkbox-group">
-                                <div class="checkbox-item">
-                                    <input type="checkbox" id="bar" name="beverages" value="bar">
-                                    <label for="bar">Full Bar</label>
-                                </div>
-                                <div class="checkbox-item">
-                                    <input type="checkbox" id="wine" name="beverages" value="wine">
-                                    <label for="wine">Wine Only</label>
-                                </div>
-                                <div class="checkbox-item">
-                                    <input type="checkbox" id="nonalcoholic" name="beverages" value="nonalcoholic">
-                                    <label for="nonalcoholic">Non-Alcoholic Only</label>
-                                </div>
+                            <div class="checkbox-group" id="beverageServicesContainer">
+                                <!-- Will be populated dynamically -->
                             </div>
                         </div>
                     </div>
@@ -619,16 +597,121 @@
         const alertError = document.getElementById('alertError');
         const errorMessage = document.getElementById('errorMessage');
         const loadingIndicator = document.getElementById('loadingIndicator');
-        const venueSelect = document.getElementById('venue');
 
-        // Load venues on page load
+        // Load all settings on page load
+        async function loadAllSettings() {
+            await Promise.all([
+                loadVenues(),
+                loadLocations(),
+                loadEventTypes(),
+                loadMealTypes(),
+                loadBeverageServices()
+            ]);
+        }
+
+        async function loadLocations() {
+            const locationSelect = document.getElementById('location');
+            try {
+                const response = await fetch('/events/api/settings/locations');
+                if (response.ok) {
+                    const locations = await response.json();
+                    locationSelect.innerHTML = '<option value="">Select location...</option>';
+                    locations.forEach(location => {
+                        const option = document.createElement('option');
+                        option.value = location.name;
+                        option.textContent = location.name;
+                        locationSelect.appendChild(option);
+                    });
+                } else {
+                    locationSelect.innerHTML = '<option value="">Failed to load locations</option>';
+                }
+            } catch (error) {
+                console.error('Failed to load locations:', error);
+                locationSelect.innerHTML = '<option value="">Failed to load locations</option>';
+            }
+        }
+
+        async function loadEventTypes() {
+            const eventTypeSelect = document.getElementById('eventType');
+            try {
+                const response = await fetch('/events/api/settings/event-types');
+                if (response.ok) {
+                    const eventTypes = await response.json();
+                    eventTypeSelect.innerHTML = '<option value="">Select event type...</option>';
+                    eventTypes.forEach(eventType => {
+                        const option = document.createElement('option');
+                        option.value = eventType.name;
+                        option.textContent = eventType.name;
+                        eventTypeSelect.appendChild(option);
+                    });
+                } else {
+                    eventTypeSelect.innerHTML = '<option value="">Failed to load event types</option>';
+                }
+            } catch (error) {
+                console.error('Failed to load event types:', error);
+                eventTypeSelect.innerHTML = '<option value="">Failed to load event types</option>';
+            }
+        }
+
+        async function loadMealTypes() {
+            const mealTypesContainer = document.getElementById('mealTypesContainer');
+            try {
+                const response = await fetch('/events/api/settings/meal-types');
+                if (response.ok) {
+                    const mealTypes = await response.json();
+                    mealTypesContainer.innerHTML = '';
+                    mealTypes.forEach(mealType => {
+                        const id = `meal_${mealType.id}`;
+                        const div = document.createElement('div');
+                        div.className = 'checkbox-item';
+                        div.innerHTML = `
+                            <input type="checkbox" id="${id}" name="mealTypes" value="${mealType.name}">
+                            <label for="${id}">${mealType.name}</label>
+                        `;
+                        mealTypesContainer.appendChild(div);
+                    });
+                } else {
+                    mealTypesContainer.innerHTML = '<p style="color: #8b949e;">Failed to load meal types</p>';
+                }
+            } catch (error) {
+                console.error('Failed to load meal types:', error);
+                mealTypesContainer.innerHTML = '<p style="color: #8b949e;">Failed to load meal types</p>';
+            }
+        }
+
+        async function loadBeverageServices() {
+            const beverageContainer = document.getElementById('beverageServicesContainer');
+            try {
+                const response = await fetch('/events/api/settings/beverage-services');
+                if (response.ok) {
+                    const beverages = await response.json();
+                    beverageContainer.innerHTML = '';
+                    beverages.forEach(beverage => {
+                        const id = `bev_${beverage.id}`;
+                        const div = document.createElement('div');
+                        div.className = 'checkbox-item';
+                        div.innerHTML = `
+                            <input type="checkbox" id="${id}" name="beverages" value="${beverage.name}">
+                            <label for="${id}">${beverage.name}</label>
+                        `;
+                        beverageContainer.appendChild(div);
+                    });
+                } else {
+                    beverageContainer.innerHTML = '<p style="color: #8b949e;">Failed to load beverage services</p>';
+                }
+            } catch (error) {
+                console.error('Failed to load beverage services:', error);
+                beverageContainer.innerHTML = '<p style="color: #8b949e;">Failed to load beverage services</p>';
+            }
+        }
+
         async function loadVenues() {
+            const venueSelect = document.getElementById('venue');
             const venueError = document.getElementById('venueError');
             try {
                 const response = await fetch('/events/api/events/venues');
                 if (response.ok) {
                     const venues = await response.json();
-                    // Clear loading message
                     venueSelect.innerHTML = '<option value="">Select venue...</option>';
 
                     if (venues.length === 0) {
@@ -654,8 +737,8 @@
             }
         }
 
-        // Load venues when page loads
-        loadVenues();
+        // Load all settings when page loads
+        loadAllSettings();
 
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -695,6 +778,7 @@
                 event: {
                     title: document.getElementById('eventTitle').value,
                     event_type: document.getElementById('eventType').value,
+                    location: document.getElementById('location').value,
                     date: eventDateValue,
                     start_at: startAt.toISOString(),
                     end_at: endAt.toISOString(),
@@ -736,6 +820,8 @@
                         alertSuccess.classList.remove('show');
                         form.style.display = 'block';
                         submitBtn.disabled = false;
+                        // Reload settings after reset
+                        loadAllSettings();
                     }, 5000);
                 } else {
                     // Error from server

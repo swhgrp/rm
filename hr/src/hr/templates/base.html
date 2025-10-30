@@ -767,6 +767,7 @@
                     <li><a href="/hr/positions" class="{% block nav_positions %}{% endblock %}"><i class="bi bi-briefcase"></i> Positions</a></li>
                     <li><a href="/hr/users" class="{% block nav_users %}{% endblock %}"><i class="bi bi-person-gear"></i> Users</a></li>
                     <li><a href="/hr/audit" class="{% block nav_audit %}{% endblock %}"><i class="bi bi-shield-lock"></i> Audit Log</a></li>
+                    <li><a href="/hr/settings" class="{% block nav_settings %}{% endblock %}"><i class="bi bi-envelope"></i> Email Settings</a></li>
                 </ul>
             </li>
         </ul>
@@ -1000,5 +1001,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 
     {% block extra_scripts %}{% endblock %}
+    <script src="/hr/static/js/inactivity-warning.js"></script>
 </body>
 </html>

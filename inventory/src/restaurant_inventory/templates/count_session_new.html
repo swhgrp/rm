@@ -490,6 +490,12 @@ function showAlert(message, type = 'info') {
 async function init() {
     try {
         console.log('Initializing count session page...');
+        // Hide start screen immediately if resuming a session
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session');
+        if (sessionId) {
+            document.getElementById('startScreen').style.display = 'none';
+        }
         [locations, storageAreas, categories, allItems] = await Promise.all([
             apiRequest('api/locations/'),
             apiRequest('api/storage-areas/'),
@@ -520,8 +526,6 @@ async function init() {
         document.getElementById('countDate').value = today;
 
         // Check if resuming an existing session
-        const urlParams = new URLSearchParams(window.location.search);
-        const sessionId = urlParams.get('session');
         if (sessionId) {
             await resumeSession(sessionId);
         }
@@ -617,30 +621,39 @@ async function showCountScreen() {
     await loadAreaStatuses();
 
     // Show/hide buttons based on status
-    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-    if (session.status === 'COMPLETED') {
-        document.getElementById('reviewBtn').style.display = 'none';
-        document.getElementById('completeBtn').style.display = 'none';
-
-        const reviewBtn = document.getElementById('completeFromReviewBtn');
-        if (reviewBtn) reviewBtn.style.display = 'none';
-
-        const userRole = (user.role || '').toUpperCase();
-        if (userRole === 'MANAGER' || userRole === 'ADMIN') {
-            document.getElementById('approveBtn').style.display = 'inline-block';
+    if (session.status === "COMPLETED") {
+        document.getElementById("reviewBtn").style.display = "none";
+        document.getElementById("completeBtn").style.display = "none";
+        const reviewBtn = document.getElementById("completeFromReviewBtn");
+        if (reviewBtn) reviewBtn.style.display = "none";
+        const userRole = (user.role || "").toUpperCase();
+        if (userRole === "MANAGER" || userRole === "ADMIN") {
+            document.getElementById("approveBtn").style.display = "inline-block";
         }
+    } else if (session.status === "APPROVED") {
+        document.getElementById("reviewBtn").style.display = "none";
+        document.getElementById("completeBtn").style.display = "none";
+        document.getElementById("approveBtn").style.display = "none";
+        const reviewBtn = document.getElementById("completeFromReviewBtn");
+        if (reviewBtn) reviewBtn.style.display = "none";
     } else {
-        document.getElementById('reviewBtn').style.display = 'inline-block';
-        document.getElementById('completeBtn').style.display = 'inline-block';
+        document.getElementById("reviewBtn").style.display = "inline-block";
+        document.getElementById("completeBtn").style.display = "inline-block";
+        const reviewBtn2 = document.getElementById("completeFromReviewBtn");
+        if (reviewBtn2) reviewBtn2.style.display = "inline-block";
+        document.getElementById("approveBtn").style.display = "none";
+    }
 
-        const reviewBtn = document.getElementById('completeFromReviewBtn');
-        if (reviewBtn) reviewBtn.style.display = 'inline-block';
-
-        document.getElementById('approveBtn').style.display = 'none';
+    // Disable inputs for APPROVED counts (read-only)
+    const storageSelector = document.getElementById("storageAreaSelector");
+    const barcodeInput = document.getElementById("barcodeInput");
+    if (session.status === "APPROVED") {
+        if (storageSelector) storageSelector.disabled = true;
+        if (barcodeInput) barcodeInput.disabled = true;
     }
 }
-
 async function switchStorageArea() {
     const areaId = parseInt(document.getElementById('storageAreaSelector').value);
     if (!areaId) {
@@ -1115,7 +1128,7 @@ async function approveCount() {
     try {
         const response = await apiRequest(`api/count-sessions/${session.id}/approve`, { method: 'POST' });
         showAlert(`Count approved! ${response.items_updated} inventory records updated.`, 'success');
-        setTimeout(() => window.location.href = '/inventory/count/history', 2000);
+        setTimeout(() => window.location.href = 'count/history', 2000);
     } catch (error) {
         showAlert('Error approving count: ' + error.message, 'danger');
     }
@@ -1129,7 +1142,7 @@ async function exitCount() {
         message += '✓ All counted items are automatically saved.\n\n';
         message += 'You can resume counting at any time from the Count History page.\n\n';
         message += 'Remember to complete and approve the count when finished to update inventory levels.';
-    } else if (session.status === 'COMPLETED') {
+    } else if (session.status === 'COMPLETED' || session.status === 'APPROVED') {
         message += '✓ This count is completed but not yet approved.\n\n';
         message += 'You can review and approve it from the Count History page.';
     } else if (session.status === 'APPROVED') {
@@ -1137,7 +1150,7 @@ async function exitCount() {
     }
 
     if (await showConfirm(message)) {
-        window.location.href = '/inventory/count/history';
+        window.location.href = 'count/history';
     }
 }
 

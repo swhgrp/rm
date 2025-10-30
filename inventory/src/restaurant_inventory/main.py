@@ -298,12 +298,12 @@ async def storage_areas_page(request: Request):
     """Storage areas management page"""
     return templates.TemplateResponse("inventory.html", {"request": request})
 
-@app.get("/inventory/count", response_class=HTMLResponse)
+@app.get("/count", response_class=HTMLResponse)
 async def count_session_page(request: Request):
     """Inventory count session page"""
     return templates.TemplateResponse("count_session_new.html", {"request": request})
 
-@app.get("/inventory/count/history", response_class=HTMLResponse)
+@app.get("/count/history", response_class=HTMLResponse)
 async def count_history_page(request: Request):
     """Inventory count history page"""
     return templates.TemplateResponse("count_history.html", {"request": request})

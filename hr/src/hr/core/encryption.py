@@ -122,3 +122,33 @@ def get_encryption() -> FieldEncryption:
     if _encryption_instance is None:
         _encryption_instance = FieldEncryption()
     return _encryption_instance
+
+
+def encrypt_value(plaintext: Optional[str]) -> Optional[str]:
+    """
+    Convenience function to encrypt a value using the global encryption instance.
+    
+    Args:
+        plaintext: String to encrypt
+        
+    Returns:
+        Encrypted string or None
+    """
+    if not plaintext:
+        return None
+    return get_encryption().encrypt(plaintext)
+
+
+def decrypt_value(ciphertext: Optional[str]) -> Optional[str]:
+    """
+    Convenience function to decrypt a value using the global encryption instance.
+    
+    Args:
+        ciphertext: Encrypted string
+        
+    Returns:
+        Decrypted string or None
+    """
+    if not ciphertext:
+        return None
+    return get_encryption().decrypt(ciphertext)

@@ -23,6 +23,8 @@
             border-right: 1px solid #30363d;
             min-height: calc(100vh - 56px);
             padding: 20px;
+            display: flex;
+            flex-direction: column;
         }
 
         .sidebar-item {
@@ -410,16 +412,13 @@
         @media (max-width: 768px) {
             /* Hide sidebar on mobile by default */
             .sidebar {
-                position: fixed;
-                left: -100%;
-                top: 56px;
-                width: 80%;
-                max-width: 300px;
-                height: calc(100vh - 56px);
-                z-index: 1040;
-                transition: left 0.3s ease;
-                overflow-y: auto;
-            }
+            background-color: #161b22;
+            border-right: 1px solid #30363d;
+            min-height: calc(100vh - 56px);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
 
             .sidebar.show {
                 left: 0;
@@ -682,8 +681,13 @@
             }
 
             .sidebar {
-                padding: 15px;
-            }
+            background-color: #161b22;
+            border-right: 1px solid #30363d;
+            min-height: calc(100vh - 56px);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+        }
 
             .file-item .btn-custom span,
             .folder-item .btn-custom span {
@@ -780,11 +784,7 @@
                 </a>
             </div>
             <div class="d-flex align-items-center gap-3">
-                <span class="text-light d-none d-sm-inline">{{ user.full_name }}</span>
-                <a href="/portal/" class="btn btn-custom">
-                    <i class="bi bi-box-arrow-left"></i>
-                    <span class="d-none d-sm-inline">Back to Portal</span>
-                </a>
+                <span class="text-light">{{ user.full_name }}</span>
             </div>
         </div>
     </nav>
@@ -795,9 +795,13 @@
     <div class="container-fluid">
         <div class="row">
             <div class="col-md-2 col-12 sidebar">
-                <a href="#" class="sidebar-item" onclick="loadRootFolders(); return false;">
+                <a href="/portal/" class="sidebar-item">
                     <i class="bi bi-house-door"></i>
-                    <span>Home</span>
+                    <span>Portal Home</span>
+                </a>
+                <a href="#" class="sidebar-item" onclick="loadRootFolders(); return false;">
+                    <i class="bi bi-folder"></i>
+                    <span>All Files</span>
                 </a>
                 <a href="#" class="sidebar-item" onclick="loadMyFiles(); return false;">
                     <i class="bi bi-folder"></i>
@@ -3453,5 +3457,6 @@
             setupSearchListener();
         });
     </script>
+    <script src="/files/static/js/inactivity-warning.js"></script>
 </body>
 </html>

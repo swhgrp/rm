@@ -8,7 +8,7 @@
         <h1><i class="bi bi-clock-history"></i> Inventory Count History</h1>
         <p class="text-muted mb-0">View and manage all inventory counts</p>
     </div>
-    <a href="/inventory/count" class="btn btn-primary">
+    <a href="count" class="btn btn-primary">
         <i class="bi bi-plus-circle"></i> Start New Count
     </a>
 </div>
@@ -149,7 +149,7 @@ function displayCounts() {
         return;
     }
 
-    const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'admin';
+    const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'ADMIN' || currentUser?.role === 'admin';
 
     container.innerHTML = `
         <div class="table-responsive">
@@ -199,11 +199,11 @@ function displayCounts() {
                                 <td>
                                     <div class="btn-group btn-group-sm">
                                         ${canResume ? `
-                                            <a href="/inventory/count?session=${count.id}" class="btn btn-outline-success" title="Resume Count">
+                                            <a href="count?session=${count.id}" class="btn btn-outline-success" title="Resume Count">
                                                 <i class="bi bi-play-circle"></i> Resume
                                             </a>
                                         ` : `
-                                            <a href="/inventory/count?session=${count.id}" class="btn btn-outline-primary" title="View Count">
+                                            <a href="count?session=${count.id}" class="btn btn-outline-primary" title="View Count">
                                                 <i class="bi bi-eye"></i> View
                                             </a>
                                         `}

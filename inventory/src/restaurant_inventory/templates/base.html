@@ -569,8 +569,8 @@
                 </a>
             </li>
             <ul id="inventorySection" class="submenu">
-                <li><a href="inventory/count"><i class="bi bi-clipboard-check"></i> Take Inventory</a></li>
-                <li><a href="inventory/count/history"><i class="bi bi-clock-history"></i> Count History</a></li>
+                <li><a href="count"><i class="bi bi-clipboard-check"></i> Take Inventory</a></li>
+                <li><a href="count/history"><i class="bi bi-clock-history"></i> Count History</a></li>
                 <li><a href="storage-areas"><i class="bi bi-grid"></i> Storage Areas</a></li>
                 <li><a href="categories"><i class="bi bi-tags"></i> Categories</a></li>
                 <li><a href="master-items"><i class="bi bi-box"></i> Master Items</a></li>
@@ -869,5 +869,6 @@
     </script>
 
     {% block scripts %}{% endblock %}
+    <script src="/inventory/static/js/inactivity-warning.js"></script>
 </body>
 </html>

@@ -7,6 +7,7 @@ from .task import Task, TaskChecklistItem, TaskStatus, TaskPriority
 from .document import Document, Email, DocumentType, EmailStatus
 from .template import EventTemplate, NotificationRule
 from .audit import AuditLog
+from .settings import Location, EventType, BeverageService, MealType
 
 __all__ = [
     "BaseModel",
@@ -29,4 +30,8 @@ __all__ = [
     "EventTemplate",
     "NotificationRule",
     "AuditLog",
+    "Location",
+    "EventType",
+    "BeverageService",
+    "MealType",
 ]

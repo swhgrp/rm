@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
 from hr.api.api_v1.endpoints import positions, employees, documents, roles, locations, departments, audit
+from hr.api.api_v1.endpoints import settings
+from hr.api.auth_helpers import require_login, require_admin
 from hr.api import auth, users
 from hr.db.database import get_db
 from hr.models.employee import Employee
@@ -33,6 +35,7 @@ app.include_router(positions.router, prefix="/api/positions", tags=["positions"]
 app.include_router(employees.router, prefix="/api/employees", tags=["employees"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])
 app.include_router(departments.router, prefix="/api/departments", tags=["departments"])
+app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 
 # Setup templates
@@ -74,17 +77,6 @@ async def login_page(request: Request, db: Session = Depends(get_db)):
 
     return templates.TemplateResponse("login.html", {"request": request})
 
-
-def require_login(request: Request, db: Session = Depends(get_db)):
-    """Middleware to require login for protected routes"""
-    from hr.api.auth import get_current_user
-    user = get_current_user(request, db)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"Location": "/hr/login"}
-        )
     return user
 
 
@@ -219,3 +211,9 @@ async def api_root():
         "version": "1.0.0",
         "status": "operational"
     }
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request, user: User = Depends(require_admin)):
+    """System Settings page (protected)"""
+    return templates.TemplateResponse("settings.html", {"request": request})
+
