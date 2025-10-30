@@ -3,6 +3,7 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from files.core.config import settings
 from files.core.deps import get_current_user
@@ -28,6 +29,8 @@ app.add_middleware(
 
 # Templates
 templates = Jinja2Templates(directory="src/files/templates")
+# Mount static files
+app.mount("/static", StaticFiles(directory="src/files/static"), name="static")
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])

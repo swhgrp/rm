@@ -232,7 +232,7 @@
             align-items: center;
         }
 
-        .location-selector {
+        .page-title {
             font-size: 18px;
             font-weight: 600;
             color: #c9d1d9;
@@ -262,6 +262,13 @@
             background-color: #161b22;
             border: 1px solid #30363d;
             box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        /* Base heading styles */
+        h2 {
+            font-size: 1.75rem;  /* ~28px, matches Accounting */
+            font-weight: 600;
+            color: #c9d1d9;
         }
 
         .table {
@@ -353,9 +360,14 @@
                 padding-right: 10px;
             }
 
-            /* Make logo smaller on mobile */
-            .location-selector img {
-                height: 40px !important;
+            /* Make page title smaller on mobile */
+            .page-title {
+                font-size: 14px;
+                margin-left: 0;
+            }
+
+            .page-title i {
+                font-size: 16px;
             }
 
             .content-area {
@@ -608,8 +620,8 @@
     <div class="main-wrapper">
         <!-- Top Navbar -->
         <div class="top-navbar">
-            <div class="location-selector" id="topLocationSelector">
-                <img src="/inventory/static/images/sw-logo.png?v=5" alt="SW Logo" style="height: 70px; vertical-align: middle;">
+            <div class="page-title">
+                <i class="bi bi-box-seam"></i> Inventory System
             </div>
             <div class="user-menu-top">
                 <!-- User menu -->

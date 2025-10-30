@@ -120,23 +120,19 @@
 
         .sidebar-brand {
             padding: 20px 15px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            color: #c9d1d9;
+            text-align: center;
+            color: #58a6ff;
+            font-size: 20px;
+            font-weight: 700;
             text-decoration: none;
             border-bottom: 1px solid #30363d;
-            margin-bottom: 20px;
+            margin-bottom: 10px;
         }
 
-        .sidebar-brand i {
-            font-size: 26px;
-            color: #58a6ff;
-        }
-
-        .sidebar-brand-text {
-            font-weight: 600;
-            font-size: 17px;
+        .sidebar-brand img {
+            max-width: 180px;
+            height: auto;
+            margin-bottom: 0px;
         }
 
         .sidebar-nav {
@@ -233,7 +229,7 @@
             min-height: 64px;
         }
 
-        .top-bar-title {
+        .page-title {
             font-size: 18px;
             font-weight: 600;
             color: #c9d1d9;
@@ -328,6 +324,13 @@
         .btn-danger-custom:hover {
             background-color: #f85149;
             color: white;
+        }
+
+        /* Base heading styles */
+        h2 {
+            font-size: 1.75rem;  /* ~28px, matches Accounting, Inventory, and HR */
+            font-weight: 600;
+            color: #c9d1d9;
         }
 
         /* Cards */
@@ -468,7 +471,7 @@
                 padding: 12px 15px 12px 60px;
             }
 
-            .top-bar-title {
+            .page-title {
                 font-size: 16px;
             }
 
@@ -550,7 +553,7 @@
         }
 
         @media (max-width: 480px) {
-            .top-bar-title {
+            .page-title {
                 font-size: 15px;
             }
 
@@ -587,10 +590,9 @@
 
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
-        <a href="/portal" class="sidebar-brand">
-            <i class="bi bi-calendar-event"></i>
-            <span class="sidebar-brand-text">Events</span>
-        </a>
+        <div class="sidebar-brand">
+            <img src="/inventory/static/images/sw-logo.png" alt="SW Logo">
+        </div>
 
 
         <ul class="sidebar-nav">
@@ -628,7 +630,9 @@
     <div class="main-content" id="mainContent">
         <!-- Top Bar -->
         <div class="top-bar">
-            <div class="top-bar-title">{% block page_title %}Events Management{% endblock %}</div>
+            <div class="page-title">
+                <i class="bi bi-calendar-event"></i> Events System
+            </div>
             <div class="top-bar-actions">
                 {% block top_bar_actions %}{% endblock %}
                 <div class="user-info" id="userInfo">

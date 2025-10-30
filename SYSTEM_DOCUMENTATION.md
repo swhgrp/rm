@@ -76,7 +76,8 @@ Central authentication and single sign-on portal for all restaurant systems.
 - ✅ System navigation dashboard
 - ✅ Token generation for cross-system authentication
 - ✅ Dark theme UI matching Events system
-- ❌ Password reset flow (MISSING)
+- ✅ Centralized password change with cross-system sync
+- ❌ Password reset flow (MISSING - forgot password)
 - ❌ User registration (manual only)
 - ❌ Two-factor authentication (FUTURE)
 
@@ -90,7 +91,7 @@ Central authentication and single sign-on portal for all restaurant systems.
 
 **Files:**
 - Python: 3 files
-- Templates: 4 HTML files
+- Templates: 5 HTML files (login, home, settings, change_password, and static assets)
 - Models: Inline in main.py (User model)
 
 **Database:**
@@ -115,6 +116,8 @@ Each user has boolean flags:
 - `GET /portal/settings` - User management (admin only)
 - `POST /portal/api/users/{id}/permissions` - Update user permissions
 - `GET /portal/api/generate-token/{system}` - Generate SSO token
+- `GET /portal/change-password` - Change password page
+- `POST /portal/api/change-password` - Change password and sync to all systems
 - `GET /portal/health` - Health check
 
 **Authentication Flow:**
@@ -125,6 +128,25 @@ Each user has boolean flags:
 5. Portal generates short-lived (5 min) system token
 6. System validates token and creates own session
 7. User accesses system without re-login
+
+**Password Change Flow (NEW):**
+1. User clicks "Change Password" in Portal dashboard
+2. Enters current password, new password, and confirmation
+3. Portal validates and updates password in HR database (master)
+4. Portal syncs new password hash to all systems via internal APIs:
+   - Inventory: `POST /api/users/sync-password`
+   - Accounting: `POST /api/users/sync-password`
+   - Events: `POST /api/auth/sync-password`
+5. Each system updates password for matching username (if user exists)
+6. User receives sync status report showing which systems were updated
+7. User can immediately use new password to log in
+
+**Password Sync Security:**
+- Internal service-to-service calls use `X-Portal-Auth` header with `PORTAL_SECRET_KEY`
+- Only Portal can trigger password sync across systems
+- Systems validate the auth header before accepting password updates
+- Passwords are stored as bcrypt hashes (never plain text)
+- JIT provisioning: Users auto-created on first SSO login to each system
 
 ---
 

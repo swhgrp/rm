@@ -319,6 +319,10 @@
                 <div class="user-name">{{ user.full_name or user.username }}</div>
                 <div class="user-role">{% if user.is_admin %}Administrator{% else %}User{% endif %}</div>
             </div>
+            <a href="/portal/change-password" class="btn-settings">
+                <i class="bi bi-key"></i>
+                <span class="btn-text">Change Password</span>
+            </a>
             {% if user.is_admin %}
             <a href="/portal/settings" class="btn-settings">
                 <i class="bi bi-gear"></i>
@@ -437,6 +441,6 @@
             }
         }
     </script>
-    <script src="/static/inactivity-warning.js"></script>
+    <script src="/portal/static/js/inactivity-warning.js"></script>
 </body>
 </html>

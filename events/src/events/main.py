@@ -25,16 +25,18 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    root_path="/events",  # Behind reverse proxy at /events/ path
+    # NO root_path - Nginx strips /events/ before forwarding
+    redirect_slashes=False,  # Disable automatic trailing slash redirects
 )
 
-# Middleware to handle proxy headers (X-Forwarded-Proto, X-Forwarded-Host)
+# Middleware to handle proxy headers
 class ProxyHeaderMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Trust X-Forwarded-Proto from nginx proxy
         forwarded_proto = request.headers.get("X-Forwarded-Proto")
         if forwarded_proto:
             request.scope["scheme"] = forwarded_proto
+
         response = await call_next(request)
         return response
 
@@ -48,9 +50,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Mount static files
-# app.mount("/static", StaticFiles(directory="src/events/static"), name="static")
 
 # Health check
 @app.get("/health")
@@ -103,6 +102,13 @@ app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
 app.include_router(settings_api.router, prefix="/api/settings", tags=["Settings"])
 
+# Mount static files AFTER routers (matching HR pattern)
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    logger.info(f"Static files mounted at /static from {STATIC_DIR}")
+
+# Catch-all routes for pages
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
     """Dashboard - main landing page (session auth checked by JS)"""

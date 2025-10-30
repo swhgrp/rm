@@ -246,6 +246,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://events_user:events_pass@events-db:5432/events_db
       - REDIS_URL=redis://events-redis:6379/0
+      - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
     depends_on:
       events-db:
         condition: service_healthy
@@ -267,6 +268,7 @@ services:
       - ./portal/templates:/app/templates
       - ./portal/css:/app/static/css
       - ./portal/images:/app/static/images
+      - ./portal/js:/app/static/js
     environment:
       - HR_DATABASE_URL=postgresql://hr_user:HR_Pr0d_2024!@hr-db:5432/hr_db
       - SECRET_KEY=your-super-secret-key-change-in-production-galveston34

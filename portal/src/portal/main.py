@@ -1,6 +1,6 @@
 """Portal main application"""
 from fastapi import FastAPI, Request, Depends, HTTPException, Form, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, Column, Integer, String, Boolean
@@ -8,8 +8,13 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
+from pydantic import BaseModel
 import os
 import bcrypt
+import httpx
+import logging
+
+logger = logging.getLogger(__name__)
 
 from portal.config import (
     HR_DATABASE_URL,
@@ -380,6 +385,113 @@ async def generate_system_token(
     token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
 
     return {"token": token}
+
+
+@app.get("/change-password", response_class=HTMLResponse)
+async def change_password_page(request: Request, db: Session = Depends(get_db)):
+    """Change password page"""
+    user = require_login(request, db)
+    return templates.TemplateResponse("change_password.html", {
+        "request": request,
+        "user": user
+    })
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str
+
+
+@app.post("/api/change-password")
+async def change_password(
+    request: Request,
+    password_data: PasswordChangeRequest,
+    db: Session = Depends(get_db)
+):
+    """Change password and sync across all systems"""
+    user = get_current_user(request, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    # Verify current password
+    if not verify_password(password_data.current_password, user.hashed_password):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    # Validate new password
+    if password_data.new_password != password_data.confirm_password:
+        raise HTTPException(status_code=400, detail="Passwords do not match")
+
+    if len(password_data.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    # Hash new password
+    new_hashed = bcrypt.hashpw(
+        password_data.new_password.encode('utf-8'),
+        bcrypt.gensalt()
+    ).decode('utf-8')
+
+    # 1. Update HR database (master)
+    user.hashed_password = new_hashed
+    db.commit()
+
+    logger.info(f"Password changed for user {user.username}")
+
+    # 2. Sync to other systems
+    sync_results = await sync_password_to_systems(
+        username=user.username,
+        hashed_password=new_hashed
+    )
+
+    return {
+        "message": "Password changed successfully",
+        "synced_systems": sync_results
+    }
+
+
+async def sync_password_to_systems(username: str, hashed_password: str):
+    """Sync password to all microservices"""
+    systems = [
+        {"name": "Inventory", "url": f"{INVENTORY_API_URL}/api/users/sync-password"},
+        {"name": "Accounting", "url": f"{ACCOUNTING_API_URL}/api/users/sync-password"},
+        # Note: Events system uses SSO-only authentication (no passwords stored)
+        # Users authenticate via Portal SSO tokens, so no password sync needed
+    ]
+
+    results = {}
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        for system in systems:
+            try:
+                response = await client.post(
+                    system["url"],
+                    json={
+                        "username": username,
+                        "hashed_password": hashed_password
+                    },
+                    headers={"X-Portal-Auth": SECRET_KEY}
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    results[system["name"]] = {
+                        "status": "success",
+                        "user_exists": data.get("user_exists", False)
+                    }
+                    logger.info(f"Password synced to {system['name']} for user {username}")
+                else:
+                    results[system["name"]] = {
+                        "status": "failed",
+                        "error": f"HTTP {response.status_code}"
+                    }
+                    logger.warning(f"Failed to sync password to {system['name']}: HTTP {response.status_code}")
+            except Exception as e:
+                results[system["name"]] = {
+                    "status": "error",
+                    "error": str(e)
+                }
+                logger.error(f"Error syncing password to {system['name']}: {str(e)}")
+
+    return results
 
 
 @app.get("/health")

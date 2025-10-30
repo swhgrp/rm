@@ -174,15 +174,21 @@ async def sso_login(
     <html>
     <head>
         <title>Logging in...</title>
+        <style>
+            body {{
+                background-color: #0d1117;
+                margin: 0;
+                padding: 0;
+            }}
+        </style>
     </head>
     <body>
-        <p>Logging you in...</p>
         <script>
             // Store token and user in localStorage for the frontend
             localStorage.setItem('access_token', '{access_token}');
             localStorage.setItem('user', '{user_json}');
             localStorage.setItem('user_role', '{user_data["role"]}');
-            // Redirect to dashboard
+            // Redirect to dashboard immediately
             window.location.href = '/inventory/';
         </script>
     </body>

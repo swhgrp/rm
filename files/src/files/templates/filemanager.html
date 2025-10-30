@@ -13,40 +13,120 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
         }
 
-        .navbar-custom {
-            background-color: #161b22;
-            border-bottom: 1px solid #30363d;
+        /* Base heading styles */
+        h2 {
+            font-size: 1.75rem;  /* ~28px, matches other systems */
+            font-weight: 600;
+            color: #c9d1d9;
         }
 
+        /* Sidebar */
         .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 200px;
+            height: 100vh;
             background-color: #161b22;
+            padding-top: 20px;
+            z-index: 1000;
+            overflow-y: auto;
             border-right: 1px solid #30363d;
-            min-height: calc(100vh - 56px);
-            padding: 20px;
+            transition: transform 0.3s ease-in-out;
+        }
+
+        .sidebar.collapsed {
+            transform: translateX(-200px);
+        }
+
+        .sidebar-brand {
+            padding: 20px 15px;
+            text-align: center;
+            color: #58a6ff;
+            font-size: 16px;
+            font-weight: 600;
+            border-bottom: 1px solid #30363d;
+            margin-bottom: 10px;
+        }
+
+        .sidebar-brand img {
+            max-width: 180px;
+            height: auto;
+            margin-bottom: 0px;
+        }
+
+        .sidebar-nav {
+            list-style: none;
+            padding: 0 0 100px 0;
+            margin: 0;
+        }
+
+        .sidebar-nav li {
+            margin: 0;
+        }
+
+        .sidebar-nav a {
+            display: block;
+            padding: 12px 20px;
+            color: #8b949e;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+
+        .sidebar-nav i {
+            margin-right: 10px;
+            font-size: 16px;
+            width: 20px;
+            display: inline-block;
+        }
+
+        .sidebar-nav a:hover,
+        .sidebar-nav a.active {
+            background-color: #21262d;
+            color: #58a6ff;
+            border-left: 3px solid #58a6ff;
+            padding-left: 17px;
+        }
+
+        /* Main content area */
+        .main-wrapper {
+            margin-left: 200px;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
         }
 
-        .sidebar-item {
-            padding: 10px 15px;
-            margin-bottom: 5px;
-            border-radius: 6px;
-            cursor: pointer;
+        /* Top navbar */
+        .top-navbar {
+            background-color: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #c9d1d9;
+        }
+
+        .user-info {
             display: flex;
             align-items: center;
-            gap: 10px;
-            color: #c9d1d9;
-            text-decoration: none;
-            transition: background 0.2s;
+            gap: 15px;
         }
 
-        .sidebar-item:hover {
-            background-color: #21262d;
+        .user-name {
             color: #c9d1d9;
         }
 
-        .main-content {
-            padding: 30px;
+        /* Content area */
+        .content-area {
+            flex: 1;
+            padding: 20px;
         }
 
         .toolbar {
@@ -772,60 +852,40 @@
         </div>
     </div>
 
-    <nav class="navbar navbar-custom">
-        <div class="container-fluid">
-            <div class="d-flex align-items-center gap-2">
-                <button class="mobile-menu-btn" onclick="toggleMobileMenu()" style="display: none;">
-                    <i class="bi bi-list"></i>
-                </button>
-                <a class="navbar-brand d-flex align-items-center gap-2" href="#">
-                    <i class="bi bi-folder"></i>
-                    Files Management
-                </a>
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <img src="/inventory/static/images/sw-logo.png" alt="SW Logo">
+        </div>
+        <ul class="sidebar-nav">
+            <li><a href="/portal/"><i class="bi bi-house-door"></i> Portal Home</a></li>
+            <li><a href="#" onclick="loadRootFolders(); return false;"><i class="bi bi-folder"></i> All Files</a></li>
+            <li><a href="#" onclick="loadMyFiles(); return false;"><i class="bi bi-folder"></i> My Files</a></li>
+            <li><a href="#" onclick="loadSharedWithMe(); return false;"><i class="bi bi-people"></i> Shared with Me</a></li>
+            <li><a href="#" onclick="loadSharedByMe(); return false;"><i class="bi bi-share"></i> Shared by Me</a></li>
+            <li><a href="#" onclick="showNewFolderModal(); return false;"><i class="bi bi-folder-plus"></i> New Folder</a></li>
+            <li><a href="#" onclick="showUploadModal(); return false;"><i class="bi bi-file-earmark-plus"></i> Upload File</a></li>
+        </ul>
+    </div>
+
+    <!-- Main wrapper -->
+    <div class="main-wrapper">
+        <!-- Top navbar -->
+        <div class="top-navbar">
+            <div class="page-title">
+                <i class="bi bi-folder2"></i> Files System
             </div>
-            <div class="d-flex align-items-center gap-3">
-                <span class="text-light">{{ user.full_name }}</span>
+            <div class="user-info">
+                <span class="user-name">{{ user.full_name }}</span>
             </div>
         </div>
-    </nav>
 
-    <!-- Mobile Menu Overlay -->
-    <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
+        <!-- Content area -->
+        <div class="content-area">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h2 class="mb-0"><i class="bi bi-folder2"></i> Files Dashboard</h2>
+                </div>
 
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-md-2 col-12 sidebar">
-                <a href="/portal/" class="sidebar-item">
-                    <i class="bi bi-house-door"></i>
-                    <span>Portal Home</span>
-                </a>
-                <a href="#" class="sidebar-item" onclick="loadRootFolders(); return false;">
-                    <i class="bi bi-folder"></i>
-                    <span>All Files</span>
-                </a>
-                <a href="#" class="sidebar-item" onclick="loadMyFiles(); return false;">
-                    <i class="bi bi-folder"></i>
-                    <span>My Files</span>
-                </a>
-                <a href="#" class="sidebar-item" onclick="loadSharedWithMe(); return false;">
-                    <i class="bi bi-people"></i>
-                    <span>Shared with Me</span>
-                </a>
-                <a href="#" class="sidebar-item" onclick="loadSharedByMe(); return false;">
-                    <i class="bi bi-share"></i>
-                    <span>Shared by Me</span>
-                </a>
-                <a href="#" class="sidebar-item" onclick="showNewFolderModal(); return false;">
-                    <i class="bi bi-folder-plus"></i>
-                    <span>New Folder</span>
-                </a>
-                <a href="#" class="sidebar-item" onclick="showUploadModal(); return false;">
-                    <i class="bi bi-file-earmark-plus"></i>
-                    <span>Upload File</span>
-                </a>
-            </div>
-
-            <div class="col-md-10 col-12 main-content">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb breadcrumb-custom" id="breadcrumb">
                         <li class="breadcrumb-item active">Home</li>
@@ -1198,6 +1258,9 @@
             </div>
         </div>
     </div>
+
+        </div><!-- End content-area -->
+    </div><!-- End main-wrapper -->
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>

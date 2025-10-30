@@ -140,3 +140,66 @@ async def get_current_user_info(user: User = Depends(require_auth)):
         "roles": [{"code": role.code, "name": role.name} for role in user.roles],
         "is_active": user.is_active
     }
+
+
+@router.post("/sync-password")
+async def sync_password_from_portal(
+    sync_data: dict,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Sync password from Portal (internal service API)
+    Called by Portal when user changes password to keep all systems in sync
+    """
+    import os
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # Validate internal service token
+    portal_token = request.headers.get("X-Portal-Auth")
+    portal_secret = os.getenv("PORTAL_SECRET_KEY", "your-super-secret-key-change-in-production-galveston34")
+
+    # Simple validation - check if it matches the portal secret key
+    if portal_token != portal_secret:
+        logger.warning(f"Invalid portal token in password sync request from {request.client.host}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized - Invalid service token"
+        )
+
+    username = sync_data.get("username")
+    new_hashed_password = sync_data.get("hashed_password")
+
+    if not username or not new_hashed_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing required fields: username and hashed_password"
+        )
+
+    # Find user by username
+    user = db.query(User).filter(User.username == username).first()
+
+    if user:
+        # Update password
+        user.hashed_password = new_hashed_password
+        db.commit()
+
+        logger.info(f"Password synced for user {username} from Portal")
+
+        return {
+            "message": "Password synced successfully",
+            "username": username,
+            "user_exists": True
+        }
+    else:
+        # User doesn't exist yet (hasn't logged in via SSO)
+        # This is OK - password will be set when they first login
+        logger.info(f"Password sync skipped for user {username} - user not found (will be set on first SSO login)")
+
+        return {
+            "message": "User not found in Events system - password will be set on first SSO login",
+            "username": username,
+            "user_exists": False
+        }

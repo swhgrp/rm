@@ -219,8 +219,8 @@
             align-items: center;
         }
 
-        .top-navbar h1 {
-            font-size: 20px;
+        .page-title {
+            font-size: 18px;
             font-weight: 600;
             color: #c9d1d9;
         }
@@ -288,6 +288,13 @@
             max-width: 1400px;
             margin: 0 auto;
             padding: 30px;
+        }
+
+        /* Base heading styles */
+        h2 {
+            font-size: 1.75rem;  /* ~28px, matches Accounting and Inventory */
+            font-weight: 600;
+            color: #c9d1d9;
         }
 
         /* ========== CARDS ========== */
@@ -777,7 +784,9 @@
     <div class="main-wrapper">
         <!-- Top Navbar -->
         <div class="top-navbar">
-            <h1>{% block page_title %}HR Management{% endblock %}</h1>
+            <div class="page-title">
+                <i class="bi bi-people"></i> HR System
+            </div>
             <div class="user-menu-top">
                 {% if current_user %}
                 <div class="dropdown">
