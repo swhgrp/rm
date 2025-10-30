@@ -2,20 +2,21 @@
 
 ## Overview
 
-The HR System is a comprehensive human resources management platform for employee administration, scheduling, time tracking, and payroll integration. It serves as the central employee database for the entire restaurant management system and provides user authentication data to the Portal.
+The HR System is an employee information management platform that serves as the central employee database for the entire restaurant management system. It provides employee profile management, organizational structure tracking, document storage, and user authentication data to the Portal.
 
-## Status: 85% Production Ready 🔄
+## Status: Production Ready (Core Features) ✅
+
+**Note:** This is an employee information management system. It does NOT include scheduling, time tracking, or payroll features.
 
 ## Purpose
 
 - Employee profile management
 - Department and position tracking
-- Shift scheduling and availability
-- Time clock and attendance tracking
-- Payroll calculation and export
 - User account management for Portal authentication
-- Employee document storage
+- Employee document storage with expiration tracking
 - Emergency contact management
+- Role-based access control
+- Audit logging for data access
 
 ## Technology Stack
 
@@ -27,134 +28,147 @@ The HR System is a comprehensive human resources management platform for employe
 
 ## Features
 
-### ✅ Implemented (85%)
+### ✅ IMPLEMENTED
 
 **Employee Management:**
-- [x] Employee profiles with personal information
-- [x] Department assignments
-- [x] Job titles and positions
-- [x] Employment status tracking
-- [x] Hire date and termination date
-- [x] Emergency contacts
-- [x] Document upload and storage
-- [x] Employee search and filtering
-- [x] Active/inactive employee lists
+- ✅ Employee profiles with personal information (encrypted)
+  - Name, email, phone, address
+  - Social Security Number (encrypted)
+  - Date of birth
+  - Employment status (Active, On Leave, Terminated)
+  - Hire date and termination date
+- ✅ Department assignments with hierarchical structure
+- ✅ Job titles and positions with multiple position support per employee
+- ✅ Emergency contacts (name, phone, relationship - encrypted)
+- ✅ Employee search and filtering by department, status, position
+- ✅ Active/inactive employee lists
 
-**User Account Management:**
-- [x] User accounts linked to employees
-- [x] Username and password (bcrypt hashed)
-- [x] System permission flags (shared with Portal)
-- [x] Active/inactive status
-- [x] Admin designation
-- [x] Integration with Portal SSO
+**User Account Management (Portal Integration):**
+- ✅ User accounts linked to employees
+- ✅ Username and password authentication (bcrypt hashed)
+- ✅ Role-based access control with permissions
+- ✅ Admin designation and system flags
+- ✅ Location-based access restrictions
+- ✅ Active/inactive status management
+- ✅ Portal SSO integration for seamless login
+- ✅ Centralized password change with sync to all systems
+
+**Document Management:**
+- ✅ Employee document upload and storage
+- ✅ Document types: Food Handler Certificate, Background Check, I-9, W-4, Performance Reviews, etc.
+- ✅ Document expiration tracking and alerts
+- ✅ Document status workflow (Pending, Approved, Expired, Rejected)
+- ✅ Secure file storage at `/app/documents/`
+- ✅ Document download and retrieval
+
+**Department & Position Management:**
+- ✅ Department creation and management
+- ✅ Position definition with pay rate ranges
+- ✅ Employee-position linking (many-to-many)
+- ✅ Organizational structure tracking
+
+**Security & Compliance:**
+- ✅ Field-level encryption for sensitive data (SSN, emergency contacts)
+- ✅ Audit logging for all employee data access and modifications
+- ✅ Audit trail UI for compliance tracking
+- ✅ Role-based permissions with granular access control
+- ✅ Session management with timeout warnings
+
+**Email Integration:**
+- ✅ Email settings configuration (SMTP)
+- ✅ Email templates for notifications
+- ✅ Admin-only email configuration access
+
+### ❌ NOT IMPLEMENTED
+
+**Time & Attendance:**
+- ❌ Time clock (clock in/out) - Not implemented
+- ❌ Attendance tracking - Not implemented
+- ❌ Timesheet management - Not implemented
+- ❌ Break time tracking - Not implemented
 
 **Scheduling:**
-- [x] Shift creation and assignment
-- [x] Department-based schedules
-- [x] Weekly schedule views
-- [x] Availability tracking
-- [x] Schedule templates
-- [x] Shift swaps (partial)
-- [x] Schedule publishing
+- ❌ Shift scheduling - Not implemented
+- ❌ Employee availability tracking - Not implemented
+- ❌ Schedule templates - Not implemented
+- ❌ Shift swaps - Not implemented
+- ❌ Schedule publishing - Not implemented
 
-**Time Tracking:**
-- [x] Clock in/out functionality
-- [x] Time entry records
-- [x] Manual time adjustments
-- [x] Overtime calculation
-- [x] Break time tracking
-- [x] Timesheet approval workflow
+**Payroll:**
+- ❌ Payroll calculation - Not implemented
+- ❌ Overtime calculation - Not implemented
+- ❌ Payroll processing - Not implemented
+- ❌ Tax calculations - Not implemented
+- ❌ Pay stub generation - Not implemented
+- ❌ Direct deposit - Not implemented
+- Note: Pay rate fields exist in Position/Employee models but no processing
 
-**Payroll (Partial - 50%):**
-- [x] Pay rate management
-- [x] Hour calculations from time entries
-- [x] Regular vs overtime hours
-- [x] Payroll period definition
-- [x] Export timesheet data
-- [ ] Direct payroll processing ❌
-- [ ] Tax calculations ❌
-- [ ] Direct deposit management ❌
-- [ ] Pay stub generation ❌
-
-**Reporting:**
-- [x] Employee roster reports
-- [x] Attendance reports
-- [x] Schedule coverage reports
-- [x] Timesheet summaries
-- [x] Department headcount
-- [x] Labor cost reports
-
-### ❌ Missing (15%)
-
-**Benefits Management:**
-- [ ] Health insurance enrollment
-- [ ] PTO/vacation tracking and accrual
-- [ ] Sick leave tracking
-- [ ] Holiday management
-- [ ] 401k enrollment
-- [ ] Benefits cost calculation
-
-**Advanced Payroll:**
-- [ ] Full payroll processing
-- [ ] Tax withholding calculations
-- [ ] Direct deposit file generation
-- [ ] W-2 generation
-- [ ] Pay stub printing
+**Benefits & Leave:**
+- ❌ Benefits management - Not implemented
+- ❌ PTO/vacation tracking - Not implemented
+- ❌ Sick leave tracking - Not implemented
+- ❌ Holiday management - Not implemented
 
 **Performance Management:**
-- [ ] Performance reviews
-- [ ] Goal setting and tracking
-- [ ] Disciplinary actions
-- [ ] Training and certifications
+- ❌ Performance review system - Not implemented
+- Note: Performance reviews can be uploaded as documents only
 
-**Onboarding/Offboarding:**
-- [ ] New hire onboarding workflows
-- [ ] I-9 and W-4 form management
-- [ ] Exit interviews
-- [ ] Equipment tracking
+**Reporting:**
+- ❌ Labor cost reports - Not implemented
+- ❌ Attendance reports - Not implemented
+- ❌ Schedule coverage reports - Not implemented
+- ❌ W-2 generation - Not implemented
+- ❌ Pay stub printing - Not implemented
+- Note: Basic employee roster available via UI
+
+**Other Features:**
+- ❌ New hire onboarding workflows - Not implemented
+- ❌ Exit interviews - Not implemented
+- ❌ Equipment tracking - Not implemented
+- ❌ Goal setting and tracking - Not implemented
+- ❌ Disciplinary actions tracking - Not implemented
+- ❌ Training and certifications - Not implemented (can upload as documents)
 
 ## Architecture
 
 ### Database Schema
 
-**Core Tables:**
-- `employees` - Employee profiles and personal information
-- `departments` - Department hierarchy
-- `positions` - Job titles and positions
-- `users` - User accounts (shared with Portal)
-- `emergency_contacts` - Emergency contact information
-- `employee_documents` - Document storage
+**Implemented Tables:**
+- `hr_employee` - Employee profiles and personal information (with encryption)
+- `hr_department` - Department hierarchy
+- `hr_position` - Job titles and positions
+- `hr_employeeposition` - Employee-position associations (many-to-many)
+- `hr_user` - User accounts (shared with Portal)
+- `hr_role` - User roles for RBAC
+- `hr_permission` - Permission definitions
+- `hr_userrole` - User-role associations
+- `hr_rolepermission` - Role-permission associations
+- `hr_document` - Employee document storage
+- `hr_auditlog` - Audit trail for data access and modifications
+- `hr_emailsettings` - SMTP configuration
 
-**Scheduling Tables:**
-- `shifts` - Shift definitions
-- `schedules` - Schedule assignments
-- `availability` - Employee availability
-- `shift_swaps` - Shift swap requests
-- `schedule_templates` - Reusable schedules
-
-**Time Tracking Tables:**
-- `time_entries` - Clock in/out records
-- `time_adjustments` - Manual corrections
-- `time_off_requests` - PTO requests
-- `timesheet_approvals` - Approval workflow
-
-**Payroll Tables:**
-- `pay_rates` - Employee pay rates
-- `pay_periods` - Payroll period definitions
-- `payroll_runs` - Payroll processing records
+**Not Implemented:**
+- ❌ Scheduling tables (shifts, schedules, availability)
+- ❌ Time tracking tables (time entries, timesheets)
+- ❌ Payroll tables (pay periods, payroll runs)
+- ❌ PTO/leave tables
+- ❌ Benefits tables
 
 ### Models
 
-**Key Django Models (53 Python files total):**
-- Employee
-- Department
-- Position
-- User (for Portal authentication)
-- EmergencyContact
-- EmployeeDocument
-- Shift, Schedule, Availability
-- TimeEntry, TimeAdjustment
-- PayRate, PayPeriod, PayrollRun
+**Implemented Django Models:**
+- `Employee` - Core employee profile with encrypted sensitive fields
+- `Department` - Organizational units
+- `Position` - Job titles with pay rate ranges
+- `EmployeePosition` - Links employees to positions
+- `User` - Portal authentication and authorization
+- `Role` - User roles for access control
+- `Permission` - Granular permissions
+- `UserRole` - User-role associations
+- `RolePermission` - Role-permission associations
+- `Document` - Employee documents with expiration tracking
+- `AuditLog` - Compliance and security audit trail
+- `EmailSettings` - Email configuration
 
 ## API Endpoints
 
@@ -176,41 +190,45 @@ The HR System is a comprehensive human resources management platform for employe
 **DELETE /hr/api/employees/{id}/**
 - Deactivate employee
 
-### Scheduling
+### Department Management
 
-**GET /hr/api/schedules/**
-- Get schedules
-- Query params: `?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD&department=X`
+**GET /hr/api/departments/**
+- List all departments
 
-**POST /hr/api/schedules/**
-- Create schedule
+**POST /hr/api/departments/**
+- Create new department
 
-**GET /hr/api/schedules/{id}/publish/**
-- Publish schedule to employees
+**PUT /hr/api/departments/{id}/**
+- Update department
 
-**POST /hr/api/shift-swaps/**
-- Request shift swap
+### Position Management
 
-**PATCH /hr/api/shift-swaps/{id}/approve/**
-- Approve/deny shift swap
+**GET /hr/api/positions/**
+- List all positions
 
-### Time Tracking
+**POST /hr/api/positions/**
+- Create new position
 
-**POST /hr/api/time-entries/clock-in/**
-- Clock in employee
+**PUT /hr/api/positions/{id}/**
+- Update position
 
-**POST /hr/api/time-entries/clock-out/**
-- Clock out employee
+### Document Management
 
-**GET /hr/api/time-entries/**
-- Get time entries
-- Query params: `?employee=X&pay_period=X`
+**GET /hr/api/documents/**
+- List employee documents
+- Query params: `?employee_id=X&status=pending`
 
-**POST /hr/api/time-adjustments/**
-- Create manual time adjustment
+**POST /hr/api/documents/**
+- Upload employee document
 
-**PATCH /hr/api/timesheets/{id}/approve/**
-- Approve timesheet
+**GET /hr/api/documents/{id}/**
+- Get document details
+
+**PATCH /hr/api/documents/{id}/approve/**
+- Approve/reject document
+
+**GET /hr/api/documents/{id}/download/**
+- Download document file
 
 ### Users (Portal Integration)
 
@@ -220,11 +238,25 @@ The HR System is a comprehensive human resources management platform for employe
 **POST /hr/api/users/**
 - Create user account
 
+**PUT /hr/api/users/{id}/**
+- Update user account
+
 **PATCH /hr/api/users/{id}/permissions/**
 - Update user system permissions
 
+**POST /hr/api/auth/sync-password**
+- Sync password from Portal (internal use)
+
+### Audit Logs
+
+**GET /hr/api/audit-logs/**
+- List audit log entries
+- Query params: `?user_id=X&action=view&start_date=YYYY-MM-DD`
+
+### Health Check
+
 **GET /hr/health**
-- Health check
+- System health check
 
 ## Configuration
 
@@ -312,44 +344,35 @@ https://rm.swhgrp.com/hr/
 2. Click "Add Employee"
 3. Fill in personal information
 4. Select department and position
-5. Set hire date and pay rate
-6. Save
+5. Set hire date and employment status
+6. Add emergency contacts (optional)
+7. Save
 
 ### Creating a User Account
 
 1. Go to HR admin or use API
 2. Create user linked to employee
 3. Set username and password
-4. Configure system permissions
-5. User can now login via Portal
+4. Assign role (Admin, Manager, Employee)
+5. Configure system permissions
+6. User can now login via Portal
 
-### Scheduling Employees
+### Managing Employee Documents
 
-1. Navigate to Schedules section
-2. Select date range and department
-3. Click "Create Schedule"
-4. Assign shifts to employees
-5. Review and publish schedule
-6. Employees receive notifications
+1. Navigate to employee profile
+2. Click "Documents" tab
+3. Click "Upload Document"
+4. Select document type (Food Handler Certificate, Background Check, I-9, W-4, etc.)
+5. Upload file and set expiration date (if applicable)
+6. Document status starts as "Pending"
+7. Admin/Manager can approve or reject documents
 
-### Time Clock
+### Viewing Audit Logs
 
-1. Employee goes to time clock page
-2. Enters employee ID or scans badge
-3. Clicks "Clock In"
-4. System records time entry
-5. At end of shift, clicks "Clock Out"
-6. Manager reviews and approves timesheets
-
-### Running Payroll
-
-1. Navigate to Payroll section
-2. Select pay period
-3. Review time entries for all employees
-4. Make any necessary adjustments
-5. Calculate totals (regular + overtime)
-6. Export to payroll processor
-7. Record payroll run
+1. Navigate to Audit Logs section (Admin only)
+2. Filter by user, action type, or date range
+3. View all employee data access and modifications
+4. Export for compliance reporting
 
 ## File Structure
 
@@ -357,32 +380,39 @@ https://rm.swhgrp.com/hr/
 hr/
 ├── src/
 │   └── hr/
-│       ├── models/              # 13 model files
-│       │   ├── employee.py
-│       │   ├── department.py
-│       │   ├── user.py
-│       │   ├── schedule.py
-│       │   ├── time_entry.py
-│       │   └── payroll.py
-│       ├── api/                 # 12 API route files
-│       │   ├── employees.py
-│       │   ├── schedules.py
-│       │   ├── time_entries.py
-│       │   ├── users.py
-│       │   └── payroll.py
-│       ├── services/            # 2 service files
-│       │   ├── scheduling_service.py
-│       │   └── payroll_service.py
-│       ├── templates/           # 13 HTML templates
-│       │   ├── employees/
-│       │   ├── schedules/
-│       │   ├── time_clock/
-│       │   └── payroll/
+│       ├── models/              # Django models
+│       │   ├── employee.py     # Employee profiles
+│       │   ├── department.py   # Departments and positions
+│       │   ├── user.py         # User accounts and RBAC
+│       │   ├── document.py     # Employee documents
+│       │   ├── audit.py        # Audit logging
+│       │   └── email.py        # Email settings
+│       ├── api/                 # API routes
+│       │   ├── employees.py    # Employee endpoints
+│       │   ├── departments.py  # Department endpoints
+│       │   ├── documents.py    # Document endpoints
+│       │   ├── users.py        # User endpoints
+│       │   ├── audit.py        # Audit log endpoints
+│       │   └── auth.py         # Authentication/SSO
+│       ├── templates/           # Django HTML templates
+│       │   ├── base.html       # Base template with sidebar
+│       │   ├── dashboard.html  # HR dashboard
+│       │   ├── employees/      # Employee management pages
+│       │   ├── documents/      # Document management pages
+│       │   ├── audit/          # Audit log pages
+│       │   └── settings/       # Email settings pages
 │       ├── static/              # CSS, JS, images
-│       ├── core/                # Settings, config
-│       ├── main.py              # Django application
+│       │   ├── css/
+│       │   ├── js/
+│       │   └── images/
+│       ├── core/                # Django settings
+│       │   ├── settings.py
+│       │   ├── urls.py
+│       │   └── wsgi.py
+│       ├── manage.py            # Django management
 │       └── __init__.py
 ├── migrations/                  # Database migrations
+├── documents/                   # Uploaded employee documents
 ├── Dockerfile
 ├── requirements.txt
 ├── .env
@@ -393,50 +423,93 @@ hr/
 
 ### Portal Integration
 
-HR system provides user authentication data:
-- User accounts
-- System permissions
-- Employee linkage
+HR system is the **master source** for user authentication:
+- User accounts stored in HR database
+- System permissions and roles managed in HR
+- Employee profiles linked to user accounts
+- Portal reads from HR database for SSO authentication
+- Centralized password changes sync to all systems
 
-Portal reads from HR database `users` table for authentication.
+**SSO Flow:**
+1. User logs into Portal with HR credentials
+2. Portal validates against HR database
+3. Portal generates JWT token
+4. User clicks system link (Inventory, Accounting, Events, etc.)
+5. System validates token with Portal and creates/updates local user via JIT provisioning
 
-### Accounting Integration
+### Password Synchronization
 
-HR system can export:
-- Labor costs by department
-- Payroll expenses
-- Employee reimbursements
+When a user changes their password via Portal:
+- HR database is updated first (master)
+- Portal syncs password to all microservices:
+  - Inventory System
+  - Accounting System
+  - Events System
+  - Integration Hub
+  - Files System
+- Uses internal service authentication with `X-Portal-Auth` header
+- Gracefully handles systems where user hasn't logged in yet (JIT)
 
-### Events Integration (Future)
+### Accounting Integration (Planned)
 
-- Employee scheduling for events
-- Event staff assignment
-- Labor cost tracking per event
+Potential future integration:
+- Export employee cost data by department
+- Employee reimbursement tracking
 
-### Inventory Integration (Future)
+### Events Integration (Planned)
 
-- Manager scheduling for inventory counts
+Potential future integration:
+- Event staff assignment based on employee data
+- Access control for event management
+
+### Inventory Integration (Planned)
+
+Potential future integration:
 - Department head access control
+- Manager assignments for inventory operations
 
 ## Troubleshooting
 
-### Issue: Can't clock in
+### Issue: Can't login via Portal
 **Solution:**
-- Verify employee is active
-- Check time clock is enabled for location
-- Ensure no open clock-in record exists
+- Verify employee has an active user account in HR system
+- Check user is marked as `is_active=True`
+- Ensure correct username and password
+- Check HR database connection
 
-### Issue: Timesheet not calculating correctly
+### Issue: User can't access certain systems
 **Solution:**
-- Check pay period dates
-- Verify time entries are approved
-- Review overtime calculation rules
+- Verify user role and permissions in HR system
+- Check system-specific access flags
+- Ensure user has logged into system at least once (JIT provisioning)
+- Check location-based access restrictions if configured
 
-### Issue: Schedule conflicts
+### Issue: Document upload fails
 **Solution:**
-- Check employee availability
-- Review shift overlap rules
-- Verify department assignments
+- Verify file size is within limits
+- Check supported file types (PDF, JPG, PNG, DOCX)
+- Ensure `/app/documents/` directory has write permissions
+- Check available disk space
+
+### Issue: Password change not syncing
+**Solution:**
+- Check Portal service is running
+- Verify `PORTAL_SECRET_KEY` matches across all systems
+- Review Portal logs for sync errors
+- Systems where user hasn't logged in yet will sync on first login (JIT)
+
+### Issue: Encrypted fields showing garbled data
+**Solution:**
+- Verify `FIELD_ENCRYPTION_KEY` environment variable is set
+- Check encryption key hasn't changed (data encrypted with old key)
+- Review Django cryptography library installation
+
+### Issue: Audit logs not recording
+**Solution:**
+- Check Celery worker is running
+- Verify Redis connection for task queue
+- Review application logs for errors
+- Ensure audit logging middleware is enabled
 
 ## Development
 
@@ -506,35 +579,95 @@ Key packages (see requirements.txt for complete list):
 
 ## Security
 
-- Password hashing with bcrypt
-- CSRF protection
-- SQL injection prevention (Django ORM)
-- XSS protection
-- Secure session management
-- Role-based access control
-- Audit logging (partial)
+**Authentication & Authorization:**
+- Password hashing with bcrypt (via Django's default hasher)
+- Role-based access control (RBAC) with granular permissions
+- User session management with timeout warnings
+- SSO integration with Portal via JWT tokens
+- Location-based access restrictions
+
+**Data Protection:**
+- Field-level encryption for sensitive data:
+  - Social Security Numbers (SSN)
+  - Emergency contact information
+  - Other PII as configured
+- Environment variable for encryption key (`FIELD_ENCRYPTION_KEY`)
+- Django cryptography library
+
+**Application Security:**
+- CSRF protection (Django built-in)
+- SQL injection prevention (Django ORM parameterized queries)
+- XSS protection (Django template auto-escaping)
+- Secure session cookies (HttpOnly, Secure flags)
+- Content Security Policy headers
+
+**Audit & Compliance:**
+- Comprehensive audit logging for all employee data access
+- Tracks: user, action (view/create/update/delete), timestamp, IP address
+- Audit log UI for compliance reporting
+- Document expiration tracking and alerts
+
+**Network Security:**
+- Internal service authentication with `X-Portal-Auth` header
+- All inter-service communication on private Docker network
+- Public access via Nginx reverse proxy with HTTPS
+- Rate limiting on authentication endpoints
 
 ## Future Enhancements
 
-### Short-Term
-- [ ] Complete benefits management
-- [ ] PTO tracking and accrual
-- [ ] Performance review system
-- [ ] Training/certification tracking
+### Potential Feature Additions
 
-### Medium-Term
-- [ ] Full payroll processing
-- [ ] Direct deposit integration
-- [ ] Mobile app for time clock
-- [ ] Employee self-service portal
-- [ ] Automated shift bidding
+**Employee Management Enhancements:**
+- [ ] Performance review system (digital reviews, ratings, goals)
+- [ ] Training and certification tracking (beyond document uploads)
+- [ ] Disciplinary action tracking
+- [ ] Exit interview management
+- [ ] New hire onboarding workflows
+- [ ] Equipment checkout tracking
 
-### Long-Term
+**Time & Attendance (Not Currently Implemented):**
+- [ ] Time clock system (clock in/out)
+- [ ] Timesheet management and approval
+- [ ] Attendance tracking and reporting
+- [ ] Break time tracking
+- [ ] Overtime calculation
+
+**Scheduling (Not Currently Implemented):**
+- [ ] Shift scheduling and templates
+- [ ] Employee availability management
+- [ ] Schedule publishing and notifications
+- [ ] Shift swap requests and approvals
+- [ ] Coverage reporting
 - [ ] AI-powered scheduling optimization
-- [ ] Predictive labor cost forecasting
-- [ ] Integration with benefits providers
-- [ ] Background check integration
+
+**Payroll (Not Currently Implemented):**
+- [ ] Payroll calculation and processing
+- [ ] Pay stub generation
+- [ ] Direct deposit integration
+- [ ] Tax calculations and reporting
+- [ ] W-2 generation
+- [ ] Labor cost analytics
+
+**Benefits & Leave (Not Currently Implemented):**
+- [ ] Benefits enrollment and management
+- [ ] PTO/vacation accrual and tracking
+- [ ] Sick leave management
+- [ ] Holiday calendar
+- [ ] Leave request workflow
+
+**Reporting & Analytics:**
+- [ ] Headcount and turnover reports
+- [ ] Labor cost analysis by department
+- [ ] Document expiration dashboard improvements
+- [ ] Custom report builder
+- [ ] Data export to Excel/PDF
+
+**Integration Enhancements:**
+- [ ] Background check API integration
+- [ ] Benefits provider integration
 - [ ] Applicant tracking system (ATS)
+- [ ] Payroll processor integration
+- [ ] Employee self-service mobile app
 
 ## Support
 
