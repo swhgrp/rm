@@ -9,6 +9,7 @@ from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, 
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from jinja2 import Environment, FileSystemLoader
 from sqlalchemy.orm import Session
 from typing import Optional, List
 import os
@@ -44,7 +45,12 @@ app = FastAPI(
 
 # Setup templates and static files
 BASE_DIR = Path(__file__).resolve().parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+jinja_env = Environment(
+    loader=FileSystemLoader(str(BASE_DIR / "templates")),
+    auto_reload=True,
+    cache_size=0  # Disable template caching
+)
+templates = Jinja2Templates(env=jinja_env)
 
 # Create static directory if it doesn't exist
 static_dir = BASE_DIR / "static"
@@ -507,9 +513,16 @@ async def vendors_page(request: Request, db: Session = Depends(get_db)):
 @app.get("/settings", response_class=HTMLResponse)
 def settings_page(request: Request):
     """System settings configuration page"""
-    return templates.TemplateResponse("settings.html", {
-        "request": request
+    from datetime import datetime
+    response = templates.TemplateResponse("settings.html", {
+        "request": request,
+        "cache_bust": int(datetime.now().timestamp())
     })
+    # Add cache-control headers to prevent browser caching
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 # ============================================================================

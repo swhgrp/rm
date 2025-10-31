@@ -2,6 +2,12 @@
 
 {% block title %}Settings - Integration Hub{% endblock %}
 
+{% block head %}
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+{% endblock %}
+
 {% block content %}
 <div style="max-width: 1200px; margin: 0 auto;">
     <!-- Page Header -->
@@ -219,27 +225,41 @@
 </div>
 
 <script>
+// Settings Page JavaScript - Version 3.0 - Added debug logging and cache busting
+console.log('Settings page JavaScript loaded - Version 3.0');
+
 // Load settings on page load
 async function loadSettings() {
     try {
-        const response = await fetch('/hub/api/settings/', {
-            credentials: 'include'
+        // Add timestamp to prevent caching
+        const timestamp = new Date().getTime();
+        const response = await fetch(`/hub/api/settings/?_t=${timestamp}`, {
+            credentials: 'include',
+            cache: 'no-cache'
         });
         const settings = await response.json();
 
+        console.log('Settings loaded:', settings);
+        console.log('Settings type:', typeof settings);
+        console.log('Is array?', Array.isArray(settings));
+
         // Populate form fields - settings is an object like {"email.address": {"value": "...", ...}}
-        Object.entries(settings).forEach(([fullKey, setting]) => {
-            // Extract just the key part after the dot (e.g., "email.address" -> "address")
-            const key = fullKey.split('.').pop();
-            const field = document.getElementById(key);
-            if (field) {
-                if (field.type === 'checkbox') {
-                    field.checked = setting.value === 'true' || setting.value === true;
-                } else {
-                    field.value = setting.value || '';
+        if (settings && typeof settings === 'object' && !Array.isArray(settings)) {
+            Object.entries(settings).forEach(([fullKey, setting]) => {
+                // Extract just the key part after the dot (e.g., "email.address" -> "address")
+                const key = fullKey.split('.').pop();
+                const field = document.getElementById(key);
+                if (field) {
+                    if (field.type === 'checkbox') {
+                        field.checked = setting.value === 'true' || setting.value === true;
+                    } else {
+                        field.value = setting.value || '';
+                    }
                 }
-            }
-        });
+            });
+        } else {
+            console.error('Settings is not an object:', settings);
+        }
     } catch (error) {
         console.error('Error loading settings:', error);
     }
