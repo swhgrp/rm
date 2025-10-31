@@ -225,12 +225,24 @@ def get_document(document_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{document_id}/download")
-def download_document(document_id: int, db: Session = Depends(get_db)):
-    """Download a document file"""
+def download_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """Download a document file (requires authentication, ID/SSN restricted to admins)"""
 
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    # Restrict ID and SSN documents to admins only
+    restricted_types = ['ID Copy', 'Social Security Card']
+    if document.document_type in restricted_types and not current_user.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied. Only administrators can view ID and Social Security documents."
+        )
 
     if not os.path.exists(document.file_path):
         raise HTTPException(status_code=404, detail="File not found on disk")

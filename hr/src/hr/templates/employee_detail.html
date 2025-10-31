@@ -325,6 +325,7 @@
 {% block extra_scripts %}
 <script>
 let currentEmployeeId = null;
+const isAdmin = {{ 'true' if current_user.is_admin else 'false' }};
 
 function formatPhoneNumber(phone) {
     if (!phone) return '-';
@@ -460,6 +461,9 @@ function renderDocuments(documents) {
         return;
     }
 
+    // Restricted document types (admin only)
+    const restrictedDocTypes = ['ID Copy', 'Social Security Card'];
+
     container.innerHTML = `
         <div style="overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse;">
@@ -474,18 +478,28 @@ function renderDocuments(documents) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${documents.map(doc => `
+                    ${documents.map(doc => {
+                        const isRestricted = restrictedDocTypes.includes(doc.document_type);
+                        const canView = !isRestricted || isAdmin;
+
+                        return `
                         <tr style="border-bottom: 1px solid #30363d;">
-                            <td style="padding: 12px; color: #c9d1d9;"><strong>${doc.document_type}</strong></td>
-                            <td style="padding: 12px; color: #c9d1d9;">${doc.file_name}</td>
-                            <td style="padding: 12px; color: #c9d1d9;">${new Date(doc.uploaded_at).toLocaleDateString()}</td>
-                            <td style="padding: 12px; color: #c9d1d9;">${doc.expiration_date ? new Date(doc.expiration_date).toLocaleDateString() : '-'}</td>
+                            <td style="padding: 12px; color: #c9d1d9;">
+                                <strong>${doc.document_type}</strong>
+                                ${isRestricted ? '<span style="color: #f85149; font-size: 11px; margin-left: 8px;"><i class="bi bi-lock-fill"></i> Admin Only</span>' : ''}
+                            </td>
+                            <td style="padding: 12px; color: #c9d1d9;">${canView ? doc.file_name : '<i style="color: #8b949e;">Restricted</i>'}</td>
+                            <td style="padding: 12px; color: #c9d1d9;">${canView ? new Date(doc.uploaded_at).toLocaleDateString() : '-'}</td>
+                            <td style="padding: 12px; color: #c9d1d9;">${canView && doc.expiration_date ? new Date(doc.expiration_date).toLocaleDateString() : '-'}</td>
                             <td style="padding: 12px;">
+                                ${canView ? `
                                 <span style="padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; ${getStatusStyle(doc.status)}">
                                     ${doc.status}
                                 </span>
+                                ` : '<span style="color: #8b949e;">-</span>'}
                             </td>
                             <td style="padding: 12px;">
+                                ${canView ? `
                                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                                     <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;"
                                             onclick="previewDocument(${doc.id}, '${doc.file_name}', '${doc.file_type}')">
@@ -500,9 +514,15 @@ function renderDocuments(documents) {
                                         <i class="bi bi-trash"></i> Delete
                                     </button>
                                 </div>
+                                ` : `
+                                <div style="color: #8b949e; font-size: 13px;">
+                                    <i class="bi bi-lock-fill"></i> Admin access required
+                                </div>
+                                `}
                             </td>
                         </tr>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </tbody>
             </table>
         </div>

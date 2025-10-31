@@ -465,49 +465,7 @@
         </div>
     </div>
 
-    <!-- Section 6: Initial Position Assignment (only for new employees) -->
-    {% if not employee %}
-    <div class="card" style="margin-bottom: 20px;">
-        <div class="card-header">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h2><i class="bi bi-pin-map"></i> Initial Position Assignment</h2>
-                <label style="margin: 0; display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="checkbox" id="assignPosition"
-                           style="width: auto; margin: 0;">
-                    <span style="color: #8b949e;">Assign position now</span>
-                </label>
-            </div>
-        </div>
-
-        <div id="positionSection" style="display: none;">
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
-                <!-- Position -->
-                <div class="form-group">
-                    <label for="position_id">Position</label>
-                    <select id="position_id" name="position_id">
-                        <option value="">Select Position</option>
-                    </select>
-                </div>
-
-                <!-- Location -->
-                <div class="form-group">
-                    <label for="location_id">Location</label>
-                    <select id="location_id" name="location_id">
-                        <option value="">Select Location</option>
-                    </select>
-                </div>
-
-                <!-- Start Date -->
-                <div class="form-group">
-                    <label for="position_start_date">Start Date</label>
-                    <input type="date" id="position_start_date" name="position_start_date">
-                </div>
-            </div>
-        </div>
-    </div>
-    {% endif %}
-
-    <!-- Section 7: Required Documents (only for new employees) -->
+    <!-- Section 6: Required Documents (only for new employees) -->
     {% if not employee %}
     <div class="card" style="margin-bottom: 20px;">
         <div class="card-header">
