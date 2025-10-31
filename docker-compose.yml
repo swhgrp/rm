@@ -135,6 +135,8 @@ services:
       - ./integration-hub/src:/app/src
       - ./integration-hub/alembic:/app/alembic
       - ./integration-hub/uploads:/app/uploads
+    env_file:
+      - ./integration-hub/.env
     environment:
       - DATABASE_URL=postgresql://hub_user:hub_password@hub-db:5432/integration_hub_db
       - INVENTORY_API_URL=http://inventory-app:8000/api

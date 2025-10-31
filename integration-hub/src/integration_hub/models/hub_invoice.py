@@ -31,6 +31,13 @@ class HubInvoice(Base):
     source_filename = Column(String(500), nullable=True)  # If uploaded
     raw_data = Column(JSON, nullable=True)  # Original invoice data
 
+    # Email monitoring fields
+    pdf_path = Column(String(1000), nullable=True)  # Path to stored PDF
+    invoice_hash = Column(String(64), nullable=True, unique=True, index=True)  # SHA-256 hash for deduplication
+    email_subject = Column(String(500), nullable=True)  # Original email subject
+    email_from = Column(String(200), nullable=True)  # Sender email address
+    email_received_at = Column(DateTime(timezone=True), nullable=True)  # When email was received
+
     # Location/Area
     location_id = Column(Integer, nullable=True)
     location_name = Column(String(100), nullable=True)

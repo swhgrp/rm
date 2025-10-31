@@ -22,21 +22,32 @@
                     <thead>
                         <tr>
                             <th>Category</th>
-                            <th>Display Name</th>
                             <th>Asset Account</th>
                             <th>COGS Account</th>
                             <th>Waste Account</th>
+                            <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for mapping in mappings %}
                         <tr>
-                            <td><code>{{ mapping.inventory_category }}</code></td>
-                            <td>{{ mapping.display_name }}</td>
+                            <td>
+                                <strong>{{ mapping.inventory_category }}</strong>
+                                {% if mapping.asset_account_name %}
+                                <br><small class="text-muted">{{ mapping.asset_account_name }}</small>
+                                {% endif %}
+                            </td>
                             <td>{{ mapping.gl_asset_account }}</td>
                             <td>{{ mapping.gl_cogs_account }}</td>
                             <td>{{ mapping.gl_waste_account or '-' }}</td>
+                            <td>
+                                {% if mapping.is_active %}
+                                <span class="badge bg-success">Active</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 <button class="btn btn-sm btn-secondary">
                                     <i class="bi bi-pencil"></i> Edit
@@ -124,28 +135,30 @@
                         <label class="form-label">Category Code <span class="text-danger">*</span></label>
                         <select class="form-select" name="inventory_category" required>
                             <option value="">Select category...</option>
-                            <option value="produce">produce</option>
-                            <option value="dairy">dairy</option>
-                            <option value="poultry">poultry</option>
-                            <option value="beef">beef</option>
-                            <option value="seafood">seafood</option>
-                            <option value="pork">pork</option>
-                            <option value="dry_goods">dry_goods</option>
-                            <option value="frozen">frozen</option>
-                            <option value="beverage_na">beverage_na</option>
-                            <option value="beer_draft">beer_draft</option>
-                            <option value="beer_bottled">beer_bottled</option>
-                            <option value="wine">wine</option>
-                            <option value="liquor">liquor</option>
-                            <option value="supplies">supplies</option>
-                            <option value="merchandise">merchandise</option>
+                            <option value="Produce">Produce</option>
+                            <option value="Dairy">Dairy</option>
+                            <option value="Poultry">Poultry</option>
+                            <option value="Beef">Beef</option>
+                            <option value="Seafood">Seafood</option>
+                            <option value="Pork">Pork</option>
+                            <option value="Dry Goods">Dry Goods</option>
+                            <option value="Frozen">Frozen</option>
+                            <option value="Beverage (Non-Alcohol)">Beverage (Non-Alcohol)</option>
+                            <option value="Beer - Draft">Beer - Draft</option>
+                            <option value="Beer - Bottled">Beer - Bottled</option>
+                            <option value="Wine">Wine</option>
+                            <option value="Liquor">Liquor</option>
+                            <option value="Supplies">Supplies</option>
+                            <option value="Merchandise">Merchandise</option>
                         </select>
+                        <small class="text-muted">Select the inventory category to map</small>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Display Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="display_name" required
-                               placeholder="e.g., Poultry">
+                        <label class="form-label">Asset Account Name</label>
+                        <input type="text" class="form-control" name="asset_account_name"
+                               placeholder="e.g., Poultry Inventory (optional)">
+                        <small class="text-muted">Optional display name for the asset account</small>
                     </div>
 
                     <hr>

@@ -9,7 +9,6 @@ from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, 
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from jinja2 import Environment, FileSystemLoader
 from sqlalchemy.orm import Session
 from typing import Optional, List
 import os
@@ -25,6 +24,7 @@ from integration_hub.services.inventory_sender import get_inventory_sender
 from integration_hub.services.accounting_sender import get_accounting_sender
 from integration_hub.services.auto_send import get_auto_send_service
 from integration_hub.services.vendor_sync import get_vendor_sync_service
+from integration_hub.services.email_scheduler import get_email_scheduler
 from integration_hub.api import auth as auth_router
 from integration_hub.api import settings as settings_router
 
@@ -45,12 +45,10 @@ app = FastAPI(
 
 # Setup templates and static files
 BASE_DIR = Path(__file__).resolve().parent
-jinja_env = Environment(
-    loader=FileSystemLoader(str(BASE_DIR / "templates")),
-    auto_reload=True,
-    cache_size=0  # Disable template caching
-)
-templates = Jinja2Templates(env=jinja_env)
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+# Configure Jinja2 environment for template caching control
+templates.env.auto_reload = True
+templates.env.cache_size = 0  # Disable template caching
 
 # Create static directory if it doesn't exist
 static_dir = BASE_DIR / "static"
@@ -60,6 +58,42 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 # Include routers
 app.include_router(auth_router.router)
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
+
+
+# ============================================================================
+# STARTUP AND SHUTDOWN EVENTS
+# ============================================================================
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize services on application startup"""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Start email scheduler (checks every 15 minutes by default)
+    try:
+        check_interval = int(os.getenv("EMAIL_CHECK_INTERVAL_MINUTES", "15"))
+        scheduler = get_email_scheduler(check_interval_minutes=check_interval)
+        scheduler.start()
+        logger.info(f"Email scheduler started - checking every {check_interval} minutes")
+    except Exception as e:
+        logger.error(f"Failed to start email scheduler: {str(e)}", exc_info=True)
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean up services on application shutdown"""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Stop email scheduler
+    try:
+        scheduler = get_email_scheduler()
+        if scheduler.is_running:
+            scheduler.stop()
+            logger.info("Email scheduler stopped")
+    except Exception as e:
+        logger.error(f"Error stopping email scheduler: {str(e)}", exc_info=True)
 
 # Custom exception handler for authentication redirects
 @app.exception_handler(HTTPException)
@@ -203,6 +237,34 @@ async def upload_invoice(
     return RedirectResponse(url=f"/invoices/{invoice.id}", status_code=303)
 
 
+@app.post("/api/invoices/{invoice_id}/parse")
+async def parse_invoice(invoice_id: int, db: Session = Depends(get_db)):
+    """
+    Parse an invoice PDF using OpenAI to extract invoice data and line items
+    """
+    from integration_hub.services.invoice_parser import get_invoice_parser
+
+    try:
+        parser = get_invoice_parser()
+        result = parser.parse_and_save(invoice_id, db)
+        return result
+    except ValueError as e:
+        # Configuration error (e.g., missing API key)
+        return {
+            "success": False,
+            "message": f"Configuration error: {str(e)}"
+        }
+    except Exception as e:
+        # Unexpected error
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error parsing invoice {invoice_id}: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "message": f"Error parsing invoice: {str(e)}"
+        }
+
+
 # ============================================================================
 # UNMAPPED ITEMS REVIEW
 # ============================================================================
@@ -224,6 +286,50 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
 # ============================================================================
 # ITEM MAPPING APIs
 # ============================================================================
+
+@app.post("/api/invoices/{invoice_id}/auto-map")
+async def auto_map_invoice_items(invoice_id: int, db: Session = Depends(get_db)):
+    """
+    Auto-map invoice items using intelligent matching
+
+    Uses vendor codes, fuzzy description matching, and category mappings
+    to automatically assign inventory items and GL accounts.
+    """
+    from integration_hub.services.auto_mapper import get_auto_mapper
+
+    try:
+        # Check if invoice exists
+        invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+        if not invoice:
+            return {
+                "success": False,
+                "message": f"Invoice {invoice_id} not found"
+            }
+
+        # Run auto-mapper
+        mapper = get_auto_mapper(db)
+        stats = mapper.map_invoice_items(invoice_id)
+
+        if stats.get('error'):
+            return {
+                "success": False,
+                "message": stats['error']
+            }
+
+        return {
+            "success": True,
+            "message": f"Auto-mapped {stats['mapped_count']} of {stats['total_items']} items",
+            "stats": stats
+        }
+
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error auto-mapping invoice {invoice_id}: {str(e)}", exc_info=True)
+        return {
+            "success": False,
+            "message": f"Error auto-mapping: {str(e)}"
+        }
 
 @app.post("/api/items/{item_id}/map")
 async def map_item(
@@ -317,7 +423,7 @@ async def list_category_mappings(request: Request, db: Session = Depends(get_db)
 @app.post("/api/category-mappings")
 async def create_category_mapping(
     inventory_category: str = Form(...),
-    display_name: str = Form(...),
+    asset_account_name: Optional[str] = Form(None),
     gl_asset_account: int = Form(...),
     gl_cogs_account: int = Form(...),
     gl_waste_account: Optional[int] = Form(None),
@@ -332,24 +438,26 @@ async def create_category_mapping(
 
     if mapping:
         # Update existing
-        mapping.display_name = display_name
+        mapping.asset_account_name = asset_account_name
         mapping.gl_asset_account = gl_asset_account
         mapping.gl_cogs_account = gl_cogs_account
         mapping.gl_waste_account = gl_waste_account
+        mapping.is_active = True
     else:
         # Create new
         mapping = CategoryGLMapping(
             inventory_category=inventory_category,
-            display_name=display_name,
+            asset_account_name=asset_account_name,
             gl_asset_account=gl_asset_account,
             gl_cogs_account=gl_cogs_account,
-            gl_waste_account=gl_waste_account
+            gl_waste_account=gl_waste_account,
+            is_active=True
         )
         db.add(mapping)
 
     db.commit()
 
-    return RedirectResponse(url="/category-mappings", status_code=303)
+    return RedirectResponse(url="/hub/category-mappings", status_code=303)
 
 
 # ============================================================================

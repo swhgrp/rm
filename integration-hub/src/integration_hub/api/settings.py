@@ -7,8 +7,13 @@ from typing import List, Dict, Optional
 from pydantic import BaseModel
 from integration_hub.db.database import get_db
 from integration_hub.models.system_setting import SystemSetting
+from integration_hub.services.email_monitor import EmailMonitorService
+from integration_hub.services.email_scheduler import get_email_scheduler
 import imaplib
 import ssl
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -176,4 +181,68 @@ def test_email_connection(
             "success": False,
             "message": f"Connection failed: {str(e)}",
             "error_type": "connection"
+        }
+
+
+@router.post("/check-email")
+def check_email_now(db: Session = Depends(get_db)):
+    """
+    Manually trigger email check for new invoices.
+    Connects to configured email account, checks for unread emails with PDF attachments,
+    and creates invoice records for any new invoices found.
+    """
+    try:
+        # Create email monitor service
+        monitor = EmailMonitorService(db)
+
+        # Process unread emails
+        stats = monitor.process_unread_emails()
+
+        return {
+            "success": True,
+            "message": f"Email check completed. Processed {stats['processed']} new invoices.",
+            "stats": {
+                "emails_checked": stats['checked'],
+                "invoices_processed": stats['processed'],
+                "duplicates_skipped": stats['duplicates'],
+                "errors": stats['errors']
+            }
+        }
+
+    except ValueError as e:
+        # Typically missing email configuration
+        logger.error(f"Configuration error checking email: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Configuration error: {str(e)}",
+            "error_type": "configuration"
+        }
+
+    except Exception as e:
+        logger.error(f"Error checking email: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to check email: {str(e)}"
+        )
+
+
+@router.get("/scheduler-status")
+def get_scheduler_status():
+    """
+    Get the current status of the email scheduler.
+    Returns information about whether it's running and when the next check will occur.
+    """
+    try:
+        scheduler = get_email_scheduler()
+        status = scheduler.get_status()
+        return {
+            "success": True,
+            **status
+        }
+    except Exception as e:
+        logger.error(f"Error getting scheduler status: {str(e)}")
+        return {
+            "success": False,
+            "running": False,
+            "error": str(e)
         }
