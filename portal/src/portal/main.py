@@ -36,6 +36,39 @@ app = FastAPI(
     root_path="/portal"
 )
 
+# Middleware to refresh session tokens
+@app.middleware("http")
+async def session_refresh_middleware(request: Request, call_next):
+    """Automatically refresh session tokens when they're close to expiring"""
+    response = await call_next(request)
+
+    # Only refresh on successful responses for authenticated users
+    if response.status_code == 200 and hasattr(request.state, "user"):
+        user = request.state.user
+        token_exp = getattr(request.state, "token_exp", None)
+
+        if token_exp and user:
+            # Check if token expires in less than 10 minutes
+            time_until_expiry = token_exp - datetime.utcnow().timestamp()
+
+            if 0 < time_until_expiry < 600:  # Less than 10 minutes (600 seconds)
+                # Issue a new token with fresh expiration
+                new_token = create_access_token(data={"sub": user.username})
+
+                # Update the cookie with the new token
+                response.set_cookie(
+                    key=SESSION_COOKIE_NAME,
+                    value=new_token,
+                    httponly=True,
+                    max_age=SESSION_EXPIRE_MINUTES * 60,
+                    samesite="lax",
+                    secure=True  # Enable secure flag for HTTPS
+                )
+
+                logger.info(f"Session refreshed for user {user.username} (had {int(time_until_expiry)} seconds remaining)")
+
+    return response
+
 # Static files and templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
@@ -105,8 +138,13 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
+        exp = payload.get("exp")
         if username is None:
             return None
+
+        # Store token expiration in request state for potential refresh
+        request.state.token_exp = exp
+        request.state.token = token
     except JWTError:
         return None
 
@@ -114,6 +152,8 @@ def get_current_user(request: Request, db: Session = Depends(get_db)):
     if user is None or not user.is_active:
         return None
 
+    # Store user in request state for middleware
+    request.state.user = user
     return user
 
 
@@ -273,7 +313,8 @@ async def login(
         value=access_token,
         httponly=True,
         max_age=SESSION_EXPIRE_MINUTES * 60,
-        samesite="lax"
+        samesite="lax",
+        secure=True  # Enable secure flag for HTTPS
     )
 
     return response
