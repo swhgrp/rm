@@ -505,7 +505,7 @@ async def vendors_page(request: Request, db: Session = Depends(get_db)):
 
 
 @app.get("/settings", response_class=HTMLResponse)
-async def settings_page(request: Request):
+def settings_page(request: Request):
     """System settings configuration page"""
     return templates.TemplateResponse("settings.html", {
         "request": request

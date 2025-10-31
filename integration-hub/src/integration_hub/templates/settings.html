@@ -227,12 +227,14 @@ async function loadSettings() {
         });
         const settings = await response.json();
 
-        // Populate form fields
-        settings.forEach(setting => {
-            const field = document.getElementById(setting.key);
+        // Populate form fields - settings is an object like {"email.address": {"value": "...", ...}}
+        Object.entries(settings).forEach(([fullKey, setting]) => {
+            // Extract just the key part after the dot (e.g., "email.address" -> "address")
+            const key = fullKey.split('.').pop();
+            const field = document.getElementById(key);
             if (field) {
                 if (field.type === 'checkbox') {
-                    field.checked = setting.value === 'true';
+                    field.checked = setting.value === 'true' || setting.value === true;
                 } else {
                     field.value = setting.value || '';
                 }

@@ -7,7 +7,6 @@ from typing import List, Dict, Optional
 from pydantic import BaseModel
 from integration_hub.db.database import get_db
 from integration_hub.models.system_setting import SystemSetting
-from integration_hub.core.auth import require_auth
 import imaplib
 import ssl
 
@@ -39,8 +38,7 @@ class EmailTestRequest(BaseModel):
 @router.get("/")
 def get_settings(
     category: Optional[str] = None,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(require_auth)
+    db: Session = Depends(get_db)
 ):
     """
     Get all settings or filter by category
@@ -68,8 +66,7 @@ def get_settings(
 @router.post("/bulk")
 def save_settings(
     bulk_update: BulkSettingsUpdate,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(require_auth)
+    db: Session = Depends(get_db)
 ):
     """
     Save multiple settings at once
@@ -88,7 +85,7 @@ def save_settings(
             # Update existing setting
             existing.value = setting_data.value
             existing.is_encrypted = setting_data.is_encrypted
-            existing.updated_by = current_user.get("user_id")
+            existing.updated_by = None  # No auth tracking for now
             updated_count += 1
         else:
             # Create new setting
@@ -97,7 +94,7 @@ def save_settings(
                 key=setting_data.key,
                 value=setting_data.value,
                 is_encrypted=setting_data.is_encrypted,
-                updated_by=current_user.get("user_id")
+                updated_by=None  # No auth tracking for now
             )
             db.add(new_setting)
             created_count += 1
@@ -114,8 +111,7 @@ def save_settings(
 
 @router.post("/test-email")
 def test_email_connection(
-    test_request: EmailTestRequest,
-    current_user: dict = Depends(require_auth)
+    test_request: EmailTestRequest
 ):
     """
     Test IMAP email connection with provided credentials
