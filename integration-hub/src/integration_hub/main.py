@@ -25,6 +25,7 @@ from integration_hub.services.accounting_sender import get_accounting_sender
 from integration_hub.services.auto_send import get_auto_send_service
 from integration_hub.services.vendor_sync import get_vendor_sync_service
 from integration_hub.api import auth as auth_router
+from integration_hub.api import settings as settings_router
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -52,6 +53,7 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 # Include routers
 app.include_router(auth_router.router)
+app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
 
 # Custom exception handler for authentication redirects
 @app.exception_handler(HTTPException)
@@ -499,6 +501,14 @@ async def vendors_page(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("vendors.html", {
         "request": request,
         "vendors": vendors
+    })
+
+
+@app.get("/settings", response_class=HTMLResponse)
+async def settings_page(request: Request):
+    """System settings configuration page"""
+    return templates.TemplateResponse("settings.html", {
+        "request": request
     })
 
 
