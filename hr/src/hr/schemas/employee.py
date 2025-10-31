@@ -37,7 +37,7 @@ class EmployeeBase(BaseModel):
     employment_status: str = "Active"
     employee_type: str = "Part-Time"
     starting_pay_rate: Optional[Decimal] = None
-    position_id: int  # Required field for new hires
+    position_id: Optional[int] = None  # Optional for existing employees
 
     # Termination Details
     termination_type: Optional[str] = None  # "Voluntary" or "Involuntary"
@@ -55,6 +55,7 @@ class EmployeeCreate(EmployeeBase):
     city: str
     state: str
     zip_code: str
+    position_id: int  # Required for new hires
 
     location_ids: Optional[List[int]] = []  # List of location IDs to assign
     create_inventory_user: bool = False  # For Phase 5 integration
