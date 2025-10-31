@@ -670,67 +670,10 @@ if (document.getElementById('employment_status').value === 'Terminated') {
     document.getElementById('authorized_by').required = true;
 }
 
-// Position assignment toggle (new employees only)
-if (!isEditMode) {
-    const assignPosCheckbox = document.getElementById('assignPosition');
-    const positionSection = document.getElementById('positionSection');
-
-    assignPosCheckbox.addEventListener('change', function() {
-        positionSection.style.display = this.checked ? 'block' : 'none';
-    });
-
-    // Load positions and locations for dropdown
-    async function loadPositionsAndLocations() {
-        try {
-            // Load positions (for position assignment section)
-            const posResponse = await fetch('/hr/api/positions/', {
-                credentials: 'include'
-            });
-            const positions = await posResponse.json();
-            const posSelect = document.getElementById('position_id');
-            if (posSelect) {
-                positions.forEach(pos => {
-                    const option = document.createElement('option');
-                    option.value = pos.id;
-                    option.textContent = pos.title;
-                    posSelect.appendChild(option);
-                });
-            }
-
-            // Load locations (for position assignment section)
-            const locResponse = await fetch('/hr/api/locations/', {
-                credentials: 'include'
-            });
-            const locations = await locResponse.json();
-            const locSelect = document.getElementById('location_id');
-            if (locSelect) {
-                locations.forEach(loc => {
-                    const option = document.createElement('option');
-                    option.value = loc.id;
-                    option.textContent = loc.name;
-                    locSelect.appendChild(option);
-                });
-            }
-        } catch (error) {
-            console.error('Error loading positions/locations:', error);
-        }
-    }
-
-    loadPositionsAndLocations();
-
-    // Set position start date to hire date when hire date changes
-    document.getElementById('hire_date').addEventListener('change', function() {
-        document.getElementById('position_start_date').value = this.value;
-    });
-}
-
 // Set default hire date to today for new employees
 if (!isEditMode && !document.getElementById('hire_date').value) {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('hire_date').value = today;
-    if (document.getElementById('position_start_date')) {
-        document.getElementById('position_start_date').value = today;
-    }
 }
 
 // Load assigned locations (for ALL employees - new and edit)
