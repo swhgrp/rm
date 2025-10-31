@@ -43,6 +43,14 @@ class HubInvoice(Base):
     inventory_sync_error = Column(Text, nullable=True)
     accounting_sync_error = Column(Text, nullable=True)
 
+    # System references (IDs from remote systems)
+    inventory_invoice_id = Column(Integer, nullable=True)
+    accounting_je_id = Column(Integer, nullable=True)
+
+    # Service-compatible error columns (aliases for sync_error columns)
+    inventory_error = Column(Text, nullable=True)
+    accounting_error = Column(Text, nullable=True)
+
     # Overall status
     status = Column(String(50), default='pending', index=True)
     # 'pending' - just received

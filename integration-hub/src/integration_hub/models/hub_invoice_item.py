@@ -53,5 +53,10 @@ class HubInvoiceItem(Base):
     # Relationships
     invoice = relationship("HubInvoice", back_populates="items")
 
+    @property
+    def line_total(self):
+        """Alias for total_amount to match service expectations"""
+        return self.total_amount
+
     def __repr__(self):
         return f"<HubInvoiceItem(id={self.id}, desc={self.item_description[:30]}, mapped={self.is_mapped})>"

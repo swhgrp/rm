@@ -3,6 +3,7 @@ Vendor sync service - fetches vendors from Inventory and Accounting systems
 and pushes new vendors to both systems
 """
 
+import asyncio
 import httpx
 import os
 from typing import List, Dict, Optional
