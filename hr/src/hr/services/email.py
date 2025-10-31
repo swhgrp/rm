@@ -71,7 +71,8 @@ class EmailService:
         subject: str,
         html_content: str,
         text_content: Optional[str] = None,
-        attachment_path: Optional[str] = None
+        attachment_path: Optional[str] = None,
+        attachment_paths: Optional[list] = None
     ) -> bool:
         """
         Send an email via SMTP.
@@ -81,7 +82,8 @@ class EmailService:
             subject: Email subject
             html_content: HTML content of the email
             text_content: Plain text content (optional)
-            attachment_path: Path to file to attach (optional)
+            attachment_path: Path to file to attach (optional, deprecated - use attachment_paths)
+            attachment_paths: List of paths to files to attach (optional)
 
         Returns:
             True if email sent successfully, False otherwise
@@ -111,17 +113,25 @@ class EmailService:
             html_part = MIMEText(html_content, 'html')
             message.attach(html_part)
 
-            # Add attachment if provided
-            if attachment_path and os.path.exists(attachment_path):
-                with open(attachment_path, 'rb') as f:
-                    part = MIMEBase('application', 'octet-stream')
-                    part.set_payload(f.read())
-                    encoders.encode_base64(part)
-                    part.add_header(
-                        'Content-Disposition',
-                        f'attachment; filename={os.path.basename(attachment_path)}'
-                    )
-                    message.attach(part)
+            # Collect all attachment paths (support both single and multiple)
+            all_attachments = []
+            if attachment_path:
+                all_attachments.append(attachment_path)
+            if attachment_paths:
+                all_attachments.extend(attachment_paths)
+
+            # Add attachments if provided
+            for att_path in all_attachments:
+                if att_path and os.path.exists(att_path):
+                    with open(att_path, 'rb') as f:
+                        part = MIMEBase('application', 'octet-stream')
+                        part.set_payload(f.read())
+                        encoders.encode_base64(part)
+                        part.add_header(
+                            'Content-Disposition',
+                            f'attachment; filename={os.path.basename(att_path)}'
+                        )
+                        message.attach(part)
 
             # Connect to SMTP server
             if config['use_tls']:
@@ -146,8 +156,21 @@ class EmailService:
             return False
 
     @staticmethod
-    def send_new_hire_email(employee_data: dict, created_by: str, position_info: Optional[dict] = None) -> bool:
-        """Send notification email when new employee is created."""
+    def send_new_hire_email(
+        employee_data: dict,
+        created_by: str,
+        position_info: Optional[dict] = None,
+        document_paths: Optional[list] = None
+    ) -> bool:
+        """
+        Send notification email when new employee is created.
+
+        Args:
+            employee_data: Dictionary containing employee information
+            created_by: Name and email of user who created the employee
+            position_info: Dictionary with position, location, start_date (optional but recommended)
+            document_paths: List of file paths to attach (ID, SSN docs, etc.)
+        """
         config = EmailService.get_smtp_config()
 
         # Format employee data
@@ -187,6 +210,7 @@ Employee Type: {employee_data.get('employee_type', 'N/A')}
 Starting Pay Rate: ${employee_data.get('starting_pay_rate', 'Not provided')}
 """
 
+        # Always include position information (now required)
         if position_info:
             text_content += f"""
 POSITION ASSIGNMENT
@@ -195,6 +219,22 @@ Position: {position_info.get('position', 'Not assigned')}
 Location: {position_info.get('location', 'Not assigned')}
 Start Date: {position_info.get('start_date', 'N/A')}
 """
+        else:
+            text_content += f"""
+POSITION ASSIGNMENT
+-------------------
+Position: Not yet assigned (ERROR - position should be required)
+"""
+
+        # Add document attachment note
+        if document_paths:
+            text_content += f"""
+ATTACHED DOCUMENTS
+-------------------
+"""
+            for doc_path in document_paths:
+                if doc_path and os.path.exists(doc_path):
+                    text_content += f"- {os.path.basename(doc_path)}\n"
 
         text_content += f"""
 ---
@@ -210,7 +250,8 @@ Date/Time: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
             to_email=config['hr_recipient'],
             subject=subject,
             html_content=html_content,
-            text_content=text_content
+            text_content=text_content,
+            attachment_paths=document_paths
         )
 
     @staticmethod

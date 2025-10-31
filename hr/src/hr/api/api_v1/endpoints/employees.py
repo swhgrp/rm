@@ -70,36 +70,8 @@ def create_employee(
         db.commit()
         db.refresh(db_employee)
 
-    # Send new hire notification email
-    try:
-        from hr.services.email import send_new_hire_notification
-        employee_dict = {
-            'employee_number': db_employee.employee_number,
-            'first_name': db_employee.first_name,
-            'last_name': db_employee.last_name,
-            'middle_name': db_employee.middle_name,
-            'date_of_birth': str(db_employee.date_of_birth) if db_employee.date_of_birth else None,
-            'email': db_employee.email,
-            'phone_number': db_employee.phone_number,
-            'street_address': db_employee.street_address,
-            'city': db_employee.city,
-            'state': db_employee.state,
-            'zip_code': db_employee.zip_code,
-            'emergency_contact_name': db_employee.emergency_contact_name,
-            'emergency_contact_relationship': db_employee.emergency_contact_relationship,
-            'emergency_contact_phone': db_employee.emergency_contact_phone,
-            'hire_date': str(db_employee.hire_date),
-            'employment_status': db_employee.employment_status,
-            'employee_type': db_employee.employee_type,
-            'starting_pay_rate': str(db_employee.starting_pay_rate) if db_employee.starting_pay_rate else None
-        }
-        created_by_info = f"{current_user.full_name} ({current_user.email})"
-        send_new_hire_notification(employee_dict, created_by_info)
-    except Exception as e:
-        # Log error but don't fail the employee creation
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Failed to send new hire notification: {str(e)}")
+    # NOTE: New hire notification email is sent after required documents are uploaded
+    # See document upload endpoint for email sending logic
 
     # Audit log: Employee created
     try:
@@ -659,6 +631,78 @@ async def upload_employee_document(
     db.add(document)
     db.commit()
     db.refresh(document)
+
+    # Check if this is a recently created employee and if all required documents are now uploaded
+    # Send new hire email with attachments if this is the case
+    try:
+        from hr.services.email import send_new_hire_notification
+        from hr.models.position import Position
+        from datetime import timedelta
+
+        # Check if employee was created recently (within last hour)
+        time_since_creation = datetime.now() - employee.created_at.replace(tzinfo=None)
+        is_new_hire = time_since_creation < timedelta(hours=1)
+
+        if is_new_hire:
+            # Check if we now have both ID and SSN documents
+            all_docs = db.query(Document).filter(Document.employee_id == employee_id).all()
+            doc_types = {doc.document_type for doc in all_docs}
+            has_required_docs = ('ID Copy' in doc_types and 'Social Security Card' in doc_types)
+
+            # Send email if we just completed the required documents
+            if has_required_docs and document_type in ['ID Copy', 'Social Security Card']:
+                # Build employee data dict
+                employee_dict = {
+                    'employee_number': employee.employee_number,
+                    'first_name': employee.first_name,
+                    'last_name': employee.last_name,
+                    'middle_name': employee.middle_name,
+                    'date_of_birth': str(employee.date_of_birth) if employee.date_of_birth else None,
+                    'email': employee.email,
+                    'phone_number': employee.phone_number,
+                    'street_address': employee.street_address,
+                    'city': employee.city,
+                    'state': employee.state,
+                    'zip_code': employee.zip_code,
+                    'emergency_contact_name': employee.emergency_contact_name,
+                    'emergency_contact_relationship': employee.emergency_contact_relationship,
+                    'emergency_contact_phone': employee.emergency_contact_phone,
+                    'hire_date': str(employee.hire_date),
+                    'employment_status': employee.employment_status,
+                    'employee_type': employee.employee_type,
+                    'starting_pay_rate': str(employee.starting_pay_rate) if employee.starting_pay_rate else None
+                }
+
+                # Fetch position information
+                position_info = None
+                if employee.position_id:
+                    position = db.query(Position).filter(Position.id == employee.position_id).first()
+                    if position:
+                        # Get first assigned location (if any)
+                        location_name = 'Not assigned'
+                        if employee.assigned_locations:
+                            location_name = employee.assigned_locations[0].name
+
+                        position_info = {
+                            'position': position.title,
+                            'location': location_name,
+                            'start_date': str(employee.hire_date) if employee.hire_date else 'N/A'
+                        }
+
+                # Collect document paths for ID and SSN documents
+                document_paths = []
+                for doc in all_docs:
+                    if doc.document_type in ['ID Copy', 'Social Security Card']:
+                        if doc.file_path and os.path.exists(doc.file_path):
+                            document_paths.append(doc.file_path)
+
+                created_by_info = f"{current_user.full_name} ({current_user.email})"
+                send_new_hire_notification(employee_dict, created_by_info, position_info, document_paths if document_paths else None)
+    except Exception as e:
+        # Log error but don't fail the document upload
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to send new hire notification after document upload: {str(e)}")
 
     return {
         "id": document.id,

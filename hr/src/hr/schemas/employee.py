@@ -37,7 +37,7 @@ class EmployeeBase(BaseModel):
     employment_status: str = "Active"
     employee_type: str = "Part-Time"
     starting_pay_rate: Optional[Decimal] = None
-    position_id: Optional[int] = None
+    position_id: int  # Required field for new hires
 
     # Termination Details
     termination_type: Optional[str] = None  # "Voluntary" or "Involuntary"
