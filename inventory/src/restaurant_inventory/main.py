@@ -313,6 +313,11 @@ async def reports_page(request: Request):
     """Reports page"""
     return templates.TemplateResponse("reports.html", {"request": request})
 
+@app.get("/analytics", response_class=HTMLResponse)
+async def analytics_page(request: Request):
+    """Analytics dashboard page"""
+    return templates.TemplateResponse("analytics.html", {"request": request})
+
 @app.get("/templates", response_class=HTMLResponse)
 async def templates_page(request: Request):
     """Count templates management page"""

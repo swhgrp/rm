@@ -617,3 +617,590 @@ async def get_transfers_report(
         ))
 
     return transfer_items
+
+
+# ==================== NEW ANALYTICS REPORTS ====================
+
+class COGSReportItem(BaseModel):
+    """Cost of Goods Sold report item"""
+    item_id: int
+    item_name: str
+    category: Optional[str]
+    beginning_inventory_qty: float
+    beginning_inventory_value: float
+    purchases_qty: float
+    purchases_value: float
+    ending_inventory_qty: float
+    ending_inventory_value: float
+    cogs_qty: float  # Beginning + Purchases - Ending
+    cogs_value: float
+    sales_qty: Optional[float]  # From POS transactions
+    theoretical_cogs: Optional[float]  # Based on recipe usage
+    variance: Optional[float]  # Actual COGS - Theoretical COGS
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/cogs", response_model=List[COGSReportItem])
+async def get_cogs_report(
+    start_date: date = Query(..., description="Period start date"),
+    end_date: date = Query(..., description="Period end date"),
+    location_id: Optional[int] = Query(None, description="Filter by location"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Cost of Goods Sold (COGS) Report
+
+    Formula: COGS = Beginning Inventory + Purchases - Ending Inventory
+    Shows actual consumption costs for the period.
+    """
+    from restaurant_inventory.models.inventory_transaction import InventoryTransaction
+
+    # Get all items that had activity during the period
+    items_query = db.query(MasterItem).filter(MasterItem.is_active == True)
+
+    if category:
+        items_query = items_query.filter(MasterItem.category == category)
+
+    items = items_query.all()
+
+    cogs_items = []
+
+    for item in items:
+        # Get beginning inventory (as of start_date - 1 day)
+        beginning_txns = db.query(
+            func.sum(InventoryTransaction.quantity_after).label('total_qty'),
+            func.sum(InventoryTransaction.value_after).label('total_value')
+        ).filter(
+            InventoryTransaction.master_item_id == item.id,
+            InventoryTransaction.transaction_date < start_date
+        )
+
+        if location_id:
+            beginning_txns = beginning_txns.filter(InventoryTransaction.location_id == location_id)
+
+        # Get the last transaction before start_date for each location/storage area
+        beginning_subquery = db.query(
+            InventoryTransaction.location_id,
+            InventoryTransaction.storage_area_id,
+            func.max(InventoryTransaction.transaction_date).label('max_date')
+        ).filter(
+            InventoryTransaction.master_item_id == item.id,
+            InventoryTransaction.transaction_date < start_date
+        )
+
+        if location_id:
+            beginning_subquery = beginning_subquery.filter(InventoryTransaction.location_id == location_id)
+
+        beginning_subquery = beginning_subquery.group_by(
+            InventoryTransaction.location_id,
+            InventoryTransaction.storage_area_id
+        ).subquery()
+
+        beginning = db.query(
+            func.sum(InventoryTransaction.quantity_after).label('total_qty'),
+            func.sum(InventoryTransaction.value_after).label('total_value')
+        ).join(
+            beginning_subquery,
+            and_(
+                InventoryTransaction.location_id == beginning_subquery.c.location_id,
+                InventoryTransaction.storage_area_id == beginning_subquery.c.storage_area_id,
+                InventoryTransaction.transaction_date == beginning_subquery.c.max_date,
+                InventoryTransaction.master_item_id == item.id
+            )
+        ).first()
+
+        beginning_qty = float(beginning.total_qty or 0) if beginning else 0
+        beginning_value = float(beginning.total_value or 0) if beginning else 0
+
+        # Get purchases during period
+        purchases = db.query(
+            func.sum(InventoryTransaction.quantity_change).label('total_qty'),
+            func.sum(InventoryTransaction.value_change).label('total_value')
+        ).filter(
+            InventoryTransaction.master_item_id == item.id,
+            InventoryTransaction.transaction_type == 'PURCHASE',
+            InventoryTransaction.transaction_date >= start_date,
+            InventoryTransaction.transaction_date <= end_date
+        )
+
+        if location_id:
+            purchases = purchases.filter(InventoryTransaction.location_id == location_id)
+
+        purchases = purchases.first()
+        purchases_qty = float(purchases.total_qty or 0) if purchases else 0
+        purchases_value = float(purchases.total_value or 0) if purchases else 0
+
+        # Get ending inventory (as of end_date)
+        ending_subquery = db.query(
+            InventoryTransaction.location_id,
+            InventoryTransaction.storage_area_id,
+            func.max(InventoryTransaction.transaction_date).label('max_date')
+        ).filter(
+            InventoryTransaction.master_item_id == item.id,
+            InventoryTransaction.transaction_date <= end_date
+        )
+
+        if location_id:
+            ending_subquery = ending_subquery.filter(InventoryTransaction.location_id == location_id)
+
+        ending_subquery = ending_subquery.group_by(
+            InventoryTransaction.location_id,
+            InventoryTransaction.storage_area_id
+        ).subquery()
+
+        ending = db.query(
+            func.sum(InventoryTransaction.quantity_after).label('total_qty'),
+            func.sum(InventoryTransaction.value_after).label('total_value')
+        ).join(
+            ending_subquery,
+            and_(
+                InventoryTransaction.location_id == ending_subquery.c.location_id,
+                InventoryTransaction.storage_area_id == ending_subquery.c.storage_area_id,
+                InventoryTransaction.transaction_date == ending_subquery.c.max_date,
+                InventoryTransaction.master_item_id == item.id
+            )
+        ).first()
+
+        ending_qty = float(ending.total_qty or 0) if ending else 0
+        ending_value = float(ending.total_value or 0) if ending else 0
+
+        # Calculate COGS
+        cogs_qty = beginning_qty + purchases_qty - ending_qty
+        cogs_value = beginning_value + purchases_value - ending_value
+
+        # Get POS sales quantity for comparison
+        sales = db.query(
+            func.sum(func.abs(InventoryTransaction.quantity_change)).label('total_qty')
+        ).filter(
+            InventoryTransaction.master_item_id == item.id,
+            InventoryTransaction.transaction_type == 'POS_SALE',
+            InventoryTransaction.transaction_date >= start_date,
+            InventoryTransaction.transaction_date <= end_date
+        )
+
+        if location_id:
+            sales = sales.filter(InventoryTransaction.location_id == location_id)
+
+        sales = sales.first()
+        sales_qty = float(sales.total_qty or 0) if sales else None
+
+        # Skip items with no activity
+        if beginning_qty == 0 and purchases_qty == 0 and ending_qty == 0:
+            continue
+
+        cogs_items.append(COGSReportItem(
+            item_id=item.id,
+            item_name=item.name,
+            category=item.category,
+            beginning_inventory_qty=beginning_qty,
+            beginning_inventory_value=beginning_value,
+            purchases_qty=purchases_qty,
+            purchases_value=purchases_value,
+            ending_inventory_qty=ending_qty,
+            ending_inventory_value=ending_value,
+            cogs_qty=cogs_qty,
+            cogs_value=cogs_value,
+            sales_qty=sales_qty,
+            theoretical_cogs=None,  # Would need recipe integration
+            variance=None
+        ))
+
+    # Sort by COGS value (highest first)
+    cogs_items.sort(key=lambda x: x.cogs_value, reverse=True)
+
+    return cogs_items
+
+
+class InventoryTurnoverItem(BaseModel):
+    """Inventory turnover metrics"""
+    item_id: int
+    item_name: str
+    category: Optional[str]
+    avg_inventory_value: float
+    cogs: float
+    turnover_ratio: float  # COGS / Avg Inventory
+    days_of_inventory: float  # 365 / Turnover Ratio
+    movement_status: str  # Fast, Medium, Slow, Dead
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/inventory-turnover", response_model=List[InventoryTurnoverItem])
+async def get_inventory_turnover(
+    start_date: date = Query(..., description="Period start date"),
+    end_date: date = Query(..., description="Period end date"),
+    location_id: Optional[int] = Query(None, description="Filter by location"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Inventory Turnover Report
+
+    Shows how quickly inventory is being used/sold.
+    Turnover Ratio = COGS / Average Inventory Value
+    Days of Inventory = 365 / Turnover Ratio
+    """
+    from restaurant_inventory.models.inventory_transaction import InventoryTransaction
+    from datetime import timedelta
+
+    # Calculate number of days in period
+    period_days = (end_date - start_date).days + 1
+
+    items_query = db.query(MasterItem).filter(MasterItem.is_active == True)
+
+    if category:
+        items_query = items_query.filter(MasterItem.category == category)
+
+    items = items_query.all()
+
+    turnover_items = []
+
+    for item in items:
+        # Get COGS for period (Beginning + Purchases - Ending)
+        # Simplified: Use sum of negative transactions (sales, waste, transfers out)
+        cogs = db.query(
+            func.sum(func.abs(InventoryTransaction.value_change)).label('total_cogs')
+        ).filter(
+            InventoryTransaction.master_item_id == item.id,
+            InventoryTransaction.transaction_type.in_(['POS_SALE', 'WASTE', 'TRANSFER_OUT', 'PRODUCTION']),
+            InventoryTransaction.transaction_date >= start_date,
+            InventoryTransaction.transaction_date <= end_date
+        )
+
+        if location_id:
+            cogs = cogs.filter(InventoryTransaction.location_id == location_id)
+
+        cogs = cogs.scalar() or 0
+        cogs = float(cogs)
+
+        # Calculate average inventory value during period
+        # Sample inventory values at start, middle, and end
+        sample_dates = [start_date, start_date + timedelta(days=period_days//2), end_date]
+        inventory_values = []
+
+        for sample_date in sample_dates:
+            subquery = db.query(
+                InventoryTransaction.location_id,
+                InventoryTransaction.storage_area_id,
+                func.max(InventoryTransaction.transaction_date).label('max_date')
+            ).filter(
+                InventoryTransaction.master_item_id == item.id,
+                InventoryTransaction.transaction_date <= sample_date
+            )
+
+            if location_id:
+                subquery = subquery.filter(InventoryTransaction.location_id == location_id)
+
+            subquery = subquery.group_by(
+                InventoryTransaction.location_id,
+                InventoryTransaction.storage_area_id
+            ).subquery()
+
+            value = db.query(
+                func.sum(InventoryTransaction.value_after)
+            ).join(
+                subquery,
+                and_(
+                    InventoryTransaction.location_id == subquery.c.location_id,
+                    InventoryTransaction.storage_area_id == subquery.c.storage_area_id,
+                    InventoryTransaction.transaction_date == subquery.c.max_date,
+                    InventoryTransaction.master_item_id == item.id
+                )
+            ).scalar()
+
+            if value:
+                inventory_values.append(float(value))
+
+        if not inventory_values:
+            continue
+
+        avg_inventory_value = sum(inventory_values) / len(inventory_values)
+
+        if avg_inventory_value == 0:
+            continue
+
+        # Calculate turnover ratio (annualized)
+        turnover_ratio = (cogs / avg_inventory_value) * (365 / period_days) if period_days > 0 else 0
+        days_of_inventory = 365 / turnover_ratio if turnover_ratio > 0 else 999
+
+        # Classify movement status
+        if days_of_inventory <= 30:
+            movement_status = "Fast"
+        elif days_of_inventory <= 60:
+            movement_status = "Medium"
+        elif days_of_inventory <= 90:
+            movement_status = "Slow"
+        else:
+            movement_status = "Dead"
+
+        turnover_items.append(InventoryTurnoverItem(
+            item_id=item.id,
+            item_name=item.name,
+            category=item.category,
+            avg_inventory_value=round(avg_inventory_value, 2),
+            cogs=round(cogs, 2),
+            turnover_ratio=round(turnover_ratio, 2),
+            days_of_inventory=round(days_of_inventory, 1),
+            movement_status=movement_status
+        ))
+
+    # Sort by days of inventory (slowest first)
+    turnover_items.sort(key=lambda x: x.days_of_inventory, reverse=True)
+
+    return turnover_items
+
+
+class ABCAnalysisItem(BaseModel):
+    """ABC Analysis classification item"""
+    item_id: int
+    item_name: str
+    category: Optional[str]
+    annual_usage_value: float
+    percent_of_total: float
+    cumulative_percent: float
+    abc_class: str  # A, B, or C
+    current_quantity: float
+    current_value: float
+    unit: str
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/abc-analysis", response_model=List[ABCAnalysisItem])
+async def get_abc_analysis(
+    start_date: date = Query(..., description="Period start date (for annual calculation)"),
+    end_date: date = Query(..., description="Period end date"),
+    location_id: Optional[int] = Query(None, description="Filter by location"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    ABC Analysis Report
+
+    Classifies inventory by value contribution:
+    - A items: Top 20% of items accounting for 80% of value
+    - B items: Next 30% of items accounting for 15% of value
+    - C items: Remaining 50% of items accounting for 5% of value
+
+    Helps prioritize inventory management efforts.
+    """
+    from restaurant_inventory.models.inventory_transaction import InventoryTransaction
+
+    # Calculate period days for annualization
+    period_days = (end_date - start_date).days + 1
+
+    # Get usage value for each item during period
+    usage_query = db.query(
+        MasterItem.id.label('item_id'),
+        MasterItem.name.label('item_name'),
+        MasterItem.category,
+        MasterItem.unit_of_measure.label('unit'),
+        func.sum(func.abs(InventoryTransaction.value_change)).label('usage_value')
+    ).join(
+        InventoryTransaction, MasterItem.id == InventoryTransaction.master_item_id
+    ).filter(
+        MasterItem.is_active == True,
+        InventoryTransaction.transaction_type.in_(['POS_SALE', 'WASTE', 'TRANSFER_OUT', 'PRODUCTION']),
+        InventoryTransaction.transaction_date >= start_date,
+        InventoryTransaction.transaction_date <= end_date
+    )
+
+    if location_id:
+        usage_query = usage_query.filter(InventoryTransaction.location_id == location_id)
+
+    usage_query = usage_query.group_by(
+        MasterItem.id, MasterItem.name, MasterItem.category, MasterItem.unit_of_measure
+    ).order_by(desc('usage_value'))
+
+    results = usage_query.all()
+
+    if not results:
+        return []
+
+    # Annualize the usage value
+    annualization_factor = 365 / period_days if period_days > 0 else 1
+
+    # Calculate total usage value
+    total_value = sum(float(r.usage_value or 0) * annualization_factor for r in results)
+
+    if total_value == 0:
+        return []
+
+    # Calculate cumulative percentages and classify
+    abc_items = []
+    cumulative = 0
+
+    for r in results:
+        annual_value = float(r.usage_value or 0) * annualization_factor
+        percent = (annual_value / total_value) * 100
+        cumulative += percent
+
+        # Classify (80/15/5 rule)
+        if cumulative <= 80:
+            abc_class = "A"
+        elif cumulative <= 95:
+            abc_class = "B"
+        else:
+            abc_class = "C"
+
+        # Get current inventory
+        current_inv = db.query(
+            func.sum(Inventory.current_quantity).label('qty'),
+            func.sum(Inventory.current_quantity * Inventory.unit_cost).label('value')
+        ).filter(
+            Inventory.master_item_id == r.item_id
+        )
+
+        if location_id:
+            current_inv = current_inv.filter(Inventory.location_id == location_id)
+
+        current_inv = current_inv.first()
+
+        abc_items.append(ABCAnalysisItem(
+            item_id=r.item_id,
+            item_name=r.item_name,
+            category=r.category,
+            annual_usage_value=round(annual_value, 2),
+            percent_of_total=round(percent, 2),
+            cumulative_percent=round(cumulative, 2),
+            abc_class=abc_class,
+            current_quantity=float(current_inv.qty or 0) if current_inv else 0,
+            current_value=float(current_inv.value or 0) if current_inv else 0,
+            unit=r.unit or ''
+        ))
+
+    return abc_items
+
+
+class SlowMovingItem(BaseModel):
+    """Slow moving inventory item"""
+    item_id: int
+    item_name: str
+    category: Optional[str]
+    current_quantity: float
+    current_value: float
+    unit: str
+    days_since_last_movement: int
+    last_movement_date: Optional[datetime]
+    last_movement_type: Optional[str]
+    par_level: Optional[float]
+    reorder_level: Optional[float]
+    recommendation: str  # Reduce stock, Discontinue, Review pricing, etc.
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/slow-moving", response_model=List[SlowMovingItem])
+async def get_slow_moving_inventory(
+    days_threshold: int = Query(90, description="Days without movement to be considered slow"),
+    location_id: Optional[int] = Query(None, description="Filter by location"),
+    min_value: Optional[float] = Query(None, description="Minimum inventory value to include"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Slow Moving Inventory Report
+
+    Identifies items that haven't moved in X days.
+    Helps identify dead stock, overstock, and obsolete items.
+    """
+    from restaurant_inventory.models.inventory_transaction import InventoryTransaction
+    from datetime import timedelta
+
+    # Get all items with current inventory
+    inventory_query = db.query(
+        MasterItem.id.label('item_id'),
+        MasterItem.name.label('item_name'),
+        MasterItem.category,
+        MasterItem.unit_of_measure.label('unit'),
+        MasterItem.par_level,
+        func.sum(Inventory.current_quantity).label('total_qty'),
+        func.sum(Inventory.current_quantity * Inventory.unit_cost).label('total_value'),
+        func.avg(Inventory.reorder_level).label('avg_reorder_level')
+    ).join(
+        Inventory, MasterItem.id == Inventory.master_item_id
+    ).filter(
+        MasterItem.is_active == True,
+        Inventory.current_quantity > 0
+    )
+
+    if location_id:
+        inventory_query = inventory_query.filter(Inventory.location_id == location_id)
+
+    inventory_query = inventory_query.group_by(
+        MasterItem.id, MasterItem.name, MasterItem.category,
+        MasterItem.unit_of_measure, MasterItem.par_level
+    )
+
+    results = inventory_query.all()
+
+    slow_items = []
+    cutoff_date = datetime.utcnow() - timedelta(days=days_threshold)
+
+    for r in results:
+        # Apply minimum value filter
+        total_value = float(r.total_value or 0)
+        if min_value and total_value < min_value:
+            continue
+
+        # Get last movement for this item
+        last_txn = db.query(
+            InventoryTransaction.transaction_date,
+            InventoryTransaction.transaction_type
+        ).filter(
+            InventoryTransaction.master_item_id == r.item_id,
+            InventoryTransaction.transaction_type.in_([
+                'POS_SALE', 'WASTE', 'TRANSFER_OUT', 'TRANSFER_IN',
+                'PURCHASE', 'PRODUCTION', 'ADJUSTMENT'
+            ])
+        )
+
+        if location_id:
+            last_txn = last_txn.filter(InventoryTransaction.location_id == location_id)
+
+        last_txn = last_txn.order_by(InventoryTransaction.transaction_date.desc()).first()
+
+        if last_txn:
+            days_since = (datetime.utcnow() - last_txn.transaction_date).days
+
+            # Only include if exceeds threshold
+            if days_since < days_threshold:
+                continue
+
+            # Generate recommendation
+            if days_since > 180:
+                recommendation = "Consider discontinuing - No movement in 6+ months"
+            elif days_since > 120:
+                recommendation = "Review pricing or run promotion - Very slow movement"
+            elif total_value > 500:
+                recommendation = "Reduce stock levels - High value slow mover"
+            else:
+                recommendation = "Monitor - Slow movement detected"
+
+            slow_items.append(SlowMovingItem(
+                item_id=r.item_id,
+                item_name=r.item_name,
+                category=r.category,
+                current_quantity=float(r.total_qty or 0),
+                current_value=total_value,
+                unit=r.unit or '',
+                days_since_last_movement=days_since,
+                last_movement_date=last_txn.transaction_date,
+                last_movement_type=last_txn.transaction_type,
+                par_level=float(r.par_level) if r.par_level else None,
+                reorder_level=float(r.avg_reorder_level) if r.avg_reorder_level else None,
+                recommendation=recommendation
+            ))
+
+    # Sort by days since movement (longest first)
+    slow_items.sort(key=lambda x: x.days_since_last_movement, reverse=True)
+
+    return slow_items

@@ -1,0 +1,580 @@
+{% extends "base.html" %}
+
+{% block title %}Inventory Analytics - SW Hospitality Group{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <h1 class="mb-4">
+        <i class="bi bi-graph-up"></i> Inventory Analytics Dashboard
+    </h1>
+
+    <!-- Date Range Filter (Global) -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label">Start Date</label>
+                    <input type="date" id="globalStartDate" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">End Date</label>
+                    <input type="date" id="globalEndDate" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Location</label>
+                    <select id="globalLocation" class="form-select">
+                        <option value="">All Locations</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <button class="btn btn-primary w-100" onclick="loadAllReports()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh All
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report Tabs -->
+    <ul class="nav nav-tabs mb-3" id="analyticsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="cogs-tab" data-bs-toggle="tab" data-bs-target="#cogs" type="button">
+                <i class="bi bi-calculator"></i> COGS
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="turnover-tab" data-bs-toggle="tab" data-bs-target="#turnover" type="button">
+                <i class="bi bi-arrow-repeat"></i> Turnover
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="abc-tab" data-bs-toggle="tab" data-bs-target="#abc" type="button">
+                <i class="bi bi-sort-alpha-down"></i> ABC Analysis
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="slowmoving-tab" data-bs-toggle="tab" data-bs-target="#slowmoving" type="button">
+                <i class="bi bi-hourglass-split"></i> Slow Moving
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="analyticsTabsContent">
+
+        <!-- COGS Report Tab -->
+        <div class="tab-pane fade show active" id="cogs" role="tabpanel">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-calculator"></i> Cost of Goods Sold (COGS)</h5>
+                    <button class="btn btn-sm btn-success" onclick="exportToCSV('cogsTable', 'COGS_Report')">
+                        <i class="bi bi-download"></i> Export CSV
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <input type="text" id="cogsSearch" class="form-control" placeholder="Search items...">
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover" id="cogsTable">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Category</th>
+                                    <th class="text-end">Beginning Qty</th>
+                                    <th class="text-end">Beginning Value</th>
+                                    <th class="text-end">Purchases</th>
+                                    <th class="text-end">Purchase Value</th>
+                                    <th class="text-end">Ending Qty</th>
+                                    <th class="text-end">Ending Value</th>
+                                    <th class="text-end">COGS</th>
+                                    <th class="text-end">Sales Qty</th>
+                                </tr>
+                            </thead>
+                            <tbody id="cogsTableBody">
+                                <tr><td colspan="10" class="text-center">Loading...</td></tr>
+                            </tbody>
+                            <tfoot id="cogsTotals">
+                                <!-- Totals will be added dynamically -->
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Inventory Turnover Tab -->
+        <div class="tab-pane fade" id="turnover" role="tabpanel">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> Inventory Turnover Analysis</h5>
+                    <button class="btn btn-sm btn-success" onclick="exportToCSV('turnoverTable', 'Turnover_Report')">
+                        <i class="bi bi-download"></i> Export CSV
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>Turnover Ratio = COGS / Avg Inventory Value</strong><br>
+                        Higher turnover = faster inventory movement. Days of Inventory shows how long inventory sits before being sold.
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <input type="text" id="turnoverSearch" class="form-control" placeholder="Search items...">
+                        </div>
+                        <div class="col-md-6">
+                            <select id="turnoverFilter" class="form-select" onchange="loadTurnoverReport()">
+                                <option value="">All Movement Status</option>
+                                <option value="Dead">Dead (90+ days)</option>
+                                <option value="Slow">Slow (60-90 days)</option>
+                                <option value="Medium">Medium (30-60 days)</option>
+                                <option value="Fast">Fast (0-30 days)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover" id="turnoverTable">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Category</th>
+                                    <th class="text-end">Avg Inventory Value</th>
+                                    <th class="text-end">COGS</th>
+                                    <th class="text-end">Turnover Ratio</th>
+                                    <th class="text-end">Days of Inventory</th>
+                                    <th>Movement Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="turnoverTableBody">
+                                <tr><td colspan="7" class="text-center">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ABC Analysis Tab -->
+        <div class="tab-pane fade" id="abc" role="tabpanel">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-sort-alpha-down"></i> ABC Analysis</h5>
+                    <button class="btn btn-sm btn-success" onclick="exportToCSV('abcTable', 'ABC_Analysis')">
+                        <i class="bi bi-download"></i> Export CSV
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <strong>ABC Classification:</strong><br>
+                        <span class="badge bg-danger me-2">A</span> High value items (top 80% of usage value) - tight control<br>
+                        <span class="badge bg-warning text-dark me-2">B</span> Medium value items (next 15%) - moderate control<br>
+                        <span class="badge bg-success me-2">C</span> Low value items (remaining 5%) - simple controls
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <input type="text" id="abcSearch" class="form-control" placeholder="Search items...">
+                        </div>
+                        <div class="col-md-6">
+                            <select id="abcClassFilter" class="form-select" onchange="loadABCAnalysis()">
+                                <option value="">All Classes</option>
+                                <option value="A">A Items Only</option>
+                                <option value="B">B Items Only</option>
+                                <option value="C">C Items Only</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover" id="abcTable">
+                            <thead>
+                                <tr>
+                                    <th>Class</th>
+                                    <th>Item</th>
+                                    <th>Category</th>
+                                    <th class="text-end">Annual Usage Value</th>
+                                    <th class="text-end">% of Total</th>
+                                    <th class="text-end">Cumulative %</th>
+                                    <th class="text-end">Current Qty</th>
+                                    <th class="text-end">Current Value</th>
+                                </tr>
+                            </thead>
+                            <tbody id="abcTableBody">
+                                <tr><td colspan="8" class="text-center">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slow Moving Tab -->
+        <div class="tab-pane fade" id="slowmoving" role="tabpanel">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-hourglass-split"></i> Slow Moving Inventory</h5>
+                    <button class="btn btn-sm btn-success" onclick="exportToCSV('slowMovingTable', 'Slow_Moving_Report')">
+                        <i class="bi bi-download"></i> Export CSV
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Days Threshold</label>
+                            <select id="daysThreshold" class="form-select" onchange="loadSlowMovingReport()">
+                                <option value="60">60 days</option>
+                                <option value="90" selected>90 days</option>
+                                <option value="120">120 days</option>
+                                <option value="180">180 days</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Minimum Value</label>
+                            <input type="number" id="minValue" class="form-control" placeholder="0" min="0" step="10">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Search</label>
+                            <input type="text" id="slowMovingSearch" class="form-control" placeholder="Search items...">
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-hover" id="slowMovingTable">
+                            <thead>
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Category</th>
+                                    <th class="text-end">Current Qty</th>
+                                    <th class="text-end">Current Value</th>
+                                    <th class="text-end">Days Since Movement</th>
+                                    <th>Last Movement</th>
+                                    <th>Recommendation</th>
+                                </tr>
+                            </thead>
+                            <tbody id="slowMovingTableBody">
+                                <tr><td colspan="7" class="text-center">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+// Initialize dates on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Set default dates (last 30 days)
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+
+    document.getElementById('globalStartDate').value = startDate.toISOString().split('T')[0];
+    document.getElementById('globalEndDate').value = endDate.toISOString().split('T')[0];
+
+    // Load locations
+    loadLocations();
+
+    // Load initial reports
+    loadAllReports();
+
+    // Set up search filters
+    document.getElementById('cogsSearch').addEventListener('input', filterTable.bind(null, 'cogsTable', 'cogsSearch'));
+    document.getElementById('turnoverSearch').addEventListener('input', filterTable.bind(null, 'turnoverTable', 'turnoverSearch'));
+    document.getElementById('abcSearch').addEventListener('input', filterTable.bind(null, 'abcTable', 'abcSearch'));
+    document.getElementById('slowMovingSearch').addEventListener('input', filterTable.bind(null, 'slowMovingTable', 'slowMovingSearch'));
+});
+
+async function loadLocations() {
+    try {
+        const response = await fetch('/inventory/api/locations');
+        const locations = await response.json();
+
+        const select = document.getElementById('globalLocation');
+        select.innerHTML = '<option value="">All Locations</option>';
+
+        locations.forEach(loc => {
+            select.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+        });
+    } catch (error) {
+        console.error('Error loading locations:', error);
+    }
+}
+
+function loadAllReports() {
+    loadCOGSReport();
+    loadTurnoverReport();
+    loadABCAnalysis();
+    loadSlowMovingReport();
+}
+
+async function loadCOGSReport() {
+    const startDate = document.getElementById('globalStartDate').value;
+    const endDate = document.getElementById('globalEndDate').value;
+    const locationId = document.getElementById('globalLocation').value;
+
+    if (!startDate || !endDate) {
+        alert('Please select start and end dates');
+        return;
+    }
+
+    try {
+        let url = `/inventory/api/reports/cogs?start_date=${startDate}&end_date=${endDate}`;
+        if (locationId) url += `&location_id=${locationId}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        const tbody = document.getElementById('cogsTableBody');
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="10" class="text-center">No data found for selected period</td></tr>';
+            return;
+        }
+
+        // Calculate totals
+        let totalBeginValue = 0, totalPurchaseValue = 0, totalEndValue = 0, totalCOGS = 0;
+
+        tbody.innerHTML = data.map(item => {
+            totalBeginValue += item.beginning_inventory_value;
+            totalPurchaseValue += item.purchases_value;
+            totalEndValue += item.ending_inventory_value;
+            totalCOGS += item.cogs_value;
+
+            return `
+                <tr>
+                    <td>${item.item_name}</td>
+                    <td>${item.category || '-'}</td>
+                    <td class="text-end">${item.beginning_inventory_qty.toFixed(2)}</td>
+                    <td class="text-end">$${item.beginning_inventory_value.toFixed(2)}</td>
+                    <td class="text-end">${item.purchases_qty.toFixed(2)}</td>
+                    <td class="text-end">$${item.purchases_value.toFixed(2)}</td>
+                    <td class="text-end">${item.ending_inventory_qty.toFixed(2)}</td>
+                    <td class="text-end">$${item.ending_inventory_value.toFixed(2)}</td>
+                    <td class="text-end"><strong>$${item.cogs_value.toFixed(2)}</strong></td>
+                    <td class="text-end">${item.sales_qty !== null ? item.sales_qty.toFixed(2) : '-'}</td>
+                </tr>
+            `;
+        }).join('');
+
+        // Add totals row
+        document.getElementById('cogsTotals').innerHTML = `
+            <tr class="table-dark">
+                <td colspan="3"><strong>TOTALS:</strong></td>
+                <td class="text-end"><strong>$${totalBeginValue.toFixed(2)}</strong></td>
+                <td></td>
+                <td class="text-end"><strong>$${totalPurchaseValue.toFixed(2)}</strong></td>
+                <td></td>
+                <td class="text-end"><strong>$${totalEndValue.toFixed(2)}</strong></td>
+                <td class="text-end"><strong>$${totalCOGS.toFixed(2)}</strong></td>
+                <td></td>
+            </tr>
+        `;
+
+    } catch (error) {
+        console.error('Error loading COGS report:', error);
+        document.getElementById('cogsTableBody').innerHTML = '<tr><td colspan="10" class="text-center text-danger">Error loading report</td></tr>';
+    }
+}
+
+async function loadTurnoverReport() {
+    const startDate = document.getElementById('globalStartDate').value;
+    const endDate = document.getElementById('globalEndDate').value;
+    const locationId = document.getElementById('globalLocation').value;
+    const statusFilter = document.getElementById('turnoverFilter').value;
+
+    if (!startDate || !endDate) return;
+
+    try {
+        let url = `/inventory/api/reports/inventory-turnover?start_date=${startDate}&end_date=${endDate}`;
+        if (locationId) url += `&location_id=${locationId}`;
+
+        const response = await fetch(url);
+        let data = await response.json();
+
+        // Filter by status if selected
+        if (statusFilter) {
+            data = data.filter(item => item.movement_status === statusFilter);
+        }
+
+        const tbody = document.getElementById('turnoverTableBody');
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No data found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(item => {
+            const statusColor = {
+                'Fast': 'success',
+                'Medium': 'info',
+                'Slow': 'warning',
+                'Dead': 'danger'
+            }[item.movement_status] || 'secondary';
+
+            return `
+                <tr>
+                    <td>${item.item_name}</td>
+                    <td>${item.category || '-'}</td>
+                    <td class="text-end">$${item.avg_inventory_value.toFixed(2)}</td>
+                    <td class="text-end">$${item.cogs.toFixed(2)}</td>
+                    <td class="text-end">${item.turnover_ratio.toFixed(2)}x</td>
+                    <td class="text-end">${item.days_of_inventory.toFixed(1)}</td>
+                    <td><span class="badge bg-${statusColor}">${item.movement_status}</span></td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Error loading turnover report:', error);
+        document.getElementById('turnoverTableBody').innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading report</td></tr>';
+    }
+}
+
+async function loadABCAnalysis() {
+    const startDate = document.getElementById('globalStartDate').value;
+    const endDate = document.getElementById('globalEndDate').value;
+    const locationId = document.getElementById('globalLocation').value;
+    const classFilter = document.getElementById('abcClassFilter').value;
+
+    if (!startDate || !endDate) return;
+
+    try {
+        let url = `/inventory/api/reports/abc-analysis?start_date=${startDate}&end_date=${endDate}`;
+        if (locationId) url += `&location_id=${locationId}`;
+
+        const response = await fetch(url);
+        let data = await response.json();
+
+        // Filter by class if selected
+        if (classFilter) {
+            data = data.filter(item => item.abc_class === classFilter);
+        }
+
+        const tbody = document.getElementById('abcTableBody');
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No data found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(item => {
+            const classColor = {
+                'A': 'danger',
+                'B': 'warning text-dark',
+                'C': 'success'
+            }[item.abc_class] || 'secondary';
+
+            return `
+                <tr>
+                    <td><span class="badge bg-${classColor}">${item.abc_class}</span></td>
+                    <td>${item.item_name}</td>
+                    <td>${item.category || '-'}</td>
+                    <td class="text-end">$${item.annual_usage_value.toFixed(2)}</td>
+                    <td class="text-end">${item.percent_of_total.toFixed(2)}%</td>
+                    <td class="text-end">${item.cumulative_percent.toFixed(2)}%</td>
+                    <td class="text-end">${item.current_quantity.toFixed(2)}</td>
+                    <td class="text-end">$${item.current_value.toFixed(2)}</td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Error loading ABC analysis:', error);
+        document.getElementById('abcTableBody').innerHTML = '<tr><td colspan="8" class="text-center text-danger">Error loading report</td></tr>';
+    }
+}
+
+async function loadSlowMovingReport() {
+    const daysThreshold = document.getElementById('daysThreshold').value;
+    const minValue = document.getElementById('minValue').value;
+    const locationId = document.getElementById('globalLocation').value;
+
+    try {
+        let url = `/inventory/api/reports/slow-moving?days_threshold=${daysThreshold}`;
+        if (locationId) url += `&location_id=${locationId}`;
+        if (minValue) url += `&min_value=${minValue}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        const tbody = document.getElementById('slowMovingTableBody');
+
+        if (data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No slow-moving items found - Great inventory management!</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = data.map(item => {
+            const lastDate = item.last_movement_date ? new Date(item.last_movement_date).toLocaleDateString() : 'Never';
+            const colorClass = item.days_since_last_movement > 180 ? 'table-danger' :
+                              item.days_since_last_movement > 120 ? 'table-warning' : '';
+
+            return `
+                <tr class="${colorClass}">
+                    <td>${item.item_name}</td>
+                    <td>${item.category || '-'}</td>
+                    <td class="text-end">${item.current_quantity.toFixed(2)} ${item.unit}</td>
+                    <td class="text-end">$${item.current_value.toFixed(2)}</td>
+                    <td class="text-end"><strong>${item.days_since_last_movement}</strong> days</td>
+                    <td><small>${lastDate}<br><span class="text-muted">${item.last_movement_type || '-'}</span></small></td>
+                    <td><small>${item.recommendation}</small></td>
+                </tr>
+            `;
+        }).join('');
+
+    } catch (error) {
+        console.error('Error loading slow moving report:', error);
+        document.getElementById('slowMovingTableBody').innerHTML = '<tr><td colspan="7" class="text-center text-danger">Error loading report</td></tr>';
+    }
+}
+
+function filterTable(tableId, searchId) {
+    const filter = document.getElementById(searchId).value.toUpperCase();
+    const table = document.getElementById(tableId);
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+    for (let i = 0; i < rows.length; i++) {
+        const text = rows[i].textContent || rows[i].innerText;
+        if (text.toUpperCase().indexOf(filter) > -1) {
+            rows[i].style.display = '';
+        } else {
+            rows[i].style.display = 'none';
+        }
+    }
+}
+
+function exportToCSV(tableId, filename) {
+    const table = document.getElementById(tableId);
+    let csv = [];
+
+    // Get headers
+    const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.textContent.trim());
+    csv.push(headers.join(','));
+
+    // Get data rows
+    const rows = table.querySelectorAll('tbody tr:not([style*="display: none"])');
+    rows.forEach(row => {
+        const cols = Array.from(row.querySelectorAll('td')).map(td => {
+            // Remove HTML tags and clean text
+            let text = td.textContent.trim();
+            // Escape commas
+            if (text.includes(',')) text = `"${text}"`;
+            return text;
+        });
+        csv.push(cols.join(','));
+    });
+
+    // Create download
+    const csvContent = csv.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+}
+</script>
+
+{% endblock %}
