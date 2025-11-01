@@ -191,6 +191,7 @@
         <button class="tab" onclick="switchTab('general-ledger')">General Ledger</button>
         <button class="tab" onclick="switchTab('account-activity')">Account Activity</button>
         <button class="tab" onclick="switchTab('ap-aging')">AP Aging</button>
+        <button class="tab" onclick="switchTab('customer-statement')">Customer Statements</button>
     </div>
 
     <!-- Profit & Loss Tab -->
@@ -404,6 +405,44 @@
             <!-- Report will be loaded here -->
         </div>
     </div>
+
+    <!-- Customer Statements Tab -->
+    <div id="customer-statement" class="tab-content">
+        <div class="filters">
+            <div class="form-group">
+                <label for="stmt-customer">Customer <span style="color: #f85149;">*</span></label>
+                <select id="stmt-customer" style="min-width: 250px;">
+                    <option value="">Select Customer...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="stmt-start-date">Start Date</label>
+                <input type="date" id="stmt-start-date" value="">
+            </div>
+            <div class="form-group">
+                <label for="stmt-end-date">End Date</label>
+                <input type="date" id="stmt-end-date" value="">
+            </div>
+            <div class="form-group">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; margin-top: 1.5rem;">
+                    <input type="checkbox" id="stmt-include-paid" checked>
+                    Include Paid Invoices
+                </label>
+            </div>
+            <button class="btn btn-primary" onclick="generateCustomerStatement()">Generate Statement</button>
+            <button class="btn btn-secondary" onclick="downloadCustomerStatementPDF()" id="stmt-download-btn" style="display: none;">
+                <i class="bi bi-file-earmark-pdf"></i> Download PDF
+            </button>
+        </div>
+
+        <div id="stmt-loading" class="loading" style="display: none;">
+            Generating customer statement...
+        </div>
+
+        <div id="stmt-report" style="display: none;">
+            <!-- Statement will be loaded here -->
+        </div>
+    </div>
 </div>
 {% endblock %}
 
@@ -424,6 +463,8 @@
     document.getElementById('aa-start-date').value = firstDayStr;
     document.getElementById('aa-end-date').value = todayStr;
     document.getElementById('aging-date').value = todayStr;
+    document.getElementById('stmt-start-date').value = firstDayStr;
+    document.getElementById('stmt-end-date').value = todayStr;
 
     // Load accounts for General Ledger dropdown
     async function loadAccounts() {
@@ -1709,8 +1750,190 @@
         return '$' + Number(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
     }
 
+    // ========== CUSTOMER STATEMENTS ==========
+
+    // Load customers for dropdown
+    async function loadCustomers() {
+        try {
+            const response = await fetch('/accounting/api/customers/?limit=1000');
+            const customers = await response.json();
+
+            const select = document.getElementById('stmt-customer');
+            // Clear existing options except first
+            select.innerHTML = '<option value="">Select Customer...</option>';
+
+            customers.forEach(customer => {
+                const option = document.createElement('option');
+                option.value = customer.id;
+                option.textContent = customer.name;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading customers:', error);
+            alert('Error loading customers: ' + error.message);
+        }
+    }
+
+    // Generate customer statement
+    async function generateCustomerStatement() {
+        const customerId = document.getElementById('stmt-customer').value;
+        const startDate = document.getElementById('stmt-start-date').value;
+        const endDate = document.getElementById('stmt-end-date').value;
+        const includePaid = document.getElementById('stmt-include-paid').checked;
+
+        if (!customerId) {
+            alert('Please select a customer');
+            return;
+        }
+
+        if (!startDate || !endDate) {
+            alert('Please select start and end dates');
+            return;
+        }
+
+        const loading = document.getElementById('stmt-loading');
+        const report = document.getElementById('stmt-report');
+        const downloadBtn = document.getElementById('stmt-download-btn');
+
+        loading.style.display = 'block';
+        report.style.display = 'none';
+        downloadBtn.style.display = 'none';
+
+        try {
+            const url = `/accounting/api/reports/customer-statement/${customerId}?start_date=${startDate}&end_date=${endDate}&include_paid=${includePaid}`;
+            const response = await fetch(url);
+
+            if (!response.ok) {
+                throw new Error('Failed to generate statement');
+            }
+
+            const data = await response.json();
+
+            // Display statement
+            displayCustomerStatement(data);
+
+            report.style.display = 'block';
+            downloadBtn.style.display = 'inline-block';
+        } catch (error) {
+            console.error('Error generating statement:', error);
+            alert('Error: ' + error.message);
+        } finally {
+            loading.style.display = 'none';
+        }
+    }
+
+    // Display customer statement
+    function displayCustomerStatement(data) {
+        const report = document.getElementById('stmt-report');
+        const customer = data.customer;
+        const balances = data.balances;
+        const aging = data.aging;
+        const transactions = data.transactions;
+
+        let html = `
+            <div class="report-header">
+                <h2>Customer Account Statement</h2>
+                <div class="subtitle">${customer.name}</div>
+                <div class="subtitle">Statement Period: ${data.statement_period.start_date} to ${data.statement_period.end_date}</div>
+            </div>
+
+            <!-- Account Summary -->
+            <div style="background: #161b22; border: 1px solid #30363d; border-radius: 4px; padding: 1rem; margin-bottom: 1.5rem;">
+                <h3 style="margin-top: 0; color: #58a6ff;">Account Summary</h3>
+                <table style="width: 100%;">
+                    <tr>
+                        <td style="padding: 0.5rem 0; font-weight: 600;">Beginning Balance:</td>
+                        <td style="text-align: right;">${formatCurrency(balances.beginning_balance)}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.5rem 0; font-weight: 600;">Charges This Period:</td>
+                        <td style="text-align: right;">${formatCurrency(Math.max(0, balances.change))}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 0.5rem 0; font-weight: 600;">Payments This Period:</td>
+                        <td style="text-align: right;">${formatCurrency(Math.abs(Math.min(0, balances.change)))}</td>
+                    </tr>
+                    <tr style="border-top: 2px solid #30363d;">
+                        <td style="padding: 0.5rem 0; font-weight: bold; font-size: 1.1rem;">Current Balance:</td>
+                        <td style="text-align: right; font-weight: bold; font-size: 1.1rem; color: ${balances.ending_balance > 0 ? '#f85149' : '#3fb950'};">${formatCurrency(balances.ending_balance)}</td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Aging Summary -->
+            <div style="background: #161b22; border: 1px solid #30363d; border-radius: 4px; padding: 1rem; margin-bottom: 1.5rem;">
+                <h3 style="margin-top: 0; color: #58a6ff;">Aging Summary</h3>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Current (0-30)</th>
+                            <th>31-60 Days</th>
+                            <th>61-90 Days</th>
+                            <th>Over 90 Days</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="text-align: right;">${formatCurrency(aging.current)}</td>
+                            <td style="text-align: right;">${formatCurrency(aging.days_31_60)}</td>
+                            <td style="text-align: right;">${formatCurrency(aging.days_61_90)}</td>
+                            <td style="text-align: right; ${aging.over_90 > 0 ? 'color: #f85149; font-weight: 600;' : ''}">${formatCurrency(aging.over_90)}</td>
+                            <td style="text-align: right; font-weight: bold;">${formatCurrency(aging.total)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Transaction Detail -->
+            ${transactions.length > 0 ? `
+            <div>
+                <h3 style="color: #58a6ff;">Transaction Detail</h3>
+                <table class="report-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Type</th>
+                            <th>Reference</th>
+                            <th>Description</th>
+                            <th style="text-align: right;">Amount</th>
+                            <th style="text-align: right;">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${transactions.map(t => `
+                            <tr>
+                                <td>${t.date}</td>
+                                <td><span class="badge bg-${t.type === 'Invoice' ? 'primary' : 'success'}">${t.type}</span></td>
+                                <td>${t.reference}</td>
+                                <td>${t.description}</td>
+                                <td style="text-align: right; ${t.amount < 0 ? 'color: #3fb950;' : ''}">${formatCurrency(t.amount)}</td>
+                                <td style="text-align: right;">${t.balance !== null ? formatCurrency(t.balance) : '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+            ` : '<p style="color: #8b949e; text-align: center; padding: 2rem;">No transactions found for this period.</p>'}
+        `;
+
+        report.innerHTML = html;
+    }
+
+    // Download statement as PDF
+    function downloadCustomerStatementPDF() {
+        const customerId = document.getElementById('stmt-customer').value;
+        const startDate = document.getElementById('stmt-start-date').value;
+        const endDate = document.getElementById('stmt-end-date').value;
+        const includePaid = document.getElementById('stmt-include-paid').checked;
+
+        const url = `/accounting/api/reports/customer-statement/${customerId}/pdf?start_date=${startDate}&end_date=${endDate}&include_paid=${includePaid}`;
+        window.open(url, '_blank');
+    }
+
     // Initialize
     loadAccounts();
+    loadCustomers();
 </script>
 
 <style media="print">
