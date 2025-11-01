@@ -22,6 +22,7 @@ from accounting.schemas.customer_invoice import (
     PaymentMethod, ARAgingReportResponse
 )
 from accounting.api.auth import require_auth
+from accounting.services.ar_gl_service import ARGLService
 
 router = APIRouter(prefix="/api/customer-invoices", tags=["customer-invoices"])
 logger = logging.getLogger(__name__)
@@ -339,7 +340,14 @@ def send_invoice(
     db: Session = Depends(get_db),
     user: User = Depends(require_auth)
 ):
-    """Mark invoice as sent"""
+    """
+    Mark invoice as sent and auto-post to GL
+
+    Creates journal entry:
+    DR: Accounts Receivable
+        CR: Revenue (per line items)
+        CR: Sales Tax Payable (if applicable)
+    """
 
     invoice = db.query(CustomerInvoice).filter(CustomerInvoice.id == invoice_id).first()
     if not invoice:
@@ -348,12 +356,44 @@ def send_invoice(
     if invoice.status != InvoiceStatus.DRAFT:
         raise HTTPException(status_code=400, detail="Can only send draft invoices")
 
+    # Update invoice status
     invoice.status = InvoiceStatus.SENT
+    invoice.sent_date = datetime.utcnow()
     invoice.updated_at = datetime.utcnow()
 
-    db.commit()
+    # Auto-post to GL
+    try:
+        ar_gl_service = ARGLService(db)
+        journal_entry = ar_gl_service.post_invoice_to_gl(
+            invoice=invoice,
+            user_id=user.id,
+            auto_post=True
+        )
 
-    return {"message": "Invoice marked as sent", "status": invoice.status}
+        logger.info(
+            f"Invoice {invoice.invoice_number} sent and posted to GL "
+            f"(JE: {journal_entry.entry_number})"
+        )
+
+        return {
+            "message": "Invoice sent and posted to GL",
+            "status": invoice.status,
+            "journal_entry_number": journal_entry.entry_number
+        }
+    except ValueError as e:
+        # GL posting failed - revert status change
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to post invoice to GL: {str(e)}"
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error posting invoice to GL: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error posting invoice to GL: {str(e)}"
+        )
 
 
 @router.post("/{invoice_id}/payments", response_model=InvoicePaymentRead)
@@ -363,7 +403,13 @@ def record_payment(
     db: Session = Depends(get_db),
     user: User = Depends(require_auth)
 ):
-    """Record a payment against an invoice"""
+    """
+    Record a payment against an invoice and auto-post to GL
+
+    Creates journal entry:
+    DR: Cash/Bank Account
+        CR: Accounts Receivable (or Customer Deposits if is_deposit=True)
+    """
 
     invoice = db.query(CustomerInvoice).filter(CustomerInvoice.id == invoice_id).first()
     if not invoice:
@@ -386,6 +432,7 @@ def record_payment(
         payment_date=payment_data.payment_date,
         amount=payment_data.amount,
         payment_method=payment_data.payment_method,
+        bank_account_id=payment_data.bank_account_id,
         reference_number=payment_data.reference_number,
         notes=payment_data.notes,
         is_deposit=payment_data.is_deposit or False,
@@ -393,6 +440,7 @@ def record_payment(
     )
 
     db.add(payment)
+    db.flush()  # Get payment ID for GL posting
 
     # Update invoice paid amount and status
     if payment_data.is_deposit:
@@ -409,10 +457,39 @@ def record_payment(
 
     invoice.updated_at = datetime.utcnow()
 
-    db.commit()
-    db.refresh(payment)
+    # Auto-post to GL
+    try:
+        ar_gl_service = ARGLService(db)
+        journal_entry = ar_gl_service.post_payment_to_gl(
+            payment=payment,
+            invoice=invoice,
+            user_id=user.id,
+            auto_post=True
+        )
 
-    return payment
+        logger.info(
+            f"Payment of ${payment.amount} recorded for invoice {invoice.invoice_number} "
+            f"and posted to GL (JE: {journal_entry.entry_number})"
+        )
+
+        db.commit()
+        db.refresh(payment)
+
+        return payment
+    except ValueError as e:
+        # GL posting failed - revert changes
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail=f"Failed to post payment to GL: {str(e)}"
+        )
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error posting payment to GL: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error posting payment to GL: {str(e)}"
+        )
 
 
 @router.delete("/{invoice_id}/payments/{payment_id}")
@@ -461,7 +538,14 @@ def void_invoice(
     db: Session = Depends(get_db),
     user: User = Depends(require_auth)
 ):
-    """Void an invoice"""
+    """
+    Void an invoice and reverse GL entry
+
+    Creates reversal journal entry:
+    DR: Revenue (per line items)
+    DR: Sales Tax Payable
+        CR: Accounts Receivable
+    """
 
     invoice = db.query(CustomerInvoice).filter(CustomerInvoice.id == invoice_id).first()
     if not invoice:
@@ -476,12 +560,44 @@ def void_invoice(
             detail="Cannot void invoice with payments. Delete payments first."
         )
 
+    # Void the invoice
     invoice.status = InvoiceStatus.VOID
     invoice.updated_at = datetime.utcnow()
 
-    db.commit()
+    # Reverse GL entry if it exists
+    if invoice.journal_entry_id:
+        try:
+            ar_gl_service = ARGLService(db)
+            reversal_entry = ar_gl_service.reverse_invoice_entry(
+                invoice=invoice,
+                reversal_date=date.today(),
+                user_id=user.id,
+                reason=f"Invoice {invoice.invoice_number} voided"
+            )
 
-    return {"message": "Invoice voided successfully", "status": invoice.status}
+            logger.info(
+                f"Invoice {invoice.invoice_number} voided and GL entry reversed "
+                f"(Reversal JE: {reversal_entry.entry_number})"
+            )
+
+            db.commit()
+
+            return {
+                "message": "Invoice voided and GL entry reversed",
+                "status": invoice.status,
+                "reversal_entry_number": reversal_entry.entry_number
+            }
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error reversing GL entry: {str(e)}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Error reversing GL entry: {str(e)}"
+            )
+    else:
+        # No GL entry to reverse
+        db.commit()
+        return {"message": "Invoice voided successfully (no GL entry to reverse)", "status": invoice.status}
 
 
 @router.delete("/{invoice_id}")

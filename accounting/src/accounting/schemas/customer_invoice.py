@@ -56,6 +56,7 @@ class InvoicePaymentBase(BaseModel):
     payment_date: date
     amount: Decimal = Field(gt=0)
     payment_method: PaymentMethod
+    bank_account_id: int  # GL account where payment is deposited
     reference_number: Optional[str] = None
     notes: Optional[str] = None
     is_deposit: bool = False
