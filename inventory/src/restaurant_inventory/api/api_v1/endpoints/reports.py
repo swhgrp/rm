@@ -670,19 +670,7 @@ async def get_cogs_report(
     cogs_items = []
 
     for item in items:
-        # Get beginning inventory (as of start_date - 1 day)
-        beginning_txns = db.query(
-            func.sum(InventoryTransaction.quantity_after).label('total_qty'),
-            func.sum(InventoryTransaction.value_after).label('total_value')
-        ).filter(
-            InventoryTransaction.master_item_id == item.id,
-            InventoryTransaction.transaction_date < start_date
-        )
-
-        if location_id:
-            beginning_txns = beginning_txns.filter(InventoryTransaction.location_id == location_id)
-
-        # Get the last transaction before start_date for each location/storage area
+        # Get beginning inventory (last transaction before start_date)
         beginning_subquery = db.query(
             InventoryTransaction.location_id,
             InventoryTransaction.storage_area_id,
@@ -702,7 +690,7 @@ async def get_cogs_report(
 
         beginning = db.query(
             func.sum(InventoryTransaction.quantity_after).label('total_qty'),
-            func.sum(InventoryTransaction.value_after).label('total_value')
+            func.sum(InventoryTransaction.quantity_after * InventoryTransaction.unit_cost).label('total_value')
         ).join(
             beginning_subquery,
             and_(
@@ -713,16 +701,16 @@ async def get_cogs_report(
             )
         ).first()
 
-        beginning_qty = float(beginning.total_qty or 0) if beginning else 0
-        beginning_value = float(beginning.total_value or 0) if beginning else 0
+        beginning_qty = float(beginning.total_qty or 0) if beginning and beginning.total_qty else 0
+        beginning_value = float(beginning.total_value or 0) if beginning and beginning.total_value else 0
 
-        # Get purchases during period
+        # Get purchases during period (sum of total_cost)
         purchases = db.query(
             func.sum(InventoryTransaction.quantity_change).label('total_qty'),
-            func.sum(InventoryTransaction.value_change).label('total_value')
+            func.sum(InventoryTransaction.total_cost).label('total_value')
         ).filter(
             InventoryTransaction.master_item_id == item.id,
-            InventoryTransaction.transaction_type == 'PURCHASE',
+            InventoryTransaction.transaction_type == 'purchase',
             InventoryTransaction.transaction_date >= start_date,
             InventoryTransaction.transaction_date <= end_date
         )
@@ -731,10 +719,10 @@ async def get_cogs_report(
             purchases = purchases.filter(InventoryTransaction.location_id == location_id)
 
         purchases = purchases.first()
-        purchases_qty = float(purchases.total_qty or 0) if purchases else 0
-        purchases_value = float(purchases.total_value or 0) if purchases else 0
+        purchases_qty = float(purchases.total_qty or 0) if purchases and purchases.total_qty else 0
+        purchases_value = float(purchases.total_value or 0) if purchases and purchases.total_value else 0
 
-        # Get ending inventory (as of end_date)
+        # Get ending inventory (last transaction on or before end_date)
         ending_subquery = db.query(
             InventoryTransaction.location_id,
             InventoryTransaction.storage_area_id,
@@ -754,7 +742,7 @@ async def get_cogs_report(
 
         ending = db.query(
             func.sum(InventoryTransaction.quantity_after).label('total_qty'),
-            func.sum(InventoryTransaction.value_after).label('total_value')
+            func.sum(InventoryTransaction.quantity_after * InventoryTransaction.unit_cost).label('total_value')
         ).join(
             ending_subquery,
             and_(
@@ -765,8 +753,8 @@ async def get_cogs_report(
             )
         ).first()
 
-        ending_qty = float(ending.total_qty or 0) if ending else 0
-        ending_value = float(ending.total_value or 0) if ending else 0
+        ending_qty = float(ending.total_qty or 0) if ending and ending.total_qty else 0
+        ending_value = float(ending.total_value or 0) if ending and ending.total_value else 0
 
         # Calculate COGS
         cogs_qty = beginning_qty + purchases_qty - ending_qty
@@ -777,7 +765,7 @@ async def get_cogs_report(
             func.sum(func.abs(InventoryTransaction.quantity_change)).label('total_qty')
         ).filter(
             InventoryTransaction.master_item_id == item.id,
-            InventoryTransaction.transaction_type == 'POS_SALE',
+            InventoryTransaction.transaction_type == 'pos_sale',
             InventoryTransaction.transaction_date >= start_date,
             InventoryTransaction.transaction_date <= end_date
         )
@@ -786,7 +774,7 @@ async def get_cogs_report(
             sales = sales.filter(InventoryTransaction.location_id == location_id)
 
         sales = sales.first()
-        sales_qty = float(sales.total_qty or 0) if sales else None
+        sales_qty = float(sales.total_qty or 0) if sales and sales.total_qty else None
 
         # Skip items with no activity
         if beginning_qty == 0 and purchases_qty == 0 and ending_qty == 0:
@@ -862,13 +850,13 @@ async def get_inventory_turnover(
     turnover_items = []
 
     for item in items:
-        # Get COGS for period (Beginning + Purchases - Ending)
-        # Simplified: Use sum of negative transactions (sales, waste, transfers out)
+        # Get COGS for period (sum of costs for outgoing transactions)
+        # Use total_cost for sales, waste, transfers out
         cogs = db.query(
-            func.sum(func.abs(InventoryTransaction.value_change)).label('total_cogs')
+            func.sum(func.abs(InventoryTransaction.total_cost)).label('total_cogs')
         ).filter(
             InventoryTransaction.master_item_id == item.id,
-            InventoryTransaction.transaction_type.in_(['POS_SALE', 'WASTE', 'TRANSFER_OUT', 'PRODUCTION']),
+            InventoryTransaction.transaction_type.in_(['pos_sale', 'waste', 'transfer_out', 'production']),
             InventoryTransaction.transaction_date >= start_date,
             InventoryTransaction.transaction_date <= end_date
         )
@@ -903,7 +891,7 @@ async def get_inventory_turnover(
             ).subquery()
 
             value = db.query(
-                func.sum(InventoryTransaction.value_after)
+                func.sum(InventoryTransaction.quantity_after * InventoryTransaction.unit_cost)
             ).join(
                 subquery,
                 and_(
@@ -1002,12 +990,12 @@ async def get_abc_analysis(
         MasterItem.name.label('item_name'),
         MasterItem.category,
         MasterItem.unit_of_measure.label('unit'),
-        func.sum(func.abs(InventoryTransaction.value_change)).label('usage_value')
+        func.sum(func.abs(InventoryTransaction.total_cost)).label('usage_value')
     ).join(
         InventoryTransaction, MasterItem.id == InventoryTransaction.master_item_id
     ).filter(
         MasterItem.is_active == True,
-        InventoryTransaction.transaction_type.in_(['POS_SALE', 'WASTE', 'TRANSFER_OUT', 'PRODUCTION']),
+        InventoryTransaction.transaction_type.in_(['pos_sale', 'waste', 'transfer_out', 'production']),
         InventoryTransaction.transaction_date >= start_date,
         InventoryTransaction.transaction_date <= end_date
     )
