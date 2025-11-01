@@ -192,7 +192,7 @@ def create_invoice(
     if existing:
         raise HTTPException(status_code=400, detail="Invoice number already exists")
 
-    # Calculate totals from line items
+    # Calculate totals from line items (needed for credit limit check)
     subtotal = Decimal("0")
     total_discount = Decimal("0")
     total_tax = Decimal("0")
@@ -217,6 +217,36 @@ def create_invoice(
 
     # Calculate total
     total_amount = subtotal - total_discount + total_tax
+
+    # Check credit limit if customer has one set
+    if customer.credit_limit and customer.credit_limit > 0:
+        # Calculate customer's current outstanding balance
+        outstanding_balance = db.query(func.sum(CustomerInvoice.total_amount - CustomerInvoice.deposit_amount - CustomerInvoice.paid_amount)).filter(
+            CustomerInvoice.customer_id == customer.id,
+            CustomerInvoice.status.in_([InvoiceStatus.SENT, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE])
+        ).scalar() or Decimal("0")
+
+        # New balance after this invoice
+        new_balance = outstanding_balance + total_amount
+
+        # Check if new balance exceeds credit limit
+        if new_balance > customer.credit_limit:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Credit limit exceeded. Customer credit limit: ${customer.credit_limit}, "
+                       f"Current outstanding: ${outstanding_balance}, "
+                       f"New invoice: ${total_amount}, "
+                       f"Total would be: ${new_balance}. "
+                       f"Available credit: ${customer.credit_limit - outstanding_balance}"
+            )
+
+        # Warn if approaching credit limit (within 10%)
+        credit_utilization = (new_balance / customer.credit_limit) * 100
+        if credit_utilization >= 90:
+            logger.warning(
+                f"Customer {customer.customer_name} (ID: {customer.id}) approaching credit limit. "
+                f"Utilization: {credit_utilization:.1f}% (${new_balance} / ${customer.credit_limit})"
+            )
 
     # Create invoice
     invoice = CustomerInvoice(

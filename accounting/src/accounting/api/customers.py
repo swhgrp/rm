@@ -3,15 +3,34 @@ Customer management API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List, Optional
+from decimal import Decimal
+from pydantic import BaseModel
 
 from accounting.db.database import get_db
 from accounting.models.user import User
 from accounting.models.customer import Customer
+from accounting.models.customer_invoice import CustomerInvoice, InvoiceStatus
 from accounting.schemas.customer import CustomerCreate, CustomerUpdate, CustomerResponse
 from accounting.api.auth import require_auth
 
 router = APIRouter(prefix="/api/customers", tags=["customers"])
+
+
+# Credit Status Schema
+class CustomerCreditStatus(BaseModel):
+    customer_id: int
+    customer_name: str
+    credit_limit: Optional[Decimal]
+    outstanding_balance: Decimal
+    available_credit: Optional[Decimal]
+    credit_utilization_percent: Optional[float]
+    is_over_limit: bool
+    warning_threshold_reached: bool  # True if >= 90% of limit
+
+    class Config:
+        from_attributes = True
 
 
 @router.get("/", response_model=List[CustomerResponse])
@@ -211,6 +230,57 @@ def update_customer(
     db.refresh(customer)
 
     return customer
+
+
+@router.get("/{customer_id}/credit-status", response_model=CustomerCreditStatus)
+def get_customer_credit_status(
+    customer_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """
+    Get customer's credit status including outstanding balance and available credit
+
+    Returns credit limit, current outstanding balance, available credit,
+    and warnings about credit utilization.
+    """
+    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    if not customer:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Customer not found"
+        )
+
+    # Calculate current outstanding balance (unpaid invoices)
+    outstanding_balance = db.query(
+        func.sum(CustomerInvoice.total_amount - CustomerInvoice.deposit_amount - CustomerInvoice.paid_amount)
+    ).filter(
+        CustomerInvoice.customer_id == customer_id,
+        CustomerInvoice.status.in_([InvoiceStatus.SENT, InvoiceStatus.PARTIALLY_PAID, InvoiceStatus.OVERDUE])
+    ).scalar() or Decimal("0")
+
+    # Calculate available credit and utilization
+    available_credit = None
+    credit_utilization = None
+    is_over_limit = False
+    warning_threshold = False
+
+    if customer.credit_limit and customer.credit_limit > 0:
+        available_credit = customer.credit_limit - outstanding_balance
+        credit_utilization = float((outstanding_balance / customer.credit_limit) * 100)
+        is_over_limit = outstanding_balance > customer.credit_limit
+        warning_threshold = credit_utilization >= 90.0
+
+    return CustomerCreditStatus(
+        customer_id=customer.id,
+        customer_name=customer.customer_name,
+        credit_limit=customer.credit_limit,
+        outstanding_balance=outstanding_balance,
+        available_credit=available_credit,
+        credit_utilization_percent=credit_utilization,
+        is_over_limit=is_over_limit,
+        warning_threshold_reached=warning_threshold
+    )
 
 
 @router.delete("/{customer_id}")
