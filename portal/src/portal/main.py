@@ -16,8 +16,8 @@ import httpx
 import logging
 
 # Add shared directory to path for Sentry config
-sys.path.insert(0, '/opt/restaurant-system/shared/python')
-from sentry_config import init_sentry
+# sys.path.insert(0, '/opt/restaurant-system/shared/python')
+# from sentry_config import init_sentry
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ from portal.config import (
 )
 
 # Initialize Sentry error tracking
-init_sentry("portal")
+# init_sentry("portal")
 
 # FastAPI app
 app = FastAPI(
@@ -962,7 +962,7 @@ async def monitoring_status(current_user: User = Depends(get_current_user)):
             ["/opt/restaurant-system/scripts/dashboard-status.sh"],
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=45
         )
 
         if result.returncode == 0:
