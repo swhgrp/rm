@@ -95,7 +95,7 @@ def upgrade() -> None:
         sa.Column('notify_by_email', sa.Boolean(), nullable=True),
         sa.ForeignKeyConstraint(['file_id'], ['file_metadata.id'], ondelete='CASCADE'),
         sa.ForeignKeyConstraint(['folder_id'], ['folders.id'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint('shared_by'], ['users.id'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['shared_by'], ['users.id'], ondelete='CASCADE'),
         sa.ForeignKeyConstraint(['shared_with_user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
     )
