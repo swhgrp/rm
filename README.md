@@ -1,14 +1,14 @@
 # SW Hospitality Group - Restaurant Management System
 
 [![Status](https://img.shields.io/badge/status-production-yellow)]()
-[![Completion](https://img.shields.io/badge/completion-78%25-orange)]()
+[![Completion](https://img.shields.io/badge/completion-80%25-orange)]()
 [![Documentation](https://img.shields.io/badge/docs-updated-blue)]()
 
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
 **Last Updated:** November 1, 2025
-**Status:** ~78% Complete - Core Systems Production Ready ✅ (New: AR Enhancements 🌟)
+**Status:** ~80% Complete - Core Systems Production Ready ✅ (New: AR Automation 🚀)
 
 ---
 
@@ -406,21 +406,23 @@ restaurant-system/
 - ✅ 1099 tracking
 - ✅ Check printing
 
-**Accounts Receivable (AR):** *(Recently Enhanced - 85% Complete)*
+**Accounts Receivable (AR):** *(95% Complete - Automation Features Added!* ✨🚀*)*
 - ✅ Customer management with credit limits
 - ✅ Invoice creation with event integration
 - ✅ **Credit limit enforcement** (prevents over-limit invoicing) 🌟
 - ✅ **PDF invoice generation** with ReportLab 🌟
 - ✅ **Email invoice delivery** with SMTP configuration 🌟
 - ✅ **Customer statements** with aging and transaction detail 🌟
+- ✅ **Recurring invoices** - Automated billing from templates (weekly, monthly, quarterly, annually) 🆕🔥
+- ✅ **Payment reminders** - Automated 3-tier reminder system for overdue invoices 🆕🔥
+- ✅ **AR automation script** - Daily cron job for invoice generation and reminder processing 🆕
 - ✅ Payment receipt and tracking
 - ✅ AR aging reports (30/60/90+ days)
 - ✅ Collections tracking
 - ✅ Credit memos
 - ✅ Customer credit status API
 - ✅ Email settings UI for AR communications
-- 🔄 Recurring invoices (planned)
-- 🔄 Automated late payment reminders (planned)
+- ✅ Payment reminder settings UI with configurable schedule
 
 **Banking:**
 - ✅ Bank account management
