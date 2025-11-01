@@ -24,6 +24,7 @@ from accounting.schemas.customer_invoice import (
 from accounting.api.auth import require_auth
 from accounting.services.ar_gl_service import ARGLService
 from accounting.services.invoice_pdf_service import InvoicePDFService
+from accounting.services.email_service import EmailService
 from fastapi.responses import StreamingResponse
 
 router = APIRouter(prefix="/api/customer-invoices", tags=["customer-invoices"])
@@ -682,6 +683,108 @@ def generate_invoice_pdf(
         raise HTTPException(
             status_code=500,
             detail=f"Error generating PDF: {str(e)}"
+        )
+
+
+@router.post("/{invoice_id}/email")
+def email_invoice(
+    invoice_id: int,
+    email_to: Optional[str] = None,
+    cc_emails: Optional[List[str]] = None,
+    additional_message: Optional[str] = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
+    """
+    Send invoice via email with PDF attachment
+
+    Args:
+        invoice_id: Invoice ID
+        email_to: Override customer email (optional, defaults to customer.email)
+        cc_emails: Optional list of CC email addresses
+        additional_message: Optional custom message to include in email
+
+    Returns:
+        Success message with delivery status
+    """
+    # Get invoice with related data
+    invoice = db.query(CustomerInvoice).filter(CustomerInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Only send invoices that are not DRAFT or VOID
+    if invoice.status == InvoiceStatus.DRAFT:
+        raise HTTPException(status_code=400, detail="Cannot email draft invoices. Send invoice first.")
+
+    if invoice.status == InvoiceStatus.VOID:
+        raise HTTPException(status_code=400, detail="Cannot email voided invoices")
+
+    # Get customer
+    customer = db.query(Customer).filter(Customer.id == invoice.customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found")
+
+    # Determine recipient email
+    recipient_email = email_to or customer.billing_email or customer.email
+
+    if not recipient_email:
+        raise HTTPException(
+            status_code=400,
+            detail="No email address found for customer. Please provide an email address."
+        )
+
+    # Get line items
+    line_items = db.query(CustomerInvoiceLine).filter(
+        CustomerInvoiceLine.invoice_id == invoice_id
+    ).order_by(CustomerInvoiceLine.line_number).all()
+
+    try:
+        # Generate PDF
+        pdf_service = InvoicePDFService()
+        pdf_buffer = pdf_service.generate_invoice_pdf(
+            invoice=invoice,
+            customer=customer,
+            line_items=line_items
+        )
+
+        # Send email
+        email_service = EmailService(db)
+        success = email_service.send_invoice_email(
+            to_email=recipient_email,
+            customer_name=customer.customer_name,
+            invoice_number=invoice.invoice_number,
+            invoice_amount=float(invoice.total_amount),
+            due_date=invoice.due_date.strftime('%B %d, %Y'),
+            pdf_buffer=pdf_buffer,
+            cc_emails=cc_emails,
+            additional_message=additional_message
+        )
+
+        if success:
+            logger.info(
+                f"Invoice {invoice.invoice_number} emailed to {recipient_email} "
+                f"by user {user.id}"
+            )
+
+            return {
+                "message": "Invoice emailed successfully",
+                "sent_to": recipient_email,
+                "cc": cc_emails or [],
+                "invoice_number": invoice.invoice_number
+            }
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to send email. Check server logs for details."
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error emailing invoice {invoice.invoice_number}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error sending email: {str(e)}"
         )
 
 
