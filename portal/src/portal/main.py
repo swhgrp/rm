@@ -271,11 +271,22 @@ async def debug_user(request: Request, db: Session = Depends(get_db)):
     user = get_current_user(request, db)
     if not user:
         return {"error": "Not logged in"}
-    return {
-        "username": user.username,
-        "can_access_files": getattr(user, 'can_access_files', 'ATTRIBUTE_MISSING'),
-        "all_attrs": [attr for attr in dir(user) if attr.startswith('can_access')]
+
+    # Use getattr with defaults to safely access all attributes
+    result = {
+        "username": getattr(user, 'username', 'MISSING'),
+        "full_name": getattr(user, 'full_name', 'MISSING'),
+        "is_admin": getattr(user, 'is_admin', 'MISSING'),
+        "is_active": getattr(user, 'is_active', 'MISSING'),
+        "can_access_files": getattr(user, 'can_access_files', 'MISSING'),
+        "all_attrs": [attr for attr in dir(user) if not attr.startswith('_')]
     }
+
+    # Also check what type the user object is
+    result["user_type"] = str(type(user))
+    result["user_dict"] = {k: str(v) for k, v in user.__dict__.items() if not k.startswith('_')}
+
+    return result
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -832,7 +843,7 @@ async def mail_gateway(path: str, request: Request, db: Session = Depends(get_db
 @app.get("/monitoring", response_class=HTMLResponse)
 async def monitoring_dashboard(request: Request, current_user: User = Depends(get_current_user)):
     """Display monitoring dashboard"""
-    if not current_user.is_admin:
+    if not current_user or not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
 
     return templates.TemplateResponse("monitoring.html", {"request": request})
@@ -841,7 +852,7 @@ async def monitoring_dashboard(request: Request, current_user: User = Depends(ge
 @app.get("/api/monitoring/status")
 async def monitoring_status(current_user: User = Depends(get_current_user)):
     """Return monitoring status as JSON"""
-    if not current_user.is_admin:
+    if not current_user or not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
 
     import subprocess
@@ -857,11 +868,20 @@ async def monitoring_status(current_user: User = Depends(get_current_user)):
 
         if result.returncode == 0:
             # Parse JSON output (skip the Content-Type header)
-            json_output = result.stdout.split('\n\n', 1)[1] if '\n\n' in result.stdout else result.stdout
+            # The script outputs "Content-Type: application/json\n\n{json...}"
+            lines = result.stdout.split('\n')
+            # Find the first line that starts with '{'
+            json_start = 0
+            for i, line in enumerate(lines):
+                if line.strip().startswith('{'):
+                    json_start = i
+                    break
+
+            json_output = '\n'.join(lines[json_start:])
             import json
             return JSONResponse(content=json.loads(json_output))
         else:
-            raise HTTPException(status_code=500, detail="Failed to get monitoring status")
+            raise HTTPException(status_code=500, detail=f"Script failed: {result.stderr}")
 
     except subprocess.TimeoutExpired:
         raise HTTPException(status_code=504, detail="Monitoring status check timed out")

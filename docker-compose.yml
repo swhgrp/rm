@@ -271,6 +271,9 @@ services:
       - ./portal/css:/app/static/css
       - ./portal/images:/app/static/images
       - ./portal/js:/app/static/js
+      - ./scripts:/opt/restaurant-system/scripts:ro
+      - ./backups:/opt/restaurant-system/backups:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - HR_DATABASE_URL=postgresql://hr_user:HR_Pr0d_2024!@hr-db:5432/hr_db
       - SECRET_KEY=your-super-secret-key-change-in-production-galveston34

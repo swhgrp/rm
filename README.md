@@ -257,6 +257,19 @@ restaurant-system/
 - POST /api/change-password (with cross-system password sync)
 - GET /portal/debug
 
+**Monitoring Dashboard:** ✅ **NEW - Complete Real-Time System Monitor**
+- ✅ Real-time system health monitoring
+- ✅ 7 microservices status tracking
+- ✅ 5 database health monitoring with connection counts
+- ✅ Nginx reverse proxy monitoring
+- ✅ Docker network health checks
+- ✅ SSL certificate expiration tracking
+- ✅ Per-database backup status
+- ✅ Recent errors and alerts display
+- ✅ Auto-refresh every 30 seconds
+- ✅ GitHub dark theme with responsive design
+- ✅ **URL:** https://rm.swhgrp.com/portal/monitoring (Admin only)
+
 **[→ View Portal Documentation](./portal/README.md)** *(Note: Missing documentation for password change system)*
 
 ---
@@ -823,8 +836,32 @@ curl https://rm.swhgrp.com/hub/health
 ./scripts/health_check.sh
 ```
 
-### Monitoring Commands
+### Monitoring
+
+**Web Dashboard (Recommended):**
+```
+Access: https://rm.swhgrp.com/portal/monitoring (Admin only)
+Features: Real-time monitoring of all services, databases, backups, SSL, and infrastructure
+Auto-refresh: Every 30 seconds
+```
+
+**Manual Monitoring Commands:**
 ```bash
+# View monitoring dashboard status
+/opt/restaurant-system/scripts/dashboard-status.sh
+
+# Check service health
+/opt/restaurant-system/scripts/monitor-services.sh
+
+# Check disk space
+/opt/restaurant-system/scripts/monitor-disk-space.sh
+
+# Check SSL certificate
+/opt/restaurant-system/scripts/monitor-ssl-cert.sh
+
+# Verify backups
+/opt/restaurant-system/scripts/verify-backups.sh
+
 # View Nginx access logs
 docker compose exec nginx-proxy tail -f /var/log/nginx/access.log
 
@@ -1021,9 +1058,9 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 - ✅ Core functionality complete
 - ✅ Production deployment
 - ✅ Documentation complete
+- ✅ **Monitoring implementation** (Complete real-time dashboard)
+- ✅ **Automated backups** (Daily backups with weekly verification)
 - 🔄 Security hardening
-- 🔄 Monitoring implementation
-- 🔄 Automated backups
 
 ### Phase 2: Enhancement (Q1 2026)
 - Complete RBAC across all systems

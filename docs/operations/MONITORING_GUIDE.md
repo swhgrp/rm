@@ -21,22 +21,41 @@ The restaurant system has comprehensive automated monitoring covering:
 **Access:** https://rm.swhgrp.com/portal/monitoring (Admin users only)
 
 A real-time monitoring dashboard provides instant visibility into:
-- System resources (disk, memory, uptime)
-- All microservice statuses
-- Database health and sizes
-- Backup status and history
-- SSL certificate expiration
+- **System resources** - disk usage, memory, uptime
+- **Microservices** - status and uptime for all 7 services
+- **Databases** - health, size, and active connections for all 5 databases
+- **Backups** - detailed per-database backup information
+- **Infrastructure** - Nginx reverse proxy, Docker network, SSL certificate
+- **Logs** - recent errors and alerts from monitoring systems
 
 **Features:**
 - Auto-refreshes every 30 seconds
-- Color-coded status indicators
-- Responsive design
+- Color-coded status indicators (green/yellow/red)
+- Priority-based layout (critical info at top)
+- Responsive design (desktop/tablet/mobile)
+- GitHub dark theme styling
 - No manual login required (uses portal session)
+
+**Dashboard Layout:**
+1. **Row 1:** System Resources + Microservices (most critical)
+2. **Row 2:** Databases + Backup Details
+3. **Row 3:** Nginx Proxy + Docker Network + SSL Certificate
+4. **Row 4:** Recent Errors + Recent Alerts
 
 **How to Access:**
 1. Log in to the portal as an admin user
 2. Click "System Monitoring" card on the home page
 3. Or navigate directly to `/portal/monitoring`
+
+**Monitoring Coverage:**
+- ✅ 7 Microservices (Portal, Inventory, HR, Accounting, Events, Integration Hub, Files)
+- ✅ 5 Databases (with connection counts)
+- ✅ Nginx reverse proxy status
+- ✅ Docker network health
+- ✅ SSL certificate expiration
+- ✅ Database backup status per DB
+- ✅ Recent errors from logs
+- ✅ Recent alerts from monitoring
 
 ---
 
