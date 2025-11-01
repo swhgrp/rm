@@ -334,60 +334,81 @@ else
     echo "    \"status\": \"error\""
 fi
 
+echo '  },'
+
+# Application Health Checks (parallel execution with timeout)
+echo '  "application_health": {'
+
+APP_SERVICES=(
+    "portal-app:8000"
+    "inventory-app:8000"
+    "hr-app:8000"
+    "accounting-app:8000"
+    "events-app:8000"
+    "integration-hub:8000"
+    "files-app:8000"
+)
+
+# Function to check a single service health
+check_service_health() {
+    local CONTAINER=$1
+    local PORT=$2
+    local TMPFILE=$3
+
+    START_TIME=$(date +%s%N)
+    RESPONSE=$(timeout 3 docker exec $CONTAINER python3 -c "import urllib.request; r = urllib.request.urlopen('http://localhost:$PORT/health', timeout=2); print(r.status)" 2>/dev/null || echo "000")
+    END_TIME=$(date +%s%N)
+
+    RESPONSE_TIME_MS=$(( ($END_TIME - $START_TIME) / 1000000 ))
+
+    if [ "$RESPONSE" = "200" ]; then
+        APP_STATUS="healthy"
+    elif [ "$RESPONSE" = "000" ]; then
+        APP_STATUS="unreachable"
+    else
+        APP_STATUS="unhealthy"
+    fi
+
+    # Write result to temp file
+    echo "${CONTAINER}|${APP_STATUS}|${RESPONSE}|${RESPONSE_TIME_MS}" >> "$TMPFILE"
+}
+
+# Create temp file for results
+HEALTH_RESULTS=$(mktemp)
+
+# Launch all health checks in parallel
+for app_config in "${APP_SERVICES[@]}"; do
+    CONTAINER=$(echo "$app_config" | cut -d':' -f1)
+    PORT=$(echo "$app_config" | cut -d':' -f2)
+    check_service_health "$CONTAINER" "$PORT" "$HEALTH_RESULTS" &
+done
+
+# Wait for all background jobs with timeout
+wait
+
+# Read results and output JSON
+APP_COUNT=0
+TOTAL_APPS=${#APP_SERVICES[@]}
+
+while IFS='|' read -r CONTAINER APP_STATUS RESPONSE RESPONSE_TIME_MS; do
+    APP_COUNT=$((APP_COUNT + 1))
+
+    echo "    \"$CONTAINER\": {"
+    echo "      \"status\": \"$APP_STATUS\","
+    echo "      \"http_code\": $RESPONSE,"
+    echo "      \"response_time_ms\": $RESPONSE_TIME_MS"
+
+    if [ $APP_COUNT -lt $TOTAL_APPS ]; then
+        echo "    },"
+    else
+        echo "    }"
+    fi
+done < "$HEALTH_RESULTS"
+
+# Cleanup
+rm -f "$HEALTH_RESULTS"
+
 echo '  }'
-# 
-# # Application Health Checks (actual HTTP endpoint tests)
-# echo '  "application_health": {'
-# 
-# APP_SERVICES=(
-#     "portal-app:8000"
-#     "inventory-app:8000"
-#     "hr-app:8000"
-#     "accounting-app:8000"
-#     "events-app:8000"
-#     "integration-hub:8000"
-#     "files-app:8000"
-# )
-# 
-# APP_COUNT=0
-# TOTAL_APPS=${#APP_SERVICES[@]}
-# 
-# for app_config in "${APP_SERVICES[@]}"; do
-#     APP_COUNT=$((APP_COUNT + 1))
-# 
-#     # Parse config: container:port
-#     CONTAINER=$(echo "$app_config" | cut -d':' -f1)
-#     PORT=$(echo "$app_config" | cut -d':' -f2)
-# 
-#     # Test if application responds to health check (direct container connection)
-#     START_TIME=$(date +%s%N)
-#     RESPONSE=$(docker exec $CONTAINER python3 -c "import urllib.request; r = urllib.request.urlopen('http://localhost:$PORT/health', timeout=2); print(r.status)" 2>/dev/null || echo "000")
-#     END_TIME=$(date +%s%N)
-# 
-#     # Calculate response time in milliseconds
-#     RESPONSE_TIME_MS=$(( ($END_TIME - $START_TIME) / 1000000 ))
-# 
-#     if [ "$RESPONSE" = "200" ]; then
-#         APP_STATUS="healthy"
-#     elif [ "$RESPONSE" = "000" ]; then
-#         APP_STATUS="unreachable"
-#     else
-#         APP_STATUS="unhealthy"
-#     fi
-# 
-#     echo "    \"$CONTAINER\": {"
-#     echo "      \"status\": \"$APP_STATUS\","
-#     echo "      \"http_code\": $RESPONSE,"
-#     echo "      \"response_time_ms\": $RESPONSE_TIME_MS"
-# 
-#     if [ $APP_COUNT -lt $TOTAL_APPS ]; then
-#         echo "    },"
-#     else
-#         echo "    }"
-#     fi
-# done
-# 
-# echo '  }'
 
 # End JSON
 echo "}"

@@ -405,6 +405,18 @@
                         </div>
                     </div>
 
+                    <!-- Application Health Status -->
+                    <div class="card" style="margin-bottom: 20px;">
+                        <div class="card-header">
+                            <div class="card-title"><i class="bi bi-heart-pulse"></i> Application Health (${countHealthyApps(data.application_health)}/7)</div>
+                            <span class="status-badge ${countHealthyApps(data.application_health) === 7 ? 'status-ok' : 'status-warning'}">
+                                ${countHealthyApps(data.application_health) === 7 ? 'ALL HEALTHY' : 'ISSUES DETECTED'}
+                            </span>
+                        </div>
+                        <ul class="service-list">
+                            ${generateAppHealthList(data.application_health)}
+                        </ul>
+                    </div>
 
                     <!-- Databases & Backups -->
                     <div class="two-column-grid" style="margin-bottom: 20px;">
