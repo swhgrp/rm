@@ -1,5 +1,44 @@
 # Changelog
 
+## [2025-10-31] - Mail System Migration: SnappyMail → Mailcow SOGo
+
+### Summary
+Migrated from SnappyMail standalone webmail to Mailcow's integrated SOGo webmail. Removed custom SnappyMail theming and configuration. Updated Portal to link directly to Mailcow SOGo for email access. Cleaned up nginx configuration and removed SnappyMail containers.
+
+### Removed - SnappyMail
+- Removed mail-ui Docker container (SnappyMail)
+- Removed custom SWHospitality dark theme for SnappyMail
+- Removed SnappyMail domain configuration files
+- Removed mail-ui nginx proxy routes (`/mail-ui/` and `/snappymail/`)
+- Removed SnappyMail data volume
+
+### Changed - Portal System
+- Updated mail link in [main.py:243](file:///opt/restaurant-system/portal/src/portal/main.py#L243)
+- Changed from `/mail-ui/` to `https://mail.swhgrp.com/SOGo/`
+- Mail now opens directly in Mailcow SOGo webmail
+
+### Changed - Nginx Configuration
+- Removed SnappyMail proxy routes from [rm.swhgrp.com-http.conf](file:///opt/restaurant-system/shared/nginx/conf.d/rm.swhgrp.com-http.conf)
+- Kept existing Mailcow SOGo proxy routes intact:
+  - `/SOGo/` - Main webmail interface
+  - `/SOGo-*/` - Static resources
+  - `/SOGo.woa/WebServerResources/` - WebServer resources
+  - `/mail-admin/` - Admin interface (Portal admin auth required)
+- Reloaded nginx configuration without downtime
+
+### Benefits
+- **Simpler Architecture**: One less container to manage
+- **Better Integration**: SOGo is Mailcow's native webmail with full integration
+- **Professional UI**: SOGo provides enterprise-grade webmail interface
+- **Reduced Complexity**: No custom theming or configuration needed
+- **Native Auth**: Users login with their mailbox credentials directly
+
+### Technical Details
+- Mailcow SOGo: Native webmail at https://mail.swhgrp.com/SOGo/
+- Custom theme: Mailcow has sw-portal-dark.css matching portal design
+- Auth: Direct mailbox authentication (no SSO required for email)
+- Container: Uses existing mail-sogo-mailcow-1 (part of Mailcow stack)
+
 ## [2025-10-30] - Design Standardization, Password Management & Documentation Accuracy
 
 ### Summary

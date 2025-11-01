@@ -278,6 +278,9 @@ services:
       - ACCOUNTING_API_URL=http://accounting-app:8000
       - HR_API_URL=http://hr-app:8000
       - INTEGRATION_HUB_URL=http://integration-hub:8000
+      - MAILCOW_API_URL=https://mail-nginx-mailcow-1:8843
+      - MAILCOW_API_KEY=06c052141dffe88dc2f9e2cb519d2006216e1a370078896c552a3c1de47b92d9
+      - MAIL_DOMAIN=swhgrp.com
     depends_on:
       hr-db:
         condition: service_healthy

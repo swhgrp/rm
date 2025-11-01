@@ -18,3 +18,8 @@ INVENTORY_API_URL = os.getenv("INVENTORY_API_URL", "http://inventory-app:8000")
 ACCOUNTING_API_URL = os.getenv("ACCOUNTING_API_URL", "http://accounting-app:8000")
 HR_API_URL = os.getenv("HR_API_URL", "http://hr-app:8000")
 INTEGRATION_HUB_URL = os.getenv("INTEGRATION_HUB_URL", "http://integration-hub:8000")
+
+# Mailcow API configuration
+MAILCOW_API_URL = os.getenv("MAILCOW_API_URL", "https://mail-nginx-mailcow-1:8843")
+MAILCOW_API_KEY = os.getenv("MAILCOW_API_KEY", "")
+MAIL_DOMAIN = os.getenv("MAIL_DOMAIN", "swhgrp.com")

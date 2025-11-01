@@ -1,6 +1,6 @@
 """
 Portal SSO Authentication Helper
-Shared module for validating Portal SSO tokens
+Shared module for validating Portal SSO tokens across all systems
 """
 
 from jose import JWTError, jwt
@@ -18,7 +18,7 @@ def validate_portal_token(token: str, expected_system: str) -> Optional[Dict]:
 
     Args:
         token: JWT token from Portal
-        expected_system: The system name this token should be for (events)
+        expected_system: The system name this token should be for (inventory, accounting, hr, hub)
 
     Returns:
         Dict with user information if valid, None if invalid
@@ -37,6 +37,7 @@ def validate_portal_token(token: str, expected_system: str) -> Optional[Dict]:
             "full_name": payload.get("full_name"),
             "user_id": payload.get("user_id"),
             "is_admin": payload.get("is_admin", False),
+            "accounting_role_id": payload.get("accounting_role_id")
         }
     except JWTError:
         return None

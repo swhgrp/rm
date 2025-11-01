@@ -359,6 +359,8 @@
                         <i class="bi bi-calendar-event"></i>
                     {% elif system.system_key == 'files' %}
                         <i class="bi bi-folder"></i>
+                    {% elif system.system_key == 'mail' %}
+                        <i class="bi bi-envelope"></i>
                     {% else %}
                         <i class="bi bi-grid"></i>
                     {% endif %}
@@ -422,7 +424,13 @@
                 // Show loading state
                 card.classList.add('loading');
 
-                // Request token from Portal
+                // Mail system uses direct proxy, no token needed
+                if (systemKey === 'mail') {
+                    window.location.href = systemUrl;
+                    return;
+                }
+
+                // Request token from Portal for other systems
                 const response = await fetch(`/portal/api/generate-token/${systemKey}`);
 
                 if (!response.ok) {
