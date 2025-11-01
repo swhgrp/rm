@@ -1,14 +1,14 @@
 # SW Hospitality Group - Restaurant Management System
 
 [![Status](https://img.shields.io/badge/status-production-yellow)]()
-[![Completion](https://img.shields.io/badge/completion-75%25-orange)]()
+[![Completion](https://img.shields.io/badge/completion-78%25-orange)]()
 [![Documentation](https://img.shields.io/badge/docs-updated-blue)]()
 
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** October 31, 2025
-**Status:** ~75% Complete - Core Systems Production Ready ✅ (New: Automated Invoice Intake 🌟)
+**Last Updated:** November 1, 2025
+**Status:** ~78% Complete - Core Systems Production Ready ✅ (New: AR Enhancements 🌟)
 
 ---
 
@@ -37,7 +37,7 @@ The SW Hospitality Group Restaurant Management System is a comprehensive microse
 - **125+ database models** with full relationships (not 74!)
 - **500+ API endpoints** for system integration (not 150!)
 - **16 Docker containers** orchestrated via Docker Compose
-- **~75% completion** - core systems production ready with caveats
+- **~78% completion** - core systems production ready with caveats
 
 ---
 
@@ -367,7 +367,7 @@ restaurant-system/
 
 ---
 
-### 4. Accounting System (~75% Complete) 🔄
+### 4. Accounting System (~78% Complete) 🔄
 **Full double-entry accounting system** *(Most Sophisticated System)*
 
 - **URL:** https://rm.swhgrp.com/accounting/
@@ -406,13 +406,21 @@ restaurant-system/
 - ✅ 1099 tracking
 - ✅ Check printing
 
-**Accounts Receivable (AR):**
-- ✅ Customer management
-- ✅ Invoice creation
-- ✅ Payment receipt
-- ✅ AR aging reports
+**Accounts Receivable (AR):** *(Recently Enhanced - 85% Complete)*
+- ✅ Customer management with credit limits
+- ✅ Invoice creation with event integration
+- ✅ **Credit limit enforcement** (prevents over-limit invoicing) 🌟
+- ✅ **PDF invoice generation** with ReportLab 🌟
+- ✅ **Email invoice delivery** with SMTP configuration 🌟
+- ✅ **Customer statements** with aging and transaction detail 🌟
+- ✅ Payment receipt and tracking
+- ✅ AR aging reports (30/60/90+ days)
 - ✅ Collections tracking
 - ✅ Credit memos
+- ✅ Customer credit status API
+- ✅ Email settings UI for AR communications
+- 🔄 Recurring invoices (planned)
+- 🔄 Automated late payment reminders (planned)
 
 **Banking:**
 - ✅ Bank account management
