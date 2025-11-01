@@ -288,11 +288,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadLocations() {
     try {
-        const response = await fetch('/inventory/api/locations');
+        const token = localStorage.getItem('access_token');
+        const response = await fetch('/inventory/api/locations', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
-        const contentType = response.headers.get('content-type');
-        if (!response.ok || (contentType && contentType.includes('text/html'))) {
-            window.location.href = '/inventory/login';
+        if (!response.ok) {
+            console.error('Failed to load locations:', response.status);
             return;
         }
 
@@ -327,15 +331,18 @@ async function loadCOGSReport() {
     }
 
     try {
+        const token = localStorage.getItem('access_token');
         let url = `/inventory/api/reports/cogs?start_date=${startDate}&end_date=${endDate}`;
         if (locationId) url += `&location_id=${locationId}`;
 
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
-        // Check if response is HTML (redirect to login)
-        const contentType = response.headers.get('content-type');
-        if (!response.ok || (contentType && contentType.includes('text/html'))) {
-            window.location.href = '/inventory/login';
+        if (!response.ok) {
+            console.error('Failed to load COGS report:', response.status);
             return;
         }
 
@@ -402,14 +409,18 @@ async function loadTurnoverReport() {
     if (!startDate || !endDate) return;
 
     try {
+        const token = localStorage.getItem('access_token');
         let url = `/inventory/api/reports/inventory-turnover?start_date=${startDate}&end_date=${endDate}`;
         if (locationId) url += `&location_id=${locationId}`;
 
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
-        const contentType = response.headers.get('content-type');
-        if (!response.ok || (contentType && contentType.includes('text/html'))) {
-            window.location.href = '/inventory/login';
+        if (!response.ok) {
+            console.error('Failed to load turnover report:', response.status);
             return;
         }
 
@@ -463,14 +474,18 @@ async function loadABCAnalysis() {
     if (!startDate || !endDate) return;
 
     try {
+        const token = localStorage.getItem('access_token');
         let url = `/inventory/api/reports/abc-analysis?start_date=${startDate}&end_date=${endDate}`;
         if (locationId) url += `&location_id=${locationId}`;
 
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
-        const contentType = response.headers.get('content-type');
-        if (!response.ok || (contentType && contentType.includes('text/html'))) {
-            window.location.href = '/inventory/login';
+        if (!response.ok) {
+            console.error('Failed to load ABC analysis:', response.status);
             return;
         }
 
@@ -521,15 +536,19 @@ async function loadSlowMovingReport() {
     const locationId = document.getElementById('globalLocation').value;
 
     try {
+        const token = localStorage.getItem('access_token');
         let url = `/inventory/api/reports/slow-moving?days_threshold=${daysThreshold}`;
         if (locationId) url += `&location_id=${locationId}`;
         if (minValue) url += `&min_value=${minValue}`;
 
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
-        const contentType = response.headers.get('content-type');
-        if (!response.ok || (contentType && contentType.includes('text/html'))) {
-            window.location.href = '/inventory/login';
+        if (!response.ok) {
+            console.error('Failed to load slow-moving report:', response.status);
             return;
         }
 

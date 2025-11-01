@@ -22,9 +22,9 @@
             if (!currentPath.endsWith('/login')) {
                 const token = localStorage.getItem('access_token');
                 if (!token) {
-                    // Redirect to login, preserving the /inventory prefix if present
-                    const loginPath = currentPath.startsWith('/inventory/') ? '/inventory/login' : '/login';
-                    window.location.replace(loginPath);
+                    // Redirect to Portal login with redirect back to current page
+                    const redirectUrl = encodeURIComponent(window.location.href);
+                    window.location.replace('/portal/login?redirect=' + redirectUrl);
                     // Stop script execution
                     throw new Error('Redirecting to login');
                 }
