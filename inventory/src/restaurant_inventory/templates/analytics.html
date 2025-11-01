@@ -289,6 +289,13 @@ document.addEventListener('DOMContentLoaded', function() {
 async function loadLocations() {
     try {
         const response = await fetch('/inventory/api/locations');
+
+        const contentType = response.headers.get('content-type');
+        if (!response.ok || (contentType && contentType.includes('text/html'))) {
+            window.location.href = '/inventory/login';
+            return;
+        }
+
         const locations = await response.json();
 
         const select = document.getElementById('globalLocation');
@@ -324,6 +331,14 @@ async function loadCOGSReport() {
         if (locationId) url += `&location_id=${locationId}`;
 
         const response = await fetch(url);
+
+        // Check if response is HTML (redirect to login)
+        const contentType = response.headers.get('content-type');
+        if (!response.ok || (contentType && contentType.includes('text/html'))) {
+            window.location.href = '/inventory/login';
+            return;
+        }
+
         const data = await response.json();
 
         const tbody = document.getElementById('cogsTableBody');
@@ -391,6 +406,13 @@ async function loadTurnoverReport() {
         if (locationId) url += `&location_id=${locationId}`;
 
         const response = await fetch(url);
+
+        const contentType = response.headers.get('content-type');
+        if (!response.ok || (contentType && contentType.includes('text/html'))) {
+            window.location.href = '/inventory/login';
+            return;
+        }
+
         let data = await response.json();
 
         // Filter by status if selected
@@ -445,6 +467,13 @@ async function loadABCAnalysis() {
         if (locationId) url += `&location_id=${locationId}`;
 
         const response = await fetch(url);
+
+        const contentType = response.headers.get('content-type');
+        if (!response.ok || (contentType && contentType.includes('text/html'))) {
+            window.location.href = '/inventory/login';
+            return;
+        }
+
         let data = await response.json();
 
         // Filter by class if selected
@@ -497,6 +526,13 @@ async function loadSlowMovingReport() {
         if (minValue) url += `&min_value=${minValue}`;
 
         const response = await fetch(url);
+
+        const contentType = response.headers.get('content-type');
+        if (!response.ok || (contentType && contentType.includes('text/html'))) {
+            window.location.href = '/inventory/login';
+            return;
+        }
+
         const data = await response.json();
 
         const tbody = document.getElementById('slowMovingTableBody');
