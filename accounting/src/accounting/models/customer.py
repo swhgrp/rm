@@ -65,6 +65,7 @@ class Customer(Base):
 
     # Relationships
     # customer_invoices = relationship("CustomerInvoice", back_populates="customer")
+    recurring_invoices = relationship("RecurringInvoice", back_populates="customer")
 
     def __repr__(self):
         return f"<Customer {self.customer_code or self.id}: {self.customer_name}>"

@@ -71,6 +71,9 @@ class CustomerInvoice(Base):
     # Accounting integration
     journal_entry_id = Column(Integer, ForeignKey('journal_entries.id', ondelete='SET NULL'), nullable=True)
 
+    # Recurring invoice tracking
+    recurring_invoice_id = Column(Integer, ForeignKey('recurring_invoices.id', ondelete='SET NULL'), nullable=True)
+
     # Audit fields
     created_by = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     created_at = Column(DateTime, nullable=False, server_default=func.now())
@@ -79,6 +82,7 @@ class CustomerInvoice(Base):
 
     # Relationships
     customer = relationship("Customer", foreign_keys=[customer_id])
+    recurring_invoice = relationship("RecurringInvoice")
     area = relationship("Area")
     line_items = relationship("CustomerInvoiceLine", back_populates="invoice", cascade="all, delete-orphan")
     payments = relationship("InvoicePayment", back_populates="invoice", cascade="all, delete-orphan")
