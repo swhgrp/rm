@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Monitoring Dashboard - SW Hospitality Group</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .last-updated {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            opacity: 0.9;
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-ok {
+            background: #4caf50;
+            color: white;
+        }
+
+        .status-warning {
+            background: #ff9800;
+            color: white;
+        }
+
+        .status-critical {
+            background: #f44336;
+            color: white;
+        }
+
+        .status-stopped {
+            background: #9e9e9e;
+            color: white;
+        }
+
+        .metric {
+            margin: 15px 0;
+        }
+
+        .metric-label {
+            font-size: 13px;
+            opacity: 0.7;
+            margin-bottom: 5px;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .metric-value.large {
+            font-size: 36px;
+        }
+
+        .service-list {
+            list-style: none;
+        }
+
+        .service-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .service-item:last-child {
+            border-bottom: none;
+        }
+
+        .service-name {
+            font-weight: 500;
+        }
+
+        .service-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-dot.green {
+            background: #4caf50;
+            box-shadow: 0 0 10px #4caf50;
+        }
+
+        .status-dot.red {
+            background: #f44336;
+            box-shadow: 0 0 10px #f44336;
+        }
+
+        .status-dot.yellow {
+            background: #ff9800;
+            box-shadow: 0 0 10px #ff9800;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+
+        .progress-fill.green {
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+        }
+
+        .progress-fill.yellow {
+            background: linear-gradient(90deg, #ff9800, #ffc107);
+        }
+
+        .progress-fill.red {
+            background: linear-gradient(90deg, #f44336, #e91e63);
+        }
+
+        .refresh-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.05);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            opacity: 0.7;
+        }
+
+        .error {
+            background: rgba(244, 67, 54, 0.2);
+            border: 1px solid #f44336;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>🖥️ System Monitoring Dashboard</h1>
+                <div class="last-updated">Last updated: <span id="lastUpdated">Loading...</span></div>
+            </div>
+            <button class="refresh-btn" onclick="loadDashboard()">🔄 Refresh</button>
+        </header>
+
+        <div id="dashboard" class="loading pulse">
+            Loading system status...
+        </div>
+    </div>
+
+    <script>
+        async function loadDashboard() {
+            try {
+                const response = await fetch('/api/monitoring/status');
+                const data = await response.json();
+
+                document.getElementById('lastUpdated').textContent = data.generated_at;
+
+                const html = `
+                    <div class="grid">
+                        <!-- System Overview -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">💻 System Resources</div>
+                                <span class="status-badge ${getDiskStatus(data.system.disk_usage_percent)}">
+                                    ${data.system.disk_usage_percent < 80 ? 'OK' : data.system.disk_usage_percent < 90 ? 'WARNING' : 'CRITICAL'}
+                                </span>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Disk Usage</div>
+                                <div class="metric-value">${data.system.disk_usage_percent}%</div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill ${getDiskColor(data.system.disk_usage_percent)}"
+                                         style="width: ${data.system.disk_usage_percent}%"></div>
+                                </div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Free Space</div>
+                                <div class="metric-value">${data.system.disk_free}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Memory Used</div>
+                                <div class="metric-value">${data.system.memory_used} / ${data.system.memory_total}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">System Uptime</div>
+                                <div class="metric-value" style="font-size: 16px;">${data.system.uptime}</div>
+                            </div>
+                        </div>
+
+                        <!-- SSL Certificate -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">🔒 SSL Certificate</div>
+                                <span class="status-badge status-${data.ssl.status}">
+                                    ${data.ssl.status.toUpperCase()}
+                                </span>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Days Remaining</div>
+                                <div class="metric-value large">${data.ssl.days_remaining}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Expires On</div>
+                                <div class="metric-value" style="font-size: 14px;">${data.ssl.expiry_date}</div>
+                            </div>
+                        </div>
+
+                        <!-- Backups -->
+                        <div class="card">
+                            <div class="card-header">
+                                <div class="card-title">💾 Backups</div>
+                                <span class="status-badge status-${data.backups.status}">
+                                    ${data.backups.status.toUpperCase()}
+                                </span>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Total Backups</div>
+                                <div class="metric-value large">${data.backups.total_backups}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Total Size</div>
+                                <div class="metric-value">${data.backups.total_size}</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Latest Backup</div>
+                                <div class="metric-value" style="font-size: 14px;">${data.backups.latest_backup}</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Services -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">🚀 Microservices (${countHealthy(data.services)}/7)</div>
+                        </div>
+                        <ul class="service-list">
+                            ${generateServiceList(data.services)}
+                        </ul>
+                    </div>
+
+                    <!-- Databases -->
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">🗄️ Databases (${countHealthyDBs(data.databases)}/5)</div>
+                        </div>
+                        <ul class="service-list">
+                            ${generateDatabaseList(data.databases)}
+                        </ul>
+                    </div>
+                `;
+
+                document.getElementById('dashboard').innerHTML = html;
+            } catch (error) {
+                document.getElementById('dashboard').innerHTML = `
+                    <div class="error">
+                        <h3>❌ Error Loading Dashboard</h3>
+                        <p>${error.message}</p>
+                        <p>Please check that the monitoring API is running.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function getDiskStatus(usage) {
+            if (usage < 80) return 'status-ok';
+            if (usage < 90) return 'status-warning';
+            return 'status-critical';
+        }
+
+        function getDiskColor(usage) {
+            if (usage < 80) return 'green';
+            if (usage < 90) return 'yellow';
+            return 'red';
+        }
+
+        function countHealthy(services) {
+            return Object.values(services).filter(s => s.status === 'running' || s.health === 'healthy').length;
+        }
+
+        function countHealthyDBs(databases) {
+            return Object.values(databases).filter(db => db.status === 'healthy').length;
+        }
+
+        function generateServiceList(services) {
+            return Object.entries(services).map(([name, service]) => `
+                <li class="service-item">
+                    <div class="service-name">${formatServiceName(name)}</div>
+                    <div class="service-status">
+                        <span class="status-dot ${service.health === 'healthy' || service.status === 'running' ? 'green' : 'red'}"></span>
+                        <span>${service.status} · ${Math.floor(service.uptime_minutes / 60)}h ${service.uptime_minutes % 60}m</span>
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        function generateDatabaseList(databases) {
+            return Object.entries(databases).map(([name, db]) => `
+                <li class="service-item">
+                    <div class="service-name">${formatDBName(name)}</div>
+                    <div class="service-status">
+                        <span class="status-dot ${db.status === 'healthy' ? 'green' : 'red'}"></span>
+                        <span>${db.status} · ${db.size}</span>
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        function formatServiceName(name) {
+            return name.replace(/-app$/, '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+        }
+
+        function formatDBName(name) {
+            return name.replace(/-db$/, '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) + ' DB';
+        }
+
+        // Load dashboard on page load
+        loadDashboard();
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadDashboard, 30000);
+    </script>
+</body>
+</html>

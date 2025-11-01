@@ -14,6 +14,29 @@ The restaurant system has comprehensive automated monitoring covering:
 - ✅ **Disk Space** - Monitored every 6 hours (warning at 80%, critical at 90%)
 - ✅ **SSL Certificate** - Checked daily (warning at 30 days, critical at 7 days)
 - ✅ **Backup Verification** - Weekly automated backup integrity checks
+- ✅ **Real-Time Dashboard** - Visual monitoring interface with auto-refresh
+
+### 🖥️ Monitoring Dashboard
+
+**Access:** https://rm.swhgrp.com/portal/monitoring (Admin users only)
+
+A real-time monitoring dashboard provides instant visibility into:
+- System resources (disk, memory, uptime)
+- All microservice statuses
+- Database health and sizes
+- Backup status and history
+- SSL certificate expiration
+
+**Features:**
+- Auto-refreshes every 30 seconds
+- Color-coded status indicators
+- Responsive design
+- No manual login required (uses portal session)
+
+**How to Access:**
+1. Log in to the portal as an admin user
+2. Click "System Monitoring" card on the home page
+3. Or navigate directly to `/portal/monitoring`
 
 ---
 
@@ -82,6 +105,21 @@ The restaurant system has comprehensive automated monitoring covering:
 - hr_db (22 tables, ~60KB)
 - events_db (19 tables, ~8KB)
 - integration_hub_db (~4KB)
+
+### 5. Dashboard Status Generator
+**Script:** `/opt/restaurant-system/scripts/dashboard-status.sh`
+**Purpose:** Generates real-time JSON status data for monitoring dashboard
+**Called By:** Portal API endpoint `/api/monitoring/status`
+
+**Data Provided:**
+- System resources (uptime, load, disk, memory)
+- Service status and uptime for all 7 microservices
+- Database health and sizes for all 5 databases
+- Backup status (latest backup time, total count, size)
+- SSL certificate expiration details
+
+**Output Format:** JSON
+**Execution:** On-demand via API calls (not scheduled)
 
 ---
 
@@ -155,6 +193,13 @@ Weekly Sunday:     Backup verification
 
 ## 🛠️ Manual Monitoring Commands
 
+### View Monitoring Dashboard (Recommended)
+The easiest way to check system status is via the web dashboard:
+```
+https://rm.swhgrp.com/portal/monitoring
+```
+(Admin login required)
+
 ### Check Service Health Now
 ```bash
 /opt/restaurant-system/scripts/monitor-services.sh
@@ -173,6 +218,11 @@ Weekly Sunday:     Backup verification
 ### Verify Backups Now
 ```bash
 /opt/restaurant-system/scripts/verify-backups.sh
+```
+
+### Get Dashboard JSON Data
+```bash
+/opt/restaurant-system/scripts/dashboard-status.sh
 ```
 
 ### View Recent Monitoring Activity

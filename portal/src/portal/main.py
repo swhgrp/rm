@@ -245,6 +245,16 @@ async def home(request: Request, db: Session = Depends(get_db)):
             "system_key": "mail"
         })
 
+    # Admin-only: Monitoring Dashboard
+    if user.is_admin:
+        systems.append({
+            "name": "System Monitoring",
+            "description": "Real-time system health and monitoring dashboard",
+            "url": "/portal/monitoring",
+            "icon": "📊",
+            "system_key": "monitoring"
+        })
+
     return templates.TemplateResponse(
         "home.html",
         {
@@ -816,3 +826,51 @@ async def mail_gateway(path: str, request: Request, db: Session = Depends(get_db
         except Exception as e:
             logger.error(f"Mail gateway error: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Mail gateway error: {str(e)}")
+
+
+# Monitoring Dashboard Routes
+@app.get("/monitoring", response_class=HTMLResponse)
+async def monitoring_dashboard(request: Request, current_user: User = Depends(get_current_user)):
+    """Display monitoring dashboard"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    return templates.TemplateResponse("monitoring.html", {"request": request})
+
+
+@app.get("/api/monitoring/status")
+async def monitoring_status(current_user: User = Depends(get_current_user)):
+    """Return monitoring status as JSON"""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    import subprocess
+
+    try:
+        # Run the dashboard status script
+        result = subprocess.run(
+            ["/opt/restaurant-system/scripts/dashboard-status.sh"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+
+        if result.returncode == 0:
+            # Parse JSON output (skip the Content-Type header)
+            json_output = result.stdout.split('\n\n', 1)[1] if '\n\n' in result.stdout else result.stdout
+            import json
+            return JSONResponse(content=json.loads(json_output))
+        else:
+            raise HTTPException(status_code=500, detail="Failed to get monitoring status")
+
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Monitoring status check timed out")
+    except Exception as e:
+        logger.error(f"Monitoring status error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {"status": "healthy", "service": "portal"}
