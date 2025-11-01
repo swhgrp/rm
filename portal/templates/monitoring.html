@@ -405,6 +405,19 @@
                         </div>
                     </div>
 
+                    <!-- Application Health Status -->
+                    <div class="card" style="margin-bottom: 20px;">
+                        <div class="card-header">
+                            <div class="card-title"><i class="bi bi-heart-pulse"></i> Application Health (${countHealthyApps(data.application_health)}/7)</div>
+                            <span class="status-badge ${countHealthyApps(data.application_health) === 7 ? 'status-ok' : 'status-warning'}">
+                                ${countHealthyApps(data.application_health) === 7 ? 'ALL HEALTHY' : 'ISSUES DETECTED'}
+                            </span>
+                        </div>
+                        <ul class="service-list">
+                            ${generateAppHealthList(data.application_health)}
+                        </ul>
+                    </div>
+
                     <!-- Databases & Backups -->
                     <div class="two-column-grid" style="margin-bottom: 20px;">
                         <!-- Databases -->
@@ -546,6 +559,10 @@
             return Object.values(databases).filter(db => db.status === 'healthy').length;
         }
 
+        function countHealthyApps(appHealth) {
+            return Object.values(appHealth).filter(app => app.status === 'healthy').length;
+        }
+
         function generateServiceList(services) {
             return Object.entries(services).map(([name, service]) => `
                 <li class="service-item">
@@ -577,6 +594,18 @@
                     <div class="service-status">
                         <span class="status-dot ${details.status === 'ok' ? 'green' : 'red'}"></span>
                         <span>${details.backup_count} backups · ${details.latest_size} · ${details.latest_backup}</span>
+                    </div>
+                </li>
+            `).join('');
+        }
+
+        function generateAppHealthList(appHealth) {
+            return Object.entries(appHealth).map(([name, app]) => `
+                <li class="service-item">
+                    <div class="service-name">${formatServiceName(name)}</div>
+                    <div class="service-status">
+                        <span class="status-dot ${app.status === 'healthy' ? 'green' : app.status === 'unhealthy' ? 'yellow' : 'red'}"></span>
+                        <span>${app.status} · HTTP ${app.http_code} · ${app.response_time_ms}ms</span>
                     </div>
                 </li>
             `).join('');
