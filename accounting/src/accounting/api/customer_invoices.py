@@ -23,6 +23,8 @@ from accounting.schemas.customer_invoice import (
 )
 from accounting.api.auth import require_auth
 from accounting.services.ar_gl_service import ARGLService
+from accounting.services.invoice_pdf_service import InvoicePDFService
+from fastapi.responses import StreamingResponse
 
 router = APIRouter(prefix="/api/customer-invoices", tags=["customer-invoices"])
 logger = logging.getLogger(__name__)
@@ -628,6 +630,59 @@ def void_invoice(
         # No GL entry to reverse
         db.commit()
         return {"message": "Invoice voided successfully (no GL entry to reverse)", "status": invoice.status}
+
+
+@router.get("/{invoice_id}/pdf")
+def generate_invoice_pdf(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
+    """
+    Generate and download PDF for an invoice
+
+    Returns PDF file as downloadable attachment
+    """
+    # Get invoice with related data
+    invoice = db.query(CustomerInvoice).filter(CustomerInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Get customer
+    customer = db.query(Customer).filter(Customer.id == invoice.customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail="Customer not found for this invoice")
+
+    # Get line items
+    line_items = db.query(CustomerInvoiceLine).filter(
+        CustomerInvoiceLine.invoice_id == invoice_id
+    ).order_by(CustomerInvoiceLine.line_number).all()
+
+    try:
+        # Generate PDF
+        pdf_service = InvoicePDFService()
+        pdf_buffer = pdf_service.generate_invoice_pdf(
+            invoice=invoice,
+            customer=customer,
+            line_items=line_items
+        )
+
+        # Return as streaming response with proper headers
+        filename = f"Invoice_{invoice.invoice_number}.pdf"
+
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}"
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error generating PDF for invoice {invoice.invoice_number}: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating PDF: {str(e)}"
+        )
 
 
 @router.delete("/{invoice_id}")
