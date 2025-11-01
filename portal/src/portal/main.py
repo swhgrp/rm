@@ -962,7 +962,7 @@ async def monitoring_status(current_user: User = Depends(get_current_user)):
             ["/opt/restaurant-system/scripts/dashboard-status.sh"],
             capture_output=True,
             text=True,
-            timeout=45
+            timeout=60
         )
 
         if result.returncode == 0:
