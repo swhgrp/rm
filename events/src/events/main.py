@@ -11,15 +11,14 @@ import os
 import sys
 
 # Add shared directory to path for Sentry config
-sys.path.insert(0, '/opt/restaurant-system/shared/python')
-from sentry_config import init_sentry
-
+# sys.path.insert(0, '/opt/restaurant-system/shared/python')
+# from sentry_config import init_sentry
 # Initialize Sentry error tracking
-init_sentry("events")
+# init_sentry("events")
 
 from events.core.config import settings
 from events.core.deps import require_auth
-from events.api import public, events, tasks, documents, auth, settings as settings_api
+from events.api import public, events, tasks, documents, auth, settings as settings_api, packages
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -120,6 +119,15 @@ async def settings_page(request: Request, current_user=Depends(require_auth)):
         "user": current_user
     })
 
+# Packages page
+@app.get("/packages", response_class=HTMLResponse)
+async def packages_page(request: Request, current_user=Depends(require_auth)):
+    """Serve the event packages management page"""
+    return templates.TemplateResponse("admin/packages.html", {
+        "request": request,
+        "user": current_user
+    })
+
 # Events list page
 @app.get("/list", response_class=HTMLResponse)
 async def events_list_page(request: Request, current_user=Depends(require_auth)):
@@ -144,6 +152,7 @@ app.include_router(public.router, prefix="/public", tags=["Public"])
 app.include_router(events.router, prefix="/api/events", tags=["Events"])
 app.include_router(tasks.router, prefix="/api/tasks", tags=["Tasks"])
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
+app.include_router(packages.router, prefix="/api/packages", tags=["Packages"])
 app.include_router(settings_api.router, prefix="/api/settings", tags=["Settings"])
 
 # Mount static files AFTER routers (matching HR pattern)

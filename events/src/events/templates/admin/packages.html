@@ -1,0 +1,405 @@
+{% extends "base.html" %}
+
+{% block title %}Event Packages - SW Hospitality Events{% endblock %}
+
+{% block page_title %}Event Packages{% endblock %}
+
+{% block content %}
+<div class="packages-container">
+    <div class="settings-header">
+        <div>
+            <h3>Manage Event Packages</h3>
+            <p class="text-muted">Create and manage pricing packages for different event types</p>
+        </div>
+        <button class="btn-primary-custom" onclick="showAddModal()">
+            <i class="bi bi-plus-circle"></i> Add Package
+        </button>
+    </div>
+
+    <!-- Filter by Event Type -->
+    <div class="mb-4">
+        <select class="form-control-custom" id="eventTypeFilter" onchange="loadPackages()" style="max-width: 300px;">
+            <option value="">All Event Types</option>
+        </select>
+    </div>
+
+    <!-- Packages Table -->
+    <div id="packagesTable" class="settings-table"></div>
+</div>
+
+<!-- Modal for Add/Edit Package -->
+<div class="modal fade" id="packageModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">Add Package</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="packageForm">
+                    <input type="hidden" id="packageId">
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="packageName" class="form-label">Package Name *</label>
+                            <input type="text" class="form-control-custom" id="packageName" required>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="eventType" class="form-label">Event Type *</label>
+                            <select class="form-control-custom" id="eventType" required>
+                                <option value="">Select Event Type</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <h6 class="mt-4 mb-3">Pricing Components</h6>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="basePrice" class="form-label">Base Price *</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control-custom" id="basePrice" step="0.01" min="0" required>
+                            </div>
+                            <small class="text-muted">Fixed base price for the package</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="perGuestPrice" class="form-label">Per Guest Price</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control-custom" id="perGuestPrice" step="0.01" min="0" value="0">
+                            </div>
+                            <small class="text-muted">Additional cost per guest</small>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="setupFee" class="form-label">Setup Fee</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control-custom" id="setupFee" step="0.01" min="0">
+                            </div>
+                            <small class="text-muted">Setup and breakdown fee</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="overtimeRate" class="form-label">Overtime Rate (per hour)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control-custom" id="overtimeRate" step="0.01" min="0">
+                            </div>
+                            <small class="text-muted">Hourly rate for overtime</small>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="taxRate" class="form-label">Tax Rate (%)</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control-custom" id="taxRate" step="0.01" min="0" max="100">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <small class="text-muted">Sales tax percentage</small>
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label for="gratuityRate" class="form-label">Gratuity Rate (%)</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control-custom" id="gratuityRate" step="0.01" min="0" max="100">
+                                <span class="input-group-text">%</span>
+                            </div>
+                            <small class="text-muted">Service gratuity percentage</small>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="priceDescription" class="form-label">Pricing Description</label>
+                        <textarea class="form-control-custom" id="priceDescription" rows="2" placeholder="Additional pricing notes or what's included..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary-custom" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-primary-custom" onclick="savePackage()">Save Package</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+}
+
+.settings-table {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.package-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    transition: border-color 0.2s;
+}
+
+.package-card:hover {
+    border-color: #58a6ff;
+}
+
+.package-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 1rem;
+}
+
+.package-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #c9d1d9;
+    margin-bottom: 0.25rem;
+}
+
+.package-type {
+    color: #8b949e;
+    font-size: 0.875rem;
+}
+
+.package-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.pricing-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.pricing-item {
+    padding: 0.75rem;
+    background: #0d1117;
+    border-radius: 4px;
+}
+
+.pricing-label {
+    font-size: 0.75rem;
+    color: #8b949e;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+}
+
+.pricing-value {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #58a6ff;
+}
+</style>
+
+<script>
+let currentPackageId = null;
+let eventTypes = [];
+let bootstrapModal = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    bootstrapModal = new bootstrap.Modal(document.getElementById('packageModal'));
+    loadEventTypes();
+    loadPackages();
+});
+
+async function loadEventTypes() {
+    try {
+        const response = await fetch('/api/settings/event-types');
+        if (!response.ok) throw new Error('Failed to load event types');
+
+        eventTypes = await response.json();
+
+        // Populate event type selects
+        const eventTypeSelect = document.getElementById('eventType');
+        const filterSelect = document.getElementById('eventTypeFilter');
+
+        eventTypes.forEach(type => {
+            eventTypeSelect.innerHTML += `<option value="${type.name}">${type.name}</option>`;
+            filterSelect.innerHTML += `<option value="${type.name}">${type.name}</option>`;
+        });
+    } catch (error) {
+        console.error('Error loading event types:', error);
+    }
+}
+
+async function loadPackages() {
+    try {
+        const filter = document.getElementById('eventTypeFilter').value;
+        let url = '/api/packages';
+        if (filter) url += `?event_type=${encodeURIComponent(filter)}`;
+
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to load packages');
+
+        const packages = await response.json();
+
+        const container = document.getElementById('packagesTable');
+
+        if (packages.length === 0) {
+            container.innerHTML = '<p class="text-center text-muted p-4">No packages found. Create your first package to get started.</p>';
+            return;
+        }
+
+        container.innerHTML = packages.map(pkg => `
+            <div class="package-card">
+                <div class="package-header">
+                    <div>
+                        <div class="package-title">${pkg.name}</div>
+                        <div class="package-type"><i class="bi bi-tag"></i> ${pkg.event_type}</div>
+                    </div>
+                    <div class="package-actions">
+                        <button class="btn-secondary-custom btn-sm" onclick="editPackage('${pkg.id}')">
+                            <i class="bi bi-pencil"></i> Edit
+                        </button>
+                        <button class="btn-danger-custom btn-sm" onclick="deletePackage('${pkg.id}', '${pkg.name}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="pricing-grid">
+                    <div class="pricing-item">
+                        <div class="pricing-label">Base Price</div>
+                        <div class="pricing-value">$${pkg.base_price ? pkg.base_price.toFixed(2) : '0.00'}</div>
+                    </div>
+                    ${pkg.per_guest_price ? `
+                    <div class="pricing-item">
+                        <div class="pricing-label">Per Guest</div>
+                        <div class="pricing-value">$${pkg.per_guest_price.toFixed(2)}</div>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading packages:', error);
+        document.getElementById('packagesTable').innerHTML = '<p class="text-center text-danger p-4">Error loading packages</p>';
+    }
+}
+
+function showAddModal() {
+    currentPackageId = null;
+    document.getElementById('modalTitle').textContent = 'Add Package';
+    document.getElementById('packageForm').reset();
+    document.getElementById('packageId').value = '';
+    bootstrapModal.show();
+}
+
+async function editPackage(id) {
+    try {
+        const response = await fetch(`/api/packages/${id}`);
+        if (!response.ok) throw new Error('Failed to load package');
+
+        const pkg = await response.json();
+        currentPackageId = id;
+
+        document.getElementById('modalTitle').textContent = 'Edit Package';
+        document.getElementById('packageId').value = id;
+        document.getElementById('packageName').value = pkg.name;
+        document.getElementById('eventType').value = pkg.event_type;
+
+        if (pkg.price_components) {
+            document.getElementById('basePrice').value = pkg.price_components.base_price || '';
+            document.getElementById('perGuestPrice').value = pkg.price_components.per_guest_price || 0;
+            document.getElementById('setupFee').value = pkg.price_components.setup_fee || '';
+            document.getElementById('overtimeRate').value = pkg.price_components.overtime_rate || '';
+            document.getElementById('taxRate').value = pkg.price_components.tax_rate ? (pkg.price_components.tax_rate * 100) : '';
+            document.getElementById('gratuityRate').value = pkg.price_components.gratuity_rate ? (pkg.price_components.gratuity_rate * 100) : '';
+            document.getElementById('priceDescription').value = pkg.price_components.description || '';
+        }
+
+        bootstrapModal.show();
+    } catch (error) {
+        console.error('Error loading package:', error);
+        alert('Error loading package details');
+    }
+}
+
+async function savePackage() {
+    const form = document.getElementById('packageForm');
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+
+    const taxRate = document.getElementById('taxRate').value;
+    const gratuityRate = document.getElementById('gratuityRate').value;
+
+    const data = {
+        name: document.getElementById('packageName').value,
+        event_type: document.getElementById('eventType').value,
+        price_components: {
+            base_price: parseFloat(document.getElementById('basePrice').value),
+            per_guest_price: parseFloat(document.getElementById('perGuestPrice').value) || 0,
+            setup_fee: document.getElementById('setupFee').value ? parseFloat(document.getElementById('setupFee').value) : null,
+            overtime_rate: document.getElementById('overtimeRate').value ? parseFloat(document.getElementById('overtimeRate').value) : null,
+            tax_rate: taxRate ? parseFloat(taxRate) / 100 : null,
+            gratuity_rate: gratuityRate ? parseFloat(gratuityRate) / 100 : null,
+            description: document.getElementById('priceDescription').value || null
+        }
+    };
+
+    try {
+        const url = currentPackageId ? `/api/packages/${currentPackageId}` : '/api/packages';
+        const method = currentPackageId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save package');
+        }
+
+        bootstrapModal.hide();
+        loadPackages();
+    } catch (error) {
+        console.error('Error saving package:', error);
+        alert('Error saving package: ' + error.message);
+    }
+}
+
+async function deletePackage(id, name) {
+    if (!confirm(`Are you sure you want to delete the package "${name}"?\n\nThis action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/packages/${id}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete package');
+        }
+
+        loadPackages();
+    } catch (error) {
+        console.error('Error deleting package:', error);
+        alert('Error deleting package: ' + error.message);
+    }
+}
+</script>
+{% endblock %}
