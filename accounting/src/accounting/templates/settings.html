@@ -214,6 +214,73 @@
     </form>
 </div>
 
+<!-- Email Settings for AR Invoices -->
+<div class="card">
+    <h3><i class="bi bi-envelope"></i> Email Settings (AR Invoices)</h3>
+    <hr>
+    <p class="text-muted">Configure email settings for sending customer invoices</p>
+    <form id="emailSettingsForm">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="emailFromAddress" class="form-label">From Email Address <span class="text-danger">*</span></label>
+                <input type="email" class="form-control" id="emailFromAddress" placeholder="ar@swrestaurantgroup.com" required>
+                <small class="text-muted">Email address invoices will be sent from</small>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="emailFromName" class="form-label">From Name <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="emailFromName" placeholder="SW Hospitality Group - Accounting" required>
+                <small class="text-muted">Display name for sent emails</small>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="emailSmtpHost" class="form-label">SMTP Server <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" id="emailSmtpHost" placeholder="smtp.gmail.com" required>
+                <small class="text-muted">SMTP server hostname (e.g., smtp.gmail.com, smtp.office365.com)</small>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="emailSmtpPort" class="form-label">SMTP Port <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" id="emailSmtpPort" placeholder="587" value="587" required>
+                <small class="text-muted">Typically 587 for TLS, 465 for SSL</small>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label for="emailSmtpUser" class="form-label">SMTP Username</label>
+                <input type="text" class="form-control" id="emailSmtpUser" placeholder="your-email@gmail.com">
+                <small class="text-muted">Email address or username for SMTP authentication</small>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label for="emailSmtpPassword" class="form-label">SMTP Password</label>
+                <input type="password" class="form-control" id="emailSmtpPassword" placeholder="••••••••">
+                <small class="text-muted">App-specific password (not your regular email password)</small>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" id="emailUseTls" checked>
+                    <label class="form-check-label" for="emailUseTls">
+                        Use TLS Encryption
+                    </label>
+                </div>
+                <small class="text-muted">Enable TLS/STARTTLS for secure connection (recommended)</small>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <button type="button" class="btn btn-primary" onclick="saveEmailSettings()">
+                    <i class="bi bi-save"></i> Save Email Settings
+                </button>
+                <button type="button" class="btn btn-secondary ms-2" onclick="testEmailConnection()">
+                    <i class="bi bi-send-check"></i> Test Connection
+                </button>
+            </div>
+        </div>
+    </form>
+    <div id="emailSettingsAlert" class="alert mt-3" style="display: none;"></div>
+</div>
+
 <!-- Audit & Security -->
 <div class="card">
     <h3><i class="bi bi-shield-check"></i> Audit & Security</h3>
@@ -471,5 +538,132 @@
             alert('Error: ' + error.message);
         }
     }
+
+    // ========== EMAIL SETTINGS ==========
+    async function loadEmailSettings() {
+        try {
+            const response = await fetch('/accounting/api/settings/');
+            const allSettings = await response.json();
+
+            // Convert to object
+            const settings = {};
+            allSettings.forEach(s => {
+                settings[s.setting_key] = s.setting_value;
+            });
+
+            // Populate email form fields
+            document.getElementById('emailFromAddress').value = settings['email_from_address'] || '';
+            document.getElementById('emailFromName').value = settings['email_from_name'] || '';
+            document.getElementById('emailSmtpHost').value = settings['email_smtp_host'] || '';
+            document.getElementById('emailSmtpPort').value = settings['email_smtp_port'] || '587';
+            document.getElementById('emailSmtpUser').value = settings['email_smtp_user'] || '';
+            document.getElementById('emailSmtpPassword').value = settings['email_smtp_password'] || '';
+            document.getElementById('emailUseTls').checked = (settings['email_use_tls'] || 'true').toLowerCase() === 'true';
+
+        } catch (error) {
+            console.error('Error loading email settings:', error);
+            showEmailAlert('Error loading email settings: ' + error.message, 'danger');
+        }
+    }
+
+    async function saveEmailSettings() {
+        try {
+            showEmailAlert('Saving email settings...', 'info');
+
+            // Collect all email settings
+            const emailSettings = {
+                'email_from_address': document.getElementById('emailFromAddress').value,
+                'email_from_name': document.getElementById('emailFromName').value,
+                'email_smtp_host': document.getElementById('emailSmtpHost').value,
+                'email_smtp_port': document.getElementById('emailSmtpPort').value,
+                'email_smtp_user': document.getElementById('emailSmtpUser').value,
+                'email_smtp_password': document.getElementById('emailSmtpPassword').value,
+                'email_use_tls': document.getElementById('emailUseTls').checked ? 'true' : 'false'
+            };
+
+            // Validate required fields
+            if (!emailSettings['email_from_address']) {
+                showEmailAlert('From Email Address is required', 'danger');
+                return;
+            }
+            if (!emailSettings['email_smtp_host']) {
+                showEmailAlert('SMTP Host is required', 'danger');
+                return;
+            }
+
+            // Save each setting
+            const promises = Object.keys(emailSettings).map(key => {
+                return fetch(`/accounting/api/settings/${key}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        setting_value: emailSettings[key]
+                    })
+                });
+            });
+
+            const responses = await Promise.all(promises);
+
+            // Check for errors
+            const errors = responses.filter(r => !r.ok);
+            if (errors.length > 0) {
+                const errorData = await errors[0].json();
+                throw new Error(errorData.detail || 'Failed to save email settings');
+            }
+
+            showEmailAlert('Email settings saved successfully!', 'success');
+            await loadEmailSettings(); // Reload to confirm
+
+        } catch (error) {
+            console.error('Error saving email settings:', error);
+            showEmailAlert('Error: ' + error.message, 'danger');
+        }
+    }
+
+    async function testEmailConnection() {
+        try {
+            showEmailAlert('Testing email connection...', 'info');
+
+            const response = await fetch('/accounting/api/email/test-connection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                showEmailAlert('Email connection test successful!', 'success');
+            } else {
+                showEmailAlert('Email connection test failed: ' + (result.message || 'Unknown error'), 'danger');
+            }
+
+        } catch (error) {
+            console.error('Error testing email connection:', error);
+            showEmailAlert('Error testing connection: ' + error.message, 'danger');
+        }
+    }
+
+    function showEmailAlert(message, type) {
+        const alertDiv = document.getElementById('emailSettingsAlert');
+        alertDiv.className = `alert alert-${type} mt-3`;
+        alertDiv.textContent = message;
+        alertDiv.style.display = 'block';
+
+        // Auto-hide after 5 seconds for success messages
+        if (type === 'success') {
+            setTimeout(() => {
+                alertDiv.style.display = 'none';
+            }, 5000);
+        }
+    }
+
+    // Load email settings when page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        loadEmailSettings();
+    });
 </script>
 {% endblock %}

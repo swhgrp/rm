@@ -37,6 +37,7 @@ from accounting.api.budgets import router as budgets_router
 from accounting.api.pos import router as pos_router
 from accounting.api.settings import router as settings_router
 from accounting.api.safe import router as safe_router
+from accounting.api.email import router as email_router
 from accounting.models.user import User
 # Import all models to ensure they are registered
 import accounting.models  # noqa
@@ -106,6 +107,7 @@ app.include_router(budgets_router, prefix="/api/budgets", tags=["Budgets"])
 app.include_router(pos_router)
 app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
 app.include_router(safe_router)
+app.include_router(email_router, prefix="/api/email", tags=["Email"])
 
 
 # Custom exception handler for authentication redirects

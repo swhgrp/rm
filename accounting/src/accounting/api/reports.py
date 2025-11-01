@@ -1,7 +1,7 @@
 """
 Reports API endpoints - Trial Balance, General Ledger, Cash Flow Statement, etc.
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
@@ -1842,3 +1842,74 @@ def get_cash_flow_statement(
     """
     service = CashFlowStatementService(db)
     return service.get_cash_flow_statement(start_date, end_date, area_id)
+
+
+# ========== CUSTOMER STATEMENTS ==========
+
+@router.get("/customer-statement/{customer_id}")
+def get_customer_statement(
+    customer_id: int,
+    start_date: date = Query(..., description="Statement period start date"),
+    end_date: date = Query(..., description="Statement period end date"),
+    include_paid: bool = Query(True, description="Include fully paid invoices"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
+    """
+    Generate customer account statement showing transactions, aging, and balances
+
+    Args:
+        customer_id: Customer ID
+        start_date: Statement period start
+        end_date: Statement period end
+        include_paid: Include paid invoices in transaction detail
+
+    Returns:
+        Statement data including transactions, aging, and balances
+    """
+    from accounting.services.customer_statement_service import CustomerStatementService
+
+    service = CustomerStatementService(db)
+    return service.generate_statement_data(customer_id, start_date, end_date, include_paid)
+
+
+@router.get("/customer-statement/{customer_id}/pdf")
+def get_customer_statement_pdf(
+    customer_id: int,
+    start_date: date = Query(..., description="Statement period start date"),
+    end_date: date = Query(..., description="Statement period end date"),
+    include_paid: bool = Query(True, description="Include fully paid invoices"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
+    """
+    Generate customer account statement as PDF
+
+    Args:
+        customer_id: Customer ID
+        start_date: Statement period start
+        end_date: Statement period end
+        include_paid: Include paid invoices in transaction detail
+
+    Returns:
+        PDF file download
+    """
+    from accounting.services.customer_statement_service import CustomerStatementService
+    from accounting.models.customer import Customer
+
+    # Get customer for filename
+    customer = db.query(Customer).filter(Customer.id == customer_id).first()
+    if not customer:
+        raise HTTPException(status_code=404, detail=f"Customer {customer_id} not found")
+
+    service = CustomerStatementService(db)
+    pdf_buffer = service.generate_statement_pdf(customer_id, start_date, end_date, include_paid)
+
+    # Create filename
+    filename = f"Statement_{customer.name.replace(' ', '_')}_{end_date.isoformat()}.pdf"
+
+    return StreamingResponse(
+        pdf_buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
