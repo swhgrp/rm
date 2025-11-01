@@ -978,12 +978,21 @@ async def monitoring_status(current_user: User = Depends(get_current_user)):
 
             json_output = '\n'.join(lines[json_start:])
             import json
-            return JSONResponse(content=json.loads(json_output))
+            try:
+                parsed_data = json.loads(json_output)
+                return JSONResponse(content=parsed_data)
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON parsing error at line {e.lineno}, col {e.colno}: {e.msg}")
+                logger.error(f"Problematic output (first 500 chars): {json_output[:500]}")
+                raise HTTPException(status_code=500, detail=f"Invalid JSON from monitoring script: {e.msg}")
         else:
             raise HTTPException(status_code=500, detail=f"Script failed: {result.stderr}")
 
     except subprocess.TimeoutExpired:
         raise HTTPException(status_code=504, detail="Monitoring status check timed out")
+    except json.JSONDecodeError:
+        # Already handled above
+        raise
     except Exception as e:
         logger.error(f"Monitoring status error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
