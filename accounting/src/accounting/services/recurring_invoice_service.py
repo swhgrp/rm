@@ -16,8 +16,7 @@ from accounting.models.recurring_invoice import (
     RecurringFrequency,
     RecurringInvoiceStatus
 )
-from accounting.models.customer_invoice import CustomerInvoice, InvoiceStatus
-from accounting.models.customer_invoice_line_item import CustomerInvoiceLineItem
+from accounting.models.customer_invoice import CustomerInvoice, InvoiceStatus, CustomerInvoiceLine
 from accounting.services.email_service import EmailService
 from accounting.services.invoice_pdf_service import InvoicePDFService
 
@@ -104,7 +103,7 @@ class RecurringInvoiceService:
 
         # Copy line items
         for template_line in recurring_invoice.line_items:
-            line_item = CustomerInvoiceLineItem(
+            line_item = CustomerInvoiceLine(
                 invoice_id=invoice.id,
                 line_number=template_line.line_number,
                 description=template_line.description,

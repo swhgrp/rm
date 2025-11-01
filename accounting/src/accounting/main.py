@@ -38,6 +38,7 @@ from accounting.api.pos import router as pos_router
 from accounting.api.settings import router as settings_router
 from accounting.api.safe import router as safe_router
 from accounting.api.email import router as email_router
+from accounting.api.recurring_invoices import router as recurring_invoices_router
 from accounting.models.user import User
 # Import all models to ensure they are registered
 import accounting.models  # noqa
@@ -108,6 +109,7 @@ app.include_router(pos_router)
 app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
 app.include_router(safe_router)
 app.include_router(email_router, prefix="/api/email", tags=["Email"])
+app.include_router(recurring_invoices_router, prefix="/api/recurring-invoices", tags=["Recurring Invoices"])
 
 
 # Custom exception handler for authentication redirects
@@ -342,6 +344,18 @@ async def customer_invoices_page(
 ):
     """Customer Invoices page"""
     return templates.TemplateResponse("customer_invoices.html", {
+        "request": request,
+        "current_user": user
+    })
+
+
+@app.get("/recurring-invoices", response_class=HTMLResponse)
+async def recurring_invoices_page(
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Recurring Invoice Templates page"""
+    return templates.TemplateResponse("recurring_invoices.html", {
         "request": request,
         "current_user": user
     })

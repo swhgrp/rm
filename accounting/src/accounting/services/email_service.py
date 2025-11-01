@@ -282,6 +282,64 @@ class EmailService:
 
             server.sendmail(self.from_address, recipients, msg.as_string())
 
+    def send_email(
+        self,
+        to_email: str,
+        subject: str,
+        html_body: str,
+        pdf_buffer: Optional[BytesIO] = None,
+        pdf_filename: str = "attachment.pdf",
+        cc_emails: Optional[List[str]] = None
+    ) -> bool:
+        """
+        Send a generic HTML email with optional PDF attachment
+
+        Args:
+            to_email: Recipient email address
+            subject: Email subject
+            html_body: HTML email body
+            pdf_buffer: Optional PDF file as BytesIO
+            pdf_filename: Filename for PDF attachment
+            cc_emails: Optional list of CC email addresses
+
+        Returns:
+            bool: True if email sent successfully, False otherwise
+        """
+        try:
+            # Create message
+            msg = MIMEMultipart()
+            msg['From'] = f"{self.from_name} <{self.from_address}>"
+            msg['To'] = to_email
+            msg['Subject'] = subject
+
+            # Add CC if provided
+            if cc_emails:
+                msg['Cc'] = ', '.join(cc_emails)
+
+            # Attach HTML body
+            msg.attach(MIMEText(html_body, 'html'))
+
+            # Attach PDF if provided
+            if pdf_buffer:
+                pdf_buffer.seek(0)
+                pdf_attachment = MIMEApplication(pdf_buffer.read(), _subtype='pdf')
+                pdf_attachment.add_header('Content-Disposition', 'attachment', filename=pdf_filename)
+                msg.attach(pdf_attachment)
+
+            # Prepare recipients list
+            recipients = [to_email]
+            if cc_emails:
+                recipients.extend(cc_emails)
+
+            # Send
+            self._send_smtp(msg, recipients)
+            logger.info(f"Email sent successfully to {to_email}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to send email to {to_email}: {str(e)}")
+            return False
+
     def test_connection(self) -> bool:
         """
         Test SMTP connection

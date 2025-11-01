@@ -1,0 +1,695 @@
+{% extends "base.html" %}
+
+{% block title %}Recurring Invoice Templates - SW Hospitality Group Accounting{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h2">
+            <i class="fas fa-sync-alt text-primary"></i> Recurring Invoice Templates
+        </h1>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#templateModal" onclick="openCreateModal()">
+            <i class="fas fa-plus"></i> New Template
+        </button>
+    </div>
+
+    <!-- Status Filter -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label">Filter by Status:</label>
+            <select id="statusFilter" class="form-select" onchange="loadTemplates()">
+                <option value="">All Statuses</option>
+                <option value="ACTIVE" selected>Active</option>
+                <option value="PAUSED">Paused</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="CANCELLED">Cancelled</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Filter by Customer:</label>
+            <select id="customerFilter" class="form-select" onchange="loadTemplates()">
+                <option value="">All Customers</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Templates Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Template Name</th>
+                            <th>Customer</th>
+                            <th>Frequency</th>
+                            <th>Next Invoice</th>
+                            <th>Amount</th>
+                            <th>Generated</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="templatesTable">
+                        <tr>
+                            <td colspan="8" class="text-center">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Template Modal -->
+<div class="modal fade" id="templateModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">New Recurring Invoice Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="templateForm">
+                    <input type="hidden" id="templateId">
+
+                    <!-- Template Info -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Template Name <span class="text-danger">*</span></label>
+                            <input type="text" id="templateName" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Customer <span class="text-danger">*</span></label>
+                            <select id="customerId" class="form-select" required>
+                                <option value="">Select Customer</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Description</label>
+                            <textarea id="description" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Schedule Settings -->
+                    <h6 class="mt-4 mb-3">Schedule Settings</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Frequency <span class="text-danger">*</span></label>
+                            <select id="frequency" class="form-select" required>
+                                <option value="WEEKLY">Weekly</option>
+                                <option value="BIWEEKLY">Bi-weekly</option>
+                                <option value="MONTHLY" selected>Monthly</option>
+                                <option value="QUARTERLY">Quarterly</option>
+                                <option value="ANNUALLY">Annually</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Start Date <span class="text-danger">*</span></label>
+                            <input type="date" id="startDate" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">Next Invoice Date <span class="text-danger">*</span></label>
+                            <input type="date" id="nextInvoiceDate" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">End Date (Optional)</label>
+                            <input type="date" id="endDate" class="form-control">
+                            <small class="text-muted">Leave blank for indefinite</small>
+                        </div>
+                    </div>
+
+                    <!-- Invoice Settings -->
+                    <h6 class="mt-4 mb-3">Invoice Settings</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Payment Terms (Days)</label>
+                            <input type="number" id="termsDays" class="form-control" value="30" min="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Discount %</label>
+                            <input type="number" id="discountPercent" class="form-control" value="0" min="0" max="100" step="0.01">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Tax Rate %</label>
+                            <input type="number" id="taxRate" class="form-control" value="0" min="0" max="100" step="0.01">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Invoice Description</label>
+                            <textarea id="invoiceDescription" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">Notes</label>
+                            <textarea id="notes" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Email Settings -->
+                    <h6 class="mt-4 mb-3">Email Settings</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="form-check">
+                                <input type="checkbox" id="autoSendEmail" class="form-check-input" checked>
+                                <label class="form-check-label" for="autoSendEmail">
+                                    Automatically send invoice email when generated
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Email To (Override)</label>
+                            <input type="email" id="emailTo" class="form-control">
+                            <small class="text-muted">Leave blank to use customer's email</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">CC Emails</label>
+                            <input type="text" id="emailCc" class="form-control">
+                            <small class="text-muted">Comma-separated list</small>
+                        </div>
+                    </div>
+
+                    <!-- Line Items -->
+                    <h6 class="mt-4 mb-3">Line Items</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm" id="lineItemsTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50px;">#</th>
+                                    <th style="width: 300px;">Description</th>
+                                    <th style="width: 100px;">Quantity</th>
+                                    <th style="width: 120px;">Unit Price</th>
+                                    <th style="width: 120px;">Amount</th>
+                                    <th style="width: 50px;">
+                                        <button type="button" class="btn btn-sm btn-success" onclick="addLineItem()">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody id="lineItemsBody">
+                                <!-- Line items will be added dynamically -->
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td colspan="4" class="text-end"><strong>Subtotal:</strong></td>
+                                    <td><strong id="subtotalDisplay">$0.00</strong></td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4" class="text-end">Discount:</td>
+                                    <td id="discountDisplay">$0.00</td>
+                                    <td></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="4" class="text-end">Tax:</td>
+                                    <td id="taxDisplay">$0.00</td>
+                                    <td></td>
+                                </tr>
+                                <tr class="table-primary">
+                                    <td colspan="4" class="text-end"><strong>Total:</strong></td>
+                                    <td><strong id="totalDisplay">$0.00</strong></td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveTemplate()">Save Template</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentTemplate = null;
+let lineItemCounter = 1;
+
+// Load templates on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadCustomers();
+    loadTemplates();
+});
+
+async function loadCustomers() {
+    try {
+        const response = await fetch('/accounting/api/customers?is_active=true');
+        const customers = await response.json();
+
+        const customerSelect = document.getElementById('customerId');
+        const filterSelect = document.getElementById('customerFilter');
+
+        customerSelect.innerHTML = '<option value="">Select Customer</option>';
+        filterSelect.innerHTML = '<option value="">All Customers</option>';
+
+        customers.forEach(customer => {
+            const option1 = new Option(customer.customer_name, customer.id);
+            const option2 = new Option(customer.customer_name, customer.id);
+            customerSelect.add(option1);
+            filterSelect.add(option2);
+        });
+    } catch (error) {
+        console.error('Error loading customers:', error);
+    }
+}
+
+async function loadTemplates() {
+    try {
+        const status = document.getElementById('statusFilter').value;
+        const customerId = document.getElementById('customerFilter').value;
+
+        let url = '/accounting/api/recurring-invoices/';
+        const params = [];
+        if (status) params.push(`status=${status}`);
+        if (customerId) params.push(`customer_id=${customerId}`);
+        if (params.length) url += '?' + params.join('&');
+
+        const response = await fetch(url);
+        const templates = await response.json();
+
+        const tbody = document.getElementById('templatesTable');
+
+        if (templates.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No recurring invoice templates found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = templates.map(template => {
+            const statusBadge = getStatusBadge(template.status);
+            const nextDate = new Date(template.next_invoice_date).toLocaleDateString();
+
+            return `
+                <tr>
+                    <td>
+                        <strong>${template.template_name}</strong>
+                        ${template.description ? `<br><small class="text-muted">${template.description}</small>` : ''}
+                    </td>
+                    <td>${template.customer_name}</td>
+                    <td>${formatFrequency(template.frequency)}</td>
+                    <td>${nextDate}</td>
+                    <td>$${parseFloat(template.total_amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                    <td>${template.invoices_generated} invoices</td>
+                    <td>${statusBadge}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-outline-primary" onclick="viewTemplate(${template.id})" title="View">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-outline-success" onclick="generateNow(${template.id})" title="Generate Now">
+                                <i class="fas fa-file-invoice"></i>
+                            </button>
+                            <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown"></button>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="#" onclick="editTemplate(${template.id})"><i class="fas fa-edit"></i> Edit</a></li>
+                                <li><a class="dropdown-item" href="#" onclick="viewHistory(${template.id})"><i class="fas fa-history"></i> History</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                ${template.status === 'ACTIVE' ? `<li><a class="dropdown-item" href="#" onclick="pauseTemplate(${template.id})"><i class="fas fa-pause"></i> Pause</a></li>` : ''}
+                                ${template.status === 'PAUSED' ? `<li><a class="dropdown-item" href="#" onclick="resumeTemplate(${template.id})"><i class="fas fa-play"></i> Resume</a></li>` : ''}
+                                ${template.status !== 'CANCELLED' ? `<li><a class="dropdown-item text-danger" href="#" onclick="cancelTemplate(${template.id})"><i class="fas fa-ban"></i> Cancel</a></li>` : ''}
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteTemplate(${template.id})"><i class="fas fa-trash"></i> Delete</a></li>
+                            </ul>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading templates:', error);
+        showAlert('Failed to load templates', 'danger');
+    }
+}
+
+function getStatusBadge(status) {
+    const badges = {
+        'ACTIVE': '<span class="badge bg-success">Active</span>',
+        'PAUSED': '<span class="badge bg-warning">Paused</span>',
+        'COMPLETED': '<span class="badge bg-info">Completed</span>',
+        'CANCELLED': '<span class="badge bg-danger">Cancelled</span>'
+    };
+    return badges[status] || status;
+}
+
+function formatFrequency(freq) {
+    const formats = {
+        'WEEKLY': 'Weekly',
+        'BIWEEKLY': 'Bi-weekly',
+        'MONTHLY': 'Monthly',
+        'QUARTERLY': 'Quarterly',
+        'ANNUALLY': 'Annually'
+    };
+    return formats[freq] || freq;
+}
+
+function openCreateModal() {
+    currentTemplate = null;
+    document.getElementById('modalTitle').textContent = 'New Recurring Invoice Template';
+    document.getElementById('templateForm').reset();
+    document.getElementById('templateId').value = '';
+    document.getElementById('lineItemsBody').innerHTML = '';
+    addLineItem();
+
+    // Set default dates
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('startDate').value = today;
+    document.getElementById('nextInvoiceDate').value = today;
+}
+
+async function viewTemplate(id) {
+    await editTemplate(id);
+}
+
+async function editTemplate(id) {
+    try {
+        const response = await fetch(`/accounting/api/recurring-invoices/${id}`);
+        const template = await response.json();
+
+        currentTemplate = template;
+
+        document.getElementById('modalTitle').textContent = 'Edit Recurring Invoice Template';
+        document.getElementById('templateId').value = template.id;
+        document.getElementById('templateName').value = template.template_name;
+        document.getElementById('customerId').value = template.customer_id;
+        document.getElementById('description').value = template.description || '';
+        document.getElementById('frequency').value = template.frequency;
+        document.getElementById('startDate').value = template.start_date;
+        document.getElementById('nextInvoiceDate').value = template.next_invoice_date;
+        document.getElementById('endDate').value = template.end_date || '';
+        document.getElementById('termsDays').value = template.terms_days;
+        document.getElementById('discountPercent').value = template.discount_percent;
+        document.getElementById('taxRate').value = template.tax_rate;
+        document.getElementById('invoiceDescription').value = template.invoice_description || '';
+        document.getElementById('notes').value = template.notes || '';
+        document.getElementById('autoSendEmail').checked = template.auto_send_email;
+        document.getElementById('emailTo').value = template.email_to || '';
+        document.getElementById('emailCc').value = template.email_cc || '';
+
+        // Load line items
+        document.getElementById('lineItemsBody').innerHTML = '';
+        lineItemCounter = 1;
+        template.line_items.forEach(item => {
+            addLineItem(item);
+        });
+
+        const modal = new bootstrap.Modal(document.getElementById('templateModal'));
+        modal.show();
+    } catch (error) {
+        console.error('Error loading template:', error);
+        showAlert('Failed to load template', 'danger');
+    }
+}
+
+function addLineItem(data = null) {
+    const tbody = document.getElementById('lineItemsBody');
+    const lineNum = lineItemCounter++;
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+        <td>${lineNum}</td>
+        <td><input type="text" class="form-control form-control-sm" value="${data ? data.description : ''}" onchange="calculateTotal()" required></td>
+        <td><input type="number" class="form-control form-control-sm" value="${data ? data.quantity : 1}" min="0" step="0.01" onchange="calculateTotal()" required></td>
+        <td><input type="number" class="form-control form-control-sm" value="${data ? data.unit_price : 0}" min="0" step="0.01" onchange="calculateTotal()" required></td>
+        <td class="line-amount">$${data ? parseFloat(data.amount).toFixed(2) : '0.00'}</td>
+        <td>
+            <button type="button" class="btn btn-sm btn-danger" onclick="removeLineItem(this)">
+                <i class="fas fa-times"></i>
+            </button>
+        </td>
+    `;
+    tbody.appendChild(row);
+
+    if (!data) {
+        calculateTotal();
+    }
+}
+
+function removeLineItem(btn) {
+    btn.closest('tr').remove();
+    calculateTotal();
+}
+
+function calculateTotal() {
+    const rows = document.querySelectorAll('#lineItemsBody tr');
+    let subtotal = 0;
+
+    rows.forEach(row => {
+        const qty = parseFloat(row.cells[2].querySelector('input').value) || 0;
+        const price = parseFloat(row.cells[3].querySelector('input').value) || 0;
+        const amount = qty * price;
+        row.cells[4].textContent = '$' + amount.toFixed(2);
+        subtotal += amount;
+    });
+
+    const discountPercent = parseFloat(document.getElementById('discountPercent').value) || 0;
+    const taxRate = parseFloat(document.getElementById('taxRate').value) || 0;
+
+    const discountAmount = (subtotal * discountPercent / 100);
+    const taxableAmount = subtotal - discountAmount;
+    const taxAmount = (taxableAmount * taxRate / 100);
+    const total = taxableAmount + taxAmount;
+
+    document.getElementById('subtotalDisplay').textContent = '$' + subtotal.toFixed(2);
+    document.getElementById('discountDisplay').textContent = '$' + discountAmount.toFixed(2);
+    document.getElementById('taxDisplay').textContent = '$' + taxAmount.toFixed(2);
+    document.getElementById('totalDisplay').textContent = '$' + total.toFixed(2);
+}
+
+async function saveTemplate() {
+    try {
+        const templateId = document.getElementById('templateId').value;
+        const lineItems = [];
+
+        document.querySelectorAll('#lineItemsBody tr').forEach((row, index) => {
+            lineItems.push({
+                line_number: index + 1,
+                description: row.cells[1].querySelector('input').value,
+                quantity: parseFloat(row.cells[2].querySelector('input').value),
+                unit_price: parseFloat(row.cells[3].querySelector('input').value),
+                account_id: null
+            });
+        });
+
+        if (lineItems.length === 0) {
+            showAlert('Please add at least one line item', 'warning');
+            return;
+        }
+
+        const data = {
+            customer_id: parseInt(document.getElementById('customerId').value),
+            template_name: document.getElementById('templateName').value,
+            description: document.getElementById('description').value || null,
+            frequency: document.getElementById('frequency').value,
+            start_date: document.getElementById('startDate').value,
+            next_invoice_date: document.getElementById('nextInvoiceDate').value,
+            end_date: document.getElementById('endDate').value || null,
+            terms_days: parseInt(document.getElementById('termsDays').value),
+            invoice_description: document.getElementById('invoiceDescription').value || null,
+            notes: document.getElementById('notes').value || null,
+            discount_percent: parseFloat(document.getElementById('discountPercent').value),
+            tax_rate: parseFloat(document.getElementById('taxRate').value),
+            auto_send_email: document.getElementById('autoSendEmail').checked,
+            email_to: document.getElementById('emailTo').value || null,
+            email_cc: document.getElementById('emailCc').value || null,
+            line_items: lineItems
+        };
+
+        const url = templateId
+            ? `/accounting/api/recurring-invoices/${templateId}`
+            : '/accounting/api/recurring-invoices/';
+
+        const method = templateId ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save template');
+        }
+
+        showAlert(templateId ? 'Template updated successfully' : 'Template created successfully', 'success');
+
+        const modal = bootstrap.Modal.getInstance(document.getElementById('templateModal'));
+        modal.hide();
+
+        loadTemplates();
+    } catch (error) {
+        console.error('Error saving template:', error);
+        showAlert(error.message, 'danger');
+    }
+}
+
+async function generateNow(id) {
+    if (!confirm('Generate an invoice from this template now?')) return;
+
+    try {
+        const response = await fetch(`/accounting/api/recurring-invoices/${id}/generate`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) throw new Error('Failed to generate invoice');
+
+        const result = await response.json();
+        showAlert(`Invoice ${result.invoice_number} generated successfully`, 'success');
+        loadTemplates();
+    } catch (error) {
+        console.error('Error generating invoice:', error);
+        showAlert(error.message, 'danger');
+    }
+}
+
+async function pauseTemplate(id) {
+    if (!confirm('Pause this recurring invoice template?')) return;
+
+    try {
+        await fetch(`/accounting/api/recurring-invoices/${id}/pause`, { method: 'POST' });
+        showAlert('Template paused successfully', 'success');
+        loadTemplates();
+    } catch (error) {
+        showAlert('Failed to pause template', 'danger');
+    }
+}
+
+async function resumeTemplate(id) {
+    if (!confirm('Resume this recurring invoice template?')) return;
+
+    try {
+        await fetch(`/accounting/api/recurring-invoices/${id}/resume`, { method: 'POST' });
+        showAlert('Template resumed successfully', 'success');
+        loadTemplates();
+    } catch (error) {
+        showAlert('Failed to resume template', 'danger');
+    }
+}
+
+async function cancelTemplate(id) {
+    if (!confirm('Cancel this recurring invoice template? This action cannot be undone.')) return;
+
+    try {
+        await fetch(`/accounting/api/recurring-invoices/${id}/cancel`, { method: 'POST' });
+        showAlert('Template cancelled successfully', 'success');
+        loadTemplates();
+    } catch (error) {
+        showAlert('Failed to cancel template', 'danger');
+    }
+}
+
+async function deleteTemplate(id) {
+    if (!confirm('Delete this recurring invoice template? This will also remove all references from generated invoices.')) return;
+
+    try {
+        await fetch(`/accounting/api/recurring-invoices/${id}`, { method: 'DELETE' });
+        showAlert('Template deleted successfully', 'success');
+        loadTemplates();
+    } catch (error) {
+        showAlert('Failed to delete template', 'danger');
+    }
+}
+
+async function viewHistory(id) {
+    try {
+        const response = await fetch(`/accounting/api/recurring-invoices/${id}/history`);
+        const data = await response.json();
+
+        let html = `
+            <h5>${data.template_name}</h5>
+            <p>${data.invoices_generated} invoices generated</p>
+            <div class="table-responsive">
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Invoice #</th>
+                            <th>Date</th>
+                            <th>Due Date</th>
+                            <th>Amount</th>
+                            <th>Paid</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        data.invoices.forEach(inv => {
+            html += `
+                <tr>
+                    <td><a href="/accounting/customer-invoices?invoice=${inv.id}">${inv.invoice_number}</a></td>
+                    <td>${new Date(inv.invoice_date).toLocaleDateString()}</td>
+                    <td>${inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '-'}</td>
+                    <td>$${parseFloat(inv.total_amount).toFixed(2)}</td>
+                    <td>$${parseFloat(inv.paid_amount).toFixed(2)}</td>
+                    <td>${inv.status}</td>
+                </tr>
+            `;
+        });
+
+        html += `
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        // Show in a modal or alert
+        const alertDiv = document.createElement('div');
+        alertDiv.className = 'modal fade';
+        alertDiv.innerHTML = `
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Invoice History</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        ${html}
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(alertDiv);
+        const modal = new bootstrap.Modal(alertDiv);
+        modal.show();
+
+    } catch (error) {
+        showAlert('Failed to load history', 'danger');
+    }
+}
+
+function showAlert(message, type = 'info') {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+
+    setTimeout(() => {
+        alertDiv.remove();
+    }, 5000);
+}
+
+// Recalculate totals when discount or tax changes
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('discountPercent').addEventListener('change', calculateTotal);
+    document.getElementById('taxRate').addEventListener('change', calculateTotal);
+});
+</script>
+{% endblock %}
