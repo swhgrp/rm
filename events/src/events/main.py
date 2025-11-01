@@ -1,15 +1,25 @@
 """Main FastAPI application"""
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
-from events.core.config import settings
-from events.api import public, events, tasks, documents, auth, settings as settings_api
 import logging
 import os
+import sys
+
+# Add shared directory to path for Sentry config
+sys.path.insert(0, '/opt/restaurant-system/shared/python')
+from sentry_config import init_sentry
+
+# Initialize Sentry error tracking
+init_sentry("events")
+
+from events.core.config import settings
+from events.core.deps import require_auth
+from events.api import public, events, tasks, documents, auth, settings as settings_api
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -42,6 +52,25 @@ class ProxyHeaderMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(ProxyHeaderMiddleware)
 
+# Custom exception handler for authentication redirects
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    """Handle HTTP exceptions - redirect 401 to Portal login for HTML requests"""
+    if exc.status_code == 401:  # HTTP_401_UNAUTHORIZED
+        # Check if this is an HTML request (not API)
+        accept = request.headers.get("accept", "")
+        if "text/html" in accept or str(request.url.path).startswith(("/", "/calendar", "/tasks", "/settings", "/list", "/event")):
+            # Redirect to Portal login
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(url="/portal/login?redirect=/events/", status_code=302)
+
+    # For API requests or other errors, return JSON response
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
@@ -66,33 +95,48 @@ async def public_intake_form():
 
 # Calendar page
 @app.get("/calendar", response_class=HTMLResponse)
-async def calendar_page(request: Request):
+async def calendar_page(request: Request, current_user=Depends(require_auth)):
     """Serve the event calendar page"""
-    return templates.TemplateResponse("admin/calendar.html", {"request": request})
+    return templates.TemplateResponse("admin/calendar.html", {
+        "request": request,
+        "user": current_user
+    })
 
 # Tasks page
 @app.get("/tasks", response_class=HTMLResponse)
-async def tasks_page(request: Request):
+async def tasks_page(request: Request, current_user=Depends(require_auth)):
     """Serve the task management page"""
-    return templates.TemplateResponse("admin/tasks.html", {"request": request})
+    return templates.TemplateResponse("admin/tasks.html", {
+        "request": request,
+        "user": current_user
+    })
 
 # Settings page
 @app.get("/settings", response_class=HTMLResponse)
-async def settings_page(request: Request):
+async def settings_page(request: Request, current_user=Depends(require_auth)):
     """Serve the settings page"""
-    return templates.TemplateResponse("admin/settings.html", {"request": request})
+    return templates.TemplateResponse("admin/settings.html", {
+        "request": request,
+        "user": current_user
+    })
 
 # Events list page
 @app.get("/list", response_class=HTMLResponse)
-async def events_list_page(request: Request):
+async def events_list_page(request: Request, current_user=Depends(require_auth)):
     """Serve the events list/dashboard page"""
-    return templates.TemplateResponse("admin/events_list.html", {"request": request})
+    return templates.TemplateResponse("admin/events_list.html", {
+        "request": request,
+        "user": current_user
+    })
 
 # Event detail page
 @app.get("/event", response_class=HTMLResponse)
-async def event_detail_page(request: Request):
+async def event_detail_page(request: Request, current_user=Depends(require_auth)):
     """Serve the event detail/edit page"""
-    return templates.TemplateResponse("admin/event_detail.html", {"request": request})
+    return templates.TemplateResponse("admin/event_detail.html", {
+        "request": request,
+        "user": current_user
+    })
 
 # Include API routers
 app.include_router(auth.router, tags=["Authentication"])
@@ -110,9 +154,12 @@ if os.path.exists(STATIC_DIR):
 
 # Catch-all routes for pages
 @app.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    """Dashboard - main landing page (session auth checked by JS)"""
-    return templates.TemplateResponse("admin/dashboard.html", {"request": request})
+async def root(request: Request, current_user=Depends(require_auth)):
+    """Dashboard - main landing page (auth required)"""
+    return templates.TemplateResponse("admin/dashboard.html", {
+        "request": request,
+        "user": current_user
+    })
 
 @app.on_event("startup")
 async def startup_event():

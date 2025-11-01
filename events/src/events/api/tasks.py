@@ -6,7 +6,8 @@ from uuid import UUID
 from datetime import datetime
 
 from events.core.database import get_db
-from events.models import Task, TaskChecklistItem, TaskStatus
+from events.core.deps import require_auth, check_permission
+from events.models import Task, TaskChecklistItem, TaskStatus, User
 from events.schemas.task import TaskCreate, TaskUpdate, TaskResponse, ChecklistItemCreate, ChecklistItemResponse
 from events.services.task_service import TaskService
 
@@ -19,7 +20,8 @@ async def list_all_tasks(
     status: Optional[TaskStatus] = None,
     department: Optional[str] = None,
     priority: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """
     List all tasks across all events

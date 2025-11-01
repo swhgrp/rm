@@ -10,9 +10,14 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 import os
+import sys
 import bcrypt
 import httpx
 import logging
+
+# Add shared directory to path for Sentry config
+sys.path.insert(0, '/opt/restaurant-system/shared/python')
+from sentry_config import init_sentry
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +32,9 @@ from portal.config import (
     HR_API_URL,
     INTEGRATION_HUB_URL
 )
+
+# Initialize Sentry error tracking
+init_sentry("portal")
 
 # FastAPI app
 app = FastAPI(
@@ -52,8 +60,14 @@ async def session_refresh_middleware(request: Request, call_next):
             time_until_expiry = token_exp - datetime.utcnow().timestamp()
 
             if 0 < time_until_expiry < 600:  # Less than 10 minutes (600 seconds)
-                # Issue a new token with fresh expiration
-                new_token = create_access_token(data={"sub": user.username})
+                # Issue a new token with fresh expiration (include full user data for SSO)
+                new_token = create_access_token(data={
+                    "sub": user.username,
+                    "email": user.email,
+                    "full_name": user.full_name,
+                    "user_id": user.id,
+                    "is_admin": user.is_admin
+                })
 
                 # Update the cookie with the new token
                 response.set_cookie(
@@ -335,11 +349,24 @@ async def login(
             status_code=403
         )
 
-    # Create access token
-    access_token = create_access_token(data={"sub": user.username})
+    # Create access token with user information for SSO
+    access_token = create_access_token(data={
+        "sub": user.username,
+        "email": user.email,
+        "full_name": user.full_name,
+        "user_id": user.id,
+        "is_admin": user.is_admin
+    })
 
-    # Redirect to home with session cookie
-    response = RedirectResponse(url="/portal/", status_code=303)
+    # Check for redirect parameter from query string
+    redirect_url = request.query_params.get("redirect", "/portal/")
+
+    # Validate redirect URL (security: only allow internal paths)
+    if not redirect_url.startswith("/"):
+        redirect_url = "/portal/"
+
+    # Redirect with session cookie
+    response = RedirectResponse(url=redirect_url, status_code=303)
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=access_token,
@@ -403,18 +430,39 @@ async def update_user_permissions(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Parse form data
+    # Prevent users from removing their own admin access
     form_data = await request.form()
+    new_is_admin = form_data.get("is_admin") == "on"
 
-    # Update permissions
-    user.can_access_portal = form_data.get("can_access_portal") == "on"
-    user.can_access_inventory = form_data.get("can_access_inventory") == "on"
-    user.can_access_accounting = form_data.get("can_access_accounting") == "on"
-    user.can_access_integration_hub = form_data.get("can_access_integration_hub") == "on"
-    user.can_access_hr = form_data.get("can_access_hr") == "on"
-    user.can_access_events = form_data.get("can_access_events") == "on"
-    user.can_access_files = form_data.get("can_access_files") == "on"
-    user.can_access_mail = form_data.get("can_access_mail") == "on"
+    if user_id == current_user.id and not new_is_admin:
+        return {"success": False, "message": "You cannot remove your own admin privileges"}
+
+    # Track if admin status changed
+    admin_changed = user.is_admin != new_is_admin
+
+    # Update admin status
+    user.is_admin = new_is_admin
+
+    # Update permissions (only if not admin, admins get all access automatically)
+    if not new_is_admin:
+        user.can_access_portal = form_data.get("can_access_portal") == "on"
+        user.can_access_inventory = form_data.get("can_access_inventory") == "on"
+        user.can_access_accounting = form_data.get("can_access_accounting") == "on"
+        user.can_access_integration_hub = form_data.get("can_access_integration_hub") == "on"
+        user.can_access_hr = form_data.get("can_access_hr") == "on"
+        user.can_access_events = form_data.get("can_access_events") == "on"
+        user.can_access_files = form_data.get("can_access_files") == "on"
+        user.can_access_mail = form_data.get("can_access_mail") == "on"
+    else:
+        # Admins get full access to everything
+        user.can_access_portal = True
+        user.can_access_inventory = True
+        user.can_access_accounting = True
+        user.can_access_integration_hub = True
+        user.can_access_hr = True
+        user.can_access_events = True
+        user.can_access_files = True
+        user.can_access_mail = True
 
     # Update accounting role if provided
     accounting_role = form_data.get("accounting_role_id")
@@ -423,7 +471,7 @@ async def update_user_permissions(
 
     db.commit()
 
-    return {"success": True, "message": "Permissions updated"}
+    return {"success": True, "message": "Permissions updated", "admin_changed": admin_changed}
 
 
 @app.get("/api/generate-token/{system}")
@@ -466,6 +514,57 @@ async def generate_system_token(
     token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
 
     return {"token": token}
+
+
+@app.get("/profile", response_class=HTMLResponse)
+async def profile_page(request: Request, db: Session = Depends(get_db)):
+    """User profile page"""
+    user = require_login(request, db)
+    return templates.TemplateResponse("profile.html", {
+        "request": request,
+        "user": user
+    })
+
+
+class ProfileUpdateRequest(BaseModel):
+    full_name: str
+    email: str
+
+
+@app.post("/api/profile/update")
+async def update_profile(
+    request: Request,
+    profile_data: ProfileUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    """Update user profile information"""
+    user = get_current_user(request, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    # Validate email format
+    import re
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if profile_data.email and not re.match(email_pattern, profile_data.email):
+        raise HTTPException(status_code=400, detail="Invalid email format")
+
+    # Check if email is already taken by another user
+    if profile_data.email != user.email:
+        existing_user = db.query(User).filter(
+            User.email == profile_data.email,
+            User.id != user.id
+        ).first()
+        if existing_user:
+            raise HTTPException(status_code=400, detail="Email already in use by another user")
+
+    # Update user information in HR database
+    user.full_name = profile_data.full_name
+    user.email = profile_data.email
+    db.commit()
+
+    logger.info(f"Profile updated for user {user.username}")
+
+    return {"success": True, "message": "Profile updated successfully"}
 
 
 @app.get("/change-password", response_class=HTMLResponse)
@@ -863,7 +962,7 @@ async def monitoring_status(current_user: User = Depends(get_current_user)):
             ["/opt/restaurant-system/scripts/dashboard-status.sh"],
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=30
         )
 
         if result.returncode == 0:

@@ -6,18 +6,18 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from events.core.database import get_db
-from events.models import Event, EventStatus, Venue, Client, Task, TaskStatus
+from events.core.deps import require_auth, check_permission
+from events.models import Event, EventStatus, Venue, Client, Task, TaskStatus, User
 from events.schemas.event import EventCreate, EventUpdate, EventResponse, EventListItem
-from events.services.auth_service import AuthService
 from sqlalchemy import func
 
 router = APIRouter()
-auth_service = AuthService()
 
 
 @router.get("/stats")
 async def get_dashboard_stats(
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """
     Get dashboard statistics
@@ -69,7 +69,7 @@ async def list_events(
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     db: Session = Depends(get_db),
-    # current_user = Depends(auth_service.get_current_user)  # TODO: Enable when auth is ready
+    current_user: User = Depends(require_auth)
 ):
     """
     List events with optional filters
@@ -82,6 +82,13 @@ async def list_events(
     - **start_date**: Events starting after this date
     - **end_date**: Events ending before this date
     """
+    # Check permission to read events
+    if not check_permission(current_user, "read", "event"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to view events"
+        )
+
     query = db.query(Event)
 
     # Apply filters
@@ -96,10 +103,6 @@ async def list_events(
     if end_date:
         query = query.filter(Event.end_at <= end_date)
 
-    # TODO: Apply RBAC filters based on user role
-    # if not auth_service.check_permission(current_user, "read", "event"):
-    #     raise HTTPException(status_code=403, detail="Insufficient permissions")
-
     events = query.order_by(Event.start_at.desc()).offset(skip).limit(limit).all()
     return events
 
@@ -111,6 +114,7 @@ async def get_calendar_events(
     view: str = Query("month", regex="^(month|week|day)$"),
     venue_id: Optional[UUID] = None,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """
     Get events for calendar view
@@ -138,6 +142,7 @@ async def get_calendar_events(
 @router.get("/venues")
 async def list_venues(
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """Get all venues"""
     venues = db.query(Venue).order_by(Venue.name).all()
@@ -147,6 +152,7 @@ async def list_venues(
 @router.get("/clients")
 async def list_clients(
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """Get all clients"""
     clients = db.query(Client).order_by(Client.name).all()
@@ -157,7 +163,7 @@ async def list_clients(
 async def get_event(
     event_id: UUID,
     db: Session = Depends(get_db),
-    # current_user = Depends(auth_service.get_current_user)
+    current_user: User = Depends(require_auth)
 ):
     """Get single event by ID"""
     from sqlalchemy.orm import joinedload
@@ -185,19 +191,22 @@ async def get_event(
 async def create_event(
     event_data: EventCreate,
     db: Session = Depends(get_db),
-    # current_user = Depends(auth_service.get_current_user)
+    current_user: User = Depends(require_auth)
 ):
     """
     Create new event
 
     Requires: event_manager or admin role
     """
-    # TODO: Check permissions
-    # if not auth_service.check_permission(current_user, "create", "event"):
-    #     raise HTTPException(status_code=403, detail="Insufficient permissions")
+    # Check permissions
+    if not check_permission(current_user, "create", "event"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to create events"
+        )
 
     event = Event(**event_data.dict())
-    # event.created_by = current_user.id
+    event.created_by = current_user.id
 
     db.add(event)
     db.commit()
