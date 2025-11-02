@@ -10,30 +10,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
 
-    <!-- Auth check via session cookie -->
-    <script>
-        (async function() {
-            const currentPath = window.location.pathname;
-            if (!currentPath.endsWith('/login') && !currentPath.includes('/public/')) {
-                try {
-                    const response = await fetch('/events/api/auth/me', {
-                        credentials: 'include'
-                    });
-                    if (!response.ok) {
-                        // Not authenticated, redirect to portal
-                        window.location.replace('/portal/');
-                        throw new Error('Redirecting to login');
-                    }
-                } catch (e) {
-                    // Network error or not authenticated
-                    if (!e.message.includes('Redirecting')) {
-                        window.location.replace('/portal/');
-                        throw new Error('Redirecting to login');
-                    }
-                }
-            }
-        })();
-    </script>
+    <!-- Auth handled server-side by require_auth dependency -->
 
     {% block head %}{% endblock %}
 
@@ -600,31 +577,31 @@
                 <i class="bi bi-house-door"></i>
                 <span>Portal Home</span>
             </a></li>
-            <li><a href="/events/" class="{% if request.path == '/events/' or request.path == '/events' %}active{% endif %}">
+            <li><a href="" class="{% if request.path == '/events/' or request.path == '/events' %}active{% endif %}">
                 <i class="bi bi-grid"></i>
                 <span>Dashboard</span>
             </a></li>
-            <li><a href="/events/list" class="{% if 'events/list' in request.path %}active{% endif %}">
+            <li><a href="list" class="{% if 'events/list' in request.path %}active{% endif %}">
                 <i class="bi bi-calendar3"></i>
                 <span>All Events</span>
             </a></li>
-            <li><a href="/events/calendar" class="{% if 'calendar' in request.path %}active{% endif %}">
+            <li><a href="calendar" class="{% if 'calendar' in request.path %}active{% endif %}">
                 <i class="bi bi-calendar-week"></i>
                 <span>Calendar View</span>
             </a></li>
-            <li><a href="/events/tasks" class="{% if 'tasks' in request.path %}active{% endif %}">
+            <li><a href="tasks" class="{% if 'tasks' in request.path %}active{% endif %}">
                 <i class="bi bi-check2-square"></i>
                 <span>Tasks</span>
             </a></li>
-            <li><a href="/events/packages" class="{% if 'packages' in request.path %}active{% endif %}">
+            <li><a href="packages" class="{% if 'packages' in request.path %}active{% endif %}">
                 <i class="bi bi-box-seam"></i>
                 <span>Packages</span>
             </a></li>
-            <li><a href="/events/settings" class="{% if 'settings' in request.path %}active{% endif %}">
+            <li><a href="settings" class="{% if 'settings' in request.path %}active{% endif %}">
                 <i class="bi bi-gear"></i>
                 <span>Settings</span>
             </a></li>
-            <li><a href="/events/public/intake">
+            <li><a href="public/intake">
                 <i class="bi bi-file-earmark-text"></i>
                 <span>Public Intake Form</span>
             </a></li>
@@ -677,7 +654,7 @@
         // Load user info from session
         async function loadUserInfo() {
             try {
-                const response = await fetch('/events/api/auth/me', {
+                const response = await fetch('api/auth/me', {
                     credentials: 'include'
                 });
                 if (response.ok) {
@@ -697,6 +674,6 @@
     </script>
 
     {% block extra_js %}{% endblock %}
-    <script src="/events/static/js/inactivity-warning.js"></script>
+    <script src="static/js/inactivity-warning.js"></script>
 </body>
 </html>

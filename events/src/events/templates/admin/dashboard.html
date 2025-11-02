@@ -3,7 +3,7 @@
 {% block title %}Dashboard - SW Hospitality Events{% endblock %}
 
 {% block top_bar_actions %}
-<a href="/events/public/intake" class="btn-primary-custom">
+<a href="public/intake" class="btn-primary-custom">
     <i class="bi bi-plus-circle"></i>
     <span class="d-none d-sm-inline">New Event Request</span>
     <span class="d-inline d-sm-none">New Event</span>
@@ -80,7 +80,7 @@
         <div class="card-custom">
             <div class="card-custom-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <span>Upcoming Events</span>
-                <a href="/events/events" class="btn-secondary-custom" style="font-size: 13px; padding: 6px 12px;">View All</a>
+                <a href="events" class="btn-secondary-custom" style="font-size: 13px; padding: 6px 12px;">View All</a>
             </div>
             <div id="upcomingEvents">
                 <div style="text-align: center; padding: 40px 20px; color: #8b949e;">
@@ -144,7 +144,7 @@
     async function loadStats() {
         try {
             // Load stats from efficient endpoint
-            const statsRes = await fetch('/events/api/events/stats', {
+            const statsRes = await fetch('api/events/stats', {
                 credentials: 'include'
             });
             const stats = await statsRes.json();
@@ -155,7 +155,7 @@
             document.getElementById('statOverdueTasks').textContent = stats.overdue_tasks;
 
             // Load full events list for upcoming events display
-            const eventsRes = await fetch('/events/api/events/?limit=50', {
+            const eventsRes = await fetch('api/events/?limit=50', {
                 credentials: 'include'
             });
             const events = await eventsRes.json();
@@ -209,7 +209,7 @@
                                 <td data-label="Guests">${event.guest_count || 0} guests</td>
                                 <td data-label="Status"><span class="badge-status badge-${event.status.toLowerCase()}">${formatStatus(event.status)}</span></td>
                                 <td data-label="Actions">
-                                    <a href="/events/event?id=${event.id}" class="btn-secondary-custom" style="font-size: 13px; padding: 6px 12px; white-space: nowrap;">
+                                    <a href="event?id=${event.id}" class="btn-secondary-custom" style="font-size: 13px; padding: 6px 12px; white-space: nowrap;">
                                         View Details
                                     </a>
                                 </td>

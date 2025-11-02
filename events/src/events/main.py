@@ -58,10 +58,19 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     if exc.status_code == 401:  # HTTP_401_UNAUTHORIZED
         # Check if this is an HTML request (not API)
         accept = request.headers.get("accept", "")
-        if "text/html" in accept or str(request.url.path).startswith(("/", "/calendar", "/tasks", "/settings", "/list", "/event")):
-            # Redirect to Portal login
+        path = str(request.url.path)
+
+        # Exclude API paths from redirects - they should get 401 JSON responses
+        is_api_request = path.startswith("/api/") or path.startswith("/public/")
+        is_html_request = "text/html" in accept
+
+        if is_html_request and not is_api_request:
+            # Redirect to Portal login for HTML page requests (use absolute URL to avoid base href issues)
             from fastapi.responses import RedirectResponse
-            return RedirectResponse(url="/portal/login?redirect=/events/", status_code=302)
+            # Always use the public hostname for redirects (not internal container name)
+            # Note: Using hardcoded hostname because nginx passes "events-app:8000" as Host
+            redirect_url = "https://rm.swhgrp.com/portal/login?redirect=/events/"
+            return RedirectResponse(url=redirect_url, status_code=302)
 
     # For API requests or other errors, return JSON response
     from fastapi.responses import JSONResponse

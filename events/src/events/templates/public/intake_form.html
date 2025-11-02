@@ -612,7 +612,7 @@
         async function loadLocations() {
             const locationSelect = document.getElementById('location');
             try {
-                const response = await fetch('/events/api/settings/locations');
+                const response = await fetch('api/settings/locations');
                 if (response.ok) {
                     const locations = await response.json();
                     locationSelect.innerHTML = '<option value="">Select location...</option>';
@@ -634,7 +634,7 @@
         async function loadEventTypes() {
             const eventTypeSelect = document.getElementById('eventType');
             try {
-                const response = await fetch('/events/api/settings/event-types');
+                const response = await fetch('api/settings/event-types');
                 if (response.ok) {
                     const eventTypes = await response.json();
                     eventTypeSelect.innerHTML = '<option value="">Select event type...</option>';
@@ -656,7 +656,7 @@
         async function loadMealTypes() {
             const mealTypesContainer = document.getElementById('mealTypesContainer');
             try {
-                const response = await fetch('/events/api/settings/meal-types');
+                const response = await fetch('api/settings/meal-types');
                 if (response.ok) {
                     const mealTypes = await response.json();
                     mealTypesContainer.innerHTML = '';
@@ -682,7 +682,7 @@
         async function loadBeverageServices() {
             const beverageContainer = document.getElementById('beverageServicesContainer');
             try {
-                const response = await fetch('/events/api/settings/beverage-services');
+                const response = await fetch('api/settings/beverage-services');
                 if (response.ok) {
                     const beverages = await response.json();
                     beverageContainer.innerHTML = '';
@@ -709,7 +709,7 @@
             const venueSelect = document.getElementById('venue');
             const venueError = document.getElementById('venueError');
             try {
-                const response = await fetch('/events/api/events/venues');
+                const response = await fetch('api/events/venues');
                 if (response.ok) {
                     const venues = await response.json();
                     venueSelect.innerHTML = '<option value="">Select venue...</option>';
@@ -797,7 +797,7 @@
             };
 
             try {
-                const response = await fetch('/events/public/beo-intake', {
+                const response = await fetch('public/beo-intake', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'

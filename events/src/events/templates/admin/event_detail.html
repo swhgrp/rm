@@ -783,7 +783,7 @@
 
     async function loadVenues(selectedId = null) {
         try {
-            const response = await fetch('/events/api/events/venues');
+            const response = await fetch('api/events/venues');
             const venues = await response.json();
 
             const select = document.getElementById('venue_id');
@@ -803,7 +803,7 @@
 
     async function loadClients(selectedId = null) {
         try {
-            const response = await fetch('/events/api/events/clients');
+            const response = await fetch('api/events/clients');
             const clients = await response.json();
 
             const select = document.getElementById('client_id');

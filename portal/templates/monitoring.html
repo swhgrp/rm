@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>System Monitoring - SW Hospitality Group</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
@@ -354,12 +357,35 @@
     <script>
         async function loadDashboard() {
             try {
-                const response = await fetch('/portal/api/monitoring/status', {
-                    credentials: 'same-origin'
+                // Add timestamp to prevent caching
+                const cacheBuster = new Date().getTime();
+                const response = await fetch(`/portal/api/monitoring/status?t=${cacheBuster}`, {
+                    credentials: 'same-origin',
+                    cache: 'no-store'
                 });
                 const data = await response.json();
+                console.log('Received monitoring data:', {
+                    timestamp: data.timestamp,
+                    generated_at: data.generated_at,
+                    cacheBuster: cacheBuster
+                });
 
-                document.getElementById('lastUpdated').textContent = data.generated_at;
+                // Format timestamp to local time (handle both UTC and local formats)
+                let displayTime = data.generated_at;
+                if (displayTime && displayTime.includes('UTC')) {
+                    // Convert UTC to local time
+                    const utcDate = new Date(displayTime.replace(' UTC', 'Z'));
+                    displayTime = utcDate.toLocaleString('en-US', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit',
+                        timeZoneName: 'short'
+                    });
+                }
+                document.getElementById('lastUpdated').textContent = displayTime;
 
                 const html = `
                     <!-- Top Priority: System Resources & Microservices -->
@@ -405,18 +431,7 @@
                         </div>
                     </div>
 
-                    <!-- Application Health Status -->
-                    <div class="card" style="margin-bottom: 20px;">
-                        <div class="card-header">
-                            <div class="card-title"><i class="bi bi-heart-pulse"></i> Application Health (${countHealthyApps(data.application_health)}/7)</div>
-                            <span class="status-badge ${countHealthyApps(data.application_health) === 7 ? 'status-ok' : 'status-warning'}">
-                                ${countHealthyApps(data.application_health) === 7 ? 'ALL HEALTHY' : 'ISSUES DETECTED'}
-                            </span>
-                        </div>
-                        <ul class="service-list">
-                            ${generateAppHealthList(data.application_health)}
-                        </ul>
-                    </div>
+                    <!-- Application Health Status - Temporarily disabled due to race conditions -->
 
                     <!-- Databases & Backups -->
                     <div class="two-column-grid" style="margin-bottom: 20px;">

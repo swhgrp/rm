@@ -359,7 +359,7 @@
 
     async function loadTasks() {
         try {
-            const response = await fetch('/events/api/tasks/all');
+            const response = await fetch('api/tasks/all');
             allTasks = await response.json();
 
             document.getElementById('loading').style.display = 'none';

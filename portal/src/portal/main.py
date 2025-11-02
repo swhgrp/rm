@@ -955,20 +955,42 @@ async def monitoring_status(current_user: User = Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     import subprocess
+    import tempfile
+    import os
+    import json
 
     try:
-        # Run the dashboard status script
-        result = subprocess.run(
-            ["/opt/restaurant-system/scripts/dashboard-status.sh"],
-            capture_output=True,
-            text=True,
-            timeout=60
-        )
+        # Use a temporary file to capture full output (bypasses subprocess buffer limits)
+        with tempfile.NamedTemporaryFile(mode='w+', delete=False, suffix='.json') as f:
+            output_file = f.name
+
+        logger.info(f"Running monitoring script, output to: {output_file}")
+
+        # Run the dashboard status script with output redirected to file
+        with open(output_file, 'w') as f:
+            result = subprocess.run(
+                ["/opt/restaurant-system/scripts/dashboard-status.sh"],
+                stdout=f,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=60
+            )
+
+        logger.info(f"Monitoring script completed with return code: {result.returncode}")
 
         if result.returncode == 0:
+            # Read the complete output from file
+            with open(output_file, 'r') as f:
+                full_output = f.read()
+
+            # Clean up temp file
+            os.unlink(output_file)
+
+            logger.info(f"Read {len(full_output)} bytes from monitoring script output file")
+
             # Parse JSON output (skip the Content-Type header)
             # The script outputs "Content-Type: application/json\n\n{json...}"
-            lines = result.stdout.split('\n')
+            lines = full_output.split('\n')
             # Find the first line that starts with '{'
             json_start = 0
             for i, line in enumerate(lines):
@@ -977,23 +999,43 @@ async def monitoring_status(current_user: User = Depends(get_current_user)):
                     break
 
             json_output = '\n'.join(lines[json_start:])
-            import json
+            logger.info(f"Extracted JSON: {len(json_output)} chars, {len(lines)} total lines, JSON starts at line {json_start}")
+
             try:
                 parsed_data = json.loads(json_output)
-                return JSONResponse(content=parsed_data)
+                logger.info(f"Successfully parsed JSON with {len(parsed_data)} top-level keys")
+                # Return with cache-busting headers
+                return JSONResponse(
+                    content=parsed_data,
+                    headers={
+                        "Cache-Control": "no-cache, no-store, must-revalidate",
+                        "Pragma": "no-cache",
+                        "Expires": "0"
+                    }
+                )
             except json.JSONDecodeError as e:
                 logger.error(f"JSON parsing error at line {e.lineno}, col {e.colno}: {e.msg}")
                 logger.error(f"Problematic output (first 500 chars): {json_output[:500]}")
+                logger.error(f"Output around error (lines {max(1, e.lineno-2)}-{e.lineno+2}): {lines[json_start + max(0, e.lineno-3):json_start + e.lineno+2]}")
                 raise HTTPException(status_code=500, detail=f"Invalid JSON from monitoring script: {e.msg}")
         else:
+            # Clean up temp file on error
+            if os.path.exists(output_file):
+                os.unlink(output_file)
             raise HTTPException(status_code=500, detail=f"Script failed: {result.stderr}")
 
     except subprocess.TimeoutExpired:
+        # Clean up temp file on timeout
+        if 'output_file' in locals() and os.path.exists(output_file):
+            os.unlink(output_file)
         raise HTTPException(status_code=504, detail="Monitoring status check timed out")
     except json.JSONDecodeError:
         # Already handled above
         raise
     except Exception as e:
+        # Clean up temp file on any error
+        if 'output_file' in locals() and os.path.exists(output_file):
+            os.unlink(output_file)
         logger.error(f"Monitoring status error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 

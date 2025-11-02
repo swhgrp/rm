@@ -11,6 +11,7 @@ import secrets
 from events.core.database import get_db
 from events.models.user import User, Role
 from events.core.portal_sso import validate_portal_token
+from events.core.deps import require_auth as portal_require_auth, get_current_user as portal_get_current_user
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -130,8 +131,8 @@ async def logout(request: Request, response: Response):
 
 
 @router.get("/me")
-async def get_current_user_info(user: User = Depends(require_auth)):
-    """Get current user information"""
+async def get_current_user_info(user: User = Depends(portal_require_auth)):
+    """Get current user information from Portal SSO"""
     return {
         "id": str(user.id),
         "email": user.email,
