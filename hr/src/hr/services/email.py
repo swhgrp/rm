@@ -160,6 +160,7 @@ class EmailService:
         employee_data: dict,
         created_by: str,
         position_info: Optional[dict] = None,
+        location_names: Optional[list] = None,
         document_paths: Optional[list] = None
     ) -> bool:
         """
@@ -169,6 +170,7 @@ class EmailService:
             employee_data: Dictionary containing employee information
             created_by: Name and email of user who created the employee
             position_info: Dictionary with position, location, start_date (optional but recommended)
+            location_names: List of location names the employee is assigned to
             document_paths: List of file paths to attach (ID, SSN docs, etc.)
         """
         config = EmailService.get_smtp_config()
@@ -210,7 +212,22 @@ Employee Type: {employee_data.get('employee_type', 'N/A')}
 Starting Pay Rate: ${employee_data.get('starting_pay_rate', 'Not provided')}
 """
 
-        # Always include position information (now required)
+        # Include assigned locations
+        if location_names and len(location_names) > 0:
+            text_content += f"""
+ASSIGNED LOCATIONS
+-------------------
+"""
+            for loc_name in location_names:
+                text_content += f"- {loc_name}\n"
+        else:
+            text_content += f"""
+ASSIGNED LOCATIONS
+-------------------
+No locations assigned yet
+"""
+
+        # Include position information if available
         if position_info:
             text_content += f"""
 POSITION ASSIGNMENT
@@ -218,12 +235,6 @@ POSITION ASSIGNMENT
 Position: {position_info.get('position', 'Not assigned')}
 Location: {position_info.get('location', 'Not assigned')}
 Start Date: {position_info.get('start_date', 'N/A')}
-"""
-        else:
-            text_content += f"""
-POSITION ASSIGNMENT
--------------------
-Position: Not yet assigned (ERROR - position should be required)
 """
 
         # Add document attachment note
@@ -341,9 +352,15 @@ Date/Time: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
 
 
 # Convenience functions
-def send_new_hire_notification(employee_data: dict, created_by: str, position_info: Optional[dict] = None) -> bool:
+def send_new_hire_notification(
+    employee_data: dict,
+    created_by: str,
+    position_info: Optional[dict] = None,
+    location_names: Optional[list] = None,
+    document_paths: Optional[list] = None
+) -> bool:
     """Convenience function to send new hire notification"""
-    return EmailService.send_new_hire_email(employee_data, created_by, position_info)
+    return EmailService.send_new_hire_email(employee_data, created_by, position_info, location_names, document_paths)
 
 
 def send_termination_notification(

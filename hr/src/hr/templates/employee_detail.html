@@ -25,6 +25,11 @@
             <button class="btn btn-primary" id="editBtn">
                 <i class="bi bi-pencil"></i> Edit
             </button>
+            {% if current_user.is_admin %}
+            <button class="btn btn-danger" id="deleteBtn" onclick="permanentlyDeleteEmployee()">
+                <i class="bi bi-trash"></i> Permanent Delete
+            </button>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -739,6 +744,50 @@ document.getElementById('previewModal').addEventListener('click', (e) => {
         closePreviewModal();
     }
 });
+
+// Permanent delete employee (Admin only)
+async function permanentlyDeleteEmployee() {
+    if (!isAdmin) {
+        showAlert('Only administrators can permanently delete employees', 'error');
+        return;
+    }
+
+    const employeeName = document.getElementById('employeeTitle').textContent;
+
+    if (!await showConfirm(`PERMANENT DELETE WARNING\n\nAre you absolutely sure you want to permanently delete ${employeeName}?\n\nThis will:\n- Delete the employee record\n- Delete ALL associated documents\n- Delete all position assignments\n\nTHIS ACTION CANNOT BE UNDONE!`)) {
+        return;
+    }
+
+    // Second confirmation
+    if (!await showConfirm('This is your final warning. Are you 100% certain you want to proceed?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hr/api/employees/${currentEmployeeId}/permanent`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            showAlert('Employee permanently deleted successfully', 'success');
+            setTimeout(() => {
+                window.location = '/hr/employees';
+            }, 2000);
+        } else {
+            const error = await response.json();
+            showAlert('Error: ' + (error.detail || 'Failed to delete employee'), 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting employee:', error);
+        showAlert('Error deleting employee', 'error');
+    }
+}
+
+// Helper function for confirmations
+async function showConfirm(message) {
+    return confirm(message);
+}
 
 // Load employee on page load
 loadEmployee();

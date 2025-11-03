@@ -213,6 +213,7 @@
 
 {% block extra_scripts %}
 <script>
+const isAdmin = {{ 'true' if current_user.is_admin else 'false' }};
 let employees = [];
 let filteredEmployees = [];
 let locations = [];
@@ -416,8 +417,16 @@ function renderEmployees() {
                     </span>
                 </td>
                 <td onclick="event.stopPropagation()">
-                    <button class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;"
-                            onclick="window.location='/hr/employees/${emp.id}'">View</button>
+                    <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                        <button class="btn btn-primary" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;"
+                                onclick="window.location='/hr/employees/${emp.id}'">View</button>
+                        ${isAdmin ? `
+                        <button class="btn btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;"
+                                onclick="deleteEmployee(${emp.id}, '${emp.first_name} ${emp.last_name}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                        ` : ''}
+                    </div>
                 </td>
             </tr>
         `;
@@ -699,6 +708,42 @@ window.addEventListener('resize', fixMobileLayout);
 
 // Run after a short delay to ensure DOM is ready
 setTimeout(fixMobileLayout, 500);
+
+// Delete employee function (Admin only)
+async function deleteEmployee(employeeId, employeeName) {
+    if (!isAdmin) {
+        alert('Only administrators can delete employees');
+        return;
+    }
+
+    if (!confirm(`PERMANENT DELETE WARNING\n\nAre you absolutely sure you want to permanently delete ${employeeName}?\n\nThis will:\n- Delete the employee record\n- Delete ALL associated documents\n- Delete all position assignments\n\nTHIS ACTION CANNOT BE UNDONE!`)) {
+        return;
+    }
+
+    // Second confirmation
+    if (!confirm('This is your final warning. Are you 100% certain you want to proceed?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hr/api/employees/${employeeId}/permanent`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            alert('Employee permanently deleted successfully');
+            // Reload the employee list
+            await loadEmployees();
+        } else {
+            const error = await response.json();
+            alert('Error: ' + (error.detail || 'Failed to delete employee'));
+        }
+    } catch (error) {
+        console.error('Error deleting employee:', error);
+        alert('Error deleting employee');
+    }
+}
 
 initializePage();
 </script>

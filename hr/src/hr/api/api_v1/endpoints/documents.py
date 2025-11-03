@@ -126,8 +126,12 @@ async def upload_document(
 
 
 @router.get("/employees/{employee_id}/documents", response_model=List[DocumentSchema])
-def list_employee_documents(employee_id: int, db: Session = Depends(get_db)):
-    """List all documents for an employee"""
+def list_employee_documents(
+    employee_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """List all documents for an employee (requires authentication, ID/SSN restricted to admins)"""
 
     # Check if employee exists
     employee = db.query(EmployeeModel).filter(EmployeeModel.id == employee_id).first()
@@ -144,6 +148,8 @@ def list_employee_documents(employee_id: int, db: Session = Depends(get_db)):
 
     db.commit()
 
+    # Return all documents - frontend will handle restricted display
+    # Admin check is enforced in download endpoint
     return documents
 
 
@@ -188,8 +194,12 @@ def list_all_documents(
 
 
 @router.get("/expiring", response_model=List[DocumentSchema])
-def list_expiring_documents(days: int = 30, db: Session = Depends(get_db)):
-    """List documents expiring within specified days"""
+def list_expiring_documents(
+    days: int = 30,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """List documents expiring within specified days (requires authentication)"""
 
     today = date.today()
     documents = db.query(Document).filter(
@@ -211,12 +221,24 @@ def list_expiring_documents(days: int = 30, db: Session = Depends(get_db)):
 
 
 @router.get("/{document_id}", response_model=DocumentSchema)
-def get_document(document_id: int, db: Session = Depends(get_db)):
-    """Get document metadata by ID"""
+def get_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """Get document metadata by ID (requires authentication)"""
 
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    # Restrict ID and SSN documents to admins only
+    restricted_types = ['ID Copy', 'Social Security Card']
+    if document.document_type in restricted_types and not current_user.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied. Only administrators can view ID and Social Security documents."
+        )
 
     update_document_status(document)
     db.commit()
@@ -258,9 +280,10 @@ def download_document(
 def update_document(
     document_id: int,
     document_update: DocumentUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
-    """Update document metadata"""
+    """Update document metadata (requires authentication)"""
 
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
@@ -280,8 +303,12 @@ def update_document(
 
 
 @router.delete("/{document_id}")
-def delete_document(document_id: int, db: Session = Depends(get_db)):
-    """Delete a document"""
+def delete_document(
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """Delete a document (requires authentication)"""
 
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:

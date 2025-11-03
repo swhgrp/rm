@@ -61,17 +61,52 @@ def create_employee(
     db.refresh(db_employee)
 
     # Assign locations to employee
+    location_names = []
     if employee.location_ids:
         from hr.models.location import Location
         for location_id in employee.location_ids:
             location = db.query(Location).filter(Location.id == location_id).first()
             if location:
                 db_employee.assigned_locations.append(location)
+                location_names.append(location.name)
         db.commit()
         db.refresh(db_employee)
 
-    # NOTE: New hire notification email is sent after required documents are uploaded
-    # See document upload endpoint for email sending logic
+    # Send new hire notification email immediately
+    try:
+        from hr.services.email import send_new_hire_notification
+        employee_dict = {
+            'employee_number': db_employee.employee_number,
+            'first_name': db_employee.first_name,
+            'last_name': db_employee.last_name,
+            'middle_name': db_employee.middle_name,
+            'date_of_birth': str(db_employee.date_of_birth) if db_employee.date_of_birth else None,
+            'email': db_employee.email,
+            'phone_number': db_employee.phone_number,
+            'street_address': db_employee.street_address,
+            'city': db_employee.city,
+            'state': db_employee.state,
+            'zip_code': db_employee.zip_code,
+            'emergency_contact_name': db_employee.emergency_contact_name,
+            'emergency_contact_relationship': db_employee.emergency_contact_relationship,
+            'emergency_contact_phone': db_employee.emergency_contact_phone,
+            'hire_date': str(db_employee.hire_date) if db_employee.hire_date else 'N/A',
+            'employment_status': db_employee.employment_status,
+            'employee_type': db_employee.employee_type,
+            'starting_pay_rate': str(db_employee.starting_pay_rate) if db_employee.starting_pay_rate else None
+        }
+        created_by_info = f"{current_user.full_name} ({current_user.email})"
+        send_new_hire_notification(
+            employee_dict,
+            created_by_info,
+            position_info=None,  # Position assignments are separate
+            location_names=location_names if location_names else None
+        )
+    except Exception as e:
+        # Log error but don't fail the employee creation
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to send new hire notification: {str(e)}")
 
     # Audit log: Employee created
     try:
@@ -348,6 +383,67 @@ def delete_employee(
     db_employee.termination_date = datetime.now().date()
 
     db.commit()
+    return None
+
+
+@router.delete("/{employee_id}/permanent", status_code=204)
+def permanently_delete_employee(
+    employee_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """
+    PERMANENTLY delete an employee and all associated data (ADMIN ONLY)
+    WARNING: This action cannot be undone!
+    Deletes employee record, documents, and position assignments.
+    """
+    # Only admins can permanently delete employees
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied. Only administrators can permanently delete employees."
+        )
+
+    db_employee = db.query(EmployeeModel).filter(EmployeeModel.id == employee_id).first()
+    if not db_employee:
+        raise HTTPException(
+            status_code=404,
+            detail="Employee not found"
+        )
+
+    # Delete associated documents from disk and database
+    from hr.models.document import Document
+    documents = db.query(Document).filter(Document.employee_id == employee_id).all()
+    for doc in documents:
+        # Delete file from disk
+        if doc.file_path and os.path.exists(doc.file_path):
+            try:
+                os.remove(doc.file_path)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to delete document file {doc.file_path}: {str(e)}")
+        # Delete database record
+        db.delete(doc)
+
+    # Delete employee directory if it exists
+    employee_dir = f"/app/documents/{employee_id}"
+    if os.path.exists(employee_dir):
+        try:
+            import shutil
+            shutil.rmtree(employee_dir)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to delete employee directory {employee_dir}: {str(e)}")
+
+    # Delete position assignments (cascade should handle this, but explicit is better)
+    db.query(EmployeePosition).filter(EmployeePosition.employee_id == employee_id).delete()
+
+    # Finally, delete the employee record
+    db.delete(db_employee)
+    db.commit()
+
     return None
 
 
@@ -689,6 +785,9 @@ async def upload_employee_document(
                             'start_date': str(employee.hire_date) if employee.hire_date else 'N/A'
                         }
 
+                # Get assigned location names
+                location_names = [loc.name for loc in employee.assigned_locations] if employee.assigned_locations else None
+
                 # Collect document paths for ID and SSN documents
                 document_paths = []
                 for doc in all_docs:
@@ -697,7 +796,13 @@ async def upload_employee_document(
                             document_paths.append(doc.file_path)
 
                 created_by_info = f"{current_user.full_name} ({current_user.email})"
-                send_new_hire_notification(employee_dict, created_by_info, position_info, document_paths if document_paths else None)
+                send_new_hire_notification(
+                    employee_dict,
+                    created_by_info,
+                    position_info,
+                    location_names,
+                    document_paths if document_paths else None
+                )
     except Exception as e:
         # Log error but don't fail the document upload
         import logging

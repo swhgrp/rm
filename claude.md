@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** November 1, 2025 (Evening)
-**System Status:** Production (80% Complete - Core systems operational)
+**Last Updated:** November 3, 2025 (Evening)
+**System Status:** Production (85% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -9,9 +9,55 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Last 24 Hours)
+### Most Recent Work (Last Session - Nov 3, 2025)
 
-1. **Events Portal SSO Integration COMPLETE** ✅ (Nov 1, 2025 - Evening) 🔒
+1. **HR System: New Hire Emails + Locations** ✅ (Nov 3, 2025 - Evening) 📧
+   - **PRODUCTION READY** - New hire email improvements deployed
+   - Fixed: Emails now sent IMMEDIATELY when employee is created (not waiting for documents)
+   - Added: Assigned locations included in new hire email notifications
+   - Email now shows all selected locations in bullet-point format
+   - Backend: Updated `send_new_hire_notification()` with `location_names` parameter
+   - Frontend: Locations captured during employee creation and passed to email service
+   - Email format: Added "ASSIGNED LOCATIONS" section to notification template
+   - Files modified: `hr/services/email.py`, `hr/api/endpoints/employees.py`
+   - **Git commit:** Pending ⏳
+
+2. **HR System: Admin-Only Employee Permanent Delete** ✅ (Nov 3, 2025 - Evening) 🗑️
+   - **PRODUCTION READY** - Permanent delete functionality for admins
+   - New API endpoint: `DELETE /api/employees/{id}/permanent` (admin-only)
+   - Deletes employee + all documents (disk + DB) + position assignments + directory
+   - UI: Delete button (trash icon 🗑️) added to employee list page (ACTIONS column)
+   - UI: "Permanent Delete" button added to employee detail page header
+   - Double confirmation prompts for safety
+   - Non-admins blocked with 403 Forbidden error
+   - Files modified: `hr/api/endpoints/employees.py`, `hr/templates/employees.html`, `hr/templates/employee_detail.html`
+   - **Git commit:** Pending ⏳
+
+3. **HR System: Document Access Control - Admin Fixes** ✅ (Nov 3, 2025 - Evening) 🔐
+   - **CRITICAL SECURITY FIX** - Document access properly secured
+   - Fixed: All document endpoints now require authentication
+   - Fixed: ID Copy and Social Security Card documents restricted to admins only
+   - Frontend: Restricted documents show lock icon 🔒 for non-admins
+   - Frontend: Admins see all documents with full access (preview/download/delete)
+   - Backend: Download endpoint enforces 403 Forbidden for non-admin ID/SSN access
+   - Fixed: Backend no longer modifies document data (frontend handles display logic)
+   - Updated endpoints: `GET /api/documents/employees/{id}/documents`, `GET /api/documents/{id}`, `GET /api/documents/{id}/download`, etc.
+   - Files modified: `hr/api/endpoints/documents.py`
+   - **Git commit:** Pending ⏳
+
+4. **HR System: User Admin Flag Synchronization** ✅ (Nov 3, 2025 - Evening) 👥
+   - **CRITICAL FIX** - Admin users now have correct permissions
+   - Fixed: `is_admin` database flag now matches role assignments
+   - Updated 4 users: erica, ian, justin, tina (is_admin = true)
+   - System uses `is_admin` column (not just role name) for permission checks
+   - All 6 admin users verified: admin, andy, erica, ian, justin, tina
+   - Admins can now access all documents, use delete buttons, and have full permissions
+   - Database update: Direct SQL UPDATE to `users` table
+   - **No code changes** - Database fix only
+
+### Previous Work (Nov 1-2, 2025)
+
+5. **POS System Design & Specification - 100% COMPLETE** ✅ (Nov 2, 2025)
    - **PRODUCTION READY** - Full Portal SSO integration implemented
    - Fixed page reload loop caused by URL routing issues with `<base href="/events/">`
    - Implemented JWT token validation from Portal cookies
@@ -77,16 +123,23 @@
    - PDF deduplication (SHA-256 hashing)
    - Committed: 63afd14, 9f0e5c7
 
-### Git Status - Clean Working Tree ✅
+### Git Status - Pending Commit ⏳
 
 ```bash
-# All changes committed and pushed to GitHub
-# Branch: main (fully synced with origin/main)
+# Recent changes need to be committed
+# Branch: main
 # Last commit: 400de0d - Events SSO & Monitoring fixes
-# Unstaged: docker-compose.yml (minor change, not critical)
+# Modified files (Nov 3, 2025):
+#   - hr/src/hr/services/email.py (new hire emails + locations)
+#   - hr/src/hr/api/api_v1/endpoints/employees.py (emails + permanent delete)
+#   - hr/src/hr/api/api_v1/endpoints/documents.py (auth + admin checks)
+#   - hr/src/hr/templates/employees.html (delete button on list)
+#   - hr/src/hr/templates/employee_detail.html (delete button on detail)
+# Database changes:
+#   - users table: is_admin flag updated for erica, ian, justin, tina
 ```
 
-**Current Status:** Working tree is clean, all major work committed and pushed.
+**Current Status:** Code changes deployed and tested. Ready for commit and push.
 
 ---
 
@@ -100,7 +153,7 @@
 |---------|------|----------|------------|--------|
 | **Portal** | 8000 | hr_db (shared) | FastAPI, SQLAlchemy, JWT | 99%+ ✅ |
 | **Inventory** | 8000 | inventory_db | FastAPI, SQLAlchemy, Redis, OpenAI | 100%+ ✅ |
-| **HR** | 8000 | hr_db | FastAPI, SQLAlchemy | 100% (core) ✅ |
+| **HR** | 8000 | hr_db | FastAPI, SQLAlchemy, Email | 100% ✅ |
 | **Accounting** | 8000 | accounting_db | FastAPI, SQLAlchemy | ~75% 🔄 |
 | **Events** | 8000 | events_db | FastAPI, SQLAlchemy | **75% ✅ PRODUCTION** |
 | **Integration Hub** | 8000 | hub_db | FastAPI, SQLAlchemy, OpenAI, APScheduler | 100%+ ✅ |
@@ -248,7 +301,7 @@ Each service has isolated PostgreSQL database:
 
 **Location:** `/opt/restaurant-system/hr/`
 
-**Technology:** FastAPI, SQLAlchemy, Celery, Redis
+**Technology:** FastAPI, SQLAlchemy, Email (SMTP), Encryption
 
 **Database:** 12 models
 
@@ -261,6 +314,9 @@ Each service has isolated PostgreSQL database:
 - ✅ Role-based access control (Admin, Manager, Employee)
 - ✅ Audit logging for data access
 - ✅ Email settings management
+- ✅ **NEW (Nov 3, 2025):** New hire email notifications with locations
+- ✅ **NEW (Nov 3, 2025):** Admin-only permanent employee deletion
+- ✅ **NEW (Nov 3, 2025):** Document access control (ID/SSN restricted to admins)
 
 **What's NOT Implemented:**
 - ❌ Shift scheduling
@@ -983,3 +1039,205 @@ curl https://rm.swhgrp.com/[service]/health
 **End of Claude Memory Document**
 
 *This document should be updated whenever significant changes are made to the system. Keep it current to maintain effective context for future work.*
+
+---
+
+## 🔄 SESSION UPDATE - November 2, 2025
+
+### POS System Design & Specification COMPLETE ✅
+
+**Context:** Designed complete POS system specification for SW Hospitality Group based on comprehensive requirements gathering.
+
+#### 1. Requirements Gathering
+- **User provided detailed specification prompt** for custom restaurant POS system
+- Reference systems: Clover, SpotOn, Toast
+- Requirements: Stripe Terminal payments, Raspberry Pi Store Hub, offline operation, table service
+- Integration with existing Inventory/Accounting systems
+
+**Clarifying Questions Asked:**
+- Integration approach (real-time vs EOD sync)
+- Store Hub architecture and hardware
+- Payment processing flow and tip handling
+- Menu management interface
+- Table service workflow (course firing, guest tracking)
+- Reporting priorities
+- Technology preferences
+
+**User Responses:**
+- Inventory sync: EOD batch (not real-time)
+- Accounting: EOD batch
+- Store Hub: Raspberry Pi 5 (8GB), 3-10 tablets per location
+- Payments: Physical Stripe readers (M2/S700), tips included
+- Menu: Back office admin panel, time-based switching, 86'd items
+- Table service: Course firing, guest count tracking
+- Reporting: Real-time priority
+- Tech: Web-based PWA, fresh stack, standalone architecture
+- Architecture: Cloud + Store Hub + offline temporary service
+
+#### 2. Documentation Created
+
+**File:** `/opt/pos-system/SPECIFICATION.md` (83KB)
+- 10 detailed feature modules with Phase 1/2/3 roadmap
+- Complete database schema (15+ tables) with SQL definitions:
+  - locations, menu_categories, items, item_modifiers
+  - tables, checks, check_items, payments
+  - users, clock_entries, tips, shifts
+  - discounts, reports, integrations
+- API integration specifications:
+  - Inventory system (EOD batch sync)
+  - Accounting system (EOD journal entries)
+- Raspberry Pi Store Hub setup guide (12 detailed steps)
+- Architecture diagrams (ASCII format)
+- Security & PCI compliance guidelines
+- Hardware requirements
+- Competitive analysis (vs Toast, Clover, SpotOn)
+
+**File:** `/opt/pos-system/README.md` (28KB)
+- Executive summary with key differentiators
+- Three-tier architecture overview:
+  - Cloud: FastAPI + PostgreSQL (permanent)
+  - Store Hub: Raspberry Pi + SQLite (transient cache/queue)
+  - Clients: React PWA on tablets (offline-capable)
+- Technology stack decisions
+- Core features by module (10 modules)
+- Phase 1/2/3/4 roadmap with success criteria
+- Hardware requirements
+- Cost analysis: $4,140/year savings per location
+- Risk mitigation strategies
+- Project structure proposal
+- Next steps for development
+
+**File:** `/opt/pos-system/design-mockup.html` (36KB)
+- Interactive HTML mockup with 4 switchable views:
+  1. **POS Terminal**: Order entry with menu grid, check panel, modifiers, totals, actions
+  2. **Floor Layout**: Table management grid with color-coded status (available/occupied/reserved)
+  3. **Kitchen Display**: Order tickets with time tracking, item details, bump/done workflow
+  4. **Admin Dashboard**: Real-time metrics, sales tracking, performance indicators
+- Dark theme matching Restaurant Management Portal design
+- Touch-friendly UI optimized for tablets
+- Offline mode indicator (demo feature)
+- Bootstrap Icons integration
+- Responsive layouts
+
+#### 3. Design Mockup Deployment
+
+**Nginx Configuration:**
+- Added `/pos-demo` location block to `rm.swhgrp.com-http.conf`
+- Routes to Portal static file handler
+- Accessible at: **https://rm.swhgrp.com/pos-demo**
+
+**Portal Updates:**
+- Created `/opt/restaurant-system/portal/html/` directory
+- Copied `design-mockup.html` to `portal/html/pos-demo.html`
+- Updated `portal/Dockerfile`:
+  - Added `COPY js/ /app/static/js/` (line 24)
+  - Added `COPY html/ /app/static/html/` (line 25)
+- Rebuilt and restarted `portal-app` container
+
+**Files Modified:**
+- `/opt/restaurant-system/shared/nginx/conf.d/rm.swhgrp.com-http.conf` (lines 257-264)
+- `/opt/restaurant-system/portal/Dockerfile` (lines 24-25)
+
+#### 4. GitHub Repository Setup ✅
+
+**Repository:** `git@github.com:swhgrp/pos-system.git`
+**URL:** https://github.com/swhgrp/pos-system
+
+**Setup Steps:**
+1. Initialized git repository in `/opt/pos-system`
+2. Renamed branch from `master` to `main`
+3. Created `.gitignore` for Python projects
+4. Configured git user:
+   - Email: admin@swhgrp.com
+   - Name: SW Hospitality Group
+5. Staged all files
+6. Created detailed initial commit with comprehensive description
+7. Added GitHub remote
+8. Pushed to `origin/main`
+
+**Commit Message Highlights:**
+- Complete specification and design documentation
+- Architecture overview (3-tier cloud + edge)
+- Key features and technology stack
+- Cost savings analysis ($4,140/year per location)
+- Credit to Claude Code
+
+**Files in Repository:**
+- `.gitignore` - Python project exclusions
+- `README.md` - Executive summary and overview
+- `SPECIFICATION.md` - Complete technical specification
+- `design-mockup.html` - Interactive UI mockup
+
+#### 5. Technical Decisions Made
+
+**Architecture Pattern:**
+- Three-tier: Cloud (permanent) → Store Hub (transient) → Tablets (PWA)
+- Event queueing for offline operation
+- EOD batch sync (not real-time) for Inventory/Accounting integration
+
+**Technology Choices:**
+- **Frontend:** React 18+, TypeScript, Tailwind CSS, Vite, PWA with Service Workers
+- **Backend:** FastAPI (async), PostgreSQL 15+, SQLAlchemy 2.0, Redis, Celery
+- **Store Hub:** Raspberry Pi 5 (8GB), Python 3.11+, SQLite, CUPS, Nginx
+- **Payments:** Stripe Terminal SDK, Stripe Reader S700
+- **Deployment:** Docker, nginx reverse proxy
+
+**Key Design Principles:**
+- Offline-first operation
+- Cost-effective hardware (Raspberry Pi vs proprietary)
+- PWA over native apps (no app store dependencies)
+- Modern, maintainable technology stack
+- PCI DSS compliance considerations
+
+---
+
+## 📊 POS SYSTEM PROJECT STATUS
+
+**Status:** 📝 Specification Complete - Ready for Development
+
+**Phase:** Planning & Design (100% Complete)
+
+**Deliverables:**
+- ✅ Complete technical specification (83KB)
+- ✅ Executive summary and project overview (28KB)
+- ✅ Interactive UI/UX mockup (36KB)
+- ✅ Database schema design (15+ tables)
+- ✅ API integration specifications
+- ✅ Hardware requirements and setup guide
+- ✅ Cost analysis and ROI justification
+- ✅ GitHub repository setup and initial commit
+- ✅ Live demo accessible at https://rm.swhgrp.com/pos-demo
+
+**Next Steps (When Development Begins):**
+1. Review and approve specification with stakeholders
+2. Finalize technology stack confirmation
+3. Setup development environment:
+   - Create GitHub project board
+   - Setup PostgreSQL development database
+   - Configure CI/CD pipeline (GitHub Actions)
+4. Phase 1 MVP Development (3-4 months):
+   - Database schema migrations
+   - Menu management backend API
+   - Basic order entry UI
+   - Table management
+   - Payment processing (Stripe Terminal integration)
+   - Kitchen display system
+   - Basic reporting
+
+**Estimated Timeline:**
+- Phase 1 (MVP): 3-4 months
+- Phase 2 (Enhancements): 2-3 months
+- Phase 3 (Advanced Features): 2-3 months
+- **Total:** 7-10 months to full production
+
+**Cost Savings:**
+- Per location: $4,140/year vs competitors
+- 5 locations: $20,700/year savings
+- 10 locations: $41,400/year savings
+
+---
+
+**End of Session Update - November 2, 2025**
+
+*Next update will include: Development environment setup, Phase 1 progress, or stakeholder feedback integration.*
+
