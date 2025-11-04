@@ -836,6 +836,16 @@ function viewEntry(entryId) {
                             <td class="text-muted"><strong>Status:</strong></td>
                             <td><span class="badge bg-success">${entry.status}</span></td>
                         </tr>
+                        ${entry.reference_type === 'hub_invoice' && entry.reference_id ? `
+                        <tr>
+                            <td class="text-muted"><strong>Source Invoice:</strong></td>
+                            <td>
+                                <a href="/hub/invoices/${entry.reference_id}" target="_blank" class="text-primary">
+                                    <i class="bi bi-box-arrow-up-right"></i> View in Integration Hub
+                                </a>
+                            </td>
+                        </tr>
+                        ` : ''}
                     </table>
                 </div>
                 <div class="col-md-6">

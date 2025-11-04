@@ -29,6 +29,16 @@
         </div>
     </div>
 
+    <!-- Alerts -->
+    {% if not invoice.vendor_id %}
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        <strong>Vendor Not Matched:</strong> The vendor "{{ invoice.vendor_name }}" parsed from this invoice is not in your vendor list.
+        Please use the <strong>Edit Invoice</strong> button to either select an existing vendor or create a new one.
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+
     <!-- Invoice Header -->
     <div class="row">
         <div class="col-md-8">
@@ -46,7 +56,14 @@
                                 </tr>
                                 <tr>
                                     <th>Vendor:</th>
-                                    <td>{{ invoice.vendor_name }}</td>
+                                    <td>
+                                        {{ invoice.vendor_name }}
+                                        {% if not invoice.vendor_id %}
+                                        <span class="badge bg-warning text-dark ms-2" title="This vendor is not in the system">
+                                            <i class="bi bi-exclamation-triangle"></i> Unmatched
+                                        </span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th>Location:</th>
@@ -149,7 +166,7 @@
 
                     {% if invoice.status == 'ready' %}
                     <button class="btn btn-primary btn-sm w-100" onclick="sendInvoice()">
-                        <i class="bi bi-send"></i> Send to Both Systems
+                        <i class="bi bi-send"></i> Send Invoice
                     </button>
                     {% elif invoice.status == 'partial' or invoice.status == 'error' %}
                     <button class="btn btn-warning btn-sm w-100 mb-2" onclick="retryInvoice('both')">
@@ -264,8 +281,18 @@
                 <form id="editInvoiceForm">
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Vendor Name</label>
-                            <input type="text" class="form-control" id="edit_vendor_name" value="{{ invoice.vendor_name }}">
+                            <label class="form-label">Vendor</label>
+                            <select class="form-select" id="edit_vendor_id" onchange="toggleNewVendorInput()">
+                                <option value="">-- Select Vendor --</option>
+                                {% for vendor in vendors %}
+                                <option value="{{ vendor.id }}" {% if invoice.vendor_id == vendor.id %}selected{% endif %}>
+                                    {{ vendor.name }}
+                                </option>
+                                {% endfor %}
+                                <option value="new">+ Add New Vendor</option>
+                            </select>
+                            <input type="text" class="form-control mt-2" id="edit_new_vendor_name"
+                                   placeholder="Enter new vendor name" style="display: none;">
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Invoice Number</label>
@@ -323,9 +350,25 @@ function showEditModal() {
     modal.show();
 }
 
+function toggleNewVendorInput() {
+    const vendorSelect = document.getElementById('edit_vendor_id');
+    const newVendorInput = document.getElementById('edit_new_vendor_name');
+
+    if (vendorSelect.value === 'new') {
+        newVendorInput.style.display = 'block';
+        newVendorInput.required = true;
+    } else {
+        newVendorInput.style.display = 'none';
+        newVendorInput.required = false;
+        newVendorInput.value = '';
+    }
+}
+
 async function saveInvoiceEdit() {
+    const vendorSelect = document.getElementById('edit_vendor_id');
+    const newVendorName = document.getElementById('edit_new_vendor_name').value;
+
     const data = {
-        vendor_name: document.getElementById('edit_vendor_name').value,
         invoice_number: document.getElementById('edit_invoice_number').value,
         invoice_date: document.getElementById('edit_invoice_date').value,
         due_date: document.getElementById('edit_due_date').value || null,
@@ -333,6 +376,17 @@ async function saveInvoiceEdit() {
         tax_amount: document.getElementById('edit_tax_amount').value ? parseFloat(document.getElementById('edit_tax_amount').value) : null,
         location_id: document.getElementById('edit_location_id').value || null
     };
+
+    // Handle vendor selection
+    if (vendorSelect.value === 'new') {
+        if (!newVendorName) {
+            await showAlert('Please enter a vendor name', 'Validation Error');
+            return;
+        }
+        data.new_vendor_name = newVendorName;
+    } else if (vendorSelect.value) {
+        data.vendor_id = parseInt(vendorSelect.value);
+    }
 
     try {
         const response = await fetch(`/hub/api/invoices/{{ invoice.id }}`, {
@@ -346,24 +400,26 @@ async function saveInvoiceEdit() {
         const result = await response.json();
 
         if (response.ok && result.success) {
-            alert('Invoice updated successfully!');
+            await showAlert('Invoice updated successfully!', 'Success');
             location.reload();
         } else {
-            alert(`Error updating invoice: ${result.detail || 'Unknown error'}`);
+            await showAlert(`Error updating invoice: ${result.detail || 'Unknown error'}`, 'Error');
         }
     } catch (error) {
-        alert(`Error updating invoice: ${error.message}`);
+        await showAlert(`Error updating invoice: ${error.message}`, 'Error');
     }
 }
 
 async function sendInvoice() {
-    if (!await showConfirm('Send this invoice to both Inventory and Accounting systems?')) {
+    if (!await showConfirm('Send this invoice to the appropriate system(s)?')) {
         return;
     }
 
-    const button = event.target;
-    button.disabled = true;
-    button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sending...';
+    const button = document.querySelector('button[onclick="sendInvoice()"]');
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sending...';
+    }
 
     try {
         const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/send`, {
@@ -376,17 +432,21 @@ async function sendInvoice() {
         const result = await response.json();
 
         if (response.ok && result.success) {
-            alert('Invoice sent successfully to both systems!');
+            await showAlert('Invoice sent successfully!', 'Success');
             location.reload();
         } else {
-            alert(`Error sending invoice:\n${result.errors ? result.errors.join('\n') : 'Unknown error'}`);
-            button.disabled = false;
-            button.innerHTML = '<i class="bi bi-send"></i> Send to Both Systems';
+            await showAlert(`Error sending invoice:\n${result.errors ? result.errors.join('\n') : 'Unknown error'}`, 'Error');
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-send"></i> Send Invoice';
+            }
         }
     } catch (error) {
-        alert(`Error sending invoice: ${error.message}`);
-        button.disabled = false;
-        button.innerHTML = '<i class="bi bi-send"></i> Send to Both Systems';
+        await showAlert(`Error sending invoice: ${error.message}`, 'Error');
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-send"></i> Send Invoice';
+        }
     }
 }
 
@@ -395,9 +455,11 @@ async function retryInvoice(system) {
         return;
     }
 
-    const button = event.target;
-    button.disabled = true;
-    button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Retrying...';
+    const button = document.querySelector(`button[onclick*="retryInvoice('${system}')"]`);
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Retrying...';
+    }
 
     try {
         const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/retry?system=${system}`, {
@@ -410,18 +472,69 @@ async function retryInvoice(system) {
         const result = await response.json();
 
         if (response.ok && result.success) {
-            alert('Retry successful!');
+            await showAlert('Retry successful!', 'Success');
             location.reload();
         } else {
-            alert(`Error retrying:\n${result.errors ? result.errors.join('\n') : 'Unknown error'}`);
+            await showAlert(`Error retrying:\n${result.errors ? result.errors.join('\n') : 'Unknown error'}`, 'Error');
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-arrow-repeat"></i> Retry';
+            }
+        }
+    } catch (error) {
+        await showAlert(`Error retrying: ${error.message}`, 'Error');
+        if (button) {
             button.disabled = false;
             button.innerHTML = '<i class="bi bi-arrow-repeat"></i> Retry';
         }
-    } catch (error) {
-        alert(`Error retrying: ${error.message}`);
-        button.disabled = false;
-        button.innerHTML = '<i class="bi bi-arrow-repeat"></i> Retry';
     }
+}
+
+// Custom alert function using Bootstrap modal (similar to showConfirm)
+function showAlert(message, title = 'Notice') {
+    return new Promise((resolve) => {
+        document.getElementById('confirmTitle').textContent = title;
+        document.getElementById('confirmMessage').textContent = message;
+
+        const modalElement = document.getElementById('confirmModal');
+        const modal = new bootstrap.Modal(modalElement);
+
+        const okBtn = document.getElementById('confirmOkBtn');
+        const cancelBtn = document.getElementById('confirmCancelBtn');
+
+        // Hide cancel button for alerts
+        cancelBtn.style.display = 'none';
+        okBtn.textContent = 'OK';
+        okBtn.disabled = false;
+
+        let resolved = false;
+
+        okBtn.onclick = function(e) {
+            if (!resolved) {
+                resolved = true;
+                modal.hide();
+                setTimeout(() => {
+                    cancelBtn.style.display = '';
+                    okBtn.textContent = 'OK';
+                    resolve(true);
+                }, 100);
+            }
+        };
+
+        modalElement.addEventListener('hidden.bs.modal', function handler() {
+            modalElement.removeEventListener('hidden.bs.modal', handler);
+            if (!resolved) {
+                resolved = true;
+                setTimeout(() => {
+                    cancelBtn.style.display = '';
+                    okBtn.textContent = 'OK';
+                    resolve(true);
+                }, 100);
+            }
+        }, { once: true });
+
+        modal.show();
+    });
 }
 </script>
 {% endblock %}

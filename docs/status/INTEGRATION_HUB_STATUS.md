@@ -1,7 +1,7 @@
 # Integration Hub - Implementation Status
 
-**Last Updated:** 2025-10-19
-**Version:** 1.2.0 (API Endpoints Complete)
+**Last Updated:** 2025-11-04
+**Version:** 1.3.0 (Vendor Bills Integration Complete)
 
 ---
 
@@ -112,13 +112,15 @@ The Integration Hub is a centralized microservice that receives invoices and rou
   - [x] Store `inventory_invoice_id` reference
 
 - [x] **Accounting Sender** ([accounting_sender.py](../../integration-hub/src/integration_hub/services/accounting_sender.py))
-  - [x] Build journal entry payload
-  - [x] Calculate Dr./Cr. entries (Asset, AP Payable)
-  - [x] POST to `http://accounting-app:8000/api/journal-entries/from-hub`
+  - [x] Build vendor bill payload (updated from journal entry)
+  - [x] Calculate Dr./Cr. entries (Expense/Asset, AP Payable)
+  - [x] POST to `http://accounting-app:8000/api/vendor-bills/from-hub`
   - [x] Handle response and errors
   - [x] Update `sent_to_accounting` status
   - [x] Store `accounting_je_id` reference
-  - [x] Validate balanced journal entries
+  - [x] Validate bill total matches invoice total
+  - [x] Account ID lookup with caching
+  - [x] Group line items by GL account
 
 - [x] **Auto-Send Orchestrator** ([auto_send.py](../../integration-hub/src/integration_hub/services/auto_send.py))
   - [x] Validate invoices are ready (all items mapped)
@@ -150,15 +152,19 @@ The Integration Hub is a centralized microservice that receives invoices and rou
   - [x] Return invoice_id
 
 **Accounting System:**
-- [x] `POST /api/journal-entries/from-hub` ([journal_entries.py:467](../../accounting/src/accounting/api/journal_entries.py#L467))
-  - [x] Accept journal entry payload
-  - [x] Validate balanced entry (debits = credits)
-  - [x] Find open fiscal period
-  - [x] Generate entry number
-  - [x] Create journal entry (auto-posted)
-  - [x] Create journal entry lines
-  - [x] Update account balances
-  - [x] Return journal_entry_id
+- [x] `POST /api/vendor-bills/from-hub` ([vendor_bills.py:741](../../accounting/src/accounting/api/vendor_bills.py#L741))
+  - [x] Accept vendor bill payload from Hub
+  - [x] Map location name to area_id for multi-location tracking
+  - [x] Create vendor bill record (auto-approved)
+  - [x] Create vendor bill line items
+  - [x] Create associated journal entry with Dr/Cr lines
+  - [x] Link bill to journal entry for audit trail
+  - [x] Default due date to +30 days if not provided
+  - [x] Return bill_id and journal_entry_id
+- [x] Journal Entry audit trail ([journal_entries.html](../../accounting/src/accounting/templates/journal_entries.html))
+  - [x] Display "Source Invoice" link when reference_type='hub_invoice'
+  - [x] Clickable link opens Hub invoice in new tab
+  - [x] Full traceability from accounting back to source documents
 
 ---
 
@@ -358,6 +364,33 @@ integration-hub/
 ---
 
 ## Change Log
+
+### 2025-11-04 - Vendor Bills Integration (v1.3.0)
+- ✅ **Implemented vendor bill creation in accounting system**
+  - Created `POST /api/vendor-bills/from-hub` endpoint
+  - Bills now appear in Accounting > AP > Vendor Bills
+  - Supports payment workflow (APPROVED → PAID)
+  - Auto-approves bills from Hub for streamlined processing
+- ✅ **Added multi-location tracking**
+  - Vendor bills tagged with location (area_id)
+  - Journal entries tagged with location (location_id)
+  - Enables location-based AP reporting
+- ✅ **Enhanced audit trail**
+  - Journal entries link back to Hub invoices
+  - "Source Invoice" link in JE details modal
+  - Clickable link opens Hub invoice in new tab
+- ✅ **Updated Hub accounting sender**
+  - Changed from journal entry endpoint to vendor bills endpoint
+  - Added account ID lookup with caching
+  - Groups line items by GL account
+  - Validates bill total matches invoice total
+- ✅ **Fixed data quality issues**
+  - Fixed line item total calculation (qty × price)
+  - Added default due date (+30 days from bill date)
+  - Handled missing due dates gracefully
+- ✅ **Full documentation**
+  - Created [VENDOR_BILL_INTEGRATION_COMPLETE.md](../completions/VENDOR_BILL_INTEGRATION_COMPLETE.md)
+  - Detailed implementation notes, testing results, and troubleshooting
 
 ### 2025-10-19 - API Endpoints Complete (v1.2.0)
 - ✅ **Built Inventory receiving endpoint**

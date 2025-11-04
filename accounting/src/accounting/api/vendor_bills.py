@@ -736,3 +736,110 @@ def list_bill_payments(
     ).order_by(BillPayment.payment_date.desc()).all()
 
     return payments
+
+
+@router.post("/from-hub")
+def receive_vendor_bill_from_hub(
+    bill_data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Receive and create a vendor bill from the Integration Hub
+
+    Expected payload:
+    {
+        "vendor_name": "Gold Coast Linen Service",
+        "bill_number": "1103/1009",
+        "bill_date": "2025-11-03",
+        "due_date": "2025-11-18",
+        "total_amount": 111.74,
+        "tax_amount": 0.00,
+        "hub_invoice_id": 10,
+        "location_id": 2,  # Hub location ID
+        "location_name": "SW Grill",
+        "lines": [
+            {
+                "account_id": 123,  # Accounting database ID
+                "amount": 111.74,
+                "description": "Linen Service"
+            }
+        ]
+    }
+    """
+    try:
+        # Look up location by name or create mapping
+        area = None
+        if bill_data.get("location_name"):
+            area = db.query(Area).filter(
+                Area.name.ilike(f"%{bill_data['location_name']}%")
+            ).first()
+
+        # Create vendor bill
+        bill_date = datetime.strptime(bill_data["bill_date"], "%Y-%m-%d").date()
+        # Default due date to 30 days from bill date if not provided
+        if bill_data.get("due_date"):
+            due_date = datetime.strptime(bill_data["due_date"], "%Y-%m-%d").date()
+        else:
+            from datetime import timedelta
+            due_date = bill_date + timedelta(days=30)
+
+        bill = VendorBill(
+            vendor_name=bill_data["vendor_name"],
+            vendor_id=None,  # TODO: Map vendor from Hub to accounting
+            bill_number=bill_data["bill_number"],
+            bill_date=bill_date,
+            due_date=due_date,
+            subtotal=Decimal(str(bill_data["total_amount"])) - Decimal(str(bill_data.get("tax_amount", 0))),
+            tax_amount=Decimal(str(bill_data.get("tax_amount", 0))),
+            total_amount=Decimal(str(bill_data["total_amount"])),
+            area_id=area.id if area else None,
+            reference_number=f"HUB-{bill_data.get('hub_invoice_id')}",
+            description=f"From Integration Hub - Invoice #{bill_data['bill_number']}",
+            status=BillStatus.APPROVED,  # Auto-approve bills from Hub
+            created_by=1,  # System user
+            approved_by=1,  # System user
+            approved_date=datetime.now()
+        )
+
+        db.add(bill)
+        db.flush()  # Get bill ID
+
+        # Create line items
+        for idx, line_data in enumerate(bill_data["lines"], start=1):
+            line = VendorBillLine(
+                bill_id=bill.id,
+                account_id=line_data["account_id"],
+                area_id=area.id if area else None,
+                description=line_data.get("description"),
+                amount=Decimal(str(line_data["amount"])),
+                is_taxable=False,
+                tax_amount=Decimal('0.00'),
+                line_number=idx
+            )
+            db.add(line)
+
+        db.flush()
+
+        # Create journal entry (Dr. Expense, Cr. AP)
+        je = create_bill_journal_entry(bill, db)
+
+        # Link bill to journal entry
+        bill.journal_entry_id = je.id
+
+        db.commit()
+        db.refresh(bill)
+
+        return {
+            "success": True,
+            "bill_id": bill.id,
+            "journal_entry_id": je.id,
+            "journal_entry_number": je.entry_number,
+            "message": f"Vendor bill {bill.bill_number} created successfully"
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating vendor bill: {str(e)}"
+        )

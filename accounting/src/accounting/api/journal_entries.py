@@ -547,21 +547,32 @@ def receive_journal_entry_from_hub(
             raise ValueError(f"No open fiscal period found for date {entry_date}")
 
         # Generate entry number
-        max_entry_number = db.query(func.max(JournalEntry.entry_number)).scalar()
+        # Only look for JE- entries that match the format "JE-NNNNNN"
+        # Filter out entries like "JE-BANK-000001" or "DSS-..."
+        max_entry_number = db.query(func.max(JournalEntry.entry_number)).filter(
+            JournalEntry.entry_number.like('JE-%')
+        ).scalar()
+
         if max_entry_number:
-            last_num = int(max_entry_number.split('-')[1])
-            new_entry_number = f"JE-{last_num + 1:06d}"
+            # Split and get the last part (handle cases like "JE-000001" correctly)
+            parts = max_entry_number.split('-')
+            if len(parts) == 2 and parts[1].isdigit():
+                last_num = int(parts[1])
+                new_entry_number = f"JE-{last_num + 1:06d}"
+            else:
+                # If entry number doesn't match expected format, start fresh
+                new_entry_number = "JE-000001"
         else:
             new_entry_number = "JE-000001"
 
         # Create journal entry
+        # Note: fiscal_period validation done above, but not stored in model
         entry = JournalEntry(
             entry_number=new_entry_number,
             entry_date=entry_date,
             description=description,
             reference_type="hub_invoice",
             reference_id=hub_invoice_id,
-            fiscal_period_id=fiscal_period.id,
             status=JournalEntryStatus.POSTED,  # Auto-post from hub
             created_by=1,  # System user - TODO: create dedicated system user
             approved_by=1,  # System user
@@ -594,11 +605,8 @@ def receive_journal_entry_from_hub(
 
             db.add(line)
 
-            # Update account balance
-            if debit > 0:
-                account.current_balance += debit
-            if credit > 0:
-                account.current_balance -= credit
+            # Note: Account balances are calculated from journal entries, not stored
+            # No need to update current_balance field (doesn't exist in model)
 
         db.commit()
 

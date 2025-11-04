@@ -17,14 +17,49 @@
     <div class="card">
         <div class="card-body">
             {% if invoices %}
+            <!-- Search and Filter Bar -->
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search invoices...">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" id="statusFilter">
+                        <option value="">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="mapping">Mapping</option>
+                        <option value="ready">Ready</option>
+                        <option value="sent">Sent</option>
+                        <option value="error">Error</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" id="sourceFilter">
+                        <option value="">All Sources</option>
+                        <option value="email">Email</option>
+                        <option value="manual">Manual</option>
+                    </select>
+                </div>
+            </div>
+
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover" id="invoicesTable">
                     <thead>
                         <tr>
-                            <th>Invoice #</th>
-                            <th>Vendor</th>
-                            <th>Date</th>
-                            <th>Amount</th>
+                            <th class="sortable" data-sort="invoice_number">
+                                Invoice # <i class="bi bi-chevron-expand"></i>
+                            </th>
+                            <th class="sortable" data-sort="vendor_name">
+                                Vendor <i class="bi bi-chevron-expand"></i>
+                            </th>
+                            <th class="sortable" data-sort="invoice_date">
+                                Date <i class="bi bi-chevron-expand"></i>
+                            </th>
+                            <th class="sortable" data-sort="total_amount">
+                                Amount <i class="bi bi-chevron-expand"></i>
+                            </th>
                             <th>Source</th>
                             <th>Status</th>
                             <th>Inventory</th>
@@ -34,9 +69,14 @@
                     </thead>
                     <tbody>
                         {% for invoice in invoices %}
-                        <tr>
+                        <tr data-status="{{ invoice.status }}" data-source="{{ invoice.source or 'unknown' }}">
                             <td><strong>{{ invoice.invoice_number }}</strong></td>
-                            <td>{{ invoice.vendor_name }}</td>
+                            <td>
+                                {{ invoice.vendor_name }}
+                                {% if not invoice.vendor_id %}
+                                <i class="bi bi-exclamation-triangle text-warning" title="Vendor not matched"></i>
+                                {% endif %}
+                            </td>
                             <td>{{ invoice.invoice_date }}</td>
                             <td>${{ "{:,.2f}".format(invoice.total_amount) }}</td>
                             <td>
@@ -74,9 +114,17 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <a href="/hub/invoices/{{ invoice.id }}" class="btn btn-sm btn-primary">
+                                <a href="/hub/invoices/{{ invoice.id }}" class="btn btn-sm btn-primary me-1">
                                     <i class="bi bi-eye"></i> View
                                 </a>
+                                {% if invoice.status == 'ready' %}
+                                <button class="btn btn-sm btn-success me-1" onclick="sendInvoiceFromList({{ invoice.id }}, '{{ invoice.invoice_number }}')">
+                                    <i class="bi bi-send"></i> Send
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-sm btn-danger" onclick="deleteInvoice({{ invoice.id }}, '{{ invoice.invoice_number }}')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -183,5 +231,201 @@ document.getElementById('invoiceUploadForm').addEventListener('submit', function
         vendorSelect.disabled = true;
     }
 });
+
+// Search functionality
+const searchInput = document.getElementById('searchInput');
+const statusFilter = document.getElementById('statusFilter');
+const sourceFilter = document.getElementById('sourceFilter');
+
+function filterTable() {
+    const searchTerm = searchInput.value.toLowerCase();
+    const statusValue = statusFilter.value.toLowerCase();
+    const sourceValue = sourceFilter.value.toLowerCase();
+    const rows = document.querySelectorAll('#invoicesTable tbody tr');
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const status = row.getAttribute('data-status').toLowerCase();
+        const source = row.getAttribute('data-source').toLowerCase();
+
+        const matchesSearch = text.includes(searchTerm);
+        const matchesStatus = !statusValue || status === statusValue;
+        const matchesSource = !sourceValue || source === sourceValue;
+
+        if (matchesSearch && matchesStatus && matchesSource) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+}
+
+if (searchInput) {
+    searchInput.addEventListener('input', filterTable);
+    statusFilter.addEventListener('change', filterTable);
+    sourceFilter.addEventListener('change', filterTable);
+}
+
+// Sorting functionality
+let sortDirection = {};
+
+document.querySelectorAll('.sortable').forEach(header => {
+    header.style.cursor = 'pointer';
+    header.addEventListener('click', function() {
+        const sortKey = this.getAttribute('data-sort');
+        const tbody = document.querySelector('#invoicesTable tbody');
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+
+        // Toggle sort direction
+        sortDirection[sortKey] = sortDirection[sortKey] === 'asc' ? 'desc' : 'asc';
+
+        // Sort rows
+        rows.sort((a, b) => {
+            let aValue, bValue;
+
+            if (sortKey === 'invoice_number') {
+                aValue = a.cells[0].textContent.trim();
+                bValue = b.cells[0].textContent.trim();
+            } else if (sortKey === 'vendor_name') {
+                aValue = a.cells[1].textContent.trim();
+                bValue = b.cells[1].textContent.trim();
+            } else if (sortKey === 'invoice_date') {
+                aValue = a.cells[2].textContent.trim();
+                bValue = b.cells[2].textContent.trim();
+            } else if (sortKey === 'total_amount') {
+                aValue = parseFloat(a.cells[3].textContent.replace(/[$,]/g, ''));
+                bValue = parseFloat(b.cells[3].textContent.replace(/[$,]/g, ''));
+            }
+
+            if (sortDirection[sortKey] === 'asc') {
+                return aValue > bValue ? 1 : -1;
+            } else {
+                return aValue < bValue ? 1 : -1;
+            }
+        });
+
+        // Update icon
+        document.querySelectorAll('.sortable i').forEach(i => {
+            i.className = 'bi bi-chevron-expand';
+        });
+        const icon = this.querySelector('i');
+        icon.className = sortDirection[sortKey] === 'asc' ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+
+        // Re-append rows
+        rows.forEach(row => tbody.appendChild(row));
+    });
+});
+
+// Send invoice from list
+async function sendInvoiceFromList(invoiceId, invoiceNumber) {
+    const confirmed = await showConfirm(
+        `Send invoice ${invoiceNumber} to the appropriate system(s)?`,
+        'Send Invoice'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hub/api/invoices/${invoiceId}/send`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            await showAlert('Invoice sent successfully!', 'Success');
+            location.reload();
+        } else {
+            const errorMsg = result.errors ? result.errors.join('\n') : 'Unknown error';
+            await showAlert(`Error sending invoice:\n${errorMsg}`, 'Error');
+        }
+    } catch (error) {
+        await showAlert(`Error sending invoice: ${error.message}`, 'Error');
+    }
+}
+
+// Delete invoice
+async function deleteInvoice(invoiceId, invoiceNumber) {
+    const confirmed = await showConfirm(
+        `Are you sure you want to delete invoice ${invoiceNumber}? This will permanently delete the invoice and all associated line items. This action cannot be undone.`,
+        'Delete Invoice'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hub/api/invoices/${invoiceId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            await showAlert('Invoice deleted successfully!', 'Success');
+            location.reload();
+        } else {
+            await showAlert(`Error deleting invoice: ${result.detail || 'Unknown error'}`, 'Error');
+        }
+    } catch (error) {
+        await showAlert(`Error deleting invoice: ${error.message}`, 'Error');
+    }
+}
+
+// Custom alert function using Bootstrap modal (similar to showConfirm)
+function showAlert(message, title = 'Notice') {
+    return new Promise((resolve) => {
+        document.getElementById('confirmTitle').textContent = title;
+        document.getElementById('confirmMessage').textContent = message;
+
+        const modalElement = document.getElementById('confirmModal');
+        const modal = new bootstrap.Modal(modalElement);
+
+        const okBtn = document.getElementById('confirmOkBtn');
+        const cancelBtn = document.getElementById('confirmCancelBtn');
+
+        // Hide cancel button for alerts
+        cancelBtn.style.display = 'none';
+        okBtn.textContent = 'OK';
+        okBtn.disabled = false;
+
+        let resolved = false;
+
+        okBtn.onclick = function(e) {
+            if (!resolved) {
+                resolved = true;
+                modal.hide();
+                setTimeout(() => {
+                    cancelBtn.style.display = '';
+                    okBtn.textContent = 'OK';
+                    resolve(true);
+                }, 100);
+            }
+        };
+
+        modalElement.addEventListener('hidden.bs.modal', function handler() {
+            modalElement.removeEventListener('hidden.bs.modal', handler);
+            if (!resolved) {
+                resolved = true;
+                setTimeout(() => {
+                    cancelBtn.style.display = '';
+                    okBtn.textContent = 'OK';
+                    resolve(true);
+                }, 100);
+            }
+        }, { once: true });
+
+        modal.show();
+    });
+}
 </script>
 {% endblock %}
