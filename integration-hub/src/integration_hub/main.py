@@ -6,7 +6,7 @@ Provides mapping UI and auto-send functionality while keeping systems independen
 """
 
 from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
@@ -359,6 +359,54 @@ async def update_invoice(
         db.rollback()
         logger.error(f"Error updating invoice {invoice_id}: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error updating invoice: {str(e)}")
+
+
+@app.get("/api/invoices/{invoice_id}/pdf")
+async def get_invoice_pdf(
+    invoice_id: int,
+    download: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Serve the PDF file for an invoice
+    If download=1 parameter is provided, force download instead of preview
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Get invoice
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    if not invoice.pdf_path:
+        raise HTTPException(status_code=404, detail="Invoice has no PDF file")
+
+    # Check if file exists
+    pdf_path = Path(invoice.pdf_path)
+    if not pdf_path.exists():
+        logger.error(f"PDF file not found: {invoice.pdf_path}")
+        raise HTTPException(status_code=404, detail="PDF file not found on disk")
+
+    # Determine filename for download
+    filename = f"invoice_{invoice.invoice_number}_{invoice.vendor_name}.pdf".replace(" ", "_").replace("/", "-")
+
+    # Serve file
+    if download:
+        # Force download
+        return FileResponse(
+            path=str(pdf_path),
+            media_type="application/pdf",
+            filename=filename,
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    else:
+        # Preview in browser
+        return FileResponse(
+            path=str(pdf_path),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"inline; filename={filename}"}
+        )
 
 
 # ============================================================================

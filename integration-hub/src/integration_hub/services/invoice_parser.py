@@ -285,6 +285,14 @@ class InvoiceParser:
         if not invoice.pdf_path:
             return {"success": False, "message": "Invoice has no PDF file"}
 
+        # Check if invoice already has items (prevent duplicate parsing)
+        existing_items_count = db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).count()
+        if existing_items_count > 0:
+            logger.warning(f"Invoice {invoice_id} already has {existing_items_count} items. Deleting existing items before re-parsing.")
+            # Delete existing items to allow re-parsing
+            db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).delete()
+            db.commit()
+
         # Update status to mapping (parsing)
         invoice.status = 'mapping'
         db.commit()
