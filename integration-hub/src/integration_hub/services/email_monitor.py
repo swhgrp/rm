@@ -51,13 +51,17 @@ class EmailMonitorService:
 
     def connect(self) -> imaplib.IMAP4_SSL:
         """Connect to IMAP server"""
-        email_address = self._get_setting('address')
-        password = self._get_setting('password')
-        imap_server = self._get_setting('imap_server', 'imap.gmail.com')
+        email_address = self._get_setting('email_address')
+        imap_username = self._get_setting('imap_username')
+        password = self._get_setting('email_password')
+        imap_server = self._get_setting('imap_host', 'imap.gmail.com')
         imap_port = int(self._get_setting('imap_port', '993'))
         use_ssl = self._get_setting('use_ssl', 'true').lower() == 'true'
 
-        if not email_address or not password:
+        # Use imap_username if provided, otherwise fall back to email_address
+        username = imap_username if imap_username else email_address
+
+        if not username or not password:
             raise ValueError("Email address and password must be configured in settings")
 
         logger.info(f"Connecting to {imap_server}:{imap_port} (SSL: {use_ssl})")
@@ -68,8 +72,8 @@ class EmailMonitorService:
         else:
             mail = imaplib.IMAP4(imap_server, imap_port)
 
-        mail.login(email_address, password)
-        logger.info(f"Successfully logged in as {email_address}")
+        mail.login(username, password)
+        logger.info(f"Successfully logged in as {username}")
 
         return mail
 

@@ -33,9 +33,10 @@ class BulkSettingsUpdate(BaseModel):
 
 class EmailTestRequest(BaseModel):
     """Model for testing email connection"""
-    email: str
-    password: str
-    imap_server: str
+    email_address: str
+    imap_username: str
+    email_password: str
+    imap_host: str
     imap_port: int
     use_ssl: bool
 
@@ -126,18 +127,18 @@ def test_email_connection(
         if test_request.use_ssl:
             context = ssl.create_default_context()
             mail = imaplib.IMAP4_SSL(
-                test_request.imap_server,
+                test_request.imap_host,
                 test_request.imap_port,
                 ssl_context=context
             )
         else:
             mail = imaplib.IMAP4(
-                test_request.imap_server,
+                test_request.imap_host,
                 test_request.imap_port
             )
 
-        # Attempt login
-        mail.login(test_request.email, test_request.password)
+        # Attempt login (use username, not email address)
+        mail.login(test_request.imap_username, test_request.email_password)
 
         # Try to select INBOX to verify full access
         status, messages = mail.select("INBOX")
@@ -155,7 +156,7 @@ def test_email_connection(
             "success": True,
             "message": f"Connection successful! Found {message_count} messages in INBOX.",
             "details": {
-                "server": test_request.imap_server,
+                "server": test_request.imap_host,
                 "port": test_request.imap_port,
                 "ssl": test_request.use_ssl,
                 "inbox_count": message_count

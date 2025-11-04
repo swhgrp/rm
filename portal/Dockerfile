@@ -21,6 +21,8 @@ COPY src/ /app/
 COPY templates/ /app/templates/
 COPY css/ /app/static/css/
 COPY images/ /app/static/images/
+COPY js/ /app/static/js/
+COPY html/ /app/static/html/
 
 # Expose port
 EXPOSE 8000

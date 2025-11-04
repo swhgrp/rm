@@ -41,6 +41,17 @@
                     <small style="color: #8b949e; font-size: 12px;">Email address that receives vendor invoices</small>
                 </div>
 
+                <!-- IMAP Username -->
+                <div class="form-group">
+                    <label for="imap_username">
+                        IMAP Username <span style="color: #f85149;">*</span>
+                    </label>
+                    <input type="text" id="imap_username" name="imap_username" required
+                           placeholder="ap"
+                           style="width: 100%; padding: 10px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
+                    <small style="color: #8b949e; font-size: 12px;">Username for IMAP login (may differ from email address)</small>
+                </div>
+
                 <!-- Email Password -->
                 <div class="form-group">
                     <label for="email_password">
@@ -282,9 +293,10 @@ document.getElementById('testConnectionBtn').addEventListener('click', async fun
             credentials: 'include',
             body: JSON.stringify({
                 email_address: document.getElementById('email_address').value,
+                imap_username: document.getElementById('imap_username').value,
                 email_password: document.getElementById('email_password').value,
                 imap_host: document.getElementById('imap_host').value,
-                imap_port: document.getElementById('imap_port').value,
+                imap_port: parseInt(document.getElementById('imap_port').value),
                 use_ssl: document.getElementById('use_ssl').checked
             })
         });
@@ -294,11 +306,11 @@ document.getElementById('testConnectionBtn').addEventListener('click', async fun
         if (result.success) {
             statusDiv.innerHTML = '<i class="bi bi-check-circle-fill"></i> <span>Connection successful!</span>';
             statusDiv.style.color = '#3fb950';
-            showAlert('Email connection test successful!', 'success');
+            showAlert('Email connection test successful! ' + (result.message || ''), 'success');
         } else {
             statusDiv.innerHTML = '<i class="bi bi-x-circle-fill"></i> <span>Connection failed</span>';
             statusDiv.style.color = '#f85149';
-            showAlert('Connection failed: ' + result.error, 'error');
+            showAlert('Connection failed: ' + (result.message || result.error || 'Unknown error'), 'error');
         }
     } catch (error) {
         statusDiv.innerHTML = '<i class="bi bi-x-circle-fill"></i> <span>Connection failed</span>';
@@ -316,6 +328,7 @@ document.getElementById('emailSettingsForm').addEventListener('submit', async fu
 
     const settings = [
         { category: 'email', key: 'email_address', value: document.getElementById('email_address').value },
+        { category: 'email', key: 'imap_username', value: document.getElementById('imap_username').value },
         { category: 'email', key: 'email_password', value: document.getElementById('email_password').value, is_encrypted: true },
         { category: 'email', key: 'imap_host', value: document.getElementById('imap_host').value },
         { category: 'email', key: 'imap_port', value: document.getElementById('imap_port').value },

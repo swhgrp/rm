@@ -192,10 +192,28 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
     # Get invoice items
     items = db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).all()
 
+    # Get locations from inventory database for location dropdown
+    from sqlalchemy import create_engine, text
+    inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
+                                 'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+    locations = []
+    try:
+        engine = create_engine(inventory_db_url)
+        with engine.connect() as conn:
+            results = conn.execute(
+                text("SELECT id, name FROM locations WHERE is_active = true ORDER BY name")
+            ).fetchall()
+            locations = [{"id": row[0], "name": row[1]} for row in results]
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error fetching locations: {str(e)}")
+
     return templates.TemplateResponse("invoice_detail.html", {
         "request": request,
         "invoice": invoice,
-        "items": items
+        "items": items,
+        "locations": locations
     })
 
 
@@ -263,6 +281,84 @@ async def parse_invoice(invoice_id: int, db: Session = Depends(get_db)):
             "success": False,
             "message": f"Error parsing invoice: {str(e)}"
         }
+
+
+@app.patch("/api/invoices/{invoice_id}")
+async def update_invoice(
+    invoice_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Update invoice header information (vendor, invoice number, dates, amounts, location)
+    """
+    import logging
+    from datetime import datetime
+    logger = logging.getLogger(__name__)
+
+    # Get invoice
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Parse request body
+    data = await request.json()
+
+    try:
+        # Update fields if provided
+        if "vendor_name" in data:
+            invoice.vendor_name = data["vendor_name"]
+
+        if "invoice_number" in data:
+            invoice.invoice_number = data["invoice_number"]
+
+        if "invoice_date" in data and data["invoice_date"]:
+            invoice.invoice_date = datetime.strptime(data["invoice_date"], '%Y-%m-%d').date()
+
+        if "due_date" in data:
+            if data["due_date"]:
+                invoice.due_date = datetime.strptime(data["due_date"], '%Y-%m-%d').date()
+            else:
+                invoice.due_date = None
+
+        if "total_amount" in data and data["total_amount"] is not None:
+            invoice.total_amount = float(data["total_amount"])
+
+        if "tax_amount" in data and data["tax_amount"] is not None:
+            invoice.tax_amount = float(data["tax_amount"])
+
+        if "location_id" in data:
+            if data["location_id"]:
+                invoice.location_id = int(data["location_id"])
+            else:
+                invoice.location_id = None
+
+        if "location_name" in data:
+            invoice.location_name = data["location_name"]
+
+        db.commit()
+        db.refresh(invoice)
+
+        return {
+            "success": True,
+            "message": "Invoice updated successfully",
+            "invoice": {
+                "id": invoice.id,
+                "vendor_name": invoice.vendor_name,
+                "invoice_number": invoice.invoice_number,
+                "invoice_date": str(invoice.invoice_date) if invoice.invoice_date else None,
+                "due_date": str(invoice.due_date) if invoice.due_date else None,
+                "total_amount": float(invoice.total_amount),
+                "tax_amount": float(invoice.tax_amount) if invoice.tax_amount else None,
+                "location_id": invoice.location_id,
+                "location_name": invoice.location_name
+            }
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating invoice {invoice_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error updating invoice: {str(e)}")
 
 
 # ============================================================================

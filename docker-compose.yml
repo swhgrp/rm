@@ -248,7 +248,6 @@ services:
     environment:
       - DATABASE_URL=postgresql://events_user:events_pass@events-db:5432/events_db
       - REDIS_URL=redis://events-redis:6379/0
-      - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
     depends_on:
       events-db:
         condition: service_healthy

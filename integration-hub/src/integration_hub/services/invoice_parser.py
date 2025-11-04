@@ -70,6 +70,7 @@ class InvoiceParser:
                         {
                             "vendor_name": "string (the supplier/vendor company name)",
                             "vendor_account_number": "string (customer/account number if present)",
+                            "location_name": "string (delivery location/restaurant name if present)",
                             "invoice_number": "string",
                             "invoice_date": "YYYY-MM-DD",
                             "due_date": "YYYY-MM-DD (or null if not present)",
@@ -91,7 +92,11 @@ class InvoiceParser:
                         }
 
                         CRITICAL INSTRUCTIONS:
-                        - vendor_name: Extract the SUPPLIER/VENDOR company name (who issued the invoice)
+                        - vendor_name: Extract the SUPPLIER/VENDOR company name (who issued/sent the invoice)
+                          Example: "Gold Coast Linen", "SYSCO", "US Foods", "Performance Food Group"
+                        - location_name: Extract the DELIVERY LOCATION or restaurant name (who received the goods)
+                          Look for "Ship To:", "Deliver To:", "Location:", or customer name on the invoice
+                          Example: "SW Grill", "Seaside Grill", "The Nest Eatery", "Park Bistro"
                         - vendor_account_number: The customer account number on the invoice
                         - For pack_size, extract packaging information like:
                           * "Case - 6" if the item comes in a case of 6
@@ -99,7 +104,8 @@ class InvoiceParser:
                           * "Each" if sold individually
                           * "Dozen" if sold by the dozen
                         - If any field is not found, use null
-                        - Be precise with numbers and dates"""
+                        - Be precise with numbers and dates
+                        - IMPORTANT: Distinguish between vendor (supplier) and location (customer/restaurant)"""
                     },
                     {
                         "role": "user",
@@ -201,6 +207,70 @@ class InvoiceParser:
         logger.warning(f"No vendor match found for: '{vendor_name}'")
         return None
 
+    def match_location(self, location_name: str) -> Optional[tuple]:
+        """
+        Match parsed location name to existing location in inventory system
+
+        Queries the inventory database to find matching locations.
+        Returns tuple of (location_id, location_name) if found.
+
+        Uses multiple strategies:
+        1. Exact match (case insensitive)
+        2. Partial match - location name contains parsed name
+        3. Partial match - parsed name contains location name
+        """
+        if not location_name:
+            return None
+
+        location_name = location_name.strip()
+
+        # Get inventory database connection string from environment
+        import os
+        from sqlalchemy import create_engine, text
+
+        inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
+                                     'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+
+        try:
+            engine = create_engine(inventory_db_url)
+            with engine.connect() as conn:
+                # 1. Exact match (case insensitive)
+                result = conn.execute(
+                    text("SELECT id, name FROM locations WHERE LOWER(name) = LOWER(:name) AND is_active = true LIMIT 1"),
+                    {"name": location_name}
+                ).fetchone()
+
+                if result:
+                    logger.info(f"Exact location match: '{location_name}' -> '{result[1]}' (ID: {result[0]})")
+                    return (result[0], result[1])
+
+                # 2. Partial match - location name contains the parsed name
+                result = conn.execute(
+                    text("SELECT id, name FROM locations WHERE LOWER(name) LIKE LOWER(:pattern) AND is_active = true LIMIT 1"),
+                    {"pattern": f"%{location_name}%"}
+                ).fetchone()
+
+                if result:
+                    logger.info(f"Partial location match (contains): '{location_name}' -> '{result[1]}' (ID: {result[0]})")
+                    return (result[0], result[1])
+
+                # 3. Partial match - parsed name contains location name
+                all_locations = conn.execute(
+                    text("SELECT id, name FROM locations WHERE is_active = true")
+                ).fetchall()
+
+                for loc in all_locations:
+                    if loc[1].lower() in location_name.lower():
+                        logger.info(f"Partial location match (in): '{location_name}' -> '{loc[1]}' (ID: {loc[0]})")
+                        return (loc[0], loc[1])
+
+                logger.warning(f"No location match found for: '{location_name}'")
+                return None
+
+        except Exception as e:
+            logger.error(f"Error matching location '{location_name}': {str(e)}")
+            return None
+
     def parse_and_save(self, invoice_id: int, db: Session) -> Dict:
         """
         Parse an invoice and save the results to database
@@ -238,6 +308,15 @@ class InvoiceParser:
                 vendor = self.match_vendor(parsed_data['vendor_name'], db)
                 if vendor:
                     invoice.vendor_id = vendor.id
+
+            # Auto-match location from location_name
+            location_matched = False
+            if parsed_data.get('location_name'):
+                location_match = self.match_location(parsed_data['location_name'])
+                if location_match:
+                    invoice.location_id = location_match[0]
+                    invoice.location_name = location_match[1]
+                    location_matched = True
 
             # Update invoice with parsed data
             invoice.vendor_name = parsed_data.get('vendor_name') or 'Unknown Vendor'
@@ -306,7 +385,9 @@ class InvoiceParser:
                 "items_unmapped": mapping_stats.get('unmapped_count', 0),
                 "mapping_methods": mapping_stats.get('methods', {}),
                 "vendor_matched": vendor is not None,
-                "vendor_name": parsed_data.get('vendor_name')
+                "vendor_name": parsed_data.get('vendor_name'),
+                "location_matched": location_matched,
+                "location_name": parsed_data.get('location_name')
             }
 
         except Exception as e:
