@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** November 3, 2025 (Evening)
+**Last Updated:** November 4, 2025 (Evening)
 **System Status:** Production (85% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -9,7 +9,41 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Last Session - Nov 3, 2025)
+### Most Recent Work (Last Session - Nov 4, 2025)
+
+1. **Events System: Venue-to-Location Migration + Per-Person Pricing** ✅ (Nov 4, 2025) 🎯
+   - **MAJOR ARCHITECTURAL CHANGE** - Complete migration from venue-based to location-based system
+   - **Backend changes:**
+     - Added `location` string field to Event model
+     - Made `venue_id` nullable for backward compatibility
+     - Updated all API endpoints (events, calendar, public intake) to use location
+     - Database migration: `ALTER TABLE events ADD COLUMN location VARCHAR(255)`
+     - Database migration: `ALTER TABLE events ALTER COLUMN venue_id DROP NOT NULL`
+   - **Frontend changes:**
+     - Updated intake form with location dropdown (from settings)
+     - Updated calendar page location filter
+     - Updated events list page location filter
+     - Updated event detail page with location dropdown
+     - Changed event type from text input to dropdown for consistency
+   - **Per-person pricing implementation:**
+     - Intake form now collects "Estimated Budget Per Person" instead of total budget
+     - Added input-group styling with "$" prefix and "per person" suffix
+     - JavaScript calculates total: `budgetPerPerson × guestCount`
+     - Backend stores calculated total in `financials_json['estimated_total']`
+     - Maintains backend compatibility while improving UX
+   - **Template management system:**
+     - Added event templates to settings page
+     - Created template CRUD API and UI
+     - Templates store default menu and financials JSON
+     - Intake form uses templates to populate event defaults
+   - **Bug fixes:**
+     - Fixed timezone display issue (was converting to UTC, now uses local time)
+     - Fixed packages page API URLs (added `/events` prefix and trailing slashes)
+     - Replaced custom alerts with browser-native modals throughout all pages
+   - **Files modified:** 15 files (1,179 insertions, 232 deletions)
+   - **Git commit:** 6b984a4 - Committed ✅ (Pending push)
+
+### Previous Work (Nov 3, 2025)
 
 1. **Inventory System: Complete Documentation Update** ✅ (Nov 3, 2025 - Late Evening) 📚
    - **DOCUMENTATION COMPLETE** - README fully updated to reflect all features
@@ -143,23 +177,28 @@
    - PDF deduplication (SHA-256 hashing)
    - Committed: 63afd14, 9f0e5c7
 
-### Git Status - Pending Commit ⏳
+### Git Status - Pending Push ⏳
 
 ```bash
-# Recent changes need to be committed
+# Recent commits need to be pushed
 # Branch: main
-# Last commit: 5701416 - HR system enhancements (emails, delete, doc security) - PUSHED ✅
-# Modified files (Nov 3, 2025 - Late Evening):
-#   - inventory/README.md (complete documentation rewrite - 960 lines)
-#   - README.md (updated inventory section and status table)
-#   - claude.md (documented inventory README update)
-#   - hr/src/hr/templates/employees.html (delete button on list)
-#   - hr/src/hr/templates/employee_detail.html (delete button on detail)
-# Database changes:
-#   - users table: is_admin flag updated for erica, ian, justin, tina
+# Last commit: 6b984a4 - Events: venue-to-location migration + per-person pricing - COMMITTED ✅
+# Previous commits (Nov 3-4, 2025):
+#   - 5701416 - HR system enhancements (emails, delete, doc security) - PUSHED ✅
+#   - [others] - Inventory docs, HR fixes
+#
+# Commit 6b984a4 includes:
+#   - events/ (15 files): venue-to-location migration, per-person pricing, template mgmt
+#   - New file: events/src/events/schemas/template.py
+#
+# Uncommitted changes (other systems):
+#   - integration-hub/ (multiple files - invoice processing work)
+#   - inventory/ (multiple files)
+#   - Untracked: integration-hub/uploads/ (invoice PDFs)
+#   - Untracked: integration-hub/alembic/versions/ (migration file)
 ```
 
-**Current Status:** Code changes deployed and tested. Ready for commit and push.
+**Current Status:** Events changes committed. Ready for push. Other systems have uncommitted work.
 
 ---
 
@@ -175,7 +214,7 @@
 | **Inventory** | 8000 | inventory_db | FastAPI, SQLAlchemy, Redis, OpenAI | 100%+ ✅ |
 | **HR** | 8000 | hr_db | FastAPI, SQLAlchemy, Email | 100% ✅ |
 | **Accounting** | 8000 | accounting_db | FastAPI, SQLAlchemy | ~75% 🔄 |
-| **Events** | 8000 | events_db | FastAPI, SQLAlchemy | **75% ✅ PRODUCTION** |
+| **Events** | 8000 | events_db | FastAPI, SQLAlchemy | **80% ✅ PRODUCTION** |
 | **Integration Hub** | 8000 | hub_db | FastAPI, SQLAlchemy, OpenAI, APScheduler | 100%+ ✅ |
 | **Files** | 8000 | files_db | FastAPI, SQLAlchemy | 75-80% ⚠️ |
 
@@ -399,7 +438,7 @@ Each service has isolated PostgreSQL database:
 
 ---
 
-### 5. Events System ✅ 75% Complete - PRODUCTION READY! (SSO COMPLETE!)
+### 5. Events System ✅ 80% Complete - PRODUCTION READY!
 
 **Purpose:** Event planning and catering management
 
@@ -409,43 +448,52 @@ Each service has isolated PostgreSQL database:
 
 **Database:** 17 models
 
-**PRODUCTION READY (Nov 1, 2025 - Evening):**
+**PRODUCTION READY - Recent Updates:**
+
+**Nov 4, 2025 - Major Architecture Update:**
+- ✅ **Location-Based System** - Migrated from venue foreign keys to location strings
+- ✅ **Per-Person Pricing** - Intake form now uses per-person budget instead of total
+- ✅ **Event Templates** - Full CRUD system for event templates in settings
+- ✅ **Timezone Fixes** - Event detail page now displays correct local times
+- ✅ **UI Consistency** - Event type dropdown, native browser modals
+- ✅ **Package Management** - Fixed API URLs, packages page fully functional
+
+**Nov 1, 2025 - SSO Complete:**
 - ✅ **Portal SSO Integration COMPLETE** - Full JWT authentication
 - ✅ JIT (Just-In-Time) user provisioning from Portal tokens
 - ✅ Fixed page reload loop (URL routing with base href)
 - ✅ Proper exception handling (API JSON vs HTML redirects)
-- ✅ All fetch() calls use relative URLs
-- ✅ `/api/auth/me` uses Portal SSO (not events session)
 - ✅ Automatic redirect to Portal login for unauthenticated users
-- ✅ Navigation links corrected for proper routing
 
 **What Works:**
-- ✅ Event CRUD with status workflow
+- ✅ Event CRUD with status workflow (location-based)
 - ✅ Public intake form (NO auth required) - https://rm.swhgrp.com/events/public/intake
-- ✅ Calendar views (month/week/day)
+- ✅ Per-person pricing with automatic total calculation
+- ✅ Event templates system (create from templates)
+- ✅ Calendar views (month/week/day) with location filtering
 - ✅ Task management with Kanban board
+- ✅ Event packages management (fully functional)
 - ✅ BEO PDF generation (WeasyPrint)
 - ✅ Email notifications
-- ✅ Client/venue management
+- ✅ Client management
+- ✅ Settings: locations, event types, meal types, beverages, templates
 - ✅ Fully mobile-responsive
 
 **Partial/Missing:**
 - 🔄 Menu builder UI (JSON storage only - 40%)
 - 🔄 Financial integration with Accounting (partial - 50%)
-- 🔄 Event packages pricing system (CRUD complete, needs UI polish - 80%)
 - ❌ S3 storage (currently local)
-- ❌ Event templates CRUD UI
-- ❌ 4 router files (emails, templates, users, admin) - NOT IMPLEMENTED
+- ❌ 4 router files (emails, users, admin) - NOT IMPLEMENTED
 - ❌ Audit logging (model exists but never populated)
 - ❌ Celery/Redis - Dependencies present but NOT USED
 
-**Files Modified (Nov 1):**
-- `events/src/events/main.py` - Exception handler and redirects
-- `events/src/events/api/auth.py` - Portal SSO integration
-- `events/src/events/templates/base.html` - URL fixes
-- `events/src/events/templates/admin/*.html` - URL fixes
+**Recent Files Modified (Nov 4):**
+- 15 files total (1,179 insertions, 232 deletions)
+- Backend: models, schemas, API endpoints (events, public, settings)
+- Frontend: intake form, calendar, events list, event detail, packages page
+- Templates: base.html with new modal functions
 
-**Git:** Committed 400de0d, pushed to GitHub ✅
+**Git:** Committed 6b984a4 (Nov 4) - Pending push ⏳
 
 ---
 
