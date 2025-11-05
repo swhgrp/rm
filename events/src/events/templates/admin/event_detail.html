@@ -848,7 +848,7 @@
         tasksContent.innerHTML = '<div class="loading">Loading tasks...</div>';
 
         try {
-            const response = await fetch(`/events/api/tasks?event_id=${currentEventId}`);
+            const response = await fetch(`/events/api/events/${currentEventId}/tasks`);
             const tasks = await response.json();
 
             if (tasks.length === 0) {
