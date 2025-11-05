@@ -10,11 +10,12 @@ class EventBase(BaseModel):
     """Base event schema"""
     title: str = Field(..., min_length=1, max_length=255)
     event_type: str = Field(..., max_length=100)
-    venue_id: UUID
+    venue_id: Optional[UUID] = None
     client_id: UUID
     start_at: datetime
     end_at: datetime
     guest_count: Optional[int] = None
+    location: Optional[str] = None
     setup_start_at: Optional[datetime] = None
     teardown_end_at: Optional[datetime] = None
     menu_json: Optional[Dict[str, Any]] = None
@@ -37,11 +38,13 @@ class EventUpdate(BaseModel):
     start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
     guest_count: Optional[int] = None
+    location: Optional[str] = None
     setup_start_at: Optional[datetime] = None
     teardown_end_at: Optional[datetime] = None
     menu_json: Optional[Dict[str, Any]] = None
     requirements_json: Optional[Dict[str, Any]] = None
     financials_json: Optional[Dict[str, Any]] = None
+    client_id: Optional[UUID] = None
 
 
 class VenueInfo(BaseModel):
@@ -91,5 +94,5 @@ class EventListItem(BaseModel):
     start_at: datetime
     end_at: datetime
     guest_count: Optional[int] = None
-    venue_id: UUID
+    location: Optional[str] = None
     created_at: datetime

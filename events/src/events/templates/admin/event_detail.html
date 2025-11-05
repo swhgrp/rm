@@ -416,8 +416,8 @@
             </div>
 
             <div class="info-card">
-                <div class="info-card-title"><i class="bi bi-geo-alt"></i> Venue</div>
-                <div class="info-card-value" id="overviewVenue">-</div>
+                <div class="info-card-title"><i class="bi bi-geo-alt"></i> Location</div>
+                <div class="info-card-value" id="overviewLocation">-</div>
             </div>
 
             <div class="info-card">
@@ -472,7 +472,9 @@
 
                 <div class="form-group">
                     <label for="event_type">Event Type</label>
-                    <input type="text" id="event_type" placeholder="e.g., Wedding, Corporate, Birthday">
+                    <select id="event_type">
+                        <option value="">Select event type...</option>
+                    </select>
                 </div>
 
                 <div class="form-group">
@@ -491,9 +493,9 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="venue_id">Venue</label>
-                    <select id="venue_id">
-                        <option value="">Select venue...</option>
+                    <label for="location">Location</label>
+                    <select id="location">
+                        <option value="">Select location...</option>
                     </select>
                 </div>
 
@@ -684,7 +686,7 @@
         });
 
         document.getElementById('overviewAttendees').textContent = `${event.guest_count || 0} guests`;
-        document.getElementById('overviewVenue').textContent = event.venue?.name || 'Not assigned';
+        document.getElementById('overviewLocation').textContent = event.location || 'Not assigned';
         document.getElementById('overviewClient').textContent = event.client?.name || 'Not assigned';
         document.getElementById('overviewType').textContent = event.event_type || 'Not specified';
 
@@ -706,7 +708,6 @@
         // Details tab
         document.getElementById('title').value = event.title;
         document.getElementById('status').value = event.status.toLowerCase();
-        document.getElementById('event_type').value = event.event_type || '';
         document.getElementById('guest_count').value = event.guest_count || 0;
         document.getElementById('start_at').value = formatDateTimeForInput(event.start_at);
         if (event.end_at) {
@@ -714,8 +715,9 @@
         }
         document.getElementById('description').value = event.description || '';
 
-        // Load venues and clients
-        loadVenues(event.venue_id);
+        // Load event types, locations and clients
+        loadEventTypes(event.event_type);
+        loadLocations(event.location);
         loadClients(event.client_id);
 
         // Menu tab
@@ -781,23 +783,43 @@
         }
     }
 
-    async function loadVenues(selectedId = null) {
+    async function loadEventTypes(selectedName = null) {
         try {
-            const response = await fetch('api/events/venues');
-            const venues = await response.json();
+            const response = await fetch('api/settings/event-types');
+            const eventTypes = await response.json();
 
-            const select = document.getElementById('venue_id');
-            venues.forEach(venue => {
+            const select = document.getElementById('event_type');
+            eventTypes.forEach(eventType => {
                 const option = document.createElement('option');
-                option.value = venue.id;
-                option.textContent = venue.name;
-                if (selectedId && venue.id === selectedId) {
+                option.value = eventType.name;
+                option.textContent = eventType.name;
+                if (selectedName && eventType.name === selectedName) {
                     option.selected = true;
                 }
                 select.appendChild(option);
             });
         } catch (error) {
-            console.error('Error loading venues:', error);
+            console.error('Error loading event types:', error);
+        }
+    }
+
+    async function loadLocations(selectedName = null) {
+        try {
+            const response = await fetch('api/settings/locations');
+            const locations = await response.json();
+
+            const select = document.getElementById('location');
+            locations.forEach(location => {
+                const option = document.createElement('option');
+                option.value = location.name;
+                option.textContent = location.name;
+                if (selectedName && location.name === selectedName) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading locations:', error);
         }
     }
 
@@ -895,7 +917,7 @@
                 start_at: new Date(document.getElementById('start_at').value).toISOString(),
                 end_at: document.getElementById('end_at').value ?
                     new Date(document.getElementById('end_at').value).toISOString() : null,
-                venue_id: document.getElementById('venue_id').value || null,
+                location: document.getElementById('location').value || null,
                 client_id: document.getElementById('client_id').value || null,
             };
 
@@ -943,7 +965,13 @@
 
     function formatDateTimeForInput(dateString) {
         const date = new Date(dateString);
-        return date.toISOString().slice(0, 16);
+        // Format for datetime-local input (YYYY-MM-DDTHH:MM) in local timezone
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
 
     function formatCurrency(value) {

@@ -223,6 +223,16 @@
         color: #c9d1d9;
     }
 
+    .action-btn-danger {
+        background-color: #21262d;
+        border-color: #da3633;
+    }
+
+    .action-btn-danger:hover {
+        background-color: #da3633;
+        color: white;
+    }
+
     .no-events {
         text-align: center;
         padding: 60px 20px;
@@ -311,9 +321,9 @@
         </div>
 
         <div class="filter-group">
-            <label class="form-label-custom">Venue</label>
-            <select id="filterVenue" class="form-control-custom" onchange="filterEvents()">
-                <option value="">All Venues</option>
+            <label class="form-label-custom">Location</label>
+            <select id="filterLocation" class="form-control-custom" onchange="filterEvents()">
+                <option value="">All Locations</option>
             </select>
         </div>
 
@@ -358,19 +368,22 @@
 {% block extra_js %}
 <script>
     let allEvents = [];
-    let allVenues = [];
+    let allLocations = [];
 
     async function loadEvents() {
         try {
-            const [eventsRes, venuesRes] = await Promise.all([
+            const [eventsRes, locationsRes] = await Promise.all([
                 fetch('api/events/'),
-                fetch('api/events/venues')
+                fetch('api/settings/locations')
             ]);
 
-            allEvents = await eventsRes.json();
-            allVenues = await venuesRes.json();
+            const events = await eventsRes.json();
+            allLocations = await locationsRes.json();
 
-            populateVenueFilter();
+            // Filter out CANCELED events (safety net - API also filters)
+            allEvents = events.filter(event => event.status !== 'CANCELED');
+
+            populateLocationFilter();
             updateStats(allEvents);
             filterEvents();
 
@@ -384,12 +397,12 @@
         }
     }
 
-    function populateVenueFilter() {
-        const select = document.getElementById('filterVenue');
-        allVenues.forEach(venue => {
+    function populateLocationFilter() {
+        const select = document.getElementById('filterLocation');
+        allLocations.forEach(location => {
             const option = document.createElement('option');
-            option.value = venue.id;
-            option.textContent = venue.name;
+            option.value = location.name;
+            option.textContent = location.name;
             select.appendChild(option);
         });
     }
@@ -421,14 +434,14 @@
 
     function filterEvents() {
         const statusFilter = document.getElementById('filterStatus').value;
-        const venueFilter = document.getElementById('filterVenue').value;
+        const locationFilter = document.getElementById('filterLocation').value;
         const startDateFilter = document.getElementById('filterStartDate').value;
         const endDateFilter = document.getElementById('filterEndDate').value;
         const searchQuery = document.getElementById('searchQuery').value.toLowerCase();
 
         let filtered = allEvents.filter(event => {
             if (statusFilter && event.status !== statusFilter) return false;
-            if (venueFilter && event.venue_id !== venueFilter) return false;
+            if (locationFilter && event.location !== locationFilter) return false;
             if (searchQuery && !event.title.toLowerCase().includes(searchQuery)) return false;
 
             if (startDateFilter) {
@@ -485,8 +498,7 @@
             minute: '2-digit'
         });
 
-        const venue = allVenues.find(v => v.id === event.venue_id);
-        const venueName = venue ? venue.name : 'No venue assigned';
+        const locationName = event.location || 'No location assigned';
 
         card.innerHTML = `
             <div class="event-header">
@@ -508,7 +520,7 @@
                 </div>
                 <div class="event-info-row">
                     <i class="bi bi-geo-alt"></i>
-                    <span>${venueName}</span>
+                    <span>${locationName}</span>
                 </div>
             </div>
 
@@ -518,6 +530,9 @@
                 </a>
                 <button class="action-btn" onclick="downloadBEO('${event.id}')">
                     <i class="bi bi-download"></i> Download BEO
+                </button>
+                <button class="action-btn action-btn-danger" onclick="deleteEvent('${event.id}', '${event.title}')">
+                    <i class="bi bi-trash"></i> Delete
                 </button>
             </div>
         `;
@@ -537,7 +552,38 @@
             window.open(`/events/api/documents/events/${eventId}/beo-pdf`, '_blank');
         } catch (error) {
             console.error('Error downloading BEO:', error);
-            alert('Failed to download BEO document');
+            await showAlert('Failed to download BEO document', 'Error');
+        }
+    }
+
+    async function deleteEvent(eventId, eventTitle) {
+        const confirmed = await showConfirm(
+            `Are you sure you want to delete "${eventTitle}"?\n\nThis will mark the event as CANCELED and cannot be undone.`,
+            'Delete Event'
+        );
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/events/api/events/${eventId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                await showAlert('Event deleted successfully', 'Success');
+                // Reload the events list
+                loadEvents();
+            } else {
+                const error = await response.json();
+                await showAlert(`Failed to delete event: ${error.detail || 'Unknown error'}`, 'Error');
+            }
+        } catch (error) {
+            console.error('Error deleting event:', error);
+            await showAlert('Failed to delete event', 'Error');
         }
     }
 

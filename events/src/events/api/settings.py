@@ -6,12 +6,15 @@ from typing import List
 from uuid import UUID
 
 from events.core.database import get_db
-from events.models import Location, EventType, BeverageService, MealType
+from events.models import Location, EventType, BeverageService, MealType, EventTemplate
 from events.schemas.settings import (
     LocationCreate, LocationUpdate, LocationResponse,
     EventTypeCreate, EventTypeUpdate, EventTypeResponse,
     BeverageServiceCreate, BeverageServiceUpdate, BeverageServiceResponse,
     MealTypeCreate, MealTypeUpdate, MealTypeResponse
+)
+from events.schemas.template import (
+    EventTemplateCreate, EventTemplateUpdate, EventTemplateResponse
 )
 
 router = APIRouter()
@@ -343,7 +346,104 @@ async def delete_meal_type(
     meal_type = db.query(MealType).filter(MealType.id == meal_type_id).first()
     if not meal_type:
         raise HTTPException(status_code=404, detail="Meal type not found")
-    
+
     db.delete(meal_type)
+    db.commit()
+    return None
+
+
+# ============= EVENT TEMPLATES =============
+
+@router.get("/templates", response_model=List[EventTemplateResponse])
+async def list_event_templates(
+    db: Session = Depends(get_db)
+):
+    """List all event templates"""
+    templates = db.query(EventTemplate).order_by(EventTemplate.name.asc()).all()
+    return templates
+
+
+@router.get("/templates/{template_id}", response_model=EventTemplateResponse)
+async def get_event_template(
+    template_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """Get event template by ID"""
+    template = db.query(EventTemplate).filter(EventTemplate.id == template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Event template not found")
+    return template
+
+
+@router.post("/templates", response_model=EventTemplateResponse, status_code=status.HTTP_201_CREATED)
+async def create_event_template(
+    template_data: EventTemplateCreate,
+    db: Session = Depends(get_db)
+):
+    """Create new event template"""
+    # Check if template with same name already exists
+    existing = db.query(EventTemplate).filter(EventTemplate.name == template_data.name).first()
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Template with name '{template_data.name}' already exists"
+        )
+
+    template = EventTemplate(**template_data.dict())
+    try:
+        db.add(template)
+        db.commit()
+        db.refresh(template)
+        return template
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Failed to create template")
+
+
+@router.patch("/templates/{template_id}", response_model=EventTemplateResponse)
+async def update_event_template(
+    template_id: UUID,
+    template_data: EventTemplateUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update event template"""
+    template = db.query(EventTemplate).filter(EventTemplate.id == template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Event template not found")
+
+    update_dict = template_data.dict(exclude_unset=True)
+
+    # Check if name is being changed and if it conflicts
+    if 'name' in update_dict and update_dict['name'] != template.name:
+        existing = db.query(EventTemplate).filter(EventTemplate.name == update_dict['name']).first()
+        if existing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Template with name '{update_dict['name']}' already exists"
+            )
+
+    for field, value in update_dict.items():
+        setattr(template, field, value)
+
+    try:
+        db.commit()
+        db.refresh(template)
+        return template
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Failed to update template")
+
+
+@router.delete("/templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_event_template(
+    template_id: UUID,
+    db: Session = Depends(get_db)
+):
+    """Delete event template"""
+    template = db.query(EventTemplate).filter(EventTemplate.id == template_id).first()
+    if not template:
+        raise HTTPException(status_code=404, detail="Event template not found")
+
+    db.delete(template)
     db.commit()
     return None

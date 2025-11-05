@@ -221,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadEventTypes() {
     try {
-        const response = await fetch('/api/settings/event-types');
+        const response = await fetch('/events/api/settings/event-types');
         if (!response.ok) throw new Error('Failed to load event types');
 
         eventTypes = await response.json();
@@ -242,7 +242,7 @@ async function loadEventTypes() {
 async function loadPackages() {
     try {
         const filter = document.getElementById('eventTypeFilter').value;
-        let url = '/api/packages';
+        let url = '/events/api/packages/';
         if (filter) url += `?event_type=${encodeURIComponent(filter)}`;
 
         const response = await fetch(url);
@@ -303,7 +303,7 @@ function showAddModal() {
 
 async function editPackage(id) {
     try {
-        const response = await fetch(`/api/packages/${id}`);
+        const response = await fetch(`/events/api/packages/${id}`);
         if (!response.ok) throw new Error('Failed to load package');
 
         const pkg = await response.json();
@@ -327,7 +327,7 @@ async function editPackage(id) {
         bootstrapModal.show();
     } catch (error) {
         console.error('Error loading package:', error);
-        alert('Error loading package details');
+        await showAlert('Error loading package details', 'Error');
     }
 }
 
@@ -356,7 +356,7 @@ async function savePackage() {
     };
 
     try {
-        const url = currentPackageId ? `/api/packages/${currentPackageId}` : '/api/packages';
+        const url = currentPackageId ? `/events/api/packages/${currentPackageId}` : '/events/api/packages/';
         const method = currentPackageId ? 'PUT' : 'POST';
 
         const response = await fetch(url, {
@@ -376,17 +376,21 @@ async function savePackage() {
         loadPackages();
     } catch (error) {
         console.error('Error saving package:', error);
-        alert('Error saving package: ' + error.message);
+        await showAlert('Error saving package: ' + error.message, 'Error');
     }
 }
 
 async function deletePackage(id, name) {
-    if (!confirm(`Are you sure you want to delete the package "${name}"?\n\nThis action cannot be undone.`)) {
+    const confirmed = await showConfirm(
+        `Are you sure you want to delete the package "${name}"?\n\nThis action cannot be undone.`,
+        'Delete Package'
+    );
+    if (!confirmed) {
         return;
     }
 
     try {
-        const response = await fetch(`/api/packages/${id}`, {
+        const response = await fetch(`/events/api/packages/${id}`, {
             method: 'DELETE'
         });
 
@@ -398,7 +402,7 @@ async function deletePackage(id, name) {
         loadPackages();
     } catch (error) {
         console.error('Error deleting package:', error);
-        alert('Error deleting package: ' + error.message);
+        await showAlert('Error deleting package: ' + error.message, 'Error');
     }
 }
 </script>

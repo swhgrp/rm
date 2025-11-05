@@ -28,6 +28,11 @@
                 <i class="bi bi-egg-fried"></i> Meal Types
             </button>
         </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="templates-tab" data-bs-toggle="tab" data-bs-target="#templates" type="button" role="tab">
+                <i class="bi bi-file-earmark-text"></i> Event Templates
+            </button>
+        </li>
     </ul>
 
     <!-- Tab Content -->
@@ -75,6 +80,17 @@
             </div>
             <div id="mealTypesTable" class="settings-table"></div>
         </div>
+
+        <!-- Event Templates Tab -->
+        <div class="tab-pane fade" id="templates" role="tabpanel">
+            <div class="settings-header">
+                <h3>Manage Event Templates</h3>
+                <button class="btn-primary-custom" onclick="showTemplateModal()">
+                    <i class="bi bi-plus-circle"></i> Add Template
+                </button>
+            </div>
+            <div id="templatesTable" class="settings-table"></div>
+        </div>
     </div>
 </div>
 
@@ -115,6 +131,81 @@
             <div class="modal-footer">
                 <button type="button" class="btn-secondary-custom" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn-primary-custom" onclick="saveItem()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Template Modal (User-Friendly Form) -->
+<div class="modal fade" id="templateModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="templateModalTitle">Add Event Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <form id="templateForm">
+                    <input type="hidden" id="templateId">
+
+                    <!-- Basic Info -->
+                    <h6 class="mb-3"><i class="bi bi-info-circle"></i> Basic Information</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="templateName" class="form-label">Template Name (Key) *</label>
+                            <input type="text" class="form-control-custom" id="templateName" required
+                                   placeholder="e.g., wedding_standard">
+                            <small class="text-muted">Lowercase with underscores (e.g., birthday_party)</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="templateEventType" class="form-label">Event Type *</label>
+                            <input type="text" class="form-control-custom" id="templateEventType" required
+                                   placeholder="e.g., Wedding, Birthday Party">
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Financials -->
+                    <h6 class="mb-3"><i class="bi bi-currency-dollar"></i> Default Pricing</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <label for="basePrice" class="form-label">Base Price ($)</label>
+                            <input type="number" class="form-control-custom" id="basePrice"
+                                   placeholder="500" min="0" step="50">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="perGuest" class="form-label">Per Guest ($)</label>
+                            <input type="number" class="form-control-custom" id="perGuest"
+                                   placeholder="35" min="0" step="5">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="depositPercent" class="form-label">Deposit (%)</label>
+                            <input type="number" class="form-control-custom" id="depositPercent"
+                                   placeholder="25" min="0" max="100" step="5">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="taxRate" class="form-label">Tax Rate (%)</label>
+                            <input type="number" class="form-control-custom" id="taxRate"
+                                   placeholder="8" min="0" max="100" step="0.5">
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
+                    <!-- Tasks -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="mb-0"><i class="bi bi-list-task"></i> Default Tasks</h6>
+                        <button type="button" class="btn-primary-custom btn-sm" onclick="addTaskRow()">
+                            <i class="bi bi-plus-circle"></i> Add Task
+                        </button>
+                    </div>
+                    <div id="tasksContainer"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary-custom" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-primary-custom" onclick="saveTemplate()">Save Template</button>
             </div>
         </div>
     </div>
@@ -321,6 +412,77 @@
             overflow-x: auto;
         }
     }
+
+    /* Task Builder Styles */
+    .task-card {
+        background-color: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+
+    .task-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .task-number {
+        color: #58a6ff;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .checklist-item {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+        align-items: center;
+    }
+
+    .checklist-item input {
+        flex: 1;
+    }
+
+    .btn-remove-task {
+        background-color: #f85149;
+        color: white;
+        border: none;
+        padding: 4px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+    }
+
+    .btn-remove-task:hover {
+        background-color: #da3633;
+    }
+
+    .btn-remove-checklist {
+        background-color: transparent;
+        color: #f85149;
+        border: none;
+        padding: 4px;
+        cursor: pointer;
+    }
+
+    .btn-add-checklist {
+        background-color: transparent;
+        color: #58a6ff;
+        border: 1px solid #30363d;
+        padding: 4px 8px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        margin-top: 5px;
+    }
+
+    .btn-add-checklist:hover {
+        border-color: #58a6ff;
+        background-color: #0d1117;
+    }
 </style>
 {% endblock %}
 
@@ -474,9 +636,9 @@
         const description = document.getElementById('itemDescription').value.trim();
         const sortOrder = parseInt(document.getElementById('itemSortOrder').value);
         const isActive = document.getElementById('itemActive').checked;
-        
+
         if (!name) {
-            alert('Name is required');
+            await showAlert('Name is required', 'Validation Error');
             return;
         }
         
@@ -518,30 +680,34 @@
             showSuccess(`${getTypeLabel(type)} saved successfully`);
         } catch (error) {
             console.error('Error saving:', error);
-            alert(error.message);
+            await showAlert(error.message, 'Error');
         }
     }
 
     async function deleteItem(type, id, name) {
-        if (!confirm(`Are you sure you want to delete "${name}"?`)) {
+        const confirmed = await showConfirm(
+            `Are you sure you want to delete "${name}"?`,
+            'Delete Item'
+        );
+        if (!confirmed) {
             return;
         }
-        
+
         try {
             const response = await fetch(`${apiEndpoints[type]}/${id}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });
-            
+
             if (!response.ok) {
                 throw new Error('Failed to delete');
             }
-            
+
             await loadSettings(type);
             showSuccess(`${getTypeLabel(type)} deleted successfully`);
         } catch (error) {
             console.error('Error deleting:', error);
-            alert('Failed to delete item');
+            await showAlert('Failed to delete item', 'Error');
         }
     }
 
@@ -564,7 +730,333 @@
         console.error('Error:', message);
     }
 
+    // ============= TEMPLATE MANAGEMENT =============
+
+    let allTemplates = [];
+    let taskCounter = 0;
+
+    async function loadTemplates() {
+        try {
+            const response = await fetch('/events/api/settings/templates', {
+                credentials: 'include'
+            });
+            allTemplates = await response.json();
+            renderTemplatesTable(allTemplates);
+        } catch (error) {
+            console.error('Error loading templates:', error);
+            showError('Failed to load templates');
+        }
+    }
+
+    function renderTemplatesTable(templates) {
+        const container = document.getElementById('templatesTable');
+        if (!templates || templates.length === 0) {
+            container.innerHTML = '<p class="text-muted">No templates found. Click "Add Template" to create one.</p>';
+            return;
+        }
+
+        let html = `
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Event Type</th>
+                        <th>Tasks</th>
+                        <th>Financials</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        templates.forEach(template => {
+            const taskCount = template.default_tasks_json?.tasks?.length || 0;
+            const hasFinancials = template.default_financials_json ? 'Yes' : 'No';
+
+            html += `
+                <tr>
+                    <td><strong>${template.name}</strong></td>
+                    <td>${template.event_type}</td>
+                    <td>${taskCount} task(s)</td>
+                    <td>${hasFinancials}</td>
+                    <td>
+                        <button class="btn-sm btn-icon" onclick="editTemplate('${template.id}')" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn-sm btn-icon text-danger" onclick="deleteTemplate('${template.id}', '${template.name}')" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+    }
+
+    function showTemplateModal(templateId = null) {
+        const modal = new bootstrap.Modal(document.getElementById('templateModal'));
+        const form = document.getElementById('templateForm');
+        form.reset();
+        document.getElementById('templateId').value = '';
+        document.getElementById('tasksContainer').innerHTML = '';
+        taskCounter = 0;
+
+        if (templateId) {
+            // Edit mode
+            const template = allTemplates.find(t => t.id === templateId);
+            if (template) {
+                document.getElementById('templateModalTitle').textContent = 'Edit Event Template';
+                document.getElementById('templateId').value = template.id;
+                document.getElementById('templateName').value = template.name;
+                document.getElementById('templateEventType').value = template.event_type;
+
+                // Load financials
+                if (template.default_financials_json) {
+                    const fin = template.default_financials_json;
+                    document.getElementById('basePrice').value = fin.base_price || '';
+                    document.getElementById('perGuest').value = fin.per_guest || '';
+                    document.getElementById('depositPercent').value = fin.deposit_percent || '';
+                    document.getElementById('taxRate').value = fin.tax_rate ? (fin.tax_rate * 100) : '';
+                }
+
+                // Load tasks
+                if (template.default_tasks_json && template.default_tasks_json.tasks) {
+                    template.default_tasks_json.tasks.forEach(task => {
+                        addTaskRow(task);
+                    });
+                }
+            }
+        } else {
+            // Add mode
+            document.getElementById('templateModalTitle').textContent = 'Add Event Template';
+            // Add one empty task by default
+            addTaskRow();
+        }
+
+        modal.show();
+    }
+
+    function editTemplate(templateId) {
+        showTemplateModal(templateId);
+    }
+
+    function addTaskRow(taskData = null) {
+        const taskId = taskCounter++;
+        const container = document.getElementById('tasksContainer');
+
+        const taskCard = document.createElement('div');
+        taskCard.className = 'task-card';
+        taskCard.id = `task-${taskId}`;
+
+        taskCard.innerHTML = `
+            <div class="task-card-header">
+                <span class="task-number">Task ${taskId + 1}</span>
+                <button type="button" class="btn-remove-task" onclick="removeTaskRow(${taskId})">
+                    <i class="bi bi-trash"></i> Remove
+                </button>
+            </div>
+            <div class="row mb-2">
+                <div class="col-md-8">
+                    <label class="form-label">Task Title *</label>
+                    <input type="text" class="form-control-custom task-title" placeholder="e.g., Menu finalization meeting" value="${taskData?.title || ''}" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Department</label>
+                    <select class="form-control-custom task-department">
+                        <option value="">Select...</option>
+                        <option value="kitchen" ${taskData?.department === 'kitchen' ? 'selected' : ''}>Kitchen</option>
+                        <option value="bar" ${taskData?.department === 'bar' ? 'selected' : ''}>Bar</option>
+                        <option value="av" ${taskData?.department === 'av' ? 'selected' : ''}>AV</option>
+                        <option value="floor" ${taskData?.department === 'floor' ? 'selected' : ''}>Floor</option>
+                        <option value="sales" ${taskData?.department === 'sales' ? 'selected' : ''}>Sales</option>
+                        <option value="admin" ${taskData?.department === 'admin' ? 'selected' : ''}>Admin</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row mb-2">
+                <div class="col-md-6">
+                    <label class="form-label">Days Before Event</label>
+                    <input type="number" class="form-control-custom task-offset" placeholder="-7" value="${taskData?.due_offset_days || ''}" step="1">
+                    <small class="text-muted">Negative = before, Positive = after, 0 = day of</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Priority</label>
+                    <select class="form-control-custom task-priority">
+                        <option value="low" ${taskData?.priority === 'low' ? 'selected' : ''}>Low</option>
+                        <option value="med" ${taskData?.priority === 'med' ? 'selected' : ''}>Medium</option>
+                        <option value="high" ${taskData?.priority === 'high' ? 'selected' : ''}>High</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mb-2">
+                <label class="form-label">Description (Optional)</label>
+                <textarea class="form-control-custom task-description" rows="2" placeholder="Additional details about this task">${taskData?.description || ''}</textarea>
+            </div>
+            <div>
+                <label class="form-label">Checklist Items</label>
+                <div class="task-checklist" id="checklist-${taskId}"></div>
+                <button type="button" class="btn-add-checklist" onclick="addChecklistItem(${taskId})">
+                    <i class="bi bi-plus"></i> Add Checklist Item
+                </button>
+            </div>
+        `;
+
+        container.appendChild(taskCard);
+
+        // Add existing checklist items if editing
+        if (taskData && taskData.checklist) {
+            taskData.checklist.forEach(item => {
+                addChecklistItem(taskId, item);
+            });
+        } else {
+            // Add one empty checklist item by default
+            addChecklistItem(taskId);
+        }
+    }
+
+    function removeTaskRow(taskId) {
+        const taskCard = document.getElementById(`task-${taskId}`);
+        if (taskCard) {
+            taskCard.remove();
+        }
+    }
+
+    function addChecklistItem(taskId, value = '') {
+        const container = document.getElementById(`checklist-${taskId}`);
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'checklist-item';
+        itemDiv.innerHTML = `
+            <input type="text" class="form-control-custom" placeholder="Checklist item" value="${value}">
+            <button type="button" class="btn-remove-checklist" onclick="this.parentElement.remove()">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        `;
+        container.appendChild(itemDiv);
+    }
+
+    async function saveTemplate() {
+        const templateId = document.getElementById('templateId').value;
+        const name = document.getElementById('templateName').value.trim();
+        const eventType = document.getElementById('templateEventType').value.trim();
+
+        if (!name || !eventType) {
+            await showAlert('Please fill in required fields (Name and Event Type)', 'Validation Error');
+            return;
+        }
+
+        // Build financials JSON
+        const basePrice = document.getElementById('basePrice').value;
+        const perGuest = document.getElementById('perGuest').value;
+        const depositPercent = document.getElementById('depositPercent').value;
+        const taxRate = document.getElementById('taxRate').value;
+
+        let financials_json = null;
+        if (basePrice || perGuest || depositPercent || taxRate) {
+            financials_json = {};
+            if (basePrice) financials_json.base_price = parseFloat(basePrice);
+            if (perGuest) financials_json.per_guest = parseFloat(perGuest);
+            if (depositPercent) financials_json.deposit_percent = parseFloat(depositPercent);
+            if (taxRate) financials_json.tax_rate = parseFloat(taxRate) / 100; // Convert % to decimal
+        }
+
+        // Build tasks JSON
+        const tasks = [];
+        const taskCards = document.querySelectorAll('.task-card');
+        taskCards.forEach(card => {
+            const title = card.querySelector('.task-title').value.trim();
+            if (!title) return; // Skip if no title
+
+            const task = {
+                title: title,
+                department: card.querySelector('.task-department').value || null,
+                due_offset_days: parseInt(card.querySelector('.task-offset').value) || 0,
+                priority: card.querySelector('.task-priority').value || 'med',
+                description: card.querySelector('.task-description').value.trim() || null,
+                checklist: []
+            };
+
+            // Get checklist items
+            card.querySelectorAll('.checklist-item input').forEach(input => {
+                const item = input.value.trim();
+                if (item) task.checklist.push(item);
+            });
+
+            tasks.push(task);
+        });
+
+        const data = {
+            name: name,
+            event_type: eventType,
+            default_financials_json: financials_json,
+            default_tasks_json: tasks.length > 0 ? { tasks: tasks } : null
+        };
+
+        try {
+            let response;
+            if (templateId) {
+                // Update
+                response = await fetch(`/events/api/settings/templates/${templateId}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(data)
+                });
+            } else {
+                // Create
+                response = await fetch('/events/api/settings/templates', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(data)
+                });
+            }
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to save template');
+            }
+
+            // Close modal and reload
+            bootstrap.Modal.getInstance(document.getElementById('templateModal')).hide();
+            await loadTemplates();
+            await showAlert(`Template "${name}" saved successfully!`, 'Success');
+        } catch (error) {
+            console.error('Error saving template:', error);
+            await showAlert(error.message, 'Error');
+        }
+    }
+
+    async function deleteTemplate(templateId, name) {
+        const confirmed = await showConfirm(
+            `Are you sure you want to delete template "${name}"?\n\nThis cannot be undone.`,
+            'Delete Template'
+        );
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/events/api/settings/templates/${templateId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to delete template');
+            }
+
+            await loadTemplates();
+            await showAlert(`Template "${name}" deleted successfully`, 'Success');
+        } catch (error) {
+            console.error('Error deleting template:', error);
+            await showAlert('Failed to delete template', 'Error');
+        }
+    }
+
     // Load settings on page load
     loadAllSettings();
+    loadTemplates();
 </script>
 {% endblock %}

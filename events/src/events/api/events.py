@@ -91,9 +91,12 @@ async def list_events(
 
     query = db.query(Event)
 
-    # Apply filters
+    # By default, exclude CANCELED events unless explicitly requested
     if status:
         query = query.filter(Event.status == status)
+    else:
+        query = query.filter(Event.status != EventStatus.CANCELED)
+
     if event_type:
         query = query.filter(Event.event_type == event_type)
     if venue_id:
@@ -112,7 +115,7 @@ async def get_calendar_events(
     start: datetime = Query(..., description="Calendar start date"),
     end: datetime = Query(..., description="Calendar end date"),
     view: str = Query("month", regex="^(month|week|day)$"),
-    venue_id: Optional[UUID] = None,
+    location: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_auth)
 ):
@@ -122,15 +125,15 @@ async def get_calendar_events(
     - **start**: Start of calendar period
     - **end**: End of calendar period
     - **view**: Calendar view mode (month, week, day)
-    - **venue_id**: Optional venue filter
+    - **location**: Optional location filter
     """
     query = db.query(Event).filter(
         Event.start_at >= start,
         Event.start_at <= end
     )
 
-    if venue_id:
-        query = query.filter(Event.venue_id == venue_id)
+    if location:
+        query = query.filter(Event.location == location)
 
     # Exclude canceled events from calendar
     query = query.filter(Event.status != EventStatus.CANCELED)

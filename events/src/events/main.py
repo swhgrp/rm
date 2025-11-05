@@ -27,6 +27,9 @@ logger = logging.getLogger(__name__)
 # Get the templates directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+# Disable template caching in development
+templates.env.auto_reload = True
+templates.env.cache = None
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -141,10 +144,16 @@ async def packages_page(request: Request, current_user=Depends(require_auth)):
 @app.get("/list", response_class=HTMLResponse)
 async def events_list_page(request: Request, current_user=Depends(require_auth)):
     """Serve the events list/dashboard page"""
-    return templates.TemplateResponse("admin/events_list.html", {
+    from fastapi.responses import Response
+    response = templates.TemplateResponse("admin/events_list.html", {
         "request": request,
         "user": current_user
     })
+    # Disable all caching
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 # Event detail page
 @app.get("/event", response_class=HTMLResponse)

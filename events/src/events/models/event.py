@@ -40,6 +40,7 @@ class Event(BaseModel):
     # Details
     guest_count = Column(Integer, nullable=True)
     lead_source = Column(String(100), nullable=True)
+    location = Column(String(255), nullable=True)  # Location name from settings
 
     # JSONB fields
     menu_json = Column(JSONB, nullable=True)  # {"items": [...], "special_requests": "..."}

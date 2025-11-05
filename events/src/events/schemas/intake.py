@@ -20,7 +20,7 @@ class IntakeEventData(BaseModel):
     start_at: datetime
     end_at: datetime
     guest_count: Optional[int] = None
-    venue_id: str  # UUID as string
+    location: Optional[str] = None  # Location name from settings
     setup_start_at: Optional[datetime] = None
     teardown_end_at: Optional[datetime] = None
     menu_json: Optional[Dict[str, Any]] = None

@@ -1,14 +1,22 @@
 """Public API endpoints (no auth required)"""
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from typing import List
 import httpx
 import logging
 from uuid import UUID
 
 from events.core.database import get_db
 from events.core.config import settings
-from events.models import Client, Event, EventTemplate, EventStatus
+from events.models import (
+    Client, Event, EventTemplate, EventStatus, Venue,
+    Location, EventType, MealType, BeverageService
+)
 from events.schemas.intake import PublicIntakeRequest, PublicIntakeResponse
+from events.schemas.settings import (
+    LocationResponse, EventTypeResponse,
+    MealTypeResponse, BeverageServiceResponse
+)
 from events.services.task_service import TaskService
 from events.services.email_service import EmailService
 
@@ -31,37 +39,9 @@ async def public_beo_intake(
     - Queues confirmation email
     """
 
-    # Verify hCaptcha
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://hcaptcha.com/siteverify",
-                data={
-                    'secret': settings.HCAPTCHA_SECRET,
-                    'response': data.hcaptcha_token
-                },
-                timeout=10.0
-            )
-            captcha_result = response.json()
-
-            if not captcha_result.get('success'):
-                logger.warning(f"hCaptcha verification failed: {captcha_result}")
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid captcha verification"
-                )
-    except httpx.TimeoutException:
-        logger.error("hCaptcha verification timeout")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Captcha verification service unavailable"
-        )
-    except Exception as e:
-        logger.error(f"hCaptcha verification error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error verifying captcha"
-        )
+    # Skip hCaptcha verification (removed for simplified public form)
+    # Forms are monitored for abuse through other means
+    logger.info(f"Public intake form submission from {data.client.email}")
 
     # Find or create client
     client_data = data.client
@@ -98,6 +78,17 @@ async def public_beo_intake(
     # Create event
     event_data = data.event
 
+    # Get location - use provided or default to first location
+    location = event_data.location
+    if not location:
+        # Use first available location as default
+        default_location = db.query(Location).filter(Location.is_active == True).order_by(Location.sort_order.asc(), Location.name).first()
+        if default_location:
+            location = default_location.name
+            logger.info(f"Using default location: {default_location.name}")
+        else:
+            logger.warning("No locations available in database")
+
     # Merge template defaults with provided data
     menu_json = event_data.menu_json or (template.default_menu_json if template else None)
     financials_json = None
@@ -110,7 +101,7 @@ async def public_beo_intake(
         title=event_data.title,
         event_type=event_data.event_type,
         status=EventStatus.PENDING,
-        venue_id=UUID(event_data.venue_id),
+        location=location,
         client_id=client_obj.id,
         start_at=event_data.start_at,
         end_at=event_data.end_at,
@@ -161,3 +152,46 @@ async def public_beo_intake(
 async def public_health():
     """Public health check endpoint"""
     return {"status": "healthy", "endpoint": "public"}
+
+
+@router.get("/venues")
+async def public_list_venues(db: Session = Depends(get_db)):
+    """Get all venues (public - no auth required)"""
+    venues = db.query(Venue).order_by(Venue.name).all()
+    return [{"id": str(v.id), "name": v.name, "address": v.address} for v in venues]
+
+
+@router.get("/locations", response_model=List[LocationResponse])
+async def public_list_locations(db: Session = Depends(get_db)):
+    """List all active locations (public - no auth required)"""
+    locations = db.query(Location).filter(Location.is_active == True).order_by(
+        Location.sort_order.asc(), Location.name.asc()
+    ).all()
+    return locations
+
+
+@router.get("/event-types", response_model=List[EventTypeResponse])
+async def public_list_event_types(db: Session = Depends(get_db)):
+    """List all active event types (public - no auth required)"""
+    event_types = db.query(EventType).filter(EventType.is_active == True).order_by(
+        EventType.sort_order.asc(), EventType.name.asc()
+    ).all()
+    return event_types
+
+
+@router.get("/meal-types", response_model=List[MealTypeResponse])
+async def public_list_meal_types(db: Session = Depends(get_db)):
+    """List all active meal types (public - no auth required)"""
+    meal_types = db.query(MealType).filter(MealType.is_active == True).order_by(
+        MealType.sort_order.asc(), MealType.name.asc()
+    ).all()
+    return meal_types
+
+
+@router.get("/beverage-services", response_model=List[BeverageServiceResponse])
+async def public_list_beverage_services(db: Session = Depends(get_db)):
+    """List all active beverage services (public - no auth required)"""
+    services = db.query(BeverageService).filter(BeverageService.is_active == True).order_by(
+        BeverageService.sort_order.asc(), BeverageService.name.asc()
+    ).all()
+    return services

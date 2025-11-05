@@ -217,16 +217,6 @@
             font-size: 14px;
         }
 
-        .captcha-container {
-            margin: 30px 0;
-            display: flex;
-            justify-content: center;
-            background-color: #0d1117;
-            padding: 20px;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-        }
-
         .submit-btn {
             width: 100%;
             padding: 16px;
@@ -328,6 +318,57 @@
             flex-shrink: 0;
         }
 
+        .input-group {
+            display: flex;
+            align-items: stretch;
+            width: 100%;
+        }
+
+        .input-group-text {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            font-size: 16px;
+            font-weight: 500;
+            line-height: 1.5;
+            color: #c9d1d9;
+            background-color: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            white-space: nowrap;
+        }
+
+        .input-group .input-group-text:first-child {
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+            border-right: none;
+        }
+
+        .input-group .input-group-text:last-child {
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+            border-left: none;
+        }
+
+        .input-group input {
+            flex: 1;
+            border-radius: 0;
+        }
+
+        .input-group input:first-child {
+            border-top-left-radius: 6px;
+            border-bottom-left-radius: 6px;
+        }
+
+        .input-group input:last-child {
+            border-top-right-radius: 6px;
+            border-bottom-right-radius: 6px;
+        }
+
+        .input-group input:not(:first-child):not(:last-child) {
+            border-radius: 0;
+        }
+
         .footer {
             background-color: #0d1117;
             padding: 25px 30px;
@@ -372,7 +413,6 @@
             }
         }
     </style>
-    <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
 </head>
 <body>
     <div class="container">
@@ -454,31 +494,18 @@
                         </div>
                     </div>
 
-                    <div class="form-row">
+                    <div class="form-row two-cols">
                         <div class="form-group">
                             <label for="eventType">Event Type <span class="required">*</span></label>
                             <select id="eventType" name="eventType" required>
                                 <option value="">Loading event types...</option>
                             </select>
                         </div>
-                    </div>
-
-                    <div class="form-row">
                         <div class="form-group">
-                            <label for="location">Location <span class="required">*</span></label>
-                            <select id="location" name="location" required>
+                            <label for="location">Location</label>
+                            <select id="location" name="location">
                                 <option value="">Loading locations...</option>
                             </select>
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="venue">Venue <span class="required">*</span></label>
-                            <select id="venue" name="venue" required>
-                                <option value="">Loading venues...</option>
-                            </select>
-                            <small id="venueError" style="color: #dc3545; display: none;">Failed to load venues. Please refresh the page.</small>
                         </div>
                     </div>
 
@@ -557,22 +584,19 @@
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="budget">Budget Range (Optional)</label>
-                            <select id="budget" name="budget">
-                                <option value="">Prefer not to say</option>
-                                <option value="under_5k">Under $5,000</option>
-                                <option value="5k_10k">$5,000 - $10,000</option>
-                                <option value="10k_25k">$10,000 - $25,000</option>
-                                <option value="25k_50k">$25,000 - $50,000</option>
-                                <option value="over_50k">Over $50,000</option>
-                            </select>
+                            <label for="budgetPerPerson">Estimated Budget Per Person (Optional)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" id="budgetPerPerson" name="budgetPerPerson" min="0" step="0.01"
+                                       placeholder="e.g., 45.00" style="border-left: none;">
+                                <span class="input-group-text">per person</span>
+                            </div>
+                            <p class="help-text">
+                                <i class="bi bi-info-circle"></i>
+                                Enter your estimated budget per person (optional)
+                            </p>
                         </div>
                     </div>
-                </div>
-
-                <!-- hCaptcha -->
-                <div class="captcha-container">
-                    <div class="h-captcha" data-sitekey="10000000-ffff-ffff-ffff-000000000001"></div>
                 </div>
 
                 <button type="submit" class="submit-btn" id="submitBtn">
@@ -585,7 +609,7 @@
         <div class="footer">
             <p>
                 <i class="bi bi-question-circle"></i>
-                Questions? Contact us at <a href="mailto:events@swhgrp.com">events@swhgrp.com</a> or call <a href="tel:+15551234567">(555) 123-4567</a>
+                Questions? Contact us at <a href="mailto:events@swhgrp.com">events@swhgrp.com</a>
             </p>
         </div>
     </div>
@@ -598,43 +622,35 @@
         const errorMessage = document.getElementById('errorMessage');
         const loadingIndicator = document.getElementById('loadingIndicator');
 
+        // Phone number formatting
+        const phoneInput = document.getElementById('phone');
+        phoneInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+            if (value.length > 10) value = value.slice(0, 10); // Limit to 10 digits
+
+            if (value.length >= 6) {
+                e.target.value = `(${value.slice(0, 3)}) ${value.slice(3, 6)}-${value.slice(6)}`;
+            } else if (value.length >= 3) {
+                e.target.value = `(${value.slice(0, 3)}) ${value.slice(3)}`;
+            } else if (value.length > 0) {
+                e.target.value = value;
+            }
+        });
+
         // Load all settings on page load
         async function loadAllSettings() {
             await Promise.all([
-                loadVenues(),
-                loadLocations(),
                 loadEventTypes(),
+                loadLocations(),
                 loadMealTypes(),
                 loadBeverageServices()
             ]);
         }
 
-        async function loadLocations() {
-            const locationSelect = document.getElementById('location');
-            try {
-                const response = await fetch('api/settings/locations');
-                if (response.ok) {
-                    const locations = await response.json();
-                    locationSelect.innerHTML = '<option value="">Select location...</option>';
-                    locations.forEach(location => {
-                        const option = document.createElement('option');
-                        option.value = location.name;
-                        option.textContent = location.name;
-                        locationSelect.appendChild(option);
-                    });
-                } else {
-                    locationSelect.innerHTML = '<option value="">Failed to load locations</option>';
-                }
-            } catch (error) {
-                console.error('Failed to load locations:', error);
-                locationSelect.innerHTML = '<option value="">Failed to load locations</option>';
-            }
-        }
-
         async function loadEventTypes() {
             const eventTypeSelect = document.getElementById('eventType');
             try {
-                const response = await fetch('api/settings/event-types');
+                const response = await fetch('/events/public/event-types');
                 if (response.ok) {
                     const eventTypes = await response.json();
                     eventTypeSelect.innerHTML = '<option value="">Select event type...</option>';
@@ -653,10 +669,32 @@
             }
         }
 
+        async function loadLocations() {
+            const locationSelect = document.getElementById('location');
+            try {
+                const response = await fetch('/events/public/locations');
+                if (response.ok) {
+                    const locations = await response.json();
+                    locationSelect.innerHTML = '<option value="">Select location (optional)...</option>';
+                    locations.forEach(location => {
+                        const option = document.createElement('option');
+                        option.value = location.name;
+                        option.textContent = location.name;
+                        locationSelect.appendChild(option);
+                    });
+                } else {
+                    locationSelect.innerHTML = '<option value="">Failed to load locations</option>';
+                }
+            } catch (error) {
+                console.error('Failed to load locations:', error);
+                locationSelect.innerHTML = '<option value="">Failed to load locations</option>';
+            }
+        }
+
         async function loadMealTypes() {
             const mealTypesContainer = document.getElementById('mealTypesContainer');
             try {
-                const response = await fetch('api/settings/meal-types');
+                const response = await fetch('/events/public/meal-types');
                 if (response.ok) {
                     const mealTypes = await response.json();
                     mealTypesContainer.innerHTML = '';
@@ -682,7 +720,7 @@
         async function loadBeverageServices() {
             const beverageContainer = document.getElementById('beverageServicesContainer');
             try {
-                const response = await fetch('api/settings/beverage-services');
+                const response = await fetch('/events/public/beverage-services');
                 if (response.ok) {
                     const beverages = await response.json();
                     beverageContainer.innerHTML = '';
@@ -705,38 +743,6 @@
             }
         }
 
-        async function loadVenues() {
-            const venueSelect = document.getElementById('venue');
-            const venueError = document.getElementById('venueError');
-            try {
-                const response = await fetch('api/events/venues');
-                if (response.ok) {
-                    const venues = await response.json();
-                    venueSelect.innerHTML = '<option value="">Select venue...</option>';
-
-                    if (venues.length === 0) {
-                        venueError.textContent = 'No venues available. Please contact support.';
-                        venueError.style.display = 'block';
-                    } else {
-                        venues.forEach(venue => {
-                            const option = document.createElement('option');
-                            option.value = venue.id;
-                            option.textContent = venue.name;
-                            venueSelect.appendChild(option);
-                        });
-                    }
-                } else {
-                    console.error('Failed to load venues:', response.status, response.statusText);
-                    venueSelect.innerHTML = '<option value="">Failed to load venues</option>';
-                    venueError.style.display = 'block';
-                }
-            } catch (error) {
-                console.error('Failed to load venues:', error);
-                venueSelect.innerHTML = '<option value="">Failed to load venues</option>';
-                venueError.style.display = 'block';
-            }
-        }
-
         // Load all settings when page loads
         loadAllSettings();
 
@@ -746,14 +752,6 @@
             // Hide any previous alerts
             alertSuccess.classList.remove('show');
             alertError.classList.remove('show');
-
-            // Get hCaptcha response
-            const hcaptchaResponse = hcaptcha.getResponse();
-            if (!hcaptchaResponse) {
-                errorMessage.textContent = 'Please complete the CAPTCHA verification.';
-                alertError.classList.add('show');
-                return;
-            }
 
             // Disable submit button and show loading
             submitBtn.disabled = true;
@@ -766,8 +764,18 @@
             const durationHours = parseFloat(document.getElementById('duration').value) || 4; // Default 4 hours
             const endAt = new Date(startAt.getTime() + durationHours * 60 * 60 * 1000);
 
+            const budgetPerPersonValue = document.getElementById('budgetPerPerson').value;
+            const guestCount = parseInt(document.getElementById('attendeeCount').value);
+            const locationValue = document.getElementById('location').value;
+
+            // Calculate total budget estimate from per-person budget and guest count
+            let budgetEstimate = null;
+            if (budgetPerPersonValue && guestCount) {
+                budgetEstimate = parseFloat(budgetPerPersonValue) * guestCount;
+            }
+
             const formData = {
-                hcaptcha_token: hcaptchaResponse,
+                hcaptcha_token: 'public-form-no-captcha',
                 eventTemplateKey: document.getElementById('eventType').value,
                 client: {
                     name: document.getElementById('fullName').value,
@@ -778,12 +786,11 @@
                 event: {
                     title: document.getElementById('eventTitle').value,
                     event_type: document.getElementById('eventType').value,
-                    location: document.getElementById('location').value,
                     date: eventDateValue,
                     start_at: startAt.toISOString(),
                     end_at: endAt.toISOString(),
-                    guest_count: parseInt(document.getElementById('attendeeCount').value),
-                    venue_id: document.getElementById('venue').value,
+                    guest_count: guestCount,
+                    location: locationValue || null,
                     menu_json: {
                         preferences: collectCheckboxValues('mealTypes'),
                         dietary_restrictions: document.getElementById('dietaryRestrictions').value || null,
@@ -792,12 +799,12 @@
                     requirements_json: {
                         special_requirements: document.getElementById('specialRequirements').value || null
                     },
-                    budget_estimate: document.getElementById('budget').value ? parseFloat(document.getElementById('budget').value) : null
+                    budget_estimate: budgetEstimate
                 }
             };
 
             try {
-                const response = await fetch('public/beo-intake', {
+                const response = await fetch('/events/public/beo-intake', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -816,7 +823,6 @@
                     // Reset form after 5 seconds
                     setTimeout(() => {
                         form.reset();
-                        hcaptcha.reset();
                         alertSuccess.classList.remove('show');
                         form.style.display = 'block';
                         submitBtn.disabled = false;
@@ -846,7 +852,6 @@
                 errorMessage.textContent = error.message;
                 alertError.classList.add('show');
                 submitBtn.disabled = false;
-                hcaptcha.reset();
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
         });

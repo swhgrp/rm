@@ -612,7 +612,7 @@
         <!-- Top Bar -->
         <div class="top-bar">
             <div class="page-title">
-                <i class="bi bi-calendar-event"></i> Events System
+                <i class="bi bi-calendar-event"></i> {% block page_title %}Events System{% endblock %}
             </div>
             <div class="top-bar-actions">
                 {% block top_bar_actions %}{% endblock %}
@@ -626,6 +626,23 @@
         <!-- Page Content -->
         <div class="container-custom">
             {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal fade" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmTitle">Confirm Action</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="confirmMessage"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmOkBtn">OK</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -671,6 +688,166 @@
 
         // Call on page load
         loadUserInfo();
+
+        // Custom confirm dialog using Bootstrap modal
+        function showConfirm(message, title = 'Confirm Action') {
+            return new Promise((resolve) => {
+                const modalElement = document.getElementById('confirmModal');
+                if (!modalElement) {
+                    console.error('Confirm modal element not found');
+                    resolve(false);
+                    return;
+                }
+
+                // Dispose any existing modal instance
+                const existingInstance = bootstrap.Modal.getInstance(modalElement);
+                if (existingInstance) {
+                    existingInstance.dispose();
+                }
+
+                const titleElement = document.getElementById('confirmTitle');
+                const messageElement = document.getElementById('confirmMessage');
+                if (titleElement) titleElement.textContent = title;
+                if (messageElement) messageElement.textContent = message;
+
+                const modal = new bootstrap.Modal(modalElement);
+                let resolved = false;
+
+                // Get button elements (after any potential cloning)
+                const okBtn = document.getElementById('confirmOkBtn');
+                const cancelBtn = document.getElementById('confirmCancelBtn');
+
+                if (!okBtn || !cancelBtn) {
+                    console.error('Modal buttons not found');
+                    resolve(false);
+                    return;
+                }
+
+                // Clone buttons to remove ALL previous event listeners
+                const newOkBtn = okBtn.cloneNode(true);
+                const newCancelBtn = cancelBtn.cloneNode(true);
+                newOkBtn.id = 'confirmOkBtn';
+                newCancelBtn.id = 'confirmCancelBtn';
+
+                okBtn.replaceWith(newOkBtn);
+                cancelBtn.replaceWith(newCancelBtn);
+
+                // Reset button states
+                newOkBtn.disabled = false;
+                newCancelBtn.disabled = false;
+                newCancelBtn.style.display = '';
+                newOkBtn.textContent = 'OK';
+
+                // Add fresh event listeners
+                newOkBtn.addEventListener('click', function handleOk(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!resolved) {
+                        resolved = true;
+                        newOkBtn.removeEventListener('click', handleOk);
+                        newCancelBtn.removeEventListener('click', handleCancel);
+                        modal.hide();
+                        setTimeout(() => resolve(true), 150);
+                    }
+                });
+
+                function handleCancel(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!resolved) {
+                        resolved = true;
+                        newOkBtn.removeEventListener('click', handleOk);
+                        newCancelBtn.removeEventListener('click', handleCancel);
+                        modal.hide();
+                        setTimeout(() => resolve(false), 150);
+                    }
+                }
+
+                newCancelBtn.addEventListener('click', handleCancel);
+
+                modalElement.addEventListener('hidden.bs.modal', function onHidden() {
+                    if (!resolved) {
+                        resolved = true;
+                        resolve(false);
+                    }
+                    modalElement.removeEventListener('hidden.bs.modal', onHidden);
+                }, { once: true });
+
+                modal.show();
+            });
+        }
+
+        // Custom alert function using Bootstrap modal
+        function showAlert(message, title = 'Notice') {
+            return new Promise((resolve) => {
+                const modalElement = document.getElementById('confirmModal');
+                if (!modalElement) {
+                    console.error('Alert modal element not found');
+                    resolve(true);
+                    return;
+                }
+
+                // Dispose any existing modal instance
+                const existingInstance = bootstrap.Modal.getInstance(modalElement);
+                if (existingInstance) {
+                    existingInstance.dispose();
+                }
+
+                const titleElement = document.getElementById('confirmTitle');
+                const messageElement = document.getElementById('confirmMessage');
+                if (titleElement) titleElement.textContent = title;
+                if (messageElement) messageElement.textContent = message;
+
+                const modal = new bootstrap.Modal(modalElement);
+                let resolved = false;
+
+                // Get button elements
+                const okBtn = document.getElementById('confirmOkBtn');
+                const cancelBtn = document.getElementById('confirmCancelBtn');
+
+                if (!okBtn || !cancelBtn) {
+                    console.error('Modal buttons not found');
+                    resolve(true);
+                    return;
+                }
+
+                // Clone OK button to remove ALL previous event listeners
+                const newOkBtn = okBtn.cloneNode(true);
+                newOkBtn.id = 'confirmOkBtn';
+                okBtn.replaceWith(newOkBtn);
+
+                // Hide cancel button for alerts
+                cancelBtn.style.display = 'none';
+                newOkBtn.textContent = 'OK';
+                newOkBtn.disabled = false;
+
+                // Add fresh event listener
+                newOkBtn.addEventListener('click', function handleOk(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!resolved) {
+                        resolved = true;
+                        newOkBtn.removeEventListener('click', handleOk);
+                        modal.hide();
+                        setTimeout(() => {
+                            if (cancelBtn) cancelBtn.style.display = '';
+                            resolve(true);
+                        }, 150);
+                    }
+                });
+
+                modalElement.addEventListener('hidden.bs.modal', function onHidden() {
+                    if (!resolved) {
+                        resolved = true;
+                        if (cancelBtn) cancelBtn.style.display = '';
+                        resolve(true);
+                    }
+                    modalElement.removeEventListener('hidden.bs.modal', onHidden);
+                }, { once: true });
+
+                modal.show();
+            });
+        }
     </script>
 
     {% block extra_js %}{% endblock %}

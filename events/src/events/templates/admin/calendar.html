@@ -230,9 +230,9 @@
 <!-- Filters -->
 <div class="filters-bar">
     <div class="filter-item">
-        <label>Venue</label>
-        <select id="filterVenue" class="form-control-custom" style="width: 200px;" onchange="loadCalendarEvents()">
-            <option value="">All Venues</option>
+        <label>Location</label>
+        <select id="filterLocation" class="form-control-custom" style="width: 200px;" onchange="loadCalendarEvents()">
+            <option value="">All Locations</option>
         </select>
     </div>
 
@@ -306,24 +306,24 @@
 
     async function loadVenues() {
         try {
-            const response = await fetch('api/events/venues');
+            const response = await fetch('api/settings/locations');
             allVenues = await response.json();
 
-            const select = document.getElementById('filterVenue');
-            allVenues.forEach(venue => {
+            const select = document.getElementById('filterLocation');
+            allVenues.forEach(location => {
                 const option = document.createElement('option');
-                option.value = venue.id;
-                option.textContent = venue.name;
+                option.value = location.name;
+                option.textContent = location.name;
                 select.appendChild(option);
             });
         } catch (error) {
-            console.error('Error loading venues:', error);
+            console.error('Error loading locations:', error);
         }
     }
 
     async function fetchCalendarEvents(info, successCallback, failureCallback) {
         try {
-            const venueFilter = document.getElementById('filterVenue')?.value || '';
+            const locationFilter = document.getElementById('filterLocation')?.value || '';
             const statusFilter = document.getElementById('filterStatus')?.value || '';
 
             const params = new URLSearchParams({
@@ -331,7 +331,7 @@
                 end: info.endStr
             });
 
-            if (venueFilter) params.append('venue_id', venueFilter);
+            if (locationFilter) params.append('location', locationFilter);
 
             const response = await fetch('api/events/calendar?' + params);
             let events = await response.json();
@@ -394,7 +394,7 @@
                 </div>
                 <div class="detail-row">
                     <i class="bi bi-geo-alt"></i>
-                    <span class="detail-label">Venue:</span>
+                    <span class="detail-label">Location:</span>
                     <span class="detail-value">${venue ? venue.name : 'Not assigned'}</span>
                 </div>
                 <div class="detail-row">
