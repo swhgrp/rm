@@ -1,8 +1,8 @@
 # Event Planning Microsystem
 
-## Status: 85% Production Ready ✅
+## Status: 95% Production Ready ✅
 
-**LAST UPDATED:** 2025-10-28
+**LAST UPDATED:** 2025-11-08
 
 A comprehensive event planning system with calendar, task management, document generation, email notifications, and role-based access control. The system is **far more complete than this README previously indicated** and is actively used in production.
 
@@ -66,14 +66,37 @@ A comprehensive event planning system with calendar, task management, document g
 - ✅ Authentication via Portal SSO
 - ✅ Dark theme UI matching system design
 
-### 🔄 PARTIALLY IMPLEMENTED (15% Remaining)
+## Recent Updates
 
-**RBAC Enforcement (60%):**
+### November 8, 2025 - RBAC Implementation ✅
+**Major security enhancement:** Full role-based access control now enforced across all API endpoints
+
+**What Changed:**
+- ✅ Added `require_role()` and `require_permission()` dependency factories to [deps.py](src/events/core/deps.py)
+- ✅ Protected all Events API endpoints with proper role checks
+- ✅ Protected all Tasks API endpoints (create/update/delete require permissions)
+- ✅ Protected all Settings endpoints (locations, event types, beverages, meals, templates)
+- ✅ Protected Package and Document endpoints
+- ✅ All endpoints now require Portal SSO authentication (JWT in `portal_session` cookie)
+
+**Permission Model:**
+- **admin**: Full access to everything
+- **event_manager**: Can create/update events, tasks, settings; cannot delete users
+- **dept_lead**: Can read/update tasks for their department, read events/financials
+- **staff**: Can read/update assigned tasks only (DEFAULT for new users)
+- **read_only**: Read-only access, no financials
+
+**Auto-Provisioning:** New users are automatically created in Events DB on first login via Portal SSO with 'staff' role.
+
+### 🔄 PARTIALLY IMPLEMENTED (5% Remaining)
+
+**RBAC Enforcement (95%):**
 - ✅ User and Role models exist
 - ✅ Auth service has RBAC logic
-- ❌ Not enforced on all API endpoints
-- ❌ UI doesn't hide features based on role
-- ❌ Permission decorators not used consistently
+- ✅ **NEW:** All API endpoints enforced with role/permission checks
+- ✅ **NEW:** Helper functions `require_role()` and `require_permission()`
+- ❌ UI doesn't hide features based on role yet
+- ❌ Admin UI for role management not built
 
 **HR Integration (0%):**
 - ❌ No HR sync service running
