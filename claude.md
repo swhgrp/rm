@@ -11,7 +11,35 @@
 
 ### Most Recent Work (Last Session - Nov 8, 2025)
 
-1. **Events System: Comprehensive RBAC Implementation** ✅ (Nov 8, 2025) 🔒 **SECURITY COMPLETE**
+1. **Events System: Admin UIs Complete** ✅ (Nov 8, 2025) 👥 **MANAGEMENT TOOLS READY**
+   - **USERS & ROLES MANAGEMENT** - Full admin interface for managing users and roles
+   - **EMAIL HISTORY VIEWER** - Complete email log with stats and resend capability
+   - **Backend changes:**
+     - Created users.py router with 10 endpoints (list, get, assign/remove roles, activate/deactivate)
+     - Created emails.py router with 4 endpoints (list, get details, resend failed, get stats)
+     - Created email.py schema for EmailResponse
+     - All endpoints protected with `require_auth` or `require_role("admin")`
+   - **Frontend changes:**
+     - Created users.html admin page with dark theme
+     - Search and filter users by name, email, role, department
+     - Role management modal for assigning/removing roles
+     - Color-coded role badges (admin=red, event_manager=yellow, dept_lead=blue, staff=green, read_only=gray)
+     - Activate/deactivate user buttons (prevents self-deactivation)
+     - Created emails.html admin page with stats dashboard
+     - Stats cards showing total, sent, queued, failed counts
+     - Filter by status and time period (7/30/90/365 days)
+     - Email detail modal showing full subject, recipients, body HTML
+     - Resend button for failed emails (admin action)
+     - Added "Users & Roles" and "Email History" links to sidebar
+   - **Files created:** 5 files (users.py, users.html, emails.py, email.py, emails.html)
+   - **Git commits:**
+     - `0d69426` - feat(events): Add Users & Roles Management UI
+     - `c6e0b46` - feat(events): Add Email History Management UI
+     - `95f5a30` - docs(events): Update README with Admin UIs completion
+   - **Status updated:** Events system now 98% complete (was 95%)
+   - **Remaining:** UI role-based hiding (2%)
+
+2. **Events System: Comprehensive RBAC Implementation** ✅ (Nov 8, 2025) 🔒 **SECURITY COMPLETE**
    - **FULL ROLE-BASED ACCESS CONTROL** - All API endpoints now properly secured
    - **Backend changes:**
      - Added `require_role()` dependency factory for role-based endpoint protection
