@@ -4,24 +4,74 @@
 
 The Integration Hub is an **invoice processing and general ledger (GL) mapping system** that receives vendor invoices, maps line items to inventory items and GL accounts, and routes the processed invoices to both the Inventory and Accounting systems.
 
-## Status: Production Ready (Core Features) ✅
+## Status: Production Ready (Core Features + Advanced Workflow) ✅
+
+**Last Updated:** November 8, 2025
 
 **Note:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
+## Recent Updates
+
+### November 8, 2025 - Major Workflow Improvements 🚀
+
+**Bulk Mapping System:**
+- Bulk mapping by description - map once, apply to all occurrences
+- Unmapped items page redesigned with unique item grouping
+- Shows frequency count and affected invoices
+- Orders by most common items first (10x faster workflow)
+
+**Statement Handling:**
+- Mark/unmark invoices as statements
+- Statements blocked from routing to Inventory/Accounting
+- New status: 'statement'
+
+**Smart Auto-Send:**
+- Only sends to Inventory if items have inventory categories
+- Always sends to Accounting (all items have GL accounts)
+- Auto-triggers send when invoice fully mapped via bulk action
+- Better validation for inventory vs expense items
+
+**UI Improvements:**
+- Mapped items review page (view/edit all mapped items)
+- Category mappings show full GL account names (1000 - Cash)
+- Vendor selection/creation in invoice detail
+- Invoice deletion with cascade cleanup
+- PDF preview/download
+
+**API Enhancements:**
+- New inventory sync endpoints: `/_hub/sync` (no auth for internal calls)
+- Bulk mapping endpoint: `POST /api/items/map-by-description`
+- Statement marking: `POST /api/invoices/{id}/mark-statement`
+- Invoice deletion: `DELETE /api/invoices/{id}`
+
+### October 31, 2025 - Automated Email Intake 📧
+
+- IMAP email monitoring (checks every 15 minutes)
+- OpenAI GPT-4o-mini PDF parsing
+- SHA-256 PDF deduplication
+- Intelligent auto-mapping (vendor codes, fuzzy matching, category fallbacks)
+- Email settings UI with connection testing
+
 ## Purpose
 
-- Receive vendor invoices (manual upload or API)
-- Map invoice line items to inventory items
+- **Automated email monitoring** - Check inbox every 15 minutes for invoice PDFs 📧
+- **AI-powered parsing** - Extract invoice data using GPT-4o-mini 🤖
+- Receive vendor invoices (email, manual upload, or API)
+- Map invoice line items to inventory items (with bulk mapping) 🚀
 - Map items to general ledger accounts (Asset, COGS, Waste, Revenue)
-- Send mapped invoices to Inventory system via REST API
+- **Smart routing** - Send to Inventory (inventory items) and/or Accounting (all items) 🧠
 - Create and send journal entries to Accounting system via REST API
 - Manage vendor master data across systems
 - Track invoice processing status and errors
+- **Statement handling** - Mark statements to prevent system routing 📋
 
 ## Technology Stack
 
 - **Framework:** FastAPI (Python async)
 - **Database:** PostgreSQL 15
+- **AI/ML:** OpenAI GPT-4o-mini (invoice parsing) 🤖
+- **PDF Processing:** PyPDF2, pdf2image 📄
+- **Background Jobs:** APScheduler (email monitoring) ⏰
 - **HTTP Client:** httpx (async)
 - **Frontend:** Bootstrap 5, jQuery
 - **Authentication:** Portal SSO integration (JWT tokens)
@@ -33,31 +83,43 @@ The Integration Hub is an **invoice processing and general ledger (GL) mapping s
 
 **Invoice Processing:**
 - ✅ Manual invoice upload (PDF/data entry)
+- ✅ **Automated email monitoring** (IMAP, checks every 15 minutes) 📧
+- ✅ **AI-powered PDF parsing** (OpenAI GPT-4o-mini) 🤖
+- ✅ **Statement detection** - Mark as statement to prevent sending to systems 🆕
+- ✅ **Invoice deletion** - Cascade delete with PDF file cleanup 🆕
+- ✅ **Vendor selection/creation** in invoice detail view 🆕
 - ✅ API endpoint for invoice creation
 - ✅ Invoice storage with vendor info, date, total amount
 - ✅ Line item tracking (description, quantity, price, extended amount)
-- ✅ Invoice status workflow (unmapped → ready → sent/partial/error)
+- ✅ Invoice status workflow (unmapped → ready → sent/partial/error/statement) 🆕
 
 **Item Mapping:**
 - ✅ Manual mapping of invoice items to inventory items
+- ✅ **Bulk mapping by description** - Map once, apply to all occurrences 🆕
+- ✅ **Unique item grouping** - Shows unmapped items grouped by description with frequency 🆕
+- ✅ **Mapped items review page** - View and edit all mapped items 🆕
 - ✅ GL account assignment (Asset, COGS, Waste, Revenue accounts)
+- ✅ **Smart GL validation** - Different requirements for inventory vs expense items 🆕
 - ✅ Mapping confidence tracking (Manual, Category Default, etc.)
-- ✅ Category-level GL mapping fallbacks
-- ✅ Unmapped items review UI
-- ✅ Bulk mapping operations
+- ✅ Category-level GL mapping fallbacks with full account names 🆕
+- ✅ Unmapped items review UI (redesigned with aggregation) 🆕
+- ✅ Support for non-inventory items (propane, linen, janitorial) 🆕
 
 **System Integration:**
-- ✅ Send invoices to Inventory system (REST API)
+- ✅ **Smart auto-send logic** - Only sends to inventory if items have categories 🆕
+- ✅ Send invoices to Inventory system (REST API) - Only for inventory items 🆕
   - Creates/updates vendors
   - Creates invoice records
   - Links items to inventory master data
-- ✅ Send journal entries to Accounting system (REST API)
+- ✅ Send journal entries to Accounting system (REST API) - For all items 🆕
   - Groups items by GL asset account
   - Creates balanced journal entries (Dr = Cr)
   - Sends to accounting API
-- ✅ Parallel sending to both systems
+- ✅ Parallel sending to both systems (when applicable) 🆕
+- ✅ **Auto-trigger send** when invoice fully mapped via bulk mapping 🆕
 - ✅ Retry logic for failed sends
 - ✅ Status tracking (sent_to_inventory, sent_to_accounting)
+- ✅ **Statement prevention** - Statements blocked from system routing 🆕
 
 **Vendor Management:**
 - ✅ Vendor master data storage (name, email, phone, addresses)
@@ -154,12 +216,14 @@ class HubInvoice:
     invoice_number: str
     invoice_date: date
     total_amount: Decimal
-    status: str  # 'unmapped', 'ready', 'sent', 'partial', 'error'
+    status: str  # 'unmapped', 'ready', 'sent', 'partial', 'error', 'statement' 🆕
+    is_statement: bool  # Mark as statement (won't route to systems) 🆕
     sent_to_inventory: bool
     sent_to_accounting: bool
     inventory_invoice_id: int (nullable)
     accounting_invoice_id: int (nullable)
     error_message: str (nullable)
+    pdf_path: str (nullable)  # Path to uploaded PDF file 🆕
 
 class HubInvoiceItem:
     """Invoice line item with mapping"""
@@ -229,10 +293,13 @@ class Vendor:
 - Upload new invoice
 
 **GET /unmapped-items**
-- Review all unmapped items across invoices
+- Review all unmapped items (grouped by unique description) 🆕
+
+**GET /mapped-items** 🆕
+- Review all mapped items with edit capability
 
 **GET /category-mappings**
-- Manage category GL mappings
+- Manage category GL mappings (with full GL account names) 🆕
 
 **GET /vendors**
 - Vendor management page
@@ -240,8 +307,13 @@ class Vendor:
 ### API Endpoints (JSON)
 
 **POST /api/items/{item_id}/map**
-- Map invoice item to inventory + GL accounts
+- Map single invoice item to inventory + GL accounts
 - Body: `{"inventory_item_id": 123, "gl_asset": "1200", "gl_cogs": "5000", ...}`
+
+**POST /api/items/map-by-description** 🆕
+- Bulk map ALL items with matching description
+- Body: `{"item_description": "...", "inventory_item_id": 123, "gl_cogs_account": "5000", ...}`
+- Returns: `{"items_mapped": 15, "invoices_affected": 3, "invoices_ready": ["INV-001"]}`
 
 **GET /api/items/{item_id}/suggestions**
 - Get mapping suggestions (TODO - not implemented)
@@ -251,11 +323,23 @@ class Vendor:
 - Body: `{"category": "Produce", "gl_asset": "1210", ...}`
 
 **POST /api/invoices/{invoice_id}/send**
-- Send invoice to both Inventory and Accounting systems
-- Returns: `{"status": "sent|partial|error", ...}`
+- Send invoice to Inventory/Accounting systems (smart routing) 🆕
+- Returns: `{"status": "sent|partial|error", "inventory_sent": bool, "accounting_sent": bool}`
 
 **POST /api/invoices/{invoice_id}/retry**
 - Retry failed invoice send
+
+**DELETE /api/invoices/{invoice_id}** 🆕
+- Delete invoice, all items, and PDF file (cascade)
+- Returns: `{"success": true, "items_deleted": 5}`
+
+**POST /api/invoices/{invoice_id}/mark-statement** 🆕
+- Mark/unmark invoice as statement
+- Body: `{"is_statement": true}`
+- Returns: `{"success": true, "status": "statement"}`
+
+**GET /api/invoices/{invoice_id}/pdf** 🆕
+- Download invoice PDF file
 
 **GET /api/vendors/**
 - List all vendors
