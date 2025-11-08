@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** November 4, 2025 (Evening)
+**Last Updated:** November 8, 2025 (Evening)
 **System Status:** Production (85% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -9,7 +9,42 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Last Session - Nov 4, 2025)
+### Most Recent Work (Last Session - Nov 8, 2025)
+
+1. **Integration Hub: Major Workflow Improvements** ✅ (Nov 8, 2025) 🚀 **GAME CHANGER**
+   - **REVOLUTIONARY BULK MAPPING** - Map once by description, applies to ALL occurrences
+   - **Backend changes:**
+     - Added bulk mapping endpoint: `POST /api/items/map-by-description`
+     - Redesigned unmapped items query with SQL aggregation (GROUP BY description)
+     - Shows frequency count and affected invoices per unique item
+     - Auto-triggers send when invoice becomes fully mapped
+     - Added statement marking system (`is_statement` boolean field)
+     - Implemented invoice deletion with cascade cleanup
+     - Smart auto-send logic (only sends to Inventory if items have categories)
+     - Enhanced GL validation (different requirements for inventory vs expense items)
+   - **Frontend changes:**
+     - Unmapped items page completely redesigned with grouping
+     - New mapped items review page (`mapped_items.html`)
+     - Category mappings show full GL account names ("1000 - Cash")
+     - Vendor selection/creation in invoice detail
+     - Invoice deletion buttons with confirmation
+     - PDF preview and download functionality
+   - **API enhancements:**
+     - New inventory sync endpoints: `GET /api/items/_hub/sync`, `GET /api/vendor-items/_hub/sync`
+     - Statement marking: `POST /api/invoices/{id}/mark-statement`
+     - Invoice deletion: `DELETE /api/invoices/{id}`
+     - PDF download: `GET /api/invoices/{id}/pdf`
+     - Category lookup: `GET /api/category-mappings/{category}`
+   - **Database migration:**
+     - `20251104_1919_6bd8b98a2419_add_is_statement_field.py` - Adds is_statement boolean
+   - **Files modified:** 20 files (2,015 insertions, 165 deletions)
+   - **Git commits:**
+     - `7d1cc9a` - feat(integration-hub): Major mapping workflow improvements
+     - `a274316` - docs(integration-hub): Update README with Nov 4-8 improvements
+     - `9f1d6ff` - docs: Update main README with Integration Hub improvements (v2.7)
+   - **Pushed to GitHub:** ✅ All commits pushed
+
+### Previous Work (Nov 4, 2025)
 
 1. **Events System: Venue-to-Location Migration + Per-Person Pricing** ✅ (Nov 4, 2025) 🎯
    - **MAJOR ARCHITECTURAL CHANGE** - Complete migration from venue-based to location-based system
@@ -177,28 +212,28 @@
    - PDF deduplication (SHA-256 hashing)
    - Committed: 63afd14, 9f0e5c7
 
-### Git Status - Pending Push ⏳
+### Git Status - All Synced ✅
 
 ```bash
-# Recent commits need to be pushed
 # Branch: main
-# Last commit: 6b984a4 - Events: venue-to-location migration + per-person pricing - COMMITTED ✅
-# Previous commits (Nov 3-4, 2025):
-#   - 5701416 - HR system enhancements (emails, delete, doc security) - PUSHED ✅
-#   - [others] - Inventory docs, HR fixes
+# Status: Clean - All changes committed and pushed
+# Last push: November 8, 2025
+# Latest commits (Nov 8):
+#   - 9f1d6ff - docs: Update main README with Integration Hub improvements (v2.7) - PUSHED ✅
+#   - a274316 - docs(integration-hub): Update README with Nov 4-8 improvements - PUSHED ✅
+#   - 7d1cc9a - feat(integration-hub): Major mapping workflow improvements - PUSHED ✅
+# Previous commits (Nov 4-8):
+#   - 7d94ccf - fix(events): correct tasks API endpoint - PUSHED ✅
+#   - ddc197c - docs: update claude.md with Nov 4 Events changes - PUSHED ✅
+#   - 6b984a4 - feat(events): venue-to-location migration - PUSHED ✅
+#   - abd4a3a - feat: vendor bill creation from Integration Hub - PUSHED ✅
+#   - 36767b3 - Integration Hub: PDF preview/download - PUSHED ✅
 #
-# Commit 6b984a4 includes:
-#   - events/ (15 files): venue-to-location migration, per-person pricing, template mgmt
-#   - New file: events/src/events/schemas/template.py
-#
-# Uncommitted changes (other systems):
-#   - integration-hub/ (multiple files - invoice processing work)
-#   - inventory/ (multiple files)
-#   - Untracked: integration-hub/uploads/ (invoice PDFs)
-#   - Untracked: integration-hub/alembic/versions/ (migration file)
+# Untracked files:
+#   - integration-hub/uploads/ (58 invoice PDFs - correctly ignored by .gitignore)
 ```
 
-**Current Status:** Events changes committed. Ready for push. Other systems have uncommitted work.
+**Current Status:** ✅ All work committed and pushed to GitHub. Repository clean.
 
 ---
 
