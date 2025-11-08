@@ -1,0 +1,467 @@
+{% extends "base.html" %}
+
+{% block title %}Email History - SW Hospitality Events{% endblock %}
+
+{% block page_title %}Email History{% endblock %}
+
+{% block content %}
+<div class="emails-container">
+    <!-- Stats Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="stat-icon bg-primary">
+                        <i class="bi bi-envelope"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalEmails">0</div>
+                        <div class="stat-label">Total Emails</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="stat-icon bg-success">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="sentEmails">0</div>
+                        <div class="stat-label">Sent</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="stat-icon bg-warning">
+                        <i class="bi bi-clock-history"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="queuedEmails">0</div>
+                        <div class="stat-label">Queued</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stat-card">
+                <div class="card-body">
+                    <div class="stat-icon bg-danger">
+                        <i class="bi bi-x-circle"></i>
+                    </div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="failedEmails">0</div>
+                        <div class="stat-label">Failed</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" id="statusFilter">
+                        <option value="">All Statuses</option>
+                        <option value="sent">Sent</option>
+                        <option value="queued">Queued</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Time Period</label>
+                    <select class="form-select" id="daysFilter">
+                        <option value="7">Last 7 days</option>
+                        <option value="30" selected>Last 30 days</option>
+                        <option value="90">Last 90 days</option>
+                        <option value="365">Last year</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Limit</label>
+                    <select class="form-select" id="limitFilter">
+                        <option value="50">50 emails</option>
+                        <option value="100" selected>100 emails</option>
+                        <option value="250">250 emails</option>
+                        <option value="500">500 emails</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">&nbsp;</label>
+                    <button class="btn btn-primary w-100" onclick="loadEmails()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Email List -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="bi bi-inbox"></i> Email Log
+                <span id="emailCount" class="badge bg-primary ms-2">0</span>
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Date/Time</th>
+                            <th>Subject</th>
+                            <th>Recipients</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="emailsTableBody">
+                        <tr>
+                            <td colspan="5" class="text-center py-4">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                Loading emails...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Email Detail Modal -->
+<div class="modal fade" id="emailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Email Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Subject:</label>
+                    <p id="modalSubject"></p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">To:</label>
+                    <p id="modalTo"></p>
+                </div>
+                <div class="mb-3" id="modalCcSection" style="display: none;">
+                    <label class="form-label fw-bold">CC:</label>
+                    <p id="modalCc"></p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Sent At:</label>
+                    <p id="modalSentAt"></p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Status:</label>
+                    <p id="modalStatus"></p>
+                </div>
+                <div class="mb-3" id="modalErrorSection" style="display: none;">
+                    <label class="form-label fw-bold text-danger">Error Message:</label>
+                    <div class="alert alert-danger" id="modalError"></div>
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Email Body:</label>
+                    <div class="email-preview border rounded p-3" id="modalBody"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-danger" id="resendBtn" style="display: none;" onclick="resendEmail()">
+                    <i class="bi bi-arrow-clockwise"></i> Resend Email
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.emails-container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.stat-card {
+    border: none;
+    background: var(--surface-color);
+}
+
+.stat-card .card-body {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.25rem;
+}
+
+.stat-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: white;
+}
+
+.stat-content {
+    flex: 1;
+}
+
+.stat-value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+}
+
+.stat-label {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.table th {
+    background-color: var(--surface-color);
+    border-bottom: 2px solid var(--border-color);
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.status-sent {
+    background-color: rgba(25, 135, 84, 0.1);
+    color: #198754;
+}
+
+.status-queued {
+    background-color: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+}
+
+.status-failed {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.email-preview {
+    background-color: var(--surface-color);
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.recipients-list {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+</style>
+
+<script>
+let currentEmailId = null;
+
+// Load emails and stats on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadStats();
+    loadEmails();
+
+    // Set up filter listeners
+    document.getElementById('statusFilter').addEventListener('change', loadEmails);
+    document.getElementById('daysFilter').addEventListener('change', () => {
+        loadStats();
+        loadEmails();
+    });
+    document.getElementById('limitFilter').addEventListener('change', loadEmails);
+});
+
+async function loadStats() {
+    const days = parseInt(document.getElementById('daysFilter').value);
+
+    try {
+        const response = await fetch(`/api/emails/stats/summary?days=${days}`);
+        if (!response.ok) throw new Error('Failed to load stats');
+
+        const stats = await response.json();
+
+        document.getElementById('totalEmails').textContent = stats.total || 0;
+        document.getElementById('sentEmails').textContent = stats.sent || 0;
+        document.getElementById('queuedEmails').textContent = stats.queued || 0;
+        document.getElementById('failedEmails').textContent = stats.failed || 0;
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+async function loadEmails() {
+    const status = document.getElementById('statusFilter').value;
+    const days = parseInt(document.getElementById('daysFilter').value);
+    const limit = parseInt(document.getElementById('limitFilter').value);
+
+    const params = new URLSearchParams();
+    if (status) params.append('status_filter', status);
+    params.append('days', days);
+    params.append('limit', limit);
+
+    try {
+        const response = await fetch(`/api/emails/?${params.toString()}`);
+        if (!response.ok) throw new Error('Failed to load emails');
+
+        const emails = await response.json();
+        renderEmails(emails);
+    } catch (error) {
+        console.error('Error loading emails:', error);
+        document.getElementById('emailsTableBody').innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center py-4 text-danger">
+                    <i class="bi bi-exclamation-triangle"></i> Failed to load emails
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function renderEmails(emails) {
+    const tbody = document.getElementById('emailsTableBody');
+    document.getElementById('emailCount').textContent = emails.length;
+
+    if (emails.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="5" class="text-center py-4 text-muted">
+                    <i class="bi bi-inbox"></i> No emails found
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = emails.map(email => {
+        const createdAt = new Date(email.created_at);
+        const recipients = email.to_list.join(', ');
+
+        return `
+            <tr>
+                <td>
+                    <div class="fw-bold">${createdAt.toLocaleDateString()}</div>
+                    <div class="text-muted small">${createdAt.toLocaleTimeString()}</div>
+                </td>
+                <td>
+                    <div class="fw-bold">${escapeHtml(email.subject)}</div>
+                </td>
+                <td>
+                    <div class="recipients-list">${escapeHtml(recipients.substring(0, 50))}${recipients.length > 50 ? '...' : ''}</div>
+                </td>
+                <td>
+                    <span class="status-badge status-${email.status}">
+                        ${email.status}
+                    </span>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick='showEmailModal(${JSON.stringify(email)})' title="View Details">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+function showEmailModal(email) {
+    currentEmailId = email.id;
+
+    document.getElementById('modalSubject').textContent = email.subject;
+    document.getElementById('modalTo').textContent = email.to_list.join(', ');
+
+    // CC section
+    if (email.cc_list && email.cc_list.length > 0) {
+        document.getElementById('modalCcSection').style.display = 'block';
+        document.getElementById('modalCc').textContent = email.cc_list.join(', ');
+    } else {
+        document.getElementById('modalCcSection').style.display = 'none';
+    }
+
+    // Sent date
+    if (email.sent_at) {
+        const sentDate = new Date(email.sent_at);
+        document.getElementById('modalSentAt').textContent = sentDate.toLocaleString();
+    } else {
+        document.getElementById('modalSentAt').textContent = 'Not sent yet';
+    }
+
+    // Status
+    document.getElementById('modalStatus').innerHTML = `<span class="status-badge status-${email.status}">${email.status}</span>`;
+
+    // Error message
+    if (email.error_message) {
+        document.getElementById('modalErrorSection').style.display = 'block';
+        document.getElementById('modalError').textContent = email.error_message;
+    } else {
+        document.getElementById('modalErrorSection').style.display = 'none';
+    }
+
+    // Email body (render as HTML)
+    document.getElementById('modalBody').innerHTML = email.body_html;
+
+    // Show resend button only for failed emails
+    if (email.status === 'failed') {
+        document.getElementById('resendBtn').style.display = 'inline-block';
+    } else {
+        document.getElementById('resendBtn').style.display = 'none';
+    }
+
+    // Show modal
+    new bootstrap.Modal(document.getElementById('emailModal')).show();
+}
+
+async function resendEmail() {
+    if (!currentEmailId) return;
+
+    if (!confirm('Resend this email?')) return;
+
+    try {
+        const response = await fetch(`/api/emails/${currentEmailId}/resend`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to resend email');
+        }
+
+        alert('Email has been queued for resending');
+        bootstrap.Modal.getInstance(document.getElementById('emailModal')).hide();
+        await loadStats();
+        await loadEmails();
+    } catch (error) {
+        console.error('Error resending email:', error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}
