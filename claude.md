@@ -11,7 +11,31 @@
 
 ### Most Recent Work (Last Session - Nov 8, 2025)
 
-1. **Integration Hub: Major Workflow Improvements** ✅ (Nov 8, 2025) 🚀 **GAME CHANGER**
+1. **Events System: Comprehensive RBAC Implementation** ✅ (Nov 8, 2025) 🔒 **SECURITY COMPLETE**
+   - **FULL ROLE-BASED ACCESS CONTROL** - All API endpoints now properly secured
+   - **Backend changes:**
+     - Added `require_role()` dependency factory for role-based endpoint protection
+     - Added `require_permission()` dependency factory for granular permission checks
+     - Protected all Events API endpoints (create, update, delete, confirm)
+     - Protected all Tasks API endpoints (create, update, delete with permission checks)
+     - Protected all Settings endpoints (locations, event types, beverages, meals, templates)
+     - Protected Package and Document endpoints (admin/event_manager only for CUD operations)
+     - All endpoints now require Portal SSO authentication (JWT in `portal_session` cookie)
+   - **Permission model:**
+     - **admin**: Full access to everything
+     - **event_manager**: Can create/update events, tasks, settings; cannot delete users
+     - **dept_lead**: Can read/update tasks for their department, read events/financials
+     - **staff**: Can read/update assigned tasks only (DEFAULT for new users)
+     - **read_only**: Read-only access, no financials
+   - **Auto-provisioning:** New users are automatically created in Events DB on first login via Portal SSO with 'staff' role
+   - **Files modified:** 6 files (169 insertions, 55 deletions)
+   - **Git commits:**
+     - `1099d2d` - feat(events): Implement comprehensive RBAC enforcement
+     - `eeea75b` - docs(events): Update README with RBAC implementation
+   - **Status updated:** Events system now 95% complete (was 85%)
+   - **Remaining:** UI role-based hiding, admin UI for role management
+
+2. **Integration Hub: Major Workflow Improvements** ✅ (Nov 8, 2025) 🚀 **GAME CHANGER**
    - **REVOLUTIONARY BULK MAPPING** - Map once by description, applies to ALL occurrences
    - **Backend changes:**
      - Added bulk mapping endpoint: `POST /api/items/map-by-description`
