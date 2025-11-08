@@ -11,11 +11,15 @@
 
 ### Most Recent Work (Last Session - Nov 8, 2025)
 
-**BUG FIX:** Fixed EmailResponse schema export issue (Nov 8, 2025)
-   - Added `EmailResponse` to `events/src/events/schemas/__init__.py` exports
-   - This was preventing the email history API from working properly
-   - Also updated `.gitignore` to exclude integration-hub upload PDFs
-   - Git commits: `7818e2d` (schema fix), `f946f73` (gitignore update)
+**BUG FIXES:** Fixed critical issues preventing admin pages from working (Nov 8, 2025) 🐛
+   1. **EmailResponse schema export** - Added to `schemas/__init__.py` exports (commit `7818e2d`)
+   2. **API URL resolution** - Changed fetch URLs from absolute to relative (commit `87437d4`)
+      - Problem: `<base href="/events/">` doesn't affect JavaScript fetch() URLs
+      - Absolute URLs `/api/users/` were going to root instead of `/events/api/users/`
+      - Nginx was returning 301 redirects → browsers got HTML instead of JSON
+      - Fixed by using relative URLs `api/users/` which properly resolve with base href
+   3. **Updated gitignore** - Exclude integration-hub upload PDFs (commit `f946f73`)
+   - **Status:** Both Users & Roles and Email History pages now fully functional ✅
 
 1. **Events System: Admin UIs Complete** ✅ (Nov 8, 2025) 👥 **MANAGEMENT TOOLS READY**
    - **USERS & ROLES MANAGEMENT** - Full admin interface for managing users and roles
