@@ -54,6 +54,7 @@
                             <th class="sortable" data-sort="vendor_name">
                                 Vendor <i class="bi bi-chevron-expand"></i>
                             </th>
+                            <th>Location</th>
                             <th class="sortable" data-sort="invoice_date">
                                 Date <i class="bi bi-chevron-expand"></i>
                             </th>
@@ -70,11 +71,25 @@
                     <tbody>
                         {% for invoice in invoices %}
                         <tr data-status="{{ invoice.status }}" data-source="{{ invoice.source or 'unknown' }}">
-                            <td><strong>{{ invoice.invoice_number }}</strong></td>
+                            <td>
+                                <strong>{{ invoice.invoice_number if invoice.invoice_number != 'None' else '-' }}</strong>
+                                {% if invoice.is_statement %}
+                                <span class="badge bg-info ms-1" title="Statement - not sent to systems">Statement</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {{ invoice.vendor_name }}
                                 {% if not invoice.vendor_id %}
                                 <i class="bi bi-exclamation-triangle text-warning" title="Vendor not matched"></i>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if invoice.location_name %}
+                                    <span class="badge bg-secondary">{{ invoice.location_name }}</span>
+                                {% elif invoice.location_id %}
+                                    <span class="badge bg-secondary">Location {{ invoice.location_id }}</span>
+                                {% else %}
+                                    <span class="text-muted">Not matched</span>
                                 {% endif %}
                             </td>
                             <td>{{ invoice.invoice_date }}</td>
@@ -117,10 +132,21 @@
                                 <a href="/hub/invoices/{{ invoice.id }}" class="btn btn-sm btn-primary me-1">
                                     <i class="bi bi-eye"></i> View
                                 </a>
-                                {% if invoice.status == 'ready' %}
-                                <button class="btn btn-sm btn-success me-1" onclick="sendInvoiceFromList({{ invoice.id }}, '{{ invoice.invoice_number }}')">
-                                    <i class="bi bi-send"></i> Send
-                                </button>
+                                {% if not invoice.is_statement %}
+                                    {% if invoice.status == 'ready' %}
+                                    <button class="btn btn-sm btn-success me-1" onclick="sendInvoiceFromList({{ invoice.id }}, '{{ invoice.invoice_number }}')">
+                                        <i class="bi bi-send"></i> Send
+                                    </button>
+                                    {% endif %}
+                                    {% if invoice.invoice_number == 'None' or not invoice.invoice_number %}
+                                    <button class="btn btn-sm btn-warning me-1" onclick="markAsStatement({{ invoice.id }})">
+                                        <i class="bi bi-file-text"></i> Mark as Statement
+                                    </button>
+                                    {% endif %}
+                                {% else %}
+                                    <button class="btn btn-sm btn-secondary me-1" onclick="unmarkStatement({{ invoice.id }})">
+                                        <i class="bi bi-arrow-counterclockwise"></i> Unmark Statement
+                                    </button>
                                 {% endif %}
                                 <button class="btn btn-sm btn-danger" onclick="deleteInvoice({{ invoice.id }}, '{{ invoice.invoice_number }}')">
                                     <i class="bi bi-trash"></i>
@@ -426,6 +452,72 @@ function showAlert(message, title = 'Notice') {
 
         modal.show();
     });
+}
+
+// Mark invoice as statement
+async function markAsStatement(invoiceId) {
+    const confirmed = await showConfirm(
+        'Mark this as a statement? Statements are not sent to inventory or accounting systems and are kept for reference only.',
+        'Mark as Statement'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hub/api/invoices/${invoiceId}/mark-statement`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ is_statement: true })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            await showAlert('Invoice marked as statement successfully!', 'Success');
+            location.reload();
+        } else {
+            await showAlert(`Error marking as statement: ${result.detail || 'Unknown error'}`, 'Error');
+        }
+    } catch (error) {
+        await showAlert(`Error marking as statement: ${error.message}`, 'Error');
+    }
+}
+
+// Unmark statement
+async function unmarkStatement(invoiceId) {
+    const confirmed = await showConfirm(
+        'Remove statement marking? This will allow the invoice to be sent to inventory and accounting systems.',
+        'Unmark Statement'
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hub/api/invoices/${invoiceId}/mark-statement`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ is_statement: false })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            await showAlert('Statement marking removed successfully!', 'Success');
+            location.reload();
+        } else {
+            await showAlert(`Error unmarking statement: ${result.detail || 'Unknown error'}`, 'Error');
+        }
+    } catch (error) {
+        await showAlert(`Error unmarking statement: ${error.message}`, 'Error');
+    }
 }
 </script>
 {% endblock %}

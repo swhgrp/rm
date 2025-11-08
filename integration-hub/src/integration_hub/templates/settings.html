@@ -126,6 +126,9 @@
                 <button type="button" id="testConnectionBtn" class="btn btn-secondary">
                     <i class="bi bi-lightning"></i> Test Connection
                 </button>
+                <button type="button" id="checkEmailNowBtn" class="btn btn-success">
+                    <i class="bi bi-envelope-check"></i> Check Email Now
+                </button>
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-save"></i> Save Settings
                 </button>
@@ -319,6 +322,44 @@ document.getElementById('testConnectionBtn').addEventListener('click', async fun
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-lightning"></i> Test Connection';
+    }
+});
+
+// Check Email Now button
+document.getElementById('checkEmailNowBtn').addEventListener('click', async function() {
+    const btn = this;
+    const originalHTML = btn.innerHTML;
+
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Checking...';
+
+        const response = await fetch('/hub/api/settings/check-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include'
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            const stats = result.stats;
+            const message = `Email check complete!\n\nEmails checked: ${stats.emails_checked}\nNew invoices: ${stats.invoices_processed}\nDuplicates skipped: ${stats.duplicates_skipped}\nErrors: ${stats.errors}`;
+
+            showAlert(message, 'success');
+
+            // Reload page if any invoices were processed
+            if (stats.invoices_processed > 0) {
+                setTimeout(() => window.location.reload(), 1500);
+            }
+        } else {
+            showAlert('Error checking email: ' + (result.message || 'Unknown error'), 'error');
+        }
+    } catch (error) {
+        showAlert('Error checking email: ' + error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
     }
 });
 

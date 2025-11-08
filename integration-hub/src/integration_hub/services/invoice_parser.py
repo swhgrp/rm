@@ -8,10 +8,12 @@ Inventory and Accounting systems.
 import os
 import json
 import logging
+import base64
 from typing import Dict, Optional
 from datetime import datetime
+from pathlib import Path
 from openai import OpenAI
-import PyPDF2
+from pdf2image import convert_from_path
 
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
@@ -22,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class InvoiceParser:
-    """Parse invoices using OpenAI GPT-4o-mini"""
+    """Parse invoices using OpenAI GPT-4o Vision"""
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.getenv("OPENAI_API_KEY")
@@ -33,7 +35,9 @@ class InvoiceParser:
 
     def parse_invoice_pdf(self, pdf_path: str) -> Dict:
         """
-        Parse invoice PDF using OpenAI GPT-4o-mini
+        Parse invoice PDF using OpenAI GPT-4o Vision
+
+        Converts PDF to images and uses vision model to extract structured data.
 
         Returns:
             Dict with structure: {
@@ -44,29 +48,33 @@ class InvoiceParser:
             }
         """
         try:
-            # Extract text from PDF
-            with open(pdf_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
-                text_content = ""
-                for page in pdf_reader.pages:
-                    text_content += page.extract_text()
+            # Convert PDF to images
+            logger.info(f"Converting PDF to images: {pdf_path}")
+            images = convert_from_path(pdf_path, dpi=200, first_page=1, last_page=1)
 
-            if not text_content.strip():
+            if not images:
                 return {
                     "success": False,
-                    "error": "No text could be extracted from PDF",
-                    "message": "PDF appears to be empty or image-based"
+                    "error": "Failed to convert PDF to image",
+                    "message": "PDF conversion failed"
                 }
 
-            # Use GPT-4o-mini for text-based parsing
+            # Convert first page to base64
+            from io import BytesIO
+            buffered = BytesIO()
+            images[0].save(buffered, format="PNG")
+            img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+
+            # Use GPT-4o Vision for image-based parsing
+            logger.info("Calling GPT-4o Vision API for invoice parsing")
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o",
                 messages=[
                     {
                         "role": "system",
                         "content": """You are an expert at parsing restaurant supply invoices.
-                        Extract structured data from the invoice text provided.
-                        Return a JSON object with the following structure:
+                        You can see the invoice image and must extract structured data from it.
+                        Return ONLY a valid JSON object with this exact structure:
                         {
                             "vendor_name": "string (the supplier/vendor company name)",
                             "vendor_account_number": "string (customer/account number if present)",
@@ -92,26 +100,37 @@ class InvoiceParser:
                         }
 
                         CRITICAL INSTRUCTIONS:
-                        - vendor_name: Extract the SUPPLIER/VENDOR company name (who issued/sent the invoice)
-                          Example: "Gold Coast Linen", "SYSCO", "US Foods", "Performance Food Group"
-                        - location_name: Extract the DELIVERY LOCATION or restaurant name (who received the goods)
-                          Look for "Ship To:", "Deliver To:", "Location:", or customer name on the invoice
-                          Example: "SW Grill", "Seaside Grill", "The Nest Eatery", "Park Bistro"
-                        - vendor_account_number: The customer account number on the invoice
-                        - For pack_size, extract packaging information like:
-                          * "Case - 6" if the item comes in a case of 6
-                          * "6x5 LB" if it's 6 packs of 5 pounds each
-                          * "Each" if sold individually
-                          * "Dozen" if sold by the dozen
-                        - If any field is not found, use null
-                        - Be precise with numbers and dates
-                        - IMPORTANT: Distinguish between vendor (supplier) and location (customer/restaurant)"""
+                        - vendor_name: The company at the TOP of the invoice (letterhead/logo area) who SENT the invoice
+                          Example: "Gold Coast Linen Service", "SYSCO", "US Foods"
+                          Look for company name near logo, top-left, or "From:" section
+                        - location_name: The DELIVERY/SHIP TO location (customer receiving goods)
+                          Look for "Ship To:", "Deliver To:", "Location:", or customer name
+                          Example: "SW GRILL", "Seaside Grill", "The Nest Eatery"
+                        - vendor_account_number: The account/customer number on the invoice
+                        - Extract ALL line items from the invoice table with precise quantities and prices
+                        - For pack_size, look for packaging info in item description or separate column
+                        - If any field is not visible/present, use null
+                        - Be extremely precise with numbers (quantities, prices, totals)
+                        - Return ONLY valid JSON, no explanations or markdown"""
                     },
                     {
                         "role": "user",
-                        "content": f"Parse this invoice:\n\n{text_content}"
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Parse this restaurant supply invoice. Extract vendor, location, invoice details, and all line items."
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/png;base64,{img_base64}",
+                                    "detail": "high"
+                                }
+                            }
+                        ]
                     }
                 ],
+                max_tokens=4096,
                 temperature=0.1
             )
 

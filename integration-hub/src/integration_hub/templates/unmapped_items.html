@@ -36,14 +36,23 @@
     {% if unique_items %}
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-list-check"></i> {{ unique_items|length }} Unique Item(s) Need Mapping</span>
+            <span><i class="bi bi-list-check"></i> <span id="itemCount">{{ unique_items|length }}</span> Unique Item(s) Need Mapping</span>
             <button class="btn btn-success btn-sm" id="mapSelectedBtn" onclick="openBulkMapModal()" disabled>
                 <i class="bi bi-link-45deg"></i> Map <span id="selectedCount">0</span> Selected
             </button>
         </div>
         <div class="card-body">
+            <div class="mb-3">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="searchInput" placeholder="Search items by description, vendor, or invoice number..." onkeyup="filterItems()">
+                    <button class="btn btn-outline-secondary" type="button" onclick="clearSearch()">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </button>
+                </div>
+            </div>
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover" id="itemsTable">
                     <thead>
                         <tr>
                             <th style="width: 40px;">
@@ -117,91 +126,98 @@
                 <form id="mapForm">
                     <input type="hidden" id="itemDescription" name="item_description">
 
-                    <div class="mb-3">
-                        <label class="form-label">Inventory Item ID</label>
-                        <input type="number" class="form-control" id="inventoryItemId" name="inventory_item_id">
-                        <small class="text-muted">Leave blank if not in inventory yet</small>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label">Category</label>
-                        <select class="form-select" id="inventoryCategory" name="inventory_category">
-                            <option value="">-- Not an inventory item (e.g., linen, propane, supplies) --</option>
-                            <option value="produce">Produce</option>
-                            <option value="dairy">Dairy</option>
-                            <option value="poultry">Poultry</option>
-                            <option value="beef">Beef</option>
-                            <option value="seafood">Seafood</option>
-                            <option value="pork">Pork</option>
-                            <option value="dry_goods">Dry Goods</option>
-                            <option value="frozen">Frozen</option>
-                            <option value="beverage_na">Beverage (Non-Alcoholic)</option>
-                            <option value="beer_draft">Beer - Draft</option>
-                            <option value="beer_bottled">Beer - Bottled</option>
-                            <option value="wine">Wine</option>
-                            <option value="liquor">Liquor</option>
-                            <option value="supplies">Supplies</option>
-                            <option value="merchandise">Merchandise</option>
-                        </select>
-                        <small class="text-muted">Only required for inventory items. Leave blank for expenses like linen, propane, CO2, etc.</small>
+                    <!-- Step 1: Choose Item Type -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Item Type <span class="text-danger">*</span></label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="item_type" id="itemTypeInventory" value="inventory" checked>
+                            <label class="form-check-label" for="itemTypeInventory">
+                                <strong>Inventory Item</strong> - Goes to Inventory & Accounting systems
+                                <br><small class="text-muted">Food items tracked in inventory (produce, meat, dairy, etc.)</small>
+                            </label>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="radio" name="item_type" id="itemTypeExpense" value="expense">
+                            <label class="form-check-label" for="itemTypeExpense">
+                                <strong>Expense Item</strong> - Goes to Accounting system only
+                                <br><small class="text-muted">Non-inventory expenses (linen, propane, supplies, services)</small>
+                            </label>
+                        </div>
                     </div>
 
                     <hr>
-                    <h6>GL Account Mapping <span class="text-danger">*</span></h6>
 
-                    <div class="mb-3">
-                        <label class="form-label">Asset Account</label>
-                        <div class="searchable-select-wrapper">
-                            <input type="text" class="form-control search-input" id="searchAssetAccount" placeholder="Search accounts...">
-                            <select class="form-select" id="glAssetAccount" name="gl_asset_account" size="6">
-                                <option value="">-- Not applicable (expense-only items) --</option>
-                                {% for account in gl_accounts %}
-                                    {% if account.account_type == 'ASSET' %}
-                                    <option value="{{ account.account_number }}">
-                                        {{ account.account_number }} - {{ account.account_name }}
+                    <!-- Inventory Item Fields -->
+                    <div id="inventoryItemFields">
+                        <h6 class="mb-3">Inventory Item Mapping</h6>
+
+                        <div class="mb-3">
+                            <label class="form-label">Vendor Item (Product) <span class="text-danger">*</span></label>
+                            <div class="searchable-select-wrapper">
+                                <input type="text" class="form-control search-input" id="searchInventoryItem" placeholder="Search vendor items by name, SKU, or vendor...">
+                                <select class="form-select" id="inventoryItemId" name="inventory_item_id" size="6">
+                                    <option value="">-- Select vendor item --</option>
+                                    {% for item in inventory_items %}
+                                    <option value="{{ item.id }}">
+                                        {{ item.vendor_name }}: {{ item.vendor_product_name }}{% if item.vendor_sku %} [{{ item.vendor_sku }}]{% endif %}{% if item.pack_size %} - {{ item.pack_size }}{% endif %}
                                     </option>
-                                    {% endif %}
-                                {% endfor %}
-                            </select>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <small class="text-muted">Select the specific vendor product with SKU and pack size</small>
                         </div>
-                        <small class="text-muted">For inventory items only (e.g., 1418 - Poultry Inventory)</small>
+
+                        <div class="mb-3">
+                            <label class="form-label">Category <span class="text-danger">*</span></label>
+                            <select class="form-select" id="inventoryCategory" name="inventory_category">
+                                <option value="">-- Select category --</option>
+                                <option value="Produce">Produce</option>
+                                <option value="Dairy">Dairy</option>
+                                <option value="Poultry">Poultry</option>
+                                <option value="Beef">Beef</option>
+                                <option value="Seafood">Seafood</option>
+                                <option value="Pork">Pork</option>
+                                <option value="Dry Goods">Dry Goods</option>
+                                <option value="Frozen">Frozen</option>
+                                <option value="Beverage (Non-Alcohol)">Beverage (Non-Alcohol)</option>
+                                <option value="Beer - Draft">Beer - Draft</option>
+                                <option value="Beer - Bottled">Beer - Bottled</option>
+                                <option value="Wine">Wine</option>
+                                <option value="Liquor">Liquor</option>
+                                <option value="Supplies">Supplies</option>
+                                <option value="Merchandise">Merchandise</option>
+                            </select>
+                            <small class="text-muted">GL accounts will be automatically assigned based on category mapping</small>
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">COGS/Expense Account <span class="text-danger">*</span></label>
-                        <div class="searchable-select-wrapper">
-                            <input type="text" class="form-control search-input" id="searchCogsAccount" placeholder="Search accounts...">
-                            <select class="form-select" id="glCogsAccount" name="gl_cogs_account" size="6" required>
-                                <option value="">-- Select account --</option>
-                                {% for account in gl_accounts %}
-                                    {% if account.account_type in ['COGS', 'EXPENSE'] %}
-                                    <option value="{{ account.account_number }}">
-                                        {{ account.account_number }} - {{ account.account_name }}
-                                    </option>
-                                    {% endif %}
-                                {% endfor %}
-                            </select>
+                    <!-- Expense Item Fields -->
+                    <div id="expenseItemFields" style="display: none;">
+                        <h6 class="mb-3">Expense Item Mapping</h6>
+
+                        <div class="mb-3">
+                            <label class="form-label">Expense Account <span class="text-danger">*</span></label>
+                            <div class="searchable-select-wrapper">
+                                <input type="text" class="form-control search-input" id="searchExpenseAccount" placeholder="Search accounts...">
+                                <select class="form-select" id="glExpenseAccount" name="gl_expense_account" size="6">
+                                    <option value="">-- Select expense account --</option>
+                                    {% for account in gl_accounts %}
+                                        {% if account.account_type in ['EXPENSE'] %}
+                                        <option value="{{ account.account_number }}">
+                                            {{ account.account_number }} - {{ account.account_name }}
+                                        </option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <small class="text-muted">Select the GL account for this expense (e.g., 7165 - Linen Expense)</small>
                         </div>
-                        <small class="text-muted">For COGS (food) use 5xxx accounts, for expenses (linen, propane) use 6xxx accounts</small>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">Waste Account</label>
-                        <div class="searchable-select-wrapper">
-                            <input type="text" class="form-control search-input" id="searchWasteAccount" placeholder="Search accounts...">
-                            <select class="form-select" id="glWasteAccount" name="gl_waste_account" size="6">
-                                <option value="">-- Not applicable --</option>
-                                {% for account in gl_accounts %}
-                                    {% if account.account_type == 'EXPENSE' %}
-                                    <option value="{{ account.account_number }}">
-                                        {{ account.account_number }} - {{ account.account_name }}
-                                    </option>
-                                    {% endif %}
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <small class="text-muted">For inventory items only (e.g., 7180 - Food Waste Expense)</small>
-                    </div>
+                    <!-- Hidden fields for GL accounts (populated automatically for inventory items) -->
+                    <input type="hidden" id="glAssetAccount" name="gl_asset_account">
+                    <input type="hidden" id="glCogsAccount" name="gl_cogs_account">
+                    <input type="hidden" id="glWasteAccount" name="gl_waste_account">
                 </form>
             </div>
             <div class="modal-footer">
@@ -226,6 +242,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Set up search input event listeners after modal is ready
     setupSearchListeners();
+
+    // Set up item type radio button listeners
+    setupItemTypeListeners();
 });
 
 // Toggle select all checkboxes
@@ -239,15 +258,60 @@ function toggleSelectAll(checkbox) {
 
 // Update selected count and enable/disable bulk button
 function updateSelectedCount() {
-    const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
+    // Only count checked boxes in visible rows
+    const checkedBoxes = Array.from(document.querySelectorAll('.item-checkbox:checked')).filter(cb => {
+        const row = cb.closest('tr');
+        return row && row.style.display !== 'none';
+    });
     const count = checkedBoxes.length;
     document.getElementById('selectedCount').textContent = count;
     document.getElementById('mapSelectedBtn').disabled = count === 0;
 
     // Update select all checkbox state
-    const allCheckboxes = document.querySelectorAll('.item-checkbox');
+    const allCheckboxes = document.querySelectorAll('.item-checkbox:not([style*="display: none"])');
     const selectAllCheckbox = document.getElementById('selectAll');
     selectAllCheckbox.checked = count === allCheckboxes.length && count > 0;
+}
+
+// Filter items table
+function filterItems() {
+    const searchInput = document.getElementById('searchInput');
+    const filter = searchInput.value.toLowerCase();
+    const table = document.getElementById('itemsTable');
+    const rows = table.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+
+    let visibleCount = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const description = row.cells[1].textContent.toLowerCase();
+        const vendors = row.cells[3].textContent.toLowerCase();
+        const invoices = row.cells[4].textContent.toLowerCase();
+
+        if (description.includes(filter) || vendors.includes(filter) || invoices.includes(filter)) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+            // Uncheck hidden rows
+            const checkbox = row.querySelector('.item-checkbox');
+            if (checkbox && checkbox.checked) {
+                checkbox.checked = false;
+            }
+        }
+    }
+
+    // Update item count display
+    document.getElementById('itemCount').textContent = visibleCount;
+
+    // Update selected count after filtering
+    updateSelectedCount();
+}
+
+// Clear search
+function clearSearch() {
+    document.getElementById('searchInput').value = '';
+    filterItems();
 }
 
 // Open modal for bulk mapping
@@ -296,12 +360,52 @@ function openBulkMapModal() {
     mapModal.show();
 }
 
+// Set up item type radio button listeners
+function setupItemTypeListeners() {
+    const inventoryRadio = document.getElementById('itemTypeInventory');
+    const expenseRadio = document.getElementById('itemTypeExpense');
+    const inventoryFields = document.getElementById('inventoryItemFields');
+    const expenseFields = document.getElementById('expenseItemFields');
+
+    function toggleFields() {
+        if (inventoryRadio.checked) {
+            inventoryFields.style.display = 'block';
+            expenseFields.style.display = 'none';
+        } else {
+            inventoryFields.style.display = 'none';
+            expenseFields.style.display = 'block';
+        }
+    }
+
+    inventoryRadio.addEventListener('change', toggleFields);
+    expenseRadio.addEventListener('change', toggleFields);
+}
+
+// Fetch GL accounts for a category from category mappings
+async function fetchCategoryGLAccounts(category) {
+    if (!category) return null;
+
+    try {
+        const response = await fetch(`/hub/api/category-mappings/${category}`);
+        if (!response.ok) return null;
+
+        const data = await response.json();
+        return {
+            gl_asset_account: data.gl_asset_account,
+            gl_cogs_account: data.gl_cogs_account,
+            gl_waste_account: data.gl_waste_account
+        };
+    } catch (error) {
+        console.error('Error fetching category GL accounts:', error);
+        return null;
+    }
+}
+
 // Set up event listeners for search inputs
 function setupSearchListeners() {
     const searchInputs = [
-        {inputId: 'searchAssetAccount', selectId: 'glAssetAccount'},
-        {inputId: 'searchCogsAccount', selectId: 'glCogsAccount'},
-        {inputId: 'searchWasteAccount', selectId: 'glWasteAccount'}
+        {inputId: 'searchInventoryItem', selectId: 'inventoryItemId'},
+        {inputId: 'searchExpenseAccount', selectId: 'glExpenseAccount'}
     ];
 
     searchInputs.forEach(({inputId, selectId}) => {
@@ -383,18 +487,63 @@ function openMapModal(description, occurrenceCount) {
 }
 
 async function saveMapping() {
-    const cogsAccount = document.getElementById('glCogsAccount').value;
+    const itemType = document.querySelector('input[name="item_type"]:checked').value;
 
-    // Validate required field
-    if (!cogsAccount) {
-        await showAlert('COGS/Expense Account is required', 'Validation Error');
-        return;
+    let inventoryItemId, category, assetAccount, cogsAccount, wasteAccount;
+
+    if (itemType === 'inventory') {
+        // Inventory item validation
+        inventoryItemId = document.getElementById('inventoryItemId').value;
+        category = document.getElementById('inventoryCategory').value;
+
+        if (!inventoryItemId) {
+            await showAlert('Please select a vendor item', 'Validation Error');
+            return;
+        }
+
+        if (!category) {
+            await showAlert('Please select a category', 'Validation Error');
+            return;
+        }
+
+        // Fetch GL accounts from category mapping
+        const categoryGLs = await fetchCategoryGLAccounts(category);
+        if (!categoryGLs) {
+            await showAlert(`No GL account mapping found for category: ${category}`, 'Error');
+            return;
+        }
+
+        // Set GL accounts from category mapping
+        assetAccount = categoryGLs.gl_asset_account;
+        cogsAccount = categoryGLs.gl_cogs_account;
+        wasteAccount = categoryGLs.gl_waste_account;
+
+        // Update hidden fields
+        document.getElementById('glAssetAccount').value = assetAccount;
+        document.getElementById('glCogsAccount').value = cogsAccount;
+        document.getElementById('glWasteAccount').value = wasteAccount || '';
+
+    } else {
+        // Expense item validation
+        const expenseAccount = document.getElementById('glExpenseAccount').value;
+
+        if (!expenseAccount) {
+            await showAlert('Please select an expense account', 'Validation Error');
+            return;
+        }
+
+        // For expense items: no vendor item, no category, expense account goes to COGS field
+        inventoryItemId = null;
+        category = null;
+        assetAccount = null;
+        cogsAccount = expenseAccount;
+        wasteAccount = null;
+
+        // Update hidden fields
+        document.getElementById('glAssetAccount').value = '';
+        document.getElementById('glCogsAccount').value = cogsAccount;
+        document.getElementById('glWasteAccount').value = '';
     }
-
-    const inventoryItemId = document.getElementById('inventoryItemId').value;
-    const category = document.getElementById('inventoryCategory').value;
-    const assetAccount = document.getElementById('glAssetAccount').value;
-    const wasteAccount = document.getElementById('glWasteAccount').value;
 
     try {
         let totalMapped = 0;

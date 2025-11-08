@@ -114,7 +114,12 @@
                                 {% for invoice in recent_invoices %}
                                 <tr>
                                     <td>{{ invoice.invoice_number }}</td>
-                                    <td>{{ invoice.vendor_name }}</td>
+                                    <td>
+                                        {{ invoice.vendor_name }}
+                                        {% if not invoice.vendor_id %}
+                                        <i class="bi bi-exclamation-triangle text-warning" title="Vendor not matched"></i>
+                                        {% endif %}
+                                    </td>
                                     <td>{{ invoice.invoice_date }}</td>
                                     <td>${{ "{:,.2f}".format(invoice.total_amount) }}</td>
                                     <td>

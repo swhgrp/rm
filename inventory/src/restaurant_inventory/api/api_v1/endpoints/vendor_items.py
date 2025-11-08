@@ -19,6 +19,53 @@ from restaurant_inventory.schemas.vendor_item import (
 router = APIRouter()
 
 
+@router.get("/_hub/sync")
+def get_vendor_items_for_hub(
+    vendor_id: Optional[int] = None,
+    is_active: bool = True,
+    limit: int = 5000,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all vendor items for Integration Hub sync
+    No authentication required - this is an internal API call from the hub
+    IMPORTANT: This route must be defined BEFORE /{vendor_item_id} route
+    Path starts with _ to avoid being matched by /{vendor_item_id} pattern
+    """
+    query = db.query(VendorItem).options(
+        joinedload(VendorItem.vendor),
+        joinedload(VendorItem.master_item)
+    )
+
+    if vendor_id:
+        query = query.filter(VendorItem.vendor_id == vendor_id)
+
+    if is_active:
+        query = query.filter(VendorItem.is_active == True)
+
+    vendor_items = query.limit(limit).all()
+
+    # Return simple dict format for hub
+    item_list = []
+    for vi in vendor_items:
+        item_list.append({
+            "id": vi.id,
+            "vendor_id": vi.vendor_id,
+            "vendor_name": vi.vendor.name if vi.vendor else None,
+            "vendor_sku": vi.vendor_sku,
+            "vendor_product_name": vi.vendor_product_name,
+            "vendor_description": vi.vendor_description,
+            "master_item_id": vi.master_item_id,
+            "master_item_name": vi.master_item.name if vi.master_item else None,
+            "pack_size": vi.pack_size,
+            "unit_price": float(vi.unit_price) if vi.unit_price else None,
+            "is_active": vi.is_active,
+            "is_preferred": vi.is_preferred
+        })
+
+    return item_list
+
+
 @router.get("/", response_model=List[VendorItemResponse])
 async def get_vendor_items(
     vendor_id: Optional[int] = None,

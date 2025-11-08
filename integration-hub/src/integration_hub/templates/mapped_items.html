@@ -1,0 +1,606 @@
+{% extends "base.html" %}
+
+{% block title %}Unmapped Items - Integration Hub{% endblock %}
+
+{% block head %}
+<style>
+    /* Modal adjustments */
+    #mapModal .modal-body {
+        padding-bottom: 50px;
+    }
+
+    /* Searchable select styling */
+    .searchable-select-wrapper {
+        position: relative;
+    }
+
+    .searchable-select-wrapper .search-input {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+
+    .searchable-select-wrapper select {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1><i class="bi bi-check-circle"></i> Mapped Items</h1>
+        <p class="text-muted">Review and edit mapped invoice items</p>
+    </div>
+
+    {% if unique_items %}
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list-check"></i> <span id="itemCount">{{ unique_items|length }}</span> Unique Item(s) Mapped</span>
+            <div class="d-flex gap-2">
+                <input type="text" id="searchInput" class="form-control form-control-sm" placeholder="Search items..." style="width: 300px;">
+                <select id="sortSelect" class="form-select form-select-sm" style="width: 200px;">
+                    <option value="description-asc">Description A-Z</option>
+                    <option value="description-desc">Description Z-A</option>
+                    <option value="vendor-asc">Vendor A-Z</option>
+                    <option value="vendor-desc">Vendor Z-A</option>
+                </select>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover" id="mappedItemsTable">
+                    <thead>
+                        <tr>
+                            <th>Item Description</th>
+                            <th>Item Code</th>
+                            <th>Current Mapping</th>
+                            <th>Vendors</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in unique_items %}
+                        <tr data-description="{{ item.item_description|lower }}" data-vendor="{{ item.vendor_names[0]|lower if item.vendor_names else '' }}">
+                            <td><strong>{{ item.item_description }}</strong></td>
+                            <td>
+                                {% if item.item_code %}
+                                    <span class="badge bg-secondary">{{ item.item_code }}</span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.vendor_item_details %}
+                                    <span class="badge bg-success">{{ item.vendor_item_details }}</span>
+                                {% elif item.inventory_category %}
+                                    <span class="badge bg-info">{{ item.inventory_category }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Not Specified</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% for vendor in item.vendor_names %}
+                                    <span class="badge bg-secondary">{{ vendor }}</span>
+                                {% endfor %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-warning"
+                                        onclick="openEditModal('{{ item.item_description|replace("'", "\\'") }}', {{ item.occurrence_count }}, {{ item.inventory_item_id or 'null' }}, '{{ item.inventory_category or '' }}', {{ item.gl_asset_account or 'null' }}, {{ item.gl_cogs_account or 'null' }}, {{ item.gl_waste_account or 'null' }})">
+                                    <i class="bi bi-pencil"></i> Edit
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i>
+        No mapped items yet. Go to <a href="/hub/unmapped-items">Unmapped Items</a> to start mapping.
+    </div>
+    {% endif %}
+</div>
+
+<!-- Mapping Modal -->
+<div class="modal fade" id="mapModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="mapModalTitle">Map Item to All Instances</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info" id="mapModalInfo">
+                    <strong>Item:</strong> <span id="modalItemDescription"></span><br>
+                    <strong>Occurrences:</strong> <span id="modalOccurrenceCount"></span> unmapped instances will be mapped
+                </div>
+
+                <form id="mapForm">
+                    <input type="hidden" id="itemDescription" name="item_description">
+
+                    <div class="mb-3">
+                        <label class="form-label">Vendor Item (Product)</label>
+                        <div class="searchable-select-wrapper">
+                            <input type="text" class="form-control search-input" id="searchInventoryItem" placeholder="Search vendor items by name, SKU, or vendor...">
+                            <select class="form-select" id="inventoryItemId" name="inventory_item_id" size="6">
+                                <option value="">-- Leave blank if not in inventory yet --</option>
+                                {% for item in inventory_items %}
+                                <option value="{{ item.id }}">
+                                    {{ item.vendor_name }}: {{ item.vendor_product_name }}{% if item.vendor_sku %} [{{ item.vendor_sku }}]{% endif %}{% if item.pack_size %} - {{ item.pack_size }}{% endif %}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <small class="text-muted">Select the specific vendor product (with SKU and pack size) or leave blank if not in inventory yet</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Category</label>
+                        <select class="form-select" id="inventoryCategory" name="inventory_category">
+                            <option value="">-- Not an inventory item (e.g., linen, propane, supplies) --</option>
+                            <option value="Produce">Produce</option>
+                            <option value="Dairy">Dairy</option>
+                            <option value="Poultry">Poultry</option>
+                            <option value="Beef">Beef</option>
+                            <option value="Dry Goods">Dry Goods</option>
+                        </select>
+                        <small class="text-muted">Only required for inventory items. Leave blank for expenses like linen, propane, CO2, etc.</small>
+                    </div>
+
+                    <hr>
+                    <h6>GL Account Mapping <span class="text-danger">*</span></h6>
+
+                    <div class="mb-3">
+                        <label class="form-label">Asset Account</label>
+                        <div class="searchable-select-wrapper">
+                            <input type="text" class="form-control search-input" id="searchAssetAccount" placeholder="Search accounts...">
+                            <select class="form-select" id="glAssetAccount" name="gl_asset_account" size="6">
+                                <option value="">-- Not applicable (expense-only items) --</option>
+                                {% for account in gl_accounts %}
+                                    {% if account.account_type == 'ASSET' %}
+                                    <option value="{{ account.account_number }}">
+                                        {{ account.account_number }} - {{ account.account_name }}
+                                    </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <small class="text-muted">For inventory items only (e.g., 1418 - Poultry Inventory)</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">COGS/Expense Account <span class="text-danger">*</span></label>
+                        <div class="searchable-select-wrapper">
+                            <input type="text" class="form-control search-input" id="searchCogsAccount" placeholder="Search accounts...">
+                            <select class="form-select" id="glCogsAccount" name="gl_cogs_account" size="6" required>
+                                <option value="">-- Select account --</option>
+                                {% for account in gl_accounts %}
+                                    {% if account.account_type in ['COGS', 'EXPENSE'] %}
+                                    <option value="{{ account.account_number }}">
+                                        {{ account.account_number }} - {{ account.account_name }}
+                                    </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <small class="text-muted">For COGS (food) use 5xxx accounts, for expenses (linen, propane) use 6xxx accounts</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Waste Account</label>
+                        <div class="searchable-select-wrapper">
+                            <input type="text" class="form-control search-input" id="searchWasteAccount" placeholder="Search accounts...">
+                            <select class="form-select" id="glWasteAccount" name="gl_waste_account" size="6">
+                                <option value="">-- Not applicable --</option>
+                                {% for account in gl_accounts %}
+                                    {% if account.account_type == 'EXPENSE' %}
+                                    <option value="{{ account.account_number }}">
+                                        {{ account.account_number }} - {{ account.account_name }}
+                                    </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <small class="text-muted">For inventory items only (e.g., 7180 - Food Waste Expense)</small>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveMapping()">Save Mapping</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let mapModalElement = null;
+let mapModal = null;
+let isBulkMode = false;
+let selectedItems = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    mapModalElement = document.getElementById('mapModal');
+    mapModal = new bootstrap.Modal(mapModalElement);
+
+    // Set up search input event listeners after modal is ready
+    setupSearchListeners();
+});
+
+// Toggle select all checkboxes
+function toggleSelectAll(checkbox) {
+    const itemCheckboxes = document.querySelectorAll('.item-checkbox');
+    itemCheckboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    updateSelectedCount();
+}
+
+// Update selected count and enable/disable bulk button
+function updateSelectedCount() {
+    const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
+    const count = checkedBoxes.length;
+    document.getElementById('selectedCount').textContent = count;
+    document.getElementById('mapSelectedBtn').disabled = count === 0;
+
+    // Update select all checkbox state
+    const allCheckboxes = document.querySelectorAll('.item-checkbox');
+    const selectAllCheckbox = document.getElementById('selectAll');
+    selectAllCheckbox.checked = count === allCheckboxes.length && count > 0;
+}
+
+// Open modal for bulk mapping
+function openBulkMapModal() {
+    const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
+    selectedItems = Array.from(checkedBoxes).map(cb => ({
+        description: cb.value,
+        count: parseInt(cb.getAttribute('data-count'))
+    }));
+
+    if (selectedItems.length === 0) {
+        showAlert('Please select at least one item to map.');
+        return;
+    }
+
+    isBulkMode = true;
+    const totalOccurrences = selectedItems.reduce((sum, item) => sum + item.count, 0);
+
+    document.getElementById('mapModalTitle').textContent = 'Map Multiple Items';
+    document.getElementById('mapModalInfo').innerHTML = `
+        <strong>Selected Items:</strong> ${selectedItems.length}<br>
+        <strong>Total Occurrences:</strong> ${totalOccurrences} unmapped instances will be mapped
+    `;
+
+    // Reset form
+    document.getElementById('mapForm').reset();
+    document.getElementById('itemDescription').value = '';
+
+    // Clear all search inputs and reset selects
+    const searchInputs = document.querySelectorAll('.search-input');
+    searchInputs.forEach(input => {
+        input.value = '';
+    });
+
+    const selects = document.querySelectorAll('#mapModal select');
+    selects.forEach(select => {
+        const options = select.getElementsByTagName('option');
+        for (let i = 0; i < options.length; i++) {
+            options[i].style.display = '';
+        }
+        select.disabled = false;
+        select.style.pointerEvents = 'auto';
+    });
+
+    setupSearchListeners();
+    mapModal.show();
+}
+
+// Set up event listeners for search inputs
+function setupSearchListeners() {
+    const searchInputs = [
+        {inputId: 'searchInventoryItem', selectId: 'inventoryItemId'},
+        {inputId: 'searchAssetAccount', selectId: 'glAssetAccount'},
+        {inputId: 'searchCogsAccount', selectId: 'glCogsAccount'},
+        {inputId: 'searchWasteAccount', selectId: 'glWasteAccount'}
+    ];
+
+    searchInputs.forEach(({inputId, selectId}) => {
+        const inputElement = document.getElementById(inputId);
+        if (inputElement) {
+            // Remove any existing listeners
+            const newInput = inputElement.cloneNode(true);
+            inputElement.parentNode.replaceChild(newInput, inputElement);
+
+            // Add new listener
+            newInput.addEventListener('input', function() {
+                filterSelect(this.value, selectId);
+            });
+        }
+    });
+}
+
+// Filter select options based on search input
+function filterSelect(searchTerm, selectId) {
+    const selectElement = document.getElementById(selectId);
+    if (!selectElement) return;
+
+    const options = selectElement.getElementsByTagName('option');
+    const lowerSearch = searchTerm.toLowerCase();
+
+    for (let i = 0; i < options.length; i++) {
+        const option = options[i];
+        const text = option.textContent.toLowerCase();
+
+        if (text.includes(lowerSearch) || option.value === '') {
+            option.style.display = '';
+        } else {
+            option.style.display = 'none';
+        }
+    }
+
+    // Ensure select is enabled and visible
+    selectElement.disabled = false;
+    selectElement.style.pointerEvents = 'auto';
+}
+
+function openMapModal(description, occurrenceCount) {
+    isBulkMode = false;
+    selectedItems = [];
+
+    document.getElementById('mapModalTitle').textContent = 'Map Item to All Instances';
+    document.getElementById('mapModalInfo').innerHTML = `
+        <strong>Item:</strong> <span id="modalItemDescription">${description}</span><br>
+        <strong>Occurrences:</strong> <span id="modalOccurrenceCount">${occurrenceCount}</span> unmapped instances will be mapped
+    `;
+
+    document.getElementById('itemDescription').value = description;
+
+    // Reset form
+    document.getElementById('mapForm').reset();
+    document.getElementById('itemDescription').value = description;
+
+    // Clear all search inputs and reset selects
+    const searchInputs = document.querySelectorAll('.search-input');
+    searchInputs.forEach(input => {
+        input.value = '';
+    });
+
+    // Show all options and ensure selects are interactive
+    const selects = document.querySelectorAll('#mapModal select');
+    selects.forEach(select => {
+        const options = select.getElementsByTagName('option');
+        for (let i = 0; i < options.length; i++) {
+            options[i].style.display = '';
+        }
+        select.disabled = false;
+        select.style.pointerEvents = 'auto';
+    });
+
+    // Re-setup listeners to ensure they work
+    setupSearchListeners();
+
+    mapModal.show();
+}
+
+function openEditModal(description, occurrenceCount, inventoryItemId, inventoryCategory, assetAccount, cogsAccount, wasteAccount) {
+    isBulkMode = false;
+    selectedItems = [];
+
+    document.getElementById('mapModalTitle').textContent = 'Edit Item Mapping';
+    document.getElementById('mapModalInfo').innerHTML = `
+        <strong>Item:</strong> <span id="modalItemDescription">${description}</span><br>
+        <strong>Occurrences:</strong> <span id="modalOccurrenceCount">${occurrenceCount}</span> mapped instances will be updated
+    `;
+
+    document.getElementById('itemDescription').value = description;
+
+    // Pre-fill the form with current values
+    if (inventoryItemId) {
+        document.getElementById('inventoryItemId').value = inventoryItemId;
+    }
+    if (inventoryCategory) {
+        document.getElementById('inventoryCategory').value = inventoryCategory;
+    }
+    if (assetAccount) {
+        document.getElementById('glAssetAccount').value = assetAccount;
+    }
+    if (cogsAccount) {
+        document.getElementById('glCogsAccount').value = cogsAccount;
+    }
+    if (wasteAccount) {
+        document.getElementById('glWasteAccount').value = wasteAccount;
+    }
+
+    // Clear search inputs but keep selections
+    const searchInputs = document.querySelectorAll('.search-input');
+    searchInputs.forEach(input => {
+        input.value = '';
+    });
+
+    // Re-setup listeners
+    setupSearchListeners();
+
+    mapModal.show();
+}
+
+async function saveMapping() {
+    const cogsAccount = document.getElementById('glCogsAccount').value;
+
+    // Validate required field
+    if (!cogsAccount) {
+        await showAlert('COGS/Expense Account is required', 'Validation Error');
+        return;
+    }
+
+    const inventoryItemId = document.getElementById('inventoryItemId').value;
+    const category = document.getElementById('inventoryCategory').value;
+    const assetAccount = document.getElementById('glAssetAccount').value;
+    const wasteAccount = document.getElementById('glWasteAccount').value;
+
+    try {
+        let totalMapped = 0;
+        let totalInvoices = 0;
+        let allInvoicesReady = [];
+        let errors = [];
+
+        if (isBulkMode) {
+            // Bulk mode: map each selected item
+            for (const item of selectedItems) {
+                const formData = new URLSearchParams();
+                formData.append('item_description', item.description);
+                if (inventoryItemId) formData.append('inventory_item_id', inventoryItemId);
+                if (category) formData.append('inventory_category', category);
+                if (assetAccount) formData.append('gl_asset_account', assetAccount);
+                formData.append('gl_cogs_account', cogsAccount);
+                if (wasteAccount) formData.append('gl_waste_account', wasteAccount);
+
+                const response = await fetch('/hub/api/items/map-by-description', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    totalMapped += result.items_mapped;
+                    totalInvoices += result.invoices_affected;
+                    if (result.invoices_ready && result.invoices_ready.length > 0) {
+                        allInvoicesReady.push(...result.invoices_ready);
+                    }
+                } else {
+                    const error = await response.json();
+                    errors.push(`${item.description}: ${error.detail || 'Unknown error'}`);
+                }
+            }
+
+            mapModal.hide();
+
+            if (errors.length > 0) {
+                await showAlert(`Some items failed to map:\n${errors.join('\n')}`, 'Partial Success');
+            }
+
+            let message = `Successfully mapped ${totalMapped} item(s) across ${totalInvoices} invoice(s)`;
+            if (allInvoicesReady.length > 0) {
+                const uniqueInvoices = [...new Set(allInvoicesReady)];
+                message += `\n\nThe following invoices are now ready to send:\n${uniqueInvoices.join(', ')}`;
+            }
+
+            await showAlert(message, 'Success');
+            location.reload();
+
+        } else {
+            // Single mode: map one item
+            const itemDescription = document.getElementById('itemDescription').value;
+            const formData = new URLSearchParams();
+            formData.append('item_description', itemDescription);
+            if (inventoryItemId) formData.append('inventory_item_id', inventoryItemId);
+            if (category) formData.append('inventory_category', category);
+            if (assetAccount) formData.append('gl_asset_account', assetAccount);
+            formData.append('gl_cogs_account', cogsAccount);
+            if (wasteAccount) formData.append('gl_waste_account', wasteAccount);
+
+            const response = await fetch('/hub/api/items/map-by-description', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: formData
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                mapModal.hide();
+
+                let message = `Successfully mapped ${result.items_mapped} item(s) across ${result.invoices_affected} invoice(s)`;
+                if (result.invoices_ready && result.invoices_ready.length > 0) {
+                    message += `\n\nThe following invoices are now ready to send:\n${result.invoices_ready.join(', ')}`;
+                }
+
+                await showAlert(message, 'Success');
+                location.reload();
+            } else {
+                const error = await response.json();
+                await showAlert('Error saving mapping: ' + (error.detail || 'Please try again.'), 'Error');
+            }
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        await showAlert('Error saving mapping. Please try again.', 'Error');
+    }
+}
+
+// Search and Sort functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const sortSelect = document.getElementById('sortSelect');
+    const table = document.getElementById('mappedItemsTable');
+    const tbody = table ? table.querySelector('tbody') : null;
+    const itemCount = document.getElementById('itemCount');
+
+    if (searchInput && tbody) {
+        searchInput.addEventListener('input', filterTable);
+    }
+
+    if (sortSelect && tbody) {
+        sortSelect.addEventListener('change', sortTable);
+    }
+
+    function filterTable() {
+        const searchTerm = searchInput.value.toLowerCase();
+        const rows = tbody.querySelectorAll('tr');
+        let visibleCount = 0;
+
+        rows.forEach(row => {
+            const description = row.getAttribute('data-description') || '';
+            const vendor = row.getAttribute('data-vendor') || '';
+            const mapping = row.cells[1].textContent.toLowerCase();
+
+            if (description.includes(searchTerm) || vendor.includes(searchTerm) || mapping.includes(searchTerm)) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        if (itemCount) {
+            itemCount.textContent = visibleCount;
+        }
+    }
+
+    function sortTable() {
+        const sortValue = sortSelect.value;
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+
+        rows.sort((a, b) => {
+            let aValue, bValue;
+
+            if (sortValue.startsWith('description')) {
+                aValue = a.getAttribute('data-description') || '';
+                bValue = b.getAttribute('data-description') || '';
+            } else if (sortValue.startsWith('vendor')) {
+                aValue = a.getAttribute('data-vendor') || '';
+                bValue = b.getAttribute('data-vendor') || '';
+            }
+
+            if (sortValue.endsWith('asc')) {
+                return aValue.localeCompare(bValue);
+            } else {
+                return bValue.localeCompare(aValue);
+            }
+        });
+
+        // Re-append rows in sorted order
+        rows.forEach(row => tbody.appendChild(row));
+    }
+});
+</script>
+{% endblock %}

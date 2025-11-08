@@ -209,11 +209,15 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
         logger = logging.getLogger(__name__)
         logger.error(f"Error fetching locations: {str(e)}")
 
+    # Get vendors from hub database for vendor dropdown
+    vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
+
     return templates.TemplateResponse("invoice_detail.html", {
         "request": request,
         "invoice": invoice,
         "items": items,
-        "locations": locations
+        "locations": locations,
+        "vendors": vendors
     })
 
 
@@ -305,6 +309,27 @@ async def update_invoice(
     data = await request.json()
 
     try:
+        # Handle vendor update - either select existing or create new
+        if "vendor_id" in data and data["vendor_id"]:
+            # Selected existing vendor
+            vendor = db.query(Vendor).filter(Vendor.id == int(data["vendor_id"])).first()
+            if vendor:
+                invoice.vendor_id = vendor.id
+                invoice.vendor_name = vendor.name
+            else:
+                raise HTTPException(status_code=404, detail="Vendor not found")
+        elif "new_vendor_name" in data and data["new_vendor_name"]:
+            # Create new vendor
+            new_vendor = Vendor(
+                name=data["new_vendor_name"].strip(),
+                is_active=True
+            )
+            db.add(new_vendor)
+            db.flush()  # Get the new vendor ID
+            invoice.vendor_id = new_vendor.id
+            invoice.vendor_name = new_vendor.name
+            logger.info(f"Created new vendor: {new_vendor.name} (ID: {new_vendor.id})")
+
         # Update fields if provided
         if "vendor_name" in data:
             invoice.vendor_name = data["vendor_name"]
@@ -409,21 +434,268 @@ async def get_invoice_pdf(
         )
 
 
+@app.delete("/api/invoices/{invoice_id}")
+async def delete_invoice(
+    invoice_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete an invoice and all associated items
+    """
+    import logging
+    import os
+    logger = logging.getLogger(__name__)
+
+    # Get invoice
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    try:
+        # Delete associated invoice items first (due to foreign key constraint)
+        items_deleted = db.query(HubInvoiceItem).filter(
+            HubInvoiceItem.invoice_id == invoice_id
+        ).delete()
+
+        # Delete PDF file if it exists
+        if invoice.pdf_path:
+            pdf_path = Path(invoice.pdf_path)
+            if pdf_path.exists():
+                try:
+                    os.remove(pdf_path)
+                    logger.info(f"Deleted PDF file: {pdf_path}")
+                except Exception as e:
+                    logger.warning(f"Could not delete PDF file {pdf_path}: {str(e)}")
+
+        # Delete invoice record
+        db.delete(invoice)
+        db.commit()
+
+        logger.info(f"Deleted invoice {invoice_id} ({invoice.invoice_number}) with {items_deleted} items")
+
+        return {
+            "success": True,
+            "message": f"Invoice {invoice.invoice_number} deleted successfully",
+            "items_deleted": items_deleted
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting invoice {invoice_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error deleting invoice: {str(e)}")
+
+
+@app.post("/api/invoices/{invoice_id}/mark-statement")
+async def mark_invoice_as_statement(
+    invoice_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Mark or unmark an invoice as a statement.
+    Statements are not sent to inventory or accounting systems.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Get the request body
+    body = await request.json()
+    is_statement = body.get('is_statement', True)
+
+    # Get invoice
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    try:
+        invoice.is_statement = is_statement
+
+        # If marking as statement, update status to 'statement' or similar
+        if is_statement:
+            invoice.status = 'statement'
+        else:
+            # Reset to pending if unmarking
+            invoice.status = 'pending'
+
+        db.commit()
+
+        action = "marked as statement" if is_statement else "unmarked as statement"
+        logger.info(f"Invoice {invoice_id} ({invoice.invoice_number}) {action}")
+
+        return {
+            "success": True,
+            "message": f"Invoice {action} successfully",
+            "is_statement": invoice.is_statement,
+            "status": invoice.status
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error marking invoice {invoice_id} as statement: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error updating invoice: {str(e)}")
+
+
 # ============================================================================
 # UNMAPPED ITEMS REVIEW
 # ============================================================================
 
 @app.get("/unmapped-items", response_class=HTMLResponse)
 async def unmapped_items(request: Request, db: Session = Depends(get_db)):
-    """Review all unmapped invoice items"""
+    """Review all unmapped invoice items - showing unique item descriptions only"""
+    from sqlalchemy import func, distinct
+    import httpx
+    import logging
 
-    items = db.query(HubInvoiceItem).filter(
+    logger = logging.getLogger(__name__)
+
+    # Get unique item descriptions with aggregated data
+    # Query returns: (item_description, count, list of invoice numbers, list of vendors)
+    unique_items_query = db.query(
+        HubInvoiceItem.item_description,
+        func.count(HubInvoiceItem.id).label('occurrence_count'),
+        func.array_agg(distinct(HubInvoice.invoice_number)).label('invoice_numbers'),
+        func.array_agg(distinct(HubInvoice.vendor_name)).label('vendor_names')
+    ).join(HubInvoice).filter(
         HubInvoiceItem.is_mapped == False
-    ).join(HubInvoice).order_by(HubInvoice.created_at.desc()).all()
+    ).group_by(
+        HubInvoiceItem.item_description
+    ).order_by(
+        func.count(HubInvoiceItem.id).desc()  # Show most frequent items first
+    ).all()
+
+    # Format results for template
+    unique_items = []
+    for desc, count, invoice_nums, vendors in unique_items_query:
+        unique_items.append({
+            'item_description': desc,
+            'occurrence_count': count,
+            'invoice_numbers': invoice_nums if invoice_nums else [],
+            'vendor_names': vendors if vendors else []
+        })
+
+    # Fetch GL accounts from Accounting API
+    gl_accounts = []
+    try:
+        async with httpx.AsyncClient() as client:
+            # ACCOUNTING_API_URL already includes /api, so just append /accounts/
+            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000})
+            if response.status_code == 200:
+                gl_accounts = response.json()
+            else:
+                logger.warning(f"Failed to fetch GL accounts: status {response.status_code}")
+    except Exception as e:
+        logger.error(f"Failed to fetch GL accounts from Accounting API: {str(e)}")
+
+    # Fetch vendor items from Inventory API (not master items - those are just for counts)
+    inventory_items = []
+    try:
+        async with httpx.AsyncClient() as client:
+            # Use special /_hub/sync endpoint that doesn't require authentication
+            response = await client.get(f"{INVENTORY_API_URL}/vendor-items/_hub/sync", params={"is_active": True, "limit": 5000})
+            if response.status_code == 200:
+                inventory_items = response.json()
+            else:
+                logger.warning(f"Failed to fetch vendor items: status {response.status_code}")
+    except Exception as e:
+        logger.error(f"Failed to fetch vendor items from Inventory API: {str(e)}")
 
     return templates.TemplateResponse("unmapped_items.html", {
         "request": request,
-        "items": items
+        "unique_items": unique_items,
+        "gl_accounts": gl_accounts,
+        "inventory_items": inventory_items
+    })
+
+
+@app.get("/mapped-items", response_class=HTMLResponse)
+async def mapped_items(request: Request, db: Session = Depends(get_db)):
+    """Review all mapped invoice items - showing unique item descriptions with their mappings"""
+    from sqlalchemy import func, distinct
+    import httpx
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # Get unique mapped item descriptions with aggregated data
+    unique_items_query = db.query(
+        HubInvoiceItem.item_description,
+        func.count(HubInvoiceItem.id).label('occurrence_count'),
+        func.array_agg(distinct(HubInvoice.invoice_number)).label('invoice_numbers'),
+        func.array_agg(distinct(HubInvoice.vendor_name)).label('vendor_names'),
+        # Get the mapping from one of the items (they should all be the same for the same description)
+        func.max(HubInvoiceItem.inventory_item_id).label('inventory_item_id'),
+        func.max(HubInvoiceItem.inventory_category).label('inventory_category'),
+        func.max(HubInvoiceItem.item_code).label('item_code'),  # Add item code
+        func.max(HubInvoiceItem.gl_asset_account).label('gl_asset_account'),
+        func.max(HubInvoiceItem.gl_cogs_account).label('gl_cogs_account'),
+        func.max(HubInvoiceItem.gl_waste_account).label('gl_waste_account')
+    ).join(HubInvoice).filter(
+        HubInvoiceItem.is_mapped == True
+    ).group_by(
+        HubInvoiceItem.item_description
+    ).order_by(
+        func.count(HubInvoiceItem.id).desc()
+    ).all()
+
+    # Fetch GL accounts from Accounting API
+    gl_accounts = []
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000})
+            if response.status_code == 200:
+                gl_accounts = response.json()
+            else:
+                logger.warning(f"Failed to fetch GL accounts: status {response.status_code}")
+    except Exception as e:
+        logger.error(f"Failed to fetch GL accounts from Accounting API: {str(e)}")
+
+    # Fetch vendor items from Inventory API
+    inventory_items = []
+    inventory_items_map = {}
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{INVENTORY_API_URL}/vendor-items/_hub/sync", params={"is_active": True, "limit": 5000})
+            if response.status_code == 200:
+                inventory_items = response.json()
+                # Create a map of vendor item ID to item details for quick lookup
+                for item in inventory_items:
+                    inventory_items_map[item['id']] = item
+            else:
+                logger.warning(f"Failed to fetch vendor items: status {response.status_code}")
+    except Exception as e:
+        logger.error(f"Failed to fetch vendor items from Inventory API: {str(e)}")
+
+    # Format results for template with vendor item details
+    unique_items = []
+    for desc, count, invoice_nums, vendors, inv_item_id, category, item_code, asset_acct, cogs_acct, waste_acct in unique_items_query:
+        vendor_item_details = None
+        if inv_item_id and inv_item_id in inventory_items_map:
+            item = inventory_items_map[inv_item_id]
+            vendor_item_details = f"{item['vendor_name']}: {item['vendor_product_name']}"
+            if item.get('vendor_sku'):
+                vendor_item_details += f" [{item['vendor_sku']}]"
+            if item.get('pack_size'):
+                vendor_item_details += f" - {item['pack_size']}"
+
+        unique_items.append({
+            'item_description': desc,
+            'occurrence_count': count,
+            'invoice_numbers': invoice_nums if invoice_nums else [],
+            'vendor_names': vendors if vendors else [],
+            'inventory_item_id': inv_item_id,
+            'inventory_category': category,
+            'item_code': item_code,
+            'vendor_item_details': vendor_item_details,
+            'gl_asset_account': asset_acct,
+            'gl_cogs_account': cogs_acct,
+            'gl_waste_account': waste_acct
+        })
+
+    return templates.TemplateResponse("mapped_items.html", {
+        "request": request,
+        "unique_items": unique_items,
+        "gl_accounts": gl_accounts,
+        "inventory_items": inventory_items
     })
 
 
@@ -531,6 +803,101 @@ async def map_item(
     return {"success": True, "item_id": item_id, "invoice_ready": invoice_ready}
 
 
+@app.post("/api/items/map-by-description")
+async def map_items_by_description(
+    item_description: str = Form(...),
+    inventory_item_id: Optional[int] = Form(None),
+    inventory_category: Optional[str] = Form(None),
+    gl_asset_account: Optional[str] = Form(None),  # Account number as string
+    gl_cogs_account: str = Form(...),  # Required - account number as string
+    gl_waste_account: Optional[str] = Form(None),  # Account number as string
+    db: Session = Depends(get_db)
+):
+    """
+    Map ALL unmapped items with a specific description to inventory item and GL accounts
+
+    Note: Only gl_cogs_account is required. Category is optional (for non-inventory items like linen, propane, etc.)
+    Account numbers are passed as strings but stored as integers (extracting numeric part only).
+    """
+
+    # Convert account number strings to integers (strip non-numeric characters)
+    def parse_account_number(account_str: Optional[str]) -> Optional[int]:
+        if not account_str:
+            return None
+        # Extract just the numeric part (account number before the dash/space)
+        import re
+        match = re.match(r'(\d+)', account_str.strip())
+        return int(match.group(1)) if match else None
+
+    gl_asset_account_int = parse_account_number(gl_asset_account)
+    gl_cogs_account_int = parse_account_number(gl_cogs_account)
+    gl_waste_account_int = parse_account_number(gl_waste_account)
+
+    if not gl_cogs_account_int:
+        raise HTTPException(status_code=400, detail="Invalid COGS/Expense account number")
+
+    # Find all items with this description (both mapped and unmapped)
+    # This allows editing of already-mapped items from the mapped items page
+    items = db.query(HubInvoiceItem).filter(
+        HubInvoiceItem.item_description == item_description
+    ).all()
+
+    if not items:
+        raise HTTPException(status_code=404, detail=f"No items found with description: {item_description}")
+
+    # Update all matching items
+    items_mapped = 0
+    invoices_affected = set()
+
+    for item in items:
+        item.inventory_item_id = inventory_item_id
+        item.inventory_category = inventory_category
+        item.gl_asset_account = gl_asset_account_int
+        item.gl_cogs_account = gl_cogs_account_int
+        item.gl_waste_account = gl_waste_account_int
+        item.is_mapped = True
+        item.mapping_method = 'manual_bulk'
+        items_mapped += 1
+        invoices_affected.add(item.invoice_id)
+
+    db.commit()
+
+    # Check each affected invoice to see if it's now fully mapped
+    invoices_ready = []
+    for invoice_id in invoices_affected:
+        invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+        unmapped_count = db.query(HubInvoiceItem).filter(
+            HubInvoiceItem.invoice_id == invoice_id,
+            HubInvoiceItem.is_mapped == False
+        ).count()
+
+        if unmapped_count == 0:
+            invoice.status = 'ready'
+            invoices_ready.append(invoice.invoice_number)
+
+            # Trigger auto-send
+            try:
+                inventory_sender = get_inventory_sender(INVENTORY_API_URL)
+                accounting_sender = get_accounting_sender(ACCOUNTING_API_URL)
+                auto_send = get_auto_send_service(inventory_sender, accounting_sender)
+
+                # Send in background (non-blocking)
+                import asyncio
+                asyncio.create_task(auto_send.send_invoice(invoice_id, db))
+            except Exception as e:
+                # Log but don't fail the mapping operation
+                print(f"Auto-send trigger failed for invoice {invoice_id}: {str(e)}")
+
+    db.commit()
+
+    return {
+        "success": True,
+        "items_mapped": items_mapped,
+        "invoices_affected": len(invoices_affected),
+        "invoices_ready": invoices_ready
+    }
+
+
 @app.get("/api/items/{item_id}/suggestions")
 async def get_mapping_suggestions(item_id: int, db: Session = Depends(get_db)):
     """Get mapping suggestions for an invoice item using fuzzy matching"""
@@ -555,13 +922,72 @@ async def get_mapping_suggestions(item_id: int, db: Session = Depends(get_db)):
 @app.get("/category-mappings", response_class=HTMLResponse)
 async def list_category_mappings(request: Request, db: Session = Depends(get_db)):
     """Manage category to GL account mappings"""
+    import httpx
+    import logging
+    logger = logging.getLogger(__name__)
 
     mappings = db.query(CategoryGLMapping).order_by(CategoryGLMapping.inventory_category).all()
 
+    # Fetch GL accounts from Accounting API
+    gl_accounts = []
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000})
+            if response.status_code == 200:
+                gl_accounts = response.json()
+            else:
+                logger.warning(f"Failed to fetch GL accounts: status {response.status_code}")
+    except Exception as e:
+        logger.error(f"Error fetching GL accounts: {str(e)}")
+
+    # Create a lookup dictionary for account names
+    account_lookup = {str(acc['account_number']): acc['account_name'] for acc in gl_accounts}
+
+    # Enrich mappings with account names
+    enriched_mappings = []
+    for mapping in mappings:
+        mapping_dict = {
+            'id': mapping.id,
+            'inventory_category': mapping.inventory_category,
+            'gl_asset_account': mapping.gl_asset_account,
+            'gl_cogs_account': mapping.gl_cogs_account,
+            'gl_waste_account': mapping.gl_waste_account,
+            'asset_account_name': mapping.asset_account_name,
+            'is_active': mapping.is_active,
+            # Add account names from lookup
+            'asset_account_full': account_lookup.get(str(mapping.gl_asset_account), 'Unknown'),
+            'cogs_account_full': account_lookup.get(str(mapping.gl_cogs_account), 'Unknown'),
+            'waste_account_full': account_lookup.get(str(mapping.gl_waste_account), 'Unknown') if mapping.gl_waste_account else None
+        }
+        enriched_mappings.append(mapping_dict)
+
     return templates.TemplateResponse("category_mappings.html", {
         "request": request,
-        "mappings": mappings
+        "mappings": enriched_mappings,
+        "gl_accounts": gl_accounts
     })
+
+
+@app.get("/api/category-mappings/{category}")
+async def get_category_mapping(category: str, db: Session = Depends(get_db)):
+    """Get GL account mapping for a specific category"""
+
+    mapping = db.query(CategoryGLMapping).filter(
+        CategoryGLMapping.inventory_category == category,
+        CategoryGLMapping.is_active == True
+    ).first()
+
+    if not mapping:
+        raise HTTPException(status_code=404, detail=f"No mapping found for category: {category}")
+
+    return {
+        "inventory_category": mapping.inventory_category,
+        "gl_asset_account": mapping.gl_asset_account,
+        "gl_cogs_account": mapping.gl_cogs_account,
+        "gl_waste_account": mapping.gl_waste_account,
+        "asset_account_name": mapping.asset_account_name,
+        "cogs_account_name": mapping.cogs_account_name
+    }
 
 
 @app.post("/api/category-mappings")
@@ -632,6 +1058,10 @@ async def send_invoice_to_systems(invoice_id: int, db: Session = Depends(get_db)
     invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Don't send statements to systems
+    if invoice.is_statement:
+        raise HTTPException(status_code=400, detail="Statements cannot be sent to inventory or accounting systems")
 
     if invoice.status not in ['ready', 'partial', 'error']:
         raise HTTPException(status_code=400, detail=f"Invoice status '{invoice.status}' cannot be sent")

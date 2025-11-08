@@ -84,33 +84,71 @@ class AutoSendService:
 
         logger.info(f"Auto-sending invoice {invoice.invoice_number} (ID: {invoice_id})")
 
-        # Send to both systems in parallel
-        inventory_result, accounting_result = await asyncio.gather(
-            self._send_to_inventory(invoice, items, db),
-            self._send_to_accounting(invoice, items, db),
-            return_exceptions=True
-        )
+        # Determine which systems need this invoice
+        # Send to inventory only if at least one item has an inventory category
+        has_inventory_items = any(item.inventory_category for item in items)
+        # Always send to accounting (all items have GL accounts)
+        needs_accounting = True
+
+        logger.info(f"Invoice {invoice.invoice_number}: has_inventory_items={has_inventory_items}, needs_accounting={needs_accounting}")
+
+        # Send to appropriate systems in parallel
+        tasks = []
+        send_to_inventory = has_inventory_items
+        send_to_accounting = needs_accounting
+
+        if send_to_inventory:
+            tasks.append(self._send_to_inventory(invoice, items, db))
+        else:
+            tasks.append(None)  # Placeholder
+
+        if send_to_accounting:
+            tasks.append(self._send_to_accounting(invoice, items, db))
+        else:
+            tasks.append(None)  # Placeholder
+
+        # Execute tasks
+        if send_to_inventory and send_to_accounting:
+            inventory_result, accounting_result = await asyncio.gather(*[t for t in tasks if t], return_exceptions=True)
+        elif send_to_inventory:
+            inventory_result = await tasks[0] if tasks[0] else {"success": False, "skipped": True}
+            accounting_result = {"success": True, "skipped": True}
+        elif send_to_accounting:
+            inventory_result = {"success": True, "skipped": True}
+            accounting_result = await tasks[1] if tasks[1] else {"success": False, "skipped": True}
+        else:
+            inventory_result = {"success": True, "skipped": True}
+            accounting_result = {"success": True, "skipped": True}
 
         # Process results
-        inventory_sent = not isinstance(inventory_result, Exception)
-        accounting_sent = not isinstance(accounting_result, Exception)
+        inventory_sent = send_to_inventory and not isinstance(inventory_result, Exception)
+        accounting_sent = send_to_accounting and not isinstance(accounting_result, Exception)
+
+        # If we skipped a system, mark it as "sent" for status purposes
+        # Also set the sent flag on the invoice so the UI shows it correctly
+        if not send_to_inventory:
+            inventory_sent = True  # Not needed, so consider it "done"
+            invoice.sent_to_inventory = True  # Mark as sent in DB so UI reflects this
+        if not send_to_accounting:
+            accounting_sent = True  # Not needed, so consider it "done"
+            invoice.sent_to_accounting = True  # Mark as sent in DB so UI reflects this
 
         errors = []
-        if isinstance(inventory_result, Exception):
+        if send_to_inventory and isinstance(inventory_result, Exception):
             errors.append(f"Inventory: {str(inventory_result)}")
-        if isinstance(accounting_result, Exception):
+        if send_to_accounting and isinstance(accounting_result, Exception):
             errors.append(f"Accounting: {str(accounting_result)}")
 
         # Update invoice status
         if inventory_sent and accounting_sent:
             invoice.status = 'sent'
-            logger.info(f"Invoice {invoice.invoice_number} successfully sent to both systems")
+            logger.info(f"Invoice {invoice.invoice_number} successfully sent to required systems")
         elif inventory_sent or accounting_sent:
             invoice.status = 'partial'
             logger.warning(f"Invoice {invoice.invoice_number} partially sent: Inv={inventory_sent}, Acct={accounting_sent}")
         else:
             invoice.status = 'error'
-            logger.error(f"Invoice {invoice.invoice_number} failed to send to both systems")
+            logger.error(f"Invoice {invoice.invoice_number} failed to send")
 
         db.commit()
 
@@ -118,8 +156,8 @@ class AutoSendService:
             "success": inventory_sent and accounting_sent,
             "inventory_sent": inventory_sent,
             "accounting_sent": accounting_sent,
-            "inventory_id": inventory_result.get("inventory_invoice_id") if inventory_sent else None,
-            "journal_entry_id": accounting_result.get("journal_entry_id") if accounting_sent else None,
+            "inventory_id": inventory_result.get("inventory_invoice_id") if (send_to_inventory and inventory_sent and isinstance(inventory_result, dict)) else None,
+            "journal_entry_id": accounting_result.get("journal_entry_id") if (send_to_accounting and accounting_sent and isinstance(accounting_result, dict)) else None,
             "errors": errors
         }
 
@@ -202,9 +240,14 @@ class AutoSendService:
             errors.append(f"{len(unmapped_items)} items are not mapped")
 
         # Check all items have GL accounts
+        # For expense-only items (no inventory_category), only gl_cogs_account is required
+        # For inventory items, both gl_asset_account and gl_cogs_account are required
         items_without_gl = [
             item for item in items
-            if item.is_mapped and (not item.gl_asset_account or not item.gl_cogs_account)
+            if item.is_mapped and (
+                not item.gl_cogs_account or
+                (item.inventory_category and not item.gl_asset_account)
+            )
         ]
         if items_without_gl:
             errors.append(f"{len(items_without_gl)} items are missing GL account mappings")

@@ -19,6 +19,40 @@ from restaurant_inventory.core.audit import log_audit_event, create_change_dict
 
 router = APIRouter()
 
+@router.get("/_hub/sync")
+def get_items_for_hub(
+    skip: int = 0,
+    limit: int = 5000,
+    active_only: bool = Query(True, description="Show only active items"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all items for Integration Hub sync
+    No authentication required - this is an internal API call from the hub
+    IMPORTANT: This route must be defined BEFORE /{item_id} route
+    Path starts with _ to avoid being matched by /{item_id} pattern
+    """
+    query = db.query(MasterItem)
+
+    if active_only:
+        query = query.filter(MasterItem.is_active == True)
+
+    items = query.offset(skip).limit(limit).all()
+
+    # Return simple dict format for hub
+    item_list = []
+    for item in items:
+        item_list.append({
+            "id": item.id,
+            "name": item.name,
+            "description": item.description,
+            "category": item.category,
+            "is_active": item.is_active
+        })
+
+    return item_list
+
+
 @router.get("/", response_model=List[MasterItemResponse])
 async def get_master_items(
     skip: int = 0,

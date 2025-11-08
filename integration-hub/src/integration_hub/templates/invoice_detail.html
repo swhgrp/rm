@@ -214,6 +214,7 @@
                     <thead>
                         <tr>
                             <th>#</th>
+                            <th>Item Code</th>
                             <th>Description</th>
                             <th>Qty</th>
                             <th>Unit Price</th>
@@ -228,6 +229,13 @@
                         {% for item in items %}
                         <tr>
                             <td>{{ item.line_number }}</td>
+                            <td>
+                                {% if item.item_code %}
+                                    <span class="badge bg-secondary">{{ item.item_code }}</span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
                             <td>{{ item.item_description }}</td>
                             <td>{{ item.quantity }} {{ item.unit_of_measure or '' }}</td>
                             <td>${{ "{:,.2f}".format(item.unit_price) }}</td>

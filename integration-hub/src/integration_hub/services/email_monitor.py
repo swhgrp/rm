@@ -29,7 +29,7 @@ class EmailMonitorService:
     def __init__(self, db: Session):
         self.db = db
         self.settings = self._load_settings()
-        self.pdf_storage_path = Path("/opt/restaurant-system/integration-hub/invoices")
+        self.pdf_storage_path = Path("/app/uploads")
         self.pdf_storage_path.mkdir(parents=True, exist_ok=True)
 
     def _load_settings(self) -> dict:

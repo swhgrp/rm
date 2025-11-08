@@ -38,9 +38,22 @@
                                 <br><small class="text-muted">{{ mapping.asset_account_name }}</small>
                                 {% endif %}
                             </td>
-                            <td>{{ mapping.gl_asset_account }}</td>
-                            <td>{{ mapping.gl_cogs_account }}</td>
-                            <td>{{ mapping.gl_waste_account or '-' }}</td>
+                            <td>
+                                <strong>{{ mapping.gl_asset_account }}</strong>
+                                <br><small class="text-muted">{{ mapping.asset_account_full }}</small>
+                            </td>
+                            <td>
+                                <strong>{{ mapping.gl_cogs_account }}</strong>
+                                <br><small class="text-muted">{{ mapping.cogs_account_full }}</small>
+                            </td>
+                            <td>
+                                {% if mapping.gl_waste_account %}
+                                <strong>{{ mapping.gl_waste_account }}</strong>
+                                <br><small class="text-muted">{{ mapping.waste_account_full }}</small>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if mapping.is_active %}
                                 <span class="badge bg-success">Active</span>
@@ -49,7 +62,13 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <button class="btn btn-sm btn-secondary">
+                                <button class="btn btn-sm btn-secondary"
+                                        data-category="{{ mapping.inventory_category }}"
+                                        data-asset="{{ mapping.gl_asset_account }}"
+                                        data-cogs="{{ mapping.gl_cogs_account }}"
+                                        data-waste="{{ mapping.gl_waste_account or '' }}"
+                                        data-name="{{ mapping.asset_account_name or '' }}"
+                                        onclick="editMapping(this)">
                                     <i class="bi bi-pencil"></i> Edit
                                 </button>
                             </td>
@@ -108,12 +127,13 @@
             </div>
             <div class="row mt-3">
                 <div class="col-md-6">
-                    <h6>Waste Expense Accounts (7180-7183)</h6>
+                    <h6>Waste Expense Accounts (7180-7184)</h6>
                     <ul class="small">
-                        <li>7180 - Waste Expense - Food</li>
+                        <li>7180 - Paper/Disposable</li>
                         <li>7181 - Waste Expense - Beverage</li>
                         <li>7182 - Waste Expense - Alcohol</li>
                         <li>7183 - Waste Expense - Merchandise</li>
+                        <li>7184 - Waste Expense - Food</li>
                     </ul>
                 </div>
             </div>
@@ -126,14 +146,15 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Add Category Mapping</h5>
+                <h5 class="modal-title" id="mappingModalTitle">Add Category Mapping</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form action="/hub/api/category-mappings" method="post">
+                <input type="hidden" id="categoryHidden" name="inventory_category">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Category Code <span class="text-danger">*</span></label>
-                        <select class="form-select" name="inventory_category" required>
+                        <select class="form-select" id="categorySelect" required>
                             <option value="">Select category...</option>
                             <option value="Produce">Produce</option>
                             <option value="Dairy">Dairy</option>
@@ -156,7 +177,7 @@
 
                     <div class="mb-3">
                         <label class="form-label">Asset Account Name</label>
-                        <input type="text" class="form-control" name="asset_account_name"
+                        <input type="text" class="form-control" id="assetAccountName" name="asset_account_name"
                                placeholder="e.g., Poultry Inventory (optional)">
                         <small class="text-muted">Optional display name for the asset account</small>
                     </div>
@@ -165,20 +186,59 @@
 
                     <div class="mb-3">
                         <label class="form-label">Asset Account <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" name="gl_asset_account" required
-                               placeholder="e.g., 1418">
+                        <div class="searchable-select-wrapper">
+                            <input type="text" class="form-control search-input" id="searchAssetAccount"
+                                   placeholder="Search asset accounts...">
+                            <select class="form-select" id="assetAccount" name="gl_asset_account" size="6" required>
+                                <option value="">-- Select asset account --</option>
+                                {% for account in gl_accounts %}
+                                    {% if account.account_type == 'ASSET' and 1400 <= account.account_number|int < 1500 %}
+                                    <option value="{{ account.account_number }}">
+                                        {{ account.account_number }} - {{ account.account_name }}
+                                    </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <small class="text-muted">Asset accounts (1400-1499)</small>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">COGS Account <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" name="gl_cogs_account" required
-                               placeholder="e.g., 5118">
+                        <div class="searchable-select-wrapper">
+                            <input type="text" class="form-control search-input" id="searchCogsAccount"
+                                   placeholder="Search COGS accounts...">
+                            <select class="form-select" id="cogsAccount" name="gl_cogs_account" size="6" required>
+                                <option value="">-- Select COGS account --</option>
+                                {% for account in gl_accounts %}
+                                    {% if account.account_type in ['COGS', 'EXPENSE'] and 5100 <= account.account_number|int < 5200 %}
+                                    <option value="{{ account.account_number }}">
+                                        {{ account.account_number }} - {{ account.account_name }}
+                                    </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <small class="text-muted">COGS accounts (5100-5199)</small>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">Waste Account</label>
-                        <input type="number" class="form-control" name="gl_waste_account"
-                               placeholder="e.g., 7180">
+                        <div class="searchable-select-wrapper">
+                            <input type="text" class="form-control search-input" id="searchWasteAccount"
+                                   placeholder="Search waste accounts...">
+                            <select class="form-select" id="wasteAccount" name="gl_waste_account" size="6">
+                                <option value="">-- Select waste account (optional) --</option>
+                                {% for account in gl_accounts %}
+                                    {% if account.account_type == 'EXPENSE' and 7180 <= account.account_number|int <= 7184 %}
+                                    <option value="{{ account.account_number }}">
+                                        {{ account.account_number }} - {{ account.account_name }}
+                                    </option>
+                                    {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <small class="text-muted">Waste expense accounts (7180-7184)</small>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -189,4 +249,227 @@
         </div>
     </div>
 </div>
+
+<style>
+.searchable-select-wrapper {
+    position: relative;
+}
+
+.searchable-select-wrapper .search-input {
+    margin-bottom: 0.5rem;
+}
+
+.searchable-select-wrapper .search-input.has-selection {
+    background-color: #d1e7dd;
+    border-color: #198754;
+    font-weight: 500;
+    color: #0f5132;
+}
+
+.searchable-select-wrapper .form-select {
+    font-family: monospace;
+    font-size: 0.9rem;
+}
+
+.searchable-select-wrapper .form-select option {
+    padding: 0.5rem;
+}
+
+.searchable-select-wrapper .form-select option:checked {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.selection-indicator {
+    position: absolute;
+    right: 10px;
+    top: 8px;
+    color: #198754;
+    pointer-events: none;
+}
+</style>
+
+<script>
+// Setup searchable dropdowns
+// Store original options globally to avoid closure issues
+const originalOptionsStore = {};
+
+function setupSearchableSelect(searchInputId, selectId) {
+    const searchInput = document.getElementById(searchInputId);
+    const select = document.getElementById(selectId);
+
+    if (!searchInput || !select) return;
+
+    // Store original options if not already stored
+    if (!originalOptionsStore[selectId]) {
+        originalOptionsStore[selectId] = Array.from(select.options).map(opt => ({
+            value: opt.value,
+            text: opt.text
+        }));
+    }
+
+    // Remove old event listener if exists (to prevent duplicates)
+    searchInput.replaceWith(searchInput.cloneNode(true));
+    const newSearchInput = document.getElementById(searchInputId);
+
+    // Handle search input
+    newSearchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase();
+        const currentValue = select.value; // Preserve current selection
+
+        // If user is typing (not from selection update), filter options
+        if (!this.dataset.fromSelection) {
+            // Clear and rebuild options
+            select.innerHTML = '';
+
+            originalOptionsStore[selectId].forEach(opt => {
+                if (opt.text.toLowerCase().includes(searchTerm) || opt.value === '') {
+                    const newOption = document.createElement('option');
+                    newOption.value = opt.value;
+                    newOption.text = opt.text;
+                    select.appendChild(newOption);
+                }
+            });
+
+            // Restore selection if it's still in the filtered list
+            if (currentValue) {
+                select.value = currentValue;
+            }
+        }
+        delete this.dataset.fromSelection;
+    });
+
+    // Handle selection change in dropdown
+    select.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+            // Update search input with selected value
+            newSearchInput.dataset.fromSelection = 'true';
+            newSearchInput.value = selectedOption.text;
+            newSearchInput.classList.add('has-selection');
+        } else {
+            newSearchInput.value = '';
+            newSearchInput.classList.remove('has-selection');
+        }
+    });
+
+    // Handle click on select options (for better UX)
+    select.addEventListener('click', function() {
+        // Trigger change event when clicking
+        const selectedOption = this.options[this.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+            this.dispatchEvent(new Event('change'));
+        }
+    });
+}
+
+function resetSearchableSelect(searchInputId, selectId) {
+    const searchInput = document.getElementById(searchInputId);
+    const select = document.getElementById(selectId);
+
+    if (!searchInput || !select || !originalOptionsStore[selectId]) return;
+
+    // Clear search input and remove selection styling
+    searchInput.value = '';
+    searchInput.classList.remove('has-selection');
+
+    // Restore all original options
+    select.innerHTML = '';
+    originalOptionsStore[selectId].forEach(opt => {
+        const newOption = document.createElement('option');
+        newOption.value = opt.value;
+        newOption.text = opt.text;
+        select.appendChild(newOption);
+    });
+}
+
+function editMapping(button) {
+    // Get data from button attributes
+    const category = button.getAttribute('data-category');
+    const assetAccount = button.getAttribute('data-asset');
+    const cogsAccount = button.getAttribute('data-cogs');
+    const wasteAccount = button.getAttribute('data-waste');
+    const assetAccountName = button.getAttribute('data-name');
+
+    // Update modal title
+    document.getElementById('mappingModalTitle').textContent = 'Edit Category Mapping';
+
+    // Populate form fields
+    document.getElementById('categorySelect').value = category;
+    document.getElementById('categorySelect').disabled = true; // Can't change category when editing
+    document.getElementById('categoryHidden').value = category; // Set hidden field for form submission
+    document.getElementById('assetAccountName').value = assetAccountName || '';
+
+    // Reset all searchable selects to show all options
+    resetSearchableSelect('searchAssetAccount', 'assetAccount');
+    resetSearchableSelect('searchCogsAccount', 'cogsAccount');
+    resetSearchableSelect('searchWasteAccount', 'wasteAccount');
+
+    // Set the selected values in the dropdowns
+    document.getElementById('assetAccount').value = assetAccount;
+    document.getElementById('cogsAccount').value = cogsAccount;
+    document.getElementById('wasteAccount').value = wasteAccount || '';
+
+    // Update search inputs to show the selected values
+    const assetSelect = document.getElementById('assetAccount');
+    const cogsSelect = document.getElementById('cogsAccount');
+    const wasteSelect = document.getElementById('wasteAccount');
+
+    const assetSearchInput = document.getElementById('searchAssetAccount');
+    const cogsSearchInput = document.getElementById('searchCogsAccount');
+    const wasteSearchInput = document.getElementById('searchWasteAccount');
+
+    // Display selected asset account in search input
+    if (assetAccount && assetSelect.selectedIndex >= 0) {
+        const selectedText = assetSelect.options[assetSelect.selectedIndex].text;
+        assetSearchInput.value = selectedText;
+        assetSearchInput.classList.add('has-selection');
+    }
+
+    // Display selected COGS account in search input
+    if (cogsAccount && cogsSelect.selectedIndex >= 0) {
+        const selectedText = cogsSelect.options[cogsSelect.selectedIndex].text;
+        cogsSearchInput.value = selectedText;
+        cogsSearchInput.classList.add('has-selection');
+    }
+
+    // Display selected waste account in search input
+    if (wasteAccount && wasteSelect.selectedIndex >= 0) {
+        const selectedText = wasteSelect.options[wasteSelect.selectedIndex].text;
+        wasteSearchInput.value = selectedText;
+        wasteSearchInput.classList.add('has-selection');
+    }
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('addMappingModal'));
+    modal.show();
+}
+
+// Reset form when modal is closed
+document.addEventListener('DOMContentLoaded', function() {
+    // Setup searchable dropdowns
+    setupSearchableSelect('searchAssetAccount', 'assetAccount');
+    setupSearchableSelect('searchCogsAccount', 'cogsAccount');
+    setupSearchableSelect('searchWasteAccount', 'wasteAccount');
+
+    // Sync category select with hidden field for new mappings
+    document.getElementById('categorySelect').addEventListener('change', function() {
+        document.getElementById('categoryHidden').value = this.value;
+    });
+
+    const modalElement = document.getElementById('addMappingModal');
+    modalElement.addEventListener('hidden.bs.modal', function() {
+        // Reset form
+        document.querySelector('#addMappingModal form').reset();
+        document.getElementById('mappingModalTitle').textContent = 'Add Category Mapping';
+        document.getElementById('categorySelect').disabled = false;
+        document.getElementById('categoryHidden').value = '';
+
+        // Reset all searchable selects to show all options
+        resetSearchableSelect('searchAssetAccount', 'assetAccount');
+        resetSearchableSelect('searchCogsAccount', 'cogsAccount');
+        resetSearchableSelect('searchWasteAccount', 'wasteAccount');
+    });
+});
+</script>
 {% endblock %}

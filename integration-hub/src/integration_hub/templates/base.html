@@ -348,6 +348,7 @@
             <li><a href="/hub/" class="{% if request.url.path == '/hub/' %}active{% endif %}"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
             <li><a href="/hub/invoices" class="{% if '/invoices' in request.url.path %}active{% endif %}"><i class="bi bi-file-earmark-text"></i> Invoices</a></li>
             <li><a href="/hub/unmapped-items" class="{% if '/unmapped-items' in request.url.path %}active{% endif %}"><i class="bi bi-question-circle"></i> Unmapped Items</a></li>
+            <li><a href="/hub/mapped-items" class="{% if '/mapped-items' in request.url.path %}active{% endif %}"><i class="bi bi-check-circle"></i> Mapped Items</a></li>
             <li><a href="/hub/category-mappings" class="{% if '/category-mappings' in request.url.path %}active{% endif %}"><i class="bi bi-list-ul"></i> Category Mappings</a></li>
             <li><a href="/hub/vendors" class="{% if '/vendors' in request.url.path %}active{% endif %}"><i class="bi bi-building"></i> Vendors</a></li>
             <li><a href="/hub/settings" class="{% if '/settings' in request.url.path %}active{% endif %}"><i class="bi bi-gear"></i> Settings</a></li>
@@ -500,6 +501,53 @@
                     if (!resolved) {
                         resolved = true;
                         setTimeout(() => resolve(false), 100);
+                    }
+                }, { once: true });
+
+                modal.show();
+            });
+        }
+
+        // Custom alert function using Bootstrap modal
+        function showAlert(message, title = 'Notice') {
+            return new Promise((resolve) => {
+                document.getElementById('confirmTitle').textContent = title;
+                document.getElementById('confirmMessage').textContent = message;
+
+                const modalElement = document.getElementById('confirmModal');
+                const modal = new bootstrap.Modal(modalElement);
+
+                const okBtn = document.getElementById('confirmOkBtn');
+                const cancelBtn = document.getElementById('confirmCancelBtn');
+
+                // Hide cancel button for alerts
+                cancelBtn.style.display = 'none';
+                okBtn.textContent = 'OK';
+                okBtn.disabled = false;
+
+                let resolved = false;
+
+                okBtn.onclick = function(e) {
+                    if (!resolved) {
+                        resolved = true;
+                        modal.hide();
+                        setTimeout(() => {
+                            cancelBtn.style.display = '';
+                            okBtn.textContent = 'OK';
+                            resolve(true);
+                        }, 100);
+                    }
+                };
+
+                modalElement.addEventListener('hidden.bs.modal', function handler() {
+                    modalElement.removeEventListener('hidden.bs.modal', handler);
+                    if (!resolved) {
+                        resolved = true;
+                        setTimeout(() => {
+                            cancelBtn.style.display = '';
+                            okBtn.textContent = 'OK';
+                            resolve(true);
+                        }, 100);
                     }
                 }, { once: true });
 

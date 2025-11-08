@@ -137,6 +137,12 @@ async def list_vendors(
         query = query.filter(Vendor.is_active == True)
 
     vendors = query.order_by(Vendor.name).all()
+
+    # Clean up empty email strings to None for validation
+    for vendor in vendors:
+        if vendor.email == '':
+            vendor.email = None
+
     return vendors
 
 

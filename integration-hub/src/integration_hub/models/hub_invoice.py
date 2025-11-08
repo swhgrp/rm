@@ -42,6 +42,9 @@ class HubInvoice(Base):
     location_id = Column(Integer, nullable=True)
     location_name = Column(String(100), nullable=True)
 
+    # Statement flag (statements don't get sent to inventory/accounting)
+    is_statement = Column(Boolean, default=False, index=True)
+
     # Routing status
     sent_to_inventory = Column(Boolean, default=False)
     sent_to_accounting = Column(Boolean, default=False)
