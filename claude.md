@@ -19,9 +19,11 @@
       - Nginx was returning 301 redirects → browsers got HTML instead of JSON
       - Fixed by using relative URLs `api/users/` which properly resolve with base href
       - Applied to: users.html, emails.html, event_detail.html
-   3. **Event save validation** - Removed `.toUpperCase()` from status field (commit `159893b`)
-      - Status enum values are lowercase ("confirmed", "draft", etc.)
-      - JavaScript was sending "CONFIRMED" which failed Pydantic validation (422 error)
+   3. **Event save validation** - Fixed status field handling (commits `159893b`, `daa7e15`)
+      - Removed `.toUpperCase()` from status field (enum values are lowercase)
+      - Fixed status dropdown options to match EventStatus enum
+      - Removed invalid options: "in_progress", "completed"
+      - Valid statuses: draft, pending, confirmed, closed, canceled
    4. **User role assignment** - Granted admin role to andy@swhgrp.com and admin@swhgrp.com
    5. **Updated gitignore** - Exclude integration-hub upload PDFs (commit `f946f73`)
    - **Status:** All admin pages fully functional ✅
