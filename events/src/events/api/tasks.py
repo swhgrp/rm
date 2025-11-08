@@ -6,7 +6,7 @@ from uuid import UUID
 from datetime import datetime
 
 from events.core.database import get_db
-from events.core.deps import require_auth, check_permission
+from events.core.deps import require_auth, require_permission, check_permission
 from events.models import Task, TaskChecklistItem, TaskStatus, User
 from events.schemas.task import TaskCreate, TaskUpdate, TaskResponse, ChecklistItemCreate, ChecklistItemResponse
 from events.services.task_service import TaskService
@@ -21,7 +21,7 @@ async def list_all_tasks(
     department: Optional[str] = None,
     priority: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_auth)
+    current_user: User = Depends(require_permission("read", "task"))
 ):
     """
     List all tasks across all events
@@ -151,13 +151,21 @@ async def list_department_tasks(
 async def create_task(
     event_id: UUID,
     task_data: TaskCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """
     Create new task for event
 
     - Optionally includes checklist items
     """
+    # Permission check: event_manager and admin can create tasks
+    if not check_permission(current_user, "create", "task"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to create tasks"
+        )
+
     # Verify event_id matches
     if task_data.event_id != event_id:
         raise HTTPException(
@@ -217,7 +225,8 @@ async def get_task(
 async def update_task(
     task_id: UUID,
     task_data: TaskUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_permission("update", "task"))
 ):
     """
     Update task
@@ -252,9 +261,17 @@ async def update_task(
 @router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_task(
     task_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
-    """Delete task"""
+    """Delete task - admin and event_manager only"""
+    # Only admin and event_manager can delete tasks
+    if not check_permission(current_user, "delete", "task"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admin and event managers can delete tasks"
+        )
+
     task = db.query(Task).filter(Task.id == task_id).first()
 
     if not task:

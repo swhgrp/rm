@@ -13,7 +13,7 @@ from events.schemas.package import (
     EventPackageResponse,
     EventPackageListItem
 )
-from events.core.deps import get_current_user
+from events.core.deps import require_auth, require_role, check_permission
 
 router = APIRouter()
 
@@ -22,7 +22,7 @@ router = APIRouter()
 async def list_packages(
     event_type: str = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_auth)
 ):
     """
     Get all event packages
@@ -61,7 +61,7 @@ async def list_packages(
 async def get_package(
     package_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_auth)
 ):
     """Get a specific event package by ID"""
     package = db.query(EventPackage).filter(EventPackage.id == package_id).first()
@@ -89,7 +89,7 @@ async def get_package(
 async def create_package(
     package_data: EventPackageCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role("admin", "event_manager"))
 ):
     """Create a new event package"""
     # Convert price_components to JSON
@@ -125,7 +125,7 @@ async def update_package(
     package_id: UUID,
     package_data: EventPackageUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role("admin", "event_manager"))
 ):
     """Update an event package"""
     package = db.query(EventPackage).filter(EventPackage.id == package_id).first()
@@ -164,7 +164,7 @@ async def update_package(
 async def delete_package(
     package_id: UUID,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_role("admin"))
 ):
     """Delete an event package"""
     package = db.query(EventPackage).filter(EventPackage.id == package_id).first()

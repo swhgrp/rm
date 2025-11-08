@@ -6,7 +6,8 @@ from uuid import UUID
 from datetime import datetime
 
 from events.core.database import get_db
-from events.models import Event, Document, DocumentType
+from events.core.deps import require_auth, check_permission
+from events.models import Event, Document, DocumentType, User
 from events.services.pdf_service import PDFService
 
 router = APIRouter()
@@ -17,7 +18,8 @@ pdf_service = PDFService()
 async def generate_beo_pdf(
     event_id: UUID,
     download: bool = True,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """
     Generate BEO (Banquet Event Order) PDF for an event
@@ -25,6 +27,13 @@ async def generate_beo_pdf(
     - **event_id**: Event UUID
     - **download**: If true, returns as downloadable file (default: true)
     """
+    # Permission check
+    if not check_permission(current_user, "read", "document"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to generate documents"
+        )
+
     from sqlalchemy.orm import joinedload
 
     # Get event with related data
@@ -82,7 +91,8 @@ async def generate_beo_pdf(
 async def generate_event_summary_pdf(
     event_id: UUID,
     download: bool = True,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """
     Generate event summary PDF with task list
@@ -90,6 +100,13 @@ async def generate_event_summary_pdf(
     - **event_id**: Event UUID
     - **download**: If true, returns as downloadable file (default: true)
     """
+    # Permission check
+    if not check_permission(current_user, "read", "document"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to generate documents"
+        )
+
     from sqlalchemy.orm import joinedload
     from events.models import Task
 

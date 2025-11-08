@@ -172,3 +172,52 @@ def check_permission(user: User, action: str, resource: str) -> bool:
         return action == "read" and resource != "financials"
 
     return False
+
+
+def require_role(*allowed_roles: str):
+    """
+    Dependency factory to require specific roles
+
+    Usage:
+        @router.post("/events")
+        async def create_event(
+            user: User = Depends(require_role("admin", "event_manager"))
+        ):
+            ...
+    """
+    def role_checker(user: User = Depends(require_auth)) -> User:
+        user_roles = [role.code for role in user.roles]
+
+        if not any(role in user_roles for role in allowed_roles):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Requires one of these roles: {', '.join(allowed_roles)}"
+            )
+
+        return user
+
+    return role_checker
+
+
+def require_permission(action: str, resource: str):
+    """
+    Dependency factory to require specific permission
+
+    Usage:
+        @router.delete("/events/{id}")
+        async def delete_event(
+            event_id: int,
+            user: User = Depends(require_permission("delete", "event"))
+        ):
+            ...
+    """
+    def permission_checker(user: User = Depends(require_auth)) -> User:
+        if not check_permission(user, action, resource):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied: Cannot {action} {resource}"
+            )
+
+        return user
+
+    return permission_checker

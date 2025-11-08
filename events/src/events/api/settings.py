@@ -6,7 +6,8 @@ from typing import List
 from uuid import UUID
 
 from events.core.database import get_db
-from events.models import Location, EventType, BeverageService, MealType, EventTemplate
+from events.core.deps import require_auth, require_role
+from events.models import Location, EventType, BeverageService, MealType, EventTemplate, User
 from events.schemas.settings import (
     LocationCreate, LocationUpdate, LocationResponse,
     EventTypeCreate, EventTypeUpdate, EventTypeResponse,
@@ -25,7 +26,8 @@ router = APIRouter()
 @router.get("/locations", response_model=List[LocationResponse])
 async def list_locations(
     include_inactive: bool = False,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """List all locations"""
     query = db.query(Location)
@@ -38,7 +40,8 @@ async def list_locations(
 @router.get("/locations/{location_id}", response_model=LocationResponse)
 async def get_location(
     location_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """Get location by ID"""
     location = db.query(Location).filter(Location.id == location_id).first()
@@ -50,7 +53,8 @@ async def get_location(
 @router.post("/locations", response_model=LocationResponse, status_code=status.HTTP_201_CREATED)
 async def create_location(
     location_data: LocationCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "event_manager"))
 ):
     """Create new location"""
     location = Location(**location_data.dict())
@@ -68,7 +72,8 @@ async def create_location(
 async def update_location(
     location_id: UUID,
     location_data: LocationUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "event_manager"))
 ):
     """Update location"""
     location = db.query(Location).filter(Location.id == location_id).first()
@@ -91,7 +96,8 @@ async def update_location(
 @router.delete("/locations/{location_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_location(
     location_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
 ):
     """Delete location"""
     location = db.query(Location).filter(Location.id == location_id).first()
@@ -108,7 +114,8 @@ async def delete_location(
 @router.get("/event-types", response_model=List[EventTypeResponse])
 async def list_event_types(
     include_inactive: bool = False,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """List all event types"""
     query = db.query(EventType)
@@ -121,7 +128,8 @@ async def list_event_types(
 @router.get("/event-types/{event_type_id}", response_model=EventTypeResponse)
 async def get_event_type(
     event_type_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """Get event type by ID"""
     event_type = db.query(EventType).filter(EventType.id == event_type_id).first()
@@ -133,7 +141,8 @@ async def get_event_type(
 @router.post("/event-types", response_model=EventTypeResponse, status_code=status.HTTP_201_CREATED)
 async def create_event_type(
     event_type_data: EventTypeCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "event_manager"))
 ):
     """Create new event type"""
     event_type = EventType(**event_type_data.dict())
@@ -151,17 +160,18 @@ async def create_event_type(
 async def update_event_type(
     event_type_id: UUID,
     event_type_data: EventTypeUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "event_manager"))
 ):
     """Update event type"""
     event_type = db.query(EventType).filter(EventType.id == event_type_id).first()
     if not event_type:
         raise HTTPException(status_code=404, detail="Event type not found")
-    
+
     update_dict = event_type_data.dict(exclude_unset=True)
     for field, value in update_dict.items():
         setattr(event_type, field, value)
-    
+
     try:
         db.commit()
         db.refresh(event_type)
@@ -174,7 +184,8 @@ async def update_event_type(
 @router.delete("/event-types/{event_type_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_event_type(
     event_type_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
 ):
     """Delete event type"""
     event_type = db.query(EventType).filter(EventType.id == event_type_id).first()
@@ -191,7 +202,8 @@ async def delete_event_type(
 @router.get("/beverage-services", response_model=List[BeverageServiceResponse])
 async def list_beverage_services(
     include_inactive: bool = False,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """List all beverage services"""
     query = db.query(BeverageService)
@@ -204,7 +216,8 @@ async def list_beverage_services(
 @router.get("/beverage-services/{service_id}", response_model=BeverageServiceResponse)
 async def get_beverage_service(
     service_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """Get beverage service by ID"""
     service = db.query(BeverageService).filter(BeverageService.id == service_id).first()
@@ -216,7 +229,8 @@ async def get_beverage_service(
 @router.post("/beverage-services", response_model=BeverageServiceResponse, status_code=status.HTTP_201_CREATED)
 async def create_beverage_service(
     service_data: BeverageServiceCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "event_manager"))
 ):
     """Create new beverage service"""
     service = BeverageService(**service_data.dict())
@@ -234,17 +248,18 @@ async def create_beverage_service(
 async def update_beverage_service(
     service_id: UUID,
     service_data: BeverageServiceUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "event_manager"))
 ):
     """Update beverage service"""
     service = db.query(BeverageService).filter(BeverageService.id == service_id).first()
     if not service:
         raise HTTPException(status_code=404, detail="Beverage service not found")
-    
+
     update_dict = service_data.dict(exclude_unset=True)
     for field, value in update_dict.items():
         setattr(service, field, value)
-    
+
     try:
         db.commit()
         db.refresh(service)
@@ -257,7 +272,8 @@ async def update_beverage_service(
 @router.delete("/beverage-services/{service_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_beverage_service(
     service_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
 ):
     """Delete beverage service"""
     service = db.query(BeverageService).filter(BeverageService.id == service_id).first()
@@ -274,7 +290,8 @@ async def delete_beverage_service(
 @router.get("/meal-types", response_model=List[MealTypeResponse])
 async def list_meal_types(
     include_inactive: bool = False,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """List all meal types"""
     query = db.query(MealType)
@@ -287,7 +304,8 @@ async def list_meal_types(
 @router.get("/meal-types/{meal_type_id}", response_model=MealTypeResponse)
 async def get_meal_type(
     meal_type_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """Get meal type by ID"""
     meal_type = db.query(MealType).filter(MealType.id == meal_type_id).first()
@@ -299,7 +317,8 @@ async def get_meal_type(
 @router.post("/meal-types", response_model=MealTypeResponse, status_code=status.HTTP_201_CREATED)
 async def create_meal_type(
     meal_type_data: MealTypeCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "event_manager"))
 ):
     """Create new meal type"""
     meal_type = MealType(**meal_type_data.dict())
@@ -317,17 +336,18 @@ async def create_meal_type(
 async def update_meal_type(
     meal_type_id: UUID,
     meal_type_data: MealTypeUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "event_manager"))
 ):
     """Update meal type"""
     meal_type = db.query(MealType).filter(MealType.id == meal_type_id).first()
     if not meal_type:
         raise HTTPException(status_code=404, detail="Meal type not found")
-    
+
     update_dict = meal_type_data.dict(exclude_unset=True)
     for field, value in update_dict.items():
         setattr(meal_type, field, value)
-    
+
     try:
         db.commit()
         db.refresh(meal_type)
@@ -340,7 +360,8 @@ async def update_meal_type(
 @router.delete("/meal-types/{meal_type_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_meal_type(
     meal_type_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
 ):
     """Delete meal type"""
     meal_type = db.query(MealType).filter(MealType.id == meal_type_id).first()
@@ -356,7 +377,8 @@ async def delete_meal_type(
 
 @router.get("/templates", response_model=List[EventTemplateResponse])
 async def list_event_templates(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """List all event templates"""
     templates = db.query(EventTemplate).order_by(EventTemplate.name.asc()).all()
@@ -366,7 +388,8 @@ async def list_event_templates(
 @router.get("/templates/{template_id}", response_model=EventTemplateResponse)
 async def get_event_template(
     template_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """Get event template by ID"""
     template = db.query(EventTemplate).filter(EventTemplate.id == template_id).first()
@@ -378,7 +401,8 @@ async def get_event_template(
 @router.post("/templates", response_model=EventTemplateResponse, status_code=status.HTTP_201_CREATED)
 async def create_event_template(
     template_data: EventTemplateCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "event_manager"))
 ):
     """Create new event template"""
     # Check if template with same name already exists
@@ -404,7 +428,8 @@ async def create_event_template(
 async def update_event_template(
     template_id: UUID,
     template_data: EventTemplateUpdate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "event_manager"))
 ):
     """Update event template"""
     template = db.query(EventTemplate).filter(EventTemplate.id == template_id).first()
@@ -437,7 +462,8 @@ async def update_event_template(
 @router.delete("/templates/{template_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_event_template(
     template_id: UUID,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
 ):
     """Delete event template"""
     template = db.query(EventTemplate).filter(EventTemplate.id == template_id).first()

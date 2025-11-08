@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from uuid import UUID
 
 from events.core.database import get_db
-from events.core.deps import require_auth, check_permission
+from events.core.deps import require_auth, require_role, require_permission, check_permission
 from events.models import Event, EventStatus, Venue, Client, Task, TaskStatus, User
 from events.schemas.event import EventCreate, EventUpdate, EventResponse, EventListItem
 from sqlalchemy import func
@@ -226,27 +226,28 @@ async def update_event(
     event_id: UUID,
     event_data: EventUpdate,
     db: Session = Depends(get_db),
-    # current_user = Depends(auth_service.get_current_user)
+    current_user: User = Depends(require_permission("update", "event"))
 ):
-    """Update event"""
+    """
+    Update event
+
+    Requires: admin or event_manager role
+    """
     event = db.query(Event).filter(Event.id == event_id).first()
 
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    # TODO: Check permissions and audit changes
-
     update_data = event_data.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(event, field, value)
-
-    # event.updated_by = current_user.id
 
     db.commit()
     db.refresh(event)
 
     # TODO: If time changed, update task due dates
     # TODO: Send update notifications
+    # TODO: Audit log
 
     return event
 
@@ -255,9 +256,12 @@ async def update_event(
 async def confirm_event(
     event_id: UUID,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin", "event_manager"))
 ):
     """
     Confirm event (change status to confirmed)
+
+    Requires: admin or event_manager role
 
     Triggers:
     - Generate BEO PDF
@@ -288,11 +292,12 @@ async def confirm_event(
 async def delete_event(
     event_id: UUID,
     db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
 ):
     """
     Delete event (soft delete - mark as canceled)
 
-    Only admins can permanently delete
+    Requires: admin role only
     """
     event = db.query(Event).filter(Event.id == event_id).first()
 
