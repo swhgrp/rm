@@ -5,6 +5,7 @@ from .client import ClientCreate, ClientResponse
 from .venue import VenueResponse
 from .user import UserResponse, RoleResponse
 from .intake import PublicIntakeRequest
+from .email import EmailResponse
 
 __all__ = [
     "EventCreate",
@@ -21,4 +22,5 @@ __all__ = [
     "UserResponse",
     "RoleResponse",
     "PublicIntakeRequest",
+    "EmailResponse",
 ]
