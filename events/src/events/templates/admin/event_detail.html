@@ -646,7 +646,7 @@
 
     async function loadEvent() {
         try {
-            const response = await fetch(`/events/api/events/${currentEventId}`);
+            const response = await fetch(`api/events/${currentEventId}`);
 
             if (!response.ok) {
                 throw new Error('Failed to load event');
@@ -848,7 +848,7 @@
         tasksContent.innerHTML = '<div class="loading">Loading tasks...</div>';
 
         try {
-            const response = await fetch(`/events/api/events/${currentEventId}/tasks`);
+            const response = await fetch(`api/events/${currentEventId}/tasks`);
             const tasks = await response.json();
 
             if (tasks.length === 0) {
@@ -911,7 +911,7 @@
         try {
             const updatedEvent = {
                 title: document.getElementById('title').value,
-                status: document.getElementById('status').value.toUpperCase(),
+                status: document.getElementById('status').value,
                 event_type: document.getElementById('event_type').value || null,
                 guest_count: parseInt(document.getElementById('guest_count').value),
                 start_at: new Date(document.getElementById('start_at').value).toISOString(),
@@ -921,7 +921,7 @@
                 client_id: document.getElementById('client_id').value || null,
             };
 
-            const response = await fetch(`/events/api/events/${currentEventId}`, {
+            const response = await fetch(`api/events/${currentEventId}`, {
                 method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
