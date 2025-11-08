@@ -48,6 +48,8 @@ logs/
 # Uploads
 uploads/*
 !uploads/.gitkeep
+**/uploads/*.pdf
+**/uploads/*.PDF
 
 # Backups
 backups/*
