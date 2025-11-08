@@ -11,6 +11,12 @@
 
 ### Most Recent Work (Last Session - Nov 8, 2025)
 
+**BUG FIX:** Fixed EmailResponse schema export issue (Nov 8, 2025)
+   - Added `EmailResponse` to `events/src/events/schemas/__init__.py` exports
+   - This was preventing the email history API from working properly
+   - Also updated `.gitignore` to exclude integration-hub upload PDFs
+   - Git commits: `7818e2d` (schema fix), `f946f73` (gitignore update)
+
 1. **Events System: Admin UIs Complete** ✅ (Nov 8, 2025) 👥 **MANAGEMENT TOOLS READY**
    - **USERS & ROLES MANAGEMENT** - Full admin interface for managing users and roles
    - **EMAIL HISTORY VIEWER** - Complete email log with stats and resend capability
