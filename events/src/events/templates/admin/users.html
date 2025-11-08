@@ -1,0 +1,464 @@
+{% extends "base.html" %}
+
+{% block title %}Users & Roles - SW Hospitality Events{% endblock %}
+
+{% block page_title %}Users & Roles Management{% endblock %}
+
+{% block content %}
+<div class="users-container">
+    <!-- Search and Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Search Users</label>
+                    <input type="text" class="form-control" id="searchInput" placeholder="Search by name or email...">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Filter by Role</label>
+                    <select class="form-select" id="roleFilter">
+                        <option value="">All Roles</option>
+                        <option value="admin">Admin</option>
+                        <option value="event_manager">Event Manager</option>
+                        <option value="dept_lead">Department Lead</option>
+                        <option value="staff">Staff</option>
+                        <option value="read_only">Read Only</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Filter by Department</label>
+                    <input type="text" class="form-control" id="deptFilter" placeholder="Department...">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">&nbsp;</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="includeInactive">
+                        <label class="form-check-label" for="includeInactive">
+                            Include Inactive
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="bi bi-people-fill"></i> Users
+                <span id="userCount" class="badge bg-primary ms-2">0</span>
+            </h5>
+            <div>
+                <button class="btn btn-sm btn-outline-secondary" onclick="loadUsers()">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Department</th>
+                            <th>Roles</th>
+                            <th>Source</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <tr>
+                            <td colspan="7" class="text-center py-4">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                Loading users...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Roles Reference Card -->
+    <div class="card mt-4">
+        <div class="card-header">
+            <h5 class="mb-0"><i class="bi bi-shield-check"></i> Role Permissions Reference</h5>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <h6 class="text-danger"><i class="bi bi-star-fill"></i> Admin</h6>
+                    <p class="small text-muted">Full access to everything including user/role management</p>
+
+                    <h6 class="text-warning"><i class="bi bi-calendar-check"></i> Event Manager</h6>
+                    <p class="small text-muted">Can create/update events, tasks, and settings. Cannot manage users or delete critical data.</p>
+
+                    <h6 class="text-info"><i class="bi bi-briefcase"></i> Department Lead</h6>
+                    <p class="small text-muted">Can manage tasks for their department, read events and financials</p>
+                </div>
+                <div class="col-md-6">
+                    <h6 class="text-success"><i class="bi bi-person"></i> Staff (Default)</h6>
+                    <p class="small text-muted">Can read/update assigned tasks only. Limited access.</p>
+
+                    <h6 class="text-secondary"><i class="bi bi-eye"></i> Read Only</h6>
+                    <p class="small text-muted">Read-only access. Cannot view financial data.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Role Management -->
+<div class="modal fade" id="roleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="roleModalTitle">Manage Roles</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">User:</label>
+                    <p id="modalUserName" class="mb-1"></p>
+                    <p id="modalUserEmail" class="text-muted small"></p>
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Current Roles:</label>
+                    <div id="currentRoles" class="mb-3"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Add Role:</label>
+                    <select class="form-select" id="roleSelect">
+                        <option value="">Select a role to add...</option>
+                        <option value="admin">Admin</option>
+                        <option value="event_manager">Event Manager</option>
+                        <option value="dept_lead">Department Lead</option>
+                        <option value="staff">Staff</option>
+                        <option value="read_only">Read Only</option>
+                    </select>
+                    <button class="btn btn-sm btn-primary mt-2" onclick="assignRole()">
+                        <i class="bi bi-plus-circle"></i> Add Role
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.users-container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.table th {
+    background-color: var(--surface-color);
+    border-bottom: 2px solid var(--border-color);
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.badge-role {
+    font-size: 0.75rem;
+    padding: 0.35em 0.65em;
+    margin-right: 0.25rem;
+    margin-bottom: 0.25rem;
+    display: inline-block;
+}
+
+.badge-admin { background-color: #dc3545; }
+.badge-event_manager { background-color: #ffc107; color: #000; }
+.badge-dept_lead { background-color: #0dcaf0; color: #000; }
+.badge-staff { background-color: #198754; }
+.badge-read_only { background-color: #6c757d; }
+
+.btn-role-action {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    margin-left: 0.25rem;
+}
+
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.status-active {
+    background-color: rgba(25, 135, 84, 0.1);
+    color: #198754;
+}
+
+.status-inactive {
+    background-color: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+}
+
+.source-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+</style>
+
+<script>
+let currentUser = null;
+let allUsers = [];
+
+// Load users on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadUsers();
+
+    // Set up filter listeners
+    document.getElementById('searchInput').addEventListener('input', filterUsers);
+    document.getElementById('roleFilter').addEventListener('change', filterUsers);
+    document.getElementById('deptFilter').addEventListener('input', filterUsers);
+    document.getElementById('includeInactive').addEventListener('change', loadUsers);
+});
+
+async function loadUsers() {
+    const includeInactive = document.getElementById('includeInactive').checked;
+
+    try {
+        const response = await fetch(`/api/users/?include_inactive=${includeInactive}`);
+        if (!response.ok) throw new Error('Failed to load users');
+
+        allUsers = await response.json();
+        filterUsers();
+    } catch (error) {
+        console.error('Error loading users:', error);
+        document.getElementById('usersTableBody').innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center py-4 text-danger">
+                    <i class="bi bi-exclamation-triangle"></i> Failed to load users
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function filterUsers() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const roleFilter = document.getElementById('roleFilter').value;
+    const deptFilter = document.getElementById('deptFilter').value.toLowerCase();
+
+    let filtered = allUsers;
+
+    // Apply search filter
+    if (search) {
+        filtered = filtered.filter(u =>
+            u.full_name.toLowerCase().includes(search) ||
+            u.email.toLowerCase().includes(search)
+        );
+    }
+
+    // Apply role filter
+    if (roleFilter) {
+        filtered = filtered.filter(u =>
+            u.roles.some(r => r.code === roleFilter)
+        );
+    }
+
+    // Apply department filter
+    if (deptFilter) {
+        filtered = filtered.filter(u =>
+            u.department && u.department.toLowerCase().includes(deptFilter)
+        );
+    }
+
+    renderUsers(filtered);
+}
+
+function renderUsers(users) {
+    const tbody = document.getElementById('usersTableBody');
+    document.getElementById('userCount').textContent = users.length;
+
+    if (users.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="7" class="text-center py-4 text-muted">
+                    <i class="bi bi-inbox"></i> No users found
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = users.map(user => `
+        <tr>
+            <td>
+                <div class="fw-bold">${escapeHtml(user.full_name)}</div>
+            </td>
+            <td>${escapeHtml(user.email)}</td>
+            <td>${user.department || '<span class="text-muted">—</span>'}</td>
+            <td>
+                ${user.roles.map(role => `
+                    <span class="badge badge-role badge-${role.code}">${role.name}</span>
+                `).join('')}
+            </td>
+            <td>
+                <span class="badge source-badge bg-secondary">${user.source}</span>
+            </td>
+            <td>
+                <span class="status-badge ${user.is_active ? 'status-active' : 'status-inactive'}">
+                    ${user.is_active ? 'Active' : 'Inactive'}
+                </span>
+            </td>
+            <td>
+                <button class="btn btn-sm btn-outline-primary" onclick='showRoleModal(${JSON.stringify(user)})' title="Manage Roles">
+                    <i class="bi bi-shield-check"></i>
+                </button>
+                ${user.is_active ? `
+                    <button class="btn btn-sm btn-outline-warning" onclick="deactivateUser('${user.id}', '${escapeHtml(user.full_name)}')" title="Deactivate">
+                        <i class="bi bi-pause-circle"></i>
+                    </button>
+                ` : `
+                    <button class="btn btn-sm btn-outline-success" onclick="activateUser('${user.id}', '${escapeHtml(user.full_name)}')" title="Activate">
+                        <i class="bi bi-play-circle"></i>
+                    </button>
+                `}
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showRoleModal(user) {
+    currentUser = user;
+    document.getElementById('modalUserName').textContent = user.full_name;
+    document.getElementById('modalUserEmail').textContent = user.email;
+
+    // Display current roles
+    const rolesHtml = user.roles.map(role => `
+        <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-dark rounded">
+            <span class="badge badge-role badge-${role.code}">${role.name}</span>
+            <button class="btn btn-sm btn-outline-danger btn-role-action"
+                    onclick="removeRole('${role.code}')"
+                    ${user.roles.length === 1 ? 'disabled title="Cannot remove last role"' : ''}>
+                <i class="bi bi-x-circle"></i> Remove
+            </button>
+        </div>
+    `).join('');
+
+    document.getElementById('currentRoles').innerHTML = rolesHtml;
+
+    // Reset role select
+    document.getElementById('roleSelect').value = '';
+
+    // Show modal
+    new bootstrap.Modal(document.getElementById('roleModal')).show();
+}
+
+async function assignRole() {
+    const roleCode = document.getElementById('roleSelect').value;
+    if (!roleCode) {
+        alert('Please select a role to add');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/users/${currentUser.id}/roles/${roleCode}`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to assign role');
+        }
+
+        // Reload users and close modal
+        await loadUsers();
+        bootstrap.Modal.getInstance(document.getElementById('roleModal')).hide();
+
+        alert(`Role "${roleCode}" assigned successfully to ${currentUser.full_name}`);
+    } catch (error) {
+        console.error('Error assigning role:', error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function removeRole(roleCode) {
+    if (!confirm(`Remove role "${roleCode}" from ${currentUser.full_name}?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/users/${currentUser.id}/roles/${roleCode}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to remove role');
+        }
+
+        // Reload users and update modal
+        await loadUsers();
+        const updatedUser = allUsers.find(u => u.id === currentUser.id);
+        if (updatedUser) {
+            showRoleModal(updatedUser);
+        }
+
+        alert(`Role "${roleCode}" removed successfully`);
+    } catch (error) {
+        console.error('Error removing role:', error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function deactivateUser(userId, userName) {
+    if (!confirm(`Deactivate user "${userName}"?\n\nThey will not be able to log in or perform any actions.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/api/users/${userId}/deactivate`, {
+            method: 'PATCH'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to deactivate user');
+        }
+
+        await loadUsers();
+        alert(`User "${userName}" has been deactivated`);
+    } catch (error) {
+        console.error('Error deactivating user:', error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function activateUser(userId, userName) {
+    try {
+        const response = await fetch(`/api/users/${userId}/activate`, {
+            method: 'PATCH'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to activate user');
+        }
+
+        await loadUsers();
+        alert(`User "${userName}" has been activated`);
+    } catch (error) {
+        console.error('Error activating user:', error);
+        alert(`Error: ${error.message}`);
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}
