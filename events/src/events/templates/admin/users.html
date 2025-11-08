@@ -228,7 +228,9 @@ async function loadUsers() {
     const includeInactive = document.getElementById('includeInactive').checked;
 
     try {
-        const response = await fetch(`/api/users/?include_inactive=${includeInactive}`);
+        const response = await fetch(`api/users/?include_inactive=${includeInactive}`, {
+            credentials: 'same-origin'
+        });
         if (!response.ok) throw new Error('Failed to load users');
 
         allUsers = await response.json();
@@ -364,7 +366,7 @@ async function assignRole() {
     }
 
     try {
-        const response = await fetch(`/api/users/${currentUser.id}/roles/${roleCode}`, {
+        const response = await fetch(`api/users/${currentUser.id}/roles/${roleCode}`, {
             method: 'POST'
         });
 
@@ -390,7 +392,7 @@ async function removeRole(roleCode) {
     }
 
     try {
-        const response = await fetch(`/api/users/${currentUser.id}/roles/${roleCode}`, {
+        const response = await fetch(`api/users/${currentUser.id}/roles/${roleCode}`, {
             method: 'DELETE'
         });
 
@@ -419,7 +421,7 @@ async function deactivateUser(userId, userName) {
     }
 
     try {
-        const response = await fetch(`/api/users/${userId}/deactivate`, {
+        const response = await fetch(`api/users/${userId}/deactivate`, {
             method: 'PATCH'
         });
 
@@ -438,7 +440,7 @@ async function deactivateUser(userId, userName) {
 
 async function activateUser(userId, userName) {
     try {
-        const response = await fetch(`/api/users/${userId}/activate`, {
+        const response = await fetch(`api/users/${userId}/activate`, {
             method: 'PATCH'
         });
 

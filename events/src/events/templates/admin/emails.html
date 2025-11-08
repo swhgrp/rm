@@ -298,7 +298,7 @@ async function loadStats() {
     const days = parseInt(document.getElementById('daysFilter').value);
 
     try {
-        const response = await fetch(`/api/emails/stats/summary?days=${days}`);
+        const response = await fetch(`api/emails/stats/summary?days=${days}`);
         if (!response.ok) throw new Error('Failed to load stats');
 
         const stats = await response.json();
@@ -323,7 +323,7 @@ async function loadEmails() {
     params.append('limit', limit);
 
     try {
-        const response = await fetch(`/api/emails/?${params.toString()}`);
+        const response = await fetch(`api/emails/?${params.toString()}`);
         if (!response.ok) throw new Error('Failed to load emails');
 
         const emails = await response.json();
@@ -439,7 +439,7 @@ async function resendEmail() {
     if (!confirm('Resend this email?')) return;
 
     try {
-        const response = await fetch(`/api/emails/${currentEmailId}/resend`, {
+        const response = await fetch(`api/emails/${currentEmailId}/resend`, {
             method: 'POST'
         });
 
