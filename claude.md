@@ -11,15 +11,20 @@
 
 ### Most Recent Work (Last Session - Nov 8, 2025)
 
-**BUG FIXES:** Fixed critical issues preventing admin pages from working (Nov 8, 2025) 🐛
+**BUG FIXES:** Fixed critical issues preventing Events system from working (Nov 8, 2025) 🐛
    1. **EmailResponse schema export** - Added to `schemas/__init__.py` exports (commit `7818e2d`)
-   2. **API URL resolution** - Changed fetch URLs from absolute to relative (commit `87437d4`)
+   2. **API URL resolution** - Changed fetch URLs from absolute to relative (commits `87437d4`, `159893b`)
       - Problem: `<base href="/events/">` doesn't affect JavaScript fetch() URLs
       - Absolute URLs `/api/users/` were going to root instead of `/events/api/users/`
       - Nginx was returning 301 redirects → browsers got HTML instead of JSON
       - Fixed by using relative URLs `api/users/` which properly resolve with base href
-   3. **Updated gitignore** - Exclude integration-hub upload PDFs (commit `f946f73`)
-   - **Status:** Both Users & Roles and Email History pages now fully functional ✅
+      - Applied to: users.html, emails.html, event_detail.html
+   3. **Event save validation** - Removed `.toUpperCase()` from status field (commit `159893b`)
+      - Status enum values are lowercase ("confirmed", "draft", etc.)
+      - JavaScript was sending "CONFIRMED" which failed Pydantic validation (422 error)
+   4. **User role assignment** - Granted admin role to andy@swhgrp.com and admin@swhgrp.com
+   5. **Updated gitignore** - Exclude integration-hub upload PDFs (commit `f946f73`)
+   - **Status:** All admin pages fully functional ✅
 
 1. **Events System: Admin UIs Complete** ✅ (Nov 8, 2025) 👥 **MANAGEMENT TOOLS READY**
    - **USERS & ROLES MANAGEMENT** - Full admin interface for managing users and roles
