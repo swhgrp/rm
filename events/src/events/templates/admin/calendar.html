@@ -383,10 +383,10 @@
                 <div class="form-group-custom">
                     <label for="itemType">Type *</label>
                     <select id="itemType" class="form-control-custom" required>
-                        <option value="MEETING">👥 Meeting</option>
-                        <option value="REMINDER">🔔 Reminder</option>
-                        <option value="NOTE">📝 Note</option>
-                        <option value="BLOCKED_TIME">🚫 Blocked Time</option>
+                        <option value="MEETING">Meeting</option>
+                        <option value="REMINDER">Reminder</option>
+                        <option value="NOTE">Note</option>
+                        <option value="BLOCKED_TIME">Blocked Time</option>
                     </select>
                 </div>
 
@@ -500,7 +500,7 @@
 
     async function loadVenues() {
         try {
-            const response = await fetch('api/venues/');
+            const response = await fetch('api/events/venues');
             allVenues = await response.json();
 
             // Build color map
