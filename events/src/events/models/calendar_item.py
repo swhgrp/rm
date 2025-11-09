@@ -26,14 +26,14 @@ class CalendarItem(BaseModel):
     start_at = Column(DateTime(timezone=True), nullable=False)
     end_at = Column(DateTime(timezone=True), nullable=True)  # Optional for reminders/notes
 
-    # Location/Venue
-    venue_id = Column(UUID(as_uuid=True), ForeignKey('venues.id', ondelete='SET NULL'), nullable=True)
+    # Location
+    location_id = Column(UUID(as_uuid=True), ForeignKey('locations.id', ondelete='SET NULL'), nullable=True)
 
     # Ownership
     created_by = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
 
     # Relationships
-    venue = relationship("Venue")
+    location = relationship("Location")
     creator = relationship("User", foreign_keys=[created_by])
 
     def __repr__(self):

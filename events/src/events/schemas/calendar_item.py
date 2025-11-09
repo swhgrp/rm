@@ -13,7 +13,7 @@ class CalendarItemBase(BaseModel):
     description: Optional[str] = None
     start_at: datetime
     end_at: Optional[datetime] = None
-    venue_id: Optional[UUID] = None
+    location_id: Optional[UUID] = None
 
 
 class CalendarItemCreate(CalendarItemBase):
@@ -28,11 +28,11 @@ class CalendarItemUpdate(BaseModel):
     description: Optional[str] = None
     start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
-    venue_id: Optional[UUID] = None
+    location_id: Optional[UUID] = None
 
 
-class VenueInfo(BaseModel):
-    """Basic venue info for calendar item response"""
+class LocationInfo(BaseModel):
+    """Basic location info for calendar item response"""
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -57,5 +57,5 @@ class CalendarItemResponse(CalendarItemBase):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
-    venue: Optional[VenueInfo] = None
+    location: Optional[LocationInfo] = None
     creator: Optional[UserInfo] = None

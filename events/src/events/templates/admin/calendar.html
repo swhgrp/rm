@@ -325,6 +325,133 @@
         resize: vertical;
         font-family: inherit;
     }
+
+    /* Toast notification system */
+    .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .toast {
+        min-width: 300px;
+        max-width: 500px;
+        padding: 16px 20px;
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes slideIn {
+        from {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+        to {
+            transform: translateX(0);
+            opacity: 1;
+        }
+    }
+
+    .toast.hiding {
+        animation: slideOut 0.3s ease-out forwards;
+    }
+
+    @keyframes slideOut {
+        from {
+            transform: translateX(0);
+            opacity: 1;
+        }
+        to {
+            transform: translateX(400px);
+            opacity: 0;
+        }
+    }
+
+    .toast-icon {
+        font-size: 20px;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+
+    .toast-content {
+        flex: 1;
+    }
+
+    .toast-title {
+        font-weight: 600;
+        color: #c9d1d9;
+        margin-bottom: 4px;
+    }
+
+    .toast-message {
+        font-size: 14px;
+        color: #8b949e;
+        line-height: 1.4;
+    }
+
+    .toast-close {
+        background: none;
+        border: none;
+        color: #8b949e;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 0;
+        width: 24px;
+        height: 24px;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 4px;
+        transition: background-color 0.2s;
+    }
+
+    .toast-close:hover {
+        background-color: #30363d;
+        color: #c9d1d9;
+    }
+
+    .toast.error {
+        border-left: 3px solid #da3633;
+    }
+
+    .toast.error .toast-icon {
+        color: #da3633;
+    }
+
+    .toast.success {
+        border-left: 3px solid #238636;
+    }
+
+    .toast.success .toast-icon {
+        color: #238636;
+    }
+
+    .toast.warning {
+        border-left: 3px solid #f0883e;
+    }
+
+    .toast.warning .toast-icon {
+        color: #f0883e;
+    }
+
+    .toast.info {
+        border-left: 3px solid #58a6ff;
+    }
+
+    .toast.info .toast-icon {
+        color: #58a6ff;
+    }
 </style>
 {% endblock %}
 
@@ -444,6 +571,10 @@
         </div>
     </div>
 </div>
+
+<!-- Toast notification container -->
+<div class="toast-container" id="toastContainer"></div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -452,6 +583,56 @@
     let calendar;
     let allVenues = [];
     let venueColorMap = {}; // Map venue_id -> color
+
+    // Toast notification system
+    function showToast(message, type = 'info', title = null) {
+        const container = document.getElementById('toastContainer');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+
+        const icons = {
+            'error': '✕',
+            'success': '✓',
+            'warning': '⚠',
+            'info': 'ℹ'
+        };
+
+        const titles = {
+            'error': 'Error',
+            'success': 'Success',
+            'warning': 'Warning',
+            'info': 'Information'
+        };
+
+        const icon = icons[type] || icons.info;
+        const toastTitle = title || titles[type] || titles.info;
+
+        toast.innerHTML = `
+            <div class="toast-icon">${icon}</div>
+            <div class="toast-content">
+                <div class="toast-title">${toastTitle}</div>
+                <div class="toast-message">${message}</div>
+            </div>
+            <button class="toast-close" onclick="closeToast(this)">×</button>
+        `;
+
+        container.appendChild(toast);
+
+        // Auto-dismiss after 5 seconds
+        setTimeout(() => {
+            closeToast(toast.querySelector('.toast-close'));
+        }, 5000);
+    }
+
+    function closeToast(button) {
+        const toast = button.closest('.toast');
+        if (toast) {
+            toast.classList.add('hiding');
+            setTimeout(() => {
+                toast.remove();
+            }, 300);
+        }
+    }
 
     document.addEventListener('DOMContentLoaded', function() {
         initializeCalendar();
@@ -798,7 +979,7 @@
 
             // Validate required fields
             if (!title || !itemType || !startDate || !startTime) {
-                alert('Please fill in all required fields');
+                showToast('Please fill in all required fields', 'warning', 'Validation Error');
                 return;
             }
 
@@ -817,7 +998,7 @@
                 description: description,
                 start_at: startDateTime.toISOString(),
                 end_at: endDateTime ? endDateTime.toISOString() : null,
-                venue_id: venueId
+                location_id: venueId
             };
 
             const response = await fetch('api/calendar-items/', {
@@ -831,7 +1012,7 @@
 
             if (!response.ok) {
                 const error = await response.json();
-                alert(`Error creating item: ${error.detail || 'Unknown error'}`);
+                showToast(error.detail || 'Unknown error occurred', 'error', 'Failed to Create Item');
                 return;
             }
 
@@ -839,10 +1020,11 @@
             closeCalendarItemModal();
             calendar.refetchEvents();
 
+            showToast('Calendar item created successfully', 'success');
             console.log('Calendar item created successfully');
         } catch (error) {
             console.error('Error creating calendar item:', error);
-            alert('Error creating calendar item');
+            showToast('Unable to create calendar item. Please try again.', 'error', 'Error');
         }
     }
 

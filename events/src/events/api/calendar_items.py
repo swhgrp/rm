@@ -26,17 +26,17 @@ async def create_calendar_item(
 ):
     """Create a new calendar item"""
 
-    # Check if user has access to the specified venue (location-based permissions)
-    if item_data.venue_id:
+    # Check if user has access to the specified location (location-based permissions)
+    if item_data.location_id:
         user_roles = [role.code for role in current_user.roles]
         if "admin" not in user_roles:
-            # Check if user has access to this venue
-            user_venue = db.query(UserLocation).filter(
+            # Check if user has access to this location
+            user_location = db.query(UserLocation).filter(
                 UserLocation.user_id == current_user.id,
-                UserLocation.venue_id == item_data.venue_id
+                UserLocation.venue_id == item_data.location_id
             ).first()
 
-            if not user_venue:
+            if not user_location:
                 raise HTTPException(
                     status_code=403,
                     detail="You do not have access to create items at this location"
@@ -60,7 +60,7 @@ async def list_calendar_items(
     start: Optional[datetime] = None,
     end: Optional[datetime] = None,
     item_type: Optional[str] = None,
-    venue_id: Optional[UUID] = None,
+    location_id: Optional[UUID] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_auth)
 ):
@@ -79,9 +79,9 @@ async def list_calendar_items(
         user_venue_ids = [v[0] for v in user_venues]
 
         if user_venue_ids:
-            # Filter to items at user's assigned venues OR items created by the user
+            # Filter to items at user's assigned locations OR items created by the user
             query = query.filter(
-                (CalendarItem.venue_id.in_(user_venue_ids)) |
+                (CalendarItem.location_id.in_(user_venue_ids)) |
                 (CalendarItem.created_by == current_user.id)
             )
         else:
@@ -98,8 +98,8 @@ async def list_calendar_items(
     if item_type:
         query = query.filter(CalendarItem.item_type == item_type)
 
-    if venue_id:
-        query = query.filter(CalendarItem.venue_id == venue_id)
+    if location_id:
+        query = query.filter(CalendarItem.location_id == location_id)
 
     items = query.order_by(CalendarItem.start_at).all()
     return items
@@ -129,7 +129,7 @@ async def get_calendar_items(
 
         if user_venue_ids:
             query = query.filter(
-                (CalendarItem.venue_id.in_(user_venue_ids)) |
+                (CalendarItem.location_id.in_(user_venue_ids)) |
                 (CalendarItem.created_by == current_user.id)
             )
         else:
@@ -155,15 +155,15 @@ async def get_calendar_item(
     # Check permissions
     user_roles = [role.code for role in current_user.roles]
     if "admin" not in user_roles:
-        # User can view if they created it or have access to the venue
+        # User can view if they created it or have access to the location
         if item.created_by != current_user.id:
-            if item.venue_id:
-                user_venue = db.query(UserLocation).filter(
+            if item.location_id:
+                user_location = db.query(UserLocation).filter(
                     UserLocation.user_id == current_user.id,
-                    UserLocation.venue_id == item.venue_id
+                    UserLocation.venue_id == item.location_id
                 ).first()
 
-                if not user_venue:
+                if not user_location:
                     raise HTTPException(status_code=403, detail="Access denied")
             else:
                 raise HTTPException(status_code=403, detail="Access denied")
@@ -190,15 +190,15 @@ async def update_calendar_item(
     if "admin" not in user_roles and item.created_by != current_user.id:
         raise HTTPException(status_code=403, detail="Only the creator can edit this item")
 
-    # If changing venue, check new venue access
-    if item_data.venue_id and item_data.venue_id != item.venue_id:
+    # If changing location, check new location access
+    if item_data.location_id and item_data.location_id != item.location_id:
         if "admin" not in user_roles:
-            user_venue = db.query(UserLocation).filter(
+            user_location = db.query(UserLocation).filter(
                 UserLocation.user_id == current_user.id,
-                UserLocation.venue_id == item_data.venue_id
+                UserLocation.venue_id == item_data.location_id
             ).first()
 
-            if not user_venue:
+            if not user_location:
                 raise HTTPException(
                     status_code=403,
                     detail="You do not have access to this location"
