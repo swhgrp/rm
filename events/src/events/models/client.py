@@ -28,6 +28,7 @@ class Venue(BaseModel):
 
     name = Column(String(255), nullable=False)
     address = Column(Text, nullable=True)
+    color = Column(String(7), nullable=True)  # Hex color code for calendar display
     rooms_json = Column(JSONB, nullable=True)  # {"rooms": [{"name": "Ballroom", "capacity": 200}]}
 
     # Relationships
