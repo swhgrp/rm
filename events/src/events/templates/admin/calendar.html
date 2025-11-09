@@ -889,8 +889,13 @@
                 const startDate = new Date(event.start_at);
 
                 document.getElementById('modalTitle').textContent = event.title;
-                document.getElementById('modalViewButton').href = '/events/event?id=' + event.id;
-                document.getElementById('modalViewButton').style.display = 'block';
+
+                // Reset button for events (clear calendar item onclick handler)
+                const modalViewButton = document.getElementById('modalViewButton');
+                modalViewButton.textContent = 'View Full Details';
+                modalViewButton.href = '/events/event?id=' + event.id;
+                modalViewButton.style.display = 'block';
+                modalViewButton.onclick = null; // Clear any previous onclick handler
 
                 // Determine location display
                 let locationDisplay = 'Not assigned';
@@ -947,6 +952,12 @@
     function closeModal(event) {
         if (!event || event.target.id === 'eventModal') {
             document.getElementById('eventModal').classList.remove('active');
+
+            // Reset button state to prevent cross-contamination
+            const modalViewButton = document.getElementById('modalViewButton');
+            modalViewButton.textContent = 'View Full Details';
+            modalViewButton.onclick = null;
+            modalViewButton.href = '#';
         }
     }
 
