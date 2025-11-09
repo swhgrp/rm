@@ -92,23 +92,23 @@
         box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
     }
 
-    .event-card.status-draft {
+    .event-card.status-DRAFT {
         border-left: 4px solid #6e7681;
     }
 
-    .event-card.status-pending {
+    .event-card.status-PENDING {
         border-left: 4px solid #f0883e;
     }
 
-    .event-card.status-confirmed {
+    .event-card.status-CONFIRMED {
         border-left: 4px solid #1f6feb;
     }
 
-    .event-card.status-closed {
+    .event-card.status-CLOSED {
         border-left: 4px solid #238636;
     }
 
-    .event-card.status-canceled {
+    .event-card.status-CANCELED {
         border-left: 4px solid #da3633;
     }
 
@@ -139,33 +139,33 @@
         text-transform: uppercase;
     }
 
-    .status-badge.status-draft {
+    .status-badge.status-DRAFT {
         background-color: #21262d;
         color: #8b949e;
     }
 
-    .status-badge.status-pending {
+    .status-badge.status-PENDING {
         background-color: #9e6a03;
         color: #ffd33d;
     }
 
-    .status-badge.status-confirmed {
+    .status-badge.status-CONFIRMED {
         background-color: #0969da;
         color: #79c0ff;
     }
 
-    .status-badge.status-closed {
+    .status-badge.status-CLOSED {
         background-color: #8250df;
         color: #d2a8ff;
     }
 
-    .status-badge.status-closed,
-    .status-badge.status-closed {
+    .status-badge.status-CLOSED,
+    .status-badge.status-CLOSED {
         background-color: #1a7f37;
         color: #4ac26b;
     }
 
-    .status-badge.status-canceled {
+    .status-badge.status-CANCELED {
         background-color: #da3633;
         color: #ffa198;
     }
@@ -303,11 +303,11 @@
             <label class="form-label-custom">Status</label>
             <select id="filterStatus" class="form-control-custom" onchange="filterEvents()">
                 <option value="">All Statuses</option>
-                <option value="draft">Draft</option>
-                <option value="pending">Pending</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="closed">Closed</option>
-                <option value="canceled">Canceled</option>
+                <option value="DRAFT">Draft</option>
+                <option value="PENDING">Pending</option>
+                <option value="CONFIRMED">Confirmed</option>
+                <option value="CLOSED">Closed</option>
+                <option value="CANCELED">Canceled</option>
             </select>
         </div>
 
@@ -401,11 +401,11 @@
     function updateStats(events) {
         const stats = {
             total: events.length,
-            draft: 0,
-            pending: 0,
-            confirmed: 0,
-            closed: 0,
-            canceled: 0
+            DRAFT: 0,
+            PENDING: 0,
+            CONFIRMED: 0,
+            CLOSED: 0,
+            CANCELED: 0
         };
 
         events.forEach(event => {
@@ -415,11 +415,11 @@
         });
 
         document.getElementById('statTotal').textContent = stats.total;
-        document.getElementById('statDraft').textContent = stats.draft;
-        document.getElementById('statPending').textContent = stats.pending;
-        document.getElementById('statConfirmed').textContent = stats.confirmed;
-        document.getElementById('statCompleted').textContent = stats.closed;
-        document.getElementById('statInProgress').textContent = stats.canceled;
+        document.getElementById('statDraft').textContent = stats.DRAFT;
+        document.getElementById('statPending').textContent = stats.PENDING;
+        document.getElementById('statConfirmed').textContent = stats.CONFIRMED;
+        document.getElementById('statCompleted').textContent = stats.CLOSED;
+        document.getElementById('statInProgress').textContent = stats.CANCELED;
     }
 
     function filterEvents() {

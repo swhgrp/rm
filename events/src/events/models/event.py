@@ -8,11 +8,11 @@ import enum
 
 class EventStatus(str, enum.Enum):
     """Event status enum"""
-    DRAFT = "draft"
-    PENDING = "pending"
-    CONFIRMED = "confirmed"
-    CLOSED = "closed"
-    CANCELED = "canceled"
+    DRAFT = "DRAFT"
+    PENDING = "PENDING"
+    CONFIRMED = "CONFIRMED"
+    CLOSED = "CLOSED"
+    CANCELED = "CANCELED"
 
 
 class Event(BaseModel):
