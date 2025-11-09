@@ -436,7 +436,8 @@ function showEmailModal(email) {
 async function resendEmail() {
     if (!currentEmailId) return;
 
-    if (!confirm('Resend this email?')) return;
+    const confirmed = await showConfirm('Resend this email?', 'Resend Email');
+    if (!confirmed) return;
 
     try {
         const response = await fetch(`api/emails/${currentEmailId}/resend`, {
@@ -448,13 +449,13 @@ async function resendEmail() {
             throw new Error(error.detail || 'Failed to resend email');
         }
 
-        alert('Email has been queued for resending');
+        await showAlert('Email has been queued for resending', 'Success');
         bootstrap.Modal.getInstance(document.getElementById('emailModal')).hide();
         await loadStats();
         await loadEmails();
     } catch (error) {
         console.error('Error resending email:', error);
-        alert(`Error: ${error.message}`);
+        await showAlert(`Error: ${error.message}`, 'Error');
     }
 }
 

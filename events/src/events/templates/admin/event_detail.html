@@ -706,7 +706,7 @@
 
         // Details tab
         document.getElementById('title').value = event.title;
-        document.getElementById('status').value = event.status.toLowerCase();
+        document.getElementById('status').value = event.status; // Don't lowercase - enum values are uppercase
         document.getElementById('guest_count').value = event.guest_count || 0;
         document.getElementById('start_at').value = formatDateTimeForInput(event.start_at);
         if (event.end_at) {
@@ -807,10 +807,16 @@
     async function loadLocations(selectedVenueId = null) {
         try {
             // Load actual venues from venues table (not locations)
-            const response = await fetch('api/events/venues/actual');
+            const response = await fetch('api/events/venues/actual?_=' + Date.now()); // Cache bust
             allVenues = await response.json();
 
+            console.log('Loaded venues from venues table:', allVenues);
+            console.log('Selected venue ID:', selectedVenueId);
+
             const select = document.getElementById('location');
+            // CLEAR ALL EXISTING OPTIONS FIRST
+            select.innerHTML = '';
+
             // Add empty option
             const emptyOption = document.createElement('option');
             emptyOption.value = '';
@@ -823,6 +829,7 @@
                 option.textContent = venue.name;
                 if (selectedVenueId && venue.id === selectedVenueId) {
                     option.selected = true;
+                    console.log('Selected venue:', venue.name, venue.id);
                 }
                 select.appendChild(option);
             });
@@ -917,6 +924,12 @@
 
     async function saveEvent() {
         try {
+            const locationSelect = document.getElementById('location');
+            const venue_id = locationSelect.value || null;
+
+            console.log('Saving event with venue_id:', venue_id);
+            console.log('All options in location select:', Array.from(locationSelect.options).map(o => ({value: o.value, text: o.text})));
+
             const updatedEvent = {
                 title: document.getElementById('title').value,
                 status: document.getElementById('status').value,
@@ -925,9 +938,11 @@
                 start_at: new Date(document.getElementById('start_at').value).toISOString(),
                 end_at: document.getElementById('end_at').value ?
                     new Date(document.getElementById('end_at').value).toISOString() : null,
-                venue_id: document.getElementById('location').value || null,
+                venue_id: venue_id,
                 client_id: document.getElementById('client_id').value || null,
             };
+
+            console.log('Full event update payload:', updatedEvent);
 
             const response = await fetch(`api/events/${currentEventId}`, {
                 method: 'PATCH',
@@ -938,6 +953,8 @@
             });
 
             if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                console.error('Save failed with status:', response.status, errorData);
                 throw new Error('Failed to save event');
             }
 

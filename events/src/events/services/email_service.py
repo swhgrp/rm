@@ -156,7 +156,7 @@ class EmailService:
         Resolve email specification to actual email list
 
         Args:
-            email_spec: Email spec like "{client.email}" or "sales@ourco.com"
+            email_spec: Email spec like "{client.email}", "{location_users}", or "events@swhgrp.com"
             event: Event object
 
         Returns:
@@ -169,9 +169,53 @@ class EmailService:
         if '{' in email_spec:
             if 'client.email' in email_spec:
                 return [event.client.email]
+            elif 'location_users' in email_spec:
+                # Get all users with permissions for this event's venue/location
+                return self._get_location_user_emails(event)
             # Add more variable handling as needed
 
         return [email_spec]
+
+    def _get_location_user_emails(self, event: Any) -> List[str]:
+        """
+        Get emails of all users with permissions for the event's location
+
+        Args:
+            event: Event object with venue_id
+
+        Returns:
+            List of user email addresses
+        """
+        from events.models.user import UserLocation, User
+
+        if not event.venue_id:
+            logger.warning(f"Event {event.id} has no venue_id, cannot get location users")
+            return []
+
+        try:
+            # Get all users assigned to this venue/location
+            from sqlalchemy import select
+            from events.core.database import SessionLocal
+
+            db = SessionLocal()
+
+            # Query users who have this venue in their user_locations
+            user_emails = db.query(User.email).join(
+                UserLocation, UserLocation.user_id == User.id
+            ).filter(
+                UserLocation.venue_id == event.venue_id,
+                User.is_active == True
+            ).distinct().all()
+
+            db.close()
+
+            emails = [email[0] for email in user_emails if email[0]]
+            logger.info(f"Found {len(emails)} users for venue {event.venue_id}: {emails}")
+            return emails
+
+        except Exception as e:
+            logger.error(f"Error getting location user emails: {e}")
+            return []
 
     def _replace_variables(self, text: str, event: Any) -> str:
         """Replace template variables in text"""
@@ -181,10 +225,12 @@ class EmailService:
         replacements = {
             '{event.title}': event.title,
             '{event.start_at}': str(event.start_at),
-            '{client.name}': event.client.name,
+            '{client.name}': event.client.name if event.client else 'N/A',
+            '{venue.name}': event.venue.name if event.venue else 'Not assigned',
         }
 
         for key, value in replacements.items():
-            text = text.replace(key, value)
+            if value:
+                text = text.replace(key, str(value))
 
         return text

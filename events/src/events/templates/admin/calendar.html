@@ -634,9 +634,95 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    // Custom confirm dialog (replaces browser confirm)
+    function showConfirm(message, title = 'Confirm') {
+        return new Promise((resolve) => {
+            // Create modal overlay
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.7);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+            `;
+
+            // Create modal
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                background: #161b22;
+                border: 1px solid #30363d;
+                border-radius: 8px;
+                padding: 24px;
+                max-width: 400px;
+                width: 90%;
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            `;
+
+            modal.innerHTML = `
+                <div style="color: #c9d1d9; font-size: 18px; font-weight: 600; margin-bottom: 16px;">
+                    ${title}
+                </div>
+                <div style="color: #8b949e; margin-bottom: 24px; line-height: 1.5;">
+                    ${message}
+                </div>
+                <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                    <button id="confirmCancel" style="
+                        background: #21262d;
+                        border: 1px solid #30363d;
+                        color: #c9d1d9;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 14px;
+                    ">Cancel</button>
+                    <button id="confirmOk" style="
+                        background: #da3633;
+                        border: 1px solid #f85149;
+                        color: white;
+                        padding: 8px 16px;
+                        border-radius: 6px;
+                        cursor: pointer;
+                        font-size: 14px;
+                    ">OK</button>
+                </div>
+            `;
+
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            // Handle button clicks
+            document.getElementById('confirmOk').onclick = () => {
+                document.body.removeChild(overlay);
+                resolve(true);
+            };
+
+            document.getElementById('confirmCancel').onclick = () => {
+                document.body.removeChild(overlay);
+                resolve(false);
+            };
+
+            // Handle escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.body.removeChild(overlay);
+                    document.removeEventListener('keydown', handleEscape);
+                    resolve(false);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Load venues first, then initialize calendar (so color map is ready)
+        await loadVenues();
         initializeCalendar();
-        loadVenues();
     });
 
     function initializeCalendar() {
@@ -654,12 +740,17 @@
             height: 'auto',
             eventDidMount: function(info) {
                 const props = info.event.extendedProps;
-                const venueId = props.venue_id;
+                const venueId = props.venue_id || props.location_id; // Support both events and calendar items
 
-                // Apply venue color
+                // Apply venue color to TEXT only (not background)
                 if (venueId && venueColorMap[venueId]) {
-                    info.el.style.backgroundColor = venueColorMap[venueId];
-                    info.el.style.borderColor = venueColorMap[venueId];
+                    // Set text color instead of background
+                    info.el.style.color = venueColorMap[venueId];
+                    info.el.style.backgroundColor = 'transparent';
+                    info.el.style.borderLeft = `3px solid ${venueColorMap[venueId]}`; // Subtle left border
+                    info.el.style.borderColor = 'transparent';
+                } else if (venueId) {
+                    console.warn(`Event "${info.event.title}" has venue_id ${venueId} but no color found in map`);
                 }
 
                 // Add icon/indicator based on type
@@ -692,33 +783,50 @@
         calendar.render();
     }
 
+    let allLocations = []; // For calendar items
+    let allActualVenues = []; // For events
+
     async function loadVenues() {
         try {
-            const response = await fetch('api/events/venues');
-            allVenues = await response.json();
+            // Load locations for calendar items (from locations table)
+            const locationsResponse = await fetch('api/events/venues');
+            allLocations = await locationsResponse.json();
+            allVenues = allLocations; // Keep allVenues for backward compatibility
 
-            // Build color map
-            allVenues.forEach(venue => {
+            // Load actual venues for events (from venues table)
+            const venuesResponse = await fetch('api/events/venues/actual');
+            allActualVenues = await venuesResponse.json();
+
+            // Build color map from both
+            allLocations.forEach(loc => {
+                if (loc.id && loc.color) {
+                    venueColorMap[loc.id] = loc.color;
+                }
+            });
+            allActualVenues.forEach(venue => {
                 if (venue.id && venue.color) {
                     venueColorMap[venue.id] = venue.color;
                 }
             });
 
-            // Populate location filter dropdown
+            console.log('Venue color map built:', venueColorMap);
+            console.log('All actual venues:', allActualVenues);
+
+            // Populate location filter dropdown (use locations since they're the same names)
             const select = document.getElementById('filterLocation');
-            allVenues.forEach(venue => {
+            allLocations.forEach(loc => {
                 const option = document.createElement('option');
-                option.value = venue.name;
-                option.textContent = venue.name;
+                option.value = loc.name;
+                option.textContent = loc.name;
                 select.appendChild(option);
             });
 
-            // Populate calendar item venue dropdown
+            // Populate calendar item venue dropdown (use locations for calendar items)
             const itemVenueSelect = document.getElementById('itemVenue');
-            allVenues.forEach(venue => {
+            allLocations.forEach(loc => {
                 const option = document.createElement('option');
-                option.value = venue.id;
-                option.textContent = venue.name;
+                option.value = loc.id;
+                option.textContent = loc.name;
                 itemVenueSelect.appendChild(option);
             });
 
@@ -767,19 +875,22 @@
             }
 
             // Map events to calendar format
-            const calendarEvents = events.map(event => ({
-                id: event.id,
-                title: event.title,
-                start: event.start_at,
-                end: event.end_at,
-                extendedProps: {
-                    type: 'event',
-                    status: event.status,
-                    event_type: event.event_type,
-                    guest_count: event.guest_count,
-                    venue_id: event.venue_id
-                }
-            }));
+            const calendarEvents = events.map(event => {
+                console.log(`Event "${event.title}" has venue_id:`, event.venue_id);
+                return {
+                    id: event.id,
+                    title: event.title,
+                    start: event.start_at,
+                    end: event.end_at,
+                    extendedProps: {
+                        type: 'event',
+                        status: event.status,
+                        event_type: event.event_type,
+                        guest_count: event.guest_count,
+                        venue_id: event.venue_id
+                    }
+                };
+            });
 
             // Map calendar items to calendar format
             const calendarItems = items.map(item => ({
@@ -818,7 +929,8 @@
                 const response = await fetch('api/calendar-items/' + info.event.id);
                 const item = await response.json();
 
-                const location = allVenues.find(v => v.id === item.location_id);
+                // Use allLocations for calendar items (locations table)
+                const location = allLocations.find(v => v.id === item.location_id);
                 const startDate = new Date(item.start_at);
                 const endDate = item.end_at ? new Date(item.end_at) : null;
 
@@ -885,7 +997,8 @@
                 const response = await fetch('api/events/' + info.event.id);
                 const event = await response.json();
 
-                const venue = allVenues.find(v => v.id === event.venue_id);
+                // Use allActualVenues for events (venues table), not allVenues (locations table)
+                const venue = allActualVenues.find(v => v.id === event.venue_id);
                 const startDate = new Date(event.start_at);
 
                 document.getElementById('modalTitle').textContent = event.title;
@@ -1120,7 +1233,8 @@
     async function deleteCalendarItem() {
         if (!editingCalendarItemId) return;
 
-        if (!confirm('Are you sure you want to delete this calendar item?')) {
+        const confirmed = await showConfirm('Are you sure you want to delete this calendar item?', 'Delete Calendar Item');
+        if (!confirmed) {
             return;
         }
 

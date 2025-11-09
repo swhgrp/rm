@@ -95,5 +95,6 @@ class EventListItem(BaseModel):
     start_at: datetime
     end_at: datetime
     guest_count: Optional[int] = None
-    location: Optional[str] = None
+    venue_id: Optional[UUID] = None
+    location: Optional[str] = None  # Deprecated
     created_at: datetime

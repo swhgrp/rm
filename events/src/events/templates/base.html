@@ -858,6 +858,156 @@
         }
     </script>
 
+    <script>
+        // Custom confirm dialog (replaces browser confirm to avoid "rm.swhgrp.com says")
+        window.showConfirm = function(message, title = 'Confirm') {
+            return new Promise((resolve) => {
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.7);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 10000;
+                `;
+
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    background: #161b22;
+                    border: 1px solid #30363d;
+                    border-radius: 8px;
+                    padding: 24px;
+                    max-width: 400px;
+                    width: 90%;
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+                `;
+
+                modal.innerHTML = `
+                    <div style="color: #c9d1d9; font-size: 18px; font-weight: 600; margin-bottom: 16px;">
+                        ${title}
+                    </div>
+                    <div style="color: #8b949e; margin-bottom: 24px; line-height: 1.5;">
+                        ${message}
+                    </div>
+                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                        <button class="confirmCancel" style="
+                            background: #21262d;
+                            border: 1px solid #30363d;
+                            color: #c9d1d9;
+                            padding: 8px 16px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 14px;
+                        ">Cancel</button>
+                        <button class="confirmOk" style="
+                            background: #da3633;
+                            border: 1px solid #f85149;
+                            color: white;
+                            padding: 8px 16px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 14px;
+                        ">OK</button>
+                    </div>
+                `;
+
+                overlay.appendChild(modal);
+                document.body.appendChild(overlay);
+
+                modal.querySelector('.confirmOk').onclick = () => {
+                    document.body.removeChild(overlay);
+                    resolve(true);
+                };
+
+                modal.querySelector('.confirmCancel').onclick = () => {
+                    document.body.removeChild(overlay);
+                    resolve(false);
+                };
+
+                const handleEscape = (e) => {
+                    if (e.key === 'Escape') {
+                        document.body.removeChild(overlay);
+                        document.removeEventListener('keydown', handleEscape);
+                        resolve(false);
+                    }
+                };
+                document.addEventListener('keydown', handleEscape);
+            });
+        };
+
+        // Custom alert (replaces browser alert to avoid "rm.swhgrp.com says")
+        window.showAlert = function(message, title = 'Notice') {
+            return new Promise((resolve) => {
+                const overlay = document.createElement('div');
+                overlay.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    bottom: 0;
+                    background: rgba(0, 0, 0, 0.7);
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    z-index: 10000;
+                `;
+
+                const modal = document.createElement('div');
+                modal.style.cssText = `
+                    background: #161b22;
+                    border: 1px solid #30363d;
+                    border-radius: 8px;
+                    padding: 24px;
+                    max-width: 400px;
+                    width: 90%;
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+                `;
+
+                modal.innerHTML = `
+                    <div style="color: #c9d1d9; font-size: 18px; font-weight: 600; margin-bottom: 16px;">
+                        ${title}
+                    </div>
+                    <div style="color: #8b949e; margin-bottom: 24px; line-height: 1.5;">
+                        ${message}
+                    </div>
+                    <div style="display: flex; justify-content: flex-end;">
+                        <button class="alertOk" style="
+                            background: #238636;
+                            border: 1px solid #2ea043;
+                            color: white;
+                            padding: 8px 16px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-size: 14px;
+                        ">OK</button>
+                    </div>
+                `;
+
+                overlay.appendChild(modal);
+                document.body.appendChild(overlay);
+
+                modal.querySelector('.alertOk').onclick = () => {
+                    document.body.removeChild(overlay);
+                    resolve(true);
+                };
+
+                const handleEscape = (e) => {
+                    if (e.key === 'Escape') {
+                        document.body.removeChild(overlay);
+                        document.removeEventListener('keydown', handleEscape);
+                        resolve(true);
+                    }
+                };
+                document.addEventListener('keydown', handleEscape);
+            });
+        };
+    </script>
+
     {% block extra_js %}{% endblock %}
     <script src="static/js/inactivity-warning.js"></script>
 </body>

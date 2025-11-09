@@ -2,6 +2,7 @@
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
+from uuid import UUID
 
 
 class IntakeClientData(BaseModel):
@@ -20,7 +21,8 @@ class IntakeEventData(BaseModel):
     start_at: datetime
     end_at: datetime
     guest_count: Optional[int] = None
-    location: Optional[str] = None  # Location name from settings
+    venue_id: Optional[UUID] = None  # Venue ID from venues table
+    location: Optional[str] = None  # Deprecated - use venue_id instead
     setup_start_at: Optional[datetime] = None
     teardown_end_at: Optional[datetime] = None
     menu_json: Optional[Dict[str, Any]] = None

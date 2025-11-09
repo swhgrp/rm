@@ -669,16 +669,30 @@
             }
         }
 
+        let venuesMap = {}; // Store venue data for lookup
+
         async function loadLocations() {
             const locationSelect = document.getElementById('location');
             try {
-                const response = await fetch('/events/public/locations');
-                if (response.ok) {
-                    const locations = await response.json();
+                // Load locations from the locations table
+                const locationsResponse = await fetch('/events/public/locations');
+                // Load venues from the venues table (for venue_id mapping)
+                const venuesResponse = await fetch('/events/api/events/venues/actual');
+
+                if (locationsResponse.ok && venuesResponse.ok) {
+                    const locations = await locationsResponse.json();
+                    const venues = await venuesResponse.json();
+
+                    // Build a map of location name -> venue_id
+                    venues.forEach(venue => {
+                        venuesMap[venue.name] = venue.id;
+                    });
+
                     locationSelect.innerHTML = '<option value="">Select location (optional)...</option>';
                     locations.forEach(location => {
                         const option = document.createElement('option');
-                        option.value = location.name;
+                        // Store the venue ID in the value
+                        option.value = venuesMap[location.name] || '';
                         option.textContent = location.name;
                         locationSelect.appendChild(option);
                     });
@@ -766,7 +780,7 @@
 
             const budgetPerPersonValue = document.getElementById('budgetPerPerson').value;
             const guestCount = parseInt(document.getElementById('attendeeCount').value);
-            const locationValue = document.getElementById('location').value;
+            const venueIdValue = document.getElementById('location').value; // This is now venue_id
 
             // Calculate total budget estimate from per-person budget and guest count
             let budgetEstimate = null;
@@ -790,7 +804,7 @@
                     start_at: startAt.toISOString(),
                     end_at: endAt.toISOString(),
                     guest_count: guestCount,
-                    location: locationValue || null,
+                    venue_id: venueIdValue || null, // Send venue_id instead of location text
                     menu_json: {
                         preferences: collectCheckboxValues('mealTypes'),
                         dietary_restrictions: document.getElementById('dietaryRestrictions').value || null,

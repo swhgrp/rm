@@ -284,17 +284,25 @@ async def update_event(
 
     Requires: admin or event_manager role
     """
+    import logging
+    logger = logging.getLogger(__name__)
+
     event = db.query(Event).filter(Event.id == event_id).first()
 
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
     update_data = event_data.dict(exclude_unset=True)
+    logger.info(f"Updating event {event_id} with data: {update_data}")
+    logger.info(f"Current event status: {event.status}, venue_id: {event.venue_id}")
+
     for field, value in update_data.items():
         setattr(event, field, value)
 
     db.commit()
     db.refresh(event)
+
+    logger.info(f"After update - event status: {event.status}, venue_id: {event.venue_id}")
 
     # TODO: If time changed, update task due dates
     # TODO: Send update notifications

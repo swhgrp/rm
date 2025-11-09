@@ -361,7 +361,7 @@ function showRoleModal(user) {
 async function assignRole() {
     const roleCode = document.getElementById('roleSelect').value;
     if (!roleCode) {
-        alert('Please select a role to add');
+        await showAlert('Please select a role to add', 'Validation Error');
         return;
     }
 
@@ -379,15 +379,16 @@ async function assignRole() {
         await loadUsers();
         bootstrap.Modal.getInstance(document.getElementById('roleModal')).hide();
 
-        alert(`Role "${roleCode}" assigned successfully to ${currentUser.full_name}`);
+        await showAlert(`Role "${roleCode}" assigned successfully to ${currentUser.full_name}`, 'Success');
     } catch (error) {
         console.error('Error assigning role:', error);
-        alert(`Error: ${error.message}`);
+        await showAlert(`Error: ${error.message}`, 'Error');
     }
 }
 
 async function removeRole(roleCode) {
-    if (!confirm(`Remove role "${roleCode}" from ${currentUser.full_name}?`)) {
+    const confirmed = await showConfirm(`Remove role "${roleCode}" from ${currentUser.full_name}?`, 'Remove Role');
+    if (!confirmed) {
         return;
     }
 
@@ -408,15 +409,16 @@ async function removeRole(roleCode) {
             showRoleModal(updatedUser);
         }
 
-        alert(`Role "${roleCode}" removed successfully`);
+        await showAlert(`Role "${roleCode}" removed successfully`, 'Success');
     } catch (error) {
         console.error('Error removing role:', error);
-        alert(`Error: ${error.message}`);
+        await showAlert(`Error: ${error.message}`, 'Error');
     }
 }
 
 async function deactivateUser(userId, userName) {
-    if (!confirm(`Deactivate user "${userName}"?\n\nThey will not be able to log in or perform any actions.`)) {
+    const confirmed = await showConfirm(`Deactivate user "${userName}"?\n\nThey will not be able to log in or perform any actions.`, 'Deactivate User');
+    if (!confirmed) {
         return;
     }
 
@@ -431,10 +433,10 @@ async function deactivateUser(userId, userName) {
         }
 
         await loadUsers();
-        alert(`User "${userName}" has been deactivated`);
+        await showAlert(`User "${userName}" has been deactivated`, 'Success');
     } catch (error) {
         console.error('Error deactivating user:', error);
-        alert(`Error: ${error.message}`);
+        await showAlert(`Error: ${error.message}`, 'Error');
     }
 }
 
@@ -450,10 +452,10 @@ async function activateUser(userId, userName) {
         }
 
         await loadUsers();
-        alert(`User "${userName}" has been activated`);
+        await showAlert(`User "${userName}" has been activated`, 'Success');
     } catch (error) {
         console.error('Error activating user:', error);
-        alert(`Error: ${error.message}`);
+        await showAlert(`Error: ${error.message}`, 'Error');
     }
 }
 

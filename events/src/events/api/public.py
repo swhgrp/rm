@@ -78,16 +78,16 @@ async def public_beo_intake(
     # Create event
     event_data = data.event
 
-    # Get location - use provided or default to first location
-    location = event_data.location
-    if not location:
-        # Use first available location as default
-        default_location = db.query(Location).filter(Location.is_active == True).order_by(Location.sort_order.asc(), Location.name).first()
-        if default_location:
-            location = default_location.name
-            logger.info(f"Using default location: {default_location.name}")
+    # Get venue_id - use provided or default to first venue
+    venue_id = event_data.venue_id
+    if not venue_id:
+        # Use first available venue as default
+        default_venue = db.query(Venue).order_by(Venue.name).first()
+        if default_venue:
+            venue_id = default_venue.id
+            logger.info(f"Using default venue: {default_venue.name}")
         else:
-            logger.warning("No locations available in database")
+            logger.warning("No venues available in database")
 
     # Merge template defaults with provided data
     menu_json = event_data.menu_json or (template.default_menu_json if template else None)
@@ -101,7 +101,7 @@ async def public_beo_intake(
         title=event_data.title,
         event_type=event_data.event_type,
         status=EventStatus.PENDING,
-        location=location,
+        venue_id=venue_id,  # Use venue_id instead of location text
         client_id=client_obj.id,
         start_at=event_data.start_at,
         end_at=event_data.end_at,
