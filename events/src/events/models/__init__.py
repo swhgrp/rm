@@ -8,6 +8,7 @@ from .document import Document, Email, DocumentType, EmailStatus
 from .template import EventTemplate, NotificationRule
 from .audit import AuditLog
 from .settings import Location, EventType, BeverageService, MealType
+from .calendar_item import CalendarItem, CalendarItemType
 
 __all__ = [
     "BaseModel",
@@ -34,4 +35,6 @@ __all__ = [
     "EventType",
     "BeverageService",
     "MealType",
+    "CalendarItem",
+    "CalendarItemType",
 ]

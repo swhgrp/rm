@@ -344,22 +344,42 @@
             },
             events: fetchCalendarEvents,
             eventClick: handleEventClick,
+            dateClick: handleDateClick,
             height: 'auto',
             eventDidMount: function(info) {
-                // Apply venue color to event
-                const venueId = info.event.extendedProps.venue_id;
+                const props = info.event.extendedProps;
+                const venueId = props.venue_id;
+
+                // Apply venue color
                 if (venueId && venueColorMap[venueId]) {
                     info.el.style.backgroundColor = venueColorMap[venueId];
                     info.el.style.borderColor = venueColorMap[venueId];
                 }
 
-                // Add status indicator dot
-                const status = info.event.extendedProps.status;
-                if (status) {
-                    const indicator = document.createElement('span');
-                    indicator.className = `status-indicator status-${status}`;
-                    indicator.title = formatStatus(status);
-                    info.el.querySelector('.fc-event-title')?.appendChild(indicator);
+                // Add icon/indicator based on type
+                if (props.type === 'event') {
+                    // For events, add status indicator dot
+                    const status = props.status;
+                    if (status) {
+                        const indicator = document.createElement('span');
+                        indicator.className = `status-indicator status-${status}`;
+                        indicator.title = formatStatus(status);
+                        info.el.querySelector('.fc-event-title')?.appendChild(indicator);
+                    }
+                } else if (props.type === 'calendar_item') {
+                    // For calendar items, add icon based on item_type
+                    const iconMap = {
+                        'MEETING': '👥',
+                        'REMINDER': '🔔',
+                        'NOTE': '📝',
+                        'BLOCKED_TIME': '🚫'
+                    };
+                    const icon = iconMap[props.item_type] || '📌';
+
+                    const titleEl = info.el.querySelector('.fc-event-title');
+                    if (titleEl) {
+                        titleEl.textContent = `${icon} ${info.event.title}`;
+                    }
                 }
             }
         });
@@ -417,20 +437,28 @@
 
             if (locationFilter) params.append('location', locationFilter);
 
-            const response = await fetch('api/events/calendar?' + params);
-            let events = await response.json();
+            // Fetch both events and calendar items
+            const [eventsResponse, itemsResponse] = await Promise.all([
+                fetch('api/events/calendar?' + params),
+                fetch('api/calendar-items/calendar?' + params)
+            ]);
 
-            // Apply status filter on client side
+            let events = await eventsResponse.json();
+            let items = await itemsResponse.json();
+
+            // Apply status filter on events
             if (statusFilter) {
                 events = events.filter(e => e.status === statusFilter);
             }
 
+            // Map events to calendar format
             const calendarEvents = events.map(event => ({
                 id: event.id,
                 title: event.title,
                 start: event.start_at,
                 end: event.end_at,
                 extendedProps: {
+                    type: 'event',
                     status: event.status,
                     event_type: event.event_type,
                     guest_count: event.guest_count,
@@ -438,9 +466,25 @@
                 }
             }));
 
-            successCallback(calendarEvents);
+            // Map calendar items to calendar format
+            const calendarItems = items.map(item => ({
+                id: item.id,
+                title: item.title,
+                start: item.start_at,
+                end: item.end_at,
+                extendedProps: {
+                    type: 'calendar_item',
+                    item_type: item.item_type,
+                    description: item.description,
+                    venue_id: item.venue_id,
+                    created_by: item.created_by
+                }
+            }));
+
+            // Combine both
+            successCallback([...calendarEvents, ...calendarItems]);
         } catch (error) {
-            console.error('Error fetching calendar events:', error);
+            console.error('Error fetching calendar data:', error);
             failureCallback(error);
         }
     }
@@ -451,69 +495,198 @@
 
     async function handleEventClick(info) {
         try {
-            const response = await fetch('api/events/' + info.event.id);
-            const event = await response.json();
+            const props = info.event.extendedProps;
+            const itemType = props.type; // 'event' or 'calendar_item'
 
-            const venue = allVenues.find(v => v.id === event.venue_id);
-            const startDate = new Date(event.start_at);
+            if (itemType === 'calendar_item') {
+                // Handle calendar item click
+                const response = await fetch('api/calendar-items/' + info.event.id);
+                const item = await response.json();
 
-            document.getElementById('modalTitle').textContent = event.title;
-            document.getElementById('modalViewButton').href = '/events/event?id=' + event.id;
+                const venue = allVenues.find(v => v.id === item.venue_id);
+                const startDate = new Date(item.start_at);
+                const endDate = item.end_at ? new Date(item.end_at) : null;
 
-            // Determine location display
-            let locationDisplay = 'Not assigned';
-            let locationColor = '#6e7681';
-            if (venue) {
-                locationDisplay = venue.name;
-                if (venue.color) {
-                    locationColor = venue.color;
+                let locationDisplay = 'Not assigned';
+                let locationColor = '#6e7681';
+                if (venue) {
+                    locationDisplay = venue.name;
+                    if (venue.color) locationColor = venue.color;
                 }
-            }
 
-            document.getElementById('modalBody').innerHTML = `
-                <div class="detail-row">
-                    <i class="bi bi-calendar3"></i>
-                    <span class="detail-label">Date & Time:</span>
-                    <span class="detail-value">${startDate.toLocaleString()}</span>
-                </div>
-                <div class="detail-row">
-                    <i class="bi bi-tag"></i>
-                    <span class="detail-label">Type:</span>
-                    <span class="detail-value">${event.event_type || 'N/A'}</span>
-                </div>
-                <div class="detail-row">
-                    <i class="bi bi-people"></i>
-                    <span class="detail-label">Guests:</span>
-                    <span class="detail-value">${event.guest_count || 0} people</span>
-                </div>
-                <div class="detail-row">
-                    <i class="bi bi-geo-alt" style="color: ${locationColor}"></i>
-                    <span class="detail-label">Location:</span>
-                    <span class="detail-value">${locationDisplay}</span>
-                </div>
-                <div class="detail-row">
-                    <i class="bi bi-circle-fill" style="color: ${getStatusColor(event.status)}"></i>
-                    <span class="detail-label">Status:</span>
-                    <span class="detail-value">${formatStatus(event.status)}</span>
-                </div>
-                ${event.client ? `
-                <div class="detail-row">
-                    <i class="bi bi-person"></i>
-                    <span class="detail-label">Client:</span>
-                    <span class="detail-value">${event.client.name}</span>
-                </div>
-                ` : ''}
-            `;
+                const typeLabels = {
+                    'MEETING': 'Meeting',
+                    'REMINDER': 'Reminder',
+                    'NOTE': 'Note',
+                    'BLOCKED_TIME': 'Blocked Time'
+                };
+
+                document.getElementById('modalTitle').textContent = item.title;
+                document.getElementById('modalViewButton').style.display = 'none'; // No detail page for calendar items yet
+
+                document.getElementById('modalBody').innerHTML = `
+                    <div class="detail-row">
+                        <i class="bi bi-tag"></i>
+                        <span class="detail-label">Type:</span>
+                        <span class="detail-value">${typeLabels[item.item_type] || item.item_type}</span>
+                    </div>
+                    <div class="detail-row">
+                        <i class="bi bi-calendar3"></i>
+                        <span class="detail-label">Start:</span>
+                        <span class="detail-value">${startDate.toLocaleString()}</span>
+                    </div>
+                    ${endDate ? `
+                    <div class="detail-row">
+                        <i class="bi bi-calendar3"></i>
+                        <span class="detail-label">End:</span>
+                        <span class="detail-value">${endDate.toLocaleString()}</span>
+                    </div>
+                    ` : ''}
+                    <div class="detail-row">
+                        <i class="bi bi-geo-alt" style="color: ${locationColor}"></i>
+                        <span class="detail-label">Location:</span>
+                        <span class="detail-value">${locationDisplay}</span>
+                    </div>
+                    ${item.description ? `
+                    <div class="detail-row">
+                        <i class="bi bi-file-text"></i>
+                        <span class="detail-label">Description:</span>
+                        <span class="detail-value">${item.description}</span>
+                    </div>
+                    ` : ''}
+                `;
+            } else {
+                // Handle event click (existing code)
+                const response = await fetch('api/events/' + info.event.id);
+                const event = await response.json();
+
+                const venue = allVenues.find(v => v.id === event.venue_id);
+                const startDate = new Date(event.start_at);
+
+                document.getElementById('modalTitle').textContent = event.title;
+                document.getElementById('modalViewButton').href = '/events/event?id=' + event.id;
+                document.getElementById('modalViewButton').style.display = 'block';
+
+                // Determine location display
+                let locationDisplay = 'Not assigned';
+                let locationColor = '#6e7681';
+                if (venue) {
+                    locationDisplay = venue.name;
+                    if (venue.color) {
+                        locationColor = venue.color;
+                    }
+                }
+
+                document.getElementById('modalBody').innerHTML = `
+                    <div class="detail-row">
+                        <i class="bi bi-calendar3"></i>
+                        <span class="detail-label">Date & Time:</span>
+                        <span class="detail-value">${startDate.toLocaleString()}</span>
+                    </div>
+                    <div class="detail-row">
+                        <i class="bi bi-tag"></i>
+                        <span class="detail-label">Type:</span>
+                        <span class="detail-value">${event.event_type || 'N/A'}</span>
+                    </div>
+                    <div class="detail-row">
+                        <i class="bi bi-people"></i>
+                        <span class="detail-label">Guests:</span>
+                        <span class="detail-value">${event.guest_count || 0} people</span>
+                    </div>
+                    <div class="detail-row">
+                        <i class="bi bi-geo-alt" style="color: ${locationColor}"></i>
+                        <span class="detail-label">Location:</span>
+                        <span class="detail-value">${locationDisplay}</span>
+                    </div>
+                    <div class="detail-row">
+                        <i class="bi bi-circle-fill" style="color: ${getStatusColor(event.status)}"></i>
+                        <span class="detail-label">Status:</span>
+                        <span class="detail-value">${formatStatus(event.status)}</span>
+                    </div>
+                    ${event.client ? `
+                    <div class="detail-row">
+                        <i class="bi bi-person"></i>
+                        <span class="detail-label">Client:</span>
+                        <span class="detail-value">${event.client.name}</span>
+                    </div>
+                    ` : ''}
+                `;
+            }
 
             document.getElementById('eventModal').classList.add('active');
         } catch (error) {
-            console.error('Error loading event details:', error);
+            console.error('Error loading details:', error);
         }
     }
 
     function closeModal(event) {
         if (!event || event.target.id === 'eventModal') {
             document.getElementById('eventModal').classList.remove('active');
+        }
+    }
+
+    function handleDateClick(info) {
+        // Quick-add dialog for calendar items
+        const itemType = prompt(`Create quick calendar item\n\nChoose type:\n1 = Meeting\n2 = Reminder\n3 = Note\n4 = Blocked Time\n\nEnter number (1-4):`);
+
+        const typeMap = {
+            '1': 'MEETING',
+            '2': 'REMINDER',
+            '3': 'NOTE',
+            '4': 'BLOCKED_TIME'
+        };
+
+        if (!typeMap[itemType]) {
+            return; // Cancelled or invalid
+        }
+
+        const title = prompt('Enter title:');
+        if (!title) return;
+
+        const description = prompt('Enter description (optional):');
+
+        // Use the clicked date with current time
+        const clickedDate = new Date(info.dateStr);
+        const now = new Date();
+        clickedDate.setHours(now.getHours(), now.getMinutes(), 0, 0);
+
+        createQuickCalendarItem(typeMap[itemType], title, description, clickedDate);
+    }
+
+    async function createQuickCalendarItem(itemType, title, description, startDate) {
+        try {
+            const payload = {
+                title: title,
+                item_type: itemType,
+                description: description || null,
+                start_at: startDate.toISOString(),
+                end_at: null,
+                venue_id: null
+            };
+
+            const response = await fetch('api/calendar-items/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                alert(`Error creating item: ${error.detail || 'Unknown error'}`);
+                return;
+            }
+
+            // Refresh calendar
+            calendar.refetchEvents();
+
+            // Show success message
+            console.log('Calendar item created successfully');
+        } catch (error) {
+            console.error('Error creating calendar item:', error);
+            alert('Error creating calendar item');
         }
     }
 

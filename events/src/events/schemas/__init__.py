@@ -6,6 +6,7 @@ from .venue import VenueResponse
 from .user import UserResponse, RoleResponse
 from .intake import PublicIntakeRequest
 from .email import EmailResponse
+from .calendar_item import CalendarItemCreate, CalendarItemUpdate, CalendarItemResponse
 
 __all__ = [
     "EventCreate",
@@ -23,4 +24,7 @@ __all__ = [
     "RoleResponse",
     "PublicIntakeRequest",
     "EmailResponse",
+    "CalendarItemCreate",
+    "CalendarItemUpdate",
+    "CalendarItemResponse",
 ]
