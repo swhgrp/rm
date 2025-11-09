@@ -35,10 +35,11 @@ class EventUpdate(BaseModel):
     title: Optional[str] = None
     event_type: Optional[str] = None
     status: Optional[EventStatus] = None
+    venue_id: Optional[UUID] = None
     start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
     guest_count: Optional[int] = None
-    location: Optional[str] = None
+    location: Optional[str] = None  # Deprecated, use venue_id
     setup_start_at: Optional[datetime] = None
     teardown_end_at: Optional[datetime] = None
     menu_json: Optional[Dict[str, Any]] = None

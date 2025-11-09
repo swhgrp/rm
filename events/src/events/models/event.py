@@ -25,7 +25,7 @@ class Event(BaseModel):
     status = Column(SQLEnum(EventStatus), default=EventStatus.DRAFT, nullable=False, index=True)
 
     # Foreign keys
-    venue_id = Column(UUID(as_uuid=True), ForeignKey('venues.id'), nullable=False)
+    venue_id = Column(UUID(as_uuid=True), ForeignKey('venues.id'), nullable=True)
     client_id = Column(UUID(as_uuid=True), ForeignKey('clients.id'), nullable=False)
     package_id = Column(UUID(as_uuid=True), ForeignKey('event_packages.id'), nullable=True)
     created_by = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
