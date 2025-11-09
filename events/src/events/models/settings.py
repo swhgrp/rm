@@ -9,6 +9,7 @@ class Location(BaseModel):
 
     name = Column(String(255), nullable=False, unique=True)
     description = Column(String(500), nullable=True)
+    color = Column(String(7), nullable=True)  # Hex color code for calendar display
     is_active = Column(Boolean, default=True, nullable=False)
     sort_order = Column(Integer, default=0, nullable=False)
 

@@ -183,27 +183,14 @@ async def list_venues(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_auth)
 ):
-    """Get venues (filtered by user's assigned locations unless admin)"""
-    query = db.query(Venue)
+    """Get locations for calendar (now using locations table instead of venues)"""
+    from events.models.settings import Location
 
-    # Location-based filtering: Users only see their assigned venues
-    # Admins see all venues
-    user_roles = [role.code for role in current_user.roles]
-    if "admin" not in user_roles:
-        # Get user's assigned venue IDs
-        from events.models.user import UserLocation
-        user_venues = db.query(UserLocation.venue_id).filter(
-            UserLocation.user_id == current_user.id
-        ).all()
-        user_venue_ids = [v[0] for v in user_venues]
+    # Get all active locations with their colors
+    query = db.query(Location).filter(Location.is_active == True)
 
-        if user_venue_ids:
-            query = query.filter(Venue.id.in_(user_venue_ids))
-        else:
-            return []
-
-    venues = query.order_by(Venue.name).all()
-    return [{"id": str(v.id), "name": v.name, "address": v.address, "color": v.color} for v in venues]
+    locations = query.order_by(Location.sort_order, Location.name).all()
+    return [{"id": str(loc.id), "name": loc.name, "address": loc.description, "color": loc.color} for loc in locations]
 
 
 @router.get("/clients")
