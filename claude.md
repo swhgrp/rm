@@ -19,11 +19,14 @@
       - Nginx was returning 301 redirects → browsers got HTML instead of JSON
       - Fixed by using relative URLs `api/users/` which properly resolve with base href
       - Applied to: users.html, emails.html, event_detail.html
-   3. **Event save validation** - Fixed status field handling (commits `159893b`, `daa7e15`)
+   3. **Event status consistency** - Fixed status handling across all pages (commits `159893b`, `daa7e15`, `17fb170`)
       - Removed `.toUpperCase()` from status field (enum values are lowercase)
-      - Fixed status dropdown options to match EventStatus enum
+      - Fixed status dropdown in event_detail.html to match EventStatus enum
+      - Fixed events_list.html status filter, stats, and CSS classes
       - Removed invalid options: "in_progress", "completed"
+      - Changed "Completed" to "Closed" in UI labels
       - Valid statuses: draft, pending, confirmed, closed, canceled
+      - Fixed issue where closed events weren't appearing in events list
    4. **User role assignment** - Granted admin role to andy@swhgrp.com and admin@swhgrp.com
    5. **Updated gitignore** - Exclude integration-hub upload PDFs (commit `f946f73`)
    - **Status:** All admin pages fully functional ✅
