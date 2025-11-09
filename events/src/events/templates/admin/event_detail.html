@@ -685,7 +685,7 @@
         });
 
         document.getElementById('overviewAttendees').textContent = `${event.guest_count || 0} guests`;
-        document.getElementById('overviewLocation').textContent = event.location || 'Not assigned';
+        document.getElementById('overviewLocation').textContent = event.venue?.name || 'Not assigned';
         document.getElementById('overviewClient').textContent = event.client?.name || 'Not assigned';
         document.getElementById('overviewType').textContent = event.event_type || 'Not specified';
 
@@ -716,7 +716,7 @@
 
         // Load event types, locations and clients
         loadEventTypes(event.event_type);
-        loadLocations(event.location);
+        loadLocations(event.venue?.name);
         loadClients(event.client_id);
 
         // Menu tab

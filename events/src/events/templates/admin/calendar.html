@@ -842,9 +842,11 @@
                 const modalViewButton = document.getElementById('modalViewButton');
                 modalViewButton.textContent = 'Edit';
                 modalViewButton.style.display = 'block';
-                modalViewButton.onclick = () => {
+                modalViewButton.onclick = (e) => {
+                    e.preventDefault();
                     closeModal();
                     openEditCalendarItem(item);
+                    return false;
                 };
 
                 document.getElementById('modalBody').innerHTML = `
