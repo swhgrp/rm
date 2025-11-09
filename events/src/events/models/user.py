@@ -1,8 +1,9 @@
 """User and role models"""
-from sqlalchemy import Column, String, Boolean, ForeignKey, Table
+from sqlalchemy import Column, String, Boolean, ForeignKey, Table, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from .base import BaseModel
+import sqlalchemy as sa
 
 
 # Association table for user-role many-to-many relationship
@@ -45,3 +46,14 @@ class Role(BaseModel):
 
     def __repr__(self):
         return f"<Role(code={self.code}, name={self.name})>"
+
+
+class UserLocation(BaseModel):
+    """User-Location assignment model for location-based permissions"""
+    __tablename__ = "user_locations"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), primary_key=True, nullable=False)
+    venue_id = Column(UUID(as_uuid=True), ForeignKey('venues.id', ondelete='CASCADE'), primary_key=True, nullable=False)
+
+    def __repr__(self):
+        return f"<UserLocation(user_id={self.user_id}, venue_id={self.venue_id})>"

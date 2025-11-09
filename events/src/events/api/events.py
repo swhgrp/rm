@@ -91,6 +91,24 @@ async def list_events(
 
     query = db.query(Event)
 
+    # Location-based filtering: Users only see events for their assigned locations
+    # Admins see all events
+    user_roles = [role.code for role in current_user.roles]
+    if "admin" not in user_roles:
+        # Get user's assigned venue IDs
+        from events.models.user import UserLocation
+        user_venues = db.query(UserLocation.venue_id).filter(
+            UserLocation.user_id == current_user.id
+        ).all()
+        user_venue_ids = [v[0] for v in user_venues]
+
+        if user_venue_ids:
+            # Filter to only events at user's assigned venues
+            query = query.filter(Event.venue_id.in_(user_venue_ids))
+        else:
+            # User has no assigned locations - return empty result
+            return []
+
     # By default, exclude CANCELED events unless explicitly requested
     if status:
         query = query.filter(Event.status == status)
@@ -132,6 +150,24 @@ async def get_calendar_events(
         Event.start_at <= end
     )
 
+    # Location-based filtering: Users only see events for their assigned locations
+    # Admins see all events
+    user_roles = [role.code for role in current_user.roles]
+    if "admin" not in user_roles:
+        # Get user's assigned venue IDs
+        from events.models.user import UserLocation
+        user_venues = db.query(UserLocation.venue_id).filter(
+            UserLocation.user_id == current_user.id
+        ).all()
+        user_venue_ids = [v[0] for v in user_venues]
+
+        if user_venue_ids:
+            # Filter to only events at user's assigned venues
+            query = query.filter(Event.venue_id.in_(user_venue_ids))
+        else:
+            # User has no assigned locations - return empty result
+            return []
+
     if location:
         query = query.filter(Event.location == location)
 
@@ -147,9 +183,27 @@ async def list_venues(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_auth)
 ):
-    """Get all venues"""
-    venues = db.query(Venue).order_by(Venue.name).all()
-    return [{"id": str(v.id), "name": v.name, "address": v.address} for v in venues]
+    """Get venues (filtered by user's assigned locations unless admin)"""
+    query = db.query(Venue)
+
+    # Location-based filtering: Users only see their assigned venues
+    # Admins see all venues
+    user_roles = [role.code for role in current_user.roles]
+    if "admin" not in user_roles:
+        # Get user's assigned venue IDs
+        from events.models.user import UserLocation
+        user_venues = db.query(UserLocation.venue_id).filter(
+            UserLocation.user_id == current_user.id
+        ).all()
+        user_venue_ids = [v[0] for v in user_venues]
+
+        if user_venue_ids:
+            query = query.filter(Venue.id.in_(user_venue_ids))
+        else:
+            return []
+
+    venues = query.order_by(Venue.name).all()
+    return [{"id": str(v.id), "name": v.name, "address": v.address, "color": v.color} for v in venues]
 
 
 @router.get("/clients")

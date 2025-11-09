@@ -106,26 +106,69 @@
         opacity: 0.9;
     }
 
-    /* Event colors by status */
-    .fc-event.status-DRAFT {
+    /* Event colors are now set dynamically by venue color */
+    /* Status indicator will show as a border or badge */
+    .fc-event {
+        position: relative;
+    }
+
+    .fc-event .status-indicator {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .status-indicator.status-DRAFT {
         background-color: #6e7681;
     }
 
-    .fc-event.status-PENDING {
+    .status-indicator.status-PENDING {
         background-color: #f0883e;
     }
 
-    .fc-event.status-CONFIRMED {
+    .status-indicator.status-CONFIRMED {
         background-color: #1f6feb;
     }
 
-    .fc-event.status-IN_PROGRESS {
+    .status-indicator.status-IN_PROGRESS {
         background-color: #8957e5;
     }
 
-    .fc-event.status-COMPLETED,
-    .fc-event.status-CLOSED {
+    .status-indicator.status-COMPLETED,
+    .status-indicator.status-CLOSED {
         background-color: #238636;
+    }
+
+    .status-indicator.status-CANCELED {
+        background-color: #da3633;
+    }
+
+    /* Location color legend */
+    .location-legend {
+        display: flex;
+        gap: 15px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin-left: auto;
+    }
+
+    .location-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 12px;
+        color: #8b949e;
+    }
+
+    .location-color-box {
+        width: 16px;
+        height: 16px;
+        border-radius: 3px;
+        border: 1px solid #30363d;
     }
 
     /* Event detail modal */
@@ -247,6 +290,10 @@
             <option value="COMPLETED">Completed</option>
         </select>
     </div>
+
+    <div class="location-legend" id="locationLegend">
+        <!-- Location color legend will be populated here -->
+    </div>
 </div>
 
 <!-- Calendar -->
@@ -279,6 +326,7 @@
 <script>
     let calendar;
     let allVenues = [];
+    let venueColorMap = {}; // Map venue_id -> color
 
     document.addEventListener('DOMContentLoaded', function() {
         initializeCalendar();
@@ -297,8 +345,22 @@
             events: fetchCalendarEvents,
             eventClick: handleEventClick,
             height: 'auto',
-            eventClassNames: function(arg) {
-                return ['status-' + arg.event.extendedProps.status];
+            eventDidMount: function(info) {
+                // Apply venue color to event
+                const venueId = info.event.extendedProps.venue_id;
+                if (venueId && venueColorMap[venueId]) {
+                    info.el.style.backgroundColor = venueColorMap[venueId];
+                    info.el.style.borderColor = venueColorMap[venueId];
+                }
+
+                // Add status indicator dot
+                const status = info.event.extendedProps.status;
+                if (status) {
+                    const indicator = document.createElement('span');
+                    indicator.className = `status-indicator status-${status}`;
+                    indicator.title = formatStatus(status);
+                    info.el.querySelector('.fc-event-title')?.appendChild(indicator);
+                }
             }
         });
         calendar.render();
@@ -306,18 +368,40 @@
 
     async function loadVenues() {
         try {
-            const response = await fetch('api/settings/locations');
+            const response = await fetch('api/venues/');
             allVenues = await response.json();
 
+            // Build color map
+            allVenues.forEach(venue => {
+                if (venue.id && venue.color) {
+                    venueColorMap[venue.id] = venue.color;
+                }
+            });
+
+            // Populate location filter dropdown
             const select = document.getElementById('filterLocation');
-            allVenues.forEach(location => {
+            allVenues.forEach(venue => {
                 const option = document.createElement('option');
-                option.value = location.name;
-                option.textContent = location.name;
+                option.value = venue.name;
+                option.textContent = venue.name;
                 select.appendChild(option);
             });
+
+            // Populate location legend
+            const legend = document.getElementById('locationLegend');
+            allVenues.forEach(venue => {
+                if (venue.color) {
+                    const item = document.createElement('div');
+                    item.className = 'location-legend-item';
+                    item.innerHTML = `
+                        <div class="location-color-box" style="background-color: ${venue.color}"></div>
+                        <span>${venue.name}</span>
+                    `;
+                    legend.appendChild(item);
+                }
+            });
         } catch (error) {
-            console.error('Error loading locations:', error);
+            console.error('Error loading venues:', error);
         }
     }
 
@@ -376,6 +460,16 @@
             document.getElementById('modalTitle').textContent = event.title;
             document.getElementById('modalViewButton').href = '/events/event?id=' + event.id;
 
+            // Determine location display
+            let locationDisplay = 'Not assigned';
+            let locationColor = '#6e7681';
+            if (venue) {
+                locationDisplay = venue.name;
+                if (venue.color) {
+                    locationColor = venue.color;
+                }
+            }
+
             document.getElementById('modalBody').innerHTML = `
                 <div class="detail-row">
                     <i class="bi bi-calendar3"></i>
@@ -393,9 +487,9 @@
                     <span class="detail-value">${event.guest_count || 0} people</span>
                 </div>
                 <div class="detail-row">
-                    <i class="bi bi-geo-alt"></i>
+                    <i class="bi bi-geo-alt" style="color: ${locationColor}"></i>
                     <span class="detail-label">Location:</span>
-                    <span class="detail-value">${venue ? venue.name : 'Not assigned'}</span>
+                    <span class="detail-value">${locationDisplay}</span>
                 </div>
                 <div class="detail-row">
                     <i class="bi bi-circle-fill" style="color: ${getStatusColor(event.status)}"></i>
