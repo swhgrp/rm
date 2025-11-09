@@ -806,7 +806,8 @@
 
     async function loadLocations(selectedVenueId = null) {
         try {
-            const response = await fetch('api/events/venues');
+            // Load actual venues from venues table (not locations)
+            const response = await fetch('api/events/venues/actual');
             allVenues = await response.json();
 
             const select = document.getElementById('location');

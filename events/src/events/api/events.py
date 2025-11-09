@@ -193,6 +193,16 @@ async def list_venues(
     return [{"id": str(loc.id), "name": loc.name, "address": loc.description, "color": loc.color} for loc in locations]
 
 
+@router.get("/venues/actual")
+async def list_actual_venues(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """Get actual venues from venues table (for event detail page)"""
+    venues = db.query(Venue).order_by(Venue.name).all()
+    return [{"id": str(v.id), "name": v.name, "address": v.address, "color": v.color} for v in venues]
+
+
 @router.get("/clients")
 async def list_clients(
     db: Session = Depends(get_db),
