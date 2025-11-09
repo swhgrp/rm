@@ -92,31 +92,23 @@
         box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
     }
 
-    .event-card.status-DRAFT {
+    .event-card.status-draft {
         border-left: 4px solid #6e7681;
     }
 
-    .event-card.status-PENDING {
+    .event-card.status-pending {
         border-left: 4px solid #f0883e;
     }
 
-    .event-card.status-CONFIRMED {
+    .event-card.status-confirmed {
         border-left: 4px solid #1f6feb;
     }
 
-    .event-card.status-IN_PROGRESS {
-        border-left: 4px solid #8957e5;
-    }
-
-    .event-card.status-COMPLETED {
+    .event-card.status-closed {
         border-left: 4px solid #238636;
     }
 
-    .event-card.status-CLOSED {
-        border-left: 4px solid #238636;
-    }
-
-    .event-card.status-CANCELED {
+    .event-card.status-canceled {
         border-left: 4px solid #da3633;
     }
 
@@ -147,33 +139,33 @@
         text-transform: uppercase;
     }
 
-    .status-badge.status-DRAFT {
+    .status-badge.status-draft {
         background-color: #21262d;
         color: #8b949e;
     }
 
-    .status-badge.status-PENDING {
+    .status-badge.status-pending {
         background-color: #9e6a03;
         color: #ffd33d;
     }
 
-    .status-badge.status-CONFIRMED {
+    .status-badge.status-confirmed {
         background-color: #0969da;
         color: #79c0ff;
     }
 
-    .status-badge.status-IN_PROGRESS {
+    .status-badge.status-closed {
         background-color: #8250df;
         color: #d2a8ff;
     }
 
-    .status-badge.status-COMPLETED,
-    .status-badge.status-CLOSED {
+    .status-badge.status-closed,
+    .status-badge.status-closed {
         background-color: #1a7f37;
         color: #4ac26b;
     }
 
-    .status-badge.status-CANCELED {
+    .status-badge.status-canceled {
         background-color: #da3633;
         color: #ffa198;
     }
@@ -295,12 +287,12 @@
         <div class="stat-value" id="statConfirmed">0</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">In Progress</div>
-        <div class="stat-value" id="statInProgress">0</div>
+        <div class="stat-label">Closed</div>
+        <div class="stat-value" id="statCompleted">0</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Completed</div>
-        <div class="stat-value" id="statCompleted">0</div>
+        <div class="stat-label">Canceled</div>
+        <div class="stat-value" id="statInProgress">0</div>
     </div>
 </div>
 
@@ -311,12 +303,11 @@
             <label class="form-label-custom">Status</label>
             <select id="filterStatus" class="form-control-custom" onchange="filterEvents()">
                 <option value="">All Statuses</option>
-                <option value="DRAFT">Draft</option>
-                <option value="PENDING">Pending</option>
-                <option value="CONFIRMED">Confirmed</option>
-                <option value="IN_PROGRESS">In Progress</option>
-                <option value="COMPLETED">Completed</option>
-                <option value="CANCELED">Canceled</option>
+                <option value="draft">Draft</option>
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="closed">Closed</option>
+                <option value="canceled">Canceled</option>
             </select>
         </div>
 
@@ -410,12 +401,11 @@
     function updateStats(events) {
         const stats = {
             total: events.length,
-            DRAFT: 0,
-            PENDING: 0,
-            CONFIRMED: 0,
-            IN_PROGRESS: 0,
-            COMPLETED: 0,
-            CLOSED: 0
+            draft: 0,
+            pending: 0,
+            confirmed: 0,
+            closed: 0,
+            canceled: 0
         };
 
         events.forEach(event => {
@@ -425,11 +415,11 @@
         });
 
         document.getElementById('statTotal').textContent = stats.total;
-        document.getElementById('statDraft').textContent = stats.DRAFT;
-        document.getElementById('statPending').textContent = stats.PENDING;
-        document.getElementById('statConfirmed').textContent = stats.CONFIRMED;
-        document.getElementById('statInProgress').textContent = stats.IN_PROGRESS;
-        document.getElementById('statCompleted').textContent = stats.COMPLETED + stats.CLOSED;
+        document.getElementById('statDraft').textContent = stats.draft;
+        document.getElementById('statPending').textContent = stats.pending;
+        document.getElementById('statConfirmed').textContent = stats.confirmed;
+        document.getElementById('statCompleted').textContent = stats.closed;
+        document.getElementById('statInProgress').textContent = stats.canceled;
     }
 
     function filterEvents() {
