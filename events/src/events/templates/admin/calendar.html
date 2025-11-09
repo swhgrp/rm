@@ -791,7 +791,7 @@
                     type: 'calendar_item',
                     item_type: item.item_type,
                     description: item.description,
-                    venue_id: item.venue_id,
+                    venue_id: item.location_id,  // Using location_id from API
                     created_by: item.created_by
                 }
             }));
@@ -818,15 +818,15 @@
                 const response = await fetch('api/calendar-items/' + info.event.id);
                 const item = await response.json();
 
-                const venue = allVenues.find(v => v.id === item.venue_id);
+                const location = allVenues.find(v => v.id === item.location_id);
                 const startDate = new Date(item.start_at);
                 const endDate = item.end_at ? new Date(item.end_at) : null;
 
                 let locationDisplay = 'Not assigned';
                 let locationColor = '#6e7681';
-                if (venue) {
-                    locationDisplay = venue.name;
-                    if (venue.color) locationColor = venue.color;
+                if (location) {
+                    locationDisplay = location.name;
+                    if (location.color) locationColor = location.color;
                 }
 
                 const typeLabels = {
@@ -837,7 +837,15 @@
                 };
 
                 document.getElementById('modalTitle').textContent = item.title;
-                document.getElementById('modalViewButton').style.display = 'none'; // No detail page for calendar items yet
+
+                // Add Edit and Delete buttons for calendar items
+                const modalViewButton = document.getElementById('modalViewButton');
+                modalViewButton.textContent = 'Edit';
+                modalViewButton.style.display = 'block';
+                modalViewButton.onclick = () => {
+                    closeModal();
+                    openEditCalendarItem(item);
+                };
 
                 document.getElementById('modalBody').innerHTML = `
                     <div class="detail-row">
@@ -945,6 +953,9 @@
         const clickedDate = new Date(info.dateStr);
         const now = new Date();
 
+        // Reset editing state
+        editingCalendarItemId = null;
+
         // Format date for input
         const dateStr = clickedDate.toISOString().split('T')[0];
         const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -954,6 +965,13 @@
         document.getElementById('itemStartDate').value = dateStr;
         document.getElementById('itemStartTime').value = timeStr;
         document.getElementById('calendarItemModalTitle').textContent = 'New Calendar Item';
+
+        // Reset modal actions
+        const modalActions = document.querySelector('#calendarItemModal .modal-actions');
+        modalActions.innerHTML = `
+            <button onclick="saveCalendarItem()" class="btn-primary-custom" style="flex: 1;">Save</button>
+            <button onclick="closeCalendarItemModal()" class="btn-secondary-custom" style="flex: 1;">Cancel</button>
+        `;
 
         // Show modal
         document.getElementById('calendarItemModal').classList.add('active');
@@ -1001,8 +1019,12 @@
                 location_id: venueId
             };
 
-            const response = await fetch('api/calendar-items/', {
-                method: 'POST',
+            const isEditing = editingCalendarItemId !== null;
+            const url = isEditing ? `api/calendar-items/${editingCalendarItemId}` : 'api/calendar-items/';
+            const method = isEditing ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
                 headers: {
                     'Content-Type': 'application/json'
                 },
@@ -1012,19 +1034,103 @@
 
             if (!response.ok) {
                 const error = await response.json();
-                showToast(error.detail || 'Unknown error occurred', 'error', 'Failed to Create Item');
+                const action = isEditing ? 'Update' : 'Create';
+                showToast(error.detail || 'Unknown error occurred', 'error', `Failed to ${action} Item`);
                 return;
             }
 
             // Close modal and refresh calendar
             closeCalendarItemModal();
+            if (isEditing) {
+                cancelEditCalendarItem();
+            }
             calendar.refetchEvents();
 
-            showToast('Calendar item created successfully', 'success');
-            console.log('Calendar item created successfully');
+            const successMessage = isEditing ? 'Calendar item updated successfully' : 'Calendar item created successfully';
+            showToast(successMessage, 'success');
+            console.log(successMessage);
         } catch (error) {
             console.error('Error creating calendar item:', error);
             showToast('Unable to create calendar item. Please try again.', 'error', 'Error');
+        }
+    }
+
+    let editingCalendarItemId = null;
+
+    function openEditCalendarItem(item) {
+        editingCalendarItemId = item.id;
+
+        // Populate form with existing data
+        document.getElementById('itemTitle').value = item.title;
+        document.getElementById('itemType').value = item.item_type;
+        document.getElementById('itemVenue').value = item.location_id || '';
+        document.getElementById('itemDescription').value = item.description || '';
+
+        // Parse dates
+        const startDate = new Date(item.start_at);
+        document.getElementById('itemStartDate').value = startDate.toISOString().split('T')[0];
+        document.getElementById('itemStartTime').value = startDate.toTimeString().slice(0, 5);
+
+        if (item.end_at) {
+            const endDate = new Date(item.end_at);
+            document.getElementById('itemEndDate').value = endDate.toISOString().split('T')[0];
+            document.getElementById('itemEndTime').value = endDate.toTimeString().slice(0, 5);
+        }
+
+        // Update modal title and show delete button
+        document.getElementById('calendarItemModalTitle').textContent = 'Edit Calendar Item';
+
+        // Update modal actions to show save and delete
+        const modalActions = document.querySelector('#calendarItemModal .modal-actions');
+        modalActions.innerHTML = `
+            <button onclick="deleteCalendarItem()" class="btn-secondary-custom" style="flex: 1; background-color: #da3633; border-color: #da3633;">Delete</button>
+            <button onclick="saveCalendarItem()" class="btn-primary-custom" style="flex: 1;">Save</button>
+            <button onclick="cancelEditCalendarItem()" class="btn-secondary-custom" style="flex: 1;">Cancel</button>
+        `;
+
+        // Show modal
+        document.getElementById('calendarItemModal').classList.add('active');
+    }
+
+    function cancelEditCalendarItem() {
+        editingCalendarItemId = null;
+        closeCalendarItemModal();
+
+        // Reset modal actions
+        const modalActions = document.querySelector('#calendarItemModal .modal-actions');
+        modalActions.innerHTML = `
+            <button onclick="saveCalendarItem()" class="btn-primary-custom" style="flex: 1;">Save</button>
+            <button onclick="closeCalendarItemModal()" class="btn-secondary-custom" style="flex: 1;">Cancel</button>
+        `;
+    }
+
+    async function deleteCalendarItem() {
+        if (!editingCalendarItemId) return;
+
+        if (!confirm('Are you sure you want to delete this calendar item?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`api/calendar-items/${editingCalendarItemId}`, {
+                method: 'DELETE',
+                credentials: 'same-origin'
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                showToast(error.detail || 'Unknown error occurred', 'error', 'Failed to Delete');
+                return;
+            }
+
+            closeCalendarItemModal();
+            cancelEditCalendarItem();
+            calendar.refetchEvents();
+
+            showToast('Calendar item deleted successfully', 'success');
+        } catch (error) {
+            console.error('Error deleting calendar item:', error);
+            showToast('Unable to delete calendar item. Please try again.', 'error', 'Error');
         }
     }
 
