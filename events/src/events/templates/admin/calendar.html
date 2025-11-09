@@ -266,6 +266,52 @@
         padding-top: 15px;
         border-top: 1px solid #30363d;
     }
+
+    /* Calendar item form styles */
+    .form-row {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 0;
+    }
+
+    .form-group-custom {
+        margin-bottom: 20px;
+    }
+
+    .form-group-custom label {
+        display: block;
+        margin-bottom: 8px;
+        color: #8b949e;
+        font-size: 14px;
+        font-weight: 500;
+    }
+
+    .form-group-custom input[type="text"],
+    .form-group-custom input[type="date"],
+    .form-group-custom input[type="time"],
+    .form-group-custom select,
+    .form-group-custom textarea {
+        width: 100%;
+        padding: 8px 12px;
+        background-color: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        color: #c9d1d9;
+        font-size: 14px;
+    }
+
+    .form-group-custom input:focus,
+    .form-group-custom select:focus,
+    .form-group-custom textarea:focus {
+        outline: none;
+        border-color: #58a6ff;
+        box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+    }
+
+    .form-group-custom textarea {
+        resize: vertical;
+        font-family: inherit;
+    }
 </style>
 {% endblock %}
 
@@ -316,6 +362,72 @@
                 View Full Details
             </a>
             <button onclick="closeModal()" class="btn-secondary-custom" style="flex: 1;">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Calendar Item Create/Edit Modal -->
+<div class="modal-overlay" id="calendarItemModal" onclick="closeCalendarItemModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()">
+        <div class="modal-header">
+            <div class="modal-title" id="calendarItemModalTitle">New Calendar Item</div>
+            <button class="modal-close" onclick="closeCalendarItemModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <form id="calendarItemForm">
+                <div class="form-group-custom">
+                    <label for="itemTitle">Title *</label>
+                    <input type="text" id="itemTitle" class="form-control-custom" required>
+                </div>
+
+                <div class="form-group-custom">
+                    <label for="itemType">Type *</label>
+                    <select id="itemType" class="form-control-custom" required>
+                        <option value="MEETING">👥 Meeting</option>
+                        <option value="REMINDER">🔔 Reminder</option>
+                        <option value="NOTE">📝 Note</option>
+                        <option value="BLOCKED_TIME">🚫 Blocked Time</option>
+                    </select>
+                </div>
+
+                <div class="form-group-custom">
+                    <label for="itemVenue">Location</label>
+                    <select id="itemVenue" class="form-control-custom">
+                        <option value="">No location</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group-custom" style="flex: 1;">
+                        <label for="itemStartDate">Start Date *</label>
+                        <input type="date" id="itemStartDate" class="form-control-custom" required>
+                    </div>
+                    <div class="form-group-custom" style="flex: 1;">
+                        <label for="itemStartTime">Start Time *</label>
+                        <input type="time" id="itemStartTime" class="form-control-custom" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group-custom" style="flex: 1;">
+                        <label for="itemEndDate">End Date</label>
+                        <input type="date" id="itemEndDate" class="form-control-custom">
+                    </div>
+                    <div class="form-group-custom" style="flex: 1;">
+                        <label for="itemEndTime">End Time</label>
+                        <input type="time" id="itemEndTime" class="form-control-custom">
+                    </div>
+                </div>
+
+                <div class="form-group-custom">
+                    <label for="itemDescription">Description</label>
+                    <textarea id="itemDescription" class="form-control-custom" rows="4" placeholder="Add details..."></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-actions">
+            <button onclick="saveCalendarItem()" class="btn-primary-custom" style="flex: 1;">Save</button>
+            <button onclick="closeCalendarItemModal()" class="btn-secondary-custom" style="flex: 1;">Cancel</button>
         </div>
     </div>
 </div>
@@ -405,6 +517,15 @@
                 option.value = venue.name;
                 option.textContent = venue.name;
                 select.appendChild(option);
+            });
+
+            // Populate calendar item venue dropdown
+            const itemVenueSelect = document.getElementById('itemVenue');
+            allVenues.forEach(venue => {
+                const option = document.createElement('option');
+                option.value = venue.id;
+                option.textContent = venue.name;
+                itemVenueSelect.appendChild(option);
             });
 
             // Populate location legend
@@ -626,42 +747,64 @@
     }
 
     function handleDateClick(info) {
-        // Quick-add dialog for calendar items
-        const itemType = prompt(`Create quick calendar item\n\nChoose type:\n1 = Meeting\n2 = Reminder\n3 = Note\n4 = Blocked Time\n\nEnter number (1-4):`);
-
-        const typeMap = {
-            '1': 'MEETING',
-            '2': 'REMINDER',
-            '3': 'NOTE',
-            '4': 'BLOCKED_TIME'
-        };
-
-        if (!typeMap[itemType]) {
-            return; // Cancelled or invalid
-        }
-
-        const title = prompt('Enter title:');
-        if (!title) return;
-
-        const description = prompt('Enter description (optional):');
-
-        // Use the clicked date with current time
+        // Open calendar item modal with the clicked date
         const clickedDate = new Date(info.dateStr);
         const now = new Date();
-        clickedDate.setHours(now.getHours(), now.getMinutes(), 0, 0);
 
-        createQuickCalendarItem(typeMap[itemType], title, description, clickedDate);
+        // Format date for input
+        const dateStr = clickedDate.toISOString().split('T')[0];
+        const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+        // Clear form and set defaults
+        document.getElementById('calendarItemForm').reset();
+        document.getElementById('itemStartDate').value = dateStr;
+        document.getElementById('itemStartTime').value = timeStr;
+        document.getElementById('calendarItemModalTitle').textContent = 'New Calendar Item';
+
+        // Show modal
+        document.getElementById('calendarItemModal').classList.add('active');
     }
 
-    async function createQuickCalendarItem(itemType, title, description, startDate) {
+    function closeCalendarItemModal(event) {
+        if (!event || event.target.id === 'calendarItemModal') {
+            document.getElementById('calendarItemModal').classList.remove('active');
+        }
+    }
+
+    async function saveCalendarItem() {
         try {
+            // Get form values
+            const title = document.getElementById('itemTitle').value.trim();
+            const itemType = document.getElementById('itemType').value;
+            const venueId = document.getElementById('itemVenue').value || null;
+            const startDate = document.getElementById('itemStartDate').value;
+            const startTime = document.getElementById('itemStartTime').value;
+            const endDate = document.getElementById('itemEndDate').value;
+            const endTime = document.getElementById('itemEndTime').value;
+            const description = document.getElementById('itemDescription').value.trim() || null;
+
+            // Validate required fields
+            if (!title || !itemType || !startDate || !startTime) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            // Build start datetime
+            const startDateTime = new Date(`${startDate}T${startTime}`);
+
+            // Build end datetime if provided
+            let endDateTime = null;
+            if (endDate && endTime) {
+                endDateTime = new Date(`${endDate}T${endTime}`);
+            }
+
             const payload = {
                 title: title,
                 item_type: itemType,
-                description: description || null,
-                start_at: startDate.toISOString(),
-                end_at: null,
-                venue_id: null
+                description: description,
+                start_at: startDateTime.toISOString(),
+                end_at: endDateTime ? endDateTime.toISOString() : null,
+                venue_id: venueId
             };
 
             const response = await fetch('api/calendar-items/', {
@@ -679,10 +822,10 @@
                 return;
             }
 
-            // Refresh calendar
+            // Close modal and refresh calendar
+            closeCalendarItemModal();
             calendar.refetchEvents();
 
-            // Show success message
             console.log('Calendar item created successfully');
         } catch (error) {
             console.error('Error creating calendar item:', error);
