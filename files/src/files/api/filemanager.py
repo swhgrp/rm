@@ -227,6 +227,50 @@ async def list_files(
     }
 
 
+def ensure_folder_hierarchy(db: Session, base_folder: Folder, relative_path: str) -> Folder:
+    """Ensure all folders in a path exist, creating them if necessary.
+    Returns the deepest folder in the hierarchy."""
+    if not relative_path or relative_path == ".":
+        return base_folder
+
+    # Split the path into parts
+    parts = Path(relative_path).parts
+    current_folder = base_folder
+    current_path = base_folder.path
+
+    for part in parts:
+        # Build the full path
+        if current_path:
+            new_path = f"{current_path}/{part}"
+        else:
+            new_path = part
+
+        # Check if folder exists
+        existing_folder = db.query(Folder).filter(
+            Folder.path == new_path,
+            Folder.owner_id == base_folder.owner_id
+        ).first()
+
+        if existing_folder:
+            current_folder = existing_folder
+        else:
+            # Create new folder
+            new_folder = Folder(
+                name=part,
+                path=new_path,
+                parent_id=current_folder.id,
+                owner_id=base_folder.owner_id,
+                is_public=False
+            )
+            db.add(new_folder)
+            db.flush()  # Get the ID without committing
+            current_folder = new_folder
+
+        current_path = new_path
+
+    return current_folder
+
+
 @router.post("/folders/{folder_id}/upload")
 async def upload_file(
     folder_id: int,
@@ -238,33 +282,50 @@ async def upload_file(
     folder = db.query(Folder).filter(Folder.id == folder_id).first()
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found")
-    
+
     if not has_folder_permission(db, current_user, folder, "write"):
         raise HTTPException(status_code=403, detail="No write permission on folder")
-    
-    # Generate file path
-    file_path = f"{folder.path}/{file.filename}"
-    folder_fs_path = get_user_folder_path(folder.owner_id, folder.path)
-    fs_path = folder_fs_path / file.filename
 
-    # Ensure parent directory exists (in case filename contains subdirectories)
+    # Parse filename to extract directory structure and actual filename
+    file_path_obj = Path(file.filename)
+    if len(file_path_obj.parts) > 1:
+        # File has subdirectories in the path
+        subdirs = str(file_path_obj.parent)
+        actual_filename = file_path_obj.name
+
+        # Ensure folder hierarchy exists and get the target folder
+        target_folder = ensure_folder_hierarchy(db, folder, subdirs)
+        target_folder_id = target_folder.id
+        file_path = f"{target_folder.path}/{actual_filename}"
+    else:
+        # No subdirectories, use the base folder
+        actual_filename = file.filename
+        target_folder = folder
+        target_folder_id = folder_id
+        file_path = f"{folder.path}/{actual_filename}"
+
+    # Generate filesystem path
+    folder_fs_path = get_user_folder_path(folder.owner_id, target_folder.path)
+    fs_path = folder_fs_path / actual_filename
+
+    # Ensure parent directory exists
     fs_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Save file to filesystem
     async with aiofiles.open(fs_path, 'wb') as out_file:
         content = await file.read()
         await out_file.write(content)
-    
+
     # Get file size and mime type
     file_size = fs_path.stat().st_size
-    mime_type, _ = mimetypes.guess_type(file.filename)
-    
+    mime_type, _ = mimetypes.guess_type(actual_filename)
+
     # Create file metadata in database
     file_metadata = FileMetadata(
-        name=file.filename,
+        name=actual_filename,
         path=file_path,
-        folder_id=folder_id,
-        owner_id=current_user.id,
+        folder_id=target_folder_id,
+        owner_id=folder.owner_id,
         size=file_size,
         mime_type=mime_type
     )
