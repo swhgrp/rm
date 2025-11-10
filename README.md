@@ -7,8 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** November 8, 2025
-**Status:** ~85% Complete - Core Systems Production Ready ✅ (New: Integration Hub Major Workflow Improvements - Bulk Mapping, Statement Handling 🚀)
+**Last Updated:** November 9, 2025
+**Status:** ~85% Complete - Core Systems Production Ready ✅
+**Latest:** Complete codebase analysis & documentation updates (Nov 9, 2025) 📚
 
 ---
 
@@ -231,48 +232,52 @@ restaurant-system/
 
 ## 📦 System Components
 
-### 1. Portal System ✅ **99%+ Complete** (Better Than Documented!)
-**Central authentication and navigation hub**
+### 1. Portal System ✅ **99%+ Complete - Fully Documented (Nov 9, 2025)** 🌟
+**Central authentication, mail gateway, and system monitoring hub**
 
 - **URL:** https://rm.swhgrp.com/portal/
-- **Purpose:** JWT-based single sign-on for all systems
+- **Purpose:** JWT-based SSO, mail integration, and infrastructure monitoring
 - **Technology:** FastAPI (Python), PostgreSQL
-- **Files:** 3 Python files, 3 templates + undocumented features
+- **Files:** 3 Python files, 5 templates (all features now documented)
 
-**Features:**
-- ✅ JWT token authentication
-- ✅ Session management with secure cookies (30-min timeout)
-- ✅ Permission-based system access control (7 systems)
+**Core Authentication:**
+- ✅ JWT token authentication with secure HTTP-only cookies
+- ✅ Session management (30-min timeout with auto-refresh)
+- ✅ Permission-based system access control (7 systems + mail)
 - ✅ Admin user management interface
 - ✅ Single sign-on (SSO) token generation (5-min tokens)
-- ✅ User permissions per system
-- ✅ **Password change system** (UNDOCUMENTED - fully implemented with cross-system sync)
-- ✅ **Session timeout warning** (UNDOCUMENTED - 2-min warning before 30-min expiration)
-- ✅ **Password requirements** (UNDOCUMENTED - minimum 8 characters enforced)
+- ✅ Cross-system password synchronization
+
+**User Management:** ✅ **Fully Documented**
+- ✅ User profile management (update full name and email)
+- ✅ Password change system with cross-system sync
+- ✅ Password complexity enforcement (8+ characters minimum)
+- ✅ Session auto-refresh (extends when <10 min remaining)
+
+**Mail System Integration:** ✅ **NEW - Fully Documented (Nov 9)**
+- ✅ Mail gateway proxy to SOGo webmail (transparent SSO)
+- ✅ Mailbox provisioning via Mailcow API
+- ✅ Mail system authentication (X-Mail-User header)
+- ✅ Admin-only mail administration
+- ✅ Automatic mailbox creation for HR users
+- ⚠️ Security note: Temp password generation needs review (see README)
+
+**System Monitoring Dashboard:** ✅ **Fully Documented**
+- ✅ Real-time infrastructure monitoring (admin-only)
+- ✅ 7 microservices health status
+- ✅ Database health with connection counts
+- ✅ SSL certificate expiration tracking
+- ✅ Per-database backup status
+- ✅ Recent alerts and error logs
+- ✅ Auto-refresh every 30 seconds
+- ✅ Local time display (EDT/EST timezone aware)
+- ✅ **URL:** https://rm.swhgrp.com/portal/monitoring
+
+**Missing (1%):**
 - ❌ Password reset via email (not implemented)
 - ❌ Two-factor authentication (future)
 
-**Undocumented Endpoints:**
-- GET /portal/change-password
-- POST /api/change-password (with cross-system password sync)
-- GET /portal/debug
-
-**Monitoring Dashboard:** ✅ **Complete Real-Time System Monitor (Updated Nov 1, 2025)**
-- ✅ Real-time system health monitoring
-- ✅ 7 microservices status tracking
-- ✅ 5 database health monitoring with connection counts
-- ✅ Nginx reverse proxy monitoring
-- ✅ Docker network health checks
-- ✅ SSL certificate expiration tracking
-- ✅ Per-database backup status
-- ✅ Recent errors and alerts display
-- ✅ Auto-refresh every 30 seconds
-- ✅ GitHub dark theme with responsive design
-- ✅ **Local time display** (EDT/EST timezone aware)
-- ✅ **Aggressive cache prevention** (meta tags, server headers, client-side busting)
-- ✅ **URL:** https://rm.swhgrp.com/portal/monitoring (Admin only)
-
-**[→ View Portal Documentation](./portal/README.md)** *(Note: Missing documentation for password change system)*
+**[→ View Portal Documentation](./portal/README.md)** ✅ **Comprehensive docs updated Nov 9, 2025**
 
 ---
 
@@ -384,10 +389,12 @@ restaurant-system/
 
 - **URL:** https://rm.swhgrp.com/accounting/
 - **Database:** accounting_db (PostgreSQL 15) - 60+ models
-- **Technology:** **FastAPI** (NOT Django), SQLAlchemy, ReportLab (PDF), openpyxl (Excel)
+- **Technology:** **FastAPI with SQLAlchemy ORM** (corrected Nov 9, 2025)
+- **Migrations:** Alembic (not Django migrations)
 - **Files:** **140 Python files** (largest system!), 37 templates, 251 API endpoints
+- **API Docs:** OpenAPI/Swagger auto-generated
 
-**Note:** Framework is FastAPI with SQLAlchemy, NOT Django as previously documented.
+**Note:** ✅ Framework documentation corrected Nov 9 - FastAPI with SQLAlchemy, NOT Django.
 
 **Features:**
 
@@ -1154,10 +1161,10 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 | System | Status | Python Files | Templates | Models | Completion | Notes |
 |--------|--------|--------------|-----------|--------|------------|-------|
-| Portal | ✅ Production | 3 | 3 | 1 | 99%+ | Password change undocumented |
+| Portal | ✅ Production | 3 | 5 | 1 | 99%+ | ✅ **Fully documented (Nov 9)** - Mail system, monitoring, password sync |
 | Inventory | ✅ Production | 101 | 27 | 25+ | **100%+** 🌟 | ✅ README updated (Nov 3) - AI invoices, POS, recipes fully documented |
 | HR | ✅ Production | 53 | 13 | 12 | **100%** ✅ | Email notifications, admin delete, doc security (Nov 3) |
-| Accounting | ⚠️ Active | 140 | 37 | 60+ | ~75% | FastAPI not Django! |
+| Accounting | ⚠️ Active | 140 | 37 | 60+ | ~75% | ✅ **Framework corrected (Nov 9)** - FastAPI documented |
 | Events | ✅ Production | 35 | 10 | 17 | ~75% | ✅ SSO complete (Nov 1) |
 | Integration Hub | ✅ Production | 30+ | 9 | 7+ | 100%+ 🌟 | **NEW: Bulk mapping workflow (10x faster), statement handling** 🚀 |
 | Files | ⚠️ Active | 11 | 1 | 6 | 75-80% | Migration syntax error |
@@ -1184,6 +1191,22 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 ## 📝 Recent Updates
+
+### November 9, 2025 - Complete Documentation Audit & Updates 📚 **CRITICAL FIXES**
+- ✅ **Comprehensive codebase analysis** - 57 undocumented features identified
+- ✅ **Portal README fully updated** - Mail system, monitoring, password sync documented
+- ✅ **Accounting framework corrected** - Fixed critical Django/FastAPI error
+- ✅ **Security warnings added** - Portal temp password generation, debug endpoint
+- ✅ **4 analysis reports generated** (49KB total documentation):
+  - `CODEBASE_ANALYSIS_NOV9_2025.md` (22KB) - Deep-dive analysis
+  - `CRITICAL_FINDINGS_SUMMARY.md` (9KB) - Executive summary
+  - `UNDOCUMENTED_FEATURES_INDEX.md` (11KB) - Complete feature index
+  - `ANALYSIS_REPORT_README.md` (7.2KB) - Navigation guide
+- ✅ **Documentation completeness scores** - Portal 99%, Accounting 60%
+- ⚠️ **Action items identified** - Security reviews, README expansions
+- 📊 **Statistics:** 680 features total, 57 undocumented, 8 incorrectly documented
+
+**Impact:** All critical documentation errors corrected. Portal and Accounting READMEs significantly improved.
 
 ### November 8, 2025 - Integration Hub: Major Workflow Improvements v2.7 🚀 **GAME CHANGER**
 - ✅ **Bulk Mapping System** - Revolutionary workflow enhancement

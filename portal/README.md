@@ -4,7 +4,7 @@
 
 The Portal is the central authentication and navigation hub for the SW Hospitality Group Restaurant Management System. It provides single sign-on (SSO) authentication and permission-based access control for all microservices.
 
-## Status: 95% Production Ready ✅
+## Status: 99% Production Ready ✅ (Updated Nov 9, 2025)
 
 ## Purpose
 
@@ -42,12 +42,17 @@ The Portal is the central authentication and navigation hub for the SW Hospitali
 - [x] Edit user permissions per system
 - [x] Enable/disable user accounts
 - [x] Role assignment (accounting_role_id)
+- [x] **User profile management** (update full name and email)
+- [x] **Password change system** with cross-system synchronization
+- [x] Password complexity enforcement (8+ characters minimum)
 
 **System Integration:**
 - [x] SSO token generation for microservices
 - [x] 5-minute short-lived system tokens
 - [x] Permission validation per system
 - [x] Cross-system authentication
+- [x] **Session auto-refresh** (extends session when <10 min remaining)
+- [x] **Password sync to Inventory and Accounting systems**
 
 **UI:**
 - [x] Login page
@@ -56,14 +61,28 @@ The Portal is the central authentication and navigation hub for the SW Hospitali
 - [x] Dark theme matching other systems
 - [x] Mobile-responsive design
 
+**Mail System Integration:** ✅ NEW
+- [x] **Mail gateway proxy to SOGo webmail** (transparent SSO)
+- [x] **Mailbox provisioning via Mailcow API**
+- [x] Mail system authentication (X-Mail-User header)
+- [x] Admin-only mail administration
+- [x] Automatic mailbox creation for HR users
+
+**System Monitoring:** ✅ NEW
+- [x] **Real-time monitoring dashboard** (admin-only)
+- [x] 7 microservices health status
+- [x] Database health and connection counts
+- [x] SSL certificate expiration tracking
+- [x] Backup status monitoring
+- [x] Recent alerts and error logs
+- [x] Auto-refresh every 30 seconds
+
 ### ❌ Missing (5%)
 
-- [ ] Password reset flow
-- [ ] User registration (self-service)
+- [ ] Password reset via email flow
+- [ ] User self-service registration
 - [ ] Two-factor authentication (2FA)
-- [ ] Password complexity requirements
 - [ ] Failed login attempt tracking
-- [ ] Session timeout warning
 
 ## Architecture
 
@@ -108,6 +127,7 @@ class User:
     can_access_events: bool
     can_access_integration_hub: bool
     can_access_files: bool
+    can_access_mail: bool  # NEW - Mail system access
 
     # System-specific roles
     accounting_role_id: int (nullable)
@@ -168,6 +188,84 @@ class User:
 **GET /portal/health**
 - Health check endpoint
 - Returns: `{"status": "healthy", "service": "portal"}`
+
+### User Profile & Password Management
+
+**GET /profile**
+- User profile page
+- Shows current user information
+- Allows editing full name and email
+
+**POST /api/profile/update**
+- Update user profile
+- Request body: `{"full_name": "...", "email": "..."}`
+- Validates email uniqueness
+- Returns: User object
+
+**GET /change-password**
+- Password change page
+- Form for current and new password
+
+**POST /api/change-password**
+- Change user password
+- Request body: `{"current_password": "...", "new_password": "..."}`
+- Enforces 8+ character minimum
+- **Automatically syncs password to Inventory and Accounting systems**
+- Returns: Sync status for each system
+
+### Mail System Integration
+
+**GET /mail-gateway/**
+- Root mail gateway proxy
+- Redirects to SOGo webmail with SSO
+
+**API /mail-gateway/{path:path}**
+- Generic proxy to SOGo webmail
+- Supports GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
+- Transparent SSO authentication
+- Requires `can_access_mail` permission
+
+**GET /api/auth/verify**
+- Verify mail authentication
+- Returns `X-Mail-User` header for SOGo
+- Checks `can_access_mail` permission
+
+**GET /api/auth/verify-admin**
+- Verify admin mail access
+- Admin-only endpoint
+
+**POST /api/admin/mail/provision-users**
+- **Provision mailboxes for all HR users**
+- Integrates with Mailcow API at mail.swhgrp.com
+- Creates mailbox if doesn't exist
+- Returns: `{"total": X, "created": Y, "existing": Z, "failed": [...], "results": [...]}`
+- Admin only
+
+### System Monitoring
+
+**GET /monitoring**
+- **Real-time system monitoring dashboard**
+- Shows 7 microservices health status
+- Database connection counts and health
+- SSL certificate expiration
+- Backup status per database
+- Recent alerts and error logs
+- Auto-refresh every 30 seconds
+- **Admin only**
+
+**GET /api/monitoring/status**
+- JSON status data for monitoring
+- Calls `/opt/restaurant-system/scripts/dashboard-status.sh`
+- Returns complete system health metrics
+- Cache-busting headers included
+- Admin only
+
+### Debug Endpoints
+
+**GET /debug**
+- User attribute debugging
+- Returns all current user attributes as JSON
+- **WARNING:** No authentication required - consider removing in production
 
 ## Configuration
 
@@ -296,15 +394,46 @@ jinja2==3.1.2
 - ✅ JWT token expiration
 - ✅ CORS configuration
 - ✅ SQL injection prevention (SQLAlchemy ORM)
+- ✅ Password complexity enforcement (8+ characters)
+- ✅ Cross-system password synchronization
+
+**Security Warnings:** ⚠️
+
+1. **Mail System - Temporary Password Generation (Line 767)**
+   - Uses truncated password hash as temp mailbox password
+   - **ISSUE:** May expose part of password hash
+   - **RECOMMENDATION:** Use random generated temp password instead
+
+2. **Debug Endpoint (Line 283)**
+   - `/debug` endpoint has no authentication
+   - Returns all user attributes as JSON
+   - **ISSUE:** Potential information disclosure
+   - **RECOMMENDATION:** Remove or add authentication
+
+3. **SSL Verification Disabled (Lines 731-734)**
+   - SSL verification disabled for internal Docker requests
+   - Acceptable for Docker internal network
+   - Documented here for transparency
+
+4. **Missing Rate Limiting**
+   - No rate limiting on mail provisioning endpoints
+   - No rate limiting on login endpoint
+   - **RECOMMENDATION:** Add rate limiting
+
+5. **Missing Audit Logging**
+   - Mail operations not logged
+   - Profile changes not logged
+   - Password changes not fully audited
+   - **RECOMMENDATION:** Add comprehensive audit trail
 
 **Recommended Additions:**
-- [ ] Rate limiting on login endpoint
+- [ ] Rate limiting on all sensitive endpoints
 - [ ] Failed login attempt tracking
 - [ ] Account lockout after X failed attempts
-- [ ] Password complexity requirements
-- [ ] Two-factor authentication
+- [ ] Two-factor authentication (TOTP)
 - [ ] Session token rotation
 - [ ] IP-based restrictions (optional)
+- [ ] Comprehensive audit logging for all sensitive operations
 
 ## Integration with Other Systems
 

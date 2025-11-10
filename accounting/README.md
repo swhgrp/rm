@@ -21,11 +21,13 @@ The Accounting System is a comprehensive double-entry accounting platform provid
 
 ## Technology Stack
 
-- **Framework:** Django 4.2 (Python)
+- **Framework:** FastAPI (Python) with SQLAlchemy ORM
 - **Database:** PostgreSQL 15
+- **Migrations:** Alembic (not Django migrations)
 - **Reporting:** ReportLab (PDF), openpyxl (Excel)
 - **Frontend:** Bootstrap 5, Chart.js
 - **Calculations:** Complex financial logic with decimal precision
+- **API Documentation:** OpenAPI/Swagger (auto-generated)
 
 ## Features
 
