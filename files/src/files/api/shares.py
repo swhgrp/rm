@@ -94,6 +94,8 @@ class InternalShareResponse(BaseModel):
     id: int
     resource_type: str
     resource_name: str
+    resource_id: int  # ID of the folder or file
+    shared_by: Optional[str] = None  # Name of user who shared
     shared_with_user: Optional[str] = None
     shared_with_department: Optional[str] = None
     permissions: dict
@@ -459,13 +461,15 @@ async def get_shared_with_me(
 
     results = []
     for share in shares:
-        # Get resource name
+        # Get resource name and ID
         if share.resource_type == ShareLinkType.FOLDER:
             resource = share.folder
             resource_name = resource.name if resource else "Unknown"
+            resource_id = resource.id if resource else 0
         else:
             resource = share.file
             resource_name = resource.name if resource else "Unknown"
+            resource_id = resource.id if resource else 0
 
         # Get sharer name
         sharer = share.sharer
@@ -475,6 +479,8 @@ async def get_shared_with_me(
             id=share.id,
             resource_type=share.resource_type.value,
             resource_name=resource_name,
+            resource_id=resource_id,
+            shared_by=sharer_name,
             shared_with_user=current_user.full_name,
             shared_with_department=share.shared_with_department,
             permissions={
@@ -508,13 +514,15 @@ async def get_shared_by_me(
 
     results = []
     for share in shares:
-        # Get resource name
+        # Get resource name and ID
         if share.resource_type == ShareLinkType.FOLDER:
             resource = share.folder
             resource_name = resource.name if resource else "Unknown"
+            resource_id = resource.id if resource else 0
         else:
             resource = share.file
             resource_name = resource.name if resource else "Unknown"
+            resource_id = resource.id if resource else 0
 
         # Get recipient name if shared with specific user
         shared_with_user_name = None
@@ -526,6 +534,8 @@ async def get_shared_by_me(
             id=share.id,
             resource_type=share.resource_type.value,
             resource_name=resource_name,
+            resource_id=resource_id,
+            shared_by=current_user.full_name,
             shared_with_user=shared_with_user_name,
             shared_with_department=share.shared_with_department,
             permissions={

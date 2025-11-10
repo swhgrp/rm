@@ -868,7 +868,7 @@
         </div>
         <ul class="sidebar-nav">
             <li><a href="/portal/"><i class="bi bi-house-door"></i> Portal Home</a></li>
-            <li><a href="#" onclick="loadRootFolders(); return false;"><i class="bi bi-folder"></i> All Files</a></li>
+            <li><a href="#" onclick="loadRootFolders(); return false;"><i class="bi bi-folder"></i> Files Dashboard</a></li>
             <li><a href="#" onclick="loadMyFiles(); return false;"><i class="bi bi-folder"></i> My Files</a></li>
             <li><a href="#" onclick="loadSharedWithMe(); return false;"><i class="bi bi-people"></i> Shared with Me</a></li>
             <li><a href="#" onclick="loadSharedByMe(); return false;"><i class="bi bi-share"></i> Shared by Me</a></li>
@@ -2887,13 +2887,16 @@
 
         async function loadSharedWithMe() {
             try {
-                const response = await fetch('/files/api/shares/internal/with-me');
-                const data = await response.json();
+                const response = await fetch('/files/api/shares/internal/shared-with-me');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const shares = await response.json();
 
                 const fileList = document.getElementById('fileList');
                 updateBreadcrumb([{name: 'Shared with Me', id: null}]);
 
-                if (!data.shares || data.shares.length === 0) {
+                if (!shares || shares.length === 0) {
                     fileList.innerHTML = `
                         <div class="empty-state">
                             <i class="bi bi-inbox"></i>
@@ -2904,24 +2907,24 @@
                 }
 
                 let html = '';
-                data.shares.forEach(share => {
+                shares.forEach(share => {
                     const perms = [];
-                    if (share.can_write) perms.push('Write');
-                    if (share.can_delete) perms.push('Delete');
-                    if (share.can_share) perms.push('Share');
+                    if (share.permissions.can_upload || share.permissions.can_edit) perms.push('Write');
+                    if (share.permissions.can_delete) perms.push('Delete');
+                    if (share.permissions.can_share) perms.push('Share');
                     const permText = perms.length > 0 ? perms.join(', ') : 'Read only';
 
                     const icon = share.resource_type === 'folder' ? 'bi-folder' : 'bi-file-earmark';
-                    const resourceName = share.folder_name || share.file_name || 'Unknown';
+                    const resourceName = share.resource_name || 'Unknown';
 
                     html += `
                         <div class="file-item">
                             <i class="bi ${icon} file-icon"></i>
                             <span class="file-name">${resourceName}</span>
-                            <span class="file-size">Shared by: ${share.shared_by_username}</span>
+                            <span class="file-size">Shared by: ${share.shared_by || 'Unknown'}</span>
                             <span class="file-size">Permissions: ${permText}</span>
-                            ${share.resource_type === 'folder' ? `<button class="btn btn-sm btn-custom" onclick="loadFolder(${share.folder_id}, '${resourceName}')"><i class="bi bi-folder-open"></i> Open</button>` : ''}
-                            ${share.resource_type === 'file' && share.can_download ? `<button class="btn btn-sm btn-custom" onclick="downloadFile(${share.file_id}, '${resourceName}')"><i class="bi bi-download"></i></button>` : ''}
+                            ${share.resource_type === 'folder' ? `<button class="btn btn-sm btn-custom" onclick="loadFolder(${share.resource_id}, '${resourceName}')"><i class="bi bi-folder-open"></i> Open</button>` : ''}
+                            ${share.resource_type === 'file' && share.permissions.can_download ? `<button class="btn btn-sm btn-custom" onclick="downloadFile(${share.resource_id}, '${resourceName}')"><i class="bi bi-download"></i></button>` : ''}
                         </div>
                     `;
                 });
