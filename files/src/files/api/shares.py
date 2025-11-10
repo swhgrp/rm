@@ -389,31 +389,69 @@ async def create_internal_share(
     if request.expires_in_days:
         expires_at = datetime.now(timezone.utc) + timedelta(days=request.expires_in_days)
 
-    # Create internal share
-    internal_share = InternalShare(
-        resource_type=request.resource_type,
-        folder_id=request.resource_id if request.resource_type == ShareLinkType.FOLDER else None,
-        file_id=request.resource_id if request.resource_type == ShareLinkType.FILE else None,
-        shared_with_user_id=request.shared_with_user_id,
-        shared_with_department=request.shared_with_department,
-        shared_with_role=request.shared_with_role,
-        shared_with_location=request.shared_with_location,
-        can_view=request.can_view,
-        can_download=request.can_download,
-        can_upload=request.can_upload,
-        can_edit=request.can_edit,
-        can_delete=request.can_delete,
-        can_share=request.can_share,
-        can_comment=request.can_comment,
-        shared_by=current_user.id,
-        expires_at=expires_at,
-        message=request.message,
-        notify_by_email=request.notify_by_email
+    # Check if share already exists
+    existing_share = db.query(InternalShare).filter(
+        InternalShare.resource_type == request.resource_type,
+        InternalShare.is_active == True
     )
 
-    db.add(internal_share)
-    db.commit()
-    db.refresh(internal_share)
+    if request.resource_type == ShareLinkType.FOLDER:
+        existing_share = existing_share.filter(InternalShare.folder_id == request.resource_id)
+    else:
+        existing_share = existing_share.filter(InternalShare.file_id == request.resource_id)
+
+    # Match on the target (user, department, role, or location)
+    if request.shared_with_user_id:
+        existing_share = existing_share.filter(InternalShare.shared_with_user_id == request.shared_with_user_id)
+    if request.shared_with_department:
+        existing_share = existing_share.filter(InternalShare.shared_with_department == request.shared_with_department)
+    if request.shared_with_role:
+        existing_share = existing_share.filter(InternalShare.shared_with_role == request.shared_with_role)
+    if request.shared_with_location:
+        existing_share = existing_share.filter(InternalShare.shared_with_location == request.shared_with_location)
+
+    existing_share = existing_share.first()
+
+    if existing_share:
+        # Update existing share permissions instead of creating duplicate
+        existing_share.can_view = request.can_view
+        existing_share.can_download = request.can_download
+        existing_share.can_upload = request.can_upload
+        existing_share.can_edit = request.can_edit
+        existing_share.can_delete = request.can_delete
+        existing_share.can_share = request.can_share
+        existing_share.can_comment = request.can_comment
+        existing_share.expires_at = expires_at
+        existing_share.message = request.message
+        db.commit()
+        db.refresh(existing_share)
+        internal_share = existing_share
+    else:
+        # Create new internal share
+        internal_share = InternalShare(
+            resource_type=request.resource_type,
+            folder_id=request.resource_id if request.resource_type == ShareLinkType.FOLDER else None,
+            file_id=request.resource_id if request.resource_type == ShareLinkType.FILE else None,
+            shared_with_user_id=request.shared_with_user_id,
+            shared_with_department=request.shared_with_department,
+            shared_with_role=request.shared_with_role,
+            shared_with_location=request.shared_with_location,
+            can_view=request.can_view,
+            can_download=request.can_download,
+            can_upload=request.can_upload,
+            can_edit=request.can_edit,
+            can_delete=request.can_delete,
+            can_share=request.can_share,
+            can_comment=request.can_comment,
+            shared_by=current_user.id,
+            expires_at=expires_at,
+            message=request.message,
+            notify_by_email=request.notify_by_email
+        )
+
+        db.add(internal_share)
+        db.commit()
+        db.refresh(internal_share)
 
     # Get shared_with name if user
     shared_with_user_name = None
@@ -421,10 +459,15 @@ async def create_internal_share(
         user = internal_share.shared_with_user
         shared_with_user_name = user.full_name if user else "Unknown"
 
+    # Get resource ID
+    resource_id = request.resource_id if request.resource_type == ShareLinkType.FOLDER else request.resource_id
+
     return InternalShareResponse(
         id=internal_share.id,
         resource_type=request.resource_type.value,
         resource_name=resource_name,
+        resource_id=resource_id,
+        shared_by=current_user.full_name,
         shared_with_user=shared_with_user_name,
         shared_with_department=internal_share.shared_with_department,
         permissions={
