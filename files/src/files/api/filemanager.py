@@ -244,7 +244,7 @@ async def upload_file(
     
     # Generate file path
     file_path = f"{folder.path}/{file.filename}"
-    folder_fs_path = get_user_folder_path(current_user.id, folder.path)
+    folder_fs_path = get_user_folder_path(folder.owner_id, folder.path)
     fs_path = folder_fs_path / file.filename
     
     # Save file to filesystem
