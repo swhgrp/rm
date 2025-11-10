@@ -2914,19 +2914,28 @@
                     if (share.permissions.can_share) perms.push('Share');
                     const permText = perms.length > 0 ? perms.join(', ') : 'Read only';
 
-                    const icon = share.resource_type === 'folder' ? 'bi-folder' : 'bi-file-earmark';
                     const resourceName = share.resource_name || 'Unknown';
 
-                    html += `
-                        <div class="file-item">
-                            <i class="bi ${icon} file-icon"></i>
-                            <span class="file-name">${resourceName}</span>
-                            <span class="file-size">Shared by: ${share.shared_by || 'Unknown'}</span>
-                            <span class="file-size">Permissions: ${permText}</span>
-                            ${share.resource_type === 'folder' ? `<button class="btn btn-sm btn-custom" onclick="loadFolder(${share.resource_id}, '${resourceName}')"><i class="bi bi-folder-open"></i> Open</button>` : ''}
-                            ${share.resource_type === 'file' && share.permissions.can_download ? `<button class="btn btn-sm btn-custom" onclick="downloadFile(${share.resource_id}, '${resourceName}')"><i class="bi bi-download"></i></button>` : ''}
-                        </div>
-                    `;
+                    if (share.resource_type === 'folder') {
+                        html += `
+                            <div class="folder-item" onclick="loadFolder(${share.resource_id}, '${resourceName}')">
+                                <i class="bi bi-folder folder-icon"></i>
+                                <span class="folder-name">${resourceName}</span>
+                                <span class="file-size">Shared by: ${share.shared_by || 'Unknown'}</span>
+                                <span class="file-size">Permissions: ${permText}</span>
+                            </div>
+                        `;
+                    } else {
+                        html += `
+                            <div class="file-item">
+                                <i class="bi bi-file-earmark file-icon"></i>
+                                <span class="file-name">${resourceName}</span>
+                                <span class="file-size">Shared by: ${share.shared_by || 'Unknown'}</span>
+                                <span class="file-size">Permissions: ${permText}</span>
+                                ${share.permissions.can_download ? `<button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); downloadFile(${share.resource_id}, '${resourceName}')"><i class="bi bi-download"></i></button>` : ''}
+                            </div>
+                        `;
+                    }
                 });
 
                 fileList.innerHTML = html;
