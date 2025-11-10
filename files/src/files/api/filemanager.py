@@ -246,7 +246,10 @@ async def upload_file(
     file_path = f"{folder.path}/{file.filename}"
     folder_fs_path = get_user_folder_path(folder.owner_id, folder.path)
     fs_path = folder_fs_path / file.filename
-    
+
+    # Ensure parent directory exists (in case filename contains subdirectories)
+    fs_path.parent.mkdir(parents=True, exist_ok=True)
+
     # Save file to filesystem
     async with aiofiles.open(fs_path, 'wb') as out_file:
         content = await file.read()
