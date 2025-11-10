@@ -1545,16 +1545,16 @@
                 `;
             } else {
                 shared_with_me.forEach(item => {
-                    const icon = item.resource_type === 'folder' ? 'bi-folder' : 'bi-file-earmark';
-                    const clickAction = item.resource_type === 'folder'
-                        ? `loadFolder(${item.resource_id}, '${item.resource_name}')`
-                        : `downloadFile(${item.resource_id}, '${item.resource_name}')`;
+                    const icon = item.type === 'folder' ? 'bi-folder' : 'bi-file-earmark';
+                    const clickAction = item.type === 'folder'
+                        ? `loadFolder(${item.id}, '${item.name}')`
+                        : `downloadFile(${item.id}, '${item.name}')`;
 
                     html += `
                         <div class="file-item border-bottom" style="padding: 12px 15px; border-bottom: 1px solid #30363d; cursor: pointer;" onclick="${clickAction}">
                             <i class="bi ${icon} file-icon"></i>
-                            <span class="file-name">${item.resource_name}</span>
-                            <span class="file-size">Shared by ${item.owner_name}</span>
+                            <span class="file-name">${item.name}</span>
+                            <span class="file-size">Shared by ${item.shared_by}</span>
                         </div>
                     `;
                 });
