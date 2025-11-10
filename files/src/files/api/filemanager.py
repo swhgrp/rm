@@ -42,10 +42,6 @@ def get_user_folder_path(user_id: int, folder_path: str = "") -> Path:
 
 def has_folder_permission(db: Session, user: User, folder: Folder, permission: str = "read") -> bool:
     """Check if user has permission on folder"""
-    # Admin has all permissions
-    if user.is_admin:
-        return True
-
     # Owner has all permissions
     if folder.owner_id == user.id:
         return True
@@ -54,7 +50,7 @@ def has_folder_permission(db: Session, user: User, folder: Folder, permission: s
     if folder.is_public and permission == "read":
         return True
 
-    # Check explicit permissions
+    # Check explicit permissions via folder_permissions table
     perm = db.query(folder_permissions).filter(
         folder_permissions.c.folder_id == folder.id,
         folder_permissions.c.user_id == user.id
@@ -66,6 +62,21 @@ def has_folder_permission(db: Session, user: User, folder: Folder, permission: s
         if permission == "write" and perm.can_write:
             return True
         if permission == "delete" and perm.can_delete:
+            return True
+
+    # Check if user has access via internal sharing
+    share = db.query(InternalShare).filter(
+        InternalShare.folder_id == folder.id,
+        InternalShare.shared_with_user_id == user.id,
+        InternalShare.is_active == True
+    ).first()
+
+    if share:
+        if permission == "read" and share.can_view:
+            return True
+        if permission == "write" and (share.can_upload or share.can_edit):
+            return True
+        if permission == "delete" and share.can_delete:
             return True
 
     return False
@@ -555,8 +566,8 @@ async def grant_folder_permission(
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found")
     
-    # Only owner or admin can grant permissions
-    if folder.owner_id != current_user.id and not current_user.is_admin:
+    # Only owner can grant permissions
+    if folder.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Only folder owner can grant permissions")
     
     target_user = db.query(User).filter(User.id == user_id).first()
@@ -1090,20 +1101,25 @@ async def get_dashboard(
 
     shared_items = []
     for share in shared_with_me:
-        if share.resource_type.value == "folder" and share.folder:
+        # Get resource_type as string (handle both enum and string cases)
+        resource_type = share.resource_type.value if hasattr(share.resource_type, 'value') else str(share.resource_type)
+
+        if resource_type == "folder" and share.folder:
             shared_items.append({
                 "id": share.folder.id,
                 "name": share.folder.name,
                 "type": "folder",
+                "path": share.folder.path,
                 "shared_by": share.sharer.full_name if share.sharer else "Unknown",
                 "shared_at": share.shared_at.isoformat() if share.shared_at else None
             })
-        elif share.resource_type.value == "file" and share.file:
+        elif resource_type == "file" and share.file:
             shared_items.append({
                 "id": share.file.id,
                 "name": share.file.name,
                 "type": "file",
                 "size": share.file.size,
+                "folder_path": share.file.folder.path if share.file.folder else "/",
                 "shared_by": share.sharer.full_name if share.sharer else "Unknown",
                 "shared_at": share.shared_at.isoformat() if share.shared_at else None
             })
