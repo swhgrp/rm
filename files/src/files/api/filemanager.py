@@ -41,49 +41,60 @@ def get_user_folder_path(user_id: int, folder_path: str = "") -> Path:
 
 
 def has_folder_permission(db: Session, user: User, folder: Folder, permission: str = "read") -> bool:
-    """Check if user has permission on folder"""
-    # Owner has all permissions
-    if folder.owner_id == user.id:
-        return True
+    """Check if user has permission on folder
 
-    # Check if folder is public and permission is read
-    if folder.is_public and permission == "read":
-        return True
+    Checks permissions recursively up the folder tree:
+    1. Direct ownership
+    2. Public folder (read-only)
+    3. Explicit folder_permissions table entry
+    4. Internal share on this folder or any parent folder
+    """
+    current_folder = folder
 
-    # Check explicit permissions via folder_permissions table
-    perm = db.query(folder_permissions).filter(
-        folder_permissions.c.folder_id == folder.id,
-        folder_permissions.c.user_id == user.id
-    ).first()
-
-    if perm:
-        if permission == "read" and perm.can_read:
-            return True
-        if permission == "write" and perm.can_write:
-            return True
-        if permission == "delete" and perm.can_delete:
+    # Walk up the folder tree checking permissions at each level
+    while current_folder:
+        # Owner has all permissions
+        if current_folder.owner_id == user.id:
             return True
 
-    # Check if user has access via internal sharing (direct share on this folder)
-    share = db.query(InternalShare).filter(
-        InternalShare.folder_id == folder.id,
-        InternalShare.shared_with_user_id == user.id,
-        InternalShare.is_active == True
-    ).first()
-
-    if share:
-        if permission == "read" and share.can_view:
-            return True
-        if permission == "write" and (share.can_upload or share.can_edit):
-            return True
-        if permission == "delete" and share.can_delete:
+        # Check if folder is public and permission is read
+        if current_folder.is_public and permission == "read":
             return True
 
-    # Check parent folder permissions (inherit from parent if parent is shared)
-    if folder.parent_id:
-        parent_folder = db.query(Folder).filter(Folder.id == folder.parent_id).first()
-        if parent_folder:
-            return has_folder_permission(db, user, parent_folder, permission)
+        # Check explicit permissions via folder_permissions table
+        perm = db.query(folder_permissions).filter(
+            folder_permissions.c.folder_id == current_folder.id,
+            folder_permissions.c.user_id == user.id
+        ).first()
+
+        if perm:
+            if permission == "read" and perm.can_read:
+                return True
+            if permission == "write" and perm.can_write:
+                return True
+            if permission == "delete" and perm.can_delete:
+                return True
+
+        # Check if user has access via internal sharing
+        share = db.query(InternalShare).filter(
+            InternalShare.folder_id == current_folder.id,
+            InternalShare.shared_with_user_id == user.id,
+            InternalShare.is_active == True
+        ).first()
+
+        if share:
+            if permission == "read" and share.can_view:
+                return True
+            if permission == "write" and (share.can_upload or share.can_edit):
+                return True
+            if permission == "delete" and share.can_delete:
+                return True
+
+        # Move to parent folder
+        if current_folder.parent_id:
+            current_folder = db.query(Folder).filter(Folder.id == current_folder.parent_id).first()
+        else:
+            break
 
     return False
 

@@ -2930,6 +2930,9 @@
                 });
 
                 fileList.innerHTML = html;
+
+                // Update URL to remember this view
+                window.history.pushState({view: 'shared-with-me'}, '', '/files/?view=shared-with-me');
             } catch (error) {
                 console.error('Error loading shared items:', error);
                 showError('Failed to load shared items');
@@ -3044,7 +3047,21 @@
         async function restoreFromURL() {
             const urlParams = new URLSearchParams(window.location.search);
             const folderId = urlParams.get('folder');
+            const view = urlParams.get('view');
 
+            // Check for special views first
+            if (view === 'shared-with-me') {
+                loadSharedWithMe();
+                return;
+            } else if (view === 'shared-by-me') {
+                loadSharedByMe();
+                return;
+            } else if (view === 'my-files') {
+                loadMyFiles();
+                return;
+            }
+
+            // Handle folder navigation
             if (folderId) {
                 try {
                     // Load the folder without pushing to stack
