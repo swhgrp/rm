@@ -61,13 +61,6 @@ The Portal is the central authentication and navigation hub for the SW Hospitali
 - [x] Dark theme matching other systems
 - [x] Mobile-responsive design
 
-**Mail System Integration:** ✅ NEW
-- [x] **Mail gateway proxy to SOGo webmail** (transparent SSO)
-- [x] **Mailbox provisioning via Mailcow API**
-- [x] Mail system authentication (X-Mail-User header)
-- [x] Admin-only mail administration
-- [x] Automatic mailbox creation for HR users
-
 **System Monitoring:** ✅ NEW
 - [x] **Real-time monitoring dashboard** (admin-only)
 - [x] 7 microservices health status
@@ -127,8 +120,6 @@ class User:
     can_access_events: bool
     can_access_integration_hub: bool
     can_access_files: bool
-    can_access_mail: bool  # NEW - Mail system access
-
     # System-specific roles
     accounting_role_id: int (nullable)
 ```
@@ -212,34 +203,6 @@ class User:
 - Enforces 8+ character minimum
 - **Automatically syncs password to Inventory and Accounting systems**
 - Returns: Sync status for each system
-
-### Mail System Integration
-
-**GET /mail-gateway/**
-- Root mail gateway proxy
-- Redirects to SOGo webmail with SSO
-
-**API /mail-gateway/{path:path}**
-- Generic proxy to SOGo webmail
-- Supports GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
-- Transparent SSO authentication
-- Requires `can_access_mail` permission
-
-**GET /api/auth/verify**
-- Verify mail authentication
-- Returns `X-Mail-User` header for SOGo
-- Checks `can_access_mail` permission
-
-**GET /api/auth/verify-admin**
-- Verify admin mail access
-- Admin-only endpoint
-
-**POST /api/admin/mail/provision-users**
-- **Provision mailboxes for all HR users**
-- Integrates with Mailcow API at mail.swhgrp.com
-- Creates mailbox if doesn't exist
-- Returns: `{"total": X, "created": Y, "existing": Z, "failed": [...], "results": [...]}`
-- Admin only
 
 ### System Monitoring
 
@@ -399,29 +362,22 @@ jinja2==3.1.2
 
 **Security Warnings:** ⚠️
 
-1. **Mail System - Temporary Password Generation (Line 767)**
-   - Uses truncated password hash as temp mailbox password
-   - **ISSUE:** May expose part of password hash
-   - **RECOMMENDATION:** Use random generated temp password instead
-
-2. **Debug Endpoint (Line 283)**
+1. **Debug Endpoint (Line 283)**
    - `/debug` endpoint has no authentication
    - Returns all user attributes as JSON
    - **ISSUE:** Potential information disclosure
    - **RECOMMENDATION:** Remove or add authentication
 
-3. **SSL Verification Disabled (Lines 731-734)**
+2. **SSL Verification Disabled (Lines 731-734)**
    - SSL verification disabled for internal Docker requests
    - Acceptable for Docker internal network
    - Documented here for transparency
 
-4. **Missing Rate Limiting**
-   - No rate limiting on mail provisioning endpoints
+3. **Missing Rate Limiting**
    - No rate limiting on login endpoint
    - **RECOMMENDATION:** Add rate limiting
 
-5. **Missing Audit Logging**
-   - Mail operations not logged
+4. **Missing Audit Logging**
    - Profile changes not logged
    - Password changes not fully audited
    - **RECOMMENDATION:** Add comprehensive audit trail

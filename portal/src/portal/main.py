@@ -114,7 +114,6 @@ class User(Base):
     can_access_hr = Column(Boolean, default=True)
     can_access_events = Column(Boolean, default=True)
     can_access_files = Column(Boolean, default=True)
-    can_access_mail = Column(Boolean, default=True)
     accounting_role_id = Column(Integer, nullable=True)
 
 
@@ -248,15 +247,6 @@ async def home(request: Request, db: Session = Depends(get_db)):
             "url": "/files/",
             "icon": "📁",
             "system_key": "files"
-        })
-
-    if user.can_access_mail:
-        systems.append({
-            "name": "Mail",
-            "description": "Email and webmail access",
-            "url": "/mail/",
-            "icon": "📧",
-            "system_key": "mail"
         })
 
     # Admin-only: Monitoring Dashboard
@@ -452,7 +442,6 @@ async def update_user_permissions(
         user.can_access_hr = form_data.get("can_access_hr") == "on"
         user.can_access_events = form_data.get("can_access_events") == "on"
         user.can_access_files = form_data.get("can_access_files") == "on"
-        user.can_access_mail = form_data.get("can_access_mail") == "on"
     else:
         # Admins get full access to everything
         user.can_access_portal = True
@@ -462,7 +451,6 @@ async def update_user_permissions(
         user.can_access_hr = True
         user.can_access_events = True
         user.can_access_files = True
-        user.can_access_mail = True
 
     # Update accounting role if provided
     accounting_role = form_data.get("accounting_role_id")
@@ -493,8 +481,6 @@ async def generate_system_token(
         raise HTTPException(status_code=403, detail="No access to Events system")
     elif system == "files" and not user.can_access_files:
         raise HTTPException(status_code=403, detail="No access to Files system")
-    elif system == "mail" and not user.can_access_mail:
-        raise HTTPException(status_code=403, detail="No access to Mail system")
 
     # Create a short-lived token (5 minutes) for system authentication
     token_data = {
@@ -674,268 +660,10 @@ async def sync_password_to_systems(username: str, hashed_password: str):
     return results
 
 
-@app.get("/api/auth/verify")
-async def verify_auth(request: Request, db: Session = Depends(get_db)):
-    """Verify portal session for nginx auth_request (Mail module)"""
-    user = get_current_user(request, db)
-    if not user:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-
-    # Check mail access permission
-    if not user.can_access_mail:
-        raise HTTPException(status_code=403, detail="No access to Mail system")
-
-    # Return user email for SOGo SSO
-    response = JSONResponse({"authenticated": True, "username": user.username})
-    # Provide email for SOGo remote user header
-    email = user.email if user.email else f"{user.username}@swhgrp.com"
-    response.headers["X-Mail-User"] = email
-    return response
-
-
-@app.get("/api/auth/verify-admin")
-async def verify_admin(request: Request, db: Session = Depends(get_db)):
-    """Verify portal admin session (Mail admin interface)"""
-    user = get_current_user(request, db)
-    if not user or not user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return {"authenticated": True, "username": user.username}
-
-
-@app.post("/api/admin/mail/provision-users")
-async def provision_mail_users(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    """Provision mailboxes for all HR users (admin only)"""
-    user = get_current_user(request, db)
-    if not user or not user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
-
-    from portal.config import MAILCOW_API_URL, MAILCOW_API_KEY, MAIL_DOMAIN
-    import ssl
-
-    if not MAILCOW_API_KEY:
-        raise HTTPException(status_code=500, detail="Mailcow API key not configured")
-
-    # Get all active users from HR database
-    users = db.query(User).filter(User.is_active == True).all()
-
-    results = {
-        "total_users": len(users),
-        "provisioned": [],
-        "already_exists": [],
-        "failed": []
-    }
-
-    # Create SSL context that doesn't verify (for internal docker communication)
-    ssl_context = ssl.create_default_context()
-    ssl_context.check_hostname = False
-    ssl_context.verify_mode = ssl.CERT_NONE
-
-    async with httpx.AsyncClient(verify=False, timeout=30.0) as client:
-        for usr in users:
-            email = usr.email if usr.email else f"{usr.username}@{MAIL_DOMAIN}"
-            local_part = email.split('@')[0]
-
-            # Check if mailbox already exists
-            try:
-                check_response = await client.get(
-                    f"{MAILCOW_API_URL}/api/v1/get/mailbox/{email}",
-                    headers={"X-API-Key": MAILCOW_API_KEY}
-                )
-
-                if check_response.status_code == 200:
-                    results["already_exists"].append({
-                        "username": usr.username,
-                        "email": email
-                    })
-                    continue
-            except Exception as e:
-                logger.warning(f"Error checking mailbox {email}: {str(e)}")
-
-            # Create mailbox
-            try:
-                create_response = await client.post(
-                    f"{MAILCOW_API_URL}/api/v1/add/mailbox",
-                    headers={"X-API-Key": MAILCOW_API_KEY},
-                    json={
-                        "local_part": local_part,
-                        "domain": MAIL_DOMAIN,
-                        "name": usr.full_name or usr.username,
-                        "quota": 5120,  # 5GB quota
-                        "password": usr.hashed_password[:16],  # Use part of hash as temp password
-                        "password2": usr.hashed_password[:16],
-                        "active": "1"
-                    }
-                )
-
-                if create_response.status_code in [200, 201]:
-                    response_data = create_response.json()
-                    if isinstance(response_data, list) and response_data:
-                        if response_data[0].get("type") == "success":
-                            results["provisioned"].append({
-                                "username": usr.username,
-                                "email": email,
-                                "full_name": usr.full_name
-                            })
-                            logger.info(f"Provisioned mailbox for {email}")
-                        else:
-                            results["failed"].append({
-                                "username": usr.username,
-                                "email": email,
-                                "error": response_data[0].get("msg", "Unknown error")
-                            })
-                    else:
-                        results["failed"].append({
-                            "username": usr.username,
-                            "email": email,
-                            "error": f"Unexpected response format"
-                        })
-                else:
-                    results["failed"].append({
-                        "username": usr.username,
-                        "email": email,
-                        "error": f"HTTP {create_response.status_code}"
-                    })
-
-            except Exception as e:
-                results["failed"].append({
-                    "username": usr.username,
-                    "email": email,
-                    "error": str(e)
-                })
-                logger.error(f"Failed to provision {email}: {str(e)}")
-
-    return results
-
-
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
     return {"status": "healthy", "service": "portal"}
-
-
-# Mail Gateway - Proxy to SOGo with SSO
-@app.get("/mail-gateway/")
-async def mail_gateway_root(request: Request, db: Session = Depends(get_db)):
-    """Redirect root mail-gateway to SOGo"""
-    # Debug logging
-    print(f"===== MAIL GATEWAY DEBUG =====", flush=True)
-    print(f"Cookies: {request.cookies}", flush=True)
-    print(f"Cookie header: {request.headers.get('cookie', 'NONE')}", flush=True)
-    print(f"All headers: {dict(request.headers)}", flush=True)
-    print(f"==============================", flush=True)
-
-    # Get current user
-    user = get_current_user(request, db)
-    if not user:
-        print("No user found, redirecting to login", flush=True)
-        return RedirectResponse(url="/portal/login", status_code=303)
-
-    if not user.can_access_mail:
-        raise HTTPException(status_code=403, detail="No access to Mail system")
-
-    # Redirect to mail gateway with empty path (will proxy to SOGo root)
-    return await mail_gateway("", request, db)
-
-
-@app.api_route("/mail-gateway/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
-async def mail_gateway(path: str, request: Request, db: Session = Depends(get_db)):
-    """Proxy requests to SOGo with SSO authentication header"""
-    import httpx
-
-    # Get current user
-    user = get_current_user(request, db)
-    if not user:
-        return RedirectResponse(url="/portal/login", status_code=303)
-
-    if not user.can_access_mail:
-        raise HTTPException(status_code=403, detail="No access to Mail system")
-
-    # Get user email
-    email = user.email if user.email else f"{user.username}@swhgrp.com"
-
-    # Prepare headers for SOGo
-    headers = dict(request.headers)
-    headers["X-Webobjects-Remote-User"] = email
-
-    # Remove problematic headers
-    headers.pop("content-length", None)
-    headers.pop("transfer-encoding", None)
-    headers.pop("host", None)  # Remove existing host header to avoid duplicates
-
-    # Set SOGo host header
-    headers["host"] = "rm.swhgrp.com"
-
-    # Build SOGo URL - handle empty path
-    if path:
-        sogo_url = f"http://mail-sogo-mailcow-1:20000/SOGo/{path}"
-    else:
-        sogo_url = "http://mail-sogo-mailcow-1:20000/SOGo/"
-
-    if request.url.query:
-        sogo_url += f"?{request.url.query}"
-
-    # Proxy the request
-    async with httpx.AsyncClient(timeout=300.0) as client:
-        try:
-            response = await client.request(
-                method=request.method,
-                url=sogo_url,
-                headers=headers,
-                content=await request.body() if request.method in ["POST", "PUT", "PATCH"] else None,
-                follow_redirects=False
-            )
-
-            print(f"SOGo response status: {response.status_code}", flush=True)
-            print(f"SOGo response headers: {dict(response.headers)}", flush=True)
-
-            # Handle redirects from SOGo
-            if response.status_code in [301, 302, 303, 307, 308]:
-                location = response.headers.get("location", "")
-                print(f"SOGo redirect location: {location}", flush=True)
-
-                # Rewrite SOGo paths to go through mail gateway
-                # Use string replacement to handle all /SOGo/ paths correctly
-                if location.startswith("http://") or location.startswith("https://"):
-                    # Parse absolute URLs and rewrite the path
-                    from urllib.parse import urlparse, urlunparse
-                    parsed = urlparse(location)
-                    if parsed.path.startswith("/SOGo/"):
-                        # Replace /SOGo/ with /mail/ in the path
-                        new_path = "/mail/" + parsed.path[6:]
-                        # Return just the path (relative redirect)
-                        location = new_path + ("?" + parsed.query if parsed.query else "")
-                        print(f"Rewritten location (absolute → relative): {location}", flush=True)
-                elif location.startswith("/SOGo/"):
-                    # Relative URL - just replace /SOGo/ with /mail/
-                    location = "/mail/" + location[6:]
-                    print(f"Rewritten location (relative): {location}", flush=True)
-
-                return RedirectResponse(url=location, status_code=response.status_code)
-
-            # Return the response
-            response_headers = dict(response.headers)
-            # Remove headers that FastAPI will recalculate
-            response_headers.pop("transfer-encoding", None)
-            response_headers.pop("content-length", None)
-
-            # httpx automatically decompresses gzip content, but leaves the content-encoding header
-            # Remove it to prevent browser from trying to decompress again
-            if response.headers.get("content-encoding") == "gzip":
-                response_headers.pop("content-encoding", None)
-                print(f"Removed gzip encoding header (httpx already decompressed)", flush=True)
-
-            return Response(
-                content=response.content,
-                status_code=response.status_code,
-                headers=response_headers,
-                media_type=response.headers.get("content-type")
-            )
-        except Exception as e:
-            logger.error(f"Mail gateway error: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"Mail gateway error: {str(e)}")
 
 
 # Monitoring Dashboard Routes

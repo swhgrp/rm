@@ -233,17 +233,17 @@ restaurant-system/
 ## 📦 System Components
 
 ### 1. Portal System ✅ **99%+ Complete - Fully Documented (Nov 9, 2025)** 🌟
-**Central authentication, mail gateway, and system monitoring hub**
+**Central authentication and system monitoring hub**
 
 - **URL:** https://rm.swhgrp.com/portal/
-- **Purpose:** JWT-based SSO, mail integration, and infrastructure monitoring
+- **Purpose:** JWT-based SSO and infrastructure monitoring
 - **Technology:** FastAPI (Python), PostgreSQL
 - **Files:** 3 Python files, 5 templates (all features now documented)
 
 **Core Authentication:**
 - ✅ JWT token authentication with secure HTTP-only cookies
 - ✅ Session management (30-min timeout with auto-refresh)
-- ✅ Permission-based system access control (7 systems + mail)
+- ✅ Permission-based system access control (7 systems)
 - ✅ Admin user management interface
 - ✅ Single sign-on (SSO) token generation (5-min tokens)
 - ✅ Cross-system password synchronization
@@ -253,14 +253,6 @@ restaurant-system/
 - ✅ Password change system with cross-system sync
 - ✅ Password complexity enforcement (8+ characters minimum)
 - ✅ Session auto-refresh (extends when <10 min remaining)
-
-**Mail System Integration:** ✅ **NEW - Fully Documented (Nov 9)**
-- ✅ Mail gateway proxy to SOGo webmail (transparent SSO)
-- ✅ Mailbox provisioning via Mailcow API
-- ✅ Mail system authentication (X-Mail-User header)
-- ✅ Admin-only mail administration
-- ✅ Automatic mailbox creation for HR users
-- ⚠️ Security note: Temp password generation needs review (see README)
 
 **System Monitoring Dashboard:** ✅ **Fully Documented**
 - ✅ Real-time infrastructure monitoring (admin-only)
@@ -1161,7 +1153,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 | System | Status | Python Files | Templates | Models | Completion | Notes |
 |--------|--------|--------------|-----------|--------|------------|-------|
-| Portal | ✅ Production | 3 | 5 | 1 | 99%+ | ✅ **Fully documented (Nov 9)** - Mail system, monitoring, password sync |
+| Portal | ✅ Production | 3 | 5 | 1 | 99%+ | ✅ **Fully documented (Nov 9)** - Monitoring, password sync |
 | Inventory | ✅ Production | 101 | 27 | 25+ | **100%+** 🌟 | ✅ README updated (Nov 3) - AI invoices, POS, recipes fully documented |
 | HR | ✅ Production | 53 | 13 | 12 | **100%** ✅ | Email notifications, admin delete, doc security (Nov 3) |
 | Accounting | ⚠️ Active | 140 | 37 | 60+ | ~75% | ✅ **Framework corrected (Nov 9)** - FastAPI documented |
@@ -1194,7 +1186,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ### November 9, 2025 - Complete Documentation Audit & Updates 📚 **CRITICAL FIXES**
 - ✅ **Comprehensive codebase analysis** - 57 undocumented features identified
-- ✅ **Portal README fully updated** - Mail system, monitoring, password sync documented
+- ✅ **Portal README fully updated** - Monitoring, password sync documented
 - ✅ **Accounting framework corrected** - Fixed critical Django/FastAPI error
 - ✅ **Security warnings added** - Portal temp password generation, debug endpoint
 - ✅ **4 analysis reports generated** (49KB total documentation):
