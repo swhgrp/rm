@@ -326,7 +326,7 @@ async function loadCOGSReport() {
     const locationId = document.getElementById('globalLocation').value;
 
     if (!startDate || !endDate) {
-        alert('Please select start and end dates');
+        showAlert('Please select start and end dates', 'warning');
         return;
     }
 

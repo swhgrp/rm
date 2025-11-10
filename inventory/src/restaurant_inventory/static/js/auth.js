@@ -65,7 +65,21 @@ async function apiRequest(url, options = {}) {
         throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    return response.json();
+    // Check if response is actually JSON before trying to parse it
+    // This handles cases where server redirects to login page (HTML) with 200 status
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+        return response.json();
+    } else {
+        // Response is not JSON (likely HTML from a redirect to login page)
+        console.warn('Non-JSON response received, likely redirected to login. Clearing auth and redirecting...');
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('user_name');
+        localStorage.removeItem('user_role');
+        window.location.href = '/login';
+        return null;
+    }
 }
 
 // Update navigation based on auth status

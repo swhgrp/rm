@@ -851,7 +851,7 @@ function showSessionInfo() {
         ${currentSession.completed_at ? 'Completed: ' + new Date(currentSession.completed_at).toLocaleString() : ''}
         ${currentSession.approved_at ? 'Approved: ' + new Date(currentSession.approved_at).toLocaleString() : ''}
     `;
-    alert(info);
+    showAlert(info.replace(/\n/g, '<br>'), 'info');
 }
 
 // Initialize on page load

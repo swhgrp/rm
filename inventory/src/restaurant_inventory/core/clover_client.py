@@ -277,44 +277,47 @@ def parse_clover_order(clover_order: Dict) -> Dict[str, Any]:
         Parsed order data ready for database insertion
     """
     # Convert Clover timestamp (milliseconds) to datetime
-    order_date = datetime.fromtimestamp(clover_order.get("createdTime", 0) / 1000)
+    # Use clientCreatedTime (when order was placed) which matches the accounting system
+    order_date = datetime.fromtimestamp(clover_order.get("clientCreatedTime", clover_order.get("createdTime", 0)) / 1000)
 
     # Parse amounts (Clover uses cents, convert to dollars)
     # NOTE: Clover's order.total INCLUDES tax but NOT tip
     order_total = float(clover_order.get("total", 0)) / 100
 
-    # Extract tax, tip, and discounts from payments (if available)
+    # Extract tax and tip from payments (only count once from first successful payment)
+    # This matches the accounting system approach
     tax = 0
     tip = 0
     total_paid = 0
-    discount = 0
 
     if clover_order.get("payments") and clover_order["payments"].get("elements"):
         for payment in clover_order["payments"]["elements"]:
-            # Skip refunded/voided payments
+            # Only process successful payments
             if payment.get("result") == "SUCCESS":
                 # Sum up all successful payments
-                total_paid += float(payment.get("amount", 0)) / 100
-                tax += float(payment.get("taxAmount", 0)) / 100 if payment.get("taxAmount") else 0
-                tip += float(payment.get("tipAmount", 0)) / 100 if payment.get("tipAmount") else 0
+                payment_amount = float(payment.get("amount", 0)) / 100
+                total_paid += payment_amount
 
-                # Check for cashDiscount (this is the discount amount)
-                if payment.get("cashDiscountAmount"):
-                    discount += float(payment.get("cashDiscountAmount", 0)) / 100
+                # Get tax and tip from first payment only (they're order-level, not payment-level)
+                if tax == 0:
+                    tax = float(payment.get("taxAmount", 0) or 0) / 100
+                if tip == 0:
+                    tip = float(payment.get("tipAmount", 0) or 0) / 100
 
     # Use total_paid if available (actual amount paid), otherwise use order total
     total = total_paid if total_paid > 0 else order_total
 
-    # If no payments yet, check order-level discount
-    if discount == 0 and clover_order.get("discounts") and clover_order["discounts"].get("elements"):
-        for disc in clover_order["discounts"]["elements"]:
-            discount += float(disc.get("amount", 0)) / 100
+    # Calculate subtotal using the accounting system's proven approach:
+    # net_sales = order_total - tax (this is the NET amount after discounts but before tax)
+    # This is what Clover reports as the actual sales amount
+    subtotal = order_total - tax
 
-    # Calculate subtotal (pre-tax sales before discounts)
-    # Clover's order.total = subtotal + tax + discount (discount is negative)
-    # Therefore: subtotal = order.total - tax - discount
-    # Since discount is negative (e.g., -$5), subtracting it adds it back
-    subtotal = order_total - tax - discount
+    # Track discounts separately for reference (not used in subtotal calculation)
+    # Discounts are already reflected in order_total
+    discount = 0
+    if clover_order.get("discounts") and clover_order["discounts"].get("elements"):
+        for disc in clover_order["discounts"]["elements"]:
+            discount += abs(float(disc.get("amount", 0)) / 100)  # Make positive for tracking
 
     # Parse order state
     state = clover_order.get("state", "").lower()
@@ -375,12 +378,16 @@ def parse_clover_line_items(clover_order: Dict) -> List[Dict[str, Any]]:
         if item.get("deleted"):
             continue
 
+        # Clover uses thousandths for quantities (unitQty: 1000 = 1 item, 500 = 0.5 items)
+        unit_qty = float(item.get("unitQty", 1000)) / 1000  # Convert to actual quantity
+        unit_price = float(item.get("price", 0)) / 100  # Convert cents to dollars
+
         parsed_item = {
             "pos_item_id": item.get("item", {}).get("id") if item.get("item") else None,
             "item_name": item.get("name", "Unknown Item"),
-            "quantity": float(item.get("unitQty", 1)),  # Clover quantity is already in units
-            "unit_price": float(item.get("price", 0)) / 100,  # Convert cents to dollars
-            "total_price": (float(item.get("price", 0)) / 100) * float(item.get("unitQty", 1)),
+            "quantity": unit_qty,
+            "unit_price": unit_price,
+            "total_price": unit_price * unit_qty,
             "notes": item.get("note")
         }
 

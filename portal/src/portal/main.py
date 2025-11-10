@@ -254,7 +254,7 @@ async def home(request: Request, db: Session = Depends(get_db)):
         systems.append({
             "name": "Mail",
             "description": "Email and webmail access",
-            "url": "https://mail.swhgrp.com/SOGo/",
+            "url": "/mail/",
             "icon": "📧",
             "system_key": "mail"
         })

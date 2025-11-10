@@ -816,7 +816,7 @@
                 clearTimeout(inactivityTimeout);
                 inactivityTimeout = setTimeout(function() {
                     // Log out the user
-                    alert('You have been logged out due to inactivity.');
+                    // Clear credentials first
                     localStorage.removeItem('access_token');
                     localStorage.removeItem('user_name');
                     localStorage.removeItem('user_role');

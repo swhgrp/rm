@@ -206,11 +206,12 @@ async def get_dashboard_analytics(
         POSSale, POSSaleItem.sale_id == POSSale.id
     ).filter(
         POSSale.order_date >= start_date,
-        POSSale.order_date <= end_date
+        POSSale.order_date < end_date,  # Exclude today (consistent with sales query)
+        POSSale.total > 0  # Exclude zero-dollar orders (voids, cancellations)
     )
 
-    if location_id:
-        top_items_query = top_items_query.filter(POSSale.location_id == location_id)
+    # Apply location filter using the same function as sales query
+    top_items_query = apply_location_filter(top_items_query, POSSale)
 
     top_items_query = top_items_query.group_by(
         POSSaleItem.item_name

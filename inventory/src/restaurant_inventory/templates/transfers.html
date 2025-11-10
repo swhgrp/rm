@@ -390,7 +390,7 @@ Created: ${new Date(transfer.created_at).toLocaleString()}
 ${transfer.notes ? '\nNotes: ' + transfer.notes : ''}
     `.trim();
 
-    alert(details);
+    showAlert(details.replace(/\n/g, '<br>'), 'info');
 }
 
 async function approveTransfer(transferId) {

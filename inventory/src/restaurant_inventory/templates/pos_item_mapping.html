@@ -673,7 +673,7 @@ async function saveMapping() {
         const mappingType = document.getElementById('mappingType').value;
 
         if (!mappingType) {
-            alert('Please select a mapping type');
+            showAlert('Please select a mapping type', 'warning');
             return;
         }
 
@@ -689,7 +689,7 @@ async function saveMapping() {
         if (mappingType === 'master_item') {
             const masterItemId = document.getElementById('masterItemId').value;
             if (!masterItemId) {
-                alert('Please select an inventory item');
+                showAlert('Please select an inventory item', 'warning');
                 return;
             }
             mappingData.master_item_id = parseInt(masterItemId);
@@ -697,7 +697,7 @@ async function saveMapping() {
         } else if (mappingType === 'recipe') {
             const recipeId = document.getElementById('recipeId').value;
             if (!recipeId) {
-                alert('Please select a recipe');
+                showAlert('Please select a recipe', 'warning');
                 return;
             }
             mappingData.recipe_id = parseInt(recipeId);

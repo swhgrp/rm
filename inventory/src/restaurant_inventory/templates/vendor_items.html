@@ -303,8 +303,41 @@
 
     // Initialize page
     document.addEventListener('DOMContentLoaded', async function() {
+        await loadFilterDropdowns();
         await loadVendorItems();
     });
+
+    // Load only the filter dropdowns (not modal dropdowns)
+    async function loadFilterDropdowns() {
+        try {
+            // Load vendors for filter
+            const vendorsResp = await apiRequest('api/vendors/');
+            const vendorFilter = document.getElementById('vendorItemFilterVendor');
+
+            if (vendorFilter && Array.isArray(vendorsResp)) {
+                vendorFilter.innerHTML = '<option value="">All Vendors</option>';
+                vendorsResp.sort((a, b) => a.name.localeCompare(b.name));
+                vendorsResp.forEach(v => {
+                    vendorFilter.innerHTML += `<option value="${v.id}">${v.name}</option>`;
+                });
+            }
+
+            // Load master items for filter
+            const itemsResp = await apiRequest('api/items/');
+            const itemFilter = document.getElementById('vendorItemFilterMaster');
+
+            if (itemFilter && Array.isArray(itemsResp)) {
+                itemFilter.innerHTML = '<option value="">All Master Items</option>';
+                itemsResp.sort((a, b) => a.name.localeCompare(b.name));
+                itemsResp.forEach(item => {
+                    itemFilter.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+                });
+            }
+        } catch (error) {
+            console.error('Error loading filter dropdowns:', error);
+            // Don't show alert - filters are optional
+        }
+    }
 
     // Note: apiRequest is provided by auth.js globally
 

@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** November 8, 2025 (Evening)
+**Last Updated:** November 9, 2025
 **System Status:** Production (85% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -9,7 +9,25 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Last Session - Nov 8, 2025)
+### Most Recent Work (Last Session - Nov 9, 2025)
+
+**SYSTEM CLEANUP:** Cleaned up /opt/restaurant-system (Nov 9, 2025) 🧹
+   1. **Python cache cleanup** - Removed all compiled bytecode
+      - Deleted 47 `__pycache__` directories
+      - Deleted 357 `.pyc` files
+      - Safe operation (automatically regenerated on run)
+   2. **Test file cleanup** - Removed test files and directories
+      - Deleted `/opt/restaurant-system/events/src/events/static/test.txt`
+      - Deleted `/opt/restaurant-system/files/storage/user_2/Test/` directory
+      - Removed test PDFs and text files
+   3. **Space savings** - Freed ~4MB of disk space
+      - Before: 238M
+      - After: 234M
+   4. **HR documents** - New employee documents added (untracked, normal operation)
+   5. **Inventory updates** - Various template and API improvements
+   - **Status:** Repository cleaned, ready for commit ✅
+
+### Previous Work (Nov 8, 2025)
 
 **BUG FIXES:** Fixed critical issues preventing Events system from working (Nov 8, 2025) 🐛
    1. **EmailResponse schema export** - Added to `schemas/__init__.py` exports (commit `7818e2d`)
@@ -284,28 +302,26 @@
    - PDF deduplication (SHA-256 hashing)
    - Committed: 63afd14, 9f0e5c7
 
-### Git Status - All Synced ✅
+### Git Status - Pending Commit
 
 ```bash
 # Branch: main
-# Status: Clean - All changes committed and pushed
-# Last push: November 8, 2025
-# Latest commits (Nov 8):
-#   - 9f1d6ff - docs: Update main README with Integration Hub improvements (v2.7) - PUSHED ✅
-#   - a274316 - docs(integration-hub): Update README with Nov 4-8 improvements - PUSHED ✅
-#   - 7d1cc9a - feat(integration-hub): Major mapping workflow improvements - PUSHED ✅
-# Previous commits (Nov 4-8):
-#   - 7d94ccf - fix(events): correct tasks API endpoint - PUSHED ✅
-#   - ddc197c - docs: update claude.md with Nov 4 Events changes - PUSHED ✅
-#   - 6b984a4 - feat(events): venue-to-location migration - PUSHED ✅
-#   - abd4a3a - feat: vendor bill creation from Integration Hub - PUSHED ✅
-#   - 36767b3 - Integration Hub: PDF preview/download - PUSHED ✅
+# Status: Changes ready to commit
+# Last commit: November 9, 2025 - PENDING
+# Changes:
+#   - Deleted: events/src/events/static/test.txt
+#   - Deleted: files/storage/user_2/Test/9028442106.pdf
+#   - Modified: Multiple inventory template and API files
+#   - Modified: portal/src/portal/main.py
+#   - Modified: shared/nginx/conf.d/rm.swhgrp.com-http.conf
+#   - Modified: claude.md (this file)
 #
-# Untracked files:
-#   - integration-hub/uploads/ (58 invoice PDFs - correctly ignored by .gitignore)
+# Untracked files (normal operations, excluded from git):
+#   - integration-hub/uploads/ (59 invoice PDFs - correctly ignored by .gitignore)
+#   - hr/documents/ (new employee documents - correctly excluded)
 ```
 
-**Current Status:** ✅ All work committed and pushed to GitHub. Repository clean.
+**Current Status:** ⏳ Cleanup changes ready to commit and push to GitHub.
 
 ---
 

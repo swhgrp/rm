@@ -128,21 +128,27 @@ class POSSyncService:
             end_datetime = datetime.combine(end_date, datetime.max.time()) if end_date else None
 
             for order in orders:
-                order_time = datetime.fromtimestamp(order.get("createdTime", 0) / 1000)
-                payment_state = order.get("paymentState", "").upper()
+                # Use clientCreatedTime (when order was placed) instead of createdTime
+                # This matches the accounting system and is more accurate for date filtering
+                order_time = datetime.fromtimestamp(order.get("clientCreatedTime", order.get("createdTime", 0)) / 1000)
 
-                # Check if order is within date range and PAID
+                # Use state == LOCKED instead of paymentState == PAID
+                # LOCKED means the order is completed and locked from editing
+                # This matches the accounting system approach and captures all completed orders
+                state = order.get("state", "").upper()
+
+                # Check if order is within date range and LOCKED (completed)
                 in_range = True
                 if start_datetime and order_time < start_datetime:
                     in_range = False
                 if end_datetime and order_time > end_datetime:
                     in_range = False
 
-                if in_range and payment_state == "PAID":
+                if in_range and state == "LOCKED":
                     filtered_orders.append(order)
 
             orders = filtered_orders
-            logger.info(f"Filtered to {len(orders)} paid orders within date range")
+            logger.info(f"Filtered to {len(orders)} locked (completed) orders within date range")
 
             # Process each order
             for order in orders:
