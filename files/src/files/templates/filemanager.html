@@ -492,16 +492,25 @@
         @media (max-width: 768px) {
             /* Hide sidebar on mobile by default */
             .sidebar {
-            background-color: #161b22;
-            border-right: 1px solid #30363d;
-            min-height: calc(100vh - 56px);
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-        }
+                position: fixed;
+                left: -200px;
+                top: 0;
+                width: 200px;
+                height: 100vh;
+                background-color: #161b22;
+                border-right: 1px solid #30363d;
+                padding: 20px;
+                z-index: 1040;
+                transition: left 0.3s ease-in-out;
+            }
 
             .sidebar.show {
                 left: 0;
+            }
+
+            /* Main wrapper full width on mobile */
+            .main-wrapper {
+                margin-left: 0;
             }
 
             /* Mobile menu overlay */
@@ -868,12 +877,20 @@
         </ul>
     </div>
 
+    <!-- Mobile overlay -->
+    <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
+
     <!-- Main wrapper -->
     <div class="main-wrapper">
         <!-- Top navbar -->
         <div class="top-navbar">
-            <div class="page-title">
-                <i class="bi bi-folder2"></i> Files System
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button class="mobile-menu-btn" onclick="toggleMobileMenu()" aria-label="Toggle menu">
+                    <i class="bi bi-list" style="font-size: 24px;"></i>
+                </button>
+                <div class="page-title">
+                    <i class="bi bi-folder2"></i> Files System
+                </div>
             </div>
             <div class="user-info">
                 <span class="user-name">{{ user.full_name }}</span>

@@ -63,6 +63,46 @@
             color: #c9d1d9;
         }
 
+        /* Mobile responsive styles */
+        @media (max-width: 768px) {
+            .navbar {
+                padding: 10px 15px;
+            }
+
+            .navbar-brand h1 {
+                font-size: 16px;
+                gap: 8px;
+            }
+
+            .navbar-brand h1 i {
+                font-size: 18px;
+            }
+
+            .user-name {
+                display: none;
+            }
+
+            .navbar-user {
+                gap: 10px;
+            }
+
+            .btn-back {
+                padding: 6px 12px;
+                font-size: 13px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .navbar-brand h1 span {
+                display: none;
+            }
+
+            .btn-back {
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+        }
+
         .btn-back {
             padding: 8px 16px;
             background-color: #21262d;
@@ -95,7 +135,7 @@
 <body>
     <nav class="navbar">
         <div class="navbar-brand">
-            <h1><i class="bi bi-folder2"></i> Files System</h1>
+            <h1><i class="bi bi-folder2"></i> <span>Files System</span></h1>
         </div>
         <div class="navbar-user">
             <span class="user-name">{{ user.full_name }}</span>
