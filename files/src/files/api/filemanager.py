@@ -64,7 +64,7 @@ def has_folder_permission(db: Session, user: User, folder: Folder, permission: s
         if permission == "delete" and perm.can_delete:
             return True
 
-    # Check if user has access via internal sharing
+    # Check if user has access via internal sharing (direct share on this folder)
     share = db.query(InternalShare).filter(
         InternalShare.folder_id == folder.id,
         InternalShare.shared_with_user_id == user.id,
@@ -78,6 +78,12 @@ def has_folder_permission(db: Session, user: User, folder: Folder, permission: s
             return True
         if permission == "delete" and share.can_delete:
             return True
+
+    # Check parent folder permissions (inherit from parent if parent is shared)
+    if folder.parent_id:
+        parent_folder = db.query(Folder).filter(Folder.id == folder.parent_id).first()
+        if parent_folder:
+            return has_folder_permission(db, user, parent_folder, permission)
 
     return False
 
