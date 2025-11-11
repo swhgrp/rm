@@ -117,17 +117,21 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if invoice.sent_to_inventory %}
-                                <i class="bi bi-check-circle text-success"></i>
+                                {% if invoice.inventory_sync_at %}
+                                <i class="bi bi-check-circle-fill text-success" title="Sent to Inventory"></i>
+                                {% elif invoice.sent_to_inventory %}
+                                <i class="bi bi-dash-circle text-muted" title="Not applicable (no inventory items)"></i>
                                 {% else %}
-                                <i class="bi bi-x-circle text-muted"></i>
+                                <i class="bi bi-x-circle text-danger" title="Not sent"></i>
                                 {% endif %}
                             </td>
                             <td>
-                                {% if invoice.sent_to_accounting %}
-                                <i class="bi bi-check-circle text-success"></i>
+                                {% if invoice.accounting_sync_at %}
+                                <i class="bi bi-check-circle-fill text-success" title="Sent to Accounting"></i>
+                                {% elif invoice.sent_to_accounting %}
+                                <i class="bi bi-dash-circle text-muted" title="Not applicable"></i>
                                 {% else %}
-                                <i class="bi bi-x-circle text-muted"></i>
+                                <i class="bi bi-x-circle text-danger" title="Not sent"></i>
                                 {% endif %}
                             </td>
                             <td>

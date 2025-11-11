@@ -139,15 +139,20 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <strong>Inventory System:</strong>
-                        {% if invoice.sent_to_inventory %}
+                        {% if invoice.inventory_sync_at %}
                         <span class="text-success">
                             <i class="bi bi-check-circle-fill"></i> Sent
                         </span>
                         {% if invoice.inventory_invoice_id %}
                         <br><small class="text-muted">ID: {{ invoice.inventory_invoice_id }}</small>
                         {% endif %}
-                        {% else %}
+                        {% elif invoice.sent_to_inventory %}
                         <span class="text-muted">
+                            <i class="bi bi-dash-circle"></i> Not Applicable
+                        </span>
+                        <br><small class="text-muted">No inventory items to send</small>
+                        {% else %}
+                        <span class="text-danger">
                             <i class="bi bi-x-circle"></i> Not Sent
                         </span>
                         {% endif %}
@@ -155,15 +160,19 @@
 
                     <div class="mb-3">
                         <strong>Accounting System:</strong>
-                        {% if invoice.sent_to_accounting %}
+                        {% if invoice.accounting_sync_at %}
                         <span class="text-success">
                             <i class="bi bi-check-circle-fill"></i> Sent
                         </span>
                         {% if invoice.accounting_je_id %}
                         <br><small class="text-muted">JE ID: {{ invoice.accounting_je_id }}</small>
                         {% endif %}
-                        {% else %}
+                        {% elif invoice.sent_to_accounting %}
                         <span class="text-muted">
+                            <i class="bi bi-dash-circle"></i> Not Applicable
+                        </span>
+                        {% else %}
+                        <span class="text-danger">
                             <i class="bi bi-x-circle"></i> Not Sent
                         </span>
                         {% endif %}
