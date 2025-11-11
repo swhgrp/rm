@@ -11,7 +11,7 @@
 
 ### Most Recent Work (Current Session - Nov 11, 2025 - AFTERNOON)
 
-**INTEGRATION HUB: CRITICAL ACCOUNTING BUG FIX** (Nov 11, 2025) 🔥 **PRODUCTION CRITICAL**
+**INTEGRATION HUB: CRITICAL ACCOUNTING BUG FIX + UX IMPROVEMENT** (Nov 11, 2025) 🔥 **PRODUCTION CRITICAL**
 
 1. **Fixed AttributeError in accounting_sender.py** 🔥 **CRITICAL**
    - Line 226 was using `item.line_total` but field is `item.total_amount`
@@ -23,13 +23,29 @@
    - Cleared 16 affected invoices (all Cozzini Bros knife service)
    - Commit: 196dab7 - PUSHED ✅
 
-**Impact:** All vendor bill creation to Accounting was completely broken until this fix.
+2. **Three-State Sync Status Icons** ✅ **UX IMPROVEMENT**
+   - Changed confusing two-state icons to clear three-state system
+   - **Before:** Green ✅ = sent OR skipped (confusing!)
+   - **After:**
+     - ✅ Green check = Actually sent to system (has sync timestamp)
+     - ➖ Gray dash = Skipped/Not applicable (no items for that system)
+     - ❌ Red X = Not sent yet
+   - Updated both invoice list and detail pages
+   - Added tooltips for clarity
+   - Example: Cozzini invoices (knife service, GL-only) now show gray dash for Inventory
+   - Commit: 3c9a0c1 - PUSHED ✅
+
+**Impact:** All vendor bill creation to Accounting was completely broken until fix #1. Fix #2 eliminates user confusion about sync status.
 
 **Files Modified:**
 - integration-hub/src/integration_hub/services/accounting_sender.py (line 226)
+- integration-hub/src/integration_hub/templates/invoices.html (sync status icons)
+- integration-hub/src/integration_hub/templates/invoice_detail.html (sync status display)
 
 **Git Commits:**
 - 196dab7 - fix(integration-hub): Critical bug - use total_amount not line_total
+- 3c9a0c1 - feat(integration-hub): Improve sync status icons with three states
+- 39e00c7 - docs: Update claude.md with critical accounting bug fix
 - e556d55 - docs: Update claude.md with Nov 11 afternoon documentation cleanup session
 
 ---
