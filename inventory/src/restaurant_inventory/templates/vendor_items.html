@@ -552,10 +552,13 @@
         itemSelect.innerHTML = '<option value="">Select master item...</option>';
         itemFilter.innerHTML = '<option value="">All Master Items</option>';
 
-        if (Array.isArray(itemsResp)) {
+        // Handle both array response and {success, items} object response
+        const items = Array.isArray(itemsResp) ? itemsResp : (itemsResp.items || []);
+
+        if (items.length > 0) {
             // Sort master items alphabetically by name
-            itemsResp.sort((a, b) => a.name.localeCompare(b.name));
-            itemsResp.forEach(item => {
+            items.sort((a, b) => a.name.localeCompare(b.name));
+            items.forEach(item => {
                 itemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
                 itemFilter.innerHTML += `<option value="${item.id}">${item.name}</option>`;
             });
