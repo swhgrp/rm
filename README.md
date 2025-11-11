@@ -554,7 +554,7 @@ restaurant-system/
 
 - **URL:** https://rm.swhgrp.com/hub/
 - **Database:** hub_db (PostgreSQL 15) - 7+ models
-- **Technology:** **FastAPI**, SQLAlchemy, OpenAI GPT-4o-mini, APScheduler, PyPDF2, pdf2image
+- **Technology:** **FastAPI**, SQLAlchemy, OpenAI GPT-4o Vision, APScheduler, PyPDF2, pdf2image
 - **Files:** 30+ Python files, 9 templates (includes new mapped_items.html)
 
 **Critical Correction:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
@@ -573,7 +573,7 @@ restaurant-system/
 **🌟 Automated Invoice Intake Pipeline (Oct 31, 2025):**
 - ✅ **Email monitoring** - Automated IMAP email checking every 15 minutes
 - ✅ **PDF extraction** - Attachment capture with SHA-256 deduplication
-- ✅ **OpenAI parsing** - GPT-4o-mini powered invoice data extraction
+- ✅ **OpenAI parsing** - GPT-4o Vision powered invoice data extraction
 - ✅ **Intelligent auto-mapping** - Multi-strategy item-to-GL mapping:
   - Vendor item code matching (confidence: 1.0)
   - Fuzzy description matching (confidence: 0.7-0.9)
@@ -595,9 +595,9 @@ restaurant-system/
 - ✅ **Support for non-inventory items** - Propane, linen, janitorial, etc.
 
 **Technical Stack:**
-- OpenAI: 1.12.0 (GPT-4o-mini for parsing)
+- OpenAI: 1.12.0 (GPT-4o Vision for multi-page invoice parsing)
 - PyPDF2: 3.0.1 (PDF text extraction)
-- pdf2image: 1.16.3 (PDF rendering)
+- pdf2image: 1.16.3 (PDF rendering to images)
 - APScheduler: 3.10.4 (Background job scheduling)
 - Pillow: 10.1.0 (Image processing support)
 
