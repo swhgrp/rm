@@ -44,7 +44,15 @@
    - User workflow: Click "Re-parse Invoice" → AI detects statement → Auto-marked
    - Commit: d48c2e1 - PUSHED ✅
 
-**Impact:** All vendor bill creation to Accounting was completely broken until fix #1. Fix #2 eliminates user confusion about sync status.
+4. **Statement Item Handling** 🔧 **FIX**
+   - Fixed statements creating unmapped items (invoice numbers, not products)
+   - When statement detected: skip item creation, skip mapping workflow
+   - Set status='statement' instead of 'mapping'
+   - Deleted 16 existing statement items from database ("Invoice #C19780218", etc.)
+   - Statements now kept for record-keeping only, no items to map
+   - Commit: fb16cb5 - PUSHED ✅
+
+**Impact:** All vendor bill creation to Accounting was completely broken until fix #1. Fixes #2-4 improve UX and automate statement handling.
 
 **Files Modified:**
 - integration-hub/src/integration_hub/services/accounting_sender.py (line 226 - field name fix)
@@ -56,6 +64,8 @@
 - 196dab7 - fix(integration-hub): Critical bug - use total_amount not line_total
 - 3c9a0c1 - feat(integration-hub): Improve sync status icons with three states
 - d48c2e1 - feat(integration-hub): Add AI-powered statement detection
+- fb16cb5 - fix(integration-hub): Skip item creation for statements
+- 9bfbb62 - docs: Update claude.md with AI statement detection feature
 - 209765b - docs: Update claude.md with three-state sync status UX improvement
 - 39e00c7 - docs: Update claude.md with critical accounting bug fix
 - e556d55 - docs: Update claude.md with Nov 11 afternoon documentation cleanup session
