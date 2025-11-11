@@ -3,31 +3,20 @@
 {% block title %}Vendor Items - Restaurant Inventory{% endblock %}
 
 {% block head %}
-<!-- Select2 for searchable dropdowns -->
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 <style>
-    /* Make Select2 work with dark theme */
-    .select2-container--bootstrap-5 .select2-selection {
-        background-color: #212529;
-        border-color: #495057;
-        color: #dee2e6;
+    /* Searchable select styling */
+    .searchable-select-wrapper {
+        position: relative;
     }
-    .select2-container--bootstrap-5 .select2-dropdown {
-        background-color: #212529;
-        border-color: #495057;
+
+    .searchable-select-wrapper .search-input {
+        width: 100%;
+        margin-bottom: 5px;
     }
-    .select2-container--bootstrap-5 .select2-results__option {
-        color: #dee2e6;
-    }
-    .select2-container--bootstrap-5 .select2-results__option--highlighted {
-        background-color: #0d6efd;
-        color: white;
-    }
-    .select2-container--bootstrap-5 .select2-search__field {
-        background-color: #212529;
-        border-color: #495057;
-        color: #dee2e6;
+
+    .searchable-select-wrapper select {
+        max-height: 200px;
+        overflow-y: auto;
     }
 </style>
 {% endblock %}
@@ -232,9 +221,12 @@
                         </div>
                         <div class="col-md-6 mb-3">
                             <label for="viMasterItemId" class="form-label">Master Item <span class="text-muted">(optional - can link later)</span></label>
-                            <select class="form-select" id="viMasterItemId">
-                                <option value="">Select master item...</option>
-                            </select>
+                            <div class="searchable-select-wrapper">
+                                <input type="text" class="form-control search-input" id="searchMasterItem" placeholder="Search master items...">
+                                <select class="form-select" id="viMasterItemId" size="6">
+                                    <option value="">Select master item...</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -352,8 +344,8 @@
                 });
             }
 
-            // Load master items for filter
-            const itemsResp = await apiRequest('api/items/');
+            // Load master items for filter (with high limit to get all items)
+            const itemsResp = await apiRequest('api/items/?limit=10000');
             const itemFilter = document.getElementById('vendorItemFilterMaster');
 
             if (itemFilter && Array.isArray(itemsResp)) {
@@ -557,10 +549,15 @@
     }
 
     async function loadVendorItemDropdowns() {
+        // Save current filter values before repopulating
+        const vendorFilter = document.getElementById('vendorItemFilterVendor');
+        const itemFilter = document.getElementById('vendorItemFilterMaster');
+        const savedVendorFilter = vendorFilter.value;
+        const savedItemFilter = itemFilter.value;
+
         // Load vendors
         const vendorsResp = await apiRequest('api/vendors/');
         const vendorSelect = document.getElementById('viVendorId');
-        const vendorFilter = document.getElementById('vendorItemFilterVendor');
 
         vendorSelect.innerHTML = '<option value="">Select vendor...</option>';
         vendorFilter.innerHTML = '<option value="">All Vendors</option>';
@@ -574,10 +571,14 @@
             });
         }
 
-        // Load master items
-        const itemsResp = await apiRequest('api/items/');
+        // Restore vendor filter selection
+        if (savedVendorFilter) {
+            vendorFilter.value = savedVendorFilter;
+        }
+
+        // Load master items (with high limit to get all items for dropdown)
+        const itemsResp = await apiRequest('api/items/?limit=10000');
         const itemSelect = document.getElementById('viMasterItemId');
-        const itemFilter = document.getElementById('vendorItemFilterMaster');
 
         itemSelect.innerHTML = '<option value="">Select master item...</option>';
         itemFilter.innerHTML = '<option value="">All Master Items</option>';
@@ -592,6 +593,11 @@
                 itemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
                 itemFilter.innerHTML += `<option value="${item.id}">${item.name}</option>`;
             });
+        }
+
+        // Restore item filter selection
+        if (savedItemFilter) {
+            itemFilter.value = savedItemFilter;
         }
 
         // Load units
@@ -1022,28 +1028,45 @@
     function closeVendorItemUploadModal() {
         bootstrap.Modal.getInstance(document.getElementById('vendorItemUploadModal')).hide();
     }
-</script>
 
-<!-- Select2 JS -->
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script>
-    // Initialize Select2 on master item dropdown when modal opens
-    document.getElementById('vendorItemModal').addEventListener('shown.bs.modal', function () {
-        if (!$('#viMasterItemId').hasClass('select2-hidden-accessible')) {
-            $('#viMasterItemId').select2({
-                theme: 'bootstrap-5',
-                dropdownParent: $('#vendorItemModal'),
-                placeholder: 'Search for master item...',
-                allowClear: true,
-                width: '100%'
+    // Filter select options based on search input
+    function filterMasterItems(searchTerm) {
+        const selectElement = document.getElementById('viMasterItemId');
+        if (!selectElement) return;
+
+        const options = selectElement.getElementsByTagName('option');
+        const lowerSearch = searchTerm.toLowerCase();
+
+        for (let i = 0; i < options.length; i++) {
+            const option = options[i];
+            const text = option.textContent.toLowerCase();
+
+            if (text.includes(lowerSearch) || option.value === '') {
+                option.style.display = '';
+            } else {
+                option.style.display = 'none';
+            }
+        }
+    }
+
+    // Setup search listener for master item search
+    function setupMasterItemSearch() {
+        const searchInput = document.getElementById('searchMasterItem');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                filterMasterItems(this.value);
             });
         }
-    });
+    }
 
-    // Destroy Select2 when modal closes to avoid conflicts
-    document.getElementById('vendorItemModal').addEventListener('hidden.bs.modal', function () {
-        if ($('#viMasterItemId').hasClass('select2-hidden-accessible')) {
-            $('#viMasterItemId').select2('destroy');
+    // Initialize search when modal opens
+    document.getElementById('vendorItemModal').addEventListener('shown.bs.modal', function() {
+        setupMasterItemSearch();
+        // Clear search when modal opens
+        const searchInput = document.getElementById('searchMasterItem');
+        if (searchInput) {
+            searchInput.value = '';
+            filterMasterItems('');
         }
     });
 </script>
