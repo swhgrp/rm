@@ -606,21 +606,13 @@ restaurant-system/
 Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send → Route to Systems
 ```
 
-**What It Does NOT Do:**
-- ❌ **US Foods API integration - DOES NOT EXIST**
-- ❌ **Sysco API integration - DOES NOT EXIST**
-- ❌ **Restaurant Depot API integration - DOES NOT EXIST**
-- ❌ **ANY third-party vendor product catalog sync - NOT IMPLEMENTED**
-- ❌ **OAuth2 vendor authentication - NOT IMPLEMENTED**
-- ❌ **Automated pricing updates from vendors - NOT IMPLEMENTED**
-- ❌ **Vendor order submission - NOT IMPLEMENTED**
-- ❌ **Rate limiting - NOT IMPLEMENTED**
-
 **Integration Points:**
 - → **Inventory:** Sends processed invoices with item mappings
 - → **Accounting:** Creates balanced journal entries (Dr = Cr)
 - ← **Both Systems:** Syncs vendor master data
 - ← **Email (IMAP):** Monitors for invoice PDFs
+
+**Note:** Integration Hub is an **internal invoice processing hub**, not a vendor API integration platform. It processes invoices from any vendor (email/upload) and routes data to internal systems.
 
 **[→ View Integration Hub Documentation](./integration-hub/README.md)** *(Updated 2025-11-08)*
 
