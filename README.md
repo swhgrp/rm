@@ -344,7 +344,7 @@ restaurant-system/
 
 - **URL:** https://rm.swhgrp.com/hr/
 - **Database:** hr_db (PostgreSQL 15)
-- **Technology:** Django 4.2, Celery, Redis
+- **Technology:** FastAPI, SQLAlchemy, Redis, APScheduler
 - **Files:** 56 Python files, 14 templates
 
 **Note:** This is an employee information management system. It does NOT include scheduling, time tracking, or payroll features.
@@ -1127,17 +1127,17 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ## 🎉 Acknowledgments
 
 **Built with:**
-- **FastAPI** - Modern async framework for Portal, Inventory, Accounting, Integration Hub, Events, Files (6/7 systems)
-- **Django 4.2** - Web framework for HR only (1/7 systems)
+- **FastAPI** - Modern async framework for ALL 7 systems (Portal, HR, Inventory, Accounting, Integration Hub, Events, Files)
 - PostgreSQL 15 - Reliable database system
+- **SQLAlchemy** - ORM for all systems
 - Redis 7 - Caching and task queues
+- **APScheduler** - Background job scheduling (not Celery)
 - Docker & Docker Compose - Containerization
 - Nginx - High-performance web server
 - Bootstrap 5 - UI framework
 - FullCalendar.js - Event calendar
 - Chart.js - Data visualization
 - WeasyPrint - PDF generation
-- Celery - Distributed task queue
 - Local File Storage - Document management
 
 ---
