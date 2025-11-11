@@ -19,6 +19,9 @@
                     <i class="bi bi-download"></i> Download PDF
                 </a>
                 {% endif %}
+                <button class="btn btn-warning" onclick="reparseInvoice()" id="reparseBtn">
+                    <i class="bi bi-arrow-clockwise"></i> Re-parse Invoice
+                </button>
                 <button class="btn btn-primary" onclick="showEditModal()">
                     <i class="bi bi-pencil"></i> Edit Invoice
                 </button>
@@ -358,6 +361,46 @@
 function showEditModal() {
     const modal = new bootstrap.Modal(document.getElementById('editInvoiceModal'));
     modal.show();
+}
+
+async function reparseInvoice() {
+    if (!await showConfirm('Re-parse this invoice using the updated OCR parser? This will replace all existing line items with newly parsed data.')) {
+        return;
+    }
+
+    const button = document.getElementById('reparseBtn');
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Re-parsing...';
+    }
+
+    try {
+        const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/parse`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            await showAlert(`Invoice re-parsed successfully!\n\nItems parsed: ${result.items_parsed || 0}\nAuto-mapped: ${result.items_mapped || 0}\nUnmapped: ${result.items_unmapped || 0}`, 'Success');
+            location.reload();
+        } else {
+            await showAlert(`Error re-parsing invoice: ${result.message || result.detail || 'Unknown error'}`, 'Error');
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-parse Invoice';
+            }
+        }
+    } catch (error) {
+        await showAlert(`Error re-parsing invoice: ${error.message}`, 'Error');
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-parse Invoice';
+        }
+    }
 }
 
 function toggleNewVendorInput() {
