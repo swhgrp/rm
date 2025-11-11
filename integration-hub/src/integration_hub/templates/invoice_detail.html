@@ -106,6 +106,8 @@
                                         <span class="badge badge-pending">Mapping</span>
                                         {% elif invoice.status == 'ready' %}
                                         <span class="badge badge-ready">Ready to Send</span>
+                                        {% elif invoice.status == 'statement' %}
+                                        <span class="badge bg-info">Statement</span>
                                         {% elif invoice.status == 'sent' %}
                                         <span class="badge badge-sent">Sent</span>
                                         {% elif invoice.status == 'partial' %}
