@@ -960,18 +960,20 @@ docker compose exec inventory-db psql -U inventory_user -d inventory_db -c "\l+"
 
 ### Immediate (This Week) 🔴
 - [x] **Set up automated database backups** ✅ COMPLETED
-  - [x] Daily backups for all 5 databases (automated via cron)
+  - [x] Daily backups for all 7 databases (automated via cron)
   - [x] 7-day retention policy implemented (`scripts/rotate-backups.sh`)
   - [x] Older backups archived to `/opt/archives/old-backups/`
   - [x] Log rotation configured via `/etc/logrotate.d/restaurant-system`
   - [x] ✅ Remote backup via **Linode Backup Service** (server-level backups)
   - [ ] TODO: Test restore procedures
 
-- [ ] **Implement monitoring and alerting**
-  - Set up health check monitoring
-  - Disk space alerts
-  - SSL certificate expiration alerts
-  - Service down notifications
+- [x] **Implement monitoring and alerting** ✅ COMPLETED (Nov 9, 2025)
+  - [x] Health check monitoring dashboard (Portal /monitoring)
+  - [x] Disk space alerts (90% warning, 95% critical)
+  - [x] SSL certificate expiration monitoring (30-day warning)
+  - [x] Service health status tracking (all 7 systems)
+  - [x] Database connectivity monitoring
+  - [x] Auto-refresh every 30 seconds
 
 - [ ] **Move secrets out of Git repository**
   - Use environment variables or secrets manager
@@ -1005,7 +1007,7 @@ docker compose exec inventory-db psql -U inventory_user -d inventory_db -c "\l+"
 - [ ] Advanced analytics dashboard
 - [ ] AI/ML features (forecasting, recommendations)
 - [ ] Mobile apps (if needed)
-- [ ] Multi-location support expansion
+- [x] ✅ Multi-location support (already implemented in Inventory, Accounting, HR, Events)
 - [ ] Advanced workflow automation
 - [ ] Blockchain audit trail (if required)
 
