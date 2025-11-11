@@ -108,6 +108,7 @@ class InvoiceParser:
                             "subtotal": float,
                             "tax_amount": float,
                             "total_amount": float,
+                            "is_statement": boolean (true if document title/header contains "Statement" or "Account Statement", false otherwise),
                             "line_items": [
                                 {
                                     "line_number": int,
@@ -124,6 +125,9 @@ class InvoiceParser:
 
                         CRITICAL INSTRUCTIONS:
                         - FOR MULTI-PAGE INVOICES: Combine line items from ALL pages into a single list
+                        - is_statement: Set to true if the document title contains words like "Statement", "Account Statement", "Monthly Statement"
+                          Statements are summary documents showing account activity/balance, not individual invoices for specific deliveries
+                          Look for the word "Statement" prominently displayed at the top of the document
                         - vendor_name: The company at the TOP of the invoice (letterhead/logo area) who SENT the invoice
                           Example: "Gold Coast Linen Service", "SYSCO", "US Foods"
                           Look for company name near logo, top-left, or "From:" section
@@ -374,6 +378,7 @@ class InvoiceParser:
             invoice.invoice_number = parsed_data.get('invoice_number')
             invoice.total_amount = parsed_data.get('total_amount')
             invoice.tax_amount = parsed_data.get('tax_amount')
+            invoice.is_statement = parsed_data.get('is_statement', False)  # AI-detected statement flag
             invoice.raw_data = parsed_data
 
             # Parse dates
