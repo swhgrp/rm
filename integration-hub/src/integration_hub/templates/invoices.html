@@ -293,9 +293,33 @@ function filterTable() {
 }
 
 if (searchInput) {
-    searchInput.addEventListener('input', filterTable);
-    statusFilter.addEventListener('change', filterTable);
-    sourceFilter.addEventListener('change', filterTable);
+    // Restore filter state from sessionStorage
+    const savedSearch = sessionStorage.getItem('invoiceSearch');
+    const savedStatus = sessionStorage.getItem('invoiceStatusFilter');
+    const savedSource = sessionStorage.getItem('invoiceSourceFilter');
+
+    if (savedSearch) searchInput.value = savedSearch;
+    if (savedStatus) statusFilter.value = savedStatus;
+    if (savedSource) sourceFilter.value = savedSource;
+
+    // Apply filters if any were restored
+    if (savedSearch || savedStatus || savedSource) {
+        filterTable();
+    }
+
+    // Save filter state on change
+    searchInput.addEventListener('input', () => {
+        sessionStorage.setItem('invoiceSearch', searchInput.value);
+        filterTable();
+    });
+    statusFilter.addEventListener('change', () => {
+        sessionStorage.setItem('invoiceStatusFilter', statusFilter.value);
+        filterTable();
+    });
+    sourceFilter.addEventListener('change', () => {
+        sessionStorage.setItem('invoiceSourceFilter', sourceFilter.value);
+        filterTable();
+    });
 }
 
 // Sorting functionality
