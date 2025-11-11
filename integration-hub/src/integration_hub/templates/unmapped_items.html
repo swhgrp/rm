@@ -331,16 +331,26 @@ function clearSearch() {
 // Open modal for bulk mapping
 function openBulkMapModal() {
     // Only get checked boxes from visible rows (not hidden by search filter)
-    const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
-    selectedItems = Array.from(checkedBoxes)
-        .filter(cb => {
-            const row = cb.closest('tr');
-            return row && row.style.display !== 'none';
-        })
-        .map(cb => ({
-            description: cb.value,
-            count: parseInt(cb.getAttribute('data-count'))
-        }));
+    const allCheckedBoxes = document.querySelectorAll('.item-checkbox:checked');
+    console.log('Total checked boxes found:', allCheckedBoxes.length);
+
+    const visibleCheckedBoxes = Array.from(allCheckedBoxes).filter(cb => {
+        const row = cb.closest('tr');
+        const isVisible = row && row.style.display !== 'none';
+        if (!isVisible) {
+            console.log('Filtering out hidden item:', cb.value);
+        }
+        return isVisible;
+    });
+
+    console.log('Visible checked boxes after filter:', visibleCheckedBoxes.length);
+
+    selectedItems = visibleCheckedBoxes.map(cb => ({
+        description: cb.value,
+        count: parseInt(cb.getAttribute('data-count'))
+    }));
+
+    console.log('Final selectedItems array:', selectedItems.length, selectedItems);
 
     if (selectedItems.length === 0) {
         showAlert('Please select at least one item to map.');
