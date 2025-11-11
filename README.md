@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** November 10, 2025
+**Last Updated:** November 11, 2025
 **Status:** ~85% Complete - Core Systems Production Ready ✅
-**Latest:** Inventory & Integration Hub UX improvements (Nov 10, 2025) 🎨
+**Latest:** Integration Hub multi-page parsing fixes & tax handling (Nov 11, 2025) 🔥
 
 ---
 
@@ -1174,8 +1174,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 2.7
-**Last Updated:** November 8, 2025
+**Version:** 2.8
+**Last Updated:** November 11, 2025
 **Maintained By:** SW Hospitality Group Development Team
 
 **For complete system details, see [SYSTEM_DOCUMENTATION.md](./SYSTEM_DOCUMENTATION.md)**
@@ -1183,6 +1183,51 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 ## 📝 Recent Updates
+
+### November 11, 2025 - Integration Hub: Multi-Page Parsing & Tax Handling 🔥 **CRITICAL FIXES**
+
+**Multi-Page Invoice OCR Fixed** 🔥
+- ✅ **Fixed critical bug** - Parser was only reading page 1 of multi-page invoices
+  - Removed `first_page=1, last_page=1` parameters from `convert_from_path()`
+  - Now processes ALL pages and converts each to base64 for GPT-4o Vision
+  - Added "EXTREMELY IMPORTANT - TOTALS FROM LAST PAGE ONLY" to system prompt
+  - Increased max_tokens from 4096 to 8192 for multi-page responses
+  - **Impact:** Gordon Food Service invoice #9028965836 (3 pages) was missing $308.06 from pages 2-3
+
+**Accounting Tax Handling Fixed** 🔥
+- ✅ **Tax capitalization corrected** - Vendor invoice tax is capitalized into item costs, not tracked separately
+  - Fixed validation error: "Bill total mismatch: Lines $33.50 != Invoice $35.85"
+  - Tax distributed proportionally across GL accounts: `line_tax = (line_subtotal / subtotal) * invoice_tax`
+  - Example: Powerade $10 (no tax) + Trash liners $5 + $0.50 tax = Dr. NAB Cost $10, Dr. Cleaning Supplies $5.50, Cr. AP $15.50
+  - Cleared 32 old accounting errors from database
+
+**UI & UX Improvements**
+- ✅ **Re-parse Invoice Button** - Manual re-parsing with updated OCR
+  - Non-blocking JavaScript allows navigation during 30-60 second parse
+  - Fixed template loading issue (FastAPI vs mounted volumes)
+- ✅ **Compact Statement Button** - Icon-only with Bootstrap tooltip
+  - Changed from full button text to icon: `<i class="bi bi-file-text"></i>`
+
+**Database Cleanup**
+- ✅ Deleted 12 sets of duplicate invoice records
+- ✅ Cleared 32 invoices with old "Bill total mismatch" errors
+
+**Bank Transaction Matching Research** 📊
+- ✅ Documented bank reconciliation matching algorithm
+  - **No AI/ML used** - Rule-based fuzzy matching with rapidfuzz library
+  - Multi-tier: Exact match (100%), Fuzzy (95-50%), Composite (99-50%), Rule-based (80-95%)
+  - Scoring: Amount (40 pts) + Date (30 pts) + Description (30 pts)
+  - Auto-matches transactions with ≥95% confidence
+
+**Files Modified:**
+- `integration-hub/src/integration_hub/services/invoice_parser.py` (multi-page OCR)
+- `integration-hub/src/integration_hub/services/accounting_sender.py` (tax distribution)
+- `integration-hub/src/integration_hub/templates/invoice_detail.html` (re-parse button)
+- `integration-hub/src/integration_hub/templates/invoices.html` (compact button)
+
+**Commits:** 33e1d57, a0ebb0c (pending final commit)
+
+---
 
 ### November 10, 2025 - Inventory & Integration Hub UX Improvements 🎨
 
@@ -1443,8 +1488,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 2.7 - Integration Hub Major Workflow Improvements
-**Last Updated:** November 8, 2025
+**Version:** 2.8 - Integration Hub Critical Parsing & Tax Fixes
+**Last Updated:** November 11, 2025
 **Documentation Health:** 95/100 - Excellent ✅
 
-*Game-changing release: Bulk mapping by description (10x faster), statement handling, smart auto-send routing, mapped items review page. Invoice processing workflow revolutionized.*
+*Critical production fixes: Multi-page invoice parsing (was missing items from pages 2+), tax capitalization logic corrected for proper GL accounting, UI improvements, bank matching algorithm documented.*

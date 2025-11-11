@@ -132,7 +132,16 @@ class InvoiceParser:
                           Example: "SW GRILL", "Seaside Grill", "The Nest Eatery"
                         - vendor_account_number: The account/customer number on the invoice
                         - Extract ALL line items from ALL pages of the invoice with precise quantities and prices
-                        - The final totals (subtotal, tax_amount, total_amount) are typically on the LAST page
+
+                        *** EXTREMELY IMPORTANT - TOTALS FROM LAST PAGE ONLY ***
+                        - Multi-page invoices often show "Page Total" or "Page Subtotal" on early pages
+                        - These intermediate page totals are NOT the invoice total
+                        - You MUST read the FINAL INVOICE TOTAL from the LAST page only
+                        - Look for labels like "Invoice Total", "Total Amount", "Amount Due", "Balance Due" on the LAST page
+                        - IGNORE any "Page Total", "Page Subtotal", or "Continued on next page" amounts
+                        - The subtotal, tax_amount, and total_amount fields must come from the LAST page's final totals section
+                        - Common locations: bottom right of last page, in a box labeled "Total" or "Amount Due"
+
                         - Verify that the sum of all line_total values approximately equals the subtotal
                         - For pack_size, look for packaging info in item description or separate column
                         - If any field is not visible/present, use null

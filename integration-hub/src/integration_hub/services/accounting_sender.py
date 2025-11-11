@@ -226,10 +226,18 @@ class AccountingSenderService:
             account_number_totals[account_number]["amount"] += Decimal(str(item.line_total))
             account_number_totals[account_number]["descriptions"].append(item.item_description)
 
+        # Calculate subtotal and tax
+        # Tax is capitalized into the cost of items (not tracked separately for purchases)
+        subtotal = sum(data["amount"] for data in account_number_totals.values())
+        invoice_tax = Decimal(str(invoice.tax_amount)) if invoice.tax_amount else Decimal('0.00')
+
         # Add bill lines (expense or asset accounts)
+        # Tax is distributed proportionally across all line items
         # Convert account numbers to database IDs
         total_amount = Decimal('0.00')
         logger.info(f"Processing {len(account_number_totals)} account entries for vendor bill")
+        logger.info(f"Subtotal: ${subtotal}, Tax: ${invoice_tax}, Total: ${subtotal + invoice_tax}")
+
         for account_number, data in account_number_totals.items():
             # Look up the database ID for this account number
             logger.info(f"Looking up account ID for account_number: {account_number}")
@@ -240,25 +248,33 @@ class AccountingSenderService:
                 logger.error(f"Cannot find account {account_number} in accounting system: {e}")
                 raise ValueError(f"Cannot find account {account_number} in accounting system: {e}")
 
-            amount = float(data["amount"])
+            # Calculate this line's share of tax (proportional to its amount)
+            line_subtotal = data["amount"]
+            if subtotal > 0 and invoice_tax > 0:
+                # Proportional tax: (line amount / subtotal) * total tax
+                line_tax = (line_subtotal / subtotal) * invoice_tax
+                line_total = line_subtotal + line_tax
+            else:
+                line_total = line_subtotal
+
             description = ", ".join(data["descriptions"][:3])  # First 3 items
             if len(data["descriptions"]) > 3:
                 description += f" (+{len(data['descriptions']) - 3} more)"
 
             payload["lines"].append({
                 "account_id": account_id,  # Using the actual database ID (integer)
-                "amount": amount,
+                "amount": float(line_total),  # Amount includes proportional tax
                 "description": description
             })
 
-            total_amount += data["amount"]
+            total_amount += line_total
 
-        logger.debug(f"Built vendor bill payload with {len(payload['lines'])} lines, total: ${total_amount}")
+        logger.debug(f"Built vendor bill payload with {len(payload['lines'])} lines, total with tax: ${total_amount}")
 
         # Validate total matches invoice total
         invoice_total = Decimal(str(invoice.total_amount))
         if abs(total_amount - invoice_total) > Decimal('0.01'):
-            raise ValueError(f"Bill total mismatch: Lines ${total_amount} != Invoice ${invoice_total}")
+            raise ValueError(f"Bill total mismatch: Lines ${total_amount} != Invoice Total ${invoice_total}")
 
         return payload
 

@@ -364,43 +364,45 @@ function showEditModal() {
 }
 
 async function reparseInvoice() {
-    if (!await showConfirm('Re-parse this invoice using the updated OCR parser? This will replace all existing line items with newly parsed data.')) {
+    if (!await showConfirm('Re-parse this invoice using the updated OCR parser? This will replace all existing line items with newly parsed data.\n\nNote: Parsing may take 30-60 seconds. You can navigate away and check back later.')) {
         return;
     }
 
     const button = document.getElementById('reparseBtn');
     if (button) {
         button.disabled = true;
-        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Re-parsing...';
+        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Parsing (may take 60 sec)...';
     }
 
-    try {
-        const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/parse`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-            await showAlert(`Invoice re-parsed successfully!\n\nItems parsed: ${result.items_parsed || 0}\nAuto-mapped: ${result.items_mapped || 0}\nUnmapped: ${result.items_unmapped || 0}`, 'Success');
+    // Start the parse request (don't block the UI)
+    fetch(`/hub/api/invoices/{{ invoice.id }}/parse`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            // Parse completed successfully - reload to show results
             location.reload();
         } else {
-            await showAlert(`Error re-parsing invoice: ${result.message || result.detail || 'Unknown error'}`, 'Error');
+            // Parse failed - show error and re-enable button
+            showAlert(`Error re-parsing invoice: ${result.message || result.detail || 'Unknown error'}`, 'Error');
             if (button) {
                 button.disabled = false;
                 button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-parse Invoice';
             }
         }
-    } catch (error) {
-        await showAlert(`Error re-parsing invoice: ${error.message}`, 'Error');
+    })
+    .catch(error => {
+        // Network/timeout error - show message
+        showAlert(`Error re-parsing invoice: ${error.message}\n\nThe parse may still be running in the background. Refresh the page in a minute to check results.`, 'Warning');
         if (button) {
             button.disabled = false;
             button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-parse Invoice';
         }
-    }
+    });
 }
 
 function toggleNewVendorInput() {

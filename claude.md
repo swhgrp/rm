@@ -9,9 +9,81 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Nov 10, 2025)
+### Most Recent Work (Current Session - Nov 11, 2025)
 
-**INVENTORY SYSTEM: VENDOR ITEMS UX IMPROVEMENTS** (Nov 10, 2025) ✅ **COMPLETE**
+**INTEGRATION HUB: MULTI-PAGE INVOICE PARSING FIXES & ACCOUNTING TAX HANDLING** (Nov 11, 2025) ✅ **PRODUCTION CRITICAL FIXES**
+
+1. **Multi-Page OCR Parsing Fixed** 🔥 **CRITICAL BUG**
+   - Fixed invoice_parser.py only reading page 1 of multi-page invoices
+   - Changed: `convert_from_path(pdf_path, dpi=200, first_page=1, last_page=1)` → `convert_from_path(pdf_path, dpi=200)`
+   - Now processes ALL pages and converts each to base64 for GPT-4o Vision
+   - Added prominent "EXTREMELY IMPORTANT - TOTALS FROM LAST PAGE ONLY" section to system prompt
+   - Increased max_tokens from 4096 to 8192 for multi-page responses
+   - Fixed: Gordon Food Service invoice #9028965836 (3 pages) missing $308.06 from pages 2-3
+   - Commit: 33e1d57 - PENDING ⏳
+
+2. **Re-parse Invoice Button Added** ✅
+   - Added "Re-parse Invoice" button to invoice_detail.html
+   - Non-blocking JavaScript - allows user to navigate away during 30-60 second parse
+   - Shows immediate alert that parsing started
+   - Button added to lines 22-24, reparseInvoice() function at lines 366-412
+   - Resolved template loading issue (FastAPI loading from /app/integration_hub/templates/, not /app/src/)
+   - Fixed with: `docker exec integration-hub cp /app/src/.../invoice_detail.html /app/integration_hub/templates/`
+   - Commit: a0ebb0c - PENDING ⏳
+
+3. **Accounting Tax Handling Fixed** 🔥 **CRITICAL - TAX CAPITALIZATION**
+   - Fixed accounting_sender.py validation error: "Bill total mismatch: Lines $33.50 != Invoice $35.85"
+   - **Tax is capitalized into item cost for purchases** (not tracked separately like sales tax)
+   - Example: Powerade $10 (no tax) + Trash liners $5 + $0.50 tax = Dr. NAB Cost $10, Dr. Cleaning Supplies $5.50, Cr. AP $15.50
+   - Tax distributed proportionally across all line items: `line_tax = (line_subtotal / subtotal) * invoice_tax`
+   - Changed validation to compare total_amount (with tax) against invoice_total (not subtotal)
+   - Updated lines 229-277 in accounting_sender.py
+   - Cleared 32 old "Bill total mismatch" errors from database
+   - Commit: PENDING ⏳
+
+4. **UI Improvements** ✅
+   - Made "Mark as Statement" button compact (icon-only with tooltip)
+   - Changed from full button text to icon only: `<i class="bi bi-file-text"></i>`
+   - Added Bootstrap tooltip: `title="Mark as Statement" data-bs-toggle="tooltip"`
+   - Initialized tooltips with JavaScript (lines 525-531 in invoices.html)
+   - Commit: PENDING ⏳
+
+5. **Database Cleanup** ✅
+   - Deleted 12 sets of duplicate invoice records
+   - Example: Invoice #C19780218 had IDs 80, 83, 84 (kept 80, deleted 83-84)
+   - Cleared 32 invoices with old accounting errors
+   - SQL: `UPDATE hub_invoices SET accounting_error = NULL WHERE accounting_error LIKE '%Bill total mismatch%'`
+
+6. **Bank Transaction Matching Investigation** 📊 **RESEARCH COMPLETE**
+   - User asked: "What are we using for bank transaction matching?"
+   - **Answer: Rule-based matching (NO AI/ML)**
+   - Uses multi-tiered approach in transaction_matcher.py and bank_matching.py:
+     - **Tier 0**: Exact match (amount + date) - 100% confidence
+     - **Tier 1**: Fuzzy match (amount + date ±7 days) - 95-50% confidence
+     - **Tier 2**: Composite match (many GL entries → 1 deposit) - 99-50% confidence
+     - **Tier 3**: Rule-based match (user-defined rules) - 80-95% confidence
+   - Scoring: Amount (40 pts) + Date (30 pts) + Description fuzzy match (30 pts)
+   - Uses **rapidfuzz library** for fuzzy string matching (like invoice auto-mapper)
+   - Auto-matches transactions with ≥95% confidence
+   - Account-specific tolerance: CC ($0.50), Cash (0.5%), Third-party (5%)
+
+**Files Modified:**
+- integration-hub/src/integration_hub/services/invoice_parser.py (multi-page OCR fix)
+- integration-hub/src/integration_hub/services/accounting_sender.py (tax distribution)
+- integration-hub/src/integration_hub/templates/invoice_detail.html (re-parse button)
+- integration-hub/src/integration_hub/templates/invoices.html (compact statement button)
+
+**Database Changes:**
+- Deleted duplicate invoice records (IDs: 83, 84, and 10 other sets)
+- Cleared 32 accounting errors
+
+**Git Status:** Changes ready to commit - PENDING ⏳
+
+---
+
+### Previous Session Work (Nov 10, 2025)
+
+**INVENTORY SYSTEM: VENDOR ITEMS UX IMPROVEMENTS** (Nov 10, 2025) ✅ **COMPLETE - PUSHED**
 
 1. **Integration Hub - Item Code Column Added** ✅
    - Added item code column to unmapped items page
@@ -482,30 +554,39 @@
    - PDF deduplication (SHA-256 hashing)
    - Committed: 63afd14, 9f0e5c7
 
-### Git Status - All Synced ✅
+### Git Status - Ready to Push ⏳
 
 ```bash
 # Branch: main
-# Status: Clean - All changes committed and pushed
+# Status: 5 modified files ready to commit
 # Last push: November 10, 2025
-# Latest commits (Nov 10 - Inventory & Integration Hub UX):
+# Pending commits (Nov 11 - Integration Hub Critical Fixes):
+#   - PENDING: fix(integration-hub): Fix multi-page invoice parsing - was only reading page 1
+#   - PENDING: fix(integration-hub): Fix accounting tax handling - capitalize tax into item costs
+#   - PENDING: feat(integration-hub): Add re-parse invoice button with non-blocking UX
+#   - PENDING: feat(integration-hub): Make statement button compact with tooltip
+#   - PENDING: docs: Update README and claude.md with Nov 11 session work
+#
+# Modified files:
+#   - integration-hub/src/integration_hub/services/invoice_parser.py (multi-page OCR fix)
+#   - integration-hub/src/integration_hub/services/accounting_sender.py (tax distribution)
+#   - integration-hub/src/integration_hub/templates/invoice_detail.html (re-parse button)
+#   - integration-hub/src/integration_hub/templates/invoices.html (compact statement button)
+#   - claude.md (session documentation)
+#   - README.md (recent updates section)
+#
+# Previous commits (Nov 10 - Inventory & Integration Hub UX):
 #   - 079b48d - feat(inventory): Improve vendor items UX - searchable dropdown and filter persistence - PUSHED ✅
 #   - 956f8a7 - feat(inventory): Add Select2 searchable dropdown for master items in vendor item form - PUSHED ✅
 #   - 0b1ae18 - fix(inventory): Load all master items in vendor item dropdown - increase API limit - PUSHED ✅
 #   - 2b64ba7 - feat(inventory): Improve vendor items terminology for clarity - PUSHED ✅
 #   - e236531 - feat(integration-hub): Add item code column to unmapped items page - PUSHED ✅
-# Previous commits (Nov 9 - Files System):
-#   - aa643b4 - Make shared folders clickable like regular folders - remove Open button - PUSHED ✅
-#   - 4894738 - Fix shared folder access and page refresh state persistence - PUSHED ✅
-#   - efce9e2 - Fix dashboard 'Shared with Me' section showing 'undefined' for folder names - PUSHED ✅
-#   - a38743d - Prevent duplicate internal shares - update existing instead of creating new - PUSHED ✅
-#   - 62b9c48 - Fix 'Shared with Me' page - correct API endpoint and response structure - PUSHED ✅
 #
 # Untracked files (normal operations, excluded from git):
-#   - integration-hub/uploads/ (59 invoice PDFs - correctly ignored by .gitignore)
+#   - integration-hub/uploads/ (63 invoice PDFs - correctly ignored by .gitignore)
 ```
 
-**Current Status:** ✅ All work committed and pushed to GitHub. Repository clean.
+**Current Status:** ⏳ Changes staged and ready to commit. Will push to GitHub next.
 
 ---
 

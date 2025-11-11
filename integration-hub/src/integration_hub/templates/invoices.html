@@ -141,8 +141,8 @@
                                     </button>
                                     {% endif %}
                                     {% if invoice.invoice_number == 'None' or not invoice.invoice_number %}
-                                    <button class="btn btn-sm btn-warning me-1" onclick="markAsStatement({{ invoice.id }})">
-                                        <i class="bi bi-file-text"></i> Mark as Statement
+                                    <button class="btn btn-sm btn-warning me-1" onclick="markAsStatement({{ invoice.id }})" title="Mark as Statement" data-bs-toggle="tooltip">
+                                        <i class="bi bi-file-text"></i>
                                     </button>
                                     {% endif %}
                                 {% else %}
@@ -521,5 +521,13 @@ async function unmarkStatement(invoiceId) {
         await showAlert(`Error unmarking statement: ${error.message}`, 'Error');
     }
 }
+
+// Initialize tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
 </script>
 {% endblock %}
