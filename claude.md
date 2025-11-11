@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** November 10, 2025
+**Last Updated:** November 11, 2025
 **System Status:** Production (85% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -9,7 +9,53 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Nov 11, 2025)
+### Most Recent Work (Current Session - Nov 11, 2025 - AFTERNOON)
+
+**DOCUMENTATION ACCURACY CLEANUP** (Nov 11, 2025) 📚 **CRITICAL CORRECTIONS**
+
+1. **Framework Documentation Errors Fixed** 🔥 **CRITICAL**
+   - Fixed extensive Django/Celery references throughout README (lines 61-119, 778, 835-854)
+   - **ALL 7 systems use FastAPI + Alembic** (not Django + manage.py)
+   - Fixed Architecture section: Changed "Django application code" → "FastAPI application code"
+   - Fixed Common Commands: Removed entire "Django Operations" section
+   - Replaced with correct FastAPI/Alembic commands
+   - Fixed Installation section: All migration and development commands
+   - **Impact:** Documentation was teaching wrong installation procedures
+   - Commits: 8da97e2, 8f8e33f, 371c2be, b191ff8 - PUSHED ✅
+
+2. **Database Count Verification** ✅
+   - Verified actual database count: **5 databases** (not 7)
+   - Databases: inventory_db, accounting_db, hr_db, events_db, hub_db
+   - Portal uses hr_db (no separate database)
+   - Files uses local storage only (no database)
+   - Corrected in README Critical Priorities section
+
+3. **Installation Section Complete Rewrite** ✅
+   - Lines 695-703: Database migrations (Django → Alembic for all 5 services)
+   - Lines 705-712: Load initial data (removed Django fixtures/loaddata commands)
+   - Lines 714-724: Create admin users (removed Django createsuperuser)
+   - Lines 744-752: Development server (manage.py runserver → uvicorn)
+   - All commands now correct for FastAPI architecture
+
+4. **Monitoring Documentation Clarification** ✅
+   - Confirmed monitoring is Portal feature, not separate microservice
+   - Routes: `/portal/monitoring` (dashboard), `/portal/api/monitoring/status` (API)
+   - Executes bash script: `/opt/restaurant-system/scripts/dashboard-status.sh`
+   - Admin-only access control, no separate monitoring container
+
+**Files Modified:**
+- `/opt/restaurant-system/README.md` (extensive Django removal, Installation rewrite)
+
+**Git Commits:**
+- 8da97e2 - docs: Fix all Django/Celery references to FastAPI/APScheduler
+- 8f8e33f - docs: Fix monitoring status and roadmap inaccuracies
+- 371c2be - docs: Fix database count - 5 databases, not 7
+- b191ff8 - docs: Fix Installation section - remove Django references
+- All commits PUSHED ✅
+
+---
+
+### Most Recent Work (Current Session - Nov 11, 2025 - MORNING)
 
 **INTEGRATION HUB: MULTI-PAGE INVOICE PARSING FIXES & ACCOUNTING TAX HANDLING** (Nov 11, 2025) ✅ **PRODUCTION CRITICAL FIXES**
 
