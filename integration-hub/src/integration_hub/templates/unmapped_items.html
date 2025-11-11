@@ -330,11 +330,17 @@ function clearSearch() {
 
 // Open modal for bulk mapping
 function openBulkMapModal() {
+    // Only get checked boxes from visible rows (not hidden by search filter)
     const checkedBoxes = document.querySelectorAll('.item-checkbox:checked');
-    selectedItems = Array.from(checkedBoxes).map(cb => ({
-        description: cb.value,
-        count: parseInt(cb.getAttribute('data-count'))
-    }));
+    selectedItems = Array.from(checkedBoxes)
+        .filter(cb => {
+            const row = cb.closest('tr');
+            return row && row.style.display !== 'none';
+        })
+        .map(cb => ({
+            description: cb.value,
+            count: parseInt(cb.getAttribute('data-count'))
+        }));
 
     if (selectedItems.length === 0) {
         showAlert('Please select at least one item to map.');
