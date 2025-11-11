@@ -394,7 +394,32 @@ class InvoiceParser:
                 except Exception as e:
                     logger.warning(f"Failed to parse due_date: {e}")
 
-            # Create invoice items
+            # Check if this is a statement - skip item creation and mapping
+            if invoice.is_statement:
+                # Delete any existing items (in case this was re-parsed)
+                existing_items = db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).count()
+                if existing_items > 0:
+                    db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).delete()
+                    logger.info(f"Deleted {existing_items} items from invoice {invoice_id} (statement detected)")
+
+                # Statements don't have items to map
+                invoice.status = 'statement'
+                db.commit()
+                logger.info(f"Invoice {invoice_id} detected as statement - skipping item creation")
+
+                return {
+                    "success": True,
+                    "message": f"Statement parsed successfully. No items to map.",
+                    "invoice_id": invoice_id,
+                    "confidence_score": confidence_score,
+                    "is_statement": True,
+                    "items_parsed": 0,
+                    "vendor_matched": vendor is not None,
+                    "vendor_name": parsed_data.get('vendor_name'),
+                    "location_matched": location_matched,
+                }
+
+            # Create invoice items (only for actual invoices, not statements)
             unmapped_count = 0
             line_items = parsed_data.get('line_items', [])
 
