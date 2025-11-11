@@ -960,7 +960,7 @@ docker compose exec inventory-db psql -U inventory_user -d inventory_db -c "\l+"
 
 ### Immediate (This Week) 🔴
 - [x] **Set up automated database backups** ✅ COMPLETED
-  - [x] Daily backups for all 7 databases (automated via cron)
+  - [x] Daily backups for all 5 databases (automated via cron)
   - [x] 7-day retention policy implemented (`scripts/rotate-backups.sh`)
   - [x] Older backups archived to `/opt/archives/old-backups/`
   - [x] Log rotation configured via `/etc/logrotate.d/restaurant-system`
