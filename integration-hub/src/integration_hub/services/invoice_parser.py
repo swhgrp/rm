@@ -48,9 +48,9 @@ class InvoiceParser:
             }
         """
         try:
-            # Convert PDF to images
+            # Convert ALL pages of PDF to images
             logger.info(f"Converting PDF to images: {pdf_path}")
-            images = convert_from_path(pdf_path, dpi=200, first_page=1, last_page=1)
+            images = convert_from_path(pdf_path, dpi=200)
 
             if not images:
                 return {
@@ -59,21 +59,44 @@ class InvoiceParser:
                     "message": "PDF conversion failed"
                 }
 
-            # Convert first page to base64
+            # Convert all pages to base64 for multi-page support
             from io import BytesIO
-            buffered = BytesIO()
-            images[0].save(buffered, format="PNG")
-            img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+            image_data = []
+            for i, img in enumerate(images):
+                buffered = BytesIO()
+                img.save(buffered, format="PNG")
+                img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+                image_data.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{img_base64}",
+                        "detail": "high"
+                    }
+                })
+
+            logger.info(f"Converted {len(images)} pages from PDF")
 
             # Use GPT-4o Vision for image-based parsing
             logger.info("Calling GPT-4o Vision API for invoice parsing")
+
+            # Build user message content with text prompt + all page images
+            page_type = "multi-page" if len(images) > 1 else "single-page"
+            user_content = [
+                {
+                    "type": "text",
+                    "text": f"Parse this restaurant supply invoice ({page_type} document with {len(images)} page(s)). Extract vendor, location, invoice details, and ALL line items from ALL pages. Make sure to capture the final totals (subtotal, tax, and total amount) which are typically on the last page."
+                }
+            ]
+            user_content.extend(image_data)
+
             response = self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
                     {
                         "role": "system",
-                        "content": """You are an expert at parsing restaurant supply invoices.
-                        You can see the invoice image and must extract structured data from it.
+                        "content": """You are an expert at parsing restaurant supply invoices, including multi-page invoices.
+                        You will receive one or more images representing all pages of an invoice.
+                        You must extract structured data from ALL pages.
                         Return ONLY a valid JSON object with this exact structure:
                         {
                             "vendor_name": "string (the supplier/vendor company name)",
@@ -100,6 +123,7 @@ class InvoiceParser:
                         }
 
                         CRITICAL INSTRUCTIONS:
+                        - FOR MULTI-PAGE INVOICES: Combine line items from ALL pages into a single list
                         - vendor_name: The company at the TOP of the invoice (letterhead/logo area) who SENT the invoice
                           Example: "Gold Coast Linen Service", "SYSCO", "US Foods"
                           Look for company name near logo, top-left, or "From:" section
@@ -107,7 +131,9 @@ class InvoiceParser:
                           Look for "Ship To:", "Deliver To:", "Location:", or customer name
                           Example: "SW GRILL", "Seaside Grill", "The Nest Eatery"
                         - vendor_account_number: The account/customer number on the invoice
-                        - Extract ALL line items from the invoice table with precise quantities and prices
+                        - Extract ALL line items from ALL pages of the invoice with precise quantities and prices
+                        - The final totals (subtotal, tax_amount, total_amount) are typically on the LAST page
+                        - Verify that the sum of all line_total values approximately equals the subtotal
                         - For pack_size, look for packaging info in item description or separate column
                         - If any field is not visible/present, use null
                         - Be extremely precise with numbers (quantities, prices, totals)
@@ -115,22 +141,10 @@ class InvoiceParser:
                     },
                     {
                         "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": "Parse this restaurant supply invoice. Extract vendor, location, invoice details, and all line items."
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/png;base64,{img_base64}",
-                                    "detail": "high"
-                                }
-                            }
-                        ]
+                        "content": user_content
                     }
                 ],
-                max_tokens=4096,
+                max_tokens=8192,  # Increased for multi-page invoices
                 temperature=0.1
             )
 
