@@ -602,12 +602,17 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Failed to fetch vendor items from Inventory API: {str(e)}")
 
-    return templates.TemplateResponse("unmapped_items.html", {
+    response = templates.TemplateResponse("unmapped_items.html", {
         "request": request,
         "unique_items": unique_items,
         "gl_accounts": gl_accounts,
         "inventory_items": inventory_items
     })
+    # Prevent browser caching
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 
 @app.get("/mapped-items", response_class=HTMLResponse)
