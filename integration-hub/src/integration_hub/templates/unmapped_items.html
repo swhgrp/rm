@@ -257,9 +257,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Toggle select all checkboxes
 function toggleSelectAll(checkbox) {
+    // Only select checkboxes in visible rows (not hidden by search filter)
     const itemCheckboxes = document.querySelectorAll('.item-checkbox');
     itemCheckboxes.forEach(cb => {
-        cb.checked = checkbox.checked;
+        const row = cb.closest('tr');
+        // Only toggle if row is visible
+        if (row && row.style.display !== 'none') {
+            cb.checked = checkbox.checked;
+        }
     });
     updateSelectedCount();
 }
