@@ -549,25 +549,28 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
     logger = logging.getLogger(__name__)
 
     # Get unique item descriptions with aggregated data
-    # Query returns: (item_description, count, list of invoice numbers, list of vendors)
+    # Query returns: (item_description, item_code, count, list of invoice numbers, list of vendors)
     unique_items_query = db.query(
         HubInvoiceItem.item_description,
+        HubInvoiceItem.item_code,
         func.count(HubInvoiceItem.id).label('occurrence_count'),
         func.array_agg(distinct(HubInvoice.invoice_number)).label('invoice_numbers'),
         func.array_agg(distinct(HubInvoice.vendor_name)).label('vendor_names')
     ).join(HubInvoice).filter(
         HubInvoiceItem.is_mapped == False
     ).group_by(
-        HubInvoiceItem.item_description
+        HubInvoiceItem.item_description,
+        HubInvoiceItem.item_code
     ).order_by(
         func.count(HubInvoiceItem.id).desc()  # Show most frequent items first
     ).all()
 
     # Format results for template
     unique_items = []
-    for desc, count, invoice_nums, vendors in unique_items_query:
+    for desc, item_code, count, invoice_nums, vendors in unique_items_query:
         unique_items.append({
             'item_description': desc,
+            'item_code': item_code,
             'occurrence_count': count,
             'invoice_numbers': invoice_nums if invoice_nums else [],
             'vendor_names': vendors if vendors else []

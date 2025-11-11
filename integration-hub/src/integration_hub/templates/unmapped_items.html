@@ -59,6 +59,7 @@
                                 <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
                             </th>
                             <th>Item Description</th>
+                            <th>Item Code</th>
                             <th>Occurrences</th>
                             <th>Vendors</th>
                             <th>Invoices</th>
@@ -75,6 +76,13 @@
                                        onchange="updateSelectedCount()">
                             </td>
                             <td><strong>{{ item.item_description }}</strong></td>
+                            <td>
+                                {% if item.item_code %}
+                                    <code class="text-success">{{ item.item_code }}</code>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 <span class="badge bg-info">{{ item.occurrence_count }}</span>
                             </td>
