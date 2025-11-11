@@ -297,11 +297,12 @@ function filterItems() {
 
     for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        const description = row.cells[1].textContent.toLowerCase();
-        const vendors = row.cells[3].textContent.toLowerCase();
-        const invoices = row.cells[4].textContent.toLowerCase();
+        const description = row.cells[1].textContent.toLowerCase(); // Item Description
+        const itemCode = row.cells[2].textContent.toLowerCase();     // Item Code
+        const vendors = row.cells[4].textContent.toLowerCase();      // Vendors (was 3)
+        const invoices = row.cells[5].textContent.toLowerCase();     // Invoices (was 4)
 
-        if (description.includes(filter) || vendors.includes(filter) || invoices.includes(filter)) {
+        if (description.includes(filter) || itemCode.includes(filter) || vendors.includes(filter) || invoices.includes(filter)) {
             row.style.display = '';
             visibleCount++;
         } else {
