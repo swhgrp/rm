@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** November 9, 2025
+**Last Updated:** November 10, 2025
 **Status:** ~85% Complete - Core Systems Production Ready ✅
-**Latest:** Complete codebase analysis & documentation updates (Nov 9, 2025) 📚
+**Latest:** Inventory & Integration Hub UX improvements (Nov 10, 2025) 🎨
 
 ---
 
@@ -1183,6 +1183,37 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 ## 📝 Recent Updates
+
+### November 10, 2025 - Inventory & Integration Hub UX Improvements 🎨
+
+**Inventory System - Vendor Items UX Overhaul**
+- ✅ **Custom Searchable Dropdown** - Replaced Select2 with Integration Hub-style search
+  - Text input + scrollable select list (compact, no massive overlay)
+  - Search anywhere in item name (e.g., "ultra" finds "Michelob Ultra")
+  - All 485 master items now loaded and searchable
+  - Fixed API limit issue (was 100, now 10000)
+- ✅ **Filter Persistence** - Filters no longer reset after editing vendor items
+  - Saves and restores vendor/master item filter selections
+  - Fixes annoying UX issue where filters cleared on every edit
+- ✅ **Improved Terminology** - Clearer field labels
+  - "Purchase Unit" → "Base Unit"
+  - "Conversion Factor" → "Quantity Per Case"
+  - "Unit Price" → "Case Price"
+  - Added helpful descriptive text for each field
+
+**Integration Hub - Item Code Visibility**
+- ✅ **Item Code Column Added** - Verify vendor SKUs on unmapped items page
+  - Shows parsed item codes from invoice OCR
+  - Allows verification that codes match Inventory system
+
+**Files Modified:**
+- `inventory/src/restaurant_inventory/templates/vendor_items.html` (major refactor)
+- `integration-hub/src/integration_hub/main.py` (unmapped items query)
+- `integration-hub/src/integration_hub/templates/unmapped_items.html` (item code column)
+
+**Commits:** e236531, 2b64ba7, 0b1ae18, 956f8a7, 079b48d
+
+---
 
 ### November 9, 2025 - Complete Documentation Audit & Updates 📚 **CRITICAL FIXES**
 - ✅ **Comprehensive codebase analysis** - 57 undocumented features identified

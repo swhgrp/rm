@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** November 9, 2025
+**Last Updated:** November 10, 2025
 **System Status:** Production (85% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -9,7 +9,60 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Last Session - Nov 9, 2025)
+### Most Recent Work (Current Session - Nov 10, 2025)
+
+**INVENTORY SYSTEM: VENDOR ITEMS UX IMPROVEMENTS** (Nov 10, 2025) ✅ **COMPLETE**
+
+1. **Integration Hub - Item Code Column Added** ✅
+   - Added item code column to unmapped items page
+   - Allows verification that vendor item codes in invoices match Inventory system
+   - Shows parsed item codes from invoice OCR
+   - Commit: e236531 - PUSHED ✅
+
+2. **Vendor Items Terminology Improved** ✅
+   - Renamed confusing "Purchase Unit + Conversion Factor" fields
+   - New labels: "Base Unit", "Quantity Per Case", "Case Price"
+   - Added descriptive help text for clarity
+   - Maintains flexible architecture while improving UX
+   - Commit: 2b64ba7 - PUSHED ✅
+
+3. **Master Items Dropdown - All Items Loaded** ✅
+   - Fixed API default limit (was 100, now 10000)
+   - All 485 master items now load in dropdown
+   - Items like "Bud Light 16oz" now accessible
+   - Updated 2 API calls: api/items/?limit=10000
+   - Commit: 0b1ae18 - PUSHED ✅
+
+4. **Searchable Dropdown Implementation** ✅
+   - Replaced Select2 with custom searchable select (Integration Hub style)
+   - Text input + scrollable select list (size=6, max-height: 200px)
+   - Search anywhere in item name (e.g., "ultra" finds "Michelob Ultra")
+   - No massive dropdown overlay - compact UX
+   - Added filterMasterItems() function using text.includes()
+   - Commit: 956f8a7, 079b48d - PUSHED ✅
+
+5. **Filter Persistence After Editing** ✅
+   - Save filter values before repopulating dropdowns
+   - Restore vendor and master item filters after modal opens
+   - Users can filter, edit items, and keep filters applied
+   - Fixes annoying UX issue where filters reset on every edit
+   - Commit: 079b48d - PUSHED ✅
+
+**Files Modified:**
+- integration-hub/src/integration_hub/main.py (unmapped items query)
+- integration-hub/src/integration_hub/templates/unmapped_items.html (item code column)
+- inventory/src/restaurant_inventory/templates/vendor_items.html (terminology, searchable dropdown, filter persistence)
+
+**Git Commits:**
+- e236531 - Add item code column to Integration Hub unmapped items page
+- 2b64ba7 - Improve vendor items terminology for clarity
+- 0b1ae18 - Fix master items dropdown - load all items
+- 956f8a7 - Implement searchable dropdown with Select2
+- 079b48d - Replace Select2 with custom searchable dropdown + filter persistence
+
+---
+
+### Previous Session Work (Nov 9, 2025)
 
 **FILES SYSTEM: SHARING & PERMISSIONS OVERHAUL:** (Nov 9, 2025) ✅ **PRODUCTION READY**
 
@@ -434,18 +487,19 @@
 ```bash
 # Branch: main
 # Status: Clean - All changes committed and pushed
-# Last push: November 9, 2025
-# Latest commits (Nov 9 - Files System):
+# Last push: November 10, 2025
+# Latest commits (Nov 10 - Inventory & Integration Hub UX):
+#   - 079b48d - feat(inventory): Improve vendor items UX - searchable dropdown and filter persistence - PUSHED ✅
+#   - 956f8a7 - feat(inventory): Add Select2 searchable dropdown for master items in vendor item form - PUSHED ✅
+#   - 0b1ae18 - fix(inventory): Load all master items in vendor item dropdown - increase API limit - PUSHED ✅
+#   - 2b64ba7 - feat(inventory): Improve vendor items terminology for clarity - PUSHED ✅
+#   - e236531 - feat(integration-hub): Add item code column to unmapped items page - PUSHED ✅
+# Previous commits (Nov 9 - Files System):
 #   - aa643b4 - Make shared folders clickable like regular folders - remove Open button - PUSHED ✅
 #   - 4894738 - Fix shared folder access and page refresh state persistence - PUSHED ✅
 #   - efce9e2 - Fix dashboard 'Shared with Me' section showing 'undefined' for folder names - PUSHED ✅
 #   - a38743d - Prevent duplicate internal shares - update existing instead of creating new - PUSHED ✅
 #   - 62b9c48 - Fix 'Shared with Me' page - correct API endpoint and response structure - PUSHED ✅
-#   - fac7010 - Fix folder permissions to inherit from parent - enable subfolder access - PUSHED ✅
-#   - 928f8cf - Remove admin bypass in file permissions - enforce sharing rules for all users - PUSHED ✅
-# Previous commits (Nov 9):
-#   - c8cce17 - chore: System cleanup - removed Python cache and test files - PUSHED ✅
-#   - 57796a5 - Fix critical location/venue bugs, improve calendar display, overhaul email routing - PUSHED ✅
 #
 # Untracked files (normal operations, excluded from git):
 #   - integration-hub/uploads/ (59 invoice PDFs - correctly ignored by .gitignore)
