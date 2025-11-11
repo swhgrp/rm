@@ -33,8 +33,8 @@ The SW Hospitality Group Restaurant Management System is a comprehensive microse
 
 ### Key Statistics (Corrected)
 - **7 microservices** running in production
-- **367 Python files** across all systems
-- **90+ HTML templates** for user interfaces
+- **417 Python files** across all systems (updated Nov 11, 2025)
+- **112 HTML templates** for user interfaces (updated Nov 11, 2025)
 - **125+ database models** with full relationships (not 74!)
 - **500+ API endpoints** for system integration (not 150!)
 - **16 Docker containers** orchestrated via Docker Compose
@@ -279,7 +279,7 @@ restaurant-system/
 - **URL:** https://rm.swhgrp.com/inventory/
 - **Database:** inventory_db (PostgreSQL 15) - **32 tables, 25+ models**
 - **Technology:** FastAPI, SQLAlchemy, OpenAI GPT-4, Redis, APScheduler, ReportLab
-- **Files:** 101 Python files, **27 templates (940KB)**, 177+ API routes across 21 modules
+- **Files:** 101 Python files, **28 templates (940KB)**, 177+ API routes across 21 modules
 
 **Core Inventory Features:**
 - ✅ Master item catalog with SKUs and categorization
@@ -345,7 +345,7 @@ restaurant-system/
 - **URL:** https://rm.swhgrp.com/hr/
 - **Database:** hr_db (PostgreSQL 15)
 - **Technology:** Django 4.2, Celery, Redis
-- **Files:** 53 Python files, 13 templates
+- **Files:** 56 Python files, 14 templates
 
 **Note:** This is an employee information management system. It does NOT include scheduling, time tracking, or payroll features.
 
@@ -383,7 +383,7 @@ restaurant-system/
 - **Database:** accounting_db (PostgreSQL 15) - 60+ models
 - **Technology:** **FastAPI with SQLAlchemy ORM** (corrected Nov 9, 2025)
 - **Migrations:** Alembic (not Django migrations)
-- **Files:** **140 Python files** (largest system!), 37 templates, 251 API endpoints
+- **Files:** **154 Python files** (largest system!), 38 templates, 251 API endpoints
 - **API Docs:** OpenAPI/Swagger auto-generated
 
 **Note:** ✅ Framework documentation corrected Nov 9 - FastAPI with SQLAlchemy, NOT Django.
@@ -467,7 +467,7 @@ restaurant-system/
 - **Public Form:** https://rm.swhgrp.com/events/public/intake (NO AUTH REQUIRED)
 - **Database:** events_db (PostgreSQL 15)
 - **Technology:** FastAPI, SQLAlchemy, WeasyPrint (PDF), FullCalendar.js
-- **Files:** 35 Python files, 10 templates
+- **Files:** 51 Python files, 14 templates
 
 **✅ Portal SSO Integration Complete (Nov 1, 2025):**
 - ✅ JWT token validation from Portal
@@ -555,7 +555,7 @@ restaurant-system/
 - **URL:** https://rm.swhgrp.com/hub/
 - **Database:** hub_db (PostgreSQL 15) - 7+ models
 - **Technology:** **FastAPI**, SQLAlchemy, OpenAI GPT-4o Vision, APScheduler, PyPDF2, pdf2image
-- **Files:** 30+ Python files, 9 templates (includes new mapped_items.html)
+- **Files:** 36 Python files, 9 templates (includes mapped_items.html)
 
 **Critical Correction:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
@@ -623,6 +623,7 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 
 - **URL:** https://rm.swhgrp.com/files/
 - **Technology:** FastAPI with local file storage, LibreOffice (document conversion)
+- **Files:** 14 Python files, 3 templates
 - **Storage:** Persistent volume on server (`/app/storage`)
 - **Status:** Core features operational, has production issues
 
@@ -1146,14 +1147,14 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 | System | Status | Python Files | Templates | Models | Completion | Notes |
 |--------|--------|--------------|-----------|--------|------------|-------|
 | Portal | ✅ Production | 3 | 5 | 1 | 99%+ | ✅ **Fully documented (Nov 9)** - Monitoring, password sync |
-| Inventory | ✅ Production | 101 | 27 | 25+ | **100%+** 🌟 | ✅ README updated (Nov 3) - AI invoices, POS, recipes fully documented |
-| HR | ✅ Production | 53 | 13 | 12 | **100%** ✅ | Email notifications, admin delete, doc security (Nov 3) |
-| Accounting | ⚠️ Active | 140 | 37 | 60+ | ~75% | ✅ **Framework corrected (Nov 9)** - FastAPI documented |
-| Events | ✅ Production | 35 | 10 | 17 | ~75% | ✅ SSO complete (Nov 1) |
-| Integration Hub | ✅ Production | 30+ | 9 | 7+ | 100%+ 🌟 | **NEW: Bulk mapping workflow (10x faster), statement handling** 🚀 |
-| Files | ⚠️ Active | 11 | 1 | 6 | 75-80% | Migration syntax error |
+| Inventory | ✅ Production | 101 | 28 | 25+ | **100%+** 🌟 | ✅ README updated (Nov 3) - AI invoices, POS, recipes fully documented |
+| HR | ✅ Production | 56 | 14 | 12 | **100%** ✅ | Email notifications, admin delete, doc security (Nov 3) |
+| Accounting | ⚠️ Active | 154 | 38 | 60+ | ~75% | ✅ **Framework corrected (Nov 9)** - FastAPI documented |
+| Events | ✅ Production | 51 | 14 | 17 | ~75% | ✅ SSO complete (Nov 1) |
+| Integration Hub | ✅ Production | 36 | 9 | 7+ | 100%+ 🌟 | **NEW: Multi-page parsing, bulk mapping workflow** 🚀 |
+| Files | ⚠️ Active | 14 | 3 | 6 | 75-80% | Migration syntax error |
 
-**Total:** 373+ Python files, 92+ templates, 128+ database models
+**Total:** 417 Python files, 112 templates, 128+ database models (updated Nov 11, 2025)
 
 **Overall Status:** ~85% Complete - Core Systems Production Ready ✅ with Caveats ⚠️
 

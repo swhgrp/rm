@@ -549,7 +549,7 @@
 
 6. **Integration Hub: Automated Invoice Intake** ✅ (Oct 31, 2025)
    - Email monitoring system (IMAP, checks every 15 minutes)
-   - OpenAI GPT-4o-mini integration for PDF invoice parsing
+   - OpenAI GPT-4o Vision integration for PDF invoice parsing
    - Intelligent auto-mapper (vendor item codes, fuzzy matching, GL accounts)
    - Email settings UI with connection testing
    - PDF deduplication (SHA-256 hashing)
@@ -792,7 +792,7 @@ Each service has isolated PostgreSQL database:
 
 **Database:** 60+ models (largest system)
 
-**Files:** 140 Python files (most complex system)
+**Files:** 154 Python files (most complex system)
 
 **Completion Status:**
 - ✅ Core Accounting: 100%
@@ -892,7 +892,7 @@ Each service has isolated PostgreSQL database:
 
 **Location:** `/opt/restaurant-system/integration-hub/`
 
-**Technology:** FastAPI, SQLAlchemy, OpenAI GPT-4o-mini, APScheduler, PyPDF2
+**Technology:** FastAPI, SQLAlchemy, OpenAI GPT-4o Vision, APScheduler, PyPDF2
 
 **Database:** 7+ models
 
@@ -900,7 +900,7 @@ Each service has isolated PostgreSQL database:
 
 **What It Actually Does:**
 - ✅ Receives vendor invoices (email, manual upload)
-- ✅ AI-powered PDF parsing (OpenAI GPT-4o-mini)
+- ✅ AI-powered PDF parsing (OpenAI GPT-4o Vision)
 - ✅ Maps invoice line items to inventory items
 - ✅ Maps items to GL accounts (Asset, COGS, Waste, Revenue)
 - ✅ Sends mapped invoices to Inventory system via REST API

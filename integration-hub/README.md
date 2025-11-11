@@ -47,7 +47,7 @@ The Integration Hub is an **invoice processing and general ledger (GL) mapping s
 ### October 31, 2025 - Automated Email Intake 📧
 
 - IMAP email monitoring (checks every 15 minutes)
-- OpenAI GPT-4o-mini PDF parsing
+- OpenAI GPT-4o Vision PDF parsing
 - SHA-256 PDF deduplication
 - Intelligent auto-mapping (vendor codes, fuzzy matching, category fallbacks)
 - Email settings UI with connection testing
@@ -55,7 +55,7 @@ The Integration Hub is an **invoice processing and general ledger (GL) mapping s
 ## Purpose
 
 - **Automated email monitoring** - Check inbox every 15 minutes for invoice PDFs 📧
-- **AI-powered parsing** - Extract invoice data using GPT-4o-mini 🤖
+- **AI-powered parsing** - Extract invoice data using GPT-4o Vision 🤖
 - Receive vendor invoices (email, manual upload, or API)
 - Map invoice line items to inventory items (with bulk mapping) 🚀
 - Map items to general ledger accounts (Asset, COGS, Waste, Revenue)
@@ -69,7 +69,7 @@ The Integration Hub is an **invoice processing and general ledger (GL) mapping s
 
 - **Framework:** FastAPI (Python async)
 - **Database:** PostgreSQL 15
-- **AI/ML:** OpenAI GPT-4o-mini (invoice parsing) 🤖
+- **AI/ML:** OpenAI GPT-4o Vision (invoice parsing) 🤖
 - **PDF Processing:** PyPDF2, pdf2image 📄
 - **Background Jobs:** APScheduler (email monitoring) ⏰
 - **HTTP Client:** httpx (async)
@@ -84,7 +84,7 @@ The Integration Hub is an **invoice processing and general ledger (GL) mapping s
 **Invoice Processing:**
 - ✅ Manual invoice upload (PDF/data entry)
 - ✅ **Automated email monitoring** (IMAP, checks every 15 minutes) 📧
-- ✅ **AI-powered PDF parsing** (OpenAI GPT-4o-mini) 🤖
+- ✅ **AI-powered PDF parsing** (OpenAI GPT-4o Vision) 🤖
 - ✅ **Statement detection** - Mark as statement to prevent sending to systems 🆕
 - ✅ **Invoice deletion** - Cascade delete with PDF file cleanup 🆕
 - ✅ **Vendor selection/creation** in invoice detail view 🆕
