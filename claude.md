@@ -35,16 +35,28 @@
    - Example: Cozzini invoices (knife service, GL-only) now show gray dash for Inventory
    - Commit: 3c9a0c1 - PUSHED ✅
 
+3. **AI-Powered Statement Detection** 🤖 **SMART AUTOMATION**
+   - GPT-4o Vision now automatically detects if document is a statement vs invoice
+   - Checks for "Statement", "Account Statement", "Monthly Statement" in document title
+   - Sets `is_statement=true` automatically during parsing
+   - Statements auto-flagged and excluded from system sync
+   - Use case: Cozzini Bros and Gordon Food Service monthly account statements
+   - User workflow: Click "Re-parse Invoice" → AI detects statement → Auto-marked
+   - Commit: d48c2e1 - PUSHED ✅
+
 **Impact:** All vendor bill creation to Accounting was completely broken until fix #1. Fix #2 eliminates user confusion about sync status.
 
 **Files Modified:**
-- integration-hub/src/integration_hub/services/accounting_sender.py (line 226)
-- integration-hub/src/integration_hub/templates/invoices.html (sync status icons)
-- integration-hub/src/integration_hub/templates/invoice_detail.html (sync status display)
+- integration-hub/src/integration_hub/services/accounting_sender.py (line 226 - field name fix)
+- integration-hub/src/integration_hub/templates/invoices.html (three-state sync icons)
+- integration-hub/src/integration_hub/templates/invoice_detail.html (three-state sync display)
+- integration-hub/src/integration_hub/services/invoice_parser.py (AI statement detection)
 
 **Git Commits:**
 - 196dab7 - fix(integration-hub): Critical bug - use total_amount not line_total
 - 3c9a0c1 - feat(integration-hub): Improve sync status icons with three states
+- d48c2e1 - feat(integration-hub): Add AI-powered statement detection
+- 209765b - docs: Update claude.md with three-state sync status UX improvement
 - 39e00c7 - docs: Update claude.md with critical accounting bug fix
 - e556d55 - docs: Update claude.md with Nov 11 afternoon documentation cleanup session
 
