@@ -11,6 +11,29 @@
 
 ### Most Recent Work (Current Session - Nov 11, 2025 - AFTERNOON)
 
+**INTEGRATION HUB: CRITICAL ACCOUNTING BUG FIX** (Nov 11, 2025) 🔥 **PRODUCTION CRITICAL**
+
+1. **Fixed AttributeError in accounting_sender.py** 🔥 **CRITICAL**
+   - Line 226 was using `item.line_total` but field is `item.total_amount`
+   - This broke ALL accounting integration - no invoices could be sent
+   - Error appeared as: "Bill total mismatch: Lines $X != Invoice $Y"
+   - Root cause: Field name mismatch, not actual calculation error
+   - Fixed: Changed `item.line_total` → `item.total_amount`
+   - Rebuilt Integration Hub container with fix
+   - Cleared 16 affected invoices (all Cozzini Bros knife service)
+   - Commit: 196dab7 - PUSHED ✅
+
+**Impact:** All vendor bill creation to Accounting was completely broken until this fix.
+
+**Files Modified:**
+- integration-hub/src/integration_hub/services/accounting_sender.py (line 226)
+
+**Git Commits:**
+- 196dab7 - fix(integration-hub): Critical bug - use total_amount not line_total
+- e556d55 - docs: Update claude.md with Nov 11 afternoon documentation cleanup session
+
+---
+
 **DOCUMENTATION ACCURACY CLEANUP** (Nov 11, 2025) 📚 **CRITICAL CORRECTIONS**
 
 1. **Framework Documentation Errors Fixed** 🔥 **CRITICAL**
