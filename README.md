@@ -1127,8 +1127,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ## 🎉 Acknowledgments
 
 **Built with:**
-- Django 4.2 - Web framework for Inventory, HR, Accounting, Integration Hub
-- FastAPI - Modern async framework for Portal, Events
+- **FastAPI** - Modern async framework for Portal, Inventory, Accounting, Integration Hub, Events, Files (6/7 systems)
+- **Django 4.2** - Web framework for HR only (1/7 systems)
 - PostgreSQL 15 - Reliable database system
 - Redis 7 - Caching and task queues
 - Docker & Docker Compose - Containerization
