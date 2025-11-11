@@ -223,7 +223,7 @@ class AccountingSenderService:
                     "descriptions": []
                 }
 
-            account_number_totals[account_number]["amount"] += Decimal(str(item.line_total))
+            account_number_totals[account_number]["amount"] += Decimal(str(item.total_amount))
             account_number_totals[account_number]["descriptions"].append(item.item_description)
 
         # Calculate subtotal and tax
