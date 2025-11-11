@@ -2,6 +2,36 @@
 
 {% block title %}Vendor Items - Restaurant Inventory{% endblock %}
 
+{% block head %}
+<!-- Select2 for searchable dropdowns -->
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<style>
+    /* Make Select2 work with dark theme */
+    .select2-container--bootstrap-5 .select2-selection {
+        background-color: #212529;
+        border-color: #495057;
+        color: #dee2e6;
+    }
+    .select2-container--bootstrap-5 .select2-dropdown {
+        background-color: #212529;
+        border-color: #495057;
+    }
+    .select2-container--bootstrap-5 .select2-results__option {
+        color: #dee2e6;
+    }
+    .select2-container--bootstrap-5 .select2-results__option--highlighted {
+        background-color: #0d6efd;
+        color: white;
+    }
+    .select2-container--bootstrap-5 .select2-search__field {
+        background-color: #212529;
+        border-color: #495057;
+        color: #dee2e6;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid py-4">
     <h1 class="mb-4">Vendor Items</h1>
@@ -992,5 +1022,29 @@
     function closeVendorItemUploadModal() {
         bootstrap.Modal.getInstance(document.getElementById('vendorItemUploadModal')).hide();
     }
+</script>
+
+<!-- Select2 JS -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script>
+    // Initialize Select2 on master item dropdown when modal opens
+    document.getElementById('vendorItemModal').addEventListener('shown.bs.modal', function () {
+        if (!$('#viMasterItemId').hasClass('select2-hidden-accessible')) {
+            $('#viMasterItemId').select2({
+                theme: 'bootstrap-5',
+                dropdownParent: $('#vendorItemModal'),
+                placeholder: 'Search for master item...',
+                allowClear: true,
+                width: '100%'
+            });
+        }
+    });
+
+    // Destroy Select2 when modal closes to avoid conflicts
+    document.getElementById('vendorItemModal').addEventListener('hidden.bs.modal', function () {
+        if ($('#viMasterItemId').hasClass('select2-hidden-accessible')) {
+            $('#viMasterItemId').select2('destroy');
+        }
+    });
 </script>
 {% endblock %}
