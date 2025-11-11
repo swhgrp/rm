@@ -694,32 +694,33 @@ docker compose up -d
 
 4. **Run database migrations:**
 ```bash
-# Django systems
-docker compose exec inventory-app python manage.py migrate
-docker compose exec hr-app python manage.py migrate
-docker compose exec accounting-app python manage.py migrate
-
-# FastAPI/Alembic systems
+# All systems use Alembic for migrations
+docker compose exec inventory-app alembic upgrade head
+docker compose exec hr-app alembic upgrade head
+docker compose exec accounting-app alembic upgrade head
 docker compose exec events-app alembic upgrade head
+docker compose exec integration-hub-app alembic upgrade head
 ```
 
 5. **Load initial data:**
 ```bash
-# Load chart of accounts for accounting
-docker compose exec accounting-app python manage.py loaddata default_coa
+# Load chart of accounts for accounting (Python script, not Django command)
+docker compose exec accounting-app python -c "from accounting.fixtures.load_coa import load_default_coa; load_default_coa()"
 
-# Create fiscal year
-docker compose exec accounting-app python manage.py create_fiscal_year 2025
-
-# Load vendor types for integration hub
-docker compose exec integration-hub python manage.py loaddata vendor_types
+# Note: Admin users are created through HR system and Portal interface
+# Initial data is typically loaded via SQL scripts or Python scripts, not Django fixtures
 ```
 
 6. **Create admin users:**
 ```bash
-docker compose exec inventory-app python manage.py createsuperuser
-docker compose exec hr-app python manage.py createsuperuser
-docker compose exec accounting-app python manage.py createsuperuser
+# Admin users are created in the HR system database
+# Use the HR system interface or direct SQL to create users
+# Portal reads from hr_db for authentication
+
+# Example: Access HR system to create first admin user
+# Visit https://rm.swhgrp.com/hr/ or use SQL:
+# INSERT INTO users (username, email, hashed_password, full_name, is_admin, is_active)
+# VALUES ('admin', 'admin@example.com', '$2b$...', 'Admin User', true, true);
 ```
 
 7. **Access the portal:**
@@ -741,12 +742,14 @@ source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
 # Run development server
-# Django systems:
-python manage.py runserver
-
-# FastAPI systems (Portal, Events):
+# All systems use FastAPI with Uvicorn
 cd src
-uvicorn portal.main:app --reload  # or events.main:app
+uvicorn portal.main:app --reload        # Portal
+uvicorn inventory.main:app --reload     # Inventory
+uvicorn hr.main:app --reload            # HR
+uvicorn accounting.main:app --reload    # Accounting
+uvicorn events.main:app --reload        # Events
+uvicorn integration_hub.main:app --reload  # Integration Hub
 ```
 
 ---
