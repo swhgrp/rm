@@ -58,9 +58,9 @@ restaurant-system/
 │   └── README.md       # Portal documentation
 │
 ├── inventory/          # Inventory Management Service
-│   ├── src/            # Django application code (101 Python files)
-│   ├── migrations/     # Database migrations
-│   ├── templates/      # 27 HTML templates
+│   ├── src/            # FastAPI application code (101 Python files)
+│   ├── alembic/        # Database migrations
+│   ├── templates/      # 28 HTML templates
 │   ├── static/         # CSS, JS, images
 │   ├── uploads/        # File uploads
 │   ├── Dockerfile
@@ -69,9 +69,9 @@ restaurant-system/
 │   └── README.md       # Complete documentation (426 lines)
 │
 ├── hr/                 # HR Management Service
-│   ├── src/            # Django application code (53 Python files)
-│   ├── migrations/     # Database migrations
-│   ├── templates/      # 13 HTML templates
+│   ├── src/            # FastAPI application code (56 Python files)
+│   ├── alembic/        # Database migrations
+│   ├── templates/      # 14 HTML templates
 │   ├── documents/      # Employee document storage
 │   ├── Dockerfile
 │   ├── requirements.txt
@@ -79,9 +79,9 @@ restaurant-system/
 │   └── README.md       # HR system documentation
 │
 ├── accounting/         # Accounting Service (LARGEST SYSTEM)
-│   ├── src/            # Django application code (140 Python files!)
-│   ├── migrations/     # 50+ database migrations
-│   ├── templates/      # 37 HTML templates
+│   ├── src/            # FastAPI application code (154 Python files!)
+│   ├── alembic/        # 50+ database migrations
+│   ├── templates/      # 38 HTML templates
 │   ├── static/         # CSS, JS, charts
 │   ├── fixtures/       # Default chart of accounts
 │   ├── Dockerfile
@@ -90,9 +90,9 @@ restaurant-system/
 │   └── README.md       # Comprehensive accounting docs
 │
 ├── events/             # Event Planning & Catering Service
-│   ├── src/            # FastAPI application code (35 Python files)
+│   ├── src/            # FastAPI application code (51 Python files)
 │   ├── alembic/        # Database migrations
-│   ├── templates/      # 10 HTML templates
+│   ├── templates/      # 14 HTML templates
 │   │   ├── admin/      # Dashboard, calendar, tasks
 │   │   ├── public/     # Public intake form
 │   │   ├── pdf/        # BEO PDF templates
@@ -104,19 +104,19 @@ restaurant-system/
 │   └── README.md       # Events documentation (278 lines)
 │
 ├── integration-hub/    # Integration Hub Service
-│   ├── src/            # Django application code (24 Python files)
-│   ├── migrations/     # Database migrations
-│   ├── templates/      # 7 HTML templates
-│   ├── tasks/          # Celery background jobs
+│   ├── src/            # FastAPI application code (36 Python files)
+│   ├── alembic/        # Database migrations
+│   ├── templates/      # 9 HTML templates
+│   ├── services/       # APScheduler background jobs (email monitoring)
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   ├── .env
 │   └── README.md       # Integration Hub documentation
 │
 ├── files/              # Files Management Service
-│   ├── src/            # FastAPI application code (11 Python files)
+│   ├── src/            # FastAPI application code (14 Python files)
 │   ├── alembic/        # Database migrations
-│   ├── templates/      # File manager interface
+│   ├── templates/      # 3 HTML templates (file manager interface)
 │   ├── storage/        # User file storage (isolated per user)
 │   ├── logs/           # Application logs
 │   ├── Dockerfile
@@ -773,9 +773,9 @@ Each system has comprehensive README documentation:
   - Troubleshooting guides
 
 ### API Documentation
-- **Portal:** https://rm.swhgrp.com/portal/docs (if FastAPI docs enabled)
+- **Portal:** https://rm.swhgrp.com/portal/docs (FastAPI interactive docs)
 - **Events:** https://rm.swhgrp.com/events/docs (FastAPI interactive docs)
-- **Django REST APIs:** Browsable API at `/api/` endpoints
+- **All Systems:** FastAPI auto-generated OpenAPI docs at `/{system}/docs` endpoints
 
 ---
 
@@ -832,25 +832,25 @@ cat backup_20251028.sql | docker compose exec -T inventory-db psql -U inventory_
 ./scripts/rotate-backups.sh
 ```
 
-### Django Operations
+### FastAPI/Alembic Operations
 ```bash
-# Run migrations
-docker compose exec [service]-app python manage.py migrate
+# Run migrations (all systems use Alembic)
+docker compose exec [service]-app alembic upgrade head
 
-# Create new migrations
-docker compose exec [service]-app python manage.py makemigrations
+# Create new migration
+docker compose exec [service]-app alembic revision --autogenerate -m "description"
 
-# Create superuser
-docker compose exec [service]-app python manage.py createsuperuser
+# Downgrade migration
+docker compose exec [service]-app alembic downgrade -1
 
-# Django shell (interactive Python)
-docker compose exec [service]-app python manage.py shell
+# View migration history
+docker compose exec [service]-app alembic history
 
-# Collect static files
-docker compose exec [service]-app python manage.py collectstatic --noinput
+# Python shell (interactive Python with service context)
+docker compose exec [service]-app python
 
-# Load fixtures
-docker compose exec [service]-app python manage.py loaddata [fixture-name]
+# View FastAPI OpenAPI docs
+# Visit: https://rm.swhgrp.com/[service]/docs
 ```
 
 ### System Health Checks
@@ -1160,10 +1160,10 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 **Critical Issues:**
 - ✅ ~~Events System: Authentication not implemented~~ - RESOLVED (Nov 1, 2025)
-- Accounting System: Wrong framework documented (needs README update)
+- ✅ ~~Accounting System: Wrong framework documented~~ - RESOLVED (Nov 11, 2025) - FastAPI confirmed
+- ✅ ~~HR System: Wrong framework documented~~ - RESOLVED (Nov 11, 2025) - FastAPI confirmed
 - Files System: Production-blocking migration error (needs fix)
 - ~~Integration Hub: Major feature misrepresentation corrected~~ - RESOLVED (Oct 31, 2025)
-- ~~HR System: Feature set corrected (no scheduling/payroll)~~ - RESOLVED (Oct 30, 2025)
 
 ---
 
