@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** November 11, 2025
+**Last Updated:** November 12, 2025
 **Status:** ~85% Complete - Core Systems Production Ready ✅
-**Latest:** Integration Hub multi-page parsing fixes & tax handling (Nov 11, 2025) 🔥
+**Latest:** Integration Hub category naming standardization (Nov 12, 2025) ✅
 
 ---
 
@@ -1181,6 +1181,36 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 ## 📝 Recent Updates
+
+### November 12, 2025 - Integration Hub: Category Naming Standardization ✅
+
+**Consistent Category Structure**
+- ✅ **Standardized category naming** from inconsistent format to professional nested structure
+  - Old: Mixed standalone (Beef, Dairy) and nested (Beer - Draft, Beer - Bottled) formats
+  - New: Consistent nested format for all food items ("Food - Beef", "Food - Dairy", "Food - Produce", etc.)
+  - Beverages: "Beer - Draft", "Beer - Bottled", "Beverage - Non-Alcohol"
+  - Standalone: "Wine", "Liquor", "Merchandise"
+  - **Impact:** Clearer organization, easier to understand item categories
+
+**Database Updates**
+- ✅ **Updated 9 category mappings** in `category_gl_mapping` table
+  - Beef → Food - Beef, Dairy → Food - Dairy, Produce → Food - Produce, etc.
+- ✅ **Updated 69 invoice items** in `hub_invoice_items` table with new category names
+- ✅ **Removed "Supplies" category** (expense-only, not inventory)
+
+**UI Template Synchronization**
+- ✅ **Updated all category dropdowns** across 3 templates:
+  - `integration-hub/src/integration_hub/templates/mapped_items.html`
+  - `integration-hub/src/integration_hub/templates/unmapped_items.html`
+  - `integration-hub/src/integration_hub/templates/category_mappings.html`
+- ✅ **Alphabetically sorted** all category options for easier selection
+- ✅ **Database and UI fully synchronized** - no more dropdown/database mismatches
+
+**Files Modified:**
+- 3 HTML templates with category dropdowns
+- Database: `category_gl_mapping` and `hub_invoice_items` tables
+
+---
 
 ### November 11, 2025 - Integration Hub: Multi-Page Parsing & Tax Handling 🔥 **CRITICAL FIXES**
 

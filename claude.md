@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** November 11, 2025
+**Last Updated:** November 12, 2025
 **System Status:** Production (85% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -9,7 +9,57 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Nov 11, 2025 - AFTERNOON)
+### Most Recent Work (Current Session - Nov 12, 2025)
+
+**INTEGRATION HUB: CATEGORY NAMING STRUCTURE STANDARDIZATION** (Nov 12, 2025) ✅ **COMPLETE**
+
+1. **Category Mapping Restructure** 🔧 **CONSISTENCY IMPROVEMENT**
+   - Standardized category naming from inconsistent format to nested structure
+   - **Old structure:** Mixed standalone (Beef, Dairy) and nested (Beer - Draft, Beer - Bottled)
+   - **New structure:**
+     - Food items: "Food - Beef", "Food - Dairy", "Food - Produce", etc.
+     - Beverages: "Beer - Draft", "Beer - Bottled", "Beverage - Non-Alcohol"
+     - Standalone: "Wine", "Liquor", "Merchandise"
+   - Updated 9 category mappings in `category_gl_mapping` table
+   - Updated 69 invoice items in `hub_invoice_items` table with new category names
+   - Removed "Supplies" category (expense-only, not needed)
+
+2. **UI Template Updates** ✅ **ALL DROPDOWNS SYNCHRONIZED**
+   - Updated all hardcoded category dropdowns across 3 templates
+   - Files modified:
+     - `integration-hub/src/integration_hub/templates/mapped_items.html`
+     - `integration-hub/src/integration_hub/templates/unmapped_items.html`
+     - `integration-hub/src/integration_hub/templates/category_mappings.html`
+   - All dropdowns now alphabetically sorted with consistent naming
+   - Database and UI now fully synchronized
+
+3. **Direct Database Updates** 🔧
+   - Used SQLAlchemy `text()` for direct SQL execution (avoided ORM relationship issues)
+   - Successfully renamed categories without triggering circular import errors
+   - Renamed categories:
+     - Beef → Food - Beef (6 items updated)
+     - Dairy → Food - Dairy (2 items)
+     - Produce → Food - Produce (36 items)
+     - Poultry → Food - Poultry
+     - Pork → Food - Pork (4 items)
+     - Seafood → Food - Seafood (7 items)
+     - Dry Goods → Food - Dry Goods (6 items)
+     - Frozen → Food - Frozen
+     - Beverage (Non-Alcohol) → Beverage - Non-Alcohol (8 items)
+
+**Impact:** Consistent, professional category structure makes mapping clearer and eliminates confusion between food items and other inventory categories.
+
+**Files Modified:**
+- integration-hub/src/integration_hub/templates/mapped_items.html (category dropdown lines 170-186)
+- integration-hub/src/integration_hub/templates/unmapped_items.html (category dropdown lines 185-201)
+- integration-hub/src/integration_hub/templates/category_mappings.html (category dropdown lines 157-173)
+- Database: category_gl_mapping and hub_invoice_items tables updated
+
+**Git Commits:** Ready to commit and push ⏳
+
+---
+
+### Most Recent Work (Previous Session - Nov 11, 2025 - AFTERNOON)
 
 **INTEGRATION HUB: CRITICAL ACCOUNTING BUG FIX + UX IMPROVEMENT** (Nov 11, 2025) 🔥 **PRODUCTION CRITICAL**
 
