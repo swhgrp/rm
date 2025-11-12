@@ -1061,7 +1061,7 @@ function renderBills(bills) {
 
     tbody.innerHTML = bills.map(bill => {
         const statusClass = `status-${bill.status.toLowerCase()}`;
-        const locationName = bill.area ? `${bill.area.code}` : 'Corporate';
+        const locationName = bill.area ? `${bill.area.name}` : 'Corporate';
         const overdueTag = bill.is_overdue ? '<span class="overdue-badge">OVERDUE</span>' : '';
 
         return `

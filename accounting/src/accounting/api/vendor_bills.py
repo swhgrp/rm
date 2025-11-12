@@ -304,8 +304,8 @@ def list_vendor_bills(
             VendorBill.paid_amount < VendorBill.total_amount
         )
 
-    # Order by due date (oldest first), then bill date
-    query = query.order_by(VendorBill.due_date.asc(), VendorBill.bill_date.desc())
+    # Order by bill date (newest first)
+    query = query.order_by(VendorBill.bill_date.desc())
 
     bills = query.offset(skip).limit(limit).all()
     return bills
