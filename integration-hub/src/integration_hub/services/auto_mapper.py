@@ -164,6 +164,34 @@ class AutoMapperService:
 
         return None
 
+    def match_by_previous_mapping(self, item: HubInvoiceItem) -> Optional[Tuple[Dict, float]]:
+        """
+        Match by exact description from previous manual mappings
+        This is the HIGHEST priority - if user previously mapped this exact item, reuse it
+        """
+        if not item.item_description:
+            return None
+
+        # Query the mapping table for exact description match
+        previous_mapping = self.db.query(ItemGLMapping).filter(
+            ItemGLMapping.inventory_item_name == item.item_description,
+            ItemGLMapping.is_active == True
+        ).first()
+
+        if previous_mapping:
+            return ({
+                'id': previous_mapping.inventory_item_id,
+                'name': previous_mapping.inventory_item_name,
+                'category': previous_mapping.inventory_category,
+                'vendor_id': previous_mapping.vendor_id,
+                'vendor_item_code': previous_mapping.vendor_item_code,
+                'gl_asset_account': previous_mapping.gl_asset_account,
+                'gl_cogs_account': previous_mapping.gl_cogs_account,
+                'gl_waste_account': previous_mapping.gl_waste_account
+            }, 1.0)  # Perfect match - previously mapped by user
+
+        return None
+
     def map_item(
         self,
         item: HubInvoiceItem,
@@ -185,6 +213,23 @@ class AutoMapperService:
                 'gl_waste_account': int
             }
         """
+        # HIGHEST PRIORITY: Check if this exact item description was previously manually mapped
+        match = self.match_by_previous_mapping(item)
+        if match:
+            inv_item, confidence = match
+            logger.info(f"Matched item {item.id} by previous mapping: {inv_item['name']} (confidence: {confidence})")
+            return {
+                'mapped': True,
+                'method': 'previous_mapping',
+                'confidence': confidence,
+                'inventory_item_id': inv_item['id'],
+                'inventory_item_name': inv_item['name'],
+                'inventory_category': inv_item['category'],
+                'gl_asset_account': inv_item['gl_asset_account'],
+                'gl_cogs_account': inv_item['gl_cogs_account'],
+                'gl_waste_account': inv_item.get('gl_waste_account')
+            }
+
         # Fetch available inventory items
         inventory_items = self.fetch_inventory_items(vendor_id)
 
@@ -192,7 +237,7 @@ class AutoMapperService:
             logger.warning("No inventory items available for mapping")
             return {'mapped': False, 'reason': 'no_inventory_items'}
 
-        # Try vendor item code match first (highest priority)
+        # Try vendor item code match (high priority)
         match = self.match_by_vendor_item_code(item, vendor_id, inventory_items)
         if match:
             inv_item, confidence = match

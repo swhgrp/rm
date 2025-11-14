@@ -5,7 +5,7 @@ Central hub for receiving invoices and routing to Inventory and Accounting syste
 Provides mapping UI and auto-send functionality while keeping systems independent.
 """
 
-from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Form
+from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -168,9 +168,23 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
 # ============================================================================
 
 @app.get("/invoices", response_class=HTMLResponse)
-async def list_invoices(request: Request, db: Session = Depends(get_db)):
-    """List all invoices with filtering"""
-    invoices = db.query(HubInvoice).order_by(HubInvoice.created_at.desc()).all()
+async def list_invoices(
+    request: Request,
+    limit: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """List all invoices with optional pagination"""
+    query = db.query(HubInvoice).order_by(HubInvoice.invoice_date.desc())
+
+    # Get total count
+    total_count = query.count()
+
+    # Apply limit if provided (for pagination)
+    if limit:
+        invoices = query.limit(limit).all()
+    else:
+        # Default: load all for client-side filtering, but show only 50 in "All" tab
+        invoices = query.all()
 
     # Get vendors for dropdown
     vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
@@ -178,7 +192,9 @@ async def list_invoices(request: Request, db: Session = Depends(get_db)):
     return templates.TemplateResponse("invoices.html", {
         "request": request,
         "invoices": invoices,
-        "vendors": vendors
+        "vendors": vendors,
+        "total_count": total_count,
+        "loaded_count": len(invoices)
     })
 
 
@@ -259,32 +275,72 @@ async def upload_invoice(
     return RedirectResponse(url=f"/invoices/{invoice.id}", status_code=303)
 
 
-@app.post("/api/invoices/{invoice_id}/parse")
-async def parse_invoice(invoice_id: int, db: Session = Depends(get_db)):
+def _parse_invoice_background(invoice_id: int):
     """
-    Parse an invoice PDF using OpenAI to extract invoice data and line items
+    Background task to parse invoice without blocking the API response
     """
     from integration_hub.services.invoice_parser import get_invoice_parser
+    from integration_hub.db.database import SessionLocal
+    import logging
+
+    logger = logging.getLogger(__name__)
+    db = SessionLocal()
 
     try:
         parser = get_invoice_parser()
         result = parser.parse_and_save(invoice_id, db)
-        return result
+        logger.info(f"Invoice {invoice_id} parsed successfully in background: {result.get('message', 'No message')}")
     except ValueError as e:
-        # Configuration error (e.g., missing API key)
-        return {
-            "success": False,
-            "message": f"Configuration error: {str(e)}"
-        }
+        logger.error(f"Configuration error parsing invoice {invoice_id}: {str(e)}")
     except Exception as e:
-        # Unexpected error
-        import logging
-        logger = logging.getLogger(__name__)
         logger.error(f"Error parsing invoice {invoice_id}: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
+@app.post("/api/invoices/{invoice_id}/parse")
+async def parse_invoice(invoice_id: int, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """
+    Parse an invoice PDF using OpenAI to extract invoice data and line items.
+    Returns immediately and processes in background to avoid blocking the UI.
+    """
+    # Verify invoice exists
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
         return {
             "success": False,
-            "message": f"Error parsing invoice: {str(e)}"
+            "message": "Invoice not found"
         }
+
+    # Add parsing task to background
+    background_tasks.add_task(_parse_invoice_background, invoice_id)
+
+    return {
+        "success": True,
+        "message": "Invoice parsing started in background. This may take 30-60 seconds. Refresh the page to see results.",
+        "invoice_id": invoice_id,
+        "processing": True
+    }
+
+
+@app.get("/api/invoices/{invoice_id}")
+async def get_invoice_status(invoice_id: int, db: Session = Depends(get_db)):
+    """
+    Get invoice status and item count (for polling during background parsing)
+    """
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Get item count
+    items = db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).all()
+
+    return {
+        "id": invoice.id,
+        "status": invoice.status,
+        "is_statement": invoice.is_statement,
+        "items": [{"id": item.id} for item in items]  # Just IDs for lightweight response
+    }
 
 
 @app.patch("/api/invoices/{invoice_id}")
@@ -647,11 +703,19 @@ async def mapped_items(request: Request, db: Session = Depends(get_db)):
 
     # Fetch GL accounts from Accounting API
     gl_accounts = []
+    gl_accounts_map = {}
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000})
             if response.status_code == 200:
                 gl_accounts = response.json()
+                # Create a map of account number to account name for quick lookup
+                # Store both string and int keys since API returns strings but DB stores ints
+                for account in gl_accounts:
+                    account_num = account['account_number']
+                    account_name = account['account_name']
+                    gl_accounts_map[account_num] = account_name  # string key
+                    gl_accounts_map[int(account_num)] = account_name  # int key
             else:
                 logger.warning(f"Failed to fetch GL accounts: status {response.status_code}")
     except Exception as e:
@@ -696,7 +760,10 @@ async def mapped_items(request: Request, db: Session = Depends(get_db)):
             'vendor_item_details': vendor_item_details,
             'gl_asset_account': asset_acct,
             'gl_cogs_account': cogs_acct,
-            'gl_waste_account': waste_acct
+            'gl_waste_account': waste_acct,
+            'gl_asset_account_name': gl_accounts_map.get(asset_acct) if asset_acct else None,
+            'gl_cogs_account_name': gl_accounts_map.get(cogs_acct) if cogs_acct else None,
+            'gl_waste_account_name': gl_accounts_map.get(waste_acct) if waste_acct else None
         })
 
     return templates.TemplateResponse("mapped_items.html", {
@@ -867,6 +934,36 @@ async def map_items_by_description(
         item.mapping_method = 'manual_bulk'
         items_mapped += 1
         invoices_affected.add(item.invoice_id)
+
+    # Save this mapping for future auto-mapping of same item descriptions
+    # This allows future invoices with the same item description to be auto-mapped
+    if items:
+        # Check if a mapping already exists for this exact description
+        existing_mapping = db.query(ItemGLMapping).filter(
+            ItemGLMapping.inventory_item_name == item_description
+        ).first()
+
+        if existing_mapping:
+            # Update existing mapping
+            existing_mapping.inventory_item_id = inventory_item_id or existing_mapping.inventory_item_id
+            existing_mapping.inventory_category = inventory_category or existing_mapping.inventory_category
+            existing_mapping.gl_asset_account = gl_asset_account_int or existing_mapping.gl_asset_account
+            existing_mapping.gl_cogs_account = gl_cogs_account_int
+            existing_mapping.gl_waste_account = gl_waste_account_int
+            existing_mapping.is_active = True
+        else:
+            # Create new mapping entry for future auto-mapping
+            new_mapping = ItemGLMapping(
+                inventory_item_id=inventory_item_id or 0,  # 0 for non-inventory items
+                inventory_item_name=item_description,
+                inventory_category=inventory_category or "Uncategorized",
+                gl_asset_account=gl_asset_account_int or gl_cogs_account_int,  # Use COGS if no asset account
+                gl_cogs_account=gl_cogs_account_int,
+                gl_waste_account=gl_waste_account_int,
+                is_active=True,
+                notes=f"Auto-created from bulk mapping on {item_description}"
+            )
+            db.add(new_mapping)
 
     db.commit()
 

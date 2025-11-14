@@ -239,9 +239,7 @@
 </div>
 
 <script>
-// Settings Page JavaScript - Version 3.0 - Added debug logging and cache busting
-console.log('Settings page JavaScript loaded - Version 3.0');
-
+// Settings Page JavaScript
 // Load settings on page load
 async function loadSettings() {
     try {
@@ -252,10 +250,6 @@ async function loadSettings() {
             cache: 'no-cache'
         });
         const settings = await response.json();
-
-        console.log('Settings loaded:', settings);
-        console.log('Settings type:', typeof settings);
-        console.log('Is array?', Array.isArray(settings));
 
         // Populate form fields - settings is an object like {"email.address": {"value": "...", ...}}
         if (settings && typeof settings === 'object' && !Array.isArray(settings)) {

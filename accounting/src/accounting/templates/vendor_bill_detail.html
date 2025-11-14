@@ -4,7 +4,12 @@
 {% block nav_vendor_bills %}active{% endblock %}
 
 {% block extra_head %}
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<!-- OPTIMIZED LAYOUT v4.0 - Audit Trail in Left Column -->
 <style>
+    /* Compact vendor bill detail layout - v2.0 */
     .detail-container {
         max-width: 1200px;
         margin: 0 auto;
@@ -14,20 +19,20 @@
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        margin-bottom: 2rem;
-        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
         border-bottom: 2px solid #30363d;
     }
 
     .detail-title h1 {
-        font-size: 2rem;
+        font-size: 1.5rem;
         color: #c9d1d9;
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.25rem;
     }
 
     .detail-title .bill-number {
         color: #8b949e;
-        font-size: 1rem;
+        font-size: 0.9rem;
     }
 
     .detail-actions {
@@ -68,34 +73,47 @@
     .status-PAID, .status-paid { background: #2ea043; color: white; }
     .status-VOID, .status-void { background: #da3633; color: white; }
 
-    /* Card Layout */
+    /* Card Layout - COMPACT VERSION */
     .detail-grid {
         display: grid;
-        grid-template-columns: 2fr 1fr;
-        gap: 1.5rem;
-        margin-bottom: 2rem;
+        grid-template-columns: 1fr 400px;  /* Fixed width sidebar */
+        gap: 0.75rem;
+        margin-bottom: 0.5rem;
     }
 
     .detail-card {
         background: #161b22;
         border: 1px solid #30363d;
-        border-radius: 8px;
-        padding: 1.5rem;
+        border-radius: 4px;
+        padding: 0.75rem;
     }
 
     .detail-card h2 {
         color: #c9d1d9;
-        font-size: 1.25rem;
-        margin-bottom: 1rem;
-        padding-bottom: 0.75rem;
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.4rem;
         border-bottom: 1px solid #30363d;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: 600;
+    }
+
+    .detail-card h2 i {
+        font-size: 0.9rem;
     }
 
     .detail-row {
         display: flex;
         justify-content: space-between;
-        padding: 0.75rem 0;
+        padding: 0.35rem 0;
         border-bottom: 1px solid #21262d;
+        font-size: 0.9rem;
+    }
+
+    .detail-row label {
+        font-size: 0.85rem;
     }
 
     .detail-row:last-child {
@@ -151,7 +169,7 @@
     }
 
     .line-items-table td {
-        padding: 0.75rem;
+        padding: 0.5rem 0.75rem;
         color: #c9d1d9;
         border-bottom: 1px solid #21262d;
     }
@@ -172,10 +190,10 @@
     /* Payment History */
     .payment-item {
         background: #0d1117;
-        padding: 1rem;
-        border-radius: 6px;
+        padding: 0.75rem;
+        border-radius: 4px;
         border: 1px solid #30363d;
-        margin-bottom: 1rem;
+        margin-bottom: 0.75rem;
     }
 
     .payment-item:last-child {
@@ -186,11 +204,11 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
     }
 
     .payment-amount {
-        font-size: 1.25rem;
+        font-size: 1.1rem;
         font-weight: 600;
         color: #2ea043;
     }
@@ -198,20 +216,20 @@
     .payment-method-badge {
         background: #21262d;
         color: #c9d1d9;
-        padding: 0.25rem 0.75rem;
+        padding: 0.2rem 0.6rem;
         border-radius: 4px;
-        font-size: 0.875rem;
+        font-size: 0.8rem;
         font-weight: 500;
     }
 
     .payment-details {
         color: #8b949e;
-        font-size: 0.875rem;
-        line-height: 1.6;
+        font-size: 0.85rem;
+        line-height: 1.4;
     }
 
     .payment-details div {
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.15rem;
     }
 
     .payment-details strong {
@@ -220,13 +238,13 @@
 
     .empty-state {
         text-align: center;
-        padding: 3rem;
+        padding: 2rem 1rem;
         color: #8b949e;
     }
 
     .empty-state i {
-        font-size: 3rem;
-        margin-bottom: 1rem;
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
         opacity: 0.5;
     }
 
@@ -317,7 +335,7 @@
 
         <!-- Main Content Grid -->
         <div class="detail-grid">
-            <!-- Left Column: Line Items & Notes -->
+            <!-- Left Column: Line Items, Notes, & Audit Trail -->
             <div>
                 <!-- Line Items -->
                 <div class="detail-card">
@@ -331,13 +349,34 @@
                 </div>
 
                 <!-- Notes -->
-                <div class="detail-card" style="margin-top: 1.5rem;" id="notesCard" style="display: none;">
+                <div class="detail-card" style="margin-top: 1rem;" id="notesCard" style="display: none;">
                     <h2><i class="bi bi-sticky"></i> Notes</h2>
                     <div class="notes-content" id="notesContent">-</div>
                 </div>
+
+                <!-- Audit Trail -->
+                <div class="detail-card" style="margin-top: 1rem;">
+                    <h2><i class="bi bi-info-circle"></i> Audit Trail</h2>
+                    <div class="detail-row">
+                        <label>Created By:</label>
+                        <span class="value" id="createdBy">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <label>Created Date:</label>
+                        <span class="value" id="createdDate">-</span>
+                    </div>
+                    <div class="detail-row" id="approvedByRow" style="display: none;">
+                        <label>Approved By:</label>
+                        <span class="value" id="approvedBy">-</span>
+                    </div>
+                    <div class="detail-row" id="approvedDateRow" style="display: none;">
+                        <label>Approved Date:</label>
+                        <span class="value" id="approvedDate">-</span>
+                    </div>
+                </div>
             </div>
 
-            <!-- Right Column: Summary & Payments -->
+            <!-- Right Column: Bill Summary & Payment History -->
             <div>
                 <!-- Bill Summary -->
                 <div class="detail-card">
@@ -385,34 +424,13 @@
                 </div>
 
                 <!-- Payment History -->
-                <div class="detail-card" style="margin-top: 1.5rem;">
+                <div class="detail-card" style="margin-top: 1rem;">
                     <h2><i class="bi bi-cash-stack"></i> Payment History</h2>
                     <div id="paymentHistoryContent">
                         <div class="empty-state">
                             <i class="bi bi-cash"></i>
                             <p>No payments recorded</p>
                         </div>
-                    </div>
-                </div>
-
-                <!-- Audit Info -->
-                <div class="detail-card" style="margin-top: 1.5rem;">
-                    <h2><i class="bi bi-info-circle"></i> Audit Trail</h2>
-                    <div class="detail-row">
-                        <label>Created By:</label>
-                        <span class="value" id="createdBy">-</span>
-                    </div>
-                    <div class="detail-row">
-                        <label>Created Date:</label>
-                        <span class="value" id="createdDate">-</span>
-                    </div>
-                    <div class="detail-row" id="approvedByRow" style="display: none;">
-                        <label>Approved By:</label>
-                        <span class="value" id="approvedBy">-</span>
-                    </div>
-                    <div class="detail-row" id="approvedDateRow" style="display: none;">
-                        <label>Approved Date:</label>
-                        <span class="value" id="approvedDate">-</span>
                     </div>
                 </div>
             </div>
@@ -663,17 +681,25 @@ function displayBillDetails(bill) {
 
     // Audit trail
     if (bill.creator) {
-        document.getElementById('createdBy').textContent = bill.creator.email;
+        // Show "Integration Hub" for system user (id=1), otherwise show email
+        const createdByText = bill.creator.id === 1 ? 'Integration Hub' : bill.creator.email;
+        document.getElementById('createdBy').textContent = createdByText;
     }
     document.getElementById('createdDate').textContent = formatDateTime(bill.created_at);
 
+    // Only show approval info if manually approved (approver exists)
     if (bill.approver) {
         document.getElementById('approvedByRow').style.display = 'flex';
         document.getElementById('approvedBy').textContent = bill.approver.email;
+    } else {
+        document.getElementById('approvedByRow').style.display = 'none';
     }
+
     if (bill.approved_date) {
         document.getElementById('approvedDateRow').style.display = 'flex';
         document.getElementById('approvedDate').textContent = formatDateTime(bill.approved_date);
+    } else {
+        document.getElementById('approvedDateRow').style.display = 'none';
     }
 }
 

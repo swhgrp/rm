@@ -362,8 +362,12 @@ function openBulkMapModal() {
 
     document.getElementById('mapModalTitle').textContent = 'Map Multiple Items';
     document.getElementById('mapModalInfo').innerHTML = `
+        <div class="alert alert-warning mb-3">
+            <i class="bi bi-exclamation-triangle"></i> <strong>Bulk Mapping</strong><br>
+            This will map <strong>ALL occurrences</strong> of the selected ${selectedItems.length} item(s) across <strong>ALL invoices</strong> in the system, not just the visible ones.
+        </div>
         <strong>Selected Items:</strong> ${selectedItems.length}<br>
-        <strong>Total Occurrences:</strong> ${totalOccurrences} unmapped instances will be mapped
+        <strong>Visible Occurrences:</strong> ${totalOccurrences} (actual total may be higher)
     `;
 
     // Reset form
@@ -653,7 +657,8 @@ async function saveMapping() {
 
                 let message = `Successfully mapped ${result.items_mapped} item(s) across ${result.invoices_affected} invoice(s)`;
                 if (result.invoices_ready && result.invoices_ready.length > 0) {
-                    message += `\n\nThe following invoices are now ready to send:\n${result.invoices_ready.join(', ')}`;
+                    const invoiceList = result.invoices_ready.map(inv => `#${inv}`).join(', ');
+                    message += `\n\nThe following invoices are now ready to send: ${invoiceList}`;
                 }
 
                 await showAlert(message, 'Success');

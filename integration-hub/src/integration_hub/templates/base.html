@@ -453,12 +453,9 @@
             // Initialize timer on page load
             resetInactivityTimer();
 
-            console.log('Auto-logout initialized - will logout after 30 minutes of inactivity');
-
             // Handle page visibility changes
             document.addEventListener('visibilitychange', function() {
                 if (!document.hidden) {
-                    console.log('Tab became visible - resetting inactivity timer');
                     resetInactivityTimer();
                 }
             });

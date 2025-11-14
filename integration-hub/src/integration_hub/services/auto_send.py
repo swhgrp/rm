@@ -92,10 +92,37 @@ class AutoSendService:
 
         logger.info(f"Invoice {invoice.invoice_number}: has_inventory_items={has_inventory_items}, needs_accounting={needs_accounting}")
 
+        # Check if already sent - prevent duplicates
+        # Only send if not already sent to that system
+        send_to_inventory = has_inventory_items and not invoice.sent_to_inventory
+        send_to_accounting = needs_accounting and not invoice.sent_to_accounting
+
+        if invoice.sent_to_inventory and invoice.sent_to_accounting:
+            logger.info(f"Invoice {invoice.invoice_number} already sent to both systems. Skipping.")
+            return {
+                "success": True,
+                "inventory_sent": True,
+                "accounting_sent": True,
+                "inventory_id": None,
+                "journal_entry_id": invoice.accounting_je_id,
+                "errors": [],
+                "message": "Invoice already sent to all required systems"
+            }
+
+        if send_to_inventory:
+            logger.info(f"Sending invoice {invoice.invoice_number} to inventory")
+        else:
+            if has_inventory_items:
+                logger.info(f"Skipping inventory for invoice {invoice.invoice_number} - already sent")
+
+        if send_to_accounting:
+            logger.info(f"Sending invoice {invoice.invoice_number} to accounting")
+        else:
+            if needs_accounting:
+                logger.info(f"Skipping accounting for invoice {invoice.invoice_number} - already sent")
+
         # Send to appropriate systems in parallel
         tasks = []
-        send_to_inventory = has_inventory_items
-        send_to_accounting = needs_accounting
 
         if send_to_inventory:
             tasks.append(self._send_to_inventory(invoice, items, db))
@@ -124,14 +151,20 @@ class AutoSendService:
         inventory_sent = send_to_inventory and not isinstance(inventory_result, Exception)
         accounting_sent = send_to_accounting and not isinstance(accounting_result, Exception)
 
-        # If we skipped a system, mark it as "sent" for status purposes
-        # Also set the sent flag on the invoice so the UI shows it correctly
+        # If we skipped a system because it doesn't need it OR it was already sent, mark as "done"
+        # Note: Don't overwrite sent flags here - they're set by the individual send methods
         if not send_to_inventory:
-            inventory_sent = True  # Not needed, so consider it "done"
-            invoice.sent_to_inventory = True  # Mark as sent in DB so UI reflects this
+            # System was skipped because either:
+            # 1. No inventory items needed (has_inventory_items=False), OR
+            # 2. Already sent previously (invoice.sent_to_inventory=True)
+            inventory_sent = True  # Consider it "done" for status purposes
+            # Only mark as sent if it doesn't need inventory at all
+            if not has_inventory_items:
+                invoice.sent_to_inventory = True  # Mark as sent so UI reflects this
         if not send_to_accounting:
-            accounting_sent = True  # Not needed, so consider it "done"
-            invoice.sent_to_accounting = True  # Mark as sent in DB so UI reflects this
+            # System was skipped because already sent previously (invoice.sent_to_accounting=True)
+            accounting_sent = True  # Consider it "done" for status purposes
+            # Note: needs_accounting is always True, so this only happens if already sent
 
         errors = []
         if send_to_inventory and isinstance(inventory_result, Exception):

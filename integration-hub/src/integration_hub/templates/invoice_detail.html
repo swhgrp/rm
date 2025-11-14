@@ -80,12 +80,12 @@
                                 </tr>
                                 <tr>
                                     <th>Invoice Date:</th>
-                                    <td>{{ invoice.invoice_date }}</td>
+                                    <td>{{ invoice.invoice_date.strftime('%m/%d/%y') if invoice.invoice_date else '' }}</td>
                                 </tr>
                                 {% if invoice.due_date %}
                                 <tr>
                                     <th>Due Date:</th>
-                                    <td>{{ invoice.due_date }}</td>
+                                    <td>{{ invoice.due_date.strftime('%m/%d/%y') if invoice.due_date else '' }}</td>
                                 </tr>
                                 {% endif %}
                             </table>
@@ -93,7 +93,15 @@
                         <div class="col-md-6">
                             <table class="table table-sm">
                                 <tr>
-                                    <th width="40%">Total Amount:</th>
+                                    <th width="40%">Subtotal:</th>
+                                    <td>${{ "{:,.2f}".format((invoice.total_amount or 0) - (invoice.tax_amount or 0)) }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Tax:</th>
+                                    <td>${{ "{:,.2f}".format(invoice.tax_amount or 0) }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Total Amount:</th>
                                     <td><strong>${{ "{:,.2f}".format(invoice.total_amount) }}</strong></td>
                                 </tr>
                                 <tr>
@@ -373,17 +381,17 @@ function showEditModal() {
 }
 
 async function reparseInvoice() {
-    if (!await showConfirm('Re-parse this invoice using the updated OCR parser? This will replace all existing line items with newly parsed data.\n\nNote: Parsing may take 30-60 seconds. You can navigate away and check back later.')) {
+    if (!await showConfirm('Re-parse this invoice using the updated OCR parser? This will replace all existing line items with newly parsed data.\n\nNote: Parsing happens in the background and takes 30-60 seconds. You can continue working - the page will auto-refresh when complete.')) {
         return;
     }
 
     const button = document.getElementById('reparseBtn');
     if (button) {
         button.disabled = true;
-        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Parsing (may take 60 sec)...';
+        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing in background...';
     }
 
-    // Start the parse request (don't block the UI)
+    // Start the parse request (now returns immediately - processing in background)
     fetch(`/hub/api/invoices/{{ invoice.id }}/parse`, {
         method: 'POST',
         headers: {
@@ -392,12 +400,39 @@ async function reparseInvoice() {
     })
     .then(response => response.json())
     .then(result => {
-        if (result.success) {
-            // Parse completed successfully - reload to show results
-            location.reload();
-        } else {
-            // Parse failed - show error and re-enable button
-            showAlert(`Error re-parsing invoice: ${result.message || result.detail || 'Unknown error'}`, 'Error');
+        if (result.success && result.processing) {
+            // Parse started successfully in background
+            showAlert('Invoice parsing started in background. Page will refresh automatically when complete.', 'Success');
+
+            // Poll for completion every 5 seconds
+            let pollCount = 0;
+            const maxPolls = 24; // 2 minutes max (24 * 5 seconds)
+
+            const pollInterval = setInterval(async () => {
+                pollCount++;
+
+                // Fetch current invoice status
+                const statusResponse = await fetch(`/hub/api/invoices/{{ invoice.id }}`);
+                const statusData = await statusResponse.json();
+
+                // Check if items have been parsed (status changed or items exist)
+                if (statusData.items && statusData.items.length > 0) {
+                    clearInterval(pollInterval);
+                    showAlert('Parsing complete! Reloading page...', 'Success');
+                    setTimeout(() => location.reload(), 1000);
+                } else if (pollCount >= maxPolls) {
+                    clearInterval(pollInterval);
+                    showAlert('Parsing is taking longer than expected. Please refresh the page manually to check results.', 'Info');
+                    if (button) {
+                        button.disabled = false;
+                        button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-parse Invoice';
+                    }
+                }
+            }, 5000);
+
+        } else if (!result.success) {
+            // Parse failed to start
+            showAlert(`Error starting parse: ${result.message || result.detail || 'Unknown error'}`, 'Error');
             if (button) {
                 button.disabled = false;
                 button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-parse Invoice';
@@ -405,8 +440,8 @@ async function reparseInvoice() {
         }
     })
     .catch(error => {
-        // Network/timeout error - show message
-        showAlert(`Error re-parsing invoice: ${error.message}\n\nThe parse may still be running in the background. Refresh the page in a minute to check results.`, 'Warning');
+        // Network error
+        showAlert(`Network error: ${error.message}`, 'Error');
         if (button) {
             button.disabled = false;
             button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-parse Invoice';

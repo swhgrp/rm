@@ -2,6 +2,12 @@
 
 {% block title %}Invoices - Integration Hub{% endblock %}
 
+{% block head %}
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+{% endblock %}
+
 {% block content %}
 <div class="container">
     <div class="page-header d-flex justify-content-between align-items-center">
@@ -14,10 +20,34 @@
         </button>
     </div>
 
+    <!-- Status Filter Tabs -->
+    <ul class="nav nav-tabs mb-3" id="statusTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="tab-pending" data-filter="pending" type="button">
+                <i class="bi bi-hourglass-split"></i> Pending <span class="badge bg-secondary ms-1" id="count-pending">0</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-ready" data-filter="ready" type="button">
+                <i class="bi bi-check-circle"></i> Ready <span class="badge bg-success ms-1" id="count-ready">0</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-errors" data-filter="errors" type="button">
+                <i class="bi bi-exclamation-triangle"></i> Errors <span class="badge bg-danger ms-1" id="count-errors">0</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-all" data-filter="all" type="button">
+                <i class="bi bi-list-ul"></i> All Invoices <span class="badge bg-secondary ms-1" id="count-all">0</span>
+            </button>
+        </li>
+    </ul>
+
     <div class="card">
         <div class="card-body">
             {% if invoices %}
-            <!-- Search and Filter Bar -->
+            <!-- Search Bar -->
             <div class="row mb-3">
                 <div class="col-md-6">
                     <div class="input-group">
@@ -26,21 +56,40 @@
                     </div>
                 </div>
                 <div class="col-md-3">
-                    <select class="form-select" id="statusFilter">
-                        <option value="">All Statuses</option>
-                        <option value="pending">Pending</option>
-                        <option value="mapping">Mapping</option>
-                        <option value="ready">Ready</option>
-                        <option value="sent">Sent</option>
-                        <option value="error">Error</option>
-                    </select>
-                </div>
-                <div class="col-md-3">
                     <select class="form-select" id="sourceFilter">
                         <option value="">All Sources</option>
                         <option value="email">Email</option>
                         <option value="manual">Manual</option>
                     </select>
+                </div>
+                <div class="col-md-3 text-end">
+                    <span class="text-muted" id="visibleCount">Showing <strong id="visibleNumber">0</strong> invoices</span>
+                </div>
+            </div>
+
+            <!-- Pagination controls -->
+            <div id="paginationControls" style="display: none;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div>
+                        <span class="text-muted" id="paginationInfo"></span>
+                    </div>
+                    <nav>
+                        <ul class="pagination mb-0">
+                            <li class="page-item" id="prevPageBtn">
+                                <a class="page-link" href="#" onclick="changePage(-1); return false;">
+                                    <i class="bi bi-chevron-left"></i> Previous
+                                </a>
+                            </li>
+                            <li class="page-item disabled">
+                                <span class="page-link" id="currentPageDisplay">Page 1</span>
+                            </li>
+                            <li class="page-item" id="nextPageBtn">
+                                <a class="page-link" href="#" onclick="changePage(1); return false;">
+                                    Next <i class="bi bi-chevron-right"></i>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
                 </div>
             </div>
 
@@ -55,7 +104,7 @@
                                 Vendor <i class="bi bi-chevron-expand"></i>
                             </th>
                             <th>Location</th>
-                            <th class="sortable" data-sort="invoice_date">
+                            <th class="sortable" data-sort="invoice_date" style="min-width: 90px;">
                                 Date <i class="bi bi-chevron-expand"></i>
                             </th>
                             <th class="sortable" data-sort="total_amount">
@@ -70,7 +119,14 @@
                     </thead>
                     <tbody>
                         {% for invoice in invoices %}
-                        <tr data-status="{{ invoice.status }}" data-source="{{ invoice.source or 'unknown' }}">
+                        {% set is_completed = invoice.inventory_sync_at and invoice.accounting_sync_at %}
+                        {% set has_errors = (invoice.inventory_error or invoice.accounting_error) %}
+                        {% set is_sent = invoice.sent_to_accounting or invoice.sent_to_inventory %}
+                        <tr data-status="{{ invoice.status }}"
+                            data-source="{{ invoice.source or 'unknown' }}"
+                            data-completed="{{ 'true' if is_completed else 'false' }}"
+                            data-has-errors="{{ 'true' if has_errors else 'false' }}"
+                            data-sent="{{ 'true' if is_sent else 'false' }}">
                             <td>
                                 <strong>{{ invoice.invoice_number if invoice.invoice_number != 'None' else '-' }}</strong>
                                 {% if invoice.is_statement %}
@@ -92,7 +148,7 @@
                                     <span class="text-muted">Not matched</span>
                                 {% endif %}
                             </td>
-                            <td>{{ invoice.invoice_date }}</td>
+                            <td style="white-space: nowrap;">{{ invoice.invoice_date.strftime('%m/%d/%y') if invoice.invoice_date else '' }}</td>
                             <td>${{ "{:,.2f}".format(invoice.total_amount) }}</td>
                             <td>
                                 <span class="badge bg-secondary">
@@ -264,60 +320,244 @@ document.getElementById('invoiceUploadForm').addEventListener('submit', function
     }
 });
 
-// Search functionality
+// Tab and filter functionality
 const searchInput = document.getElementById('searchInput');
-const statusFilter = document.getElementById('statusFilter');
 const sourceFilter = document.getElementById('sourceFilter');
+let currentTabFilter = 'pending'; // Default to pending tab
+let currentPage = 1;
+const ITEMS_PER_PAGE = 50;
+
+function updateTabCounts() {
+    const rows = document.querySelectorAll('#invoicesTable tbody tr');
+    const counts = {
+        pending: 0,
+        ready: 0,
+        errors: 0,
+        all: rows.length
+    };
+
+    rows.forEach(row => {
+        const status = row.getAttribute('data-status');
+        const hasErrors = row.getAttribute('data-has-errors') === 'true';
+        const isSent = row.getAttribute('data-sent') === 'true';
+
+        // Count for tabs - match the filtering logic
+        if ((status === 'pending' || status === 'mapping') && !hasErrors && !isSent) {
+            counts.pending++;
+        } else if (status === 'ready' && !hasErrors && !isSent) {
+            counts.ready++;
+        }
+
+        if (hasErrors) {
+            counts.errors++;
+        }
+    });
+
+    // Update badge counts
+    document.getElementById('count-pending').textContent = counts.pending;
+    document.getElementById('count-ready').textContent = counts.ready;
+    document.getElementById('count-errors').textContent = counts.errors;
+    document.getElementById('count-all').textContent = counts.all;
+}
 
 function filterTable() {
-    const searchTerm = searchInput.value.toLowerCase();
-    const statusValue = statusFilter.value.toLowerCase();
-    const sourceValue = sourceFilter.value.toLowerCase();
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+    const sourceValue = sourceFilter ? sourceFilter.value.toLowerCase() : '';
     const rows = document.querySelectorAll('#invoicesTable tbody tr');
+
+    // First pass: collect all matching rows
+    let matchingRows = [];
 
     rows.forEach(row => {
         const text = row.textContent.toLowerCase();
-        const status = row.getAttribute('data-status').toLowerCase();
+        const status = row.getAttribute('data-status');
         const source = row.getAttribute('data-source').toLowerCase();
+        const hasErrors = row.getAttribute('data-has-errors') === 'true';
+        const isSent = row.getAttribute('data-sent') === 'true';
 
-        const matchesSearch = text.includes(searchTerm);
-        const matchesStatus = !statusValue || status === statusValue;
+        const matchesSearch = !searchTerm || text.includes(searchTerm);
         const matchesSource = !sourceValue || source === sourceValue;
 
-        if (matchesSearch && matchesStatus && matchesSource) {
+        // Tab filtering logic
+        let matchesTab = true;
+        if (currentTabFilter === 'pending') {
+            matchesTab = (status === 'pending' || status === 'mapping') && !hasErrors && !isSent;
+        } else if (currentTabFilter === 'ready') {
+            matchesTab = (status === 'ready') && !hasErrors && !isSent;
+        } else if (currentTabFilter === 'errors') {
+            matchesTab = hasErrors;
+        }
+
+        if (matchesSearch && matchesSource && matchesTab) {
+            matchingRows.push(row);
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    const totalMatching = matchingRows.length;
+
+    // Calculate pagination
+    const totalPages = Math.ceil(totalMatching / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+
+    // Second pass: show only items for current page
+    matchingRows.forEach((row, index) => {
+        if (index >= startIndex && index < endIndex) {
             row.style.display = '';
         } else {
             row.style.display = 'none';
         }
     });
+
+    // Update visible count
+    const visibleNumber = document.getElementById('visibleNumber');
+    if (visibleNumber) {
+        const itemsOnPage = Math.min(endIndex, totalMatching) - startIndex;
+        visibleNumber.textContent = itemsOnPage;
+    }
+
+    // Update pagination controls
+    updatePaginationControls(totalMatching, totalPages);
 }
+
+function updatePaginationControls(totalMatching, totalPages) {
+    const paginationControls = document.getElementById('paginationControls');
+    const paginationInfo = document.getElementById('paginationInfo');
+    const currentPageDisplay = document.getElementById('currentPageDisplay');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+
+    if (totalMatching > ITEMS_PER_PAGE) {
+        // Show pagination controls
+        paginationControls.style.display = 'block';
+
+        const startItem = ((currentPage - 1) * ITEMS_PER_PAGE) + 1;
+        const endItem = Math.min(currentPage * ITEMS_PER_PAGE, totalMatching);
+
+        paginationInfo.textContent = `Showing ${startItem}-${endItem} of ${totalMatching} invoices`;
+        currentPageDisplay.textContent = `Page ${currentPage} of ${totalPages}`;
+
+        // Enable/disable prev/next buttons
+        if (currentPage <= 1) {
+            prevPageBtn.classList.add('disabled');
+        } else {
+            prevPageBtn.classList.remove('disabled');
+        }
+
+        if (currentPage >= totalPages) {
+            nextPageBtn.classList.add('disabled');
+        } else {
+            nextPageBtn.classList.remove('disabled');
+        }
+    } else {
+        // Hide pagination controls
+        paginationControls.style.display = 'none';
+    }
+}
+
+function changePage(direction) {
+    const rows = document.querySelectorAll('#invoicesTable tbody tr');
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
+    const sourceValue = sourceFilter ? sourceFilter.value.toLowerCase() : '';
+
+    // Count matching rows to determine total pages
+    let matchingCount = 0;
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const status = row.getAttribute('data-status');
+        const source = row.getAttribute('data-source').toLowerCase();
+        const hasErrors = row.getAttribute('data-has-errors') === 'true';
+        const isSent = row.getAttribute('data-sent') === 'true';
+
+        const matchesSearch = !searchTerm || text.includes(searchTerm);
+        const matchesSource = !sourceValue || source === sourceValue;
+
+        let matchesTab = true;
+        if (currentTabFilter === 'pending') {
+            matchesTab = (status === 'pending' || status === 'mapping') && !hasErrors && !isSent;
+        } else if (currentTabFilter === 'ready') {
+            matchesTab = (status === 'ready') && !hasErrors && !isSent;
+        } else if (currentTabFilter === 'errors') {
+            matchesTab = hasErrors;
+        }
+
+        if (matchesSearch && matchesSource && matchesTab) {
+            matchingCount++;
+        }
+    });
+
+    const totalPages = Math.ceil(matchingCount / ITEMS_PER_PAGE);
+
+    currentPage += direction;
+
+    // Bounds checking
+    if (currentPage < 1) currentPage = 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+
+    // Reapply filter with new page
+    filterTable();
+
+    // Scroll to top of table
+    document.getElementById('invoicesTable').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Tab click handlers
+document.querySelectorAll('#statusTabs button').forEach(tab => {
+    tab.addEventListener('click', function() {
+        // Remove active class from all tabs
+        document.querySelectorAll('#statusTabs button').forEach(t => t.classList.remove('active'));
+
+        // Add active to clicked tab
+        this.classList.add('active');
+
+        // Update current filter
+        currentTabFilter = this.getAttribute('data-filter');
+
+        // Reset to page 1 when changing tabs
+        currentPage = 1;
+
+        // Save to session storage
+        sessionStorage.setItem('invoiceTabFilter', currentTabFilter);
+
+        // Apply filter
+        filterTable();
+    });
+});
 
 if (searchInput) {
     // Restore filter state from sessionStorage
     const savedSearch = sessionStorage.getItem('invoiceSearch');
-    const savedStatus = sessionStorage.getItem('invoiceStatusFilter');
     const savedSource = sessionStorage.getItem('invoiceSourceFilter');
+    const savedTab = sessionStorage.getItem('invoiceTabFilter');
 
     if (savedSearch) searchInput.value = savedSearch;
-    if (savedStatus) statusFilter.value = savedStatus;
     if (savedSource) sourceFilter.value = savedSource;
 
-    // Apply filters if any were restored
-    if (savedSearch || savedStatus || savedSource) {
+    // Restore tab selection
+    if (savedTab) {
+        currentTabFilter = savedTab;
+        document.querySelectorAll('#statusTabs button').forEach(t => t.classList.remove('active'));
+        const savedTabButton = document.getElementById(`tab-${savedTab}`);
+        if (savedTabButton) savedTabButton.classList.add('active');
+    }
+
+    // Update counts and apply filters
+    updateTabCounts();
+    if (savedSearch || savedSource || savedTab) {
         filterTable();
     }
 
     // Save filter state on change
     searchInput.addEventListener('input', () => {
         sessionStorage.setItem('invoiceSearch', searchInput.value);
-        filterTable();
-    });
-    statusFilter.addEventListener('change', () => {
-        sessionStorage.setItem('invoiceStatusFilter', statusFilter.value);
+        currentPage = 1; // Reset to page 1 when searching
         filterTable();
     });
     sourceFilter.addEventListener('change', () => {
         sessionStorage.setItem('invoiceSourceFilter', sourceFilter.value);
+        currentPage = 1; // Reset to page 1 when changing source
         filterTable();
     });
 }

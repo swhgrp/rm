@@ -1,11 +1,4 @@
-# Restaurant System - Multi-Service Docker Compose Configuration
-# Services: Inventory Management, Accounting System, and future services (HR, etc.)
-
 services:
-  # ============================================================================
-  # INVENTORY SERVICE
-  # ============================================================================
-
   inventory-db:
     image: postgres:15
     container_name: inventory-db
@@ -13,46 +6,53 @@ services:
       POSTGRES_USER: inventory_user
       POSTGRES_PASSWORD: inventory_pass
       POSTGRES_DB: inventory_db
+      TZ: America/New_York
     volumes:
-      - inventory_data:/var/lib/postgresql/data
+    - inventory_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+    - 5432:5432
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U inventory_user -d inventory_db"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U inventory_user -d inventory_db
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
     networks:
-      - restaurant-network
-
+    - restaurant-network
   inventory-redis:
     image: redis:7-alpine
     container_name: inventory-redis
     volumes:
-      - redis_data:/data
+    - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+      - CMD
+      - redis-cli
+      - ping
       interval: 10s
       timeout: 5s
       retries: 3
     restart: unless-stopped
     networks:
-      - restaurant-network
-
+    - restaurant-network
+    environment:
+    - TZ=America/New_York
   inventory-app:
     build: ./inventory
     container_name: inventory-app
     volumes:
-      - ./inventory/src:/app/src
-      - ./inventory/uploads:/app/uploads
+    - ./inventory/src:/app/src
+    - ./inventory/uploads:/app/uploads
     env_file:
-      - ./inventory/.env
+    - ./inventory/.env
     environment:
-      - DATABASE_URL=postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db
-      - REDIS_URL=redis://inventory-redis:6379
-      - DEBUG=true
-      - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    - TZ=America/New_York
+    - DATABASE_URL=postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db
+    - REDIS_URL=redis://inventory-redis:6379
+    - DEBUG=true
+    - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
     depends_on:
       inventory-db:
         condition: service_healthy
@@ -60,12 +60,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - restaurant-network
-
-  # ============================================================================
-  # ACCOUNTING SERVICE
-  # ============================================================================
-
+    - restaurant-network
   accounting-db:
     image: postgres:15
     container_name: accounting-db
@@ -73,30 +68,33 @@ services:
       POSTGRES_USER: accounting_user
       POSTGRES_PASSWORD: Acc0unt1ng_Pr0d_2024!
       POSTGRES_DB: accounting_db
+      TZ: America/New_York
     volumes:
-      - accounting_data:/var/lib/postgresql/data
+    - accounting_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U accounting_user -d accounting_db"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U accounting_user -d accounting_db
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
     networks:
-      - restaurant-network
-
+    - restaurant-network
   accounting-app:
     build: ./accounting
     container_name: accounting-app
     volumes:
-      - ./accounting/src:/app/src
-      - ./accounting/alembic:/app/alembic
-      - ./accounting/logs:/app/logs
+    - ./accounting/src:/app/src
+    - ./accounting/alembic:/app/alembic
+    - ./accounting/logs:/app/logs
     env_file:
-      - ./accounting/.env
+    - ./accounting/.env
     environment:
-      - DATABASE_URL=postgresql://accounting_user:Acc0unt1ng_Pr0d_2024!@accounting-db:5432/accounting_db
-      - INVENTORY_API_URL=http://inventory-app:8000/api
-      - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    - TZ=America/New_York
+    - DATABASE_URL=postgresql://accounting_user:Acc0unt1ng_Pr0d_2024!@accounting-db:5432/accounting_db
+    - INVENTORY_API_URL=http://inventory-app:8000/api
+    - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
     depends_on:
       accounting-db:
         condition: service_healthy
@@ -104,12 +102,7 @@ services:
         condition: service_started
     restart: unless-stopped
     networks:
-      - restaurant-network
-
-  # ============================================================================
-  # INTEGRATION HUB SERVICE
-  # ============================================================================
-
+    - restaurant-network
   hub-db:
     image: postgres:15
     container_name: hub-db
@@ -117,31 +110,34 @@ services:
       POSTGRES_USER: hub_user
       POSTGRES_PASSWORD: hub_password
       POSTGRES_DB: integration_hub_db
+      TZ: America/New_York
     volumes:
-      - hub_data:/var/lib/postgresql/data
+    - hub_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hub_user -d integration_hub_db"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U hub_user -d integration_hub_db
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
     networks:
-      - restaurant-network
-
+    - restaurant-network
   integration-hub:
     build: ./integration-hub
     container_name: integration-hub
     volumes:
-      - ./integration-hub/src:/app/src
-      - ./integration-hub/alembic:/app/alembic
-      - ./integration-hub/uploads:/app/uploads
+    - ./integration-hub/src:/app/src
+    - ./integration-hub/alembic:/app/alembic
+    - ./integration-hub/uploads:/app/uploads
     env_file:
-      - ./integration-hub/.env
+    - ./integration-hub/.env
     environment:
-      - DATABASE_URL=postgresql://hub_user:hub_password@hub-db:5432/integration_hub_db
-      - INVENTORY_API_URL=http://inventory-app:8000/api
-      - ACCOUNTING_API_URL=http://accounting-app:8000/api
-      - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    - TZ=America/New_York
+    - DATABASE_URL=postgresql://hub_user:hub_password@hub-db:5432/integration_hub_db
+    - INVENTORY_API_URL=http://inventory-app:8000/api
+    - ACCOUNTING_API_URL=http://accounting-app:8000/api
+    - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
     depends_on:
       hub-db:
         condition: service_healthy
@@ -151,12 +147,7 @@ services:
         condition: service_started
     restart: unless-stopped
     networks:
-      - restaurant-network
-
-  # ============================================================================
-  # HR SERVICE
-  # ============================================================================
-
+    - restaurant-network
   hr-db:
     image: postgres:15
     container_name: hr-db
@@ -164,33 +155,36 @@ services:
       POSTGRES_USER: hr_user
       POSTGRES_PASSWORD: HR_Pr0d_2024!
       POSTGRES_DB: hr_db
+      TZ: America/New_York
     volumes:
-      - hr_data:/var/lib/postgresql/data
+    - hr_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U hr_user -d hr_db"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U hr_user -d hr_db
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
     networks:
-      - restaurant-network
-
+    - restaurant-network
   hr-app:
     build: ./hr
     container_name: hr-app
     volumes:
-      - ./hr/src:/app/src
-      - ./hr/alembic:/app/alembic
-      - ./hr/documents:/app/documents
+    - ./hr/src:/app/src
+    - ./hr/alembic:/app/alembic
+    - ./hr/documents:/app/documents
     env_file:
-      - ./hr/.env
+    - ./hr/.env
     environment:
-      - DATABASE_URL=postgresql://hr_user:HR_Pr0d_2024!@hr-db:5432/hr_db
-      - REDIS_URL=redis://inventory-redis:6379
-      - INVENTORY_API_URL=http://inventory-app:8000/api
-      - ACCOUNTING_API_URL=http://accounting-app:8000/api
-      - ENCRYPTION_KEY=yX_axNoTYxskNPgHeaoSSi2gM1jXhXvsdwf9acQqKpM=
-      - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    - TZ=America/New_York
+    - DATABASE_URL=postgresql://hr_user:HR_Pr0d_2024!@hr-db:5432/hr_db
+    - REDIS_URL=redis://inventory-redis:6379
+    - INVENTORY_API_URL=http://inventory-app:8000/api
+    - ACCOUNTING_API_URL=http://accounting-app:8000/api
+    - ENCRYPTION_KEY=yX_axNoTYxskNPgHeaoSSi2gM1jXhXvsdwf9acQqKpM=
+    - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
     depends_on:
       hr-db:
         condition: service_healthy
@@ -200,12 +194,7 @@ services:
         condition: service_started
     restart: unless-stopped
     networks:
-      - restaurant-network
-
-  # ============================================================================
-  # EVENTS SERVICE
-  # ============================================================================
-
+    - restaurant-network
   events-db:
     image: postgres:15
     container_name: events-db
@@ -213,41 +202,48 @@ services:
       POSTGRES_USER: events_user
       POSTGRES_PASSWORD: events_pass
       POSTGRES_DB: events_db
+      TZ: America/New_York
     volumes:
-      - events_data:/var/lib/postgresql/data
+    - events_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U events_user -d events_db"]
+      test:
+      - CMD-SHELL
+      - pg_isready -U events_user -d events_db
       interval: 10s
       timeout: 5s
       retries: 5
     restart: unless-stopped
     networks:
-      - restaurant-network
-
+    - restaurant-network
   events-redis:
     image: redis:7-alpine
     container_name: events-redis
     volumes:
-      - events_redis_data:/data
+    - events_redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test:
+      - CMD
+      - redis-cli
+      - ping
       interval: 10s
       timeout: 5s
       retries: 3
     restart: unless-stopped
     networks:
-      - restaurant-network
-
+    - restaurant-network
+    environment:
+    - TZ=America/New_York
   events-app:
     build: ./events
     container_name: events-app
     volumes:
-      - ./events/src:/app/src
+    - ./events/src:/app/src
     env_file:
-      - ./events/.env
+    - ./events/.env
     environment:
-      - DATABASE_URL=postgresql://events_user:events_pass@events-db:5432/events_db
-      - REDIS_URL=redis://events-redis:6379/0
+    - TZ=America/New_York
+    - DATABASE_URL=postgresql://events_user:events_pass@events-db:5432/events_db
+    - REDIS_URL=redis://events-redis:6379/0
     depends_on:
       events-db:
         condition: service_healthy
@@ -255,105 +251,92 @@ services:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - restaurant-network
-
-  # ============================================================================
-  # PORTAL SERVICE
-  # ============================================================================
-
+    - restaurant-network
   portal-app:
     build: ./portal
     container_name: portal-app
     volumes:
-      - ./portal/src:/app/src
-      - ./portal/templates:/app/templates
-      - ./portal/css:/app/static/css
-      - ./portal/images:/app/static/images
-      - ./portal/js:/app/static/js
-      - ./scripts:/opt/restaurant-system/scripts:ro
-      - ./backups:/opt/restaurant-system/backups:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+    - ./portal/src:/app/src
+    - ./portal/templates:/app/templates
+    - ./portal/css:/app/static/css
+    - ./portal/images:/app/static/images
+    - ./portal/js:/app/static/js
+    - ./scripts:/opt/restaurant-system/scripts:ro
+    - ./backups:/opt/restaurant-system/backups:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
-      - HR_DATABASE_URL=postgresql://hr_user:HR_Pr0d_2024!@hr-db:5432/hr_db
-      - SECRET_KEY=your-super-secret-key-change-in-production-galveston34
-      - INVENTORY_API_URL=http://inventory-app:8000
-      - ACCOUNTING_API_URL=http://accounting-app:8000
-      - HR_API_URL=http://hr-app:8000
-      - INTEGRATION_HUB_URL=http://integration-hub:8000
-      - MAILCOW_API_URL=https://mail-nginx-mailcow-1:8843
-      - MAILCOW_API_KEY=06c052141dffe88dc2f9e2cb519d2006216e1a370078896c552a3c1de47b92d9
-      - MAIL_DOMAIN=swhgrp.com
+    - TZ=America/New_York
+    - HR_DATABASE_URL=postgresql://hr_user:HR_Pr0d_2024!@hr-db:5432/hr_db
+    - SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    - INVENTORY_API_URL=http://inventory-app:8000
+    - ACCOUNTING_API_URL=http://accounting-app:8000
+    - HR_API_URL=http://hr-app:8000
+    - INTEGRATION_HUB_URL=http://integration-hub:8000
+    - MAILCOW_API_URL=https://mail-nginx-mailcow-1:8843
+    - MAILCOW_API_KEY=06c052141dffe88dc2f9e2cb519d2006216e1a370078896c552a3c1de47b92d9
+    - MAIL_DOMAIN=swhgrp.com
     depends_on:
       hr-db:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - restaurant-network
-
-  # ============================================================================
-  # FILES SERVICE
-  # ============================================================================
-
+    - restaurant-network
   files-app:
     build: ./files
     container_name: files-app
     volumes:
-      - ./files/src:/app/src
-      - ./files/logs:/app/logs
-      - ./files/storage:/app/storage
+    - ./files/src:/app/src
+    - ./files/logs:/app/logs
+    - ./files/storage:/app/storage
     env_file:
-      - ./files/.env
+    - ./files/.env
     depends_on:
       hr-db:
         condition: service_healthy
     restart: unless-stopped
     networks:
-      - restaurant-network
-
-  # ============================================================================
-  # SHARED INFRASTRUCTURE
-  # ============================================================================
-
+    - restaurant-network
+    environment:
+    - TZ=America/New_York
   nginx:
     image: nginx:alpine
     container_name: nginx-proxy
     ports:
-      - "80:80"
-      - "443:443"
+    - 80:80
+    - 443:443
     volumes:
-      - ./shared/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./shared/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./portal:/var/www/portal:ro
-      - ./inventory/src/restaurant_inventory/static:/app/static:ro
-      - ./inventory/uploads:/app/uploads:ro
-      - ./shared/certbot/conf:/etc/letsencrypt:ro
-      - ./shared/certbot/www:/var/www/certbot:ro
+    - ./shared/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    - ./shared/nginx/conf.d:/etc/nginx/conf.d:ro
+    - ./portal:/var/www/portal:ro
+    - ./inventory/src/restaurant_inventory/static:/app/static:ro
+    - ./inventory/uploads:/app/uploads:ro
+    - ./shared/certbot/conf:/etc/letsencrypt:ro
+    - ./shared/certbot/www:/var/www/certbot:ro
     depends_on:
-      - inventory-app
-      - accounting-app
-      - events-app
-      - hr-app
-      - integration-hub
-      - portal-app
-      - files-app
+    - inventory-app
+    - accounting-app
+    - events-app
+    - hr-app
+    - integration-hub
+    - portal-app
+    - files-app
     restart: unless-stopped
     networks:
-      - restaurant-network
-
+    - restaurant-network
+    environment:
+    - TZ=America/New_York
   certbot:
     image: certbot/certbot
     container_name: certbot
     volumes:
-      - ./shared/certbot/conf:/etc/letsencrypt
-      - ./shared/certbot/www:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    - ./shared/certbot/conf:/etc/letsencrypt
+    - ./shared/certbot/www:/var/www/certbot
+    entrypoint: /bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h &
+      wait $${!}; done;'
     networks:
-      - restaurant-network
-
-# ============================================================================
-# VOLUMES
-# ============================================================================
-
+    - restaurant-network
+    environment:
+    - TZ=America/New_York
 volumes:
   inventory_data:
     external: true
@@ -372,11 +355,6 @@ volumes:
     name: restaurant-events_data
   events_redis_data:
     name: restaurant-events_redis_data
-
-# ============================================================================
-# NETWORKS
-# ============================================================================
-
 networks:
   restaurant-network:
     name: restaurant-network

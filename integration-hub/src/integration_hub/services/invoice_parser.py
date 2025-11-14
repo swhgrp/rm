@@ -108,7 +108,7 @@ class InvoiceParser:
                             "subtotal": float,
                             "tax_amount": float,
                             "total_amount": float,
-                            "is_statement": boolean (true if document title/header contains "Statement" or "Account Statement", false otherwise),
+                            "is_statement": boolean (true if document title/header contains "Statement", "Account Statement", "Final-Notification", "EFT", "Electronic Funds Transfer", or similar non-invoice payment notifications, false otherwise),
                             "line_items": [
                                 {
                                     "line_number": int,
@@ -424,15 +424,32 @@ class InvoiceParser:
             line_items = parsed_data.get('line_items', [])
 
             for item_data in line_items:
+                quantity = float(item_data.get('quantity') or 0)
+                unit_price = float(item_data.get('unit_price') or 0)
+                line_total = float(item_data.get('line_total') or 0)
+
+                # Fallback: If line_total is incorrect or missing, calculate it
+                # Some AI parsers return unit_price as line_total by mistake
+                calculated_total = quantity * unit_price
+
+                # Use calculated total if:
+                # 1. line_total is 0 or missing, OR
+                # 2. line_total equals unit_price (common parsing error), OR
+                # 3. line_total differs significantly from calculated (>$0.02 difference for rounding)
+                if line_total == 0 or line_total == unit_price or abs(line_total - calculated_total) > 0.02:
+                    line_total = calculated_total
+                    logger.warning(f"Line total mismatch for '{item_data.get('description')}': "
+                                 f"parsed=${item_data.get('line_total')}, calculated=${calculated_total:.2f}. Using calculated.")
+
                 invoice_item = HubInvoiceItem(
                     invoice_id=invoice_id,
                     line_number=item_data.get('line_number'),
                     item_description=item_data.get('description') or 'Unknown',
                     item_code=item_data.get('item_code'),
-                    quantity=float(item_data.get('quantity') or 0),
+                    quantity=quantity,
                     unit_of_measure=item_data.get('unit'),
-                    unit_price=float(item_data.get('unit_price') or 0),
-                    total_amount=float(item_data.get('line_total') or 0),
+                    unit_price=unit_price,
+                    total_amount=line_total,
                     is_mapped=False  # Will need manual mapping
                 )
                 db.add(invoice_item)

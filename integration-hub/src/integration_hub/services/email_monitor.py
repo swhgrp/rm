@@ -197,6 +197,7 @@ class EmailMonitorService:
                 return stats
 
             # Search for unread emails
+            # Emails will be marked as read after processing to prevent re-processing
             status, message_ids = mail.search(None, "UNSEEN")
             if status != "OK":
                 logger.error(f"Failed to search for unread emails: {status}")
@@ -284,6 +285,13 @@ class EmailMonitorService:
                         except Exception as e:
                             logger.error(f"Error processing attachment {filename}: {str(e)}")
                             stats['errors'] += 1
+
+                    # Mark email as read after processing all attachments
+                    try:
+                        mail.store(msg_id, '+FLAGS', '\\Seen')
+                        logger.debug(f"Marked email {msg_id} as read")
+                    except Exception as e:
+                        logger.warning(f"Failed to mark email {msg_id} as read: {str(e)}")
 
                 except Exception as e:
                     logger.error(f"Error processing email {msg_id}: {str(e)}")

@@ -796,9 +796,9 @@ def receive_vendor_bill_from_hub(
             reference_number=f"HUB-{bill_data.get('hub_invoice_id')}",
             description=f"From Integration Hub - Invoice #{bill_data['bill_number']}",
             status=BillStatus.APPROVED,  # Auto-approve bills from Hub
-            created_by=1,  # System user
-            approved_by=1,  # System user
-            approved_date=datetime.now()
+            created_by=1,  # System user (Integration Hub)
+            approved_by=None,  # No manual approval - auto-approved by system
+            approved_date=None  # No manual approval date
         )
 
         db.add(bill)

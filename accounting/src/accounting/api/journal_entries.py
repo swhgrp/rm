@@ -11,6 +11,7 @@ from decimal import Decimal
 from accounting.db.database import get_db
 from accounting.models.journal_entry import JournalEntry, JournalEntryLine, JournalEntryStatus
 from accounting.models.account import Account
+from accounting.models.area import Area
 from accounting.models.fiscal_period import FiscalPeriod, FiscalPeriodStatus
 from accounting.models.user import User
 from accounting.api.auth import require_auth, require_admin
@@ -21,6 +22,7 @@ from pydantic import BaseModel, Field, field_validator
 # Pydantic schemas
 class JournalEntryLineCreate(BaseModel):
     account_id: int
+    area_id: Optional[int] = None
     debit_amount: Decimal = Field(default=Decimal('0.00'), ge=0)
     credit_amount: Decimal = Field(default=Decimal('0.00'), ge=0)
     description: Optional[str] = Field(None, max_length=500)
@@ -68,6 +70,15 @@ class JournalEntryCreate(BaseModel):
         return lines
 
 
+class AreaResponse(BaseModel):
+    id: int
+    code: str
+    name: str
+
+    class Config:
+        from_attributes = True
+
+
 class JournalEntryLineResponse(BaseModel):
     id: int
     account_id: int
@@ -76,6 +87,7 @@ class JournalEntryLineResponse(BaseModel):
     debit_amount: Decimal
     credit_amount: Decimal
     description: Optional[str]
+    area: Optional[AreaResponse] = None
 
     class Config:
         from_attributes = True
@@ -208,15 +220,23 @@ def list_journal_entries(
 
         for line in entry.lines:
             account = db.query(Account).filter(Account.id == line.account_id).first()
-            entry_dict["lines"].append({
+            area = db.query(Area).filter(Area.id == line.area_id).first() if line.area_id else None
+
+            line_dict = {
                 "id": line.id,
                 "account_id": line.account_id,
                 "account_number": account.account_number if account else "UNKNOWN",
                 "account_name": account.account_name if account else "UNKNOWN",
                 "debit_amount": line.debit_amount,
                 "credit_amount": line.credit_amount,
-                "description": line.description
-            })
+                "description": line.description,
+                "area": {
+                    "id": area.id,
+                    "code": area.code,
+                    "name": area.name
+                } if area else None
+            }
+            entry_dict["lines"].append(line_dict)
 
         result.append(entry_dict)
 
@@ -314,6 +334,7 @@ def create_journal_entry(
         line = JournalEntryLine(
             journal_entry_id=new_entry.id,
             account_id=line_data.account_id,
+            area_id=line_data.area_id,
             debit_amount=line_data.debit_amount,
             credit_amount=line_data.credit_amount,
             description=line_data.description

@@ -533,24 +533,20 @@ async function loadDSS(id) {
 
             for (const [paymentType, paymentData] of Object.entries(dss.payment_breakdown)) {
                 // Check if payment_breakdown has new structure with amount and tips
-                console.log(`Processing ${paymentType}:`, paymentData, 'Type:', typeof paymentData);
                 let paymentAmount, paymentTips;
 
                 if (typeof paymentData === 'object' && paymentData !== null && 'amount' in paymentData) {
                     // New structure: {"CARD": {"amount": 1960.27, "tips": 339.47}}
-                    console.log(`${paymentType}: Using NEW structure - amount=${paymentData.amount}, tips=${paymentData.tips}`);
                     paymentAmount = parseFloat(paymentData.amount) || 0;
                     paymentTips = parseFloat(paymentData.tips) || 0;
                 } else {
                     // Old structure: {"CARD": 1960.27} - distribute tips proportionally
-                    console.log(`${paymentType}: Using OLD proportional distribution`);
                     paymentAmount = parseFloat(paymentData) || 0;
                     const totalPayments = Object.values(dss.payment_breakdown).reduce((sum, amt) => {
                         return sum + (typeof amt === 'object' ? parseFloat(amt.amount || 0) : parseFloat(amt || 0));
                     }, 0);
                     const paymentPct = paymentAmount / totalPayments;
                     paymentTips = dss.tips ? (dss.tips * paymentPct) : 0;
-                    console.log(`${paymentType}: paymentPct=${paymentPct}, calculated tips=${paymentTips}`);
                 }
 
                 // Look up mapped account for this payment type

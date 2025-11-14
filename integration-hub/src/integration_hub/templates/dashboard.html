@@ -120,7 +120,7 @@
                                         <i class="bi bi-exclamation-triangle text-warning" title="Vendor not matched"></i>
                                         {% endif %}
                                     </td>
-                                    <td>{{ invoice.invoice_date }}</td>
+                                    <td>{{ invoice.invoice_date.strftime('%m/%d/%y') if invoice.invoice_date else '' }}</td>
                                     <td>${{ "{:,.2f}".format(invoice.total_amount) }}</td>
                                     <td>
                                         <span class="badge badge-{{ invoice.status }}">

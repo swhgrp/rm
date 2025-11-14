@@ -3,6 +3,9 @@
 # Dashboard Status Generator
 # Generates JSON status data for monitoring dashboard
 
+# Force EST/EDT timezone for consistent timestamps
+export TZ="America/New_York"
+
 # Output JSON header
 echo "Content-Type: application/json"
 echo ""
@@ -160,7 +163,7 @@ echo '  },'
 echo '  "backup_details": {'
 
 BACKUP_DIR="/opt/restaurant-system/backups"
-DB_NAMES=("inventory_db" "accounting_db" "hr_db" "events_db" "hub_db")
+DB_NAMES=("inventory_db" "accounting_db" "hr_db" "events_db" "integration_hub_db")
 DETAIL_COUNT=0
 TOTAL_DETAILS=${#DB_NAMES[@]}
 
@@ -171,7 +174,8 @@ for dbname in "${DB_NAMES[@]}"; do
     LATEST=$(ls -t "$BACKUP_DIR/${dbname}_"*.sql.gz 2>/dev/null | head -1)
 
     if [ -n "$LATEST" ]; then
-        BACKUP_DATE=$(stat -c %y "$LATEST" | cut -d' ' -f1,2 | cut -d'.' -f1)
+        # Get timestamp with timezone name (EST/EDT)
+        BACKUP_DATE=$(TZ="America/New_York" date -r "$LATEST" "+%Y-%m-%d %H:%M:%S %Z")
         BACKUP_SIZE=$(du -h "$LATEST" 2>/dev/null | cut -f1)
         BACKUP_COUNT=$(ls -1 "$BACKUP_DIR/${dbname}_"*.sql.gz 2>/dev/null | wc -l)
         BACKUP_STATUS="ok"
@@ -203,7 +207,8 @@ echo '  "backups": {'
 LATEST_BACKUP=$(ls -t "$BACKUP_DIR"/*.sql.gz 2>/dev/null | head -1)
 
 if [ -n "$LATEST_BACKUP" ]; then
-    BACKUP_DATE=$(stat -c %y "$LATEST_BACKUP" | cut -d' ' -f1,2 | cut -d'.' -f1)
+    # Get timestamp with timezone name (EST/EDT)
+    BACKUP_DATE=$(TZ="America/New_York" date -r "$LATEST_BACKUP" "+%Y-%m-%d %H:%M:%S %Z")
     BACKUP_COUNT=$(ls -1 "$BACKUP_DIR"/*.sql.gz 2>/dev/null | wc -l)
     BACKUP_SIZE=$(du -sh "$BACKUP_DIR" 2>/dev/null | cut -f1)
 

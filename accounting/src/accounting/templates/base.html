@@ -1024,7 +1024,7 @@
     <script>
         // Global debug configuration
         // Set to false in production to disable console.log and console.warn
-        window.DEBUG_MODE = true;
+        window.DEBUG_MODE = false;
 
         // Debug helper functions
         window.debug = {
@@ -1077,11 +1077,9 @@
                 const cancelBtn = document.getElementById('confirmCancelBtn');
                 okBtn.disabled = false;
                 cancelBtn.disabled = false;
-                console.log('Confirm buttons enabled. OK disabled:', okBtn.disabled, 'Cancel disabled:', cancelBtn.disabled);
 
                 // Set onclick handlers directly
                 okBtn.onclick = function(e) {
-                    console.log('Confirm OK clicked, event:', e);
                     if (!resolved) {
                         resolved = true;
                         modal.hide();
@@ -1090,7 +1088,6 @@
                 };
 
                 cancelBtn.onclick = function(e) {
-                    console.log('Confirm Cancel clicked, event:', e);
                     if (!resolved) {
                         resolved = true;
                         modal.hide();
@@ -1100,7 +1097,6 @@
 
                 // Handle modal being closed without clicking buttons
                 modalElement.addEventListener('hidden.bs.modal', function handler() {
-                    console.log('Modal hidden, resolved:', resolved);
                     modalElement.removeEventListener('hidden.bs.modal', handler);
                     if (!resolved) {
                         resolved = true;
@@ -1108,7 +1104,6 @@
                     }
                 }, { once: true });
 
-                console.log('Showing confirm modal');
                 modal.show();
             });
         }
