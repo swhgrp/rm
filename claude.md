@@ -78,7 +78,8 @@
 - `integration-hub/src/integration_hub/templates/invoices.html` - Tabs + pagination
 - Database: Cleaned 70 duplicate accounting records
 
-**Git Commits:** Ready to commit and push ⏳
+**Git Commits:**
+- Commit a979bca: "feat(integration-hub): Major workflow improvements and data integrity fixes" - PUSHED ✅
 
 ---
 
