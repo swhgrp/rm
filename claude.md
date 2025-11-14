@@ -25,9 +25,9 @@
    - **Impact:** Reduces repetitive mapping work by 90%+ for recurring items
 
 2. **Invoice Parser Line Total Validation** 🔧 **DATA QUALITY FIX**
-   - **Problem:** AI parser sometimes returned unit_price as line_total (e.g., $5.13 instead of 15×$5.13=$76.95)
+   - **Problem:** OpenAI GPT-4o Vision parser sometimes returned unit_price as line_total (e.g., $5.13 instead of 15×$5.13=$76.95)
    - **Solution:** Added fallback calculation that validates and corrects line totals
-   - Detects when line_total equals unit_price (common error) or differs by >$0.02
+   - Detects when line_total equals unit_price (common GPT-4o parsing error) or differs by >$0.02
    - Recalculates as quantity × unit_price when mismatch detected
    - Logs warning when correction is made
    - **File Modified:** `integration-hub/src/integration_hub/services/invoice_parser.py` (lines 426-456)
@@ -159,13 +159,13 @@
    - Example: Cozzini invoices (knife service, GL-only) now show gray dash for Inventory
    - Commit: 3c9a0c1 - PUSHED ✅
 
-3. **AI-Powered Statement Detection** 🤖 **SMART AUTOMATION**
+3. **OpenAI GPT-4o Vision Statement Detection** 🤖 **SMART AUTOMATION**
    - GPT-4o Vision now automatically detects if document is a statement vs invoice
    - Checks for "Statement", "Account Statement", "Monthly Statement" in document title
    - Sets `is_statement=true` automatically during parsing
    - Statements auto-flagged and excluded from system sync
    - Use case: Cozzini Bros and Gordon Food Service monthly account statements
-   - User workflow: Click "Re-parse Invoice" → AI detects statement → Auto-marked
+   - User workflow: Click "Re-parse Invoice" → GPT-4o detects statement → Auto-marked
    - Commit: d48c2e1 - PUSHED ✅
 
 4. **Statement Item Handling** 🔧 **FIX**
