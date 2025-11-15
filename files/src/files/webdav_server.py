@@ -101,14 +101,15 @@ def create_webdav_app():
         "host": "0.0.0.0",
         "port": 8080,  # WsgiDAV internal port (not exposed, proxied by nginx)
         "provider_mapping": {
-            "/": UserIsolatedFilesystemProvider(str(STORAGE_PATH))
+            "/andy": FilesystemProvider(str(STORAGE_PATH / "user_2")),
+            "/": FilesystemProvider(str(STORAGE_PATH))  # Fallback for other users
         },
         "simple_dc": {
             "user_mapping": {
                 "*": True  # Accept all users with any password (auth handled by Portal/nginx)
             }
         },
-        "verbose": 2,  # Logging level (1=ERROR, 2=WARN, 3=INFO, 4=DEBUG)
+        "verbose": 3,  # Logging level (1=ERROR, 2=WARN, 3=INFO, 4=DEBUG)
         "logging": {
             "enable_loggers": ["wsgidav"],
         },

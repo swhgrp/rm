@@ -27,13 +27,17 @@ async def sso_login(
             algorithms=[settings.ALGORITHM]
         )
         
-        # Validate expiration
+        # Validate expiration (use UTC for both sides of comparison)
         exp = payload.get("exp")
-        if exp and datetime.fromtimestamp(exp) < datetime.utcnow():
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token expired"
-            )
+        if exp:
+            from datetime import timezone
+            exp_dt = datetime.fromtimestamp(exp, tz=timezone.utc)
+            now_dt = datetime.now(timezone.utc)
+            if exp_dt < now_dt:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Token expired"
+                )
         
         # Get user
         user_id = payload.get("user_id")

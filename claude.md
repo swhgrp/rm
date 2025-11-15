@@ -9,9 +9,9 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Nov 14, 2025)
+### Most Recent Work (Current Session - Nov 14-15, 2025)
 
-**FILES SYSTEM: WEBDAV SYNC IMPLEMENTATION** (Nov 14, 2025) ✅ **COMPLETE**
+**FILES SYSTEM: WEBDAV SYNC + TIMEZONE BUG FIX** (Nov 14-15, 2025) ✅ **COMPLETE**
 
 1. **WebDAV Server for Dropbox-like Desktop Sync** 💾 **MAJOR FEATURE**
    - **Goal:** Enable offline file access and two-way sync between desktop and Files system
@@ -52,6 +52,44 @@
    - Found 85% architectural similarity (database + filesystem storage)
    - Identified WebDAV as the only missing sync layer
    - **File Created:** `docs/files-vs-nextcloud-comparison.md` (400+ lines)
+
+5. **WsgiDAV 4.3.0 Compatibility Fixes** 🔧 **PRODUCTION FIX**
+   - **Problem:** WsgiDAV 4.3.0 deprecated several config options, server wouldn't start
+   - **Solution:** Updated configuration for v4.3.0 compatibility
+   - Changed `lock_manager` → `lock_storage`
+   - Changed `propsmanager` → `property_manager`
+   - Moved `enable_loggers` → `logging.enable_loggers`
+   - Removed deprecated `dir_browser.ms_mount`
+   - Simplified domain controller (removed custom auth, use simple_dc)
+   - **File Modified:** `files/src/files/webdav_server.py`
+   - **Impact:** WebDAV server now starts and runs successfully
+
+6. **Direct Path Mapping for Users** 🗂️ **CONFIGURATION**
+   - **Problem:** Complex UserIsolatedFilesystemProvider causing 404 errors
+   - **Solution:** Simplified to direct path mapping
+   - `/andy` → `/app/storage/user_2/` (direct FilesystemProvider)
+   - Removed path normalization complexity
+   - **File Modified:** `files/src/files/webdav_server.py` (lines 137-138)
+   - **Impact:** WebDAV now responds with HTTP 200, files accessible
+
+7. **Critical Timezone Bug Fix** 🕐 **CRITICAL BUG FIX**
+   - **Problem:** Files web interface always returned "Token expired" error
+   - **Root Cause:** Server in EST timezone, code compared local time to UTC
+     - `datetime.fromtimestamp(exp)` returned local EST time (00:01:07)
+     - `datetime.utcnow()` returned UTC time (05:00:31)
+     - Tokens appeared expired 5 hours early!
+   - **Solution:** Use timezone-aware datetime for both sides of comparison
+     - `datetime.fromtimestamp(exp, tz=timezone.utc)`
+     - `datetime.now(timezone.utc)`
+   - **File Modified:** `files/src/files/api/auth.py` (lines 30-40)
+   - **Impact:** Files web interface now accessible, SSO login works correctly
+
+8. **Production Testing & Validation** ✅ **VERIFIED WORKING**
+   - Successfully mounted WebDAV on macOS Finder
+   - Verified file operations: LIST, GET, PUT, LOCK, UNLOCK
+   - Confirmed Files web interface accessible after timezone fix
+   - WebDAV endpoint: `https://rm.swhgrp.com/files/webdav/andy`
+   - All systems operational
 
 **EVENTS SYSTEM: CALDAV CALENDAR SYNC & EMAIL FIXES** (Nov 14, 2025) ✅ **COMPLETE**
 

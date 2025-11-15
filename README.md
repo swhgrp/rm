@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** November 14, 2025
+**Last Updated:** November 15, 2025
 **Status:** ~87% Complete - Core Systems Production Ready ✅
-**Latest:** Files WebDAV sync + Events CalDAV/email fixes (Nov 14, 2025) ✅
+**Latest:** Files WebDAV desktop sync + timezone bug fix (Nov 14-15, 2025) ✅
 
 ---
 
