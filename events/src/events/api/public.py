@@ -125,6 +125,18 @@ async def public_beo_intake(
         tasks = task_service.generate_tasks_from_template(db, event, template)
         logger.info(f"Generated {len(tasks)} tasks for event {event.id}")
 
+    # Sync to CalDAV for admin user if enabled
+    if settings.CALDAV_ENABLED:
+        try:
+            from events.services.caldav_sync_service import CalDAVSyncService
+            caldav_service = CalDAVSyncService()
+            # Sync to admin user 'andy' - new events should appear in admin calendar
+            caldav_service.sync_event_to_caldav(event, 'andy')
+            logger.info(f"Event {event.id} synced to CalDAV for admin")
+        except Exception as e:
+            logger.error(f"Failed to sync event {event.id} to CalDAV: {e}")
+            # Don't fail the whole request if CalDAV sync fails
+
     # Send confirmation email
     try:
         if template and template.email_rules_json:

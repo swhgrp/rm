@@ -252,6 +252,16 @@ services:
     restart: unless-stopped
     networks:
     - restaurant-network
+  caldav:
+    build: ./caldav
+    container_name: caldav
+    volumes:
+    - caldav_data:/data/collections
+    environment:
+    - TZ=America/New_York
+    restart: unless-stopped
+    networks:
+    - restaurant-network
   portal-app:
     build: ./portal
     container_name: portal-app
@@ -355,6 +365,8 @@ volumes:
     name: restaurant-events_data
   events_redis_data:
     name: restaurant-events_redis_data
+  caldav_data:
+    name: restaurant-caldav_data
 networks:
   restaurant-network:
     name: restaurant-network

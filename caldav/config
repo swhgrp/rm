@@ -1,0 +1,21 @@
+[server]
+hosts = 0.0.0.0:5232
+
+[auth]
+type = http_x_remote_user
+# Authentication handled at nginx level via Portal SSO
+# Nginx sets X-Remote-User header after verifying with Portal
+
+[storage]
+filesystem_folder = /data/collections
+
+[rights]
+# owner_write: Only the owner can write, everyone can read their own calendars
+# We'll use from_file with permissive rules
+type = owner_write
+
+[web]
+type = internal
+
+[logging]
+level = info

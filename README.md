@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** November 12, 2025
-**Status:** ~85% Complete - Core Systems Production Ready ✅
-**Latest:** Integration Hub category naming standardization (Nov 12, 2025) ✅
+**Last Updated:** November 14, 2025
+**Status:** ~87% Complete - Core Systems Production Ready ✅
+**Latest:** Events CalDAV calendar sync + email fixes (Nov 14, 2025) ✅
 
 ---
 
@@ -96,12 +96,19 @@ restaurant-system/
 │   │   ├── admin/      # Dashboard, calendar, tasks
 │   │   ├── public/     # Public intake form
 │   │   ├── pdf/        # BEO PDF templates
-│   │   └── emails/     # Email templates
+│   │   └── emails/     # Email templates (with event detail links)
+│   ├── services/       # CalDAV sync service
 │   ├── storage/        # Document storage
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   ├── .env
 │   └── README.md       # Events documentation (278 lines)
+│
+├── caldav/             # CalDAV Calendar Server (Radicale 3.5.8)
+│   ├── Dockerfile      # Radicale container
+│   ├── config          # Server configuration
+│   ├── rights          # Access control rules
+│   └── data/           # Persistent calendar storage (venue-based)
 │
 ├── integration-hub/    # Integration Hub Service
 │   ├── src/            # FastAPI application code (36 Python files)
@@ -136,10 +143,12 @@ restaurant-system/
 │   └── tests/                 # Test scripts
 │
 ├── docs/               # Additional Documentation
+│   ├── events-caldav-calendar-sync.md  # CalDAV setup guide
 │   └── status/         # Progress reports
 │
 ├── docker-compose.yml  # Multi-service orchestration
 ├── SYSTEM_DOCUMENTATION.md  # 80-page comprehensive guide
+├── claude.md          # Claude AI memory/context
 └── README.md          # This file
 ```
 
@@ -158,6 +167,7 @@ restaurant-system/
 │  /accounting/ → accounting-app:8000                     │
 │  /hr/         → hr-app:8000                             │
 │  /events/     → events-app:8000                         │
+│  /caldav/     → caldav:5232        (Calendar Sync)     │
 │  /hub/        → integration-hub:8000                    │
 │  /files/      → files-app:8000                          │
 └─────────────────────────────────────────────────────────┘

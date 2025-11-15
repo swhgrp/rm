@@ -106,6 +106,11 @@
         opacity: 0.9;
     }
 
+    /* Hide the default FullCalendar dot */
+    .fc .fc-daygrid-event-dot {
+        display: none;
+    }
+
     /* Event colors are now set dynamically by venue color */
     /* Status indicator will show as a border or badge */
     .fc-event {
@@ -744,24 +749,29 @@
 
                 // Apply venue color to TEXT only (not background)
                 if (venueId && venueColorMap[venueId]) {
-                    // Set text color instead of background
+                    // Set text color to venue color
                     info.el.style.color = venueColorMap[venueId];
                     info.el.style.backgroundColor = 'transparent';
-                    info.el.style.borderLeft = `3px solid ${venueColorMap[venueId]}`; // Subtle left border
-                    info.el.style.borderColor = 'transparent';
                 } else if (venueId) {
                     console.warn(`Event "${info.event.title}" has venue_id ${venueId} but no color found in map`);
                 }
 
-                // Add icon/indicator based on type
-                if (props.type === 'event') {
-                    // For events, add status indicator dot
-                    const status = props.status;
-                    if (status) {
-                        const indicator = document.createElement('span');
-                        indicator.className = `status-indicator status-${status}`;
-                        indicator.title = formatStatus(status);
-                        info.el.querySelector('.fc-event-title')?.appendChild(indicator);
+                // Add status-based left border for events
+                if (props.type === 'event' && props.status) {
+                    const statusColorMap = {
+                        'DRAFT': '#6e7681',
+                        'PENDING': '#f0883e',
+                        'CONFIRMED': '#1f6feb',
+                        'IN_PROGRESS': '#8957e5',
+                        'COMPLETED': '#238636',
+                        'CLOSED': '#238636',
+                        'CANCELED': '#da3633'
+                    };
+                    // Handle both enum format and string format
+                    const status = props.status.value || props.status;
+                    const statusColor = statusColorMap[status];
+                    if (statusColor) {
+                        info.el.style.borderLeft = `3px solid ${statusColor}`;
                     }
                 } else if (props.type === 'calendar_item') {
                     // For calendar items, add icon based on item_type
@@ -876,7 +886,7 @@
 
             // Map events to calendar format
             const calendarEvents = events.map(event => {
-                console.log(`Event "${event.title}" has venue_id:`, event.venue_id);
+                console.log(`Event "${event.title}" - status:`, event.status, 'type:', typeof event.status, 'value:', event.status?.value);
                 return {
                     id: event.id,
                     title: event.title,

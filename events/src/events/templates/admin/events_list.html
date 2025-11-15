@@ -72,8 +72,8 @@
     /* Events Grid */
     .events-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-        gap: 20px;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 15px;
         margin-top: 20px;
     }
 
@@ -81,7 +81,7 @@
         background-color: #161b22;
         border: 1px solid #30363d;
         border-radius: 6px;
-        padding: 20px;
+        padding: 14px;
         transition: all 0.2s;
         cursor: pointer;
     }
@@ -116,25 +116,25 @@
         display: flex;
         justify-content: space-between;
         align-items: flex-start;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
     }
 
     .event-title {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 600;
         color: #c9d1d9;
-        margin-bottom: 5px;
+        margin-bottom: 3px;
     }
 
     .event-type {
-        font-size: 13px;
+        font-size: 12px;
         color: #8b949e;
     }
 
     .status-badge {
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 11px;
+        padding: 3px 8px;
+        border-radius: 10px;
+        font-size: 10px;
         font-weight: 600;
         text-transform: uppercase;
     }
@@ -171,38 +171,39 @@
     }
 
     .event-info {
-        margin-bottom: 15px;
+        margin-bottom: 10px;
     }
 
     .event-info-row {
         display: flex;
         align-items: center;
-        gap: 8px;
-        margin-bottom: 8px;
-        font-size: 14px;
+        gap: 6px;
+        margin-bottom: 5px;
+        font-size: 13px;
         color: #8b949e;
     }
 
     .event-info-row i {
         color: #58a6ff;
-        width: 16px;
+        width: 14px;
+        font-size: 12px;
     }
 
     .event-footer {
         display: flex;
-        gap: 8px;
-        padding-top: 15px;
+        gap: 6px;
+        padding-top: 10px;
         border-top: 1px solid #30363d;
     }
 
     .action-btn {
         flex: 1;
-        padding: 8px 12px;
+        padding: 6px 10px;
         background-color: #21262d;
         color: #c9d1d9;
         border: 1px solid #30363d;
-        border-radius: 6px;
-        font-size: 13px;
+        border-radius: 4px;
+        font-size: 12px;
         text-align: center;
         cursor: pointer;
         transition: all 0.2s;
@@ -363,16 +364,18 @@
 
     async function loadEvents() {
         try {
-            const [eventsRes, locationsRes] = await Promise.all([
+            const [eventsRes, venuesRes] = await Promise.all([
                 fetch('api/events/'),
-                fetch('api/settings/locations')
+                fetch('api/events/venues/actual')
             ]);
 
             const events = await eventsRes.json();
-            allLocations = await locationsRes.json();
+            allLocations = await venuesRes.json();
 
-            // Filter out CANCELED events (safety net - API also filters)
-            allEvents = events.filter(event => event.status !== 'CANCELED');
+            // Filter out CANCELED and CLOSED events (safety net - API also filters)
+            allEvents = events.filter(event =>
+                event.status !== 'CANCELED' && event.status !== 'CLOSED'
+            );
 
             populateLocationFilter();
             updateStats(allEvents);
@@ -431,7 +434,7 @@
 
         let filtered = allEvents.filter(event => {
             if (statusFilter && event.status !== statusFilter) return false;
-            if (locationFilter && event.location !== locationFilter) return false;
+            if (locationFilter && event.venue_name !== locationFilter) return false;
             if (searchQuery && !event.title.toLowerCase().includes(searchQuery)) return false;
 
             if (startDateFilter) {
@@ -488,7 +491,7 @@
             minute: '2-digit'
         });
 
-        const locationName = event.location || 'No location assigned';
+        const locationName = event.venue_name || 'No location assigned';
 
         card.innerHTML = `
             <div class="event-header">

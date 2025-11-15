@@ -11,6 +11,45 @@
 
 ### Most Recent Work (Current Session - Nov 14, 2025)
 
+**EVENTS SYSTEM: CALDAV CALENDAR SYNC & EMAIL FIXES** (Nov 14, 2025) ✅ **COMPLETE**
+
+1. **Fixed Email Event Detail Links** 🔗 **CRITICAL BUG FIX**
+   - **Problem:** Email links to event details returned 404 errors
+   - **Root Cause:** Email templates used wrong URL patterns:
+     - `internal_new_event.html`: Used `/events/admin/events/{id}` (wrong)
+     - `internal_update.html`: Used `/events/event/{id}` (wrong - missing query param)
+   - **Solution:** Corrected both templates to use `/events/event?id={event_id}`
+   - Event detail page uses query parameters, not path parameters
+   - **Files Modified:**
+     - `events/src/events/templates/emails/internal_new_event.html` (line 220)
+     - `events/src/events/templates/emails/internal_update.html` (line 123)
+   - **Impact:** Email "View Event Details" links now work correctly
+
+2. **Calendar Status Color Indicators** 🎨 **UX IMPROVEMENT**
+   - **Problem:** Calendar events all showed blue dots regardless of status
+   - **Solution:** Implemented status-based colored left borders on calendar events
+   - Added `use_enum_values=True` to EventListItem schema for proper enum serialization
+   - Left border colors indicate event status:
+     - **Orange** (#f0883e) = PENDING
+     - **Blue** (#1f6feb) = CONFIRMED
+     - **Green** (#238636) = CLOSED/COMPLETED
+     - **Red** (#da3633) = CANCELED
+     - **Gray** (#6e7681) = DRAFT
+     - **Purple** (#8957e5) = IN_PROGRESS
+   - Text color still shows venue (purple=Links Grill, pink=SW Grill, etc.)
+   - **Files Modified:**
+     - `events/src/events/schemas/event.py` (line 91 - added use_enum_values=True)
+     - `events/src/events/templates/admin/calendar.html` (lines 754-770 - status color mapping)
+   - **Impact:** Clear visual status indicators at a glance
+
+3. **Removed FullCalendar Default Dots** 🎯 **CLEANER UI**
+   - **Problem:** FullCalendar showed small dots to left of event names (duplicate visual indicator)
+   - **Solution:** Added CSS to hide `.fc-daygrid-event-dot` elements
+   - Left border line is cleaner and more modern than dots
+   - Kept venue legend at top for reference
+   - **File Modified:** `events/src/events/templates/admin/calendar.html` (lines 110-112)
+   - **Impact:** Cleaner calendar appearance with single status indicator per event
+
 **INTEGRATION HUB: MAJOR WORKFLOW & DATA INTEGRITY IMPROVEMENTS** (Nov 14, 2025) ✅ **COMPLETE**
 
 1. **Persistent Item Mapping System** 🎯 **GAME CHANGER**

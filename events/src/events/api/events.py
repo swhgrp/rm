@@ -4,14 +4,18 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta
 from uuid import UUID
+import logging
 
 from events.core.database import get_db
 from events.core.deps import require_auth, require_role, require_permission, check_permission
 from events.models import Event, EventStatus, Venue, Client, Task, TaskStatus, User
 from events.schemas.event import EventCreate, EventUpdate, EventResponse, EventListItem
+from events.services.caldav_sync_service import CalDAVSyncService
+from events.core.config import settings
 from sqlalchemy import func
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/stats")
@@ -109,11 +113,14 @@ async def list_events(
             # User has no assigned locations - return empty result
             return []
 
-    # By default, exclude CANCELED events unless explicitly requested
+    # By default, exclude CANCELED and CLOSED events unless explicitly requested
     if status:
         query = query.filter(Event.status == status)
     else:
-        query = query.filter(Event.status != EventStatus.CANCELED)
+        query = query.filter(
+            Event.status != EventStatus.CANCELED,
+            Event.status != EventStatus.CLOSED
+        )
 
     if event_type:
         query = query.filter(Event.event_type == event_type)
@@ -124,8 +131,27 @@ async def list_events(
     if end_date:
         query = query.filter(Event.end_at <= end_date)
 
-    events = query.order_by(Event.start_at.desc()).offset(skip).limit(limit).all()
-    return events
+    events = query.order_by(Event.start_at.asc()).offset(skip).limit(limit).all()
+
+    # Add venue_name to each event for display
+    result = []
+    for event in events:
+        event_dict = {
+            "id": event.id,
+            "title": event.title,
+            "event_type": event.event_type,
+            "status": event.status,
+            "start_at": event.start_at,
+            "end_at": event.end_at,
+            "guest_count": event.guest_count,
+            "venue_id": event.venue_id,
+            "venue_name": event.venue.name if event.venue else None,
+            "location": event.location,
+            "created_at": event.created_at
+        }
+        result.append(event_dict)
+
+    return result
 
 
 @router.get("/calendar", response_model=List[EventListItem])
@@ -175,7 +201,26 @@ async def get_calendar_events(
     query = query.filter(Event.status != EventStatus.CANCELED)
 
     events = query.order_by(Event.start_at).all()
-    return events
+
+    # Add venue_name to each event for display
+    result = []
+    for event in events:
+        event_dict = {
+            "id": event.id,
+            "title": event.title,
+            "event_type": event.event_type,
+            "status": event.status,
+            "start_at": event.start_at,
+            "end_at": event.end_at,
+            "guest_count": event.guest_count,
+            "venue_id": event.venue_id,
+            "venue_name": event.venue.name if event.venue else None,
+            "location": event.location,
+            "created_at": event.created_at
+        }
+        result.append(event_dict)
+
+    return result
 
 
 @router.get("/venues")
@@ -266,6 +311,16 @@ async def create_event(
     db.commit()
     db.refresh(event)
 
+    # Sync to CalDAV if enabled
+    if settings.CALDAV_ENABLED:
+        try:
+            caldav_service = CalDAVSyncService()
+            caldav_service.sync_event_to_caldav(event, current_user.email)
+            logger.info(f"Event {event.id} synced to CalDAV for user {current_user.email}")
+        except Exception as e:
+            logger.error(f"Failed to sync event {event.id} to CalDAV: {e}")
+            # Don't fail the request if CalDAV sync fails
+
     # TODO: Generate initial tasks from template
     # TODO: Send confirmation email
 
@@ -303,6 +358,21 @@ async def update_event(
     db.refresh(event)
 
     logger.info(f"After update - event status: {event.status}, venue_id: {event.venue_id}")
+
+    # Sync to CalDAV if enabled
+    if settings.CALDAV_ENABLED:
+        try:
+            caldav_service = CalDAVSyncService()
+            # If event is canceled or closed, remove from CalDAV
+            if event.status in [EventStatus.CANCELED, EventStatus.CLOSED]:
+                caldav_service.remove_event_from_caldav(event, current_user.email)
+                logger.info(f"Event {event.id} removed from CalDAV for user {current_user.email}")
+            else:
+                caldav_service.sync_event_to_caldav(event, current_user.email)
+                logger.info(f"Event {event.id} synced to CalDAV for user {current_user.email}")
+        except Exception as e:
+            logger.error(f"Failed to sync event {event.id} to CalDAV: {e}")
+            # Don't fail the request if CalDAV sync fails
 
     # TODO: If time changed, update task due dates
     # TODO: Send update notifications

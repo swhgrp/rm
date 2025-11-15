@@ -38,6 +38,10 @@ class Settings(BaseSettings):
     HCAPTCHA_SECRET: str
     HCAPTCHA_SITEKEY: str
 
+    # CalDAV
+    CALDAV_URL: Optional[str] = "http://caldav:5232"
+    CALDAV_ENABLED: bool = False
+
     # Application
     APP_NAME: str = "SW Hospitality Events"
     APP_URL: str

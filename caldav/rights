@@ -1,0 +1,18 @@
+# Allow all access (internal service with no authentication)
+# Authentication is handled at nginx level for external access
+# With auth type = none, user is empty string (anonymous)
+
+[anonymous-root]
+user =
+collection =
+permissions = RW
+
+[anonymous-all]
+user =
+collection = .*
+permissions = RW
+
+[allow-all]
+user = .*
+collection = .*
+permissions = RW

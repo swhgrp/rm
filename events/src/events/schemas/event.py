@@ -16,6 +16,7 @@ class EventBase(BaseModel):
     end_at: datetime
     guest_count: Optional[int] = None
     location: Optional[str] = None
+    description: Optional[str] = None
     setup_start_at: Optional[datetime] = None
     teardown_end_at: Optional[datetime] = None
     menu_json: Optional[Dict[str, Any]] = None
@@ -40,6 +41,7 @@ class EventUpdate(BaseModel):
     end_at: Optional[datetime] = None
     guest_count: Optional[int] = None
     location: Optional[str] = None  # Deprecated, use venue_id
+    description: Optional[str] = None
     setup_start_at: Optional[datetime] = None
     teardown_end_at: Optional[datetime] = None
     menu_json: Optional[Dict[str, Any]] = None
@@ -86,7 +88,7 @@ class EventResponse(EventBase):
 
 class EventListItem(BaseModel):
     """Lightweight event for calendar/list views"""
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, use_enum_values=True)
 
     id: UUID
     title: str
@@ -96,5 +98,6 @@ class EventListItem(BaseModel):
     end_at: datetime
     guest_count: Optional[int] = None
     venue_id: Optional[UUID] = None
+    venue_name: Optional[str] = None  # Venue name for display
     location: Optional[str] = None  # Deprecated
     created_at: datetime

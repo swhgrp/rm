@@ -940,6 +940,7 @@
                     new Date(document.getElementById('end_at').value).toISOString() : null,
                 venue_id: venue_id,
                 client_id: document.getElementById('client_id').value || null,
+                description: document.getElementById('description').value || null,
             };
 
             console.log('Full event update payload:', updatedEvent);
