@@ -13,47 +13,14 @@ logger = logging.getLogger(__name__)
 STORAGE_PATH = Path("/app/storage")
 
 
-class PortalAuthDomainController:
-    """Custom domain controller that uses Portal's X-Remote-User header for authentication"""
-
-    def __init__(self, user_mapping=None):
-        self.user_mapping = user_mapping or {}
-
-    def require_authentication(self, realm, environ):
-        """Return True to require authentication for this realm/path"""
-        return True
-
-    def basic_auth_user(self, realm, user_name, password, environ):
-        """
-        Authenticate using Portal's X-Remote-User header
-
-        In production, nginx adds X-Remote-User header after Portal SSO auth.
-        For testing/dev, we can use basic auth with any password.
-        """
-        # Check if already authenticated via Portal (X-Remote-User header)
-        remote_user = environ.get("HTTP_X_REMOTE_USER")
-        if remote_user:
-            logger.info(f"WebDAV: Authenticated user '{remote_user}' via X-Remote-User header")
-            return True
-
-        # Fallback: Accept basic auth for testing
-        # In production, nginx would handle auth and set X-Remote-User
-        logger.info(f"WebDAV: Basic auth for user '{user_name}'")
-        return True  # Accept any password when X-Remote-User present
-
-    def supports_http_digest_auth(self):
-        """We only support basic auth"""
-        return False
-
-
 class UserIsolatedFilesystemProvider(FilesystemProvider):
     """
     Filesystem provider that isolates users to their own storage directories
     Maps /webdav/username/ to /app/storage/user_{id}/
     """
 
-    def __init__(self, root_path, readonly=False):
-        super().__init__(root_path, readonly)
+    def __init__(self, root_path):
+        super().__init__(root_path)
         self.root_path = Path(root_path)
 
     def _get_user_from_environ(self, environ):
@@ -136,25 +103,20 @@ def create_webdav_app():
         "provider_mapping": {
             "/": UserIsolatedFilesystemProvider(str(STORAGE_PATH))
         },
-        "http_authenticator": {
-            "domain_controller": PortalAuthDomainController(),
-            "accept_basic": True,  # Accept HTTP Basic Auth
-            "accept_digest": False,
-            "default_to_digest": False,
-        },
         "simple_dc": {
             "user_mapping": {
-                "*": True  # Accept all users (auth handled by Portal)
+                "*": True  # Accept all users with any password (auth handled by Portal/nginx)
             }
         },
         "verbose": 2,  # Logging level (1=ERROR, 2=WARN, 3=INFO, 4=DEBUG)
-        "enable_loggers": ["wsgidav"],
-        "propsmanager": True,  # Enable property manager for metadata
-        "locksmanager": True,  # Enable lock manager for file locking
+        "logging": {
+            "enable_loggers": ["wsgidav"],
+        },
+        "property_manager": True,  # Enable property manager for metadata
+        "lock_storage": True,  # Enable lock storage for file locking
         "dir_browser": {
             "enable": True,  # Enable web browser interface
             "davmount": False,
-            "ms_mount": False,
         },
     }
 
