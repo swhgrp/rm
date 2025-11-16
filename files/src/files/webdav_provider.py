@@ -28,10 +28,9 @@ STORAGE_PATH = Path("/app/storage")
 class DatabaseBackedDAVResource:
     """Base class for DAV resources backed by database"""
 
-    def __init__(self, path: str, environ: dict, db: Session, user: User):
+    def __init__(self, path: str, environ: dict, user: User):
         self.path = path
         self.environ = environ
-        self.db = db
         self.user = user
         self._user_storage_path = STORAGE_PATH / f"user_{user.id}"
 
@@ -57,9 +56,9 @@ class DatabaseBackedDAVResource:
 class DatabaseBackedDAVCollection(DAVCollection, DatabaseBackedDAVResource):
     """WebDAV collection (folder) backed by database"""
 
-    def __init__(self, path: str, environ: dict, db: Session, user: User, folder: Optional[Folder] = None):
+    def __init__(self, path: str, environ: dict, user: User, folder: Optional[Folder] = None):
         DAVCollection.__init__(self, path, environ)
-        DatabaseBackedDAVResource.__init__(self, path, environ, db, user)
+        DatabaseBackedDAVResource.__init__(self, path, environ, user)
         self.folder = folder
 
     def get_member_names(self):
@@ -83,27 +82,31 @@ class DatabaseBackedDAVCollection(DAVCollection, DatabaseBackedDAVResource):
         if not fs_path.exists():
             return None
 
-        if fs_path.is_dir():
-            # Try to find folder in database
-            db_path = self.get_database_path().rstrip('/') + '/' + name
-            folder = self.db.query(Folder).filter(
-                Folder.path == db_path,
-                Folder.owner_id == self.user.id
-            ).first()
-            return DatabaseBackedDAVCollection(member_path, self.environ, self.db, self.user, folder)
-        else:
-            # Try to find file in database
-            db_path = self.get_database_path().rstrip('/') + '/' + name
-            file_meta = self.db.query(FileMetadata).filter(
-                FileMetadata.path == db_path,
-                FileMetadata.owner_id == self.user.id
-            ).first()
-            return DatabaseBackedDAVFile(member_path, self.environ, self.db, self.user, file_meta)
+        db = SessionLocal()
+        try:
+            if fs_path.is_dir():
+                # Try to find folder in database
+                db_path = self.get_database_path().rstrip('/') + '/' + name
+                folder = db.query(Folder).filter(
+                    Folder.path == db_path,
+                    Folder.owner_id == self.user.id
+                ).first()
+                return DatabaseBackedDAVCollection(member_path, self.environ, self.user, folder)
+            else:
+                # Try to find file in database
+                db_path = self.get_database_path().rstrip('/') + '/' + name
+                file_meta = db.query(FileMetadata).filter(
+                    FileMetadata.path == db_path,
+                    FileMetadata.owner_id == self.user.id
+                ).first()
+                return DatabaseBackedDAVFile(member_path, self.environ, self.user, file_meta)
+        finally:
+            db.close()
 
     def create_empty_resource(self, name):
         """Create a new empty file"""
         member_path = f"{self.path.rstrip('/')}/{name}"
-        return DatabaseBackedDAVFile(member_path, self.environ, self.db, self.user, None)
+        return DatabaseBackedDAVFile(member_path, self.environ, self.user, None)
 
     def create_collection(self, name):
         """Create a new subfolder"""
@@ -202,9 +205,9 @@ class DatabaseBackedDAVCollection(DAVCollection, DatabaseBackedDAVResource):
 class DatabaseBackedDAVFile(DAVNonCollection, DatabaseBackedDAVResource):
     """WebDAV file backed by database"""
 
-    def __init__(self, path: str, environ: dict, db: Session, user: User, file_meta: Optional[FileMetadata] = None):
+    def __init__(self, path: str, environ: dict, user: User, file_meta: Optional[FileMetadata] = None):
         DAVNonCollection.__init__(self, path, environ)
-        DatabaseBackedDAVResource.__init__(self, path, environ, db, user)
+        DatabaseBackedDAVResource.__init__(self, path, environ, user)
         self.file_meta = file_meta
 
     def get_content_length(self):
@@ -267,6 +270,7 @@ class DatabaseBackedDAVFile(DAVNonCollection, DatabaseBackedDAVResource):
             logger.error(f"File not found after write: {fs_path}")
             return
 
+        db = SessionLocal()
         try:
             # Get file info
             stat = fs_path.stat()
@@ -277,7 +281,7 @@ class DatabaseBackedDAVFile(DAVNonCollection, DatabaseBackedDAVResource):
             if parent_path == '/':
                 parent_path = '/'
 
-            parent_folder = self.db.query(Folder).filter(
+            parent_folder = db.query(Folder).filter(
                 Folder.path == parent_path,
                 Folder.owner_id == self.user.id
             ).first()
@@ -290,18 +294,24 @@ class DatabaseBackedDAVFile(DAVNonCollection, DatabaseBackedDAVResource):
                     owner_id=self.user.id,
                     parent_id=None
                 )
-                self.db.add(parent_folder)
-                self.db.flush()
+                db.add(parent_folder)
+                db.flush()
+
+            # Check if file already exists in database
+            file_meta = db.query(FileMetadata).filter(
+                FileMetadata.path == db_path,
+                FileMetadata.owner_id == self.user.id
+            ).first()
 
             # Update or create file metadata
-            if self.file_meta:
+            if file_meta:
                 # Update existing
-                self.file_meta.size = stat.st_size
-                self.file_meta.mime_type = mime_type
-                self.file_meta.updated_at = datetime.now(timezone.utc)
+                file_meta.size = stat.st_size
+                file_meta.mime_type = mime_type
+                file_meta.updated_at = datetime.now(timezone.utc)
             else:
                 # Create new
-                self.file_meta = FileMetadata(
+                file_meta = FileMetadata(
                     name=os.path.basename(db_path),
                     path=db_path,
                     folder_id=parent_folder.id,
@@ -309,30 +319,41 @@ class DatabaseBackedDAVFile(DAVNonCollection, DatabaseBackedDAVResource):
                     size=stat.st_size,
                     mime_type=mime_type
                 )
-                self.db.add(self.file_meta)
+                db.add(file_meta)
 
-            self.db.commit()
+            db.commit()
             logger.info(f"Saved file to database: {db_path} ({stat.st_size} bytes)")
 
         except Exception as e:
-            self.db.rollback()
+            db.rollback()
             logger.error(f"Error saving file to database: {e}")
             raise DAVError(HTTP_CONFLICT, f"Failed to save file: {e}")
+        finally:
+            db.close()
 
     def delete(self):
         """Delete this file"""
         fs_path = self.get_filesystem_path()
+        db_path = self.get_database_path()
 
         # Delete from database first
-        if self.file_meta:
-            try:
-                self.db.delete(self.file_meta)
-                self.db.commit()
-                logger.info(f"Deleted file from database: {self.file_meta.path}")
-            except Exception as e:
-                self.db.rollback()
-                logger.error(f"Error deleting file from database: {e}")
-                raise DAVError(HTTP_CONFLICT, f"Failed to delete from database: {e}")
+        db = SessionLocal()
+        try:
+            file_meta = db.query(FileMetadata).filter(
+                FileMetadata.path == db_path,
+                FileMetadata.owner_id == self.user.id
+            ).first()
+
+            if file_meta:
+                db.delete(file_meta)
+                db.commit()
+                logger.info(f"Deleted file from database: {db_path}")
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error deleting file from database: {e}")
+            raise DAVError(HTTP_CONFLICT, f"Failed to delete from database: {e}")
+        finally:
+            db.close()
 
         # Delete from filesystem
         if fs_path.exists():
@@ -442,7 +463,7 @@ class DatabaseBackedDAVProvider(DAVProvider):
 
             # Root collection
             if path == '/' or path == '':
-                return DatabaseBackedDAVCollection('/', environ, db, user, None)
+                return DatabaseBackedDAVCollection('/', environ, user, None)
 
             # Determine if it's a file or folder
             user_storage = STORAGE_PATH / f"user_{user.id}"
@@ -459,13 +480,13 @@ class DatabaseBackedDAVProvider(DAVProvider):
                         Folder.path == db_path,
                         Folder.owner_id == user.id
                     ).first()
-                    return DatabaseBackedDAVCollection(path, environ, db, user, folder)
+                    return DatabaseBackedDAVCollection(path, environ, user, folder)
                 else:
                     file_meta = db.query(FileMetadata).filter(
                         FileMetadata.path == db_path,
                         FileMetadata.owner_id == user.id
                     ).first()
-                    return DatabaseBackedDAVFile(path, environ, db, user, file_meta)
+                    return DatabaseBackedDAVFile(path, environ, user, file_meta)
 
             # Doesn't exist - check database to see if it's a known folder or file
             folder = db.query(Folder).filter(
@@ -473,14 +494,14 @@ class DatabaseBackedDAVProvider(DAVProvider):
                 Folder.owner_id == user.id
             ).first()
             if folder:
-                return DatabaseBackedDAVCollection(path, environ, db, user, folder)
+                return DatabaseBackedDAVCollection(path, environ, user, folder)
 
             file_meta = db.query(FileMetadata).filter(
                 FileMetadata.path == db_path,
                 FileMetadata.owner_id == user.id
             ).first()
             if file_meta:
-                return DatabaseBackedDAVFile(path, environ, db, user, file_meta)
+                return DatabaseBackedDAVFile(path, environ, user, file_meta)
 
             # Not in database either - check if path looks like a file (has extension)
             # If no extension and doesn't end with /, treat as potential folder
@@ -489,10 +510,10 @@ class DatabaseBackedDAVProvider(DAVProvider):
             name = os.path.basename(path)
             if '.' in name or path.endswith('.txt') or path.endswith('.pdf'):
                 # Looks like a file
-                return DatabaseBackedDAVFile(path, environ, db, user, None)
+                return DatabaseBackedDAVFile(path, environ, user, None)
             else:
                 # Looks like a folder
-                return DatabaseBackedDAVCollection(path, environ, db, user, None)
+                return DatabaseBackedDAVCollection(path, environ, user, None)
 
         except DAVError:
             db.close()
