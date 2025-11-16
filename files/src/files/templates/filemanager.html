@@ -900,7 +900,7 @@
         <!-- Content area -->
         <div class="content-area">
                 <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h2 class="mb-0"><i class="bi bi-folder2"></i> Files Dashboard</h2>
+                    <h2 class="mb-0" id="pageTitle"><i class="bi bi-folder2"></i> Files Dashboard</h2>
                 </div>
 
                 <nav aria-label="breadcrumb">
@@ -1000,6 +1000,10 @@
                         <i class="bi bi-folder-plus"></i>
                         <span>New Folder</span>
                     </button>
+                    <button class="btn btn-custom" onclick="showNewDocumentModal()">
+                        <i class="bi bi-file-earmark-text"></i>
+                        <span>New Document</span>
+                    </button>
                     <button class="btn btn-custom" onclick="refreshFiles()">
                         <i class="bi bi-arrow-clockwise"></i>
                         <span>Refresh</span>
@@ -1041,6 +1045,39 @@
                     <button type="button" class="btn btn-custom" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-primary-custom" onclick="createFolder()">
                         <i class="bi bi-check"></i> Create
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Document Modal -->
+    <div class="modal fade" id="newDocumentModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="bi bi-file-earmark-text"></i> Create New Document</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="documentName" class="form-label">Document Name</label>
+                        <input type="text" class="form-control" id="documentName" placeholder="Enter document name">
+                        <small class="form-text text-muted">File extension will be added automatically</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="documentType" class="form-label">Document Type</label>
+                        <select class="form-select" id="documentType">
+                            <option value="word">Word Document (.docx)</option>
+                            <option value="excel">Excel Spreadsheet (.xlsx)</option>
+                            <option value="powerpoint">PowerPoint Presentation (.pptx)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-custom" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary-custom" onclick="createDocument()">
+                        <i class="bi bi-check"></i> Create & Open
                     </button>
                 </div>
             </div>
@@ -1360,6 +1397,7 @@
 
         let currentFolderId = null;
         let folderStack = [];
+        let currentView = 'dashboard'; // 'dashboard', 'myfiles', 'shared-with-me', 'shared-by-me', 'folder'
 
         async function loadRootFolders() {
             try {
@@ -1369,7 +1407,9 @@
                 displayDashboard(data);
                 currentFolderId = null;
                 folderStack = [];
+                currentView = 'dashboard';
                 updateBreadcrumb([{name: 'Home', id: null}]);
+                setPageTitle('Files Dashboard');
 
                 // Update URL
                 window.history.pushState({folderId: null}, '', '/files/');
@@ -1386,16 +1426,22 @@
 
         async function loadMyFiles() {
             try {
-                // Load full folder browser for My Files
-                const response = await fetch(`/files/api/files/folders?_=${Date.now()}`);
-                const data = await response.json();
-                displayFolders(data.folders, []);
+                // Load both folders and files for root level
+                const foldersResponse = await fetch(`/files/api/files/folders?_=${Date.now()}`);
+                const foldersData = await foldersResponse.json();
+
+                const filesResponse = await fetch(`/files/api/files/files/root?_=${Date.now()}`);
+                const filesData = await filesResponse.json();
+
+                displayFolders(foldersData.folders || [], filesData.files || []);
                 currentFolderId = null;
                 folderStack = [];
+                currentView = 'myfiles';
                 updateBreadcrumb([{name: 'My Files', id: null}]);
+                setPageTitle('My Files');
 
                 // Update URL
-                window.history.pushState({folderId: null}, '', '/files/');
+                window.history.pushState({view: 'my-files'}, '', '/files/?view=my-files');
 
                 // Clear selection when navigating to root
                 if (typeof clearSelection === 'function') {
@@ -1413,6 +1459,7 @@
                 const data = await response.json();
 
                 currentFolderId = folderId;
+                currentView = 'folder';
 
                 // Only push to stack if this is a new navigation (not a refresh or restore)
                 if (!skipStackPush) {
@@ -1421,6 +1468,7 @@
 
                 displayFiles(data.files, data.folder);
                 updateBreadcrumb([{name: 'Home', id: null}, ...folderStack]);
+                setPageTitle(folderName);
 
                 // Update URL
                 window.history.pushState({folderId: folderId}, '', `/files/?folder=${folderId}`);
@@ -1633,6 +1681,13 @@
                     }
                 }
 
+                // Check if file is editable in OnlyOffice
+                const editBtn = canEditFile(file.name)
+                    ? `<button class="btn btn-sm btn-custom edit-btn" onclick="event.stopPropagation(); openEditor(${file.id})" title="Edit in OnlyOffice">
+                            <i class="bi bi-pencil-square"></i>
+                        </button>`
+                    : '';
+
                 html += `
                     <div class="file-item file-item-preview" data-type="file" data-id="${file.id}" data-name="${file.name}" data-mime="${file.mime_type}">
                         <input type="checkbox" class="selection-checkbox" onchange="toggleItemSelection('file', ${file.id}, '${file.name}', this.checked)" onclick="event.stopPropagation()">
@@ -1642,6 +1697,7 @@
                         <button class="btn btn-sm btn-custom preview-btn" style="display:none;" onclick="event.stopPropagation(); showFilePreview(${file.id}, '${file.name}', '${file.mime_type}')" title="Preview">
                             <i class="bi bi-eye"></i>
                         </button>
+                        ${editBtn}
                         <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); downloadFile(${file.id}, '${file.name}')" title="Download">
                             <i class="bi bi-download"></i>
                         </button>
@@ -1709,7 +1765,7 @@
         function updateBreadcrumb(path) {
             const breadcrumb = document.getElementById('breadcrumb');
             let html = '';
-            
+
             path.forEach((item, index) => {
                 if (index === path.length - 1) {
                     html += `<li class="breadcrumb-item active">${item.name}</li>`;
@@ -1717,8 +1773,15 @@
                     html += `<li class="breadcrumb-item"><a href="#" onclick="navigateTo(${index}); return false;">${item.name}</a></li>`;
                 }
             });
-            
+
             breadcrumb.innerHTML = html;
+        }
+
+        function setPageTitle(title) {
+            const pageTitle = document.getElementById('pageTitle');
+            if (pageTitle) {
+                pageTitle.innerHTML = `<i class="bi bi-folder2"></i> ${title}`;
+            }
         }
 
         function navigateTo(index) {
@@ -1783,6 +1846,58 @@
             } catch (error) {
                 console.error('Error creating folder:', error);
                 showError('Failed to create folder');
+            }
+        }
+
+        function showNewDocumentModal() {
+            const modal = new bootstrap.Modal(document.getElementById('newDocumentModal'));
+            modal.show();
+        }
+
+        async function createDocument() {
+            const documentName = document.getElementById('documentName').value.trim();
+            const docType = document.getElementById('documentType').value;
+
+            if (!documentName) {
+                showWarning('Please enter a document name');
+                return;
+            }
+
+            try {
+                const requestBody = {
+                    name: documentName,
+                    doc_type: docType
+                };
+
+                if (currentFolderId !== null) {
+                    requestBody.folder_id = currentFolderId;
+                }
+
+                const response = await fetch('/files/api/files/documents/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    bootstrap.Modal.getInstance(document.getElementById('newDocumentModal')).hide();
+                    document.getElementById('documentName').value = '';
+
+                    // Refresh file list
+                    await refreshFiles();
+
+                    // Open the document in OnlyOffice editor
+                    window.location.href = `/files/editor?fileId=${data.id}`;
+                } else {
+                    const error = await response.json();
+                    showError(error.detail || 'Failed to create document');
+                }
+            } catch (error) {
+                console.error('Error creating document:', error);
+                showError('Failed to create document');
             }
         }
 
@@ -2279,19 +2394,36 @@
         }
 
         async function refreshFiles() {
-            if (currentFolderId === null) {
-                loadRootFolders();
-            } else {
-                // Reload current folder without adding to stack
-                try {
-                    const response = await fetch(`/files/api/files/folders/${currentFolderId}/files`);
-                    const data = await response.json();
-                    displayFiles(data.files, data.folder);
-                    updateBreadcrumb([{name: 'Home', id: null}, ...folderStack]);
-                } catch (error) {
-                    console.error('Error refreshing folder:', error);
-                    showError('Failed to refresh folder');
-                }
+            // Reload the current view based on what page we're on
+            switch (currentView) {
+                case 'dashboard':
+                    loadRootFolders();
+                    break;
+                case 'myfiles':
+                    loadMyFiles();
+                    break;
+                case 'shared-with-me':
+                    loadSharedWithMe();
+                    break;
+                case 'shared-by-me':
+                    loadSharedByMe();
+                    break;
+                case 'folder':
+                    // Reload current folder without adding to stack
+                    if (currentFolderId !== null) {
+                        try {
+                            const response = await fetch(`/files/api/files/folders/${currentFolderId}/files`);
+                            const data = await response.json();
+                            displayFiles(data.files, data.folder);
+                            updateBreadcrumb([{name: 'Home', id: null}, ...folderStack]);
+                        } catch (error) {
+                            console.error('Error refreshing folder:', error);
+                            showError('Failed to refresh folder');
+                        }
+                    }
+                    break;
+                default:
+                    loadRootFolders();
             }
         }
 
@@ -2894,7 +3026,9 @@
                 const shares = await response.json();
 
                 const fileList = document.getElementById('fileList');
+                currentView = 'shared-with-me';
                 updateBreadcrumb([{name: 'Shared with Me', id: null}]);
+                setPageTitle('Shared with Me');
 
                 if (!shares || shares.length === 0) {
                     fileList.innerHTML = `
@@ -2926,13 +3060,25 @@
                             </div>
                         `;
                     } else {
+                        // Check if file is editable in OnlyOffice
+                        const canEditFile = share.permissions.can_edit || share.permissions.can_upload;
+                        const isOfficeFile = /\.(docx?|xlsx?|pptx?|odt|ods|odp)$/i.test(resourceName);
+                        const editBtn = canEditFile && isOfficeFile
+                            ? `<button class="btn btn-sm btn-custom edit-btn" onclick="event.stopPropagation(); openEditor(${share.resource_id})" title="Edit in OnlyOffice">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>`
+                            : '';
+
                         html += `
                             <div class="file-item">
                                 <i class="bi bi-file-earmark file-icon"></i>
                                 <span class="file-name">${resourceName}</span>
                                 <span class="file-size">Shared by: ${share.shared_by || 'Unknown'}</span>
                                 <span class="file-size">Permissions: ${permText}</span>
-                                ${share.permissions.can_download ? `<button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); downloadFile(${share.resource_id}, '${resourceName}')"><i class="bi bi-download"></i></button>` : ''}
+                                <div class="file-actions">
+                                    ${editBtn}
+                                    ${share.permissions.can_download ? `<button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); downloadFile(${share.resource_id}, '${resourceName}')" title="Download"><i class="bi bi-download"></i></button>` : ''}
+                                </div>
                             </div>
                         `;
                     }
@@ -2959,7 +3105,9 @@
                 const internalShares = await internalResponse.json();
 
                 const fileList = document.getElementById('fileList');
+                currentView = 'shared-by-me';
                 updateBreadcrumb([{name: 'Shared by Me', id: null}]);
+                setPageTitle('Shared by Me');
 
                 let html = '';
 
@@ -3018,6 +3166,9 @@
                 }
 
                 fileList.innerHTML = html;
+
+                // Update URL to remember this view
+                window.history.pushState({view: 'shared-by-me'}, '', '/files/?view=shared-by-me');
             } catch (error) {
                 console.error('Error loading shared by me:', error);
                 showError('Failed to load your shares');
@@ -3128,6 +3279,28 @@
             if (['mp3', 'wav', 'ogg', 'flac', 'm4a'].includes(ext)) return true;
 
             return false;
+        }
+
+        function canEditFile(filename) {
+            if (!filename) return false;
+
+            const ext = filename.toLowerCase().split('.').pop();
+
+            // Editable document formats supported by OnlyOffice
+            const editableExtensions = [
+                // Word
+                'docx', 'docm', 'dotx', 'dotm', 'odt', 'fodt', 'ott', 'rtf', 'txt',
+                // Spreadsheet
+                'xlsx', 'xlsm', 'xltx', 'xltm', 'ods', 'fods', 'ots', 'csv',
+                // Presentation
+                'pptx', 'pptm', 'potx', 'potm', 'odp', 'fodp', 'otp'
+            ];
+
+            return editableExtensions.includes(ext);
+        }
+
+        function openEditor(fileId) {
+            window.open(`/files/editor?fileId=${fileId}`, '_blank');
         }
 
         async function showFilePreview(fileId, fileName, mimeType) {
@@ -3410,6 +3583,13 @@
                     }
                 }
 
+                // Check if file is editable in OnlyOffice
+                const editBtn = canEditFile(file.name)
+                    ? `<button class="btn btn-sm btn-custom edit-btn" onclick="event.stopPropagation(); openEditor(${file.id})" title="Edit in OnlyOffice">
+                            <i class="bi bi-pencil-square"></i>
+                        </button>`
+                    : '';
+
                 html += `
                     <div class="file-item file-item-preview" data-type="file" data-id="${file.id}" data-name="${file.name}" data-mime="${file.mime_type}">
                         <input type="checkbox" class="selection-checkbox" onchange="toggleItemSelection('file', ${file.id}, '${file.name}', this.checked)" onclick="event.stopPropagation()">
@@ -3419,6 +3599,7 @@
                         <button class="btn btn-sm btn-custom preview-btn" style="display:none;" onclick="event.stopPropagation(); showFilePreview(${file.id}, '${file.name}', '${file.mime_type}')" title="Preview">
                             <i class="bi bi-eye"></i>
                         </button>
+                        ${editBtn}
                         <button class="btn btn-sm btn-custom" onclick="event.stopPropagation(); downloadFile(${file.id}, '${file.name}')" title="Download">
                             <i class="bi bi-download"></i>
                         </button>

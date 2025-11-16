@@ -2061,3 +2061,248 @@ curl https://rm.swhgrp.com/[service]/health
 
 *Next update will include: Development environment setup, Phase 1 progress, or stakeholder feedback integration.*
 
+
+## 🔄 SESSION UPDATE - November 16, 2025
+
+### Files Service: OnlyOffice Integration & UI Improvements ✅
+
+**Context:** Completed OnlyOffice Document Server integration and fixed multiple UI/UX issues in the Files service.
+
+#### 1. OnlyOffice Document Server Integration
+**Initial Setup:**
+- Added OnlyOffice Document Server container to docker-compose.yml
+- Configured JWT authentication with shared secret
+- Set up nginx reverse proxy for `/onlyoffice` path
+- Created document templates (blank.docx, blank.xlsx, blank.pptx)
+
+**Backend Implementation:**
+- Created `/files/api/onlyoffice.py` with editor configuration endpoint
+- Implemented document type detection (Word, Excel, PowerPoint)
+- Added file editability checking based on extension
+- Configured callback endpoint for document saves
+- Generated unique document keys using file ID + modification time hash
+- Implemented JWT signing for OnlyOffice API requests
+
+**Frontend Integration:**
+- Created `/files/templates/editor.html` for OnlyOffice editor iframe
+- Added "New Document" functionality with template selection modal
+- Implemented edit button for Office files (pencil icon)
+- Connected editor to backend API for configuration loading
+
+#### 2. Permission System Fixes
+
+**Issue:** Shared files in nested folders returned 403 errors when trying to open in OnlyOffice.
+
+**Root Cause:** Permission check in `onlyoffice.py` only checked immediate parent folder, not ancestor folders.
+
+**Solution:**
+- Created `check_folder_access()` helper function (lines 26-52)
+- Traverses UP folder tree to find any shared ancestor folder
+- Returns inherited permissions from first shared parent found
+- Updated `get_editor_config()` to use recursive folder access check
+
+**Files Modified:**
+- `/opt/restaurant-system/files/src/files/api/onlyoffice.py`
+  - Lines 26-52: New `check_folder_access()` function
+  - Lines 131-134: Updated to use recursive folder check
+
+#### 3. UI/UX Improvements
+
+**Navigation State Management:**
+- Added `currentView` tracking variable ('dashboard', 'myfiles', 'shared-with-me', 'shared-by-me', 'folder')
+- Updated all navigation functions to set `currentView` state
+- Fixed refresh button to stay on current page instead of returning to dashboard
+- Fixed create/delete operations to refresh current view instead of navigating to dashboard
+
+**Dynamic Page Headers:**
+- Added `id="pageTitle"` to page header element (line 903)
+- Created `setPageTitle(title)` function (lines 1774-1779)
+- Updated all navigation functions to set appropriate page titles:
+  - Dashboard → "Files Dashboard"
+  - My Files → "My Files"
+  - Shared with Me → "Shared with Me"
+  - Shared by Me → "Shared by Me"
+  - Folders → Show folder name
+
+**URL State Management:**
+- Updated `loadMyFiles()` to set URL parameter: `?view=my-files`
+- Updated `loadSharedByMe()` to set URL parameter: `?view=shared-by-me`
+- Fixed `restoreFromURL()` to properly restore view state on page refresh
+
+**Files Display:**
+- Fixed `loadMyFiles()` to fetch and display BOTH folders AND files from root
+- Previously only displayed folders, hiding root-level files
+- Now calls both `/api/files/folders` and `/api/files/files/root` endpoints
+
+**Shared Files UI:**
+- Added edit button for shared Office files with write permissions
+- Detects Office file types with regex: `/\.(docx?|xlsx?|pptx?|odt|ods|odp)$/i`
+- Shows edit button only if user has `can_edit` or `can_upload` permission
+- Added proper file actions container for consistent button layout
+
+**Files Modified:**
+- `/opt/restaurant-system/files/src/files/templates/filemanager.html`
+  - Line 903: Added `id="pageTitle"` to header
+  - Lines 1398-1400: Added `currentView` tracking variable
+  - Lines 1402-1412: Updated `loadRootFolders()` to set view state
+  - Lines 1427-1444: Fixed `loadMyFiles()` to load both folders and files
+  - Lines 1456-1471: Updated `loadFolder()` to set view state
+  - Lines 1774-1779: Added `setPageTitle()` function
+  - Lines 2396-2428: Rewrote `refreshFiles()` with switch/case for all views
+  - Lines 3003-3084: Updated `loadSharedWithMe()` with edit button logic
+  - Lines 3085-3159: Updated `loadSharedByMe()` with URL state
+  - Lines 3063-3084: Added edit button for shared files
+
+#### 4. Complete Fix Summary
+
+**All Issues Resolved:**
+1. ✅ OnlyOffice Document Server fully integrated and working
+2. ✅ Shared files open correctly with proper permission inheritance
+3. ✅ Files display in "My Files" view (both folders and files)
+4. ✅ Dynamic page headers update based on current view
+5. ✅ Refresh button stays on current page
+6. ✅ Create/delete operations stay on current page
+7. ✅ Shared files show edit button when user has write permissions
+8. ✅ URL state persists across page refreshes
+
+**Technical Achievements:**
+- Recursive folder permission checking for nested shared folders
+- Proper state management with `currentView` tracking
+- Dynamic UI updates without page reloads
+- Conditional rendering based on file type and permissions
+- JWT-based security for OnlyOffice integration
+
+**Testing Confirmed:**
+- Documents can be created from templates
+- Owned files can be edited in OnlyOffice
+- Shared files with edit permissions can be edited
+- Files in nested folders of shared parents work correctly
+- All navigation states persist on refresh
+- Page headers update correctly across all views
+
+
+
+## 🔄 SESSION UPDATE - November 16, 2025
+
+### Files Service: OnlyOffice Integration & UI Improvements ✅
+
+**Context:** Completed OnlyOffice Document Server integration and fixed multiple UI/UX issues in the Files service.
+
+
+## 🔄 SESSION UPDATE - November 16, 2025
+
+### Files Service: OnlyOffice Integration & UI Improvements ✅
+
+**Context:** Completed OnlyOffice Document Server integration and fixed multiple UI/UX issues in the Files service.
+
+#### 1. OnlyOffice Document Server Integration
+**Initial Setup:**
+- Added OnlyOffice Document Server container to docker-compose.yml
+- Configured JWT authentication with shared secret
+- Set up nginx reverse proxy for `/onlyoffice` path
+- Created document templates (blank.docx, blank.xlsx, blank.pptx)
+
+**Backend Implementation:**
+- Created `/files/api/onlyoffice.py` with editor configuration endpoint
+- Implemented document type detection (Word, Excel, PowerPoint)
+- Added file editability checking based on extension
+- Configured callback endpoint for document saves
+- Generated unique document keys using file ID + modification time hash
+- Implemented JWT signing for OnlyOffice API requests
+
+**Frontend Integration:**
+- Created `/files/templates/editor.html` for OnlyOffice editor iframe
+- Added "New Document" functionality with template selection modal
+- Implemented edit button for Office files (pencil icon)
+- Connected editor to backend API for configuration loading
+
+#### 2. Permission System Fixes
+
+**Issue:** Shared files in nested folders returned 403 errors when trying to open in OnlyOffice.
+
+**Root Cause:** Permission check in `onlyoffice.py` only checked immediate parent folder, not ancestor folders.
+
+**Solution:**
+- Created `check_folder_access()` helper function (lines 26-52)
+- Traverses UP folder tree to find any shared ancestor folder
+- Returns inherited permissions from first shared parent found
+- Updated `get_editor_config()` to use recursive folder access check
+
+**Files Modified:**
+- `/opt/restaurant-system/files/src/files/api/onlyoffice.py`
+  - Lines 26-52: New `check_folder_access()` function
+  - Lines 131-134: Updated to use recursive folder check
+
+#### 3. UI/UX Improvements
+
+**Navigation State Management:**
+- Added `currentView` tracking variable ('dashboard', 'myfiles', 'shared-with-me', 'shared-by-me', 'folder')
+- Updated all navigation functions to set `currentView` state
+- Fixed refresh button to stay on current page instead of returning to dashboard
+- Fixed create/delete operations to refresh current view instead of navigating to dashboard
+
+**Dynamic Page Headers:**
+- Added `id="pageTitle"` to page header element (line 903)
+- Created `setPageTitle(title)` function (lines 1774-1779)
+- Updated all navigation functions to set appropriate page titles:
+  - Dashboard → "Files Dashboard"
+  - My Files → "My Files"
+  - Shared with Me → "Shared with Me"
+  - Shared by Me → "Shared by Me"
+  - Folders → Show folder name
+
+**URL State Management:**
+- Updated `loadMyFiles()` to set URL parameter: `?view=my-files`
+- Updated `loadSharedByMe()` to set URL parameter: `?view=shared-by-me`
+- Fixed `restoreFromURL()` to properly restore view state on page refresh
+
+**Files Display:**
+- Fixed `loadMyFiles()` to fetch and display BOTH folders AND files from root
+- Previously only displayed folders, hiding root-level files
+- Now calls both `/api/files/folders` and `/api/files/files/root` endpoints
+
+**Shared Files UI:**
+- Added edit button for shared Office files with write permissions
+- Detects Office file types with regex: `/\.(docx?|xlsx?|pptx?|odt|ods|odp)$/i`
+- Shows edit button only if user has `can_edit` or `can_upload` permission
+- Added proper file actions container for consistent button layout
+
+**Files Modified:**
+- `/opt/restaurant-system/files/src/files/templates/filemanager.html`
+  - Line 903: Added `id="pageTitle"` to header
+  - Lines 1398-1400: Added `currentView` tracking variable
+  - Lines 1402-1412: Updated `loadRootFolders()` to set view state
+  - Lines 1427-1444: Fixed `loadMyFiles()` to load both folders and files
+  - Lines 1456-1471: Updated `loadFolder()` to set view state
+  - Lines 1774-1779: Added `setPageTitle()` function
+  - Lines 2396-2428: Rewrote `refreshFiles()` with switch/case for all views
+  - Lines 3003-3084: Updated `loadSharedWithMe()` with edit button logic
+  - Lines 3085-3159: Updated `loadSharedByMe()` with URL state
+  - Lines 3063-3084: Added edit button for shared files
+
+#### 4. Complete Fix Summary
+
+**All Issues Resolved:**
+1. ✅ OnlyOffice Document Server fully integrated and working
+2. ✅ Shared files open correctly with proper permission inheritance
+3. ✅ Files display in "My Files" view (both folders and files)
+4. ✅ Dynamic page headers update based on current view
+5. ✅ Refresh button stays on current page
+6. ✅ Create/delete operations stay on current page
+7. ✅ Shared files show edit button when user has write permissions
+8. ✅ URL state persists across page refreshes
+
+**Technical Achievements:**
+- Recursive folder permission checking for nested shared folders
+- Proper state management with `currentView` tracking
+- Dynamic UI updates without page reloads
+- Conditional rendering based on file type and permissions
+- JWT-based security for OnlyOffice integration
+
+**Testing Confirmed:**
+- Documents can be created from templates
+- Owned files can be edited in OnlyOffice
+- Shared files with edit permissions can be edited
+- Files in nested folders of shared parents work correctly
+- All navigation states persist on refresh
+- Page headers update correctly across all views

@@ -308,6 +308,19 @@ services:
     - restaurant-network
     environment:
     - TZ=America/New_York
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: onlyoffice-documentserver
+    restart: unless-stopped
+    networks:
+    - restaurant-network
+    environment:
+    - TZ=America/New_York
+    - JWT_ENABLED=true
+    - JWT_SECRET=your-super-secret-jwt-key-change-in-production
+    volumes:
+    - onlyoffice_data:/var/www/onlyoffice/Data
+    - onlyoffice_logs:/var/log/onlyoffice
   nginx:
     image: nginx:alpine
     container_name: nginx-proxy
@@ -330,6 +343,7 @@ services:
     - integration-hub
     - portal-app
     - files-app
+    - onlyoffice
     restart: unless-stopped
     networks:
     - restaurant-network
@@ -367,6 +381,10 @@ volumes:
     name: restaurant-events_redis_data
   caldav_data:
     name: restaurant-caldav_data
+  onlyoffice_data:
+    name: restaurant-onlyoffice_data
+  onlyoffice_logs:
+    name: restaurant-onlyoffice_logs
 networks:
   restaurant-network:
     name: restaurant-network

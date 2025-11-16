@@ -36,9 +36,16 @@ class DatabaseBackedDAVResource:
 
     def get_filesystem_path(self) -> Path:
         """Convert DAV path to filesystem path"""
-        # Path comes in already normalized (e.g., /file.txt or /subdir/file.txt)
+        # Remove username prefix if present
+        path_to_use = self.path
+        if path_to_use.startswith(f"/{self.user.username}/"):
+            path_to_use = '/' + path_to_use[len(f"/{self.user.username}/"):]
+        elif path_to_use == f"/{self.user.username}":
+            path_to_use = '/'
+
+        # Path comes in (e.g., /file.txt or /subdir/file.txt)
         # Remove leading / and use directly as relative path within user storage
-        relative_path = self.path.lstrip('/')
+        relative_path = path_to_use.lstrip('/')
 
         # Handle root path
         if not relative_path:
@@ -50,7 +57,12 @@ class DatabaseBackedDAVResource:
     def get_database_path(self) -> str:
         """Get path for database storage (relative to user storage)"""
         fs_path = self.get_filesystem_path()
-        return '/' + str(fs_path.relative_to(self._user_storage_path))
+        relative = fs_path.relative_to(self._user_storage_path)
+        # Handle root case where relative is '.'
+        if str(relative) == '.':
+            return '/'
+        return '/' + str(relative)
+
 
 
 class DatabaseBackedDAVCollection(DAVCollection, DatabaseBackedDAVResource):
@@ -61,15 +73,35 @@ class DatabaseBackedDAVCollection(DAVCollection, DatabaseBackedDAVResource):
         DatabaseBackedDAVResource.__init__(self, path, environ, user)
         self.folder = folder
 
+    def get_preferred_path(self) -> str:
+        """Get the preferred path for this resource (used in hrefs)"""
+        # Get the script name (mount prefix) from environ if available
+        script_name = self.environ.get('SCRIPT_NAME', '')
+
+        # Nginx proxies /files/webdav/ to /webdav/, so SCRIPT_NAME is /webdav
+        # But Cyberduck needs the full public path /files/webdav
+        # Prepend /files if SCRIPT_NAME is /webdav
+        if script_name == '/webdav':
+            script_name = '/files/webdav'
+
+        # Combine script name with path
+        full_path = script_name + self.path
+
+        if self.is_collection and not full_path.endswith("/"):
+            return full_path + "/"
+        return full_path
+
     def get_member_names(self):
         """List folder contents"""
         fs_path = self.get_filesystem_path()
 
         if not fs_path.exists():
+            logger.warning(f"Directory does not exist: {fs_path}")
             return []
 
         try:
-            return [item.name for item in fs_path.iterdir() if not item.name.startswith('.')]
+            members = [item.name for item in fs_path.iterdir() if not item.name.startswith('.')]
+            return members
         except Exception as e:
             logger.error(f"Error listing directory {fs_path}: {e}")
             return []
@@ -117,10 +149,11 @@ class DatabaseBackedDAVCollection(DAVCollection, DatabaseBackedDAVResource):
         fs_path.mkdir(parents=True, exist_ok=True)
 
         # Create database entry
+        db = SessionLocal()
         try:
             # Find parent folder
             parent_path = self.get_database_path()
-            parent_folder = self.db.query(Folder).filter(
+            parent_folder = db.query(Folder).filter(
                 Folder.path == parent_path,
                 Folder.owner_id == self.user.id
             ).first()
@@ -133,8 +166,8 @@ class DatabaseBackedDAVCollection(DAVCollection, DatabaseBackedDAVResource):
                     owner_id=self.user.id,
                     parent_id=None
                 )
-                self.db.add(parent_folder)
-                self.db.flush()
+                db.add(parent_folder)
+                db.flush()
 
             # Create new folder
             new_folder = Folder(
@@ -143,15 +176,22 @@ class DatabaseBackedDAVCollection(DAVCollection, DatabaseBackedDAVResource):
                 owner_id=self.user.id,
                 parent_id=parent_folder.id
             )
-            self.db.add(new_folder)
-            self.db.commit()
+            db.add(new_folder)
+            db.commit()
 
             logger.info(f"Created folder: {db_path} for user {self.user.username}")
 
         except Exception as e:
-            self.db.rollback()
+            db.rollback()
             logger.error(f"Error creating folder in database: {e}")
             raise DAVError(HTTP_CONFLICT, f"Failed to create folder: {e}")
+        finally:
+            db.close()
+
+    def handle_delete(self):
+        """Handle delete request - returns True if handled"""
+        self.delete()
+        return True
 
     def delete(self):
         """Delete this folder"""
@@ -160,21 +200,24 @@ class DatabaseBackedDAVCollection(DAVCollection, DatabaseBackedDAVResource):
 
         # Delete from database
         if self.folder:
+            db = SessionLocal()
             try:
                 # Delete all files in folder
-                files = self.db.query(FileMetadata).filter(
+                files = db.query(FileMetadata).filter(
                     FileMetadata.folder_id == self.folder.id
                 ).all()
                 for f in files:
-                    self.db.delete(f)
+                    db.delete(f)
 
                 # Delete folder
-                self.db.delete(self.folder)
-                self.db.commit()
+                db.delete(self.folder)
+                db.commit()
                 logger.info(f"Deleted folder from database: {db_path}")
             except Exception as e:
-                self.db.rollback()
+                db.rollback()
                 logger.error(f"Error deleting folder from database: {e}")
+            finally:
+                db.close()
 
         # Delete from filesystem
         if fs_path.exists():
@@ -209,6 +252,20 @@ class DatabaseBackedDAVFile(DAVNonCollection, DatabaseBackedDAVResource):
         DAVNonCollection.__init__(self, path, environ)
         DatabaseBackedDAVResource.__init__(self, path, environ, user)
         self.file_meta = file_meta
+
+    def get_preferred_path(self) -> str:
+        """Get the preferred path for this resource (used in hrefs)"""
+        # Get the script name (mount prefix) from environ if available
+        script_name = self.environ.get('SCRIPT_NAME', '')
+
+        # Nginx proxies /files/webdav/ to /webdav/, so SCRIPT_NAME is /webdav
+        # But Cyberduck needs the full public path /files/webdav
+        # Prepend /files if SCRIPT_NAME is /webdav
+        if script_name == '/webdav':
+            script_name = '/files/webdav'
+
+        # Combine script name with path
+        return script_name + self.path
 
     def get_content_length(self):
         if self.file_meta:
@@ -331,6 +388,11 @@ class DatabaseBackedDAVFile(DAVNonCollection, DatabaseBackedDAVResource):
         finally:
             db.close()
 
+    def handle_delete(self):
+        """Handle delete request - returns True if handled"""
+        self.delete()
+        return True
+
     def delete(self):
         """Delete this file"""
         fs_path = self.get_filesystem_path()
@@ -350,7 +412,7 @@ class DatabaseBackedDAVFile(DAVNonCollection, DatabaseBackedDAVResource):
                 logger.info(f"Deleted file from database: {db_path}")
         except Exception as e:
             db.rollback()
-            logger.error(f"Error deleting file from database: {e}")
+            logger.error(f"Error deleting file from database: {e}", exc_info=True)
             raise DAVError(HTTP_CONFLICT, f"Failed to delete from database: {e}")
         finally:
             db.close()
@@ -361,7 +423,7 @@ class DatabaseBackedDAVFile(DAVNonCollection, DatabaseBackedDAVResource):
                 fs_path.unlink()
                 logger.info(f"Deleted file from filesystem: {fs_path}")
             except Exception as e:
-                logger.error(f"Error deleting file from filesystem: {e}")
+                logger.error(f"Error deleting file from filesystem: {e}", exc_info=True)
                 raise DAVError(HTTP_CONFLICT, f"Failed to delete from filesystem: {e}")
         else:
             logger.warning(f"File not found on filesystem: {fs_path}")
@@ -452,22 +514,23 @@ class DatabaseBackedDAVProvider(DAVProvider):
             if not user:
                 raise DAVError(HTTP_FORBIDDEN, "Authentication required")
 
-            # Attach db session to environ for resource use
-            environ['wsgidav.db'] = db
+            # Store original path for href generation
+            original_path = path
 
-            # Normalize path (remove /username prefix if present)
+            # Normalize path for internal use (remove /username prefix if present)
+            internal_path = path
             if path.startswith(f"/{user.username}/"):
-                path = '/' + path[len(f"/{user.username}/"):]
+                internal_path = '/' + path[len(f"/{user.username}/"):]
             elif path == f"/{user.username}":
-                path = '/'
+                internal_path = '/'
 
             # Root collection
-            if path == '/' or path == '':
-                return DatabaseBackedDAVCollection('/', environ, user, None)
+            if internal_path == '/' or internal_path == '':
+                return DatabaseBackedDAVCollection(original_path, environ, user, None)
 
             # Determine if it's a file or folder
             user_storage = STORAGE_PATH / f"user_{user.id}"
-            relative_path = path.lstrip('/')
+            relative_path = internal_path.lstrip('/')
             fs_path = user_storage / relative_path
 
             # Check database first
@@ -480,13 +543,13 @@ class DatabaseBackedDAVProvider(DAVProvider):
                         Folder.path == db_path,
                         Folder.owner_id == user.id
                     ).first()
-                    return DatabaseBackedDAVCollection(path, environ, user, folder)
+                    return DatabaseBackedDAVCollection(original_path, environ, user, folder)
                 else:
                     file_meta = db.query(FileMetadata).filter(
                         FileMetadata.path == db_path,
                         FileMetadata.owner_id == user.id
                     ).first()
-                    return DatabaseBackedDAVFile(path, environ, user, file_meta)
+                    return DatabaseBackedDAVFile(original_path, environ, user, file_meta)
 
             # Doesn't exist - check database to see if it's a known folder or file
             folder = db.query(Folder).filter(
@@ -494,31 +557,32 @@ class DatabaseBackedDAVProvider(DAVProvider):
                 Folder.owner_id == user.id
             ).first()
             if folder:
-                return DatabaseBackedDAVCollection(path, environ, user, folder)
+                return DatabaseBackedDAVCollection(original_path, environ, user, folder)
 
             file_meta = db.query(FileMetadata).filter(
                 FileMetadata.path == db_path,
                 FileMetadata.owner_id == user.id
             ).first()
             if file_meta:
-                return DatabaseBackedDAVFile(path, environ, user, file_meta)
+                return DatabaseBackedDAVFile(original_path, environ, user, file_meta)
 
             # Not in database either - check if path looks like a file (has extension)
             # If no extension and doesn't end with /, treat as potential folder
             # If has extension or ends with filename pattern, treat as file
             import os
-            name = os.path.basename(path)
-            if '.' in name or path.endswith('.txt') or path.endswith('.pdf'):
+            name = os.path.basename(internal_path)
+            if '.' in name or internal_path.endswith('.txt') or internal_path.endswith('.pdf'):
                 # Looks like a file
-                return DatabaseBackedDAVFile(path, environ, user, None)
+                return DatabaseBackedDAVFile(original_path, environ, user, None)
             else:
                 # Looks like a folder
-                return DatabaseBackedDAVCollection(path, environ, user, None)
+                return DatabaseBackedDAVCollection(original_path, environ, user, None)
 
         except DAVError:
-            db.close()
             raise
         except Exception as e:
-            db.close()
             logger.error(f"Error getting resource for path {path}: {e}")
             raise DAVError(HTTP_CONFLICT, str(e))
+        finally:
+            # Always close the database session
+            db.close()

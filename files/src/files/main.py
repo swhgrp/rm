@@ -8,7 +8,7 @@ from starlette.middleware.wsgi import WSGIMiddleware
 
 from files.core.config import settings
 from files.core.deps import get_current_user
-from files.api import auth, filemanager, shares
+from files.api import auth, filemanager, shares, onlyoffice
 from files.models.user import User
 from files.webdav_server import create_webdav_app
 
@@ -38,6 +38,7 @@ app.mount("/static", StaticFiles(directory="src/files/static"), name="static")
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(filemanager.router)
 app.include_router(shares.router)
+app.include_router(onlyoffice.router, prefix="/api", tags=["onlyoffice"])
 
 # Mount WebDAV server as WSGI app
 webdav_app = create_webdav_app()
@@ -70,6 +71,18 @@ async def public_share(request: Request, share_token: str):
         {
             "request": request,
             "share_token": share_token
+        }
+    )
+
+
+@app.get("/editor", response_class=HTMLResponse)
+async def editor(request: Request, user: User = Depends(get_current_user)):
+    """Document editor page"""
+    return templates.TemplateResponse(
+        "editor.html",
+        {
+            "request": request,
+            "user": user
         }
     )
 

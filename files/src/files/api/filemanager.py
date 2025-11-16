@@ -13,7 +13,9 @@ from files.db.database import get_db, get_hr_db
 from files.models.user import User
 from files.models.file_metadata import Folder, FileMetadata, folder_permissions
 from files.models.shares import ShareLink, InternalShare
-from files.core.deps import get_current_user
+from files.core.deps import get_current_user, get_optional_user
+from datetime import datetime, timezone
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/files", tags=["filemanager"])
 
@@ -28,6 +30,8 @@ def get_user_folder_path(user_id: int, folder_path: str = "") -> Path:
     Note: This function creates directories, so folder_path should be a directory path,
     not a file path. If you need a file path, create the folder first, then append the filename.
     """
+    # Strip leading slashes to prevent Path from treating it as absolute
+    folder_path = folder_path.lstrip('/')
     user_path = STORAGE_PATH / f"user_{user_id}" / folder_path
 
     # Only create directory if the path doesn't already exist as a file
@@ -143,12 +147,15 @@ async def list_folders(
 ):
     """List folders accessible to current user"""
     query = db.query(Folder)
-    
+
     if parent_id:
         query = query.filter(Folder.parent_id == parent_id)
     else:
         query = query.filter(Folder.parent_id.is_(None))
-    
+
+    # Exclude root folder (path="/") from listings - it's an internal construct
+    query = query.filter(Folder.path != "/")
+
     folders = query.all()
     
     # Filter by permissions
@@ -216,6 +223,55 @@ async def create_folder(
     }
 
 
+@router.get("/files/root")
+async def list_root_files(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """List files at the root level (My Files)"""
+    # Find the root folder for the current user
+    root_folder = db.query(Folder).filter(
+        Folder.path == "/",
+        Folder.owner_id == current_user.id
+    ).first()
+
+    if not root_folder:
+        # No root folder exists yet, return empty list
+        return {
+            "folder": {
+                "id": None,
+                "name": "My Files",
+                "path": "/"
+            },
+            "files": []
+        }
+
+    # List files in root folder
+    files = db.query(FileMetadata).filter(FileMetadata.folder_id == root_folder.id).all()
+
+    files_with_status = []
+    for file in files:
+        share_status = get_share_status(db, "file", file.id)
+        files_with_status.append({
+            "id": file.id,
+            "name": file.name,
+            "size": file.size,
+            "mime_type": file.mime_type,
+            "created_at": file.created_at.isoformat() if file.created_at else None,
+            "owner": file.owner.full_name if file.owner else "System",
+            "share_status": share_status
+        })
+
+    return {
+        "folder": {
+            "id": root_folder.id,
+            "name": "My Files",
+            "path": "/"
+        },
+        "files": files_with_status
+    }
+
+
 @router.get("/folders/{folder_id}/files")
 async def list_files(
     folder_id: int,
@@ -226,12 +282,12 @@ async def list_files(
     folder = db.query(Folder).filter(Folder.id == folder_id).first()
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found")
-    
+
     if not has_folder_permission(db, current_user, folder, "read"):
         raise HTTPException(status_code=403, detail="No read permission on folder")
-    
+
     files = db.query(FileMetadata).filter(FileMetadata.folder_id == folder_id).all()
-    
+
     files_with_status = []
     for file in files:
         share_status = get_share_status(db, "file", file.id)
@@ -297,6 +353,69 @@ def ensure_folder_hierarchy(db: Session, base_folder: Folder, relative_path: str
         current_path = new_path
 
     return current_folder
+
+
+@router.post("/files/root/upload")
+async def upload_file_to_root(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload a file to the root level (My Files)"""
+    # Find or create root folder
+    root_folder = db.query(Folder).filter(
+        Folder.path == "/",
+        Folder.owner_id == current_user.id
+    ).first()
+
+    if not root_folder:
+        # Create root folder
+        root_folder = Folder(
+            name="My Files",
+            path="/",
+            owner_id=current_user.id,
+            parent_id=None
+        )
+        db.add(root_folder)
+        db.commit()
+        db.refresh(root_folder)
+
+    # Parse filename
+    actual_filename = Path(file.filename).name
+    file_path = f"/{actual_filename}"
+
+    # Generate filesystem path
+    folder_fs_path = get_user_folder_path(current_user.id, "/")
+    fs_path = folder_fs_path / actual_filename
+
+    # Save file to filesystem
+    async with aiofiles.open(fs_path, 'wb') as out_file:
+        content = await file.read()
+        await out_file.write(content)
+
+    # Get file size and mime type
+    file_size = fs_path.stat().st_size
+    mime_type, _ = mimetypes.guess_type(actual_filename)
+
+    # Create file metadata in database
+    file_metadata = FileMetadata(
+        name=actual_filename,
+        path=file_path,
+        folder_id=root_folder.id,
+        owner_id=current_user.id,
+        size=file_size,
+        mime_type=mime_type
+    )
+    db.add(file_metadata)
+    db.commit()
+    db.refresh(file_metadata)
+
+    return {
+        "id": file_metadata.id,
+        "name": file_metadata.name,
+        "size": file_metadata.size,
+        "message": "File uploaded successfully"
+    }
 
 
 @router.post("/folders/{folder_id}/upload")
@@ -369,20 +488,151 @@ async def upload_file(
     }
 
 
-@router.get("/files/{file_id}/download")
-async def download_file(
-    file_id: int,
+class CreateDocumentRequest(BaseModel):
+    """Request model for creating a new document"""
+    name: str
+    doc_type: str  # "word", "excel", or "powerpoint"
+    folder_id: Optional[int] = None
+
+
+@router.post("/documents/create")
+async def create_new_document(
+    request: CreateDocumentRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Download a file"""
+    """Create a new blank document (Word, Excel, or PowerPoint)"""
+
+    # Map document types to file extensions and templates
+    doc_type_map = {
+        "word": {"ext": "docx", "template": "blank.docx", "mime": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+        "excel": {"ext": "xlsx", "template": "blank.xlsx", "mime": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+        "powerpoint": {"ext": "pptx", "template": "blank.pptx", "mime": "application/vnd.openxmlformats-officedocument.presentationml.presentation"}
+    }
+
+    if request.doc_type not in doc_type_map:
+        raise HTTPException(status_code=400, detail=f"Invalid document type. Must be one of: {', '.join(doc_type_map.keys())}")
+
+    doc_info = doc_type_map[request.doc_type]
+
+    # Ensure filename has correct extension
+    filename = request.name
+    if not filename.endswith(f".{doc_info['ext']}"):
+        filename = f"{filename}.{doc_info['ext']}"
+
+    # Determine target folder
+    if request.folder_id:
+        folder = db.query(Folder).filter(Folder.id == request.folder_id).first()
+        if not folder:
+            raise HTTPException(status_code=404, detail="Folder not found")
+
+        if not has_folder_permission(db, current_user, folder, "write"):
+            raise HTTPException(status_code=403, detail="No write permission on folder")
+
+        target_folder = folder
+        file_path = f"{folder.path}/{filename}"
+    else:
+        # Create in root folder
+        root_folder = db.query(Folder).filter(
+            Folder.path == "/",
+            Folder.owner_id == current_user.id
+        ).first()
+
+        if not root_folder:
+            # Create root folder
+            root_folder = Folder(
+                name="My Files",
+                path="/",
+                owner_id=current_user.id,
+                parent_id=None
+            )
+            db.add(root_folder)
+            db.commit()
+            db.refresh(root_folder)
+
+        target_folder = root_folder
+        file_path = f"/{filename}"
+
+    # Check if file already exists
+    existing_file = db.query(FileMetadata).filter(
+        FileMetadata.path == file_path,
+        FileMetadata.owner_id == current_user.id
+    ).first()
+
+    if existing_file:
+        raise HTTPException(status_code=409, detail="File with this name already exists")
+
+    # Copy template to user's storage
+    template_path = Path("/app/src/files/templates/document_templates") / doc_info['template']
+    if not template_path.exists():
+        raise HTTPException(status_code=500, detail="Document template not found")
+
+    # Generate filesystem path
+    folder_fs_path = get_user_folder_path(current_user.id, target_folder.path)
+    fs_path = folder_fs_path / filename
+
+    # Copy template to new file
+    shutil.copy(template_path, fs_path)
+
+    # Get file size
+    file_size = fs_path.stat().st_size
+
+    # Create file metadata in database
+    file_metadata = FileMetadata(
+        name=filename,
+        path=file_path,
+        folder_id=target_folder.id,
+        owner_id=current_user.id,
+        size=file_size,
+        mime_type=doc_info['mime']
+    )
+    db.add(file_metadata)
+    db.commit()
+    db.refresh(file_metadata)
+
+    return {
+        "id": file_metadata.id,
+        "name": file_metadata.name,
+        "size": file_metadata.size,
+        "doc_type": request.doc_type,
+        "message": f"New {request.doc_type} document created successfully"
+    }
+
+
+@router.get("/files/{file_id}/download")
+async def download_file(
+    file_id: int,
+    token: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_user)
+):
+    """Download a file - supports both session auth and JWT token auth for OnlyOffice"""
     file_metadata = db.query(FileMetadata).filter(FileMetadata.id == file_id).first()
     if not file_metadata:
         raise HTTPException(status_code=404, detail="File not found")
 
-    folder = file_metadata.folder
-    if not has_folder_permission(db, current_user, folder, "read"):
-        raise HTTPException(status_code=403, detail="No read permission on folder")
+    # If token is provided (OnlyOffice download), validate it instead of using session
+    if token:
+        try:
+            from jose import jwt, JWTError
+            ONLYOFFICE_JWT_SECRET = "your-super-secret-jwt-key-change-in-production"
+            payload = jwt.decode(token, ONLYOFFICE_JWT_SECRET, algorithms=['HS256'])
+
+            # Verify token is for this file
+            if payload.get('file_id') != file_id:
+                raise HTTPException(status_code=403, detail="Invalid token for this file")
+
+            # Token is valid - allow download without further permission checks
+        except JWTError:
+            raise HTTPException(status_code=403, detail="Invalid download token")
+    else:
+        # Normal session-based download - check folder permissions
+        if not current_user:
+            raise HTTPException(status_code=401, detail="Authentication required")
+
+        folder = file_metadata.folder
+        if not has_folder_permission(db, current_user, folder, "read"):
+            raise HTTPException(status_code=403, detail="No read permission on folder")
 
     folder_fs_path = get_user_folder_path(file_metadata.owner_id, file_metadata.folder.path)
     fs_path = folder_fs_path / file_metadata.name
@@ -543,7 +793,11 @@ async def delete_folder(
     folder = db.query(Folder).filter(Folder.id == folder_id).first()
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found")
-    
+
+    # Prevent deletion of root folder
+    if folder.path == "/" or folder.path == "":
+        raise HTTPException(status_code=400, detail="Cannot delete root folder")
+
     if not has_folder_permission(db, current_user, folder, "delete"):
         raise HTTPException(status_code=403, detail="No delete permission on folder")
 

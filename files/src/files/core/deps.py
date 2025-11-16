@@ -14,25 +14,47 @@ def get_current_user(
 ) -> User:
     """Get current authenticated user"""
     token = session_token or request.cookies.get("session_token")
-    
+
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated"
         )
-    
+
     user_id = verify_token(token)
     if user_id is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication"
         )
-    
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found or inactive"
         )
-    
+
+    return user
+
+
+def get_optional_user(
+    request: Request,
+    session_token: Optional[str] = Cookie(None),
+    db: Session = Depends(get_db)
+) -> Optional[User]:
+    """Get current authenticated user, or None if not authenticated"""
+    token = session_token or request.cookies.get("session_token")
+
+    if not token:
+        return None
+
+    user_id = verify_token(token)
+    if user_id is None:
+        return None
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user or not user.is_active:
+        return None
+
     return user

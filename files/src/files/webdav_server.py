@@ -38,7 +38,7 @@ def create_webdav_app():
                 "*": True  # Accept all users with any password (auth handled by Portal/nginx)
             }
         },
-        "verbose": 2,  # Logging level (1=ERROR, 2=WARN, 3=INFO, 4=DEBUG)
+        "verbose": 4,  # Logging level (1=ERROR, 2=WARN, 3=INFO, 4=DEBUG)
         "logging": {
             "enable_loggers": ["wsgidav"],
         },

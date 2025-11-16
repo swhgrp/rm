@@ -10,7 +10,7 @@ The Files system provides centralized file storage, folder organization, and doc
 
 **LAST UPDATED:** 2025-10-29
 
-The Files system is fully implemented, mobile-friendly, and actively used in production.
+The Files system is fully implemented, mobile-friendly, and actively used in production with OnlyOffice Document Server integration.
 
 ## Technology Stack
 
