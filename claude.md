@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** November 14, 2025
-**System Status:** Production (87% Complete - Core systems operational)
+**Last Updated:** November 25, 2025
+**System Status:** Production (88% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -9,7 +9,62 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Nov 14-15, 2025)
+### Most Recent Work (Current Session - Nov 25, 2025)
+
+**INTEGRATION HUB: OCR ITEM CODE VALIDATION + EMAIL HISTORY UI** ✅ **COMPLETE**
+
+1. **OCR Item Code Auto-Correction** 🔧 **MAJOR FEATURE**
+   - **Problem:** Invoice parsing produces OCR errors in item codes (e.g., 006032 instead of 206032)
+   - **Solution:** Post-parse validation that compares extracted codes against verified codes
+   - **Algorithm:**
+     - `digit_similarity_score()` function accounts for common OCR confusions (0↔6↔8, 1↔7↔I, etc.)
+     - Requires ≥80% similarity AND matching description words to prevent false positives
+     - Only corrects against verified codes (is_verified=true OR occurrence_count≥3)
+   - **Files Modified:**
+     - `integration-hub/src/integration_hub/services/invoice_parser.py` (added ~150 lines)
+       - `levenshtein_distance()` - string distance calculation
+       - `digit_similarity_score()` - OCR-aware similarity (handles 0/O/6/8 confusion)
+       - `_validate_and_correct_item_codes()` - post-parse validation method
+     - Added OCR correction stats to parse response (`ocr_corrected`, `ocr_corrections`)
+   - **Impact:** Future invoices auto-correct common OCR errors during parsing
+
+2. **Item Codes Page Filter Enhancement** 🔍 **UI IMPROVEMENT**
+   - **Problem:** No way to quickly see unverified item codes that need review
+   - **Solution:** Added "Unverified Only" and "Verified Only" filter options
+   - **Files Modified:**
+     - `integration-hub/src/integration_hub/templates/item_codes.html` (line 38-44)
+     - `integration-hub/src/integration_hub/main.py` (lines 1514-1529)
+   - **Filter Options Now:**
+     - All Item Codes
+     - Unverified Only (sorted by occurrence count DESC - review high-frequency first)
+     - Verified Only
+     - Potential Duplicates
+     - Single Occurrence
+
+3. **Events Email History Page Improvements** 📧 **UI FIX**
+   - **Problem:** Email list showed full HTML body inline, causing layout issues
+   - **Solution:** Changed to clean list view with modal for details
+   - **Changes:**
+     - Created `EmailListResponse` schema (without body_html for list performance)
+     - List API now returns lightweight response
+     - Email body fetched on-demand when viewing details
+     - Modal uses iframe to isolate email styles (prevents style leakage)
+   - **Files Modified:**
+     - `events/src/events/schemas/email.py` (added EmailListResponse)
+     - `events/src/events/api/emails.py` (changed list response model)
+     - `events/src/events/templates/admin/emails.html` (major UI rewrite)
+   - **Bug Fixes:**
+     - Fixed UUID quoting in JavaScript onclick handlers
+     - Fixed layout shift caused by email HTML styles leaking into page
+     - Added dark theme styling for modal to match app theme
+
+4. **Occurrence Count Badge Styling** 🎨
+   - Green badge (bg-success): Items with >3 occurrences (well-established)
+   - Grey badge (bg-secondary): Items with ≤3 occurrences (may need verification)
+
+---
+
+### Previous Session Work (Nov 14-15, 2025)
 
 **FILES SYSTEM: WEBDAV SYNC + TIMEZONE BUG FIX** (Nov 14-15, 2025) ✅ **COMPLETE**
 

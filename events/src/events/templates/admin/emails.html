@@ -140,7 +140,7 @@
 </div>
 
 <!-- Email Detail Modal -->
-<div class="modal fade" id="emailModal" tabindex="-1">
+<div class="modal fade" id="emailModal" tabindex="-1" data-bs-backdrop="true" data-bs-keyboard="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
@@ -175,7 +175,7 @@
                 <hr>
                 <div class="mb-3">
                     <label class="form-label fw-bold">Email Body:</label>
-                    <div class="email-preview border rounded p-3" id="modalBody"></div>
+                    <iframe class="email-preview border rounded" id="modalBody" sandbox="allow-same-origin"></iframe>
                 </div>
             </div>
             <div class="modal-footer">
@@ -190,8 +190,8 @@
 
 <style>
 .emails-container {
-    max-width: 1400px;
-    margin: 0 auto;
+    max-width: 100%;
+    padding: 0 20px;
 }
 
 .stat-card {
@@ -266,19 +266,41 @@
 }
 
 .email-preview {
-    background-color: var(--surface-color);
-    max-height: 400px;
-    overflow-y: auto;
+    background-color: #fff;
+    width: 100%;
+    height: 400px;
+    border: none;
+    border-radius: 8px;
 }
 
 .recipients-list {
     font-size: 0.875rem;
     color: var(--text-muted);
 }
+
+/* Dark theme modal styling */
+.modal-content {
+    background-color: #161b22;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+}
+
+.modal-header {
+    border-bottom: 1px solid #30363d;
+}
+
+.modal-footer {
+    border-top: 1px solid #30363d;
+}
+
+.modal-header .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+}
 </style>
 
 <script>
 let currentEmailId = null;
+let emailsCache = {};
 
 // Load emails and stats on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -344,6 +366,12 @@ function renderEmails(emails) {
     const tbody = document.getElementById('emailsTableBody');
     document.getElementById('emailCount').textContent = emails.length;
 
+    // Cache emails for modal lookup
+    emailsCache = {};
+    emails.forEach(email => {
+        emailsCache[email.id] = email;
+    });
+
     if (emails.length === 0) {
         tbody.innerHTML = `
             <tr>
@@ -360,7 +388,7 @@ function renderEmails(emails) {
         const recipients = email.to_list.join(', ');
 
         return `
-            <tr>
+            <tr class="email-row" data-email-id="${email.id}" style="cursor: pointer;">
                 <td>
                     <div class="fw-bold">${createdAt.toLocaleDateString()}</div>
                     <div class="text-muted small">${createdAt.toLocaleTimeString()}</div>
@@ -377,13 +405,38 @@ function renderEmails(emails) {
                     </span>
                 </td>
                 <td>
-                    <button class="btn btn-sm btn-outline-primary" onclick='showEmailModal(${JSON.stringify(email)})' title="View Details">
+                    <button class="btn btn-sm btn-outline-primary" onclick="showEmailModalById('${email.id}')" title="View Details">
                         <i class="bi bi-eye"></i>
                     </button>
                 </td>
             </tr>
         `;
     }).join('');
+
+    // Add click handler for entire row
+    document.querySelectorAll('.email-row').forEach(row => {
+        row.addEventListener('click', function(e) {
+            if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
+                const emailId = this.dataset.emailId;
+                showEmailModalById(emailId);
+            }
+        });
+    });
+}
+
+async function showEmailModalById(emailId) {
+    // Fetch full email details (including body) from API
+    try {
+        const response = await fetch(`api/emails/${emailId}`);
+        if (!response.ok) {
+            throw new Error('Failed to load email details');
+        }
+        const email = await response.json();
+        showEmailModal(email);
+    } catch (error) {
+        console.error('Error loading email:', error);
+        alert('Failed to load email details');
+    }
 }
 
 function showEmailModal(email) {
@@ -419,8 +472,12 @@ function showEmailModal(email) {
         document.getElementById('modalErrorSection').style.display = 'none';
     }
 
-    // Email body (render as HTML)
-    document.getElementById('modalBody').innerHTML = email.body_html;
+    // Email body (render in iframe to isolate styles)
+    const iframe = document.getElementById('modalBody');
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(email.body_html);
+    iframeDoc.close();
 
     // Show resend button only for failed emails
     if (email.status === 'failed') {

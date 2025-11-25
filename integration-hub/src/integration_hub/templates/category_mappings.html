@@ -14,6 +14,24 @@
         </button>
     </div>
 
+    <!-- Sync from Inventory -->
+    <div class="card mb-4 border-success">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-cloud-download"></i> <strong>Sync Categories from Inventory System</strong></span>
+            <button class="btn btn-light btn-sm" onclick="syncFromInventory()">
+                <i class="bi bi-arrow-repeat"></i> Sync Now
+            </button>
+        </div>
+        <div class="card-body">
+            <p class="mb-0">
+                <strong>{{ inventory_categories_count }}</strong> categories defined in Inventory System.
+                Syncing will import category names so you can map them to GL accounts.
+                <span class="text-muted">Categories without mappings will appear as "unmapped".</span>
+                <span id="syncStatus" class="ms-2"></span>
+            </p>
+        </div>
+    </div>
+
     <div class="card">
         <div class="card-body">
             {% if mappings %}
@@ -156,22 +174,11 @@
                         <label class="form-label">Category Code <span class="text-danger">*</span></label>
                         <select class="form-select" id="categorySelect" required>
                             <option value="">Select category...</option>
-                            <option value="Beer - Bottled">Beer - Bottled</option>
-                            <option value="Beer - Draft">Beer - Draft</option>
-                            <option value="Beverage - Non-Alcohol">Beverage - Non-Alcohol</option>
-                            <option value="Food - Beef">Food - Beef</option>
-                            <option value="Food - Dairy">Food - Dairy</option>
-                            <option value="Food - Dry Goods">Food - Dry Goods</option>
-                            <option value="Food - Frozen">Food - Frozen</option>
-                            <option value="Food - Pork">Food - Pork</option>
-                            <option value="Food - Poultry">Food - Poultry</option>
-                            <option value="Food - Produce">Food - Produce</option>
-                            <option value="Food - Seafood">Food - Seafood</option>
-                            <option value="Liquor">Liquor</option>
-                            <option value="Merchandise">Merchandise</option>
-                            <option value="Wine">Wine</option>
+                            {% for cat in inventory_categories %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
                         </select>
-                        <small class="text-muted">Select the inventory category to map</small>
+                        <small class="text-muted">Select the inventory category to map (sync from Inventory to see all categories)</small>
                     </div>
 
                     <div class="mb-3">
@@ -445,6 +452,34 @@ function editMapping(button) {
 }
 
 // Reset form when modal is closed
+// Sync categories from Inventory System
+async function syncFromInventory() {
+    const statusEl = document.getElementById('syncStatus');
+    statusEl.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Syncing...';
+
+    try {
+        const response = await fetch('/hub/api/category-mappings/sync-from-inventory', {
+            method: 'POST'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            let msg = `Synced ${result.total_synced} categories. `;
+            msg += `${result.imported} new, ${result.already_exists} already mapped.`;
+            if (result.unmapped && result.unmapped.length > 0) {
+                msg += ` ${result.unmapped.length} need GL mapping.`;
+            }
+            statusEl.innerHTML = `<span class="badge bg-success">${msg}</span>`;
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            statusEl.innerHTML = `<span class="badge bg-danger">Error: ${result.error}</span>`;
+        }
+    } catch (error) {
+        statusEl.innerHTML = `<span class="badge bg-danger">Error: ${error.message}</span>`;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Setup searchable dropdowns
     setupSearchableSelect('searchAssetAccount', 'assetAccount');

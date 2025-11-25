@@ -19,8 +19,108 @@ from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.models.vendor import Vendor
 from sqlalchemy.orm import Session
+from sqlalchemy import text as sql_text
 
 logger = logging.getLogger(__name__)
+
+
+def levenshtein_distance(s1: str, s2: str) -> int:
+    """Calculate the Levenshtein distance between two strings."""
+    if len(s1) < len(s2):
+        return levenshtein_distance(s2, s1)
+
+    if len(s2) == 0:
+        return len(s1)
+
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+
+    return previous_row[-1]
+
+
+def digit_similarity_score(code1: str, code2: str) -> float:
+    """
+    Calculate similarity score between two item codes, accounting for common OCR errors.
+
+    Common OCR errors for digits:
+    - 0 <-> O, 6, 8
+    - 1 <-> I, l, 7
+    - 2 <-> Z
+    - 5 <-> S, 6
+    - 6 <-> 0, 8, 5
+    - 8 <-> 0, 6, B
+
+    Returns a score from 0.0 to 1.0, where 1.0 is exact match.
+    """
+    # Remove any non-alphanumeric characters and normalize
+    code1 = ''.join(c for c in str(code1).upper() if c.isalnum())
+    code2 = ''.join(c for c in str(code2).upper() if c.isalnum())
+
+    if not code1 or not code2:
+        return 0.0
+
+    if code1 == code2:
+        return 1.0
+
+    # Must be same length for high-confidence digit matching
+    if len(code1) != len(code2):
+        # Allow 1 character difference if very similar
+        if abs(len(code1) - len(code2)) == 1:
+            # Pad shorter string and check
+            shorter, longer = (code1, code2) if len(code1) < len(code2) else (code2, code1)
+            # Try inserting at each position
+            best_score = 0.0
+            for i in range(len(longer)):
+                padded = shorter[:i] + longer[i] + shorter[i:]
+                if padded == longer:
+                    return 0.85  # One missing digit
+            return 0.0
+        return 0.0
+
+    # Count matching positions and OCR-likely confusions
+    exact_matches = 0
+    ocr_confusions = 0
+
+    # OCR confusion pairs (digit -> commonly confused with)
+    ocr_pairs = {
+        '0': {'O', '6', '8', 'D', 'Q'},
+        '1': {'I', 'L', '7', 'T'},
+        '2': {'Z'},
+        '5': {'S', '6'},
+        '6': {'0', '8', '5', 'G', 'B'},
+        '8': {'0', '6', 'B'},
+        'O': {'0', 'Q', 'D'},
+        'B': {'8', '6'},
+        'S': {'5'},
+        'Z': {'2'},
+        'I': {'1', 'L'},
+        'L': {'1', 'I'},
+        'G': {'6'},
+    }
+
+    for c1, c2 in zip(code1, code2):
+        if c1 == c2:
+            exact_matches += 1
+        elif c2 in ocr_pairs.get(c1, set()) or c1 in ocr_pairs.get(c2, set()):
+            ocr_confusions += 1
+
+    # Score calculation
+    total = len(code1)
+    # Exact matches are worth 1.0, OCR confusions are worth 0.7 (still likely same item)
+    score = (exact_matches + ocr_confusions * 0.7) / total
+
+    # Require at least 70% of characters to match or be OCR confusable
+    if (exact_matches + ocr_confusions) / total < 0.7:
+        return 0.0
+
+    return score
 
 
 class InvoiceParser:
@@ -317,6 +417,195 @@ class InvoiceParser:
             logger.error(f"Error matching location '{location_name}': {str(e)}")
             return None
 
+    def _validate_and_correct_item_codes(self, invoice_id: int, db: Session) -> dict:
+        """
+        Validate extracted item codes against verified codes and correct OCR errors.
+
+        Uses fuzzy matching to detect common OCR errors like:
+        - 006032 instead of 206032 (leading digit confusion)
+        - 260632 instead of 206032 (digit transposition)
+
+        Only corrects codes when:
+        1. The verified code has occurrence_count > 3 (well-established)
+        2. The similarity score is >= 0.8 (high confidence)
+        3. The descriptions are similar (prevents false matches)
+
+        Returns dict with correction stats.
+        """
+        corrections = []
+
+        try:
+            # Get all invoice items with item codes
+            items_result = db.execute(
+                sql_text("""
+                    SELECT id, item_code, item_description
+                    FROM hub_invoice_items
+                    WHERE invoice_id = :invoice_id
+                      AND item_code IS NOT NULL
+                      AND item_code != ''
+                """),
+                {"invoice_id": invoice_id}
+            ).fetchall()
+
+            if not items_result:
+                return {"corrected": 0, "corrections": []}
+
+            # Get verified item codes with high occurrence count
+            verified_codes = db.execute(
+                sql_text("""
+                    SELECT item_code, canonical_description, occurrence_count
+                    FROM item_code_mapping
+                    WHERE is_verified = true OR occurrence_count >= 3
+                    ORDER BY occurrence_count DESC
+                """)
+            ).fetchall()
+
+            if not verified_codes:
+                return {"corrected": 0, "corrections": []}
+
+            # Build lookup dict for verified codes
+            verified_lookup = {
+                row[0]: {"description": row[1], "occurrences": row[2]}
+                for row in verified_codes
+            }
+
+            for item in items_result:
+                item_id, parsed_code, parsed_desc = item
+
+                # Skip if code already exists exactly in verified codes
+                if parsed_code in verified_lookup:
+                    continue
+
+                # Find best matching verified code
+                best_match = None
+                best_score = 0.0
+
+                for verified_code, info in verified_lookup.items():
+                    # Calculate code similarity
+                    code_score = digit_similarity_score(parsed_code, verified_code)
+
+                    if code_score < 0.8:
+                        continue
+
+                    # Also check description similarity to avoid false positives
+                    desc_words1 = set(parsed_desc.upper().split()) if parsed_desc else set()
+                    desc_words2 = set(info["description"].upper().split()) if info["description"] else set()
+
+                    if desc_words1 and desc_words2:
+                        # Need at least one common word in description
+                        common_words = desc_words1 & desc_words2
+                        if not common_words:
+                            continue
+
+                    # Prefer higher occurrence counts for tie-breaking
+                    combined_score = code_score + (info["occurrences"] / 1000)
+
+                    if combined_score > best_score:
+                        best_score = combined_score
+                        best_match = {
+                            "verified_code": verified_code,
+                            "code_score": code_score,
+                            "verified_desc": info["description"],
+                            "occurrences": info["occurrences"]
+                        }
+
+                if best_match and best_match["code_score"] >= 0.8:
+                    # Correct the item code
+                    db.execute(
+                        sql_text("""
+                            UPDATE hub_invoice_items
+                            SET item_code = :correct_code,
+                                item_description = COALESCE(:correct_desc, item_description)
+                            WHERE id = :item_id
+                        """),
+                        {
+                            "item_id": item_id,
+                            "correct_code": best_match["verified_code"],
+                            "correct_desc": best_match["verified_desc"]
+                        }
+                    )
+
+                    corrections.append({
+                        "original_code": parsed_code,
+                        "corrected_code": best_match["verified_code"],
+                        "similarity": round(best_match["code_score"], 2),
+                        "description": best_match["verified_desc"]
+                    })
+
+                    logger.info(
+                        f"OCR correction: {parsed_code} -> {best_match['verified_code']} "
+                        f"(similarity: {best_match['code_score']:.2f}, "
+                        f"verified occurrences: {best_match['occurrences']})"
+                    )
+
+            if corrections:
+                db.commit()
+
+            return {
+                "corrected": len(corrections),
+                "corrections": corrections
+            }
+
+        except Exception as e:
+            logger.error(f"Error validating item codes for invoice {invoice_id}: {str(e)}")
+            db.rollback()
+            return {"corrected": 0, "corrections": [], "error": str(e)}
+
+    def _normalize_item_descriptions(self, invoice_id: int, db: Session) -> int:
+        """
+        Normalize item descriptions based on item codes.
+
+        If an item code already exists in the item_code_mapping table with a canonical description,
+        update the item description to match. This fixes OCR variations where the same product
+        gets parsed with slightly different descriptions.
+
+        Returns the number of items normalized.
+        """
+        try:
+            # Update item descriptions to match canonical descriptions based on item code
+            result = db.execute(
+                sql_text("""
+                    UPDATE hub_invoice_items hi
+                    SET item_description = icm.canonical_description
+                    FROM item_code_mapping icm
+                    WHERE hi.invoice_id = :invoice_id
+                      AND hi.item_code IS NOT NULL
+                      AND hi.item_code != ''
+                      AND hi.item_code = icm.item_code
+                      AND hi.item_description != icm.canonical_description
+                """),
+                {"invoice_id": invoice_id}
+            )
+            normalized_count = result.rowcount
+            db.commit()
+
+            if normalized_count > 0:
+                logger.info(f"Normalized {normalized_count} item descriptions for invoice {invoice_id}")
+
+            # Also add any new item codes to the mapping table for future normalization
+            db.execute(
+                sql_text("""
+                    INSERT INTO item_code_mapping (item_code, canonical_description, occurrence_count)
+                    SELECT item_code, item_description, 1
+                    FROM hub_invoice_items
+                    WHERE invoice_id = :invoice_id
+                      AND item_code IS NOT NULL
+                      AND item_code != ''
+                    ON CONFLICT (item_code) DO UPDATE SET
+                        occurrence_count = item_code_mapping.occurrence_count + 1,
+                        updated_at = NOW()
+                """),
+                {"invoice_id": invoice_id}
+            )
+            db.commit()
+
+            return normalized_count
+
+        except Exception as e:
+            logger.error(f"Error normalizing item descriptions for invoice {invoice_id}: {str(e)}")
+            db.rollback()
+            return 0
+
     def parse_and_save(self, invoice_id: int, db: Session) -> Dict:
         """
         Parse an invoice and save the results to database
@@ -459,6 +748,16 @@ class InvoiceParser:
             invoice.status = 'mapping'
             db.commit()
 
+            # Step 1: Validate and correct OCR errors in item codes
+            # This compares parsed codes against verified codes and fixes common OCR mistakes
+            ocr_correction_stats = self._validate_and_correct_item_codes(invoice_id, db)
+            if ocr_correction_stats.get('corrected', 0) > 0:
+                logger.info(f"Corrected {ocr_correction_stats['corrected']} OCR errors in item codes")
+
+            # Step 2: Normalize item descriptions based on item codes
+            # This fixes OCR variations where the same item code has different parsed descriptions
+            self._normalize_item_descriptions(invoice_id, db)
+
             items_count = len(line_items)
 
             # Auto-map items using intelligent mapping
@@ -472,14 +771,17 @@ class InvoiceParser:
                 logger.error(f"Error auto-mapping items for invoice {invoice_id}: {str(e)}")
                 # Don't fail the parsing if auto-mapping fails
 
+            ocr_corrected = ocr_correction_stats.get('corrected', 0)
             return {
                 "success": True,
-                "message": f"Invoice parsed successfully with {items_count} items. Auto-mapped: {mapping_stats.get('mapped_count', 0)}, Unmapped: {mapping_stats.get('unmapped_count', 0)}.",
+                "message": f"Invoice parsed successfully with {items_count} items. Auto-mapped: {mapping_stats.get('mapped_count', 0)}, Unmapped: {mapping_stats.get('unmapped_count', 0)}, OCR corrected: {ocr_corrected}.",
                 "invoice_id": invoice_id,
                 "confidence_score": confidence_score,
                 "items_parsed": items_count,
                 "items_mapped": mapping_stats.get('mapped_count', 0),
                 "items_unmapped": mapping_stats.get('unmapped_count', 0),
+                "ocr_corrected": ocr_corrected,
+                "ocr_corrections": ocr_correction_stats.get('corrections', []),
                 "mapping_methods": mapping_stats.get('methods', {}),
                 "vendor_matched": vendor is not None,
                 "vendor_name": parsed_data.get('vendor_name'),

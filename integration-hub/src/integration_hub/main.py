@@ -141,8 +141,13 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     sent_invoices = db.query(HubInvoice).filter(HubInvoice.status == 'sent').count()
     error_invoices = db.query(HubInvoice).filter(HubInvoice.status == 'error').count()
 
-    # Get unmapped items count
-    unmapped_items = db.query(HubInvoiceItem).filter(HubInvoiceItem.is_mapped == False).count()
+    # Get unmapped items count (unique item descriptions, not total line items)
+    from sqlalchemy import func
+    unmapped_items = db.query(
+        func.count(func.distinct(
+            func.concat(HubInvoiceItem.item_description, '|', HubInvoiceItem.item_code)
+        ))
+    ).filter(HubInvoiceItem.is_mapped == False).scalar() or 0
 
     # Get recent invoices
     recent_invoices = db.query(HubInvoice).order_by(HubInvoice.created_at.desc()).limit(10).all()
@@ -411,10 +416,27 @@ async def update_invoice(
         if "location_id" in data:
             if data["location_id"]:
                 invoice.location_id = int(data["location_id"])
+                # Look up location name from inventory database if not provided
+                if "location_name" not in data or not data["location_name"]:
+                    inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
+                                                 'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+                    try:
+                        from sqlalchemy import create_engine, text as sql_text
+                        engine = create_engine(inventory_db_url)
+                        with engine.connect() as conn:
+                            result = conn.execute(
+                                sql_text("SELECT name FROM locations WHERE id = :loc_id"),
+                                {"loc_id": invoice.location_id}
+                            ).fetchone()
+                            if result:
+                                invoice.location_name = result[0]
+                    except Exception as loc_error:
+                        logger.warning(f"Could not look up location name: {str(loc_error)}")
             else:
                 invoice.location_id = None
+                invoice.location_name = None
 
-        if "location_name" in data:
+        if "location_name" in data and data["location_name"]:
             invoice.location_name = data["location_name"]
 
         db.commit()
@@ -658,11 +680,17 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Failed to fetch vendor items from Inventory API: {str(e)}")
 
+    # Get active category mappings for the dropdown
+    category_mappings = db.query(CategoryGLMapping).filter(
+        CategoryGLMapping.is_active == True
+    ).order_by(CategoryGLMapping.inventory_category).all()
+
     response = templates.TemplateResponse("unmapped_items.html", {
         "request": request,
         "unique_items": unique_items,
         "gl_accounts": gl_accounts,
-        "inventory_items": inventory_items
+        "inventory_items": inventory_items,
+        "category_mappings": category_mappings
     })
     # Prevent browser caching
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
@@ -766,11 +794,17 @@ async def mapped_items(request: Request, db: Session = Depends(get_db)):
             'gl_waste_account_name': gl_accounts_map.get(waste_acct) if waste_acct else None
         })
 
+    # Get active category mappings for the dropdown
+    category_mappings = db.query(CategoryGLMapping).filter(
+        CategoryGLMapping.is_active == True
+    ).order_by(CategoryGLMapping.inventory_category).all()
+
     return templates.TemplateResponse("mapped_items.html", {
         "request": request,
         "unique_items": unique_items,
         "gl_accounts": gl_accounts,
-        "inventory_items": inventory_items
+        "inventory_items": inventory_items,
+        "category_mappings": category_mappings
     })
 
 
@@ -936,34 +970,60 @@ async def map_items_by_description(
         invoices_affected.add(item.invoice_id)
 
     # Save this mapping for future auto-mapping of same item descriptions
-    # This allows future invoices with the same item description to be auto-mapped
+    # Uses invoice_item_mapping table (separate from inventory item GL mappings)
     if items:
+        from sqlalchemy import text as sql_text
         # Check if a mapping already exists for this exact description
-        existing_mapping = db.query(ItemGLMapping).filter(
-            ItemGLMapping.inventory_item_name == item_description
-        ).first()
+        existing = db.execute(
+            sql_text("SELECT id FROM invoice_item_mapping WHERE item_description = :desc"),
+            {"desc": item_description}
+        ).fetchone()
 
-        if existing_mapping:
+        if existing:
             # Update existing mapping
-            existing_mapping.inventory_item_id = inventory_item_id or existing_mapping.inventory_item_id
-            existing_mapping.inventory_category = inventory_category or existing_mapping.inventory_category
-            existing_mapping.gl_asset_account = gl_asset_account_int or existing_mapping.gl_asset_account
-            existing_mapping.gl_cogs_account = gl_cogs_account_int
-            existing_mapping.gl_waste_account = gl_waste_account_int
-            existing_mapping.is_active = True
+            db.execute(
+                sql_text("""
+                    UPDATE invoice_item_mapping
+                    SET inventory_item_id = :inv_id,
+                        inventory_item_name = :inv_name,
+                        inventory_category = :category,
+                        gl_asset_account = :asset,
+                        gl_cogs_account = :cogs,
+                        gl_waste_account = :waste,
+                        is_active = true,
+                        updated_at = NOW()
+                    WHERE item_description = :desc
+                """),
+                {
+                    "inv_id": inventory_item_id,
+                    "inv_name": items[0].inventory_item_name if items else None,
+                    "category": inventory_category,
+                    "asset": gl_asset_account_int,
+                    "cogs": gl_cogs_account_int,
+                    "waste": gl_waste_account_int,
+                    "desc": item_description
+                }
+            )
         else:
             # Create new mapping entry for future auto-mapping
-            new_mapping = ItemGLMapping(
-                inventory_item_id=inventory_item_id or 0,  # 0 for non-inventory items
-                inventory_item_name=item_description,
-                inventory_category=inventory_category or "Uncategorized",
-                gl_asset_account=gl_asset_account_int or gl_cogs_account_int,  # Use COGS if no asset account
-                gl_cogs_account=gl_cogs_account_int,
-                gl_waste_account=gl_waste_account_int,
-                is_active=True,
-                notes=f"Auto-created from bulk mapping on {item_description}"
+            db.execute(
+                sql_text("""
+                    INSERT INTO invoice_item_mapping
+                    (item_description, inventory_item_id, inventory_item_name, inventory_category,
+                     gl_asset_account, gl_cogs_account, gl_waste_account, is_active, notes)
+                    VALUES (:desc, :inv_id, :inv_name, :category, :asset, :cogs, :waste, true, :notes)
+                """),
+                {
+                    "desc": item_description,
+                    "inv_id": inventory_item_id,
+                    "inv_name": items[0].inventory_item_name if items else None,
+                    "category": inventory_category or "Uncategorized",
+                    "asset": gl_asset_account_int or gl_cogs_account_int,
+                    "cogs": gl_cogs_account_int,
+                    "waste": gl_waste_account_int,
+                    "notes": f"Auto-created from bulk mapping"
+                }
             )
-            db.add(new_mapping)
 
     db.commit()
 
@@ -1066,10 +1126,42 @@ async def list_category_mappings(request: Request, db: Session = Depends(get_db)
         }
         enriched_mappings.append(mapping_dict)
 
+    # Get categories from Inventory system for the dropdown
+    inventory_categories = []
+    inventory_categories_count = 0
+    try:
+        from sqlalchemy import text as sql_text
+        inv_result = db.execute(sql_text("""
+            SELECT name, parent_name
+            FROM dblink(
+                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                'SELECT c.name, p.name as parent_name
+                 FROM categories c
+                 LEFT JOIN categories p ON c.parent_id = p.id
+                 WHERE c.is_active = true OR c.is_active IS NULL
+                 ORDER BY COALESCE(p.name, c.name), c.name'
+            ) AS t(name VARCHAR, parent_name VARCHAR)
+        """)).fetchall()
+
+        for cat in inv_result:
+            cat_name = cat[0]
+            parent_name = cat[1]
+            if parent_name:
+                standardized_name = f"{parent_name} - {cat_name}"
+            else:
+                standardized_name = cat_name
+            inventory_categories.append(standardized_name)
+
+        inventory_categories_count = len(inventory_categories)
+    except Exception:
+        pass  # Inventory unavailable, keep as empty
+
     return templates.TemplateResponse("category_mappings.html", {
         "request": request,
         "mappings": enriched_mappings,
-        "gl_accounts": gl_accounts
+        "gl_accounts": gl_accounts,
+        "inventory_categories": inventory_categories,
+        "inventory_categories_count": inventory_categories_count
     })
 
 
@@ -1133,6 +1225,82 @@ async def create_category_mapping(
     db.commit()
 
     return RedirectResponse(url="/hub/category-mappings", status_code=303)
+
+
+@app.post("/api/category-mappings/sync-from-inventory")
+async def sync_categories_from_inventory(db: Session = Depends(get_db)):
+    """
+    Sync categories from Inventory system to category_gl_mapping table.
+    Creates placeholder entries for unmapped categories.
+    """
+    from sqlalchemy import text as sql_text
+
+    try:
+        # Fetch categories from Inventory database (with hierarchy)
+        inventory_categories = db.execute(sql_text("""
+            SELECT name, parent_name, description
+            FROM dblink(
+                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                'SELECT c.name, p.name as parent_name, c.description
+                 FROM categories c
+                 LEFT JOIN categories p ON c.parent_id = p.id
+                 WHERE c.is_active = true OR c.is_active IS NULL
+                 ORDER BY COALESCE(p.name, c.name), c.name'
+            ) AS t(name VARCHAR, parent_name VARCHAR, description TEXT)
+        """)).fetchall()
+
+        if not inventory_categories:
+            return {"success": False, "error": "No categories found in Inventory system"}
+
+        imported_count = 0
+        already_exists = 0
+        unmapped = []
+
+        for cat in inventory_categories:
+            cat_name = cat[0]
+            parent_name = cat[1]
+
+            # Build standardized category name (Parent - Child format)
+            if parent_name:
+                standardized_name = f"{parent_name} - {cat_name}"
+            else:
+                standardized_name = cat_name
+
+            # Check if this category already exists in mappings
+            existing = db.query(CategoryGLMapping).filter(
+                CategoryGLMapping.inventory_category == standardized_name
+            ).first()
+
+            if existing:
+                already_exists += 1
+            else:
+                # Create placeholder entry (will need GL accounts assigned)
+                # Use 0 as placeholder for required GL accounts
+                new_mapping = CategoryGLMapping(
+                    inventory_category=standardized_name,
+                    asset_account_name=f"{standardized_name} Inventory",
+                    gl_asset_account=0,  # Placeholder - needs to be set
+                    gl_cogs_account=0,   # Placeholder - needs to be set
+                    gl_waste_account=None,
+                    is_active=False  # Mark inactive until GL accounts are assigned
+                )
+                db.add(new_mapping)
+                imported_count += 1
+                unmapped.append(standardized_name)
+
+        db.commit()
+
+        return {
+            "success": True,
+            "imported": imported_count,
+            "already_exists": already_exists,
+            "total_synced": len(inventory_categories),
+            "unmapped": unmapped
+        }
+
+    except Exception as e:
+        db.rollback()
+        return {"success": False, "error": str(e)}
 
 
 # ============================================================================
@@ -1310,6 +1478,489 @@ def settings_page(request: Request):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
+
+
+# ============================================================================
+# ITEM CODE MANAGEMENT
+# ============================================================================
+
+@app.get("/item-codes", response_class=HTMLResponse)
+async def item_codes_page(
+    request: Request,
+    search: str = "",
+    filter: str = "all",
+    db: Session = Depends(get_db)
+):
+    """Item code management page for fixing OCR errors"""
+    from sqlalchemy import text as sql_text
+
+    # Build query based on filter
+    if filter == "duplicates":
+        # Find item codes that might be duplicates (similar codes with different descriptions)
+        query = """
+            SELECT item_code, canonical_description, occurrence_count, is_verified
+            FROM item_code_mapping
+            WHERE item_code IS NOT NULL
+            ORDER BY canonical_description, item_code
+        """
+    elif filter == "single":
+        # Single occurrence items are often OCR errors
+        query = """
+            SELECT item_code, canonical_description, occurrence_count, is_verified
+            FROM item_code_mapping
+            WHERE occurrence_count = 1
+            ORDER BY canonical_description
+        """
+    elif filter == "unverified":
+        # Show only unverified item codes
+        query = """
+            SELECT item_code, canonical_description, occurrence_count, is_verified
+            FROM item_code_mapping
+            WHERE item_code IS NOT NULL AND (is_verified = false OR is_verified IS NULL)
+            ORDER BY occurrence_count DESC, canonical_description
+        """
+    elif filter == "verified":
+        # Show only verified item codes
+        query = """
+            SELECT item_code, canonical_description, occurrence_count, is_verified
+            FROM item_code_mapping
+            WHERE item_code IS NOT NULL AND is_verified = true
+            ORDER BY canonical_description
+        """
+    else:
+        query = """
+            SELECT item_code, canonical_description, occurrence_count, is_verified
+            FROM item_code_mapping
+            WHERE item_code IS NOT NULL
+            ORDER BY canonical_description
+        """
+
+    results = db.execute(sql_text(query)).fetchall()
+
+    # Apply search filter
+    item_codes = []
+    for row in results:
+        if search:
+            if search.lower() not in row[0].lower() and search.lower() not in row[1].lower():
+                continue
+        item_codes.append({
+            "item_code": row[0],
+            "canonical_description": row[1],
+            "occurrence_count": row[2],
+            "is_verified": row[3] or False
+        })
+
+    # Get count of verified vendor items from Inventory system
+    inventory_items_count = 0
+    try:
+        inv_result = db.execute(sql_text("""
+            SELECT COUNT(*) FROM dblink(
+                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                'SELECT id FROM vendor_items WHERE vendor_sku IS NOT NULL'
+            ) AS t(id INTEGER)
+        """)).scalar()
+        inventory_items_count = inv_result or 0
+    except Exception:
+        pass  # Inventory count unavailable, keep as 0
+
+    return templates.TemplateResponse("item_codes.html", {
+        "request": request,
+        "item_codes": item_codes,
+        "search": search,
+        "filter_type": filter,
+        "inventory_items_count": inventory_items_count
+    })
+
+
+@app.post("/api/item-codes/merge")
+async def merge_item_codes(
+    wrong_codes: str = Form(...),
+    correct_code: str = Form(...),
+    correct_description: str = Form(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Merge wrong item codes into the correct one.
+    Updates all invoice items with wrong codes to use the correct code and description.
+    """
+    from sqlalchemy import text as sql_text
+
+    # Parse wrong codes (comma-separated)
+    wrong_code_list = [c.strip() for c in wrong_codes.split(",") if c.strip()]
+
+    if not wrong_code_list:
+        raise HTTPException(status_code=400, detail="No wrong codes provided")
+
+    if correct_code in wrong_code_list:
+        raise HTTPException(status_code=400, detail="Correct code cannot be in the list of wrong codes")
+
+    # Get the correct description (from existing mapping or use provided)
+    if not correct_description:
+        result = db.execute(
+            sql_text("SELECT canonical_description FROM item_code_mapping WHERE item_code = :code"),
+            {"code": correct_code}
+        ).fetchone()
+        if result:
+            correct_description = result[0]
+        else:
+            # Get from the first wrong code
+            result = db.execute(
+                sql_text("SELECT canonical_description FROM item_code_mapping WHERE item_code = :code"),
+                {"code": wrong_code_list[0]}
+            ).fetchone()
+            if result:
+                correct_description = result[0]
+            else:
+                raise HTTPException(status_code=400, detail="Could not determine correct description")
+
+    # Update all invoice items with wrong codes
+    items_updated = 0
+    for wrong_code in wrong_code_list:
+        result = db.execute(
+            sql_text("""
+                UPDATE hub_invoice_items
+                SET item_code = :correct_code, item_description = :description
+                WHERE item_code = :wrong_code
+            """),
+            {"correct_code": correct_code, "description": correct_description, "wrong_code": wrong_code}
+        )
+        items_updated += result.rowcount
+
+    # Delete wrong codes from mapping table
+    db.execute(
+        sql_text("DELETE FROM item_code_mapping WHERE item_code = ANY(:codes)"),
+        {"codes": wrong_code_list}
+    )
+
+    # Update or create correct code mapping
+    existing = db.execute(
+        sql_text("SELECT id, occurrence_count FROM item_code_mapping WHERE item_code = :code"),
+        {"code": correct_code}
+    ).fetchone()
+
+    if existing:
+        db.execute(
+            sql_text("""
+                UPDATE item_code_mapping
+                SET canonical_description = :description,
+                    occurrence_count = occurrence_count + :added,
+                    is_verified = true,
+                    updated_at = NOW()
+                WHERE item_code = :code
+            """),
+            {"description": correct_description, "added": items_updated, "code": correct_code}
+        )
+    else:
+        db.execute(
+            sql_text("""
+                INSERT INTO item_code_mapping (item_code, canonical_description, occurrence_count, is_verified)
+                VALUES (:code, :description, :count, true)
+            """),
+            {"code": correct_code, "description": correct_description, "count": items_updated}
+        )
+
+    # Also update the invoice_item_mapping if description changed
+    db.execute(
+        sql_text("""
+            UPDATE invoice_item_mapping
+            SET item_code = :code
+            WHERE item_description = :description AND (item_code IS NULL OR item_code != :code)
+        """),
+        {"code": correct_code, "description": correct_description}
+    )
+
+    db.commit()
+
+    return {
+        "success": True,
+        "items_updated": items_updated,
+        "codes_merged": len(wrong_code_list),
+        "correct_code": correct_code,
+        "correct_description": correct_description
+    }
+
+
+@app.post("/api/item-codes/update")
+async def update_item_code(
+    item_code: str = Form(...),
+    description: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Update the canonical description for an item code"""
+    from sqlalchemy import text as sql_text
+
+    # Update item_code_mapping
+    db.execute(
+        sql_text("""
+            UPDATE item_code_mapping
+            SET canonical_description = :description, updated_at = NOW()
+            WHERE item_code = :code
+        """),
+        {"description": description, "code": item_code}
+    )
+
+    # Update all invoice items with this code
+    result = db.execute(
+        sql_text("""
+            UPDATE hub_invoice_items
+            SET item_description = :description
+            WHERE item_code = :code
+        """),
+        {"description": description, "code": item_code}
+    )
+
+    db.commit()
+
+    return {
+        "success": True,
+        "items_updated": result.rowcount,
+        "item_code": item_code,
+        "description": description
+    }
+
+
+@app.post("/api/item-codes/verify")
+async def verify_item_code(
+    item_code: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Mark an item code as verified (confirmed correct)"""
+    from sqlalchemy import text as sql_text
+
+    db.execute(
+        sql_text("""
+            UPDATE item_code_mapping
+            SET is_verified = true, updated_at = NOW()
+            WHERE item_code = :code
+        """),
+        {"code": item_code}
+    )
+
+    db.commit()
+
+    return {"success": True, "item_code": item_code}
+
+
+@app.post("/api/item-codes/fix")
+async def fix_item_code(
+    wrong_code: str = Form(...),
+    correct_code: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Fix an OCR error by changing a wrong item code to the correct one.
+    This updates all invoice items with the wrong code to use the correct code.
+    Unlike merge, this doesn't require the correct code to already exist.
+    """
+    from sqlalchemy import text as sql_text
+
+    if wrong_code == correct_code:
+        raise HTTPException(status_code=400, detail="Codes must be different")
+
+    # Get the description from the wrong code entry
+    wrong_entry = db.execute(
+        sql_text("SELECT canonical_description FROM item_code_mapping WHERE item_code = :code"),
+        {"code": wrong_code}
+    ).fetchone()
+
+    description = wrong_entry[0] if wrong_entry else None
+
+    # Update all invoice items with the wrong code
+    result = db.execute(
+        sql_text("""
+            UPDATE hub_invoice_items
+            SET item_code = :correct_code
+            WHERE item_code = :wrong_code
+        """),
+        {"correct_code": correct_code, "wrong_code": wrong_code}
+    )
+    items_updated = result.rowcount
+
+    # Check if the correct code already exists in mapping table
+    existing = db.execute(
+        sql_text("SELECT id, occurrence_count FROM item_code_mapping WHERE item_code = :code"),
+        {"code": correct_code}
+    ).fetchone()
+
+    if existing:
+        # Update existing entry's occurrence count
+        db.execute(
+            sql_text("""
+                UPDATE item_code_mapping
+                SET occurrence_count = occurrence_count + :added,
+                    updated_at = NOW()
+                WHERE item_code = :code
+            """),
+            {"added": items_updated, "code": correct_code}
+        )
+    else:
+        # Create new entry for the correct code
+        db.execute(
+            sql_text("""
+                INSERT INTO item_code_mapping (item_code, canonical_description, occurrence_count, is_verified)
+                VALUES (:code, :description, :count, false)
+            """),
+            {"code": correct_code, "description": description, "count": items_updated}
+        )
+
+    # Delete the wrong code from mapping table
+    db.execute(
+        sql_text("DELETE FROM item_code_mapping WHERE item_code = :code"),
+        {"code": wrong_code}
+    )
+
+    db.commit()
+
+    return {
+        "success": True,
+        "items_updated": items_updated,
+        "wrong_code": wrong_code,
+        "correct_code": correct_code
+    }
+
+
+@app.post("/api/item-codes/sync-from-inventory")
+async def sync_item_codes_from_inventory(db: Session = Depends(get_db)):
+    """
+    Sync vendor items from Inventory system to item_code_mapping table.
+    This ensures item codes have verified descriptions from the source system.
+    """
+    from sqlalchemy import text as sql_text
+
+    try:
+        # Fetch vendor items from Inventory database
+        vendor_items = db.execute(sql_text("""
+            SELECT vendor_sku, vendor_product_name, vendor_id
+            FROM dblink(
+                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                'SELECT vendor_sku, vendor_product_name, vendor_id FROM vendor_items WHERE vendor_sku IS NOT NULL AND vendor_product_name IS NOT NULL'
+            ) AS t(vendor_sku VARCHAR, vendor_product_name VARCHAR, vendor_id INTEGER)
+        """)).fetchall()
+
+        if not vendor_items:
+            return {"success": False, "error": "No vendor items found in Inventory system"}
+
+        imported_count = 0
+        updated_count = 0
+
+        for item in vendor_items:
+            vendor_sku = item[0].strip() if item[0] else None
+            vendor_product_name = item[1].strip() if item[1] else None
+            vendor_id = item[2]
+
+            if not vendor_sku or not vendor_product_name:
+                continue
+
+            # Check if this item code already exists
+            existing = db.execute(
+                sql_text("SELECT id, canonical_description FROM item_code_mapping WHERE item_code = :code"),
+                {"code": vendor_sku}
+            ).fetchone()
+
+            if existing:
+                # Update existing entry with verified description if different
+                if existing[1] != vendor_product_name:
+                    db.execute(
+                        sql_text("""
+                            UPDATE item_code_mapping
+                            SET canonical_description = :desc,
+                                vendor_id = :vendor_id,
+                                is_verified = true,
+                                updated_at = NOW()
+                            WHERE item_code = :code
+                        """),
+                        {"desc": vendor_product_name, "vendor_id": vendor_id, "code": vendor_sku}
+                    )
+                    updated_count += 1
+                else:
+                    # Just mark as verified if description matches
+                    db.execute(
+                        sql_text("""
+                            UPDATE item_code_mapping
+                            SET is_verified = true, vendor_id = :vendor_id, updated_at = NOW()
+                            WHERE item_code = :code
+                        """),
+                        {"vendor_id": vendor_id, "code": vendor_sku}
+                    )
+            else:
+                # Insert new item code mapping
+                db.execute(
+                    sql_text("""
+                        INSERT INTO item_code_mapping (item_code, canonical_description, vendor_id, is_verified, occurrence_count)
+                        VALUES (:code, :desc, :vendor_id, true, 0)
+                    """),
+                    {"code": vendor_sku, "desc": vendor_product_name, "vendor_id": vendor_id}
+                )
+                imported_count += 1
+
+        # Also update invoice items that match synced codes
+        normalized_count = db.execute(sql_text("""
+            UPDATE hub_invoice_items hi
+            SET item_description = icm.canonical_description
+            FROM item_code_mapping icm
+            WHERE hi.item_code = icm.item_code
+              AND hi.item_description != icm.canonical_description
+              AND icm.is_verified = true
+        """)).rowcount
+
+        db.commit()
+
+        return {
+            "success": True,
+            "imported": imported_count,
+            "updated": updated_count,
+            "total_synced": len(vendor_items),
+            "items_normalized": normalized_count
+        }
+
+    except Exception as e:
+        db.rollback()
+        return {"success": False, "error": str(e)}
+
+
+@app.get("/api/item-codes/{item_code}/invoices")
+async def get_invoices_by_item_code(item_code: str, db: Session = Depends(get_db)):
+    """Get all invoices that contain a specific item code"""
+    from sqlalchemy import text as sql_text
+
+    try:
+        # Find all invoices containing this item code
+        results = db.execute(sql_text("""
+            SELECT DISTINCT
+                hi.id as invoice_id,
+                hi.invoice_number,
+                hi.vendor_name,
+                hi.invoice_date,
+                hi.pdf_path,
+                hii.item_description,
+                hii.item_code,
+                hii.quantity,
+                hii.unit_price
+            FROM hub_invoices hi
+            JOIN hub_invoice_items hii ON hi.id = hii.invoice_id
+            WHERE hii.item_code = :item_code
+            ORDER BY hi.invoice_date DESC
+            LIMIT 50
+        """), {"item_code": item_code}).fetchall()
+
+        invoices = []
+        for row in results:
+            invoices.append({
+                "invoice_id": row[0],
+                "invoice_number": row[1],
+                "vendor_name": row[2],
+                "invoice_date": row[3].isoformat() if row[3] else None,
+                "pdf_path": row[4],
+                "item_description": row[5],
+                "item_code": row[6],
+                "quantity": float(row[7]) if row[7] else None,
+                "unit_price": float(row[8]) if row[8] else None
+            })
+
+        return {"success": True, "invoices": invoices, "count": len(invoices)}
+
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 # ============================================================================

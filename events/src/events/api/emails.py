@@ -8,13 +8,13 @@ from datetime import datetime, timedelta
 from events.core.database import get_db
 from events.core.deps import require_auth
 from events.models.document import Email, EmailStatus
-from events.schemas.email import EmailResponse
+from events.schemas.email import EmailResponse, EmailListResponse
 from events.models.user import User
 
 router = APIRouter()
 
 
-@router.get("/", response_model=List[EmailResponse])
+@router.get("/", response_model=List[EmailListResponse])
 async def list_emails(
     event_id: Optional[UUID] = None,
     status_filter: Optional[str] = None,
