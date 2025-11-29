@@ -1665,7 +1665,7 @@ function updateConversionPreview() {
     const previewDiv = document.getElementById('conversionPreview');
     const conversionValue = parseFloat(conversionInput.value) || 0;
 
-    document.getElementById('previewConversion').textContent = conversionValue.toFixed(4);
+    document.getElementById('previewConversion').textContent = conversionValue.toFixed(2);
 
     if (conversionValue > 0) {
         previewDiv.style.display = 'block';

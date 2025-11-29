@@ -327,6 +327,18 @@
     document.addEventListener('DOMContentLoaded', async function() {
         await loadFilterDropdowns();
         await loadVendorItems();
+
+        // Check for highlight parameter to auto-open edit modal
+        const urlParams = new URLSearchParams(window.location.search);
+        const highlightId = urlParams.get('highlight');
+        if (highlightId) {
+            // Wait a moment for the data to load, then open the edit modal
+            setTimeout(() => {
+                editVendorItem(parseInt(highlightId));
+                // Clean up URL
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }, 500);
+        }
     });
 
     // Load only the filter dropdowns (not modal dropdowns)

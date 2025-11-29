@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Prevent caching -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <base href="/hub/">
     <title>{% block title %}SW Hospitality Group - Integration Hub{% endblock %}</title>
 
@@ -76,10 +80,12 @@
         .sidebar-nav a {
             display: block;
             padding: 12px 20px;
+            padding-left: 17px;
             color: #8b949e;
             text-decoration: none;
             font-size: 14px;
-            transition: all 0.2s;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+            border-left: 3px solid transparent;
         }
 
         .sidebar-nav i {
@@ -93,8 +99,7 @@
         .sidebar-nav a.active {
             background-color: #21262d;
             color: #58a6ff;
-            border-left: 3px solid #58a6ff;
-            padding-left: 17px;
+            border-left-color: #58a6ff;
         }
 
         /* Main content area */
@@ -341,7 +346,7 @@
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-brand">
-            <img src="/inventory/static/images/sw-logo.png" alt="SW Logo">
+            <img src="/hub/static/images/sw-logo.png" alt="SW Logo">
         </div>
         <ul class="sidebar-nav">
             <li><a href="/portal/" title="Return to Portal"><i class="bi bi-house-door"></i> Portal Home</a></li>
@@ -350,6 +355,7 @@
             <li><a href="/hub/unmapped-items" class="{% if '/unmapped-items' in request.url.path %}active{% endif %}"><i class="bi bi-question-circle"></i> Unmapped Items</a></li>
             <li><a href="/hub/mapped-items" class="{% if '/mapped-items' in request.url.path %}active{% endif %}"><i class="bi bi-check-circle"></i> Mapped Items</a></li>
             <li><a href="/hub/category-mappings" class="{% if '/category-mappings' in request.url.path %}active{% endif %}"><i class="bi bi-list-ul"></i> Category Mappings</a></li>
+            <li><a href="/hub/item-codes" class="{% if '/item-codes' in request.url.path %}active{% endif %}"><i class="bi bi-upc-scan"></i> Item Codes</a></li>
             <li><a href="/hub/vendors" class="{% if '/vendors' in request.url.path %}active{% endif %}"><i class="bi bi-building"></i> Vendors</a></li>
             <li><a href="/hub/settings" class="{% if '/settings' in request.url.path %}active{% endif %}"><i class="bi bi-gear"></i> Settings</a></li>
         </ul>
@@ -370,6 +376,18 @@
         </div>
     </div>
 
+    <!-- Toast Container for non-blocking notifications -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999;">
+        <div id="notificationToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header">
+                <i class="bi bi-info-circle me-2" id="toastIcon"></i>
+                <strong class="me-auto" id="toastTitle">Notice</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" id="toastMessage"></div>
+        </div>
+    </div>
+
     <!-- Confirm Modal -->
     <div id="confirmModal" class="modal fade" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
@@ -380,8 +398,8 @@
                 </div>
                 <div class="modal-body" id="confirmMessage"></div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="confirmOkBtn">OK</button>
+                    <button type="button" class="btn btn-secondary" id="confirmCancelBtn" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="confirmOkBtn" data-bs-dismiss="modal">OK</button>
                 </div>
             </div>
         </div>
@@ -468,37 +486,30 @@
                 document.getElementById('confirmMessage').textContent = message;
 
                 const modalElement = document.getElementById('confirmModal');
-                const modal = new bootstrap.Modal(modalElement);
-
-                let resolved = false;
+                // Get existing instance or create new one
+                let modal = bootstrap.Modal.getInstance(modalElement);
+                if (!modal) {
+                    modal = new bootstrap.Modal(modalElement);
+                }
 
                 const okBtn = document.getElementById('confirmOkBtn');
                 const cancelBtn = document.getElementById('confirmCancelBtn');
-                okBtn.disabled = false;
-                cancelBtn.disabled = false;
 
-                okBtn.onclick = function(e) {
-                    if (!resolved) {
-                        resolved = true;
-                        modal.hide();
-                        setTimeout(() => resolve(true), 100);
-                    }
-                };
+                // Show cancel button for confirms
+                cancelBtn.style.display = '';
 
-                cancelBtn.onclick = function(e) {
-                    if (!resolved) {
-                        resolved = true;
-                        modal.hide();
-                        setTimeout(() => resolve(false), 100);
-                    }
-                };
+                // Track which button was clicked
+                let clickedOk = false;
 
-                modalElement.addEventListener('hidden.bs.modal', function handler() {
-                    modalElement.removeEventListener('hidden.bs.modal', handler);
-                    if (!resolved) {
-                        resolved = true;
-                        setTimeout(() => resolve(false), 100);
-                    }
+                const okHandler = () => { clickedOk = true; };
+                const cancelHandler = () => { clickedOk = false; };
+
+                okBtn.addEventListener('click', okHandler, { once: true });
+                cancelBtn.addEventListener('click', cancelHandler, { once: true });
+
+                // Resolve when modal is hidden
+                modalElement.addEventListener('hidden.bs.modal', function() {
+                    resolve(clickedOk);
                 }, { once: true });
 
                 modal.show();
@@ -512,44 +523,53 @@
                 document.getElementById('confirmMessage').textContent = message;
 
                 const modalElement = document.getElementById('confirmModal');
-                const modal = new bootstrap.Modal(modalElement);
+                // Get existing instance or create new one
+                let modal = bootstrap.Modal.getInstance(modalElement);
+                if (!modal) {
+                    modal = new bootstrap.Modal(modalElement);
+                }
 
-                const okBtn = document.getElementById('confirmOkBtn');
                 const cancelBtn = document.getElementById('confirmCancelBtn');
 
                 // Hide cancel button for alerts
                 cancelBtn.style.display = 'none';
-                okBtn.textContent = 'OK';
-                okBtn.disabled = false;
 
-                let resolved = false;
-
-                okBtn.onclick = function(e) {
-                    if (!resolved) {
-                        resolved = true;
-                        modal.hide();
-                        setTimeout(() => {
-                            cancelBtn.style.display = '';
-                            okBtn.textContent = 'OK';
-                            resolve(true);
-                        }, 100);
-                    }
-                };
-
-                modalElement.addEventListener('hidden.bs.modal', function handler() {
-                    modalElement.removeEventListener('hidden.bs.modal', handler);
-                    if (!resolved) {
-                        resolved = true;
-                        setTimeout(() => {
-                            cancelBtn.style.display = '';
-                            okBtn.textContent = 'OK';
-                            resolve(true);
-                        }, 100);
-                    }
+                // Resolve when modal is hidden (OK has data-bs-dismiss so it will close automatically)
+                modalElement.addEventListener('hidden.bs.modal', function() {
+                    cancelBtn.style.display = '';  // Restore for next use
+                    resolve(true);
                 }, { once: true });
 
                 modal.show();
             });
+        }
+
+        // Non-blocking toast notification (auto-dismisses)
+        function showToast(message, title = 'Notice', type = 'info', duration = 5000) {
+            const toast = document.getElementById('notificationToast');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastTitle.textContent = title;
+            toastMessage.textContent = message;
+
+            // Set icon and color based on type
+            toast.classList.remove('bg-success', 'bg-danger', 'bg-warning', 'bg-info');
+            toastIcon.classList.remove('bi-check-circle', 'bi-x-circle', 'bi-exclamation-triangle', 'bi-info-circle', 'text-success', 'text-danger', 'text-warning', 'text-info');
+
+            if (type === 'success' || type === 'Success') {
+                toastIcon.classList.add('bi-check-circle', 'text-success');
+            } else if (type === 'error' || type === 'Error') {
+                toastIcon.classList.add('bi-x-circle', 'text-danger');
+            } else if (type === 'warning' || type === 'Warning') {
+                toastIcon.classList.add('bi-exclamation-triangle', 'text-warning');
+            } else {
+                toastIcon.classList.add('bi-info-circle', 'text-info');
+            }
+
+            const bsToast = new bootstrap.Toast(toast, { delay: duration });
+            bsToast.show();
         }
     </script>
 

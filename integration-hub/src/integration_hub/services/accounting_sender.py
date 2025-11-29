@@ -250,7 +250,9 @@ class AccountingSenderService:
 
             # Calculate this line's share of tax (proportional to its amount)
             line_subtotal = data["amount"]
-            if subtotal > 0 and invoice_tax > 0:
+            # Add proportional tax if there is tax to distribute
+            # Handle both positive invoices and negative credits
+            if subtotal != 0 and invoice_tax != 0:
                 # Proportional tax: (line amount / subtotal) * total tax
                 line_tax = (line_subtotal / subtotal) * invoice_tax
                 line_total = line_subtotal + line_tax
@@ -273,8 +275,39 @@ class AccountingSenderService:
 
         # Validate total matches invoice total
         invoice_total = Decimal(str(invoice.total_amount))
-        if abs(total_amount - invoice_total) > Decimal('0.01'):
-            raise ValueError(f"Bill total mismatch: Lines ${total_amount} != Invoice Total ${invoice_total}")
+        difference = total_amount - invoice_total
+
+        # If there's a discrepancy, add an adjustment line to balance
+        if abs(difference) > Decimal('0.01'):
+            # Adjustment needed: negative if lines > invoice, positive if lines < invoice
+            adjustment_amount = invoice_total - total_amount
+
+            if difference > 0:
+                logger.info(f"Lines exceed invoice by ${difference} - adding credit/discount adjustment of ${adjustment_amount}")
+                adjustment_desc = "Credit / Discount Adjustment"
+            else:
+                logger.info(f"Lines under invoice by ${-difference} - adding minimum charge adjustment of ${adjustment_amount}")
+                adjustment_desc = "Minimum Charge / Adjustment"
+
+            # Use the most common GL account from the existing lines
+            if account_number_totals:
+                # Find the account with the highest total (most likely the primary expense account)
+                primary_account = max(account_number_totals.keys(),
+                                     key=lambda k: abs(account_number_totals[k]["amount"]))
+                try:
+                    adjustment_account_id = self._get_account_id(primary_account)
+                except ValueError:
+                    # Fallback: use the first account from the lines
+                    adjustment_account_id = payload["lines"][0]["account_id"] if payload["lines"] else None
+
+                if adjustment_account_id:
+                    payload["lines"].append({
+                        "account_id": adjustment_account_id,
+                        "amount": float(adjustment_amount),
+                        "description": adjustment_desc
+                    })
+                    total_amount += adjustment_amount
+                    logger.info(f"Added adjustment line: ${adjustment_amount} to account {primary_account}")
 
         return payload
 

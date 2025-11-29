@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** November 15, 2025
-**Status:** ~87% Complete - Core Systems Production Ready ✅
-**Latest:** Files WebDAV desktop sync + timezone bug fix (Nov 14-15, 2025) ✅
+**Last Updated:** November 28, 2025
+**Status:** ~88% Complete - Core Systems Production Ready ✅
+**Latest:** Inventory key items + unit conversions, Integration Hub invoice fixes (Nov 28, 2025) ✅
 
 ---
 
@@ -1188,8 +1188,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 2.8
-**Last Updated:** November 11, 2025
+**Version:** 2.9
+**Last Updated:** November 28, 2025
 **Maintained By:** SW Hospitality Group Development Team
 
 **For complete system details, see [SYSTEM_DOCUMENTATION.md](./SYSTEM_DOCUMENTATION.md)**
@@ -1197,6 +1197,46 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 ## 📝 Recent Updates
+
+### November 28, 2025 - Inventory Key Items & Integration Hub Invoice Fixes 🔧
+
+**Inventory System - New Data Model Features**
+- ✅ **Key Item Flag** - Added `is_key_item` boolean to master_items for highlighting important items
+- ✅ **Additional Count Units** - Added `count_unit_2_id` and `count_unit_3_id` for flexible counting
+- ✅ **Item Unit Conversions** - New model for per-item unit conversions (e.g., 1 case = 40 lbs)
+- ✅ **Database Migrations** - Two new migrations merging previous heads
+
+**Integration Hub - Invoice Processing Fixes**
+- ✅ **Bill Total Mismatch Resolution** - Fixed 10 of 11 invoices with errors
+  - Cleared stale error messages from previous attempts
+  - Fixed tax double-counting (tax as line item + tax_amount field)
+  - Added minimum charge adjustment lines (Gold Coast Linen $40 minimum)
+  - Added credit/discount adjustment lines for unparsed credits
+- ✅ **Credit Memo Support** - Fixed negative tax handling (`!= 0` instead of `> 0`)
+- ✅ **Item Code Corrections** - Fixed OCR errors in invoice 89 (819753→819573, 599860→599850)
+- ✅ **Accounting Entry Verification** - JE #433 confirmed correct with proper adjustment lines
+
+**Files Modified:**
+- `inventory/alembic/versions/20251128_1600_add_key_item_and_count_units.py` (NEW)
+- `inventory/alembic/versions/20251128_1800_add_item_unit_conversions.py` (NEW)
+- `inventory/src/restaurant_inventory/models/item.py`
+- `inventory/src/restaurant_inventory/models/item_unit_conversion.py` (NEW)
+- `integration-hub/src/integration_hub/services/accounting_sender.py`
+
+---
+
+### November 25, 2025 - Integration Hub: OCR Item Code Validation ✅
+
+**OCR Auto-Correction System**
+- ✅ **Item Code Validation** - Post-parse validation against verified codes
+- ✅ **Digit Similarity Scoring** - Accounts for common OCR confusions (0↔6↔8, 1↔7↔I)
+- ✅ **Filter Enhancements** - Added "Unverified Only" and "Verified Only" filters
+
+**Events System - Email History Page**
+- ✅ **Clean List View** - Replaced inline HTML with modal-based detail view
+- ✅ **Style Isolation** - Email styles no longer leak into page via iframe
+
+---
 
 ### November 12, 2025 - Integration Hub: Category Naming Standardization ✅
 
@@ -1532,8 +1572,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 2.8 - Integration Hub Critical Parsing & Tax Fixes
-**Last Updated:** November 11, 2025
+**Version:** 2.9 - Inventory Key Items & Invoice Fixes
+**Last Updated:** November 28, 2025
 **Documentation Health:** 95/100 - Excellent ✅
 
-*Critical production fixes: Multi-page invoice parsing (was missing items from pages 2+), tax capitalization logic corrected for proper GL accounting, UI improvements, bank matching algorithm documented.*
+*New inventory features: key item flag, additional count units, item unit conversions. Integration Hub fixes: invoice total mismatch resolution, credit memo support, OCR item code corrections.*

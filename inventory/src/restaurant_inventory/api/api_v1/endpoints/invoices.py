@@ -14,7 +14,7 @@ from pathlib import Path
 
 from restaurant_inventory.core.deps import get_db, get_current_user, filter_by_user_locations
 from restaurant_inventory.core.audit import log_audit_event
-from restaurant_inventory.models import User, Invoice, InvoiceItem, Vendor, Location, MasterItem, InvoiceStatus
+from restaurant_inventory.models import User, Invoice, InvoiceItem, Vendor, Location, MasterItem, VendorItem, InvoiceStatus
 from restaurant_inventory.schemas.invoice import (
     InvoiceCreate, InvoiceUpdate, InvoiceInDB, InvoiceWithDetails, InvoiceList,
     InvoiceItemCreate, InvoiceItemUpdate, InvoiceItemInDB,
@@ -673,17 +673,21 @@ def receive_invoice_from_hub(
             db.add(vendor)
             db.flush()  # Get vendor ID
 
-        # TODO: Get default location or system user
-        # For now, we'll use location_id=1 and uploaded_by_id=1 (system user)
-        # In production, you should have a dedicated system user
+        # Get location_id from hub data, default to finding first active location
+        location_id = invoice_data.get("location_id")
+        if not location_id:
+            from restaurant_inventory.models.location import Location
+            default_location = db.query(Location).filter(Location.is_active == True).first()
+            location_id = default_location.id if default_location else None
 
         # Create invoice record
+        # Note: uploaded_by_id and approved_by_id are nullable for hub-imported invoices
         invoice = Invoice(
             filename=f"hub_{hub_invoice_id}_{invoice_number}.pdf",
             file_path=f"/app/uploads/invoices/hub_{hub_invoice_id}_{invoice_number}.pdf",
             file_type="pdf",
             vendor_id=vendor.id,
-            location_id=1,  # Default location - TODO: make configurable
+            location_id=location_id,
             invoice_number=invoice_number,
             invoice_date=invoice_date,
             due_date=due_date,
@@ -692,8 +696,8 @@ def receive_invoice_from_hub(
             total=total_amount,
             status=InvoiceStatus.APPROVED,  # Auto-approve from hub
             notes=f"Received from Integration Hub (hub_invoice_id: {hub_invoice_id})",
-            uploaded_by_id=1,  # System user - TODO: create dedicated system user
-            approved_by_id=1,  # System user
+            uploaded_by_id=None,  # No user for hub imports
+            approved_by_id=None,  # No user for hub imports
             uploaded_at=datetime.utcnow(),
             approved_at=datetime.utcnow()
         )
@@ -703,7 +707,10 @@ def receive_invoice_from_hub(
 
         # Create invoice items
         for item_data in items_data:
-            inventory_item_id = item_data.get("inventory_item_id")
+            # Note: Hub sends "inventory_item_id" which is actually the VENDOR ITEM ID
+            # (the ID from the vendor_items table, not master_items)
+            hub_item_id = item_data.get("inventory_item_id")
+            item_code = item_data.get("item_code")  # Vendor's item code from invoice
             description = item_data.get("description")
             quantity = item_data.get("quantity")
             unit_of_measure = item_data.get("unit_of_measure")
@@ -711,7 +718,32 @@ def receive_invoice_from_hub(
             line_total = item_data.get("line_total")
             category = item_data.get("category")
 
-            # Create invoice item
+            # Look up vendor item to get the master_item_id and other details
+            valid_vendor_item_id = None
+            valid_master_item_id = None
+            vendor_sku = item_code  # Default to hub's item_code
+            pack_size = None
+            purchase_unit_id = None
+
+            if hub_item_id:
+                # First try to find as vendor_item_id (correct interpretation)
+                vendor_item = db.query(VendorItem).options(
+                    joinedload(VendorItem.purchase_unit)
+                ).filter(VendorItem.id == hub_item_id).first()
+                if vendor_item:
+                    valid_vendor_item_id = vendor_item.id
+                    valid_master_item_id = vendor_item.master_item_id
+                    # Get vendor_sku and pack_size from vendor_item
+                    vendor_sku = vendor_item.vendor_sku or item_code
+                    pack_size = vendor_item.pack_size
+                    purchase_unit_id = vendor_item.purchase_unit_id
+                    # Update vendor item's last price
+                    vendor_item.unit_price = unit_price
+                    # Also update master item's current cost if linked
+                    if vendor_item.master_item:
+                        vendor_item.master_item.current_cost = unit_price
+
+            # Create invoice item with vendor details
             invoice_item = InvoiceItem(
                 invoice_id=invoice.id,
                 description=description,
@@ -719,26 +751,15 @@ def receive_invoice_from_hub(
                 unit=unit_of_measure,
                 unit_price=unit_price,
                 line_total=line_total,
-                master_item_id=inventory_item_id,  # Link to master item if provided
-                is_mapped=inventory_item_id is not None
+                vendor_item_id=valid_vendor_item_id,
+                master_item_id=valid_master_item_id,
+                vendor_sku=vendor_sku,
+                pack_size=pack_size,
+                unit_of_measure_id=purchase_unit_id,
+                mapping_method='hub' if valid_vendor_item_id else None
             )
 
             db.add(invoice_item)
-
-            # Update inventory quantities if item is mapped
-            if inventory_item_id:
-                master_item = db.query(MasterItem).filter(MasterItem.id == inventory_item_id).first()
-                if master_item:
-                    # Update current quantity
-                    master_item.current_quantity = (master_item.current_quantity or 0) + quantity
-
-                    # Update cost using weighted average
-                    current_value = (master_item.current_quantity or 0) * (master_item.current_cost or 0)
-                    new_value = quantity * unit_price
-                    new_total_quantity = (master_item.current_quantity or 0) + quantity
-
-                    if new_total_quantity > 0:
-                        master_item.current_cost = (current_value + new_value) / new_total_quantity
 
         db.commit()
 

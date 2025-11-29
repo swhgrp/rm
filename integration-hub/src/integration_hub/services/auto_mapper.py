@@ -166,29 +166,85 @@ class AutoMapperService:
 
     def match_by_previous_mapping(self, item: HubInvoiceItem) -> Optional[Tuple[Dict, float]]:
         """
-        Match by exact description from previous manual mappings
+        Match by exact description OR item code from previous manual mappings
         This is the HIGHEST priority - if user previously mapped this exact item, reuse it
+
+        Checks:
+        1. First by item_code via item_code_mapping -> invoice_item_mapping
+        2. Then by exact description in invoice_item_mapping table
+        3. Fallback to old ItemGLMapping table for backward compatibility
         """
-        if not item.item_description:
-            return None
+        from sqlalchemy import text as sql_text
 
-        # Query the mapping table for exact description match
-        previous_mapping = self.db.query(ItemGLMapping).filter(
-            ItemGLMapping.inventory_item_name == item.item_description,
-            ItemGLMapping.is_active == True
-        ).first()
+        # FIRST: Try to match by item code (most reliable - item codes don't have OCR variations)
+        if item.item_code:
+            # Get canonical description for this item code, then look up mapping by that description
+            result = self.db.execute(
+                sql_text("""
+                    SELECT iim.inventory_item_id, iim.inventory_item_name, iim.inventory_category,
+                           iim.gl_asset_account, iim.gl_cogs_account, iim.gl_waste_account, iim.vendor_id
+                    FROM item_code_mapping icm
+                    JOIN invoice_item_mapping iim ON iim.item_description = icm.canonical_description
+                    WHERE icm.item_code = :item_code AND iim.is_active = true
+                """),
+                {"item_code": item.item_code}
+            ).fetchone()
 
-        if previous_mapping:
-            return ({
-                'id': previous_mapping.inventory_item_id,
-                'name': previous_mapping.inventory_item_name,
-                'category': previous_mapping.inventory_category,
-                'vendor_id': previous_mapping.vendor_id,
-                'vendor_item_code': previous_mapping.vendor_item_code,
-                'gl_asset_account': previous_mapping.gl_asset_account,
-                'gl_cogs_account': previous_mapping.gl_cogs_account,
-                'gl_waste_account': previous_mapping.gl_waste_account
-            }, 1.0)  # Perfect match - previously mapped by user
+            if result:
+                logger.info(f"Matched item {item.id} by item_code {item.item_code}")
+                return ({
+                    'id': result[0],  # inventory_item_id
+                    'name': result[1] or item.item_description,  # inventory_item_name
+                    'category': result[2],  # inventory_category
+                    'vendor_id': result[6],  # vendor_id
+                    'vendor_item_code': item.item_code,
+                    'gl_asset_account': result[3],  # gl_asset_account
+                    'gl_cogs_account': result[4],  # gl_cogs_account
+                    'gl_waste_account': result[5]  # gl_waste_account
+                }, 1.0)  # Perfect match - item code matched
+
+        # SECOND: Query the invoice_item_mapping table for exact description match
+        if item.item_description:
+            result = self.db.execute(
+                sql_text("""
+                    SELECT inventory_item_id, inventory_item_name, inventory_category,
+                           gl_asset_account, gl_cogs_account, gl_waste_account, vendor_id
+                    FROM invoice_item_mapping
+                    WHERE item_description = :desc AND is_active = true
+                """),
+                {"desc": item.item_description}
+            ).fetchone()
+
+            if result:
+                return ({
+                    'id': result[0],  # inventory_item_id
+                    'name': result[1] or item.item_description,  # inventory_item_name
+                    'category': result[2],  # inventory_category
+                    'vendor_id': result[6],  # vendor_id
+                    'vendor_item_code': None,
+                    'gl_asset_account': result[3],  # gl_asset_account
+                    'gl_cogs_account': result[4],  # gl_cogs_account
+                    'gl_waste_account': result[5]  # gl_waste_account
+                }, 1.0)  # Perfect match - previously mapped by user
+
+        # THIRD: Fallback to old ItemGLMapping table for backward compatibility
+        if item.item_description:
+            previous_mapping = self.db.query(ItemGLMapping).filter(
+                ItemGLMapping.inventory_item_name == item.item_description,
+                ItemGLMapping.is_active == True
+            ).first()
+
+            if previous_mapping:
+                return ({
+                    'id': previous_mapping.inventory_item_id,
+                    'name': previous_mapping.inventory_item_name,
+                    'category': previous_mapping.inventory_category,
+                    'vendor_id': previous_mapping.vendor_id,
+                    'vendor_item_code': previous_mapping.vendor_item_code,
+                    'gl_asset_account': previous_mapping.gl_asset_account,
+                    'gl_cogs_account': previous_mapping.gl_cogs_account,
+                    'gl_waste_account': previous_mapping.gl_waste_account
+                }, 1.0)  # Perfect match - previously mapped by user
 
         return None
 

@@ -76,10 +76,12 @@
         .sidebar-nav a {
             display: block;
             padding: 12px 20px;
+            padding-left: 17px;
             color: #8b949e;
             text-decoration: none;
             font-size: 14px;
-            transition: all 0.2s;
+            transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+            border-left: 3px solid transparent;
         }
 
         .sidebar-nav i {
@@ -93,8 +95,7 @@
         .sidebar-nav a.active {
             background-color: #21262d;
             color: #58a6ff;
-            border-left: 3px solid #58a6ff;
-            padding-left: 17px;
+            border-left-color: #58a6ff;
         }
 
         /* Submenu styles */

@@ -1,0 +1,819 @@
+{% extends "base.html" %}
+
+{% block title %}Storage Areas - Restaurant Inventory{% endblock %}
+
+{% block head %}
+<style>
+    /* Accordion styling for dark mode */
+    .accordion-item {
+        background-color: #161b22;
+        border-color: #30363d !important;
+    }
+
+    .accordion-button {
+        background-color: #21262d;
+        color: #c9d1d9;
+        border: none;
+        box-shadow: none;
+    }
+
+    .accordion-button:not(.collapsed) {
+        background-color: #21262d;
+        color: #58a6ff;
+    }
+
+    .accordion-button:focus {
+        box-shadow: none;
+        border-color: transparent;
+    }
+
+    .accordion-button::after {
+        filter: invert(1);
+    }
+
+    .accordion-body {
+        background-color: #0d1117;
+        padding: 0;
+    }
+
+    .accordion-collapse {
+        border-top: 1px solid #30363d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-grid"></i> Storage Areas</h1>
+    <button class="btn btn-primary" onclick="showCreateStorageAreaModal()" id="addStorageAreaBtn">
+        <i class="bi bi-plus-circle"></i> Add Storage Area
+    </button>
+</div>
+
+<!-- Location Filter -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row align-items-end">
+            <div class="col-md-4">
+                <label for="locationFilter" class="form-label fw-bold">Select Location</label>
+                <select class="form-select form-select-lg" id="locationFilter" onchange="onLocationChange()">
+                    <option value="">-- Select a Location --</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label for="searchItems" class="form-label">Search Items</label>
+                <input type="text" class="form-control" id="searchItems" placeholder="Search by item name..." oninput="filterDisplayedItems()">
+            </div>
+            <div class="col-md-4 text-end">
+                <span id="locationStats" class="text-muted"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- No Location Selected Message -->
+<div id="noLocationMessage" class="card">
+    <div class="card-body text-center py-5">
+        <i class="bi bi-geo-alt display-1 text-muted"></i>
+        <h4 class="mt-3">Select a Location</h4>
+        <p class="text-muted">Choose a location from the dropdown above to view and manage its storage areas.</p>
+    </div>
+</div>
+
+<!-- Storage Areas Container -->
+<div id="storageAreasContainer" style="display: none;">
+    <!-- Storage areas will be rendered here -->
+</div>
+
+<!-- Create/Edit Storage Area Modal -->
+<div class="modal fade" id="storageAreaModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="storageAreaModalTitle">Add Storage Area</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="storageAreaForm">
+                    <div class="mb-3">
+                        <label for="storageAreaLocation" class="form-label">Location *</label>
+                        <select class="form-select" id="storageAreaLocation" required>
+                            <option value="">Select location...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="storageAreaName" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="storageAreaName" required placeholder="e.g. Main Bar, Walk-in Cooler">
+                    </div>
+                    <div class="mb-3">
+                        <label for="storageAreaDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="storageAreaDescription" rows="2" placeholder="Optional description..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveStorageArea()">Save Storage Area</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Add Items Modal -->
+<div class="modal fade" id="bulkAddItemsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-plus-square"></i> Add Items to <span id="bulkAddStorageAreaName"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Search and Filter -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" id="bulkItemSearch" placeholder="Search items..." oninput="filterBulkItems()">
+                    </div>
+                    <div class="col-md-4">
+                        <select class="form-select" id="bulkCategoryFilter" onchange="filterBulkItems()">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-outline-secondary w-100" onclick="clearBulkSelection()">Clear</button>
+                    </div>
+                </div>
+
+                <!-- Selection Summary -->
+                <div class="alert alert-info py-2 mb-3">
+                    <i class="bi bi-check2-square"></i> <span id="bulkSelectionCount">0</span> items selected
+                    <button class="btn btn-sm btn-outline-primary float-end" onclick="selectAllVisible()">Select All Visible</button>
+                </div>
+
+                <!-- Items List -->
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover table-sm">
+                        <thead class="table-dark sticky-top">
+                            <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" class="form-check-input" id="selectAllCheckbox" onchange="toggleSelectAll()">
+                                </th>
+                                <th>Item Name</th>
+                                <th>Category</th>
+                                <th>Unit</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bulkItemsTableBody">
+                            <tr>
+                                <td colspan="4" class="text-center py-3">Loading items...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="saveBulkItems()">
+                    <i class="bi bi-plus-circle"></i> Add Selected Items
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Global state
+let locations = [];
+let storageAreas = [];
+let allItems = [];
+let categories = [];
+let selectedLocationId = null;
+let currentEditStorageAreaId = null;
+let bulkAddStorageAreaId = null;
+let selectedBulkItems = new Set();
+let expandedAreas = new Set(); // Track which storage areas are expanded
+
+// API helper
+async function apiRequest(url, options = {}) {
+    const token = localStorage.getItem('access_token');
+    const defaultOptions = {
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    };
+
+    const response = await fetch(url, { ...defaultOptions, ...options });
+
+    if (response.status === 401) {
+        localStorage.clear();
+        window.location.href = '/portal/login';
+        throw new Error('Unauthorized');
+    }
+
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+        throw new Error(error.detail || 'Request failed');
+    }
+
+    return await response.json();
+}
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', async function() {
+    if (!isAuthenticated()) {
+        window.location.href = '/portal/login';
+        return;
+    }
+
+    await loadInitialData();
+
+    // Restore last selected location from localStorage
+    const savedLocationId = localStorage.getItem('storageAreas_selectedLocation');
+    if (savedLocationId) {
+        document.getElementById('locationFilter').value = savedLocationId;
+        onLocationChange();
+    }
+});
+
+async function loadInitialData() {
+    try {
+        // Load locations, items, and categories in parallel
+        const [locationsResponse, itemsResponse, categoriesResponse] = await Promise.all([
+            apiRequest('api/locations/'),
+            apiRequest('api/items/?limit=10000'),
+            apiRequest('api/categories/')
+        ]);
+
+        locations = locationsResponse.filter(l => l.is_active);
+        allItems = itemsResponse.filter(i => i.is_active);
+        categories = categoriesResponse;
+
+        populateLocationDropdowns();
+        populateCategoryFilter();
+
+    } catch (error) {
+        console.error('Error loading initial data:', error);
+        showAlert('Error loading data: ' + error.message, 'danger');
+    }
+}
+
+function populateLocationDropdowns() {
+    // Main filter dropdown
+    const filterSelect = document.getElementById('locationFilter');
+    filterSelect.innerHTML = '<option value="">-- Select a Location --</option>';
+
+    // Modal dropdown
+    const modalSelect = document.getElementById('storageAreaLocation');
+    modalSelect.innerHTML = '<option value="">Select location...</option>';
+
+    locations.forEach(loc => {
+        filterSelect.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+        modalSelect.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+    });
+}
+
+function populateCategoryFilter() {
+    const select = document.getElementById('bulkCategoryFilter');
+    select.innerHTML = '<option value="">All Categories</option>';
+
+    // Get unique categories from items
+    const uniqueCategories = [...new Set(allItems.map(i => i.category).filter(Boolean))].sort();
+    uniqueCategories.forEach(cat => {
+        select.innerHTML += `<option value="${cat}">${cat}</option>`;
+    });
+}
+
+async function onLocationChange() {
+    const locationId = document.getElementById('locationFilter').value;
+    selectedLocationId = locationId ? parseInt(locationId) : null;
+
+    // Save selection
+    if (locationId) {
+        localStorage.setItem('storageAreas_selectedLocation', locationId);
+    } else {
+        localStorage.removeItem('storageAreas_selectedLocation');
+    }
+
+    if (!selectedLocationId) {
+        document.getElementById('noLocationMessage').style.display = 'block';
+        document.getElementById('storageAreasContainer').style.display = 'none';
+        document.getElementById('locationStats').textContent = '';
+        return;
+    }
+
+    document.getElementById('noLocationMessage').style.display = 'none';
+    document.getElementById('storageAreasContainer').style.display = 'block';
+    document.getElementById('storageAreasContainer').innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border" role="status"></div>
+            <p class="mt-2">Loading storage areas...</p>
+        </div>
+    `;
+
+    await loadStorageAreasForLocation(selectedLocationId);
+}
+
+async function loadStorageAreasForLocation(locationId) {
+    try {
+        // Load storage areas for this location
+        storageAreas = await apiRequest(`api/storage-areas/?location_id=${locationId}`);
+
+        // Load items for each storage area
+        const storageAreaItemPromises = storageAreas.map(sa =>
+            apiRequest(`api/storage-areas/${sa.id}/items`).then(items => ({ id: sa.id, items }))
+        );
+
+        const storageAreaItems = await Promise.all(storageAreaItemPromises);
+
+        // Attach items to storage areas
+        storageAreas.forEach(sa => {
+            const itemData = storageAreaItems.find(sai => sai.id === sa.id);
+            sa.items = itemData ? itemData.items : [];
+        });
+
+        // Update stats
+        const totalItems = storageAreas.reduce((sum, sa) => sum + sa.items.length, 0);
+        document.getElementById('locationStats').innerHTML = `
+            <span class="badge bg-primary me-2">${storageAreas.length} storage areas</span>
+            <span class="badge bg-secondary">${totalItems} items configured</span>
+        `;
+
+        renderStorageAreas();
+
+    } catch (error) {
+        console.error('Error loading storage areas:', error);
+        document.getElementById('storageAreasContainer').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> Error loading storage areas: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function renderStorageAreas() {
+    const container = document.getElementById('storageAreasContainer');
+    const searchTerm = document.getElementById('searchItems').value.toLowerCase();
+
+    if (storageAreas.length === 0) {
+        container.innerHTML = `
+            <div class="card">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-archive display-1 text-muted"></i>
+                    <h4 class="mt-3">No Storage Areas</h4>
+                    <p class="text-muted">This location doesn't have any storage areas yet.</p>
+                    <button class="btn btn-primary" onclick="showCreateStorageAreaModal()">
+                        <i class="bi bi-plus-circle"></i> Create First Storage Area
+                    </button>
+                </div>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '<div class="accordion" id="storageAreasAccordion">';
+
+    storageAreas.forEach((sa, index) => {
+        // Filter items based on search
+        let filteredItems = sa.items;
+        if (searchTerm) {
+            filteredItems = sa.items.filter(item =>
+                item.item_name.toLowerCase().includes(searchTerm)
+            );
+        }
+
+        const collapseId = `collapse-${sa.id}`;
+        const isExpanded = expandedAreas.has(sa.id);
+
+        html += `
+            <div class="accordion-item mb-2 border rounded">
+                <h2 class="accordion-header">
+                    <div class="d-flex align-items-center bg-dark rounded-top">
+                        <button class="accordion-button ${isExpanded ? '' : 'collapsed'} flex-grow-1 py-2" type="button"
+                                data-bs-toggle="collapse" data-bs-target="#${collapseId}"
+                                aria-expanded="${isExpanded}" aria-controls="${collapseId}"
+                                onclick="toggleExpandedArea(${sa.id})">
+                            <i class="bi bi-archive text-primary me-2"></i>
+                            <strong>${sa.name}</strong>
+                            <span class="badge bg-secondary ms-2">${sa.items.length} items</span>
+                            ${sa.description ? `<small class="text-muted ms-3">${sa.description}</small>` : ''}
+                        </button>
+                        <div class="btn-group me-2" onclick="event.stopPropagation();">
+                            <button class="btn btn-success btn-sm" onclick="showBulkAddItemsModal(${sa.id}, '${sa.name.replace(/'/g, "\\'")}')" title="Add Items">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                            <button class="btn btn-outline-primary btn-sm" onclick="editStorageArea(${sa.id})" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-outline-danger btn-sm" onclick="deleteStorageArea(${sa.id})" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </h2>
+                <div id="${collapseId}" class="accordion-collapse collapse ${isExpanded ? 'show' : ''}" data-bs-parent="#storageAreasAccordion">
+                    <div class="accordion-body p-0">
+                        ${filteredItems.length === 0 ? `
+                            <div class="text-center py-3 text-muted">
+                                ${searchTerm ? '<i class="bi bi-search"></i> No items match your search' : '<i class="bi bi-inbox"></i> No items configured. Click + to add items.'}
+                            </div>
+                        ` : `
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm mb-0">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th style="width: 40px;"></th>
+                                            <th>Item Name</th>
+                                            <th>Category</th>
+                                            <th>Unit</th>
+                                            <th style="width: 60px;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="sortable-items" data-storage-area-id="${sa.id}">
+                                        ${filteredItems.map((item, index) => `
+                                            <tr class="sortable-row" data-item-id="${item.id}" data-master-item-id="${item.master_item_id}">
+                                                <td class="text-center drag-handle" style="cursor: move;">
+                                                    <i class="bi bi-grip-vertical text-muted"></i>
+                                                </td>
+                                                <td><strong>${item.item_name}</strong></td>
+                                                <td><span class="badge bg-light text-dark">${item.item_category || '-'}</span></td>
+                                                <td>${item.item_unit || 'Each'}</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-danger" onclick="removeItemFromStorageArea(${sa.id}, ${item.id})" title="Remove">
+                                                        <i class="bi bi-x"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += '</div>';
+    container.innerHTML = html;
+
+    // Initialize drag-and-drop
+    initializeDragAndDrop();
+}
+
+function filterDisplayedItems() {
+    renderStorageAreas();
+}
+
+function toggleExpandedArea(storageAreaId) {
+    if (expandedAreas.has(storageAreaId)) {
+        expandedAreas.delete(storageAreaId);
+    } else {
+        expandedAreas.add(storageAreaId);
+    }
+}
+
+// ========== DRAG AND DROP ==========
+function initializeDragAndDrop() {
+    const sortableTables = document.querySelectorAll('.sortable-items');
+
+    sortableTables.forEach(tbody => {
+        let draggedRow = null;
+
+        tbody.querySelectorAll('.sortable-row').forEach(row => {
+            row.setAttribute('draggable', true);
+
+            row.addEventListener('dragstart', function(e) {
+                draggedRow = this;
+                this.style.opacity = '0.5';
+                e.dataTransfer.effectAllowed = 'move';
+            });
+
+            row.addEventListener('dragend', function(e) {
+                this.style.opacity = '1';
+                draggedRow = null;
+            });
+
+            row.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+
+                if (this !== draggedRow) {
+                    const rect = this.getBoundingClientRect();
+                    const midpoint = rect.top + rect.height / 2;
+
+                    if (e.clientY < midpoint) {
+                        this.parentNode.insertBefore(draggedRow, this);
+                    } else {
+                        this.parentNode.insertBefore(draggedRow, this.nextSibling);
+                    }
+                }
+            });
+
+            row.addEventListener('drop', function(e) {
+                e.stopPropagation();
+                saveItemOrder(tbody);
+            });
+        });
+    });
+}
+
+async function saveItemOrder(tbody) {
+    const storageAreaId = tbody.getAttribute('data-storage-area-id');
+    const rows = Array.from(tbody.querySelectorAll('.sortable-row'));
+
+    const reorderData = rows.map((row, index) => ({
+        item_id: parseInt(row.getAttribute('data-item-id')),
+        display_order: index + 1
+    }));
+
+    try {
+        await apiRequest(`api/storage-areas/${storageAreaId}/items/reorder`, {
+            method: 'PUT',
+            body: JSON.stringify(reorderData)
+        });
+        showAlert('Item order saved!', 'success');
+    } catch (error) {
+        console.error('Error saving item order:', error);
+        showAlert('Error saving order: ' + error.message, 'danger');
+        await loadStorageAreasForLocation(selectedLocationId);
+    }
+}
+
+// ========== STORAGE AREA CRUD ==========
+function showCreateStorageAreaModal() {
+    currentEditStorageAreaId = null;
+    document.getElementById('storageAreaModalTitle').textContent = 'Add Storage Area';
+    document.getElementById('storageAreaForm').reset();
+
+    // Pre-select current location if one is selected
+    if (selectedLocationId) {
+        document.getElementById('storageAreaLocation').value = selectedLocationId;
+    }
+
+    new bootstrap.Modal(document.getElementById('storageAreaModal')).show();
+}
+
+function editStorageArea(id) {
+    const area = storageAreas.find(sa => sa.id === id);
+    if (!area) return;
+
+    currentEditStorageAreaId = id;
+    document.getElementById('storageAreaModalTitle').textContent = 'Edit Storage Area';
+    document.getElementById('storageAreaName').value = area.name;
+    document.getElementById('storageAreaLocation').value = area.location_id;
+    document.getElementById('storageAreaDescription').value = area.description || '';
+
+    new bootstrap.Modal(document.getElementById('storageAreaModal')).show();
+}
+
+async function saveStorageArea() {
+    const name = document.getElementById('storageAreaName').value.trim();
+    const locationId = document.getElementById('storageAreaLocation').value;
+    const description = document.getElementById('storageAreaDescription').value.trim();
+
+    if (!name || !locationId) {
+        showAlert('Please fill in all required fields', 'warning');
+        return;
+    }
+
+    try {
+        const data = { name, location_id: parseInt(locationId), description, is_active: true };
+
+        if (currentEditStorageAreaId) {
+            await apiRequest(`api/storage-areas/${currentEditStorageAreaId}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+            showAlert('Storage area updated successfully', 'success');
+        } else {
+            await apiRequest('api/storage-areas/', {
+                method: 'POST',
+                body: JSON.stringify(data)
+            });
+            showAlert('Storage area created successfully', 'success');
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('storageAreaModal')).hide();
+
+        // Refresh the current location's storage areas
+        if (selectedLocationId) {
+            await loadStorageAreasForLocation(selectedLocationId);
+        }
+
+    } catch (error) {
+        showAlert('Error saving storage area: ' + error.message, 'danger');
+    }
+}
+
+async function deleteStorageArea(id) {
+    const area = storageAreas.find(sa => sa.id === id);
+    if (!area) return;
+
+    if (!await showConfirm(`Delete storage area "${area.name}"? This will remove all item assignments.`)) {
+        return;
+    }
+
+    try {
+        await apiRequest(`api/storage-areas/${id}`, { method: 'DELETE' });
+        showAlert('Storage area deleted successfully', 'success');
+        await loadStorageAreasForLocation(selectedLocationId);
+    } catch (error) {
+        showAlert('Error deleting storage area: ' + error.message, 'danger');
+    }
+}
+
+// ========== BULK ADD ITEMS ==========
+function showBulkAddItemsModal(storageAreaId, storageAreaName) {
+    bulkAddStorageAreaId = storageAreaId;
+    selectedBulkItems.clear();
+
+    document.getElementById('bulkAddStorageAreaName').textContent = storageAreaName;
+    document.getElementById('bulkItemSearch').value = '';
+    document.getElementById('bulkCategoryFilter').value = '';
+    document.getElementById('selectAllCheckbox').checked = false;
+    updateBulkSelectionCount();
+
+    // Get items already in this storage area
+    const storageArea = storageAreas.find(sa => sa.id === storageAreaId);
+    const existingItemIds = new Set(storageArea.items.map(i => i.master_item_id));
+
+    // Filter out items already in the storage area
+    const availableItems = allItems.filter(item => !existingItemIds.has(item.id));
+
+    renderBulkItemsTable(availableItems);
+
+    new bootstrap.Modal(document.getElementById('bulkAddItemsModal')).show();
+}
+
+function renderBulkItemsTable(items) {
+    const tbody = document.getElementById('bulkItemsTableBody');
+
+    if (items.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" class="text-center py-3 text-muted">
+                    <i class="bi bi-inbox"></i> No available items to add
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = items.map(item => `
+        <tr class="bulk-item-row" data-item-id="${item.id}">
+            <td>
+                <input type="checkbox" class="form-check-input bulk-item-checkbox"
+                       value="${item.id}"
+                       ${selectedBulkItems.has(item.id) ? 'checked' : ''}
+                       onchange="toggleBulkItem(${item.id})">
+            </td>
+            <td><strong>${item.name}</strong></td>
+            <td><span class="badge bg-light text-dark">${item.category || '-'}</span></td>
+            <td>${item.unit_name || item.unit_of_measure || 'Each'}</td>
+        </tr>
+    `).join('');
+}
+
+function filterBulkItems() {
+    const searchTerm = document.getElementById('bulkItemSearch').value.toLowerCase();
+    const categoryFilter = document.getElementById('bulkCategoryFilter').value;
+
+    // Get items already in this storage area
+    const storageArea = storageAreas.find(sa => sa.id === bulkAddStorageAreaId);
+    const existingItemIds = new Set(storageArea.items.map(i => i.master_item_id));
+
+    let filteredItems = allItems.filter(item => !existingItemIds.has(item.id));
+
+    if (searchTerm) {
+        filteredItems = filteredItems.filter(item =>
+            item.name.toLowerCase().includes(searchTerm)
+        );
+    }
+
+    if (categoryFilter) {
+        filteredItems = filteredItems.filter(item => item.category === categoryFilter);
+    }
+
+    renderBulkItemsTable(filteredItems);
+}
+
+function toggleBulkItem(itemId) {
+    if (selectedBulkItems.has(itemId)) {
+        selectedBulkItems.delete(itemId);
+    } else {
+        selectedBulkItems.add(itemId);
+    }
+    updateBulkSelectionCount();
+}
+
+function toggleSelectAll() {
+    const checkbox = document.getElementById('selectAllCheckbox');
+    const visibleCheckboxes = document.querySelectorAll('.bulk-item-checkbox');
+
+    visibleCheckboxes.forEach(cb => {
+        const itemId = parseInt(cb.value);
+        if (checkbox.checked) {
+            selectedBulkItems.add(itemId);
+            cb.checked = true;
+        } else {
+            selectedBulkItems.delete(itemId);
+            cb.checked = false;
+        }
+    });
+
+    updateBulkSelectionCount();
+}
+
+function selectAllVisible() {
+    const visibleCheckboxes = document.querySelectorAll('.bulk-item-checkbox');
+    visibleCheckboxes.forEach(cb => {
+        const itemId = parseInt(cb.value);
+        selectedBulkItems.add(itemId);
+        cb.checked = true;
+    });
+    document.getElementById('selectAllCheckbox').checked = true;
+    updateBulkSelectionCount();
+}
+
+function clearBulkSelection() {
+    selectedBulkItems.clear();
+    document.querySelectorAll('.bulk-item-checkbox').forEach(cb => cb.checked = false);
+    document.getElementById('selectAllCheckbox').checked = false;
+    document.getElementById('bulkItemSearch').value = '';
+    document.getElementById('bulkCategoryFilter').value = '';
+    filterBulkItems();
+    updateBulkSelectionCount();
+}
+
+function updateBulkSelectionCount() {
+    document.getElementById('bulkSelectionCount').textContent = selectedBulkItems.size;
+}
+
+async function saveBulkItems() {
+    if (selectedBulkItems.size === 0) {
+        showAlert('Please select at least one item to add', 'warning');
+        return;
+    }
+
+    try {
+        // Add each item to the storage area
+        const promises = Array.from(selectedBulkItems).map(itemId =>
+            apiRequest(`api/storage-areas/${bulkAddStorageAreaId}/items/${itemId}`, {
+                method: 'POST'
+            }).catch(err => {
+                console.error(`Error adding item ${itemId}:`, err);
+                return null; // Continue with other items even if one fails
+            })
+        );
+
+        const results = await Promise.all(promises);
+        const successCount = results.filter(r => r !== null).length;
+
+        bootstrap.Modal.getInstance(document.getElementById('bulkAddItemsModal')).hide();
+
+        if (successCount === selectedBulkItems.size) {
+            showAlert(`Successfully added ${successCount} items to storage area`, 'success');
+        } else {
+            showAlert(`Added ${successCount} of ${selectedBulkItems.size} items (some may have already existed)`, 'warning');
+        }
+
+        // Refresh storage areas
+        await loadStorageAreasForLocation(selectedLocationId);
+
+    } catch (error) {
+        showAlert('Error adding items: ' + error.message, 'danger');
+    }
+}
+
+// ========== REMOVE ITEM ==========
+async function removeItemFromStorageArea(storageAreaId, itemId) {
+    const storageArea = storageAreas.find(sa => sa.id === storageAreaId);
+    const item = storageArea?.items.find(i => i.id === itemId);
+
+    if (!await showConfirm(`Remove "${item?.item_name || 'this item'}" from ${storageArea?.name || 'storage area'}?`)) {
+        return;
+    }
+
+    try {
+        await apiRequest(`api/storage-areas/${storageAreaId}/items/${itemId}`, {
+            method: 'DELETE'
+        });
+        showAlert('Item removed from storage area', 'success');
+        await loadStorageAreasForLocation(selectedLocationId);
+    } catch (error) {
+        showAlert('Error removing item: ' + error.message, 'danger');
+    }
+}
+
+// Check authentication
+function isAuthenticated() {
+    return !!localStorage.getItem('access_token');
+}
+</script>
+{% endblock %}

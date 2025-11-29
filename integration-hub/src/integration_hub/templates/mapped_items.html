@@ -169,20 +169,9 @@
                             <label class="form-label">Category <span class="text-danger">*</span></label>
                             <select class="form-select" id="inventoryCategory" name="inventory_category">
                                 <option value="">-- Select category --</option>
-                                <option value="Beer - Bottled">Beer - Bottled</option>
-                                <option value="Beer - Draft">Beer - Draft</option>
-                                <option value="Beverage - Non-Alcohol">Beverage - Non-Alcohol</option>
-                                <option value="Food - Beef">Food - Beef</option>
-                                <option value="Food - Dairy">Food - Dairy</option>
-                                <option value="Food - Dry Goods">Food - Dry Goods</option>
-                                <option value="Food - Frozen">Food - Frozen</option>
-                                <option value="Food - Pork">Food - Pork</option>
-                                <option value="Food - Poultry">Food - Poultry</option>
-                                <option value="Food - Produce">Food - Produce</option>
-                                <option value="Food - Seafood">Food - Seafood</option>
-                                <option value="Liquor">Liquor</option>
-                                <option value="Merchandise">Merchandise</option>
-                                <option value="Wine">Wine</option>
+                                {% for cat in category_mappings %}
+                                <option value="{{ cat.inventory_category }}">{{ cat.inventory_category }}</option>
+                                {% endfor %}
                             </select>
                             <small class="text-muted">GL accounts will be automatically assigned based on category mapping</small>
                         </div>

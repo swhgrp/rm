@@ -59,6 +59,17 @@ class MasterItem(Base):
     unit = relationship("UnitOfMeasure", foreign_keys=[unit_of_measure_id], backref="master_items_primary")
     secondary_unit_rel = relationship("UnitOfMeasure", foreign_keys=[secondary_unit_id], backref="master_items_secondary")
 
+    # Key Item flag - highlight important items for tracking
+    is_key_item = Column(Boolean, default=False)
+
+    # Additional count units (for flexible counting - e.g., count by case OR by each)
+    count_unit_2_id = Column(Integer, ForeignKey("units_of_measure.id"), nullable=True)
+    count_unit_3_id = Column(Integer, ForeignKey("units_of_measure.id"), nullable=True)
+
+    # Relationships for additional count units
+    count_unit_2 = relationship("UnitOfMeasure", foreign_keys=[count_unit_2_id], backref="master_items_count2")
+    count_unit_3 = relationship("UnitOfMeasure", foreign_keys=[count_unit_3_id], backref="master_items_count3")
+
     # Status
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

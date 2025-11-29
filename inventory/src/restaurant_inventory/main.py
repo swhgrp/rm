@@ -296,7 +296,7 @@ async def invoices_page(request: Request):
 @app.get("/storage-areas", response_class=HTMLResponse)
 async def storage_areas_page(request: Request):
     """Storage areas management page"""
-    return templates.TemplateResponse("inventory.html", {"request": request})
+    return templates.TemplateResponse("storage_areas.html", {"request": request})
 
 @app.get("/count", response_class=HTMLResponse)
 async def count_session_page(request: Request):
@@ -352,6 +352,11 @@ async def categories_page(request: Request):
 async def master_items_page(request: Request):
     """Master Items management page"""
     return templates.TemplateResponse("master_items.html", {"request": request})
+
+@app.get("/item-detail", response_class=HTMLResponse)
+async def item_detail_page(request: Request):
+    """Item detail page - unified view of master item with all vendors and details"""
+    return templates.TemplateResponse("item_detail.html", {"request": request})
 
 @app.get("/vendor-items", response_class=HTMLResponse)
 async def vendor_items_page(request: Request):

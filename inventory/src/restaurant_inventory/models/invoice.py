@@ -57,7 +57,7 @@ class Invoice(Base):
     anomalies = Column(JSON, nullable=True)  # List of detected issues
 
     # Audit fields
-    uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    uploaded_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)  # Nullable for hub imports
     reviewed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     approved_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
 

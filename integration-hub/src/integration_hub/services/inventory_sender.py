@@ -148,7 +148,8 @@ class InventorySenderService:
                 continue
 
             item_payload = {
-                "inventory_item_id": item.inventory_item_id,
+                "inventory_item_id": item.inventory_item_id,  # This is actually vendor_item_id
+                "item_code": item.item_code,  # Vendor's item code from invoice
                 "description": item.item_description,
                 "quantity": float(item.quantity),
                 "unit_of_measure": item.unit_of_measure,

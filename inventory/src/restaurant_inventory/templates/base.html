@@ -161,10 +161,12 @@
         .sidebar-nav a {
             display: block;
             padding: 12px 20px;
+            padding-left: 17px;
             color: #8b949e;
             text-decoration: none;
             font-size: 14px;
             transition: all 0.2s;
+            border-left: 3px solid transparent;
         }
 
         .sidebar-nav a:hover,
@@ -172,7 +174,6 @@
             background-color: #21262d;
             color: #58a6ff;
             border-left: 3px solid #58a6ff;
-            padding-left: 17px;
         }
 
         .sidebar-nav i {
@@ -197,11 +198,12 @@
         }
 
         .submenu li a {
-            padding-left: 50px;
+            padding-left: 47px;
             font-size: 13px;
             color: #8b949e;
             white-space: normal;
             line-height: 1.4;
+            border-left: 3px solid transparent;
         }
 
         .submenu li a:hover,
@@ -209,7 +211,6 @@
             background-color: #21262d;
             color: #58a6ff;
             border-left: 3px solid #58a6ff;
-            padding-left: 47px;
         }
 
         .nav-section-toggle {
@@ -613,7 +614,6 @@
                 <li><a href="count"><i class="bi bi-clipboard-check"></i> Take Inventory</a></li>
                 <li><a href="count/history"><i class="bi bi-clock-history"></i> Count History</a></li>
                 <li><a href="storage-areas"><i class="bi bi-grid"></i> Storage Areas</a></li>
-                <li><a href="categories"><i class="bi bi-tags"></i> Categories</a></li>
                 <li><a href="master-items"><i class="bi bi-box"></i> Master Items</a></li>
                 <li><a href="vendor-items"><i class="bi bi-truck"></i> Vendor Items</a></li>
                 <li><a href="inventory-movements"><i class="bi bi-arrow-left-right"></i> Inventory Movements</a></li>
@@ -722,7 +722,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
 
     <!-- Custom JavaScript -->
-    <script src="/inventory/static/js/auth.js?v=3"></script>
+    <script src="/inventory/static/js/auth.js?v=4"></script>
     <script src="/inventory/static/js/main.js"></script>
 
     <!-- Sidebar Toggle Script -->

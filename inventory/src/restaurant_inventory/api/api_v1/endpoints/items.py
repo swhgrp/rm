@@ -140,13 +140,100 @@ async def get_master_item(
     current_user: User = Depends(get_current_user)
 ):
     """Get specific master item by ID"""
-    item = db.query(MasterItem).filter(MasterItem.id == item_id).first()
+    item = db.query(MasterItem).options(
+        joinedload(MasterItem.unit),
+        joinedload(MasterItem.secondary_unit_rel),
+        joinedload(MasterItem.count_unit_2),
+        joinedload(MasterItem.count_unit_3)
+    ).filter(MasterItem.id == item_id).first()
+
     if not item:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Master item not found"
         )
-    return item
+
+    # Build response with unit names
+    item_dict = MasterItemResponse.from_orm(item).dict()
+    item_dict['unit_of_measure'] = item.unit.name if item.unit else item.unit_of_measure
+    item_dict['unit_name'] = item.unit.name if item.unit else item.unit_of_measure
+    item_dict['secondary_unit_name'] = item.secondary_unit_rel.name if item.secondary_unit_rel else item.secondary_unit
+    item_dict['count_unit_2_name'] = item.count_unit_2.name if item.count_unit_2 else None
+    item_dict['count_unit_3_name'] = item.count_unit_3.name if item.count_unit_3 else None
+
+    return item_dict
+
+@router.get("/{item_id}/location-costs")
+async def get_item_location_costs(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Get cost comparison by location for a master item"""
+    from sqlalchemy import func, desc
+    from restaurant_inventory.models.invoice import Invoice, InvoiceItem
+    from restaurant_inventory.models.location import Location
+
+    # Query invoice items for this master item, grouped by location
+    location_stats = db.query(
+        Location.id.label('location_id'),
+        Location.name.label('location_name'),
+        func.count(InvoiceItem.id).label('invoice_count'),
+        func.avg(InvoiceItem.unit_price).label('avg_price'),
+        func.max(Invoice.invoice_date).label('last_invoice_date')
+    ).join(
+        Invoice, Invoice.id == InvoiceItem.invoice_id
+    ).join(
+        Location, Location.id == Invoice.location_id
+    ).filter(
+        InvoiceItem.master_item_id == item_id
+    ).group_by(
+        Location.id, Location.name
+    ).all()
+
+    if not location_stats:
+        return []
+
+    # Get the last price for each location (most recent invoice)
+    results = []
+    overall_avg = 0
+    total_count = 0
+
+    for stat in location_stats:
+        # Get the most recent price for this location
+        last_item = db.query(InvoiceItem.unit_price).join(
+            Invoice, Invoice.id == InvoiceItem.invoice_id
+        ).filter(
+            InvoiceItem.master_item_id == item_id,
+            Invoice.location_id == stat.location_id
+        ).order_by(desc(Invoice.invoice_date)).first()
+
+        last_price = last_item[0] if last_item else None
+        avg_price = float(stat.avg_price) if stat.avg_price else None
+
+        results.append({
+            'location_id': stat.location_id,
+            'location_name': stat.location_name,
+            'invoice_count': stat.invoice_count,
+            'last_price': last_price,
+            'avg_price': avg_price,
+            'last_invoice_date': stat.last_invoice_date.isoformat() if stat.last_invoice_date else None
+        })
+
+        if avg_price:
+            overall_avg += avg_price * stat.invoice_count
+            total_count += stat.invoice_count
+
+    # Calculate overall average and variance for each location
+    if total_count > 0:
+        overall_avg = overall_avg / total_count
+        for result in results:
+            if result['avg_price'] and overall_avg > 0:
+                result['variance_pct'] = ((result['avg_price'] - overall_avg) / overall_avg) * 100
+            else:
+                result['variance_pct'] = None
+
+    return results
 
 @router.post("/", response_model=MasterItemResponse)
 async def create_master_item(
@@ -1198,3 +1285,266 @@ async def import_master_items(
             os.unlink(temp_path)
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Item Unit Conversions API
+# ============================================================================
+
+@router.get("/{item_id}/unit-conversions")
+async def get_item_unit_conversions(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get all unit conversions for a master item.
+
+    Example response for sausage patties:
+    [
+        {
+            "id": 1,
+            "from_unit": {"id": 5, "name": "Pound", "abbreviation": "LB"},
+            "to_unit": {"id": 1, "name": "Each", "abbreviation": "EA"},
+            "conversion_factor": 8.0,
+            "individual_weight_oz": 2.0,
+            "notes": "2oz patties, 8 per pound"
+        }
+    ]
+    """
+    from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
+    from restaurant_inventory.models.unit_of_measure import UnitOfMeasure
+
+    # Verify item exists
+    item = db.query(MasterItem).filter(MasterItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Master item not found")
+
+    conversions = db.query(ItemUnitConversion).filter(
+        ItemUnitConversion.master_item_id == item_id,
+        ItemUnitConversion.is_active == True
+    ).all()
+
+    result = []
+    for conv in conversions:
+        from_unit = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == conv.from_unit_id).first()
+        to_unit = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == conv.to_unit_id).first()
+
+        result.append({
+            "id": conv.id,
+            "from_unit": {
+                "id": from_unit.id,
+                "name": from_unit.name,
+                "abbreviation": from_unit.abbreviation
+            } if from_unit else None,
+            "to_unit": {
+                "id": to_unit.id,
+                "name": to_unit.name,
+                "abbreviation": to_unit.abbreviation
+            } if to_unit else None,
+            "conversion_factor": float(conv.conversion_factor),
+            "individual_weight_oz": float(conv.individual_weight_oz) if conv.individual_weight_oz else None,
+            "individual_volume_oz": float(conv.individual_volume_oz) if conv.individual_volume_oz else None,
+            "notes": conv.notes
+        })
+
+    return result
+
+
+@router.post("/{item_id}/unit-conversions")
+async def create_item_unit_conversion(
+    item_id: int,
+    from_unit_id: int,
+    to_unit_id: int,
+    conversion_factor: float,
+    individual_weight_oz: float = None,
+    individual_volume_oz: float = None,
+    notes: str = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager_or_admin)
+):
+    """
+    Create a new unit conversion for a master item.
+
+    Example: For 2oz sausage patties:
+    - from_unit_id: Pound
+    - to_unit_id: Each
+    - conversion_factor: 8 (8 patties per pound)
+    - individual_weight_oz: 2 (each patty is 2oz)
+    """
+    from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
+    from restaurant_inventory.models.unit_of_measure import UnitOfMeasure
+
+    # Verify item exists
+    item = db.query(MasterItem).filter(MasterItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Master item not found")
+
+    # Verify units exist
+    from_unit = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == from_unit_id).first()
+    to_unit = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == to_unit_id).first()
+
+    if not from_unit:
+        raise HTTPException(status_code=400, detail="From unit not found")
+    if not to_unit:
+        raise HTTPException(status_code=400, detail="To unit not found")
+
+    # Check for existing conversion
+    existing = db.query(ItemUnitConversion).filter(
+        ItemUnitConversion.master_item_id == item_id,
+        ItemUnitConversion.from_unit_id == from_unit_id,
+        ItemUnitConversion.to_unit_id == to_unit_id
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=400, detail="Conversion already exists for this unit pair")
+
+    conversion = ItemUnitConversion(
+        master_item_id=item_id,
+        from_unit_id=from_unit_id,
+        to_unit_id=to_unit_id,
+        conversion_factor=conversion_factor,
+        individual_weight_oz=individual_weight_oz,
+        individual_volume_oz=individual_volume_oz,
+        notes=notes,
+        is_active=True
+    )
+
+    db.add(conversion)
+    db.commit()
+    db.refresh(conversion)
+
+    return {
+        "id": conversion.id,
+        "from_unit": {
+            "id": from_unit.id,
+            "name": from_unit.name,
+            "abbreviation": from_unit.abbreviation
+        },
+        "to_unit": {
+            "id": to_unit.id,
+            "name": to_unit.name,
+            "abbreviation": to_unit.abbreviation
+        },
+        "conversion_factor": float(conversion.conversion_factor),
+        "individual_weight_oz": float(conversion.individual_weight_oz) if conversion.individual_weight_oz else None,
+        "individual_volume_oz": float(conversion.individual_volume_oz) if conversion.individual_volume_oz else None,
+        "notes": conversion.notes
+    }
+
+
+@router.put("/{item_id}/unit-conversions/{conversion_id}")
+async def update_item_unit_conversion(
+    item_id: int,
+    conversion_id: int,
+    conversion_factor: float = None,
+    individual_weight_oz: float = None,
+    individual_volume_oz: float = None,
+    notes: str = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager_or_admin)
+):
+    """Update an existing unit conversion."""
+    from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
+
+    conversion = db.query(ItemUnitConversion).filter(
+        ItemUnitConversion.id == conversion_id,
+        ItemUnitConversion.master_item_id == item_id
+    ).first()
+
+    if not conversion:
+        raise HTTPException(status_code=404, detail="Conversion not found")
+
+    if conversion_factor is not None:
+        conversion.conversion_factor = conversion_factor
+    if individual_weight_oz is not None:
+        conversion.individual_weight_oz = individual_weight_oz
+    if individual_volume_oz is not None:
+        conversion.individual_volume_oz = individual_volume_oz
+    if notes is not None:
+        conversion.notes = notes
+
+    db.commit()
+    db.refresh(conversion)
+
+    return {"success": True, "id": conversion.id}
+
+
+@router.delete("/{item_id}/unit-conversions/{conversion_id}")
+async def delete_item_unit_conversion(
+    item_id: int,
+    conversion_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager_or_admin)
+):
+    """Delete (deactivate) a unit conversion."""
+    from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
+
+    conversion = db.query(ItemUnitConversion).filter(
+        ItemUnitConversion.id == conversion_id,
+        ItemUnitConversion.master_item_id == item_id
+    ).first()
+
+    if not conversion:
+        raise HTTPException(status_code=404, detail="Conversion not found")
+
+    conversion.is_active = False
+    db.commit()
+
+    return {"success": True}
+
+
+@router.post("/{item_id}/convert")
+async def convert_units(
+    item_id: int,
+    quantity: float,
+    from_unit_id: int,
+    to_unit_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Convert a quantity from one unit to another for a specific item.
+
+    Example: Convert 12 LB of sausage patties to Each
+    - quantity: 12
+    - from_unit_id: Pound ID
+    - to_unit_id: Each ID
+    - Result: 96 (patties)
+    """
+    from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
+
+    # Find the conversion
+    conversion = db.query(ItemUnitConversion).filter(
+        ItemUnitConversion.master_item_id == item_id,
+        ItemUnitConversion.is_active == True,
+        (
+            (ItemUnitConversion.from_unit_id == from_unit_id) &
+            (ItemUnitConversion.to_unit_id == to_unit_id)
+        ) | (
+            (ItemUnitConversion.from_unit_id == to_unit_id) &
+            (ItemUnitConversion.to_unit_id == from_unit_id)
+        )
+    ).first()
+
+    if not conversion:
+        raise HTTPException(
+            status_code=400,
+            detail="No conversion defined between these units for this item"
+        )
+
+    # Calculate conversion
+    if conversion.from_unit_id == from_unit_id:
+        # Converting from -> to (multiply)
+        result = quantity * float(conversion.conversion_factor)
+    else:
+        # Converting to -> from (divide)
+        result = quantity / float(conversion.conversion_factor)
+
+    return {
+        "original_quantity": quantity,
+        "original_unit_id": from_unit_id,
+        "converted_quantity": round(result, 4),
+        "converted_unit_id": to_unit_id,
+        "conversion_factor": float(conversion.conversion_factor)
+    }

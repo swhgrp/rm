@@ -17,11 +17,12 @@ from .count_template import CountTemplate
 from .count_session import CountSession
 from .unit_of_measure import UnitCategory, UnitOfMeasure
 from .role import Role
+from .item_unit_conversion import ItemUnitConversion
 
 __all__ = [
     "Location", "StorageArea", "User", "MasterItem", "VendorItem", "Inventory", "POSSale", "POSSaleItem",
     "InventoryTransaction", "TransactionType", "Transfer",
     "WasteRecord", "AuditLog", "Vendor", "Invoice", "InvoiceItem", "InvoiceStatus",
     "Recipe", "RecipeIngredient", "RecipeCategory", "Category", "CountTemplate", "CountSession",
-    "UnitCategory", "UnitOfMeasure", "Role"
+    "UnitCategory", "UnitOfMeasure", "Role", "ItemUnitConversion"
 ]

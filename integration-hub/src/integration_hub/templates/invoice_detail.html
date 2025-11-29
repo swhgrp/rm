@@ -401,9 +401,7 @@ async function reparseInvoice() {
     .then(response => response.json())
     .then(result => {
         if (result.success && result.processing) {
-            // Parse started successfully in background
-            showAlert('Invoice parsing started in background. Page will refresh automatically when complete.', 'Success');
-
+            // Parse started - button already shows "Processing in background..." so no notification needed
             // Poll for completion every 5 seconds
             let pollCount = 0;
             const maxPolls = 24; // 2 minutes max (24 * 5 seconds)
@@ -418,11 +416,11 @@ async function reparseInvoice() {
                 // Check if items have been parsed (status changed or items exist)
                 if (statusData.items && statusData.items.length > 0) {
                     clearInterval(pollInterval);
-                    showAlert('Parsing complete! Reloading page...', 'Success');
+                    showToast('Parsing complete! Reloading page...', 'Success', 'success');
                     setTimeout(() => location.reload(), 1000);
                 } else if (pollCount >= maxPolls) {
                     clearInterval(pollInterval);
-                    showAlert('Parsing is taking longer than expected. Please refresh the page manually to check results.', 'Info');
+                    showToast('Parsing is taking longer than expected. Please refresh the page manually to check results.', 'Info', 'warning', 10000);
                     if (button) {
                         button.disabled = false;
                         button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-parse Invoice';
@@ -432,7 +430,7 @@ async function reparseInvoice() {
 
         } else if (!result.success) {
             // Parse failed to start
-            showAlert(`Error starting parse: ${result.message || result.detail || 'Unknown error'}`, 'Error');
+            showToast(`Error starting parse: ${result.message || result.detail || 'Unknown error'}`, 'Error', 'error', 10000);
             if (button) {
                 button.disabled = false;
                 button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-parse Invoice';
@@ -441,7 +439,7 @@ async function reparseInvoice() {
     })
     .catch(error => {
         // Network error
-        showAlert(`Network error: ${error.message}`, 'Error');
+        showToast(`Network error: ${error.message}`, 'Error', 'error', 10000);
         if (button) {
             button.disabled = false;
             button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Re-parse Invoice';
@@ -589,51 +587,6 @@ async function retryInvoice(system) {
     }
 }
 
-// Custom alert function using Bootstrap modal (similar to showConfirm)
-function showAlert(message, title = 'Notice') {
-    return new Promise((resolve) => {
-        document.getElementById('confirmTitle').textContent = title;
-        document.getElementById('confirmMessage').textContent = message;
-
-        const modalElement = document.getElementById('confirmModal');
-        const modal = new bootstrap.Modal(modalElement);
-
-        const okBtn = document.getElementById('confirmOkBtn');
-        const cancelBtn = document.getElementById('confirmCancelBtn');
-
-        // Hide cancel button for alerts
-        cancelBtn.style.display = 'none';
-        okBtn.textContent = 'OK';
-        okBtn.disabled = false;
-
-        let resolved = false;
-
-        okBtn.onclick = function(e) {
-            if (!resolved) {
-                resolved = true;
-                modal.hide();
-                setTimeout(() => {
-                    cancelBtn.style.display = '';
-                    okBtn.textContent = 'OK';
-                    resolve(true);
-                }, 100);
-            }
-        };
-
-        modalElement.addEventListener('hidden.bs.modal', function handler() {
-            modalElement.removeEventListener('hidden.bs.modal', handler);
-            if (!resolved) {
-                resolved = true;
-                setTimeout(() => {
-                    cancelBtn.style.display = '';
-                    okBtn.textContent = 'OK';
-                    resolve(true);
-                }, 100);
-            }
-        }, { once: true });
-
-        modal.show();
-    });
-}
+// showAlert and showConfirm are defined in base.html
 </script>
 {% endblock %}

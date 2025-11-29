@@ -24,6 +24,98 @@ from sqlalchemy import text as sql_text
 logger = logging.getLogger(__name__)
 
 
+def to_title_case(text: str) -> str:
+    """
+    Convert text to title case with smart handling for food/restaurant items.
+
+    Handles edge cases:
+    - Preserves common abbreviations (LB, OZ, CS, EA, etc.)
+    - Handles slash/comma separated items
+    - Preserves numbers and units
+    - Handles hyphenated words
+
+    Examples:
+    - "CHICKEN BREAST BNLS SKNLS" -> "Chicken Breast Bnls Sknls"
+    - "BEEF, GROUND 80/20" -> "Beef, Ground 80/20"
+    - "OIL OLIVE EXTRA-VIRGIN" -> "Oil Olive Extra-Virgin"
+    """
+    if not text:
+        return text
+
+    # Common abbreviations/units to preserve in uppercase
+    preserve_upper = {
+        'LB', 'OZ', 'CS', 'EA', 'CT', 'PK', 'BX', 'BG', 'GL', 'QT', 'PT',
+        'GAL', 'PKG', 'DOZ', 'PC', 'SL', 'BTL', 'CAN', 'JAR', 'TUB',
+        'USDA', 'IQF', 'RTU', 'RTE', 'NAE', 'ABF', 'LSRW'
+    }
+
+    # Common words to keep lowercase (unless first word)
+    lowercase_words = {'and', 'or', 'with', 'w/', 'in', 'for', 'of', 'the', 'a', 'an'}
+
+    def process_word(word: str, is_first: bool) -> str:
+        """Process a single word for title casing."""
+        # Skip empty words
+        if not word:
+            return word
+
+        # Check if it's a preserved abbreviation
+        word_upper = word.upper()
+        if word_upper in preserve_upper:
+            return word_upper
+
+        # Check for numbers/fractions (e.g., "80/20", "6x5", "0.75")
+        if any(c.isdigit() for c in word):
+            # Keep as-is if mostly numbers/symbols
+            alpha_count = sum(1 for c in word if c.isalpha())
+            if alpha_count <= 1:
+                return word
+            # Title case the letters, keep numbers
+            result = []
+            capitalize_next = True
+            for c in word:
+                if c.isalpha():
+                    if capitalize_next:
+                        result.append(c.upper())
+                        capitalize_next = False
+                    else:
+                        result.append(c.lower())
+                else:
+                    result.append(c)
+            return ''.join(result)
+
+        # Handle hyphenated words (e.g., "extra-virgin")
+        if '-' in word:
+            parts = word.split('-')
+            return '-'.join(process_word(p, i == 0) for i, p in enumerate(parts))
+
+        # Lowercase words (except if first word)
+        word_lower = word.lower()
+        if not is_first and word_lower in lowercase_words:
+            return word_lower
+
+        # Standard title case
+        return word.capitalize()
+
+    # Split by spaces but preserve original spacing
+    words = text.split(' ')
+    result_words = []
+
+    for i, word in enumerate(words):
+        # Handle comma at end of word
+        suffix = ''
+        if word.endswith(','):
+            suffix = ','
+            word = word[:-1]
+        elif word.endswith('.'):
+            suffix = '.'
+            word = word[:-1]
+
+        processed = process_word(word, i == 0)
+        result_words.append(processed + suffix)
+
+    return ' '.join(result_words)
+
+
 def levenshtein_distance(s1: str, s2: str) -> int:
     """Calculate the Levenshtein distance between two strings."""
     if len(s1) < len(s2):
@@ -730,10 +822,14 @@ class InvoiceParser:
                     logger.warning(f"Line total mismatch for '{item_data.get('description')}': "
                                  f"parsed=${item_data.get('line_total')}, calculated=${calculated_total:.2f}. Using calculated.")
 
+                # Normalize description to title case for consistency
+                raw_description = item_data.get('description') or 'Unknown'
+                normalized_description = to_title_case(raw_description)
+
                 invoice_item = HubInvoiceItem(
                     invoice_id=invoice_id,
                     line_number=item_data.get('line_number'),
-                    item_description=item_data.get('description') or 'Unknown',
+                    item_description=normalized_description,
                     item_code=item_data.get('item_code'),
                     quantity=quantity,
                     unit_of_measure=item_data.get('unit'),

@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** November 25, 2025
+**Last Updated:** November 28, 2025
 **System Status:** Production (88% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -9,7 +9,72 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Nov 25, 2025)
+### Most Recent Work (Current Session - Nov 28, 2025)
+
+**INVENTORY: KEY ITEMS + UNIT CONVERSIONS & INTEGRATION HUB: INVOICE FIXES** ✅ **COMPLETE**
+
+1. **Master Item Key Item Flag + Additional Count Units** 🔑 **DATA MODEL**
+   - **Feature:** Added `is_key_item` boolean flag to master_items for highlighting important items
+   - **Feature:** Added `count_unit_2_id` and `count_unit_3_id` for additional counting units
+   - **Database Migration:** `20251128_1600_add_key_item_and_count_units.py`
+     - Merges two previous migration heads (`20251009_1330` + `make_master_item_optional`)
+     - Adds foreign key constraints to units_of_measure table
+   - **Files Modified:**
+     - `inventory/alembic/versions/20251128_1600_add_key_item_and_count_units.py` (NEW)
+     - `inventory/src/restaurant_inventory/models/item.py` (added fields)
+     - `inventory/src/restaurant_inventory/schemas/item.py` (added fields)
+
+2. **Item Unit Conversions Model** 📐 **NEW FEATURE**
+   - **Purpose:** Store per-item unit conversions (e.g., 1 case of chicken = 40 lbs)
+   - **Model:** `ItemUnitConversion` with from_unit, to_unit, conversion_factor
+   - **Database Migration:** `20251128_1800_add_item_unit_conversions.py`
+   - **Files Created:**
+     - `inventory/alembic/versions/20251128_1800_add_item_unit_conversions.py` (NEW)
+     - `inventory/src/restaurant_inventory/models/item_unit_conversion.py` (NEW)
+   - **Files Modified:**
+     - `inventory/src/restaurant_inventory/models/__init__.py` (added export)
+
+3. **Integration Hub: Invoice Total Mismatch Fixes** 🔧 **CRITICAL FIXES**
+   - **Problem:** 11 invoices had "Bill total mismatch" errors preventing send to accounting
+   - **Root Causes Identified:**
+     - Stale errors (data now correct but old error message persisted)
+     - Tax double-counting (tax as line item + tax_amount field)
+     - Gold Coast Linen minimum charge ($40 min not parsed)
+     - Credits/discounts not parsed (lines > invoice total)
+   - **Solutions Applied:**
+     - Cleared stale errors and retried sends
+     - Set `tax_amount=0` for invoices where taxes appear as line items
+     - Fixed negative tax handling for credit memos: `subtotal != 0 and invoice_tax != 0`
+     - Added adjustment lines for minimum charges and credits/discounts
+   - **Files Modified:**
+     - `integration-hub/src/integration_hub/services/accounting_sender.py`
+       - Changed tax condition from `> 0` to `!= 0` for credit memo support
+       - Added adjustment line logic for minimum charges (lines < invoice)
+       - Added "Credit / Discount Adjustment" for lines > invoice
+   - **Result:** 10 of 11 invoices successfully sent
+
+4. **Invoice 89 Item Code Corrections** 🔍 **DATA FIX**
+   - **Problem:** Re-parsed invoice had OCR errors in item codes
+     - 819753 should be 819573 (Philly Beef)
+     - 599860 should be 599850 (French Fries)
+   - **Issue:** Items were manually mapped to wrong items due to OCR digit errors
+   - **Lesson:** Do NOT send invoices until 100% verified correct
+   - **Fixed in Hub:** Corrected item codes in hub_invoice_items table
+   - **Fixed in Inventory:** Corrected vendor_sku and master_item_id in invoice_items table
+   - **Accounting Entry (JE #433):** Verified CORRECT - properly balanced
+     - 8 expense lines totaling $978.64 in debits
+     - -$20.44 "Credit / Discount Adjustment" (offsets unparsed credits)
+     - $958.20 Accounts Payable credit
+     - Math: $978.64 - $20.44 = $958.20 ✓
+
+5. **Outstanding Issues**
+   - Invoice 217: Bad parse - line items $340 vs invoice $42, needs manual re-parse
+   - Item Detail Page: New template created (`item_detail.html`)
+   - Storage Areas Page: New template created (`storage_areas.html`)
+
+---
+
+### Previous Session Work (Nov 25, 2025)
 
 **INTEGRATION HUB: OCR ITEM CODE VALIDATION + EMAIL HISTORY UI** ✅ **COMPLETE**
 

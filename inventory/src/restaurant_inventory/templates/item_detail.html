@@ -1,0 +1,1353 @@
+{% extends "base.html" %}
+
+{% block title %}Item Details - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Breadcrumb and back button -->
+    <div class="d-flex align-items-center mb-3">
+        <a href="master-items" class="btn btn-outline-secondary btn-sm me-3">
+            <i class="bi bi-arrow-left"></i> Back to Items
+        </a>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="master-items">Master Items</a></li>
+                <li class="breadcrumb-item active" id="breadcrumbItemName">Loading...</li>
+            </ol>
+        </nav>
+    </div>
+
+    <!-- Item Header -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <h2 class="mb-1">
+                        <span id="itemName">Loading...</span>
+                        <span class="badge bg-warning text-dark ms-2" id="keyItemBadge" style="display: none;" title="Key Item - Important for tracking">
+                            <i class="bi bi-star-fill"></i> Key Item
+                        </span>
+                    </h2>
+                    <p class="text-muted mb-2" id="itemDescription">-</p>
+                    <div>
+                        <span class="badge bg-secondary me-2" id="itemCategory">-</span>
+                        <span class="badge" id="itemStatus">-</span>
+                    </div>
+                </div>
+                <div>
+                    <button class="btn btn-outline-warning me-2" id="toggleKeyItemBtn" onclick="toggleKeyItem()" title="Mark as Key Item">
+                        <i class="bi bi-star"></i>
+                    </button>
+                    <button class="btn btn-primary" onclick="showEditItemModal()">
+                        <i class="bi bi-pencil"></i> Edit Item
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 1: Basic Information & Pricing Summary side by side -->
+    <div class="row">
+        <div class="col-md-6">
+            <!-- Basic Information -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> Basic Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            <tr>
+                                <td class="text-muted" style="width: 40%;">Category</td>
+                                <td id="itemCategoryDetail">-</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Count Unit</td>
+                                <td id="itemCountUnit">-</td>
+                            </tr>
+                            <tr id="countUnit2Row" style="display: none;">
+                                <td class="text-muted">Count Unit 2</td>
+                                <td id="itemCountUnit2">-</td>
+                            </tr>
+                            <tr id="countUnit3Row" style="display: none;">
+                                <td class="text-muted">Count Unit 3</td>
+                                <td id="itemCountUnit3">-</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Par Level</td>
+                                <td id="itemParLevel">-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <!-- Pricing Summary -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-currency-dollar"></i> Pricing Summary</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                            <tr>
+                                <td class="text-muted" style="width: 40%;">Last Cost</td>
+                                <td id="itemLastCost">-</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Avg Cost</td>
+                                <td id="itemAvgCost">-</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Min Price</td>
+                                <td id="itemMinPrice">-</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted">Max Price</td>
+                                <td id="itemMaxPrice">-</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div id="pricingNote" class="mt-2 small text-muted" style="display: none;">
+                        <i class="bi bi-info-circle"></i> Prices shown per count unit across all vendors
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 2: Price History (full width) -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> Price History</h5>
+                </div>
+                <div class="card-body">
+                    <div id="priceHistoryContent">
+                        <p class="text-muted mb-0">Price history is tracked when invoices are processed. Recent price changes will appear here.</p>
+                    </div>
+                    <div id="priceHistoryTable" style="display: none;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Vendor</th>
+                                    <th>Invoice</th>
+                                    <th>Old Price</th>
+                                    <th>New Price</th>
+                                    <th>Change</th>
+                                </tr>
+                            </thead>
+                            <tbody id="priceHistoryTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 3: Cost by Location -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Cost by Location</h5>
+                </div>
+                <div class="card-body">
+                    <div id="locationCostContent">
+                        <p class="text-muted mb-0">Loading location costs...</p>
+                    </div>
+                    <div id="locationCostTable" style="display: none;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Location</th>
+                                    <th>Last Price</th>
+                                    <th>Avg Price</th>
+                                    <th>Invoice Count</th>
+                                    <th>Last Invoice</th>
+                                    <th>Variance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="locationCostTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="noLocationCostMessage" class="alert alert-info mb-0" style="display: none;">
+                        <i class="bi bi-info-circle"></i> No invoice data available yet. Costs by location will appear here once invoices are processed.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 4: Unit Conversions -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-arrow-left-right"></i> Unit Conversions</h5>
+                    <button class="btn btn-primary btn-sm" onclick="showAddConversionModal()">
+                        <i class="bi bi-plus-circle"></i> Add Conversion
+                    </button>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Define how to convert between units for this item (e.g., 1 LB = 8 patties for 2oz patties)
+                    </p>
+                    <div id="conversionsContent">
+                        <p class="text-muted">Loading conversions...</p>
+                    </div>
+                    <div id="conversionsTable" style="display: none;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead>
+                                <tr>
+                                    <th>From Unit</th>
+                                    <th>To Unit</th>
+                                    <th>Factor</th>
+                                    <th>Individual Size</th>
+                                    <th>Notes</th>
+                                    <th style="width: 80px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="conversionsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="noConversionsMessage" class="alert alert-info mb-0" style="display: none;">
+                        <i class="bi bi-info-circle"></i> No unit conversions defined. Click "Add Conversion" to define how to convert between units.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Row 5: Vendors (full width) -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-truck"></i> Vendors</h5>
+                    <button class="btn btn-primary btn-sm" onclick="showAddVendorModal()">
+                        <i class="bi bi-plus-circle"></i> Add Vendor
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="vendorsContent">
+                        <p class="text-muted">Loading vendors...</p>
+                    </div>
+                    <div id="vendorsTable" style="display: none;">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Vendor</th>
+                                    <th>SKU</th>
+                                    <th>Product Name</th>
+                                    <th>Purchase Unit</th>
+                                    <th>Case Price</th>
+                                    <th>Cost/Count Unit</th>
+                                    <th style="width: 100px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vendorsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="noVendorsMessage" class="alert alert-info mb-0" style="display: none;">
+                        <i class="bi bi-info-circle"></i> No vendors are selling this item yet. Click "Add Vendor" to link a vendor.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Unit Conversion Modal -->
+<div class="modal fade" id="addConversionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Unit Conversion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small">
+                    Define how to convert between units for this item.<br>
+                    Example: For 2oz patties, 1 LB = 8 patties (16oz / 2oz = 8)
+                </p>
+                <form id="addConversionForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="convFromUnit" class="form-label">From Unit *</label>
+                            <select class="form-select" id="convFromUnit" required>
+                                <option value="">Select unit...</option>
+                            </select>
+                            <small class="form-text text-muted">Purchase/weight unit</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="convToUnit" class="form-label">To Unit *</label>
+                            <select class="form-select" id="convToUnit" required>
+                                <option value="">Select unit...</option>
+                            </select>
+                            <small class="form-text text-muted">Count unit</small>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="convFactor" class="form-label">Conversion Factor *</label>
+                        <input type="number" step="0.0001" class="form-control" id="convFactor" required placeholder="e.g., 8">
+                        <small class="form-text text-muted">How many "To Units" in one "From Unit" (e.g., 8 patties per pound)</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="convIndividualWeight" class="form-label">Individual Weight (oz)</label>
+                            <input type="number" step="0.01" class="form-control" id="convIndividualWeight" placeholder="e.g., 2">
+                            <small class="form-text text-muted">Weight of each unit (optional)</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="convIndividualVolume" class="form-label">Individual Volume (oz)</label>
+                            <input type="number" step="0.01" class="form-control" id="convIndividualVolume" placeholder="e.g., 8">
+                            <small class="form-text text-muted">Volume of each unit (optional)</small>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="convNotes" class="form-label">Notes</label>
+                        <input type="text" class="form-control" id="convNotes" placeholder="e.g., 2oz oval patties">
+                    </div>
+                    <div id="conversionPreview" class="alert alert-info" style="display: none;">
+                        <strong>Preview:</strong> <span id="conversionPreviewText"></span>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveConversion()">Save Conversion</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Item Modal -->
+<div class="modal fade" id="editItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editItemForm">
+                    <div class="mb-3">
+                        <label for="editItemName" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="editItemName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editItemDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="editItemDescription" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editItemCategory" class="form-label">Category *</label>
+                        <select class="form-select" id="editItemCategory" required>
+                            <option value="">Select category...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editItemUnitId" class="form-label">Count Unit (Primary) *</label>
+                        <select class="form-select" id="editItemUnitId" required>
+                            <option value="">Select unit...</option>
+                        </select>
+                        <small class="form-text text-muted">The main unit you count inventory in (e.g., lbs, each)</small>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="editItemCountUnit2Id" class="form-label">Count Unit 2 (Optional)</label>
+                            <select class="form-select" id="editItemCountUnit2Id">
+                                <option value="">None</option>
+                            </select>
+                            <small class="form-text text-muted">Alternative count unit</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="editItemCountUnit3Id" class="form-label">Count Unit 3 (Optional)</label>
+                            <select class="form-select" id="editItemCountUnit3Id">
+                                <option value="">None</option>
+                            </select>
+                            <small class="form-text text-muted">Alternative count unit</small>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="editItemParLevel" class="form-label">Par Level</label>
+                        <input type="number" step="0.01" class="form-control" id="editItemParLevel">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check mb-3">
+                                <input type="checkbox" class="form-check-input" id="editItemIsActive" checked>
+                                <label class="form-check-label" for="editItemIsActive">Active</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check mb-3">
+                                <input type="checkbox" class="form-check-input" id="editItemIsKeyItem">
+                                <label class="form-check-label" for="editItemIsKeyItem">
+                                    <i class="bi bi-star-fill text-warning"></i> Key Item
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveItem()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Vendor Modal -->
+<div class="modal fade" id="vendorItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="vendorItemModalTitle">Add Vendor</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="vendorItemForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="viVendorId" class="form-label">Vendor *</label>
+                            <select class="form-select" id="viVendorId" required>
+                                <option value="">Select vendor...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="viVendorSku" class="form-label">Vendor SKU</label>
+                            <input type="text" class="form-control" id="viVendorSku">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="viVendorProductName" class="form-label">Vendor Product Name *</label>
+                        <input type="text" class="form-control" id="viVendorProductName" required>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="viPurchaseUnitId" class="form-label">Purchase Unit *</label>
+                            <select class="form-select" id="viPurchaseUnitId" required>
+                                <option value="">Select unit...</option>
+                            </select>
+                            <small class="form-text text-muted">Unit you order in (Case, Bag, Each)</small>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="viConversionFactor" class="form-label">Count Units Per Purchase Unit</label>
+                            <input type="number" step="0.01" class="form-control" id="viConversionFactor" placeholder="e.g., 25 for 25lb case">
+                            <small class="form-text text-muted">How many <span id="countUnitLabel">count units</span> per purchase unit</small>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="viUnitPrice" class="form-label">Case/Purchase Price</label>
+                            <input type="number" step="0.01" class="form-control" id="viUnitPrice">
+                            <small class="form-text text-muted">Price per purchase unit</small>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="viMinOrderQty" class="form-label">Min Order Qty</label>
+                            <input type="number" step="0.001" class="form-control" id="viMinOrderQty">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="viLeadTimeDays" class="form-label">Lead Time (days)</label>
+                            <input type="number" class="form-control" id="viLeadTimeDays">
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <div class="form-check mt-4">
+                                <input type="checkbox" class="form-check-input" id="viIsPreferred">
+                                <label class="form-check-label" for="viIsPreferred">Preferred Vendor</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="viNotes" class="form-label">Notes</label>
+                        <textarea class="form-control" id="viNotes" rows="2"></textarea>
+                    </div>
+
+                    <div class="alert alert-info" id="viCostCalculation" style="display: none;">
+                        <strong>Calculated Cost per Count Unit:</strong> <span id="viCostPerCount">$0.00</span>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveVendorItem()">Save Vendor</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirmation Modal -->
+<div class="modal fade" id="confirmDeleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="confirmDeleteBody">
+                Are you sure?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Global variables
+    let itemId = null;
+    let itemData = null;
+    let vendorItems = [];
+    let categories = [];
+    let unitsOfMeasure = [];
+    let vendors = [];
+    let editItemModal = null;
+    let vendorItemModal = null;
+    let confirmDeleteModal = null;
+    let currentEditVendorItemId = null;
+
+    // API helper
+    async function apiRequest(url, options = {}) {
+        const token = localStorage.getItem('access_token');
+        const defaultOptions = {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        const response = await fetch(url, { ...defaultOptions, ...options });
+
+        if (response.status === 401) {
+            localStorage.clear();
+            window.location.href = '/login';
+            throw new Error('Unauthorized');
+        }
+
+        // Handle 204 No Content responses (from DELETE operations)
+        if (response.status === 204) {
+            return { success: true };
+        }
+
+        if (!response.ok) {
+            let errorMessage = 'Request failed';
+            try {
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    const error = await response.json();
+                    errorMessage = error.detail || error.message || 'Request failed';
+                }
+            } catch (e) {
+                errorMessage = `Server error (${response.status})`;
+            }
+            throw new Error(errorMessage);
+        }
+
+        // Check if there's content to parse
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            return response.json();
+        }
+
+        return { success: true };
+    }
+
+    // Show alert
+    function showAlert(message, type) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+        alertDiv.style.zIndex = '9999';
+        alertDiv.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+
+        setTimeout(() => alertDiv.remove(), 5000);
+    }
+
+    // Get item ID from URL
+    function getItemIdFromUrl() {
+        const urlParams = new URLSearchParams(window.location.search);
+        return urlParams.get('id');
+    }
+
+    // Load item details
+    async function loadItemDetails() {
+        try {
+            itemData = await apiRequest(`api/items/${itemId}`);
+            displayItemDetails();
+        } catch (error) {
+            console.error('Error loading item:', error);
+            showAlert('Error loading item: ' + error.message, 'danger');
+        }
+    }
+
+    // Display item details
+    function displayItemDetails() {
+        if (!itemData) return;
+
+        // Header
+        document.getElementById('itemName').textContent = itemData.name;
+        document.getElementById('breadcrumbItemName').textContent = itemData.name;
+        document.getElementById('itemDescription').textContent = itemData.description || 'No description';
+        document.getElementById('itemCategory').textContent = itemData.category || 'Uncategorized';
+
+        // Key Item badge and button
+        const keyItemBadge = document.getElementById('keyItemBadge');
+        const toggleKeyItemBtn = document.getElementById('toggleKeyItemBtn');
+        if (itemData.is_key_item) {
+            keyItemBadge.style.display = 'inline';
+            toggleKeyItemBtn.className = 'btn btn-warning me-2';
+            toggleKeyItemBtn.innerHTML = '<i class="bi bi-star-fill"></i>';
+            toggleKeyItemBtn.title = 'Remove Key Item designation';
+        } else {
+            keyItemBadge.style.display = 'none';
+            toggleKeyItemBtn.className = 'btn btn-outline-warning me-2';
+            toggleKeyItemBtn.innerHTML = '<i class="bi bi-star"></i>';
+            toggleKeyItemBtn.title = 'Mark as Key Item';
+        }
+
+        // Status badge
+        const statusBadge = document.getElementById('itemStatus');
+        if (itemData.is_active) {
+            statusBadge.className = 'badge bg-success';
+            statusBadge.textContent = 'Active';
+        } else {
+            statusBadge.className = 'badge bg-secondary';
+            statusBadge.textContent = 'Inactive';
+        }
+
+        // Details
+        document.getElementById('itemCategoryDetail').textContent = itemData.category || '-';
+        document.getElementById('itemCountUnit').textContent = itemData.unit_of_measure || itemData.unit_name || '-';
+        document.getElementById('itemParLevel').textContent = itemData.par_level ? parseFloat(itemData.par_level).toFixed(2) : '-';
+
+        // Additional count units
+        if (itemData.count_unit_2_name) {
+            document.getElementById('countUnit2Row').style.display = '';
+            document.getElementById('itemCountUnit2').textContent = itemData.count_unit_2_name;
+        } else {
+            document.getElementById('countUnit2Row').style.display = 'none';
+        }
+
+        if (itemData.count_unit_3_name) {
+            document.getElementById('countUnit3Row').style.display = '';
+            document.getElementById('itemCountUnit3').textContent = itemData.count_unit_3_name;
+        } else {
+            document.getElementById('countUnit3Row').style.display = 'none';
+        }
+
+        // Update count unit label in vendor form
+        const countUnitLabel = document.getElementById('countUnitLabel');
+        if (countUnitLabel) {
+            countUnitLabel.textContent = itemData.unit_of_measure || 'count units';
+        }
+    }
+
+    // Toggle key item status
+    async function toggleKeyItem() {
+        if (!itemData) return;
+
+        try {
+            await apiRequest(`api/items/${itemId}`, {
+                method: 'PUT',
+                body: JSON.stringify({
+                    is_key_item: !itemData.is_key_item
+                })
+            });
+
+            showAlert(itemData.is_key_item ? 'Key Item designation removed' : 'Marked as Key Item!', 'success');
+            await loadItemDetails();
+        } catch (error) {
+            showAlert('Error updating item: ' + error.message, 'danger');
+        }
+    }
+
+    // Calculate and display pricing statistics from vendor items
+    function displayPricingStats() {
+        const lastCostEl = document.getElementById('itemLastCost');
+        const avgCostEl = document.getElementById('itemAvgCost');
+        const minPriceEl = document.getElementById('itemMinPrice');
+        const maxPriceEl = document.getElementById('itemMaxPrice');
+        const pricingNoteEl = document.getElementById('pricingNote');
+
+        const unitName = itemData?.unit_of_measure || 'unit';
+
+        // Calculate pricing from vendor items
+        const validPrices = vendorItems
+            .filter(vi => vi.unit_price && vi.conversion_factor && vi.is_active)
+            .map(vi => ({
+                vendor: vi.vendor_name,
+                costPerUnit: vi.unit_price / vi.conversion_factor,
+                isPreferred: vi.is_preferred
+            }));
+
+        if (validPrices.length === 0) {
+            lastCostEl.textContent = '-';
+            avgCostEl.textContent = '-';
+            minPriceEl.textContent = '-';
+            maxPriceEl.textContent = '-';
+            pricingNoteEl.style.display = 'none';
+            return;
+        }
+
+        pricingNoteEl.style.display = 'block';
+
+        // Last cost (from preferred vendor, or most recent)
+        const preferredPrice = validPrices.find(p => p.isPreferred);
+        const lastCost = preferredPrice ? preferredPrice.costPerUnit : validPrices[0].costPerUnit;
+        lastCostEl.innerHTML = `$${lastCost.toFixed(2)} / ${unitName}`;
+        if (preferredPrice) {
+            lastCostEl.innerHTML += ` <small class="text-muted">(${preferredPrice.vendor})</small>`;
+        }
+
+        // Average cost
+        const avgCost = validPrices.reduce((sum, p) => sum + p.costPerUnit, 0) / validPrices.length;
+        avgCostEl.textContent = `$${avgCost.toFixed(2)} / ${unitName}`;
+
+        // Min/Max
+        const costs = validPrices.map(p => p.costPerUnit);
+        const minCost = Math.min(...costs);
+        const maxCost = Math.max(...costs);
+        const minVendor = validPrices.find(p => p.costPerUnit === minCost);
+        const maxVendor = validPrices.find(p => p.costPerUnit === maxCost);
+
+        minPriceEl.innerHTML = `$${minCost.toFixed(2)} <small class="text-muted">(${minVendor.vendor})</small>`;
+        maxPriceEl.innerHTML = `$${maxCost.toFixed(2)} <small class="text-muted">(${maxVendor.vendor})</small>`;
+
+        // Highlight if there's a significant price difference
+        if (validPrices.length > 1 && maxCost > minCost * 1.1) {
+            minPriceEl.innerHTML = `<span class="text-success">$${minCost.toFixed(2)}</span> <small class="text-muted">(${minVendor.vendor})</small>`;
+            maxPriceEl.innerHTML = `<span class="text-danger">$${maxCost.toFixed(2)}</span> <small class="text-muted">(${maxVendor.vendor})</small>`;
+        }
+    }
+
+    // Load vendor items for this master item
+    async function loadVendorItems() {
+        try {
+            vendorItems = await apiRequest(`api/vendor-items/?master_item_id=${itemId}`);
+            displayVendorItems();
+            displayPricingStats();  // Calculate pricing from vendor items
+        } catch (error) {
+            console.error('Error loading vendor items:', error);
+            document.getElementById('vendorsContent').innerHTML =
+                `<p class="text-danger">Error loading vendors: ${error.message}</p>`;
+        }
+    }
+
+    // Display vendor items
+    function displayVendorItems() {
+        const content = document.getElementById('vendorsContent');
+        const table = document.getElementById('vendorsTable');
+        const noVendors = document.getElementById('noVendorsMessage');
+        const tbody = document.getElementById('vendorsTableBody');
+
+        content.style.display = 'none';
+
+        if (!vendorItems || vendorItems.length === 0) {
+            table.style.display = 'none';
+            noVendors.style.display = 'block';
+            return;
+        }
+
+        noVendors.style.display = 'none';
+        table.style.display = 'block';
+
+        tbody.innerHTML = vendorItems.map(vi => {
+            const costPerCount = vi.unit_price && vi.conversion_factor
+                ? (vi.unit_price / vi.conversion_factor).toFixed(2)
+                : '-';
+            const preferredBadge = vi.is_preferred
+                ? '<span class="badge bg-primary ms-1" title="Preferred Vendor"><i class="bi bi-star-fill"></i></span>'
+                : '';
+            const statusBadge = vi.is_active
+                ? ''
+                : '<span class="badge bg-secondary ms-1">Inactive</span>';
+
+            return `
+                <tr>
+                    <td>${vi.vendor_name || '-'}${preferredBadge}${statusBadge}</td>
+                    <td>${vi.vendor_sku || '-'}</td>
+                    <td>${vi.vendor_product_name || '-'}</td>
+                    <td>
+                        ${vi.purchase_unit_name || '-'}
+                        ${vi.conversion_factor ? `<br><small class="text-muted">(${parseFloat(vi.conversion_factor).toFixed(2)} ${itemData?.unit_of_measure || 'units'})</small>` : ''}
+                    </td>
+                    <td>${vi.unit_price ? '$' + parseFloat(vi.unit_price).toFixed(2) : '-'}</td>
+                    <td>${costPerCount !== '-' ? '$' + costPerCount : '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="editVendorItem(${vi.id})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="confirmDeleteVendorItem(${vi.id}, '${vi.vendor_name}')" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // Load location costs for this master item
+    async function loadLocationCosts() {
+        try {
+            const locationCosts = await apiRequest(`api/items/${itemId}/location-costs`);
+            displayLocationCosts(locationCosts);
+        } catch (error) {
+            console.error('Error loading location costs:', error);
+            document.getElementById('locationCostContent').innerHTML =
+                `<p class="text-danger">Error loading location costs: ${error.message}</p>`;
+        }
+    }
+
+    // Display location costs
+    function displayLocationCosts(locationCosts) {
+        const content = document.getElementById('locationCostContent');
+        const table = document.getElementById('locationCostTable');
+        const noData = document.getElementById('noLocationCostMessage');
+        const tbody = document.getElementById('locationCostTableBody');
+
+        content.style.display = 'none';
+
+        if (!locationCosts || locationCosts.length === 0) {
+            table.style.display = 'none';
+            noData.style.display = 'block';
+            return;
+        }
+
+        noData.style.display = 'none';
+        table.style.display = 'block';
+
+        tbody.innerHTML = locationCosts.map(loc => {
+            const lastPrice = loc.last_price ? `$${parseFloat(loc.last_price).toFixed(2)}` : '-';
+            const avgPrice = loc.avg_price ? `$${parseFloat(loc.avg_price).toFixed(2)}` : '-';
+            const lastDate = loc.last_invoice_date
+                ? new Date(loc.last_invoice_date).toLocaleDateString()
+                : '-';
+
+            // Format variance with color coding
+            let varianceHtml = '-';
+            if (loc.variance_pct !== null && loc.variance_pct !== undefined) {
+                const variance = parseFloat(loc.variance_pct);
+                if (Math.abs(variance) < 0.01) {
+                    varianceHtml = '<span class="text-muted">-</span>';
+                } else if (variance > 5) {
+                    varianceHtml = `<span class="text-danger">+${variance.toFixed(1)}%</span>`;
+                } else if (variance < -5) {
+                    varianceHtml = `<span class="text-success">${variance.toFixed(1)}%</span>`;
+                } else {
+                    varianceHtml = `<span class="text-muted">${variance >= 0 ? '+' : ''}${variance.toFixed(1)}%</span>`;
+                }
+            }
+
+            return `
+                <tr>
+                    <td>${loc.location_name}</td>
+                    <td>${lastPrice}</td>
+                    <td>${avgPrice}</td>
+                    <td>${loc.invoice_count}</td>
+                    <td>${lastDate}</td>
+                    <td>${varianceHtml}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // ============================================================================
+    // Unit Conversions
+    // ============================================================================
+
+    let conversionModal = null;
+
+    // Load unit conversions for this master item
+    async function loadUnitConversions() {
+        try {
+            const conversions = await apiRequest(`api/items/${itemId}/unit-conversions`);
+            displayUnitConversions(conversions);
+        } catch (error) {
+            console.error('Error loading unit conversions:', error);
+            document.getElementById('conversionsContent').innerHTML =
+                `<p class="text-danger">Error loading conversions: ${error.message}</p>`;
+        }
+    }
+
+    // Display unit conversions
+    function displayUnitConversions(conversions) {
+        const content = document.getElementById('conversionsContent');
+        const table = document.getElementById('conversionsTable');
+        const noData = document.getElementById('noConversionsMessage');
+        const tbody = document.getElementById('conversionsTableBody');
+
+        content.style.display = 'none';
+
+        if (!conversions || conversions.length === 0) {
+            table.style.display = 'none';
+            noData.style.display = 'block';
+            return;
+        }
+
+        noData.style.display = 'none';
+        table.style.display = 'block';
+
+        tbody.innerHTML = conversions.map(conv => {
+            const fromUnit = conv.from_unit ? `${conv.from_unit.name} (${conv.from_unit.abbreviation})` : '-';
+            const toUnit = conv.to_unit ? `${conv.to_unit.name} (${conv.to_unit.abbreviation})` : '-';
+            const factor = parseFloat(conv.conversion_factor).toFixed(4).replace(/\.?0+$/, '');
+
+            let sizeInfo = '-';
+            if (conv.individual_weight_oz) {
+                sizeInfo = `${conv.individual_weight_oz} oz`;
+            } else if (conv.individual_volume_oz) {
+                sizeInfo = `${conv.individual_volume_oz} fl oz`;
+            }
+
+            return `
+                <tr>
+                    <td>1 ${fromUnit}</td>
+                    <td>${factor} ${toUnit}</td>
+                    <td>${factor}</td>
+                    <td>${sizeInfo}</td>
+                    <td>${conv.notes || '-'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteConversion(${conv.id})" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // Show add conversion modal
+    function showAddConversionModal() {
+        if (!conversionModal) {
+            conversionModal = new bootstrap.Modal(document.getElementById('addConversionModal'));
+        }
+
+        // Populate unit dropdowns
+        const fromSelect = document.getElementById('convFromUnit');
+        const toSelect = document.getElementById('convToUnit');
+
+        fromSelect.innerHTML = '<option value="">Select unit...</option>';
+        toSelect.innerHTML = '<option value="">Select unit...</option>';
+
+        unitsOfMeasure.forEach(unit => {
+            fromSelect.innerHTML += `<option value="${unit.id}">${unit.name} (${unit.abbreviation})</option>`;
+            toSelect.innerHTML += `<option value="${unit.id}">${unit.name} (${unit.abbreviation})</option>`;
+        });
+
+        // Clear form
+        document.getElementById('addConversionForm').reset();
+        document.getElementById('conversionPreview').style.display = 'none';
+
+        // Add change handlers for preview
+        document.getElementById('convFromUnit').onchange = updateConversionPreview;
+        document.getElementById('convToUnit').onchange = updateConversionPreview;
+        document.getElementById('convFactor').oninput = updateConversionPreview;
+
+        conversionModal.show();
+    }
+
+    // Update conversion preview
+    function updateConversionPreview() {
+        const fromUnitId = document.getElementById('convFromUnit').value;
+        const toUnitId = document.getElementById('convToUnit').value;
+        const factor = parseFloat(document.getElementById('convFactor').value);
+
+        const preview = document.getElementById('conversionPreview');
+        const previewText = document.getElementById('conversionPreviewText');
+
+        if (fromUnitId && toUnitId && factor > 0) {
+            const fromUnit = unitsOfMeasure.find(u => u.id == fromUnitId);
+            const toUnit = unitsOfMeasure.find(u => u.id == toUnitId);
+
+            if (fromUnit && toUnit) {
+                previewText.textContent = `1 ${fromUnit.name} = ${factor} ${toUnit.name}`;
+                preview.style.display = 'block';
+            }
+        } else {
+            preview.style.display = 'none';
+        }
+    }
+
+    // Save conversion
+    async function saveConversion() {
+        const fromUnitId = document.getElementById('convFromUnit').value;
+        const toUnitId = document.getElementById('convToUnit').value;
+        const factor = parseFloat(document.getElementById('convFactor').value);
+        const individualWeight = document.getElementById('convIndividualWeight').value;
+        const individualVolume = document.getElementById('convIndividualVolume').value;
+        const notes = document.getElementById('convNotes').value;
+
+        if (!fromUnitId || !toUnitId || !factor) {
+            alert('Please fill in all required fields');
+            return;
+        }
+
+        if (fromUnitId === toUnitId) {
+            alert('From and To units must be different');
+            return;
+        }
+
+        try {
+            // Build query params
+            let url = `api/items/${itemId}/unit-conversions?from_unit_id=${fromUnitId}&to_unit_id=${toUnitId}&conversion_factor=${factor}`;
+            if (individualWeight) url += `&individual_weight_oz=${individualWeight}`;
+            if (individualVolume) url += `&individual_volume_oz=${individualVolume}`;
+            if (notes) url += `&notes=${encodeURIComponent(notes)}`;
+
+            await apiRequest(url, {
+                method: 'POST'
+            });
+
+            conversionModal.hide();
+            await loadUnitConversions();
+            alert('Conversion saved successfully');
+        } catch (error) {
+            console.error('Error saving conversion:', error);
+            alert('Error saving conversion: ' + error.message);
+        }
+    }
+
+    // Delete conversion
+    async function deleteConversion(conversionId) {
+        if (!confirm('Are you sure you want to delete this conversion?')) {
+            return;
+        }
+
+        try {
+            await apiRequest(`api/items/${itemId}/unit-conversions/${conversionId}`, {
+                method: 'DELETE'
+            });
+            await loadUnitConversions();
+        } catch (error) {
+            console.error('Error deleting conversion:', error);
+            alert('Error deleting conversion: ' + error.message);
+        }
+    }
+
+    // Load reference data (categories, units, vendors)
+    async function loadReferenceData() {
+        try {
+            const [categoriesResp, unitsResp, vendorsResp] = await Promise.all([
+                apiRequest('api/categories/'),
+                apiRequest('api/units/'),
+                apiRequest('api/vendors/')
+            ]);
+
+            // Flatten categories
+            categories = [];
+            if (Array.isArray(categoriesResp)) {
+                categoriesResp.forEach(parent => {
+                    categories.push(parent);
+                    if (parent.subcategories && Array.isArray(parent.subcategories)) {
+                        parent.subcategories.forEach(sub => categories.push(sub));
+                    }
+                });
+            }
+
+            unitsOfMeasure = unitsResp || [];
+            vendors = vendorsResp || [];
+        } catch (error) {
+            console.error('Error loading reference data:', error);
+        }
+    }
+
+    // Show edit item modal
+    function showEditItemModal() {
+        if (!itemData) return;
+
+        // Populate dropdowns
+        populateCategoryDropdown('editItemCategory');
+        populateUnitDropdown('editItemUnitId');
+        populateUnitDropdown('editItemCountUnit2Id', true);  // With "None" option
+        populateUnitDropdown('editItemCountUnit3Id', true);  // With "None" option
+
+        // Fill form with current values
+        document.getElementById('editItemName').value = itemData.name || '';
+        document.getElementById('editItemDescription').value = itemData.description || '';
+        document.getElementById('editItemCategory').value = itemData.category || '';
+        document.getElementById('editItemUnitId').value = itemData.unit_of_measure_id || '';
+        document.getElementById('editItemCountUnit2Id').value = itemData.count_unit_2_id || '';
+        document.getElementById('editItemCountUnit3Id').value = itemData.count_unit_3_id || '';
+        document.getElementById('editItemParLevel').value = itemData.par_level || '';
+        document.getElementById('editItemIsActive').checked = itemData.is_active !== false;
+        document.getElementById('editItemIsKeyItem').checked = itemData.is_key_item === true;
+
+        editItemModal.show();
+    }
+
+    // Save item changes
+    async function saveItem() {
+        const countUnit2Val = document.getElementById('editItemCountUnit2Id').value;
+        const countUnit3Val = document.getElementById('editItemCountUnit3Id').value;
+
+        const data = {
+            name: document.getElementById('editItemName').value,
+            description: document.getElementById('editItemDescription').value || null,
+            category: document.getElementById('editItemCategory').value,
+            unit_of_measure_id: parseInt(document.getElementById('editItemUnitId').value),
+            count_unit_2_id: countUnit2Val ? parseInt(countUnit2Val) : null,
+            count_unit_3_id: countUnit3Val ? parseInt(countUnit3Val) : null,
+            par_level: document.getElementById('editItemParLevel').value
+                ? parseFloat(document.getElementById('editItemParLevel').value)
+                : null,
+            is_active: document.getElementById('editItemIsActive').checked,
+            is_key_item: document.getElementById('editItemIsKeyItem').checked
+        };
+
+        if (!data.name || !data.category || !data.unit_of_measure_id) {
+            showAlert('Please fill in all required fields', 'warning');
+            return;
+        }
+
+        try {
+            await apiRequest(`api/items/${itemId}`, {
+                method: 'PUT',
+                body: JSON.stringify(data)
+            });
+
+            showAlert('Item updated successfully!', 'success');
+            editItemModal.hide();
+            await loadItemDetails();
+        } catch (error) {
+            showAlert('Error updating item: ' + error.message, 'danger');
+        }
+    }
+
+    // Show add vendor modal
+    function showAddVendorModal() {
+        currentEditVendorItemId = null;
+        document.getElementById('vendorItemModalTitle').textContent = 'Add Vendor';
+        document.getElementById('vendorItemForm').reset();
+
+        populateVendorDropdown();
+        populateUnitDropdown('viPurchaseUnitId');
+
+        vendorItemModal.show();
+    }
+
+    // Edit vendor item
+    function editVendorItem(vendorItemId) {
+        const vi = vendorItems.find(v => v.id === vendorItemId);
+        if (!vi) return;
+
+        currentEditVendorItemId = vendorItemId;
+        document.getElementById('vendorItemModalTitle').textContent = 'Edit Vendor';
+
+        populateVendorDropdown();
+        populateUnitDropdown('viPurchaseUnitId');
+
+        // Fill form
+        document.getElementById('viVendorId').value = vi.vendor_id || '';
+        document.getElementById('viVendorSku').value = vi.vendor_sku || '';
+        document.getElementById('viVendorProductName').value = vi.vendor_product_name || '';
+        document.getElementById('viPurchaseUnitId').value = vi.purchase_unit_id || '';
+        document.getElementById('viConversionFactor').value = vi.conversion_factor ? parseFloat(vi.conversion_factor).toFixed(2) : '';
+        document.getElementById('viUnitPrice').value = vi.unit_price || '';
+        document.getElementById('viMinOrderQty').value = vi.minimum_order_quantity || '';
+        document.getElementById('viLeadTimeDays').value = vi.lead_time_days || '';
+        document.getElementById('viIsPreferred').checked = vi.is_preferred || false;
+        document.getElementById('viNotes').value = vi.notes || '';
+
+        updateCostCalculation();
+        vendorItemModal.show();
+    }
+
+    // Save vendor item
+    async function saveVendorItem() {
+        const vendorId = document.getElementById('viVendorId').value;
+        const vendorProductName = document.getElementById('viVendorProductName').value;
+        const purchaseUnitId = document.getElementById('viPurchaseUnitId').value;
+
+        if (!vendorId || !vendorProductName || !purchaseUnitId) {
+            showAlert('Please fill in all required fields', 'warning');
+            return;
+        }
+
+        const data = {
+            vendor_id: parseInt(vendorId),
+            master_item_id: parseInt(itemId),
+            vendor_sku: document.getElementById('viVendorSku').value || null,
+            vendor_product_name: vendorProductName,
+            purchase_unit_id: parseInt(purchaseUnitId),
+            conversion_factor: document.getElementById('viConversionFactor').value
+                ? parseFloat(document.getElementById('viConversionFactor').value)
+                : 1.0,
+            unit_price: document.getElementById('viUnitPrice').value
+                ? parseFloat(document.getElementById('viUnitPrice').value)
+                : null,
+            minimum_order_quantity: document.getElementById('viMinOrderQty').value
+                ? parseFloat(document.getElementById('viMinOrderQty').value)
+                : null,
+            lead_time_days: document.getElementById('viLeadTimeDays').value
+                ? parseInt(document.getElementById('viLeadTimeDays').value)
+                : null,
+            is_preferred: document.getElementById('viIsPreferred').checked,
+            notes: document.getElementById('viNotes').value || null,
+            is_active: true
+        };
+
+        try {
+            if (currentEditVendorItemId) {
+                await apiRequest(`api/vendor-items/${currentEditVendorItemId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+                showAlert('Vendor updated successfully!', 'success');
+            } else {
+                await apiRequest('api/vendor-items/', {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+                showAlert('Vendor added successfully!', 'success');
+            }
+
+            vendorItemModal.hide();
+            await loadVendorItems();
+        } catch (error) {
+            showAlert('Error saving vendor: ' + error.message, 'danger');
+        }
+    }
+
+    // Confirm delete vendor item
+    function confirmDeleteVendorItem(vendorItemId, vendorName) {
+        document.getElementById('confirmDeleteBody').textContent =
+            `Are you sure you want to remove ${vendorName} as a vendor for this item?`;
+
+        document.getElementById('confirmDeleteBtn').onclick = async function() {
+            try {
+                await apiRequest(`api/vendor-items/${vendorItemId}`, { method: 'DELETE' });
+                showAlert('Vendor removed successfully!', 'success');
+                confirmDeleteModal.hide();
+                await loadVendorItems();
+            } catch (error) {
+                showAlert('Error removing vendor: ' + error.message, 'danger');
+            }
+        };
+
+        confirmDeleteModal.show();
+    }
+
+    // Populate category dropdown
+    function populateCategoryDropdown(selectId) {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+
+        const parentCategories = categories.filter(c => c.is_active && !c.parent_id);
+        const childCategories = categories.filter(c => c.is_active && c.parent_id);
+
+        let options = '<option value="">Select category...</option>';
+
+        parentCategories
+            .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+            .forEach(parent => {
+                options += `<option value="${parent.name}">${parent.name}</option>`;
+                childCategories
+                    .filter(child => child.parent_id === parent.id)
+                    .sort((a, b) => (a.display_order || 0) - (b.display_order || 0))
+                    .forEach(child => {
+                        options += `<option value="${child.name}">&nbsp;&nbsp;&nbsp;&nbsp;↳ ${child.name}</option>`;
+                    });
+            });
+
+        select.innerHTML = options;
+    }
+
+    // Populate unit dropdown
+    function populateUnitDropdown(selectId, allowNone = false) {
+        const select = document.getElementById(selectId);
+        if (!select) return;
+
+        select.innerHTML = allowNone
+            ? '<option value="">None</option>'
+            : '<option value="">Select unit...</option>';
+        unitsOfMeasure.forEach(unit => {
+            select.innerHTML += `<option value="${unit.id}">${unit.name} (${unit.abbreviation})</option>`;
+        });
+    }
+
+    // Populate vendor dropdown
+    function populateVendorDropdown() {
+        const select = document.getElementById('viVendorId');
+        if (!select) return;
+
+        select.innerHTML = '<option value="">Select vendor...</option>';
+        vendors
+            .filter(v => v.is_active)
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .forEach(vendor => {
+                select.innerHTML += `<option value="${vendor.id}">${vendor.name}</option>`;
+            });
+    }
+
+    // Update cost calculation display
+    function updateCostCalculation() {
+        const price = parseFloat(document.getElementById('viUnitPrice').value) || 0;
+        const factor = parseFloat(document.getElementById('viConversionFactor').value) || 1;
+
+        const calcDiv = document.getElementById('viCostCalculation');
+        const costSpan = document.getElementById('viCostPerCount');
+
+        if (price > 0 && factor > 0) {
+            const costPerCount = price / factor;
+            costSpan.textContent = '$' + costPerCount.toFixed(2) + ' / ' + (itemData?.unit_of_measure || 'unit');
+            calcDiv.style.display = 'block';
+        } else {
+            calcDiv.style.display = 'none';
+        }
+    }
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Check authentication
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            window.location.href = '/login';
+            return;
+        }
+
+        // Get item ID from URL
+        itemId = getItemIdFromUrl();
+        if (!itemId) {
+            showAlert('No item ID specified', 'danger');
+            return;
+        }
+
+        // Initialize modals
+        editItemModal = new bootstrap.Modal(document.getElementById('editItemModal'));
+        vendorItemModal = new bootstrap.Modal(document.getElementById('vendorItemModal'));
+        confirmDeleteModal = new bootstrap.Modal(document.getElementById('confirmDeleteModal'));
+
+        // Add event listeners for cost calculation
+        document.getElementById('viUnitPrice').addEventListener('input', updateCostCalculation);
+        document.getElementById('viConversionFactor').addEventListener('input', updateCostCalculation);
+
+        // Load data
+        await loadReferenceData();
+        await loadItemDetails();
+        await loadVendorItems();
+        await loadLocationCosts();
+        await loadUnitConversions();
+    });
+</script>
+{% endblock %}

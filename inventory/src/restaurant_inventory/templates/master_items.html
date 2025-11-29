@@ -7,7 +7,7 @@
     <h1 class="h2 mb-4">Master Items</h1>
 
     <div class="alert alert-info mb-3">
-        <i class="bi bi-info-circle"></i> <strong>Master Items</strong> – Generic items for inventory counting. Link to vendor-specific products via Vendor Items.
+        <i class="bi bi-info-circle"></i> <strong>Master Items</strong> – Click on any item to see its full details including all vendors, pricing, and storage locations.
     </div>
 
     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -85,7 +85,7 @@
                     <p class="mt-2">Loading vendor items...</p>
                 </div>
                 <div id="vendorItemsContent" style="display: none;">
-                    <table class="table table-sm">
+                    <table class="table table-sm table-hover">
                         <thead>
                             <tr>
                                 <th>Vendor</th>
@@ -93,18 +93,18 @@
                                 <th>Purchase Unit</th>
                                 <th>Unit Price</th>
                                 <th>Status</th>
+                                <th style="width: 80px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="vendorItemsTableBody"></tbody>
                     </table>
                 </div>
                 <div id="vendorItemsEmpty" style="display: none;" class="alert alert-info">
-                    No vendors are selling this item yet. Add vendor items from the Vendor Items page.
+                    No vendors are selling this item yet. <a href="vendor-items">Add vendor items from the Vendor Items page</a>.
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <a href="/vendor-items" class="btn btn-primary">Go to Vendor Items</a>
             </div>
         </div>
     </div>
@@ -357,7 +357,13 @@
         try {
             const response = await apiRequest('api/items/?limit=1000');
             items = Array.isArray(response) ? response : [];
-            displayItems();
+            // Re-apply search filter if one exists
+            const searchValue = document.getElementById('itemSearch').value;
+            if (searchValue) {
+                filterItems();
+            } else {
+                displayItems();
+            }
         } catch (error) {
             console.error('Error loading items:', error);
             showAlert('Error loading items: ' + error.message, 'danger');
@@ -395,19 +401,16 @@
             }
 
             return `
-                <tr>
-                    <td>${item.name}</td>
+                <tr style="cursor: pointer;" onclick="goToItemDetail(${item.id})">
+                    <td><a href="item-detail?id=${item.id}" class="text-decoration-none text-primary" onclick="event.stopPropagation();">${item.name}</a></td>
                     <td>${item.category || '-'}</td>
                     <td>${item.unit_of_measure || '-'}</td>
                     <td>${lastPrice}</td>
                     <td>${statusBadge}</td>
-                    <td class="text-end">
-                        <button class="btn btn-sm btn-link p-0 me-2" onclick="viewVendorItems(${item.id})" title="View Vendors">
-                            <i class="bi bi-shop"></i>
-                        </button>
-                        <button class="btn btn-sm btn-link p-0 me-2" onclick="editItem(${item.id})" title="Edit">
-                            <i class="bi bi-pencil"></i>
-                        </button>
+                    <td class="text-end" onclick="event.stopPropagation();">
+                        <a href="item-detail?id=${item.id}" class="btn btn-sm btn-link p-0 me-2" title="View Details">
+                            <i class="bi bi-eye"></i>
+                        </a>
                         <button class="btn btn-sm btn-link p-0 text-danger" onclick="deleteItem(${item.id})" title="Delete">
                             <i class="bi bi-trash"></i>
                         </button>
@@ -415,6 +418,11 @@
                 </tr>
             `;
         }).join('');
+    }
+
+    // Navigate to item detail page
+    function goToItemDetail(itemId) {
+        window.location.href = `item-detail?id=${itemId}`;
     }
 
     function filterItems() {
@@ -621,6 +629,11 @@
                         <td>${vi.purchase_unit_name || '-'} ${vi.pack_size ? `(${vi.pack_size})` : ''}</td>
                         <td>${vi.unit_price ? '$' + parseFloat(vi.unit_price).toFixed(2) : '-'}</td>
                         <td>${statusBadge}${preferredBadge}</td>
+                        <td>
+                            <a href="vendor-items?highlight=${vi.id}" class="btn btn-sm btn-outline-primary" title="View & Edit">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                        </td>
                     </tr>
                 `;
             }).join('');

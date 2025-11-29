@@ -65,11 +65,19 @@ async function apiRequest(url, options = {}) {
         throw new Error(`HTTP error! status: ${response.status}`);
     }
 
+    // Handle 204 No Content responses (from DELETE operations)
+    if (response.status === 204) {
+        return { success: true };
+    }
+
     // Check if response is actually JSON before trying to parse it
     // This handles cases where server redirects to login page (HTML) with 200 status
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
         return response.json();
+    } else if (!contentType || contentType.length === 0) {
+        // No content-type header - assume successful empty response (like 204)
+        return { success: true };
     } else {
         // Response is not JSON (likely HTML from a redirect to login page)
         console.warn('Non-JSON response received, likely redirected to login. Clearing auth and redirecting...');

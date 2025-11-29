@@ -553,6 +553,15 @@
             }
         }
 
+        /* Prevent layout shift when modal opens/closes */
+        html {
+            overflow-x: hidden;
+        }
+
+        body {
+            overflow-x: hidden;
+        }
+
         {% block extra_css %}{% endblock %}
     </style>
 </head>
