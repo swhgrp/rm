@@ -81,7 +81,7 @@ async def get_inventory_records(
             "storage_area_name": record.storage_area.name if record.storage_area else None,
             "item_name": record.master_item.name if record.master_item else None,
             "item_category": record.master_item.category if record.master_item else None,
-            "item_unit": record.master_item.unit_of_measure if record.master_item else None
+            "item_unit": record.master_item.unit.name if record.master_item and record.master_item.unit else None
         }
         response_data.append(InventoryResponse(**record_data))
     
@@ -183,7 +183,7 @@ async def get_inventory_record(
         location_name=record.location.name if record.location else None,
         item_name=record.master_item.name if record.master_item else None,
         item_category=record.master_item.category if record.master_item else None,
-        item_unit=record.master_item.unit_of_measure if record.master_item else None
+        item_unit=record.master_item.unit.name if record.master_item and record.master_item.unit else None
     )
 
 @router.post("/", response_model=InventoryResponse)

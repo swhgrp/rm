@@ -27,6 +27,7 @@ from accounting.schemas.vendor_bill import (
     VendorAgingDetail,
 )
 from accounting.api.auth import require_auth, require_admin
+from accounting.services.vendor_service import VendorService
 
 router = APIRouter(prefix="/api/vendor-bills", tags=["vendor_bills"])
 
@@ -72,14 +73,25 @@ def create_bill_journal_entry(bill: VendorBill, db: Session) -> JournalEntry:
     db.flush()  # Get JE ID
 
     # Add debit lines for each bill line item (Expenses)
+    # Note: Credit line items (negative amounts) are recorded as credits, not negative debits
     line_number = 1
     for bill_line in bill.line_items:
+        line_amount = bill_line.amount + bill_line.tax_amount
+
+        # Handle credit items (negative amounts) - record as credit instead of negative debit
+        if line_amount >= 0:
+            debit_amt = line_amount
+            credit_amt = Decimal('0.00')
+        else:
+            debit_amt = Decimal('0.00')
+            credit_amt = abs(line_amount)
+
         je_line = JournalEntryLine(
             journal_entry_id=je.id,
             account_id=bill_line.account_id,
             area_id=bill_line.area_id or bill.area_id,
-            debit_amount=bill_line.amount + bill_line.tax_amount,
-            credit_amount=Decimal('0.00'),
+            debit_amount=debit_amt,
+            credit_amount=credit_amt,
             description=bill_line.description or f"{bill.vendor_name} - {bill.bill_number}",
             line_number=line_number
         )
@@ -774,18 +786,41 @@ def receive_vendor_bill_from_hub(
                 Area.name.ilike(f"%{bill_data['location_name']}%")
             ).first()
 
+        # Resolve vendor name using VendorService (handles aliases)
+        vendor_service = VendorService(db)
+        vendor, was_created, was_alias = vendor_service.get_or_create_vendor(
+            vendor_name=bill_data["vendor_name"],
+            create_if_not_found=True,
+            default_payment_terms="Net 30"
+        )
+
+        # Use canonical vendor name if resolved via alias
+        canonical_vendor_name = vendor.vendor_name if vendor else bill_data["vendor_name"]
+
         # Create vendor bill
         bill_date = datetime.strptime(bill_data["bill_date"], "%Y-%m-%d").date()
-        # Default due date to 30 days from bill date if not provided
+        # Default due date to vendor's payment terms, or 30 days if not set
         if bill_data.get("due_date"):
             due_date = datetime.strptime(bill_data["due_date"], "%Y-%m-%d").date()
         else:
             from datetime import timedelta
-            due_date = bill_date + timedelta(days=30)
+            # Use vendor payment terms if available
+            payment_days = 30
+            if vendor and vendor.payment_terms:
+                # Parse "Net X" to get days
+                terms = vendor.payment_terms.lower()
+                if "net" in terms:
+                    try:
+                        payment_days = int(''.join(filter(str.isdigit, terms)))
+                    except ValueError:
+                        payment_days = 30
+                elif "due on receipt" in terms:
+                    payment_days = 0
+            due_date = bill_date + timedelta(days=payment_days)
 
         bill = VendorBill(
-            vendor_name=bill_data["vendor_name"],
-            vendor_id=None,  # TODO: Map vendor from Hub to accounting
+            vendor_name=canonical_vendor_name,  # Use canonical name
+            vendor_id=vendor.id if vendor else None,
             bill_number=bill_data["bill_number"],
             bill_date=bill_date,
             due_date=due_date,

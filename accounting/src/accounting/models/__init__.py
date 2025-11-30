@@ -17,6 +17,7 @@ from accounting.models.account_balance import AccountBalance
 from accounting.models.sync_log import InventorySyncLog, SyncStatus
 from accounting.models.cogs import COGSTransaction, TransactionType
 from accounting.models.vendor import Vendor
+from accounting.models.vendor_alias import VendorAlias
 from accounting.models.vendor_bill import VendorBill, VendorBillLine, BillPayment, BillStatus, PaymentMethod
 from accounting.models.customer import Customer
 from accounting.models.customer_invoice import CustomerInvoice, CustomerInvoiceLine, InvoicePayment, InvoiceStatus
@@ -104,6 +105,7 @@ __all__ = [
     "COGSTransaction",
     "TransactionType",
     "Vendor",
+    "VendorAlias",
     "VendorBill",
     "VendorBillLine",
     "BillPayment",

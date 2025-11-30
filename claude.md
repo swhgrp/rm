@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** November 28, 2025
+**Last Updated:** November 30, 2025
 **System Status:** Production (88% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -9,7 +9,139 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Nov 28, 2025)
+### Most Recent Work (Current Session - Nov 30, 2025)
+
+**ACCOUNTING: JOURNAL ENTRY CORRECTION FEATURE + TAX DOUBLE-COUNTING FIX** ✅ **COMPLETE**
+
+1. **Journal Entry Correction Feature** 🔧 **NEW FEATURE**
+   - **Purpose:** Allow users to correct posted journal entries by reversing and re-entering
+   - **Workflow:**
+     1. User clicks "Correct" on a posted entry
+     2. Form pre-populates with entry data (no reversal yet - deferred pattern)
+     3. User edits the amounts/accounts as needed
+     4. On Save: Original entry reversed, then new corrected entry created
+     5. On Cancel: No changes made, correction mode cleared
+   - **Key Design Decision:** Deferred reversal pattern
+     - Reversal only happens when user actually saves the correction
+     - Prevents orphaned reversals if user cancels
+   - **Files Modified:**
+     - `accounting/src/accounting/templates/journal_entries.html`
+       - Added `correctingEntryId` tracking variable
+       - Modified `correctEntry()` to store entry ID without immediate reversal
+       - Modified `handleSubmit()` to reverse original entry on save
+       - Modified `cancelEntry()` to clear correction mode with appropriate message
+       - Modified `showListView()` and `showCreateView()` to clear correction mode
+     - `accounting/src/accounting/api/journal_entries.py`
+       - Changed reversal entries to auto-post (status=POSTED) instead of DRAFT
+
+2. **Reversal Entry Auto-Post** ✅ **IMPROVEMENT**
+   - **Problem:** Reversal entries were created as DRAFT status, requiring manual posting
+   - **Solution:** Reversal entries now auto-post with `status=JournalEntryStatus.POSTED`
+   - Sets `posted_at=datetime.utcnow()` and `posted_by=user.id` automatically
+   - **File Modified:** `accounting/src/accounting/api/journal_entries.py` line ~175
+
+3. **Tax Double-Counting Fix** 🔥 **CRITICAL FIX** (from earlier in session)
+   - **Problem:** Invoice items that already included tax line items (e.g., "State Sales Tax") were having tax added again from `invoice.tax_amount`
+   - **Root Cause:** `accounting_sender.py` always added proportional tax without checking if items already totaled to invoice total
+   - **Solution:** Added detection logic to check if items_total ≈ invoice_total
+     - If yes: Tax already in items, don't add again
+     - If no: Distribute tax proportionally across line items
+   - **Code Change:**
+     ```python
+     # Determine if tax is already included in items
+     tax_already_in_items = abs(items_total - invoice_total) < Decimal('0.02')
+
+     if tax_already_in_items:
+         logger.info(f"Tax appears to be included in line items")
+     else:
+         # Add proportional tax to each line
+     ```
+   - **File Modified:** `integration-hub/src/integration_hub/services/accounting_sender.py` (lines 226-266)
+
+4. **Data Corrections Applied** 🔧 **DATABASE FIXES**
+   - Fixed REV-20251130-0001 status from REVERSED to POSTED (reversals should be POSTED)
+   - Restored AP-20251130-0004 to POSTED status after test correction was cancelled
+   - **SQL Commands:**
+     - `UPDATE journal_entries SET status='POSTED', posted_at=NOW() WHERE entry_number='REV-20251130-0001';`
+     - `UPDATE journal_entries SET status='POSTED', posted_at=NOW() WHERE entry_number='AP-20251130-0004';`
+
+5. **Accounting Concepts Clarified** 📚 **DOCUMENTATION**
+   - **REVERSED status vs REV entry:**
+     - REVERSED is a status label on the original entry (marks it as voided)
+     - The REV entry is what actually zeros out the GL by creating opposite debits/credits
+     - The original entry stays in the ledger with REVERSED status for audit trail
+     - The REV entry creates offsetting entries so net effect is zero
+   - **Example from session:**
+     - AP-20251129-0006 (wrong amount $142.09) → marked REVERSED
+     - REV-20251130-0001 (reversal) → credits back the $142.09
+     - AP-20251130-0004 (correct amount $127.37) → new correct entry
+
+**Files Modified This Session:**
+- `accounting/src/accounting/templates/journal_entries.html` (deferred reversal pattern)
+- `accounting/src/accounting/api/journal_entries.py` (auto-post reversals)
+- `integration-hub/src/integration_hub/services/accounting_sender.py` (tax double-counting fix)
+
+---
+
+### Previous Session Work (Nov 29, 2025)
+
+**INVENTORY COUNT FIXES + OCR ACCURACY IMPROVEMENT PROJECT** 🔄 **IN PROGRESS**
+
+1. **Inventory Count Session Fixes** ✅ **COMPLETE**
+   - **Unit Display Fix:** Items showed "null" next to count amounts
+     - Root cause: API used deprecated `unit_of_measure` string field (empty) instead of `unit_of_measure_id` relationship
+     - Fixed by changing API endpoints to use `item.master_item.unit.name`
+     - Files modified: `items.py`, `count_templates.py`, `storage_areas.py`, `inventory.py`, `waste.py`
+
+   - **Additional Count Units Not Showing:** count_unit_2 and count_unit_3 not appearing in dropdown
+     - Root cause: API wasn't returning `count_unit_2_name` and `count_unit_3_name`
+     - Fixed by adding joinedload for count_unit_2/3 in items.py and updating count_session_new.html
+
+   - **Unit Conversion Not Working:** Counting 2 cases showed "2 cans" instead of 48
+     - Root cause: Pydantic schema `MasterItemResponse` missing `count_unit_2_factor` and `count_unit_3_factor`
+     - Fixed by adding fields to `inventory/src/restaurant_inventory/schemas/item.py`
+
+   - **500 Error on Save:** "numeric field overflow" for variance_percent
+     - Root cause: Column precision (5,2) couldn't hold 5900% variance
+     - Fixed: `ALTER TABLE count_session_items ALTER COLUMN variance_percent TYPE NUMERIC(10, 2);`
+
+   - **Inventory Type Always "Partial":** Should be "Full" when selected
+     - Root cause: `create_count_session` endpoint not passing `inventory_type` to model
+     - Fixed by adding inventory_type parameter in count_sessions.py
+
+   - **Delete Count Session 500 Error:** Foreign key constraint violation
+     - Root cause: `count_session_storage_areas` table not deleted before session
+     - Fixed by explicitly deleting related records before session deletion
+     - File: `inventory/src/restaurant_inventory/api/api_v1/endpoints/count_sessions.py`
+
+2. **OCR Accuracy Improvement Project** 🔄 **IN PROGRESS - PAUSED**
+   - **Problem:** Invoice item codes frequently have OCR errors (1-2 digits off)
+   - **Analysis Complete:** Created fuzzy matching script to compare unmapped items vs vendor items
+   - **Script Location:** `/opt/restaurant-system/integration-hub/scripts/fuzzy_match_report.py`
+
+   - **Fuzzy Match Report Results:**
+     - 356 unique unmapped items analyzed
+     - **67 exact/near-exact matches (≥95%)** - Safe to auto-correct
+     - **1 high confidence match (80-95%)** - Quick review needed
+     - **26 medium confidence matches (60-80%)** - Manual review needed
+     - **262 no match** - New items or vendors not in system (Gold Coast Beverage, Southern Glazier's)
+
+   - **OCR Errors Detected Examples:**
+     - `104471` → `100471` (Grape Juice)
+     - `141441` → `141341` (Honey)
+     - `434013` → `431013` (Garlic)
+     - `1017400` → `101740` (Caribbean Vegetable Blend)
+
+   - **Next Steps (TO DO):**
+     1. Auto-correct the 67 exact matches in hub_invoice_items
+     2. Review and approve/reject the 26 medium confidence matches
+     3. Add vendor items for Gold Coast Beverage and Southern Glazier's (need price lists)
+     4. Enhance invoice parser with OCR confidence scoring
+     5. Add fuzzy matching logic to auto-mapper for future invoices
+
+---
+
+### Previous Session Work (Nov 28, 2025)
 
 **INVENTORY: KEY ITEMS + UNIT CONVERSIONS & INTEGRATION HUB: INVOICE FIXES** ✅ **COMPLETE**
 

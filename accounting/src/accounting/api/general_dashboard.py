@@ -29,6 +29,7 @@ router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
 def get_dashboard_summary(
     as_of_date: Optional[date] = Query(None, description="As of date (defaults to today)"),
     area_id: Optional[int] = Query(None, description="Filter by location (null = all locations)"),
+    period: Optional[str] = Query(None, description="Period: yesterday, wtd, mtd, ytd"),
     db: Session = Depends(get_db),
     user: User = Depends(require_auth)
 ):
@@ -43,7 +44,7 @@ def get_dashboard_summary(
     - Revenue by location
     """
     service = GeneralDashboardService(db)
-    return service.get_executive_summary(as_of_date, area_id)
+    return service.get_executive_summary(as_of_date, area_id, period)
 
 
 @router.get("/real-time", response_model=RealTimeTrackingResponse)

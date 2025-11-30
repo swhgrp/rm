@@ -66,7 +66,9 @@ async def get_master_items(
     """Get all master items with filtering"""
     query = db.query(MasterItem).options(
         joinedload(MasterItem.unit),
-        joinedload(MasterItem.secondary_unit_rel)
+        joinedload(MasterItem.secondary_unit_rel),
+        joinedload(MasterItem.count_unit_2),
+        joinedload(MasterItem.count_unit_3)
     )
 
     if active_only:
@@ -94,6 +96,13 @@ async def get_master_items(
         item_dict['unit_name'] = unit_name
         item_dict['secondary_unit_name'] = item.secondary_unit_rel.name if item.secondary_unit_rel else item.secondary_unit
         item_dict['secondary_unit'] = item.secondary_unit_rel.name if item.secondary_unit_rel else item.secondary_unit
+
+        # Additional count units for flexible inventory counting
+        # Include conversion factors (contains_quantity) for unit conversion during counting
+        item_dict['count_unit_2_name'] = item.count_unit_2.name if item.count_unit_2 else None
+        item_dict['count_unit_2_factor'] = float(item.count_unit_2.contains_quantity) if item.count_unit_2 and item.count_unit_2.contains_quantity else None
+        item_dict['count_unit_3_name'] = item.count_unit_3.name if item.count_unit_3 else None
+        item_dict['count_unit_3_factor'] = float(item.count_unit_3.contains_quantity) if item.count_unit_3 and item.count_unit_3.contains_quantity else None
 
         # Get last price paid from preferred vendor item, or most recent vendor item
         preferred_vendor_item = db.query(VendorItem).filter(

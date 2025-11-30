@@ -25,6 +25,7 @@ class StorageAreaUpdate(BaseModel):
 class StorageAreaResponse(StorageAreaBase):
     id: int
     location_id: int
+    display_order: int
     created_at: datetime
     updated_at: Optional[datetime] = None
 

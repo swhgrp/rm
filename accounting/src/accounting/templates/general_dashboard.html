@@ -278,9 +278,9 @@
             </select>
             <!-- Period Tabs -->
             <div class="period-tabs" id="periodTabs">
-                <div class="period-tab active" data-period="yesterday">Yesterday</div>
+                <div class="period-tab" data-period="yesterday">Yesterday</div>
                 <div class="period-tab" data-period="wtd">WTD</div>
-                <div class="period-tab" data-period="mtd">MTD</div>
+                <div class="period-tab active" data-period="mtd">MTD</div>
                 <div class="period-tab" data-period="ytd">YTD</div>
             </div>
         </div>
@@ -402,9 +402,13 @@
                     </div>
                 </div>
                 <hr>
+                <div class="d-flex justify-content-between mb-2">
+                    <strong>Total Outstanding:</strong>
+                    <span class="metric-value" style="font-size: 1.25rem;" id="totalOutstandingAP">$0.00</span>
+                </div>
                 <div class="d-flex justify-content-between">
-                    <strong>Total Overdue:</strong>
-                    <span class="metric-value" style="font-size: 1.25rem; color: #f85149;" id="totalOverdueAP">$0.00</span>
+                    <span style="color: #8b949e;">Total Overdue (31+ days):</span>
+                    <span style="color: #f85149; font-weight: 600;" id="totalOverdueAP">$0.00</span>
                 </div>
             </div>
         </div>
@@ -459,7 +463,7 @@
 
 {% block extra_scripts %}
 <script>
-let currentPeriod = 'yesterday';
+let currentPeriod = 'mtd';
 let currentAreaId = null;
 let charts = {};
 
@@ -527,12 +531,20 @@ async function loadDashboardData() {
     }
 }
 
+function buildDashboardUrl(endpoint = '/accounting/api/dashboard/summary') {
+    const url = new URL(endpoint, window.location.origin);
+    if (currentAreaId) {
+        url.searchParams.append('area_id', currentAreaId);
+    }
+    if (currentPeriod) {
+        url.searchParams.append('period', currentPeriod);
+    }
+    return url;
+}
+
 async function loadNetSales() {
     try {
-        const url = new URL('/accounting/api/dashboard/summary', window.location.origin);
-        if (currentAreaId) {
-            url.searchParams.append('area_id', currentAreaId);
-        }
+        const url = buildDashboardUrl();
         const response = await fetch(url, {
             credentials: 'include'
         });
@@ -587,7 +599,8 @@ async function loadNetSales() {
 
 async function loadTopExpenses() {
     try {
-        const response = await fetch('/accounting/api/dashboard/summary', {
+        const url = buildDashboardUrl();
+        const response = await fetch(url, {
             credentials: 'include'
         });
 
@@ -632,7 +645,8 @@ async function loadTopExpenses() {
 
 async function loadGrossProfit() {
     try {
-        const response = await fetch('/accounting/api/dashboard/summary', {
+        const url = buildDashboardUrl();
+        const response = await fetch(url, {
             credentials: 'include'
         });
 
@@ -660,7 +674,8 @@ async function loadGrossProfit() {
 
 async function loadEBITDA() {
     try {
-        const response = await fetch('/accounting/api/dashboard/summary', {
+        const url = buildDashboardUrl();
+        const response = await fetch(url, {
             credentials: 'include'
         });
 
@@ -764,18 +779,23 @@ async function loadAPAging() {
         }
 
         const data = await response.json();
+        const totals = data.totals || {};
 
         // Update aging buckets in the HTML
         const agingBuckets = document.querySelectorAll('#apAging .aging-bucket');
         if (agingBuckets.length >= 4) {
-            agingBuckets[0].querySelector('.aging-amount').textContent = formatCurrency(data.current || 0);
-            agingBuckets[1].querySelector('.aging-amount').textContent = formatCurrency(data.days_31_60 || 0);
-            agingBuckets[2].querySelector('.aging-amount').textContent = formatCurrency(data.days_61_90 || 0);
-            agingBuckets[3].querySelector('.aging-amount').textContent = formatCurrency(data.over_90 || 0);
+            agingBuckets[0].querySelector('.aging-amount').textContent = formatCurrency(totals.current || 0);
+            agingBuckets[1].querySelector('.aging-amount').textContent = formatCurrency(totals.days_31_60 || 0);
+            agingBuckets[2].querySelector('.aging-amount').textContent = formatCurrency(totals.days_61_90 || 0);
+            agingBuckets[3].querySelector('.aging-amount').textContent = formatCurrency(totals.over_90_days || 0);
         }
 
+        // Total outstanding (all AP)
+        const totalOutstanding = parseFloat(totals.total || 0);
+        document.getElementById('totalOutstandingAP').textContent = formatCurrency(totalOutstanding);
+
         // Calculate total overdue (everything except current/0-30)
-        const overdue = (data.days_31_60 || 0) + (data.days_61_90 || 0) + (data.over_90 || 0);
+        const overdue = parseFloat(totals.days_31_60 || 0) + parseFloat(totals.days_61_90 || 0) + parseFloat(totals.over_90_days || 0);
         document.getElementById('totalOverdueAP').textContent = formatCurrency(overdue);
     } catch (error) {
         console.error('Error loading AP aging:', error);
@@ -798,18 +818,19 @@ async function loadARAging() {
         }
 
         const data = await response.json();
+        const totals = data.totals || {};
 
         // Update aging buckets in the HTML
         const agingBuckets = document.querySelectorAll('#arAging .aging-bucket');
         if (agingBuckets.length >= 4) {
-            agingBuckets[0].querySelector('.aging-amount').textContent = formatCurrency(data.current || 0);
-            agingBuckets[1].querySelector('.aging-amount').textContent = formatCurrency(data.days_31_60 || 0);
-            agingBuckets[2].querySelector('.aging-amount').textContent = formatCurrency(data.days_61_90 || 0);
-            agingBuckets[3].querySelector('.aging-amount').textContent = formatCurrency(data.over_90 || 0);
+            agingBuckets[0].querySelector('.aging-amount').textContent = formatCurrency(totals.current || 0);
+            agingBuckets[1].querySelector('.aging-amount').textContent = formatCurrency(totals.days_31_60 || 0);
+            agingBuckets[2].querySelector('.aging-amount').textContent = formatCurrency(totals.days_61_90 || 0);
+            agingBuckets[3].querySelector('.aging-amount').textContent = formatCurrency(totals.over_90_days || 0);
         }
 
         // Update total outstanding
-        const totalOutstanding = data.total_outstanding || 0;
+        const totalOutstanding = parseFloat(totals.total || 0);
         document.getElementById('totalOutstandingAR').textContent = formatCurrency(totalOutstanding);
     } catch (error) {
         console.error('Error loading AR aging:', error);

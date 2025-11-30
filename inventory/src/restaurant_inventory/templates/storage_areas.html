@@ -39,6 +39,20 @@
     .accordion-collapse {
         border-top: 1px solid #30363d;
     }
+    .storage-area-drag-handle {
+        display: inline-flex;
+        align-items: center;
+        user-select: none;
+    }
+
+    .storage-area-drag-handle:active {
+        cursor: grabbing !important;
+    }
+
+    .accordion-item[draggable="true"] {
+        cursor: move;
+    }
+
 </style>
 {% endblock %}
 
@@ -402,6 +416,10 @@ function renderStorageAreas() {
                             <span class="badge bg-secondary ms-2">${sa.items.length} items</span>
                             ${sa.description ? `<small class="text-muted ms-3">${sa.description}</small>` : ''}
                         </button>
+                        <!-- Drag handle for reordering -->
+                        <div class="storage-area-drag-handle me-2 px-2" style="cursor: grab;" title="Drag to reorder">
+                            <i class="bi bi-grip-vertical text-muted"></i>
+                        </div>
                         <div class="btn-group me-2" onclick="event.stopPropagation();">
                             <button class="btn btn-success btn-sm" onclick="showBulkAddItemsModal(${sa.id}, '${sa.name.replace(/'/g, "\\'")}')" title="Add Items">
                                 <i class="bi bi-plus-circle"></i>
@@ -464,6 +482,9 @@ function renderStorageAreas() {
 
     // Initialize drag-and-drop
     initializeDragAndDrop();
+    
+    // Initialize storage area drag-and-drop
+    initializeStorageAreaDragAndDrop();
 }
 
 function filterDisplayedItems() {
@@ -479,14 +500,12 @@ function toggleExpandedArea(storageAreaId) {
 }
 
 // ========== DRAG AND DROP ==========
-function initializeDragAndDrop() {
-    const sortableTables = document.querySelectorAll('.sortable-items');
+function initializeDragAndDrop() {    const sortableTables = document.querySelectorAll('.sortable-items');
 
     sortableTables.forEach(tbody => {
         let draggedRow = null;
 
-        tbody.querySelectorAll('.sortable-row').forEach(row => {
-            row.setAttribute('draggable', true);
+        tbody.querySelectorAll('.sortable-row').forEach(row => {            row.setAttribute('draggable', true);
 
             row.addEventListener('dragstart', function(e) {
                 draggedRow = this;
@@ -811,7 +830,101 @@ async function removeItemFromStorageArea(storageAreaId, itemId) {
     }
 }
 
-// Check authentication
+// ========== STORAGE AREA DRAG AND DROP REORDERING ==========
+function initializeStorageAreaDragAndDrop() {    const accordion = document.getElementById('storageAreasAccordion');
+    if (!accordion) return;
+
+    const items = accordion.querySelectorAll('.accordion-item');
+    let draggedItem = null;
+
+    items.forEach((item, index) => {
+        const dragHandle = item.querySelector('.storage-area-drag-handle');        if (!dragHandle) return;
+
+        // Add dragstart listener to the HANDLE, not the item
+        dragHandle.addEventListener('dragstart', function(e) {
+            e.stopPropagation();
+            draggedItem = item;
+            item.style.opacity = '0.5';
+            e.dataTransfer.effectAllowed = 'move';
+        });
+
+        // Make the HANDLE draggable
+        dragHandle.setAttribute('draggable', 'true');
+
+        dragHandle.addEventListener('dragend', function(e) {
+            if (draggedItem) {
+                draggedItem.style.opacity = '1';
+                draggedItem = null;
+            }
+        });
+
+        // Add dragover to the item (not the handle)
+        item.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+
+            if (this !== draggedItem && draggedItem) {
+                const rect = this.getBoundingClientRect();
+                const midpoint = rect.top + rect.height / 2;
+
+                if (e.clientY < midpoint) {
+                    this.parentNode.insertBefore(draggedItem, this);
+                } else {
+                    this.parentNode.insertBefore(draggedItem, this.nextSibling);
+                }
+            }
+        });
+
+        item.addEventListener('drop', function(e) {
+            e.preventDefault();
+            if (draggedItem) {
+                saveStorageAreaOrderAfterDrag();
+            }
+        });
+    });
+}
+
+async function saveStorageAreaOrderAfterDrag() {
+    // Get new order from DOM
+    const accordion = document.getElementById('storageAreasAccordion');
+    const items = accordion.querySelectorAll('.accordion-item');
+    
+    // Update storageAreas array based on new DOM order
+    const newOrder = [];
+    items.forEach((item) => {
+        // Extract ID from the collapse target
+        const collapseButton = item.querySelector('.accordion-button');
+        const collapseTarget = collapseButton.getAttribute('data-bs-target');
+        const id = parseInt(collapseTarget.replace('#collapse-', ''));
+        const sa = storageAreas.find(s => s.id === id);
+        if (sa) {
+            newOrder.push(sa);
+        }
+    });
+
+    storageAreas = newOrder;
+
+    // Save to backend
+    const reorderData = storageAreas.map((sa, index) => ({
+        area_id: sa.id,
+        display_order: index
+    }));
+
+    try {
+        await apiRequest('api/storage-areas/reorder', {
+            method: 'PUT',
+            body: JSON.stringify(reorderData)
+        });
+        showAlert('Storage area order saved!', 'success');
+    } catch (error) {
+        console.error('Error saving storage area order:', error);
+        showAlert('Error saving order: ' + error.message, 'danger');
+        // Reload to reset order on error
+        await loadStorageAreasForLocation(selectedLocationId);
+    }
+}
+
+// // Check authentication
 function isAuthenticated() {
     return !!localStorage.getItem('access_token');
 }

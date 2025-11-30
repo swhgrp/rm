@@ -8,8 +8,10 @@ from typing import List, Optional
 from accounting.db.database import get_db
 from accounting.models.user import User
 from accounting.models.vendor import Vendor
+from accounting.models.vendor_alias import VendorAlias
 from accounting.schemas.vendor import VendorCreate, VendorUpdate, VendorResponse
 from accounting.api.auth import require_auth
+from accounting.services.vendor_service import VendorService
 
 router = APIRouter(prefix="/api/vendors", tags=["vendors"])
 
@@ -324,3 +326,197 @@ def delete_vendor(
     db.commit()
 
     return {"message": "Vendor deleted successfully"}
+
+
+# ============================================================================
+# VENDOR ALIAS ENDPOINTS
+# ============================================================================
+
+@router.get("/{vendor_id}/aliases")
+def get_vendor_aliases(
+    vendor_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """Get all aliases for a vendor"""
+    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vendor not found"
+        )
+
+    aliases = db.query(VendorAlias).filter(VendorAlias.vendor_id == vendor_id).all()
+
+    return {
+        "vendor_id": vendor_id,
+        "vendor_name": vendor.vendor_name,
+        "aliases": [
+            {
+                "id": a.id,
+                "alias_name": a.alias_name,
+                "case_insensitive": a.case_insensitive,
+                "created_at": a.created_at.isoformat() if a.created_at else None
+            }
+            for a in aliases
+        ]
+    }
+
+
+@router.post("/{vendor_id}/aliases")
+def add_vendor_alias(
+    vendor_id: int,
+    alias_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """
+    Add an alias for a vendor
+
+    Request body:
+    {
+        "alias_name": "Gordon Food Service Inc.",
+        "case_insensitive": true  // optional, defaults to true
+    }
+    """
+    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vendor not found"
+        )
+
+    alias_name = alias_data.get("alias_name", "").strip()
+    if not alias_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="alias_name is required"
+        )
+
+    # Check if alias already exists
+    existing = db.query(VendorAlias).filter(VendorAlias.alias_name == alias_name).first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Alias '{alias_name}' already exists (maps to vendor_id={existing.vendor_id})"
+        )
+
+    vendor_service = VendorService(db)
+    alias = vendor_service.add_alias(
+        alias_name=alias_name,
+        vendor_id=vendor_id,
+        case_insensitive=alias_data.get("case_insensitive", True),
+        created_by=current_user.id
+    )
+    db.commit()
+
+    return {
+        "success": True,
+        "alias_id": alias.id,
+        "message": f"Alias '{alias_name}' added for vendor '{vendor.vendor_name}'"
+    }
+
+
+@router.delete("/{vendor_id}/aliases/{alias_id}")
+def delete_vendor_alias(
+    vendor_id: int,
+    alias_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """Delete a vendor alias"""
+    alias = db.query(VendorAlias).filter(
+        VendorAlias.id == alias_id,
+        VendorAlias.vendor_id == vendor_id
+    ).first()
+
+    if not alias:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Alias not found"
+        )
+
+    alias_name = alias.alias_name
+    db.delete(alias)
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Alias '{alias_name}' deleted"
+    }
+
+
+@router.get("/aliases/all")
+def get_all_aliases(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """Get all vendor aliases with their canonical vendor names"""
+    aliases = db.query(
+        VendorAlias.id,
+        VendorAlias.alias_name,
+        VendorAlias.vendor_id,
+        VendorAlias.case_insensitive,
+        VendorAlias.created_at,
+        Vendor.vendor_name.label("canonical_name")
+    ).join(
+        Vendor, VendorAlias.vendor_id == Vendor.id
+    ).order_by(
+        Vendor.vendor_name, VendorAlias.alias_name
+    ).all()
+
+    return [
+        {
+            "id": a.id,
+            "alias_name": a.alias_name,
+            "vendor_id": a.vendor_id,
+            "canonical_name": a.canonical_name,
+            "case_insensitive": a.case_insensitive,
+            "created_at": a.created_at.isoformat() if a.created_at else None
+        }
+        for a in aliases
+    ]
+
+
+@router.post("/resolve-name")
+def resolve_vendor_name(
+    request: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """
+    Resolve a vendor name to its canonical form
+
+    Request body:
+    {
+        "vendor_name": "Gordon Food Service Inc."
+    }
+
+    Returns the canonical vendor if found, or None
+    """
+    vendor_name = request.get("vendor_name", "").strip()
+    if not vendor_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="vendor_name is required"
+        )
+
+    vendor_service = VendorService(db)
+    vendor, was_alias = vendor_service.resolve_vendor_name(vendor_name)
+
+    if vendor:
+        return {
+            "found": True,
+            "vendor_id": vendor.id,
+            "canonical_name": vendor.vendor_name,
+            "matched_via_alias": was_alias,
+            "payment_terms": vendor.payment_terms
+        }
+    else:
+        return {
+            "found": False,
+            "vendor_id": None,
+            "canonical_name": None,
+            "matched_via_alias": False,
+            "message": f"No vendor found for '{vendor_name}'"
+        }

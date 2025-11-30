@@ -293,8 +293,18 @@ async function initializePage() {
 
         populateLocationSelect();
 
-        // Check if template_id in URL
+        // Check URL parameters
         const urlParams = new URLSearchParams(window.location.search);
+
+        // Check if session ID in URL (resume existing session)
+        const sessionId = urlParams.get('session');
+        if (sessionId) {
+            await loadCountSession(sessionId);
+            showCountingScreen();
+            return;
+        }
+
+        // Check if template_id in URL (start new session from template)
         const templateId = urlParams.get('template_id');
         if (templateId) {
             await loadTemplateAndStart(templateId);

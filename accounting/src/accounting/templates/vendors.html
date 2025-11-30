@@ -11,9 +11,14 @@
             <h2 class="mb-0"><i class="bi bi-people"></i> Vendors</h2>
             <p class="text-muted mb-0">Manage your suppliers and service providers</p>
         </div>
-        <button class="btn btn-success" onclick="showCreateModal()">
-            <i class="bi bi-plus-circle"></i> Add Vendor
-        </button>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-info" onclick="showAllAliases()">
+                <i class="bi bi-link-45deg"></i> Manage Aliases
+            </button>
+            <button class="btn btn-success" onclick="showCreateModal()">
+                <i class="bi bi-plus-circle"></i> Add Vendor
+            </button>
+        </div>
     </div>
 
     <!-- Vendors Table -->
@@ -287,18 +292,134 @@
     </div>
 </div>
 
+<!-- Vendor Aliases Modal -->
+<div class="modal fade" id="aliasesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content" style="background-color: #161b22; border: 1px solid #30363d;">
+            <div class="modal-header" style="border-bottom: 1px solid #30363d;">
+                <h5 class="modal-title">
+                    <i class="bi bi-link-45deg"></i> Vendor Aliases - <span id="aliasVendorName"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>What are aliases?</strong> When invoices arrive from vendors with different name variations
+                    (e.g., "Gordon Food Service Inc." vs "GFS"), aliases help map them to the correct canonical vendor.
+                </div>
+
+                <!-- Add New Alias -->
+                <div class="card mb-3" style="background-color: #21262d; border: 1px solid #30363d;">
+                    <div class="card-body">
+                        <h6 class="card-title"><i class="bi bi-plus-circle"></i> Add New Alias</h6>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="newAliasName"
+                                   placeholder="Enter alias name (e.g., Gordon Food Service Inc.)">
+                            <button class="btn btn-success" onclick="addAlias()">
+                                <i class="bi bi-plus"></i> Add
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Current Aliases -->
+                <h6><i class="bi bi-list"></i> Current Aliases</h6>
+                <div id="aliasesList">
+                    <div class="text-muted text-center py-3">Loading...</div>
+                </div>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #30363d;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- All Aliases Modal -->
+<div class="modal fade" id="allAliasesModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content" style="background-color: #161b22; border: 1px solid #30363d;">
+            <div class="modal-header" style="border-bottom: 1px solid #30363d;">
+                <h5 class="modal-title"><i class="bi bi-link-45deg"></i> All Vendor Aliases</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle"></i>
+                    Aliases automatically map vendor name variations from invoices to canonical vendor names.
+                    When the Hub sends an invoice with "Gordon Food Service Inc.", it will be recorded under "Gordon Food Service".
+                </div>
+
+                <!-- Quick Add -->
+                <div class="card mb-3" style="background-color: #21262d; border: 1px solid #30363d;">
+                    <div class="card-body">
+                        <h6 class="card-title"><i class="bi bi-plus-circle"></i> Quick Add Alias</h6>
+                        <div class="row g-2">
+                            <div class="col-md-5">
+                                <input type="text" class="form-control" id="quickAliasName"
+                                       placeholder="Alias name (as it appears on invoices)">
+                            </div>
+                            <div class="col-md-5">
+                                <select class="form-select" id="quickAliasVendor">
+                                    <option value="">Select canonical vendor...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-success w-100" onclick="quickAddAlias()">
+                                    <i class="bi bi-plus"></i> Add
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search -->
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="aliasSearchBox"
+                           placeholder="Search aliases..." style="max-width: 400px;">
+                </div>
+
+                <!-- Aliases Table -->
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Alias Name (Invoice Name)</th>
+                            <th><i class="bi bi-arrow-right"></i></th>
+                            <th>Canonical Vendor</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="allAliasesTable">
+                        <tr>
+                            <td colspan="4" class="text-center text-muted">Loading...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="modal-footer" style="border-top: 1px solid #30363d;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
 let vendors = [];
+let allAliases = [];
 let editingVendorId = null;
 let deletingVendorId = null;
-let vendorModal, deleteModal;
+let currentAliasVendorId = null;
+let vendorModal, deleteModal, aliasesModal, allAliasesModal;
 
 document.addEventListener('DOMContentLoaded', function() {
     vendorModal = new bootstrap.Modal(document.getElementById('vendorModal'));
     deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    aliasesModal = new bootstrap.Modal(document.getElementById('aliasesModal'));
+    allAliasesModal = new bootstrap.Modal(document.getElementById('allAliasesModal'));
 
     // Auto-uppercase vendor code input
     document.getElementById('vendorCode').addEventListener('input', function(e) {
@@ -373,6 +494,9 @@ function renderVendorsTable(searchTerm = '') {
                     : '<span class="badge bg-secondary">Inactive</span>'}
             </td>
             <td>
+                <button class="btn btn-sm btn-info" onclick="showVendorAliases(${vendor.id})" title="Aliases">
+                    <i class="bi bi-link-45deg"></i>
+                </button>
                 <button class="btn btn-sm btn-primary" onclick="editVendor(${vendor.id})" title="Edit">
                     <i class="bi bi-pencil"></i>
                 </button>
@@ -552,6 +676,262 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ============================================================================
+// ALIAS MANAGEMENT FUNCTIONS
+// ============================================================================
+
+async function showVendorAliases(vendorId) {
+    const vendor = vendors.find(v => v.id === vendorId);
+    if (!vendor) return;
+
+    currentAliasVendorId = vendorId;
+    document.getElementById('aliasVendorName').textContent = vendor.vendor_name;
+    document.getElementById('newAliasName').value = '';
+
+    // Load aliases for this vendor
+    await loadVendorAliases(vendorId);
+    aliasesModal.show();
+}
+
+async function loadVendorAliases(vendorId) {
+    const aliasesList = document.getElementById('aliasesList');
+    aliasesList.innerHTML = '<div class="text-muted text-center py-3">Loading...</div>';
+
+    try {
+        const response = await fetch(`/accounting/api/vendors/${vendorId}/aliases`);
+        if (!response.ok) throw new Error('Failed to load aliases');
+
+        const data = await response.json();
+        const aliases = data.aliases || [];
+
+        if (aliases.length === 0) {
+            aliasesList.innerHTML = `
+                <div class="text-muted text-center py-3">
+                    <i class="bi bi-info-circle"></i> No aliases defined for this vendor.
+                    <br><small>Add aliases for name variations that appear on invoices.</small>
+                </div>
+            `;
+            return;
+        }
+
+        aliasesList.innerHTML = `
+            <div class="list-group">
+                ${aliases.map(alias => `
+                    <div class="list-group-item d-flex justify-content-between align-items-center"
+                         style="background-color: #21262d; border-color: #30363d;">
+                        <div>
+                            <strong>${escapeHtml(alias.alias_name)}</strong>
+                            <br><small class="text-muted">Added: ${alias.created_at ? new Date(alias.created_at).toLocaleDateString() : 'Unknown'}</small>
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteAlias(${vendorId}, ${alias.id}, '${escapeHtml(alias.alias_name)}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error loading aliases:', error);
+        aliasesList.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> Error loading aliases
+            </div>
+        `;
+    }
+}
+
+async function addAlias() {
+    const aliasName = document.getElementById('newAliasName').value.trim();
+
+    if (!aliasName) {
+        showNotification('Please enter an alias name', 'error');
+        return;
+    }
+
+    if (!currentAliasVendorId) {
+        showNotification('No vendor selected', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/vendors/${currentAliasVendorId}/aliases`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alias_name: aliasName })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to add alias');
+        }
+
+        showNotification(`Alias "${aliasName}" added successfully`, 'success');
+        document.getElementById('newAliasName').value = '';
+        await loadVendorAliases(currentAliasVendorId);
+    } catch (error) {
+        console.error('Error adding alias:', error);
+        showNotification(error.message, 'error');
+    }
+}
+
+async function deleteAlias(vendorId, aliasId, aliasName) {
+    if (!confirm(`Delete alias "${aliasName}"?`)) return;
+
+    try {
+        const response = await fetch(`/accounting/api/vendors/${vendorId}/aliases/${aliasId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete alias');
+        }
+
+        showNotification(`Alias "${aliasName}" deleted`, 'success');
+        await loadVendorAliases(vendorId);
+
+        // Also refresh all aliases if that modal is open
+        if (allAliasesModal._isShown) {
+            await loadAllAliases();
+        }
+    } catch (error) {
+        console.error('Error deleting alias:', error);
+        showNotification(error.message, 'error');
+    }
+}
+
+async function showAllAliases() {
+    // Populate vendor dropdown
+    const vendorSelect = document.getElementById('quickAliasVendor');
+    vendorSelect.innerHTML = '<option value="">Select canonical vendor...</option>' +
+        vendors.filter(v => v.is_active).map(v =>
+            `<option value="${v.id}">${escapeHtml(v.vendor_name)}</option>`
+        ).join('');
+
+    // Clear inputs
+    document.getElementById('quickAliasName').value = '';
+    document.getElementById('aliasSearchBox').value = '';
+
+    // Setup search
+    document.getElementById('aliasSearchBox').addEventListener('input', function(e) {
+        renderAllAliasesTable(e.target.value.toLowerCase());
+    });
+
+    await loadAllAliases();
+    allAliasesModal.show();
+}
+
+async function loadAllAliases() {
+    const tbody = document.getElementById('allAliasesTable');
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Loading...</td></tr>';
+
+    try {
+        const response = await fetch('/accounting/api/vendors/aliases/all');
+        if (!response.ok) throw new Error('Failed to load aliases');
+
+        allAliases = await response.json();
+        renderAllAliasesTable();
+    } catch (error) {
+        console.error('Error loading all aliases:', error);
+        tbody.innerHTML = `
+            <tr><td colspan="4" class="text-center text-danger">
+                <i class="bi bi-exclamation-triangle"></i> Error loading aliases
+            </td></tr>
+        `;
+    }
+}
+
+function renderAllAliasesTable(searchTerm = '') {
+    const tbody = document.getElementById('allAliasesTable');
+
+    let filtered = allAliases;
+    if (searchTerm) {
+        filtered = allAliases.filter(a =>
+            a.alias_name.toLowerCase().includes(searchTerm) ||
+            a.canonical_name.toLowerCase().includes(searchTerm)
+        );
+    }
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = `
+            <tr><td colspan="4" class="text-center text-muted">
+                ${searchTerm ? 'No aliases match your search' : 'No aliases defined yet'}
+            </td></tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = filtered.map(alias => `
+        <tr>
+            <td><code>${escapeHtml(alias.alias_name)}</code></td>
+            <td class="text-center text-info"><i class="bi bi-arrow-right"></i></td>
+            <td><strong>${escapeHtml(alias.canonical_name)}</strong></td>
+            <td>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteAliasFromAll(${alias.vendor_id}, ${alias.id}, '${escapeHtml(alias.alias_name)}')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+async function deleteAliasFromAll(vendorId, aliasId, aliasName) {
+    if (!confirm(`Delete alias "${aliasName}"?`)) return;
+
+    try {
+        const response = await fetch(`/accounting/api/vendors/${vendorId}/aliases/${aliasId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete alias');
+        }
+
+        showNotification(`Alias "${aliasName}" deleted`, 'success');
+        await loadAllAliases();
+    } catch (error) {
+        console.error('Error deleting alias:', error);
+        showNotification(error.message, 'error');
+    }
+}
+
+async function quickAddAlias() {
+    const aliasName = document.getElementById('quickAliasName').value.trim();
+    const vendorId = document.getElementById('quickAliasVendor').value;
+
+    if (!aliasName) {
+        showNotification('Please enter an alias name', 'error');
+        return;
+    }
+
+    if (!vendorId) {
+        showNotification('Please select a vendor', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/accounting/api/vendors/${vendorId}/aliases`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alias_name: aliasName })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to add alias');
+        }
+
+        showNotification(`Alias "${aliasName}" added successfully`, 'success');
+        document.getElementById('quickAliasName').value = '';
+        document.getElementById('quickAliasVendor').value = '';
+        await loadAllAliases();
+    } catch (error) {
+        console.error('Error adding alias:', error);
+        showNotification(error.message, 'error');
+    }
 }
 </script>
 {% endblock %}

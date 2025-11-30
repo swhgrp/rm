@@ -5,7 +5,7 @@ Central hub for receiving invoices and routing to Inventory and Accounting syste
 Provides mapping UI and auto-send functionality while keeping systems independent.
 """
 
-from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Form, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, Request, UploadFile, File, Form, BackgroundTasks, Query
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -325,6 +325,32 @@ async def parse_invoice(invoice_id: int, background_tasks: BackgroundTasks, db: 
         "message": "Invoice parsing started in background. This may take 30-60 seconds. Refresh the page to see results.",
         "invoice_id": invoice_id,
         "processing": True
+    }
+
+
+@app.get("/api/invoice-lookup")
+async def lookup_invoice_by_number(
+    invoice_number: str = Query(..., description="Invoice number to look up"),
+    db: Session = Depends(get_db)
+):
+    """
+    Look up an invoice by invoice number. Returns PDF info if available.
+    Used by accounting system to link journal entries back to source PDFs.
+    """
+    invoice = db.query(HubInvoice).filter(
+        HubInvoice.invoice_number == invoice_number
+    ).order_by(HubInvoice.id.desc()).first()
+
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    return {
+        "id": invoice.id,
+        "invoice_number": invoice.invoice_number,
+        "vendor_name": invoice.vendor_name,
+        "has_pdf": bool(invoice.pdf_path),
+        "pdf_url": f"/hub/api/invoices/{invoice.id}/pdf" if invoice.pdf_path else None,
+        "invoice_url": f"/hub/invoices/{invoice.id}"
     }
 
 

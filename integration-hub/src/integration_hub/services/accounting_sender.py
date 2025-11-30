@@ -201,8 +201,8 @@ class AccountingSenderService:
         }
 
         # Group items by GL account
-        # For inventory items, use gl_asset_account
-        # For expense items, use gl_cogs_account
+        # All purchases go directly to COGS/Expense accounts (periodic inventory method)
+        # Inventory asset adjustments are made at month-end based on physical counts
         # Note: At this point we have account_number strings, will convert to IDs later
         account_number_totals = {}
         for item in items:
@@ -210,12 +210,9 @@ class AccountingSenderService:
                 logger.warning(f"Skipping unmapped or incomplete item: {item.item_description}")
                 continue
 
-            # Use asset account for inventory items, expense account for expense-only items
+            # Use COGS account directly for all purchases (periodic inventory method)
             # Convert to string since accounting DB stores account_number as VARCHAR
-            if item.gl_asset_account:
-                account_number = str(item.gl_asset_account)
-            else:
-                account_number = str(item.gl_cogs_account)
+            account_number = str(item.gl_cogs_account)
 
             if account_number not in account_number_totals:
                 account_number_totals[account_number] = {
@@ -226,17 +223,27 @@ class AccountingSenderService:
             account_number_totals[account_number]["amount"] += Decimal(str(item.total_amount))
             account_number_totals[account_number]["descriptions"].append(item.item_description)
 
-        # Calculate subtotal and tax
-        # Tax is capitalized into the cost of items (not tracked separately for purchases)
-        subtotal = sum(data["amount"] for data in account_number_totals.values())
+        # Calculate the sum of all line items
+        # Note: Invoice items often already include tax as separate line items
+        # (e.g., "State Sales Tax", "County Sales Tax") so we should NOT add tax again
+        items_total = sum(data["amount"] for data in account_number_totals.values())
+        invoice_total = Decimal(str(invoice.total_amount))
         invoice_tax = Decimal(str(invoice.tax_amount)) if invoice.tax_amount else Decimal('0.00')
 
+        # Determine if tax is already included in items
+        # If items_total is close to invoice_total, tax is already in items - don't add again
+        # If items_total is close to invoice_total - tax, we need to add tax proportionally
+        tax_already_in_items = abs(items_total - invoice_total) < Decimal('0.02')
+
+        if tax_already_in_items:
+            logger.info(f"Tax appears to be included in line items (items total ${items_total} ≈ invoice total ${invoice_total})")
+        else:
+            logger.info(f"Tax needs to be distributed (items total ${items_total}, invoice total ${invoice_total}, tax ${invoice_tax})")
+
         # Add bill lines (expense or asset accounts)
-        # Tax is distributed proportionally across all line items
         # Convert account numbers to database IDs
         total_amount = Decimal('0.00')
         logger.info(f"Processing {len(account_number_totals)} account entries for vendor bill")
-        logger.info(f"Subtotal: ${subtotal}, Tax: ${invoice_tax}, Total: ${subtotal + invoice_tax}")
 
         for account_number, data in account_number_totals.items():
             # Look up the database ID for this account number
@@ -248,13 +255,12 @@ class AccountingSenderService:
                 logger.error(f"Cannot find account {account_number} in accounting system: {e}")
                 raise ValueError(f"Cannot find account {account_number} in accounting system: {e}")
 
-            # Calculate this line's share of tax (proportional to its amount)
             line_subtotal = data["amount"]
-            # Add proportional tax if there is tax to distribute
-            # Handle both positive invoices and negative credits
-            if subtotal != 0 and invoice_tax != 0:
+
+            # Only add proportional tax if it's NOT already included in items
+            if not tax_already_in_items and items_total != 0 and invoice_tax != 0:
                 # Proportional tax: (line amount / subtotal) * total tax
-                line_tax = (line_subtotal / subtotal) * invoice_tax
+                line_tax = (line_subtotal / items_total) * invoice_tax
                 line_total = line_subtotal + line_tax
             else:
                 line_total = line_subtotal
@@ -265,13 +271,13 @@ class AccountingSenderService:
 
             payload["lines"].append({
                 "account_id": account_id,  # Using the actual database ID (integer)
-                "amount": float(line_total),  # Amount includes proportional tax
+                "amount": float(line_total),
                 "description": description
             })
 
             total_amount += line_total
 
-        logger.debug(f"Built vendor bill payload with {len(payload['lines'])} lines, total with tax: ${total_amount}")
+        logger.debug(f"Built vendor bill payload with {len(payload['lines'])} lines, total: ${total_amount}")
 
         # Validate total matches invoice total
         invoice_total = Decimal(str(invoice.total_amount))

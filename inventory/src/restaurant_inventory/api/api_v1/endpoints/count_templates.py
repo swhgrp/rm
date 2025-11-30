@@ -60,7 +60,7 @@ async def get_count_templates(
                     sort_order=item.sort_order,
                     item_name=item.master_item.name if item.master_item else None,
                     item_category=item.master_item.category if item.master_item else None,
-                    item_unit=item.master_item.unit_of_measure if item.master_item else None
+                    item_unit=item.master_item.unit.name if item.master_item and item.master_item.unit else None
                 )
                 for item in sorted(template.items, key=lambda x: x.sort_order)
             ]

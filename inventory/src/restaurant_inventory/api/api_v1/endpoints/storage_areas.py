@@ -31,7 +31,9 @@ async def get_storage_areas(
 
     if location_id:
         query = query.filter(StorageArea.location_id == location_id)
-    return query.filter(StorageArea.is_active == True).all()
+
+    # Order by display_order, then by name
+    return query.filter(StorageArea.is_active == True).order_by(StorageArea.display_order, StorageArea.name).all()
 
 
 @router.get("/{storage_area_id}", response_model=StorageAreaResponse)
@@ -68,10 +70,16 @@ async def create_storage_area(
             detail="Location not found"
         )
 
+    # Get max display_order for this location
+    max_order = db.query(StorageArea).filter(
+        StorageArea.location_id == storage_area_data.location_id
+    ).count()
+
     storage_area = StorageArea(
         location_id=storage_area_data.location_id,
         name=storage_area_data.name,
         description=storage_area_data.description,
+        display_order=max_order,
         is_active=storage_area_data.is_active
     )
 
@@ -97,6 +105,32 @@ async def create_storage_area(
     )
 
     return storage_area
+
+
+# Pydantic schema for storage area reordering
+class StorageAreaReorder(BaseModel):
+    area_id: int
+    display_order: int
+
+
+@router.put("/reorder")
+async def reorder_storage_areas(
+    areas: List[StorageAreaReorder],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager_or_admin)
+):
+    """Update display order of storage areas"""
+    for area_data in areas:
+        storage_area = db.query(StorageArea).filter(
+            StorageArea.id == area_data.area_id
+        ).first()
+
+        if storage_area:
+            storage_area.display_order = area_data.display_order
+
+    db.commit()
+
+    return {"success": True, "message": "Storage areas reordered"}
 
 
 @router.put("/{storage_area_id}", response_model=StorageAreaResponse)
@@ -188,6 +222,9 @@ async def delete_storage_area(
     return {"success": True, "message": "Storage area deleted"}
 
 
+
+
+
 # Pydantic schemas for storage area items
 class StorageAreaItemResponse(BaseModel):
     id: int
@@ -229,7 +266,7 @@ async def get_storage_area_items(
                 display_order=item.display_order,
                 item_name=master_item.name,
                 item_category=master_item.category or "",
-                item_unit=master_item.unit_of_measure or "Each"
+                item_unit=master_item.unit.name if master_item.unit else "Each"
             ))
 
     return result

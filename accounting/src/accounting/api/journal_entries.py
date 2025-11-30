@@ -3,7 +3,7 @@ Journal Entry API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_, and_, exists
 from typing import List, Optional
 from datetime import datetime, date
 from decimal import Decimal
@@ -192,7 +192,18 @@ def list_journal_entries(
         query = query.filter(JournalEntry.entry_date <= end_date)
 
     if location_id:
-        query = query.filter(JournalEntry.location_id == location_id)
+        # Filter by location - check both header-level location_id and line-level area_id
+        query = query.filter(
+            or_(
+                JournalEntry.location_id == location_id,
+                exists().where(
+                    and_(
+                        JournalEntryLine.journal_entry_id == JournalEntry.id,
+                        JournalEntryLine.area_id == location_id
+                    )
+                )
+            )
+        )
 
     if reference_type:
         query = query.filter(JournalEntry.reference_type == reference_type.upper())
@@ -416,7 +427,7 @@ def reverse_journal_entry(
     # Generate reversal entry number
     reversal_number = generate_entry_number(db, reversal_date)
 
-    # Create reversal entry
+    # Create reversal entry - auto-posted since we're undoing a posted entry
     reversal_entry = JournalEntry(
         entry_number=reversal_number,
         entry_date=reversal_date,
@@ -424,7 +435,9 @@ def reverse_journal_entry(
         reference_type="REVERSAL",
         reference_id=entry.id,
         location_id=entry.location_id,
-        status=JournalEntryStatus.DRAFT
+        status=JournalEntryStatus.POSTED,  # Auto-post reversals
+        posted_at=datetime.utcnow(),
+        posted_by=user.id
     )
     db.add(reversal_entry)
     db.flush()
@@ -434,6 +447,7 @@ def reverse_journal_entry(
         reversal_line = JournalEntryLine(
             journal_entry_id=reversal_entry.id,
             account_id=line.account_id,
+            area_id=line.area_id,  # Preserve the location/area
             debit_amount=line.credit_amount,  # Swap
             credit_amount=line.debit_amount,  # Swap
             description=f"Reversal of {entry.entry_number}"

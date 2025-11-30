@@ -500,7 +500,7 @@ async function init() {
             apiRequest('api/locations/'),
             apiRequest('api/storage-areas/'),
             apiRequest('api/categories/'),
-            apiRequest('api/items/')
+            apiRequest('api/items/?limit=5000')  // Load all items for counting
         ]);
 
         console.log('Loaded locations:', locations);
@@ -791,7 +791,10 @@ function clearSearch() {
 
 function openCountModal(itemId) {
     const item = allItems.find(i => i.id === itemId);
-    if (!item) return;
+    if (!item) {
+        showAlert('Item not found. Please refresh the page.', 'danger');
+        return;
+    }
 
     currentItem = item;
 
@@ -817,17 +820,26 @@ function openCountModal(itemId) {
     const unitSelect = document.getElementById('unitSelect');
     let compatibleUnits = [itemUnit]; // Always include primary unit
 
-    // Add item-specific secondary unit if defined
-    if (item.secondary_unit && item.units_per_secondary) {
-        compatibleUnits.push(item.secondary_unit);
-        console.log(`Item has custom conversion: ${item.units_per_secondary} ${itemUnit} = 1 ${item.secondary_unit}`);
-    } else {
-        // Fall back to standard conversions if no custom conversion defined
-        const standardUnits = getCompatibleUnits(itemUnit);
-        compatibleUnits = [...new Set([...compatibleUnits, ...standardUnits])]; // Remove duplicates
+    // Add additional count units if defined (count_unit_2 and count_unit_3)
+    if (item.count_unit_2_name) {
+        compatibleUnits.push(item.count_unit_2_name);
+    }
+    if (item.count_unit_3_name) {
+        compatibleUnits.push(item.count_unit_3_name);
     }
 
-    console.log('Item unit:', item.unit_of_measure, 'Compatible units:', compatibleUnits);
+    // Fall back to secondary_unit for older items or standard conversions
+    if (compatibleUnits.length === 1) {
+        if (item.secondary_unit && item.units_per_secondary) {
+            compatibleUnits.push(item.secondary_unit);
+        } else {
+            // Fall back to standard conversions if no custom conversion defined
+            const standardUnits = getCompatibleUnits(itemUnit);
+            compatibleUnits = [...new Set([...compatibleUnits, ...standardUnits])]; // Remove duplicates
+        }
+    }
+
+    console.log('Item unit:', item.unit_of_measure, 'Compatible units:', compatibleUnits, 'count_unit_2:', item.count_unit_2_name, 'count_unit_3:', item.count_unit_3_name);
 
     unitSelect.innerHTML = compatibleUnits.map(unit =>
         `<option value="${unit}" ${unit && itemUnit && unit.toLowerCase() === itemUnit.toLowerCase() ? 'selected' : ''}>${unit ? unit.toUpperCase() : 'EACH'}</option>`
@@ -891,21 +903,37 @@ async function saveItemCount() {
     // Convert quantity to base unit
     const baseUnit = currentItem.unit_of_measure || 'Each';
     let convertedQty;
+    const selectedUnitLower = selectedUnit ? selectedUnit.toLowerCase() : '';
+    const baseUnitLower = baseUnit ? baseUnit.toLowerCase() : '';
 
     // If no base unit, just use the quantity as-is
     if (!baseUnit || !selectedUnit) {
         convertedQty = qty;
     }
-    // Check if using item-specific conversion
+    // Already in base unit
+    else if (selectedUnitLower === baseUnitLower) {
+        convertedQty = qty;
+    }
+    // Check if using count_unit_2 with conversion factor
+    else if (currentItem.count_unit_2_name && currentItem.count_unit_2_factor &&
+        selectedUnitLower === currentItem.count_unit_2_name.toLowerCase()) {
+        // Convert from count_unit_2 to primary using the unit's contains_quantity
+        convertedQty = qty * parseFloat(currentItem.count_unit_2_factor);
+        console.log(`Count Unit 2 conversion: ${qty} ${selectedUnit} × ${currentItem.count_unit_2_factor} = ${convertedQty} ${baseUnit}`);
+    }
+    // Check if using count_unit_3 with conversion factor
+    else if (currentItem.count_unit_3_name && currentItem.count_unit_3_factor &&
+        selectedUnitLower === currentItem.count_unit_3_name.toLowerCase()) {
+        // Convert from count_unit_3 to primary using the unit's contains_quantity
+        convertedQty = qty * parseFloat(currentItem.count_unit_3_factor);
+        console.log(`Count Unit 3 conversion: ${qty} ${selectedUnit} × ${currentItem.count_unit_3_factor} = ${convertedQty} ${baseUnit}`);
+    }
+    // Check if using item-specific legacy secondary_unit conversion
     else if (currentItem.secondary_unit && currentItem.units_per_secondary &&
-        selectedUnit.toLowerCase() === currentItem.secondary_unit.toLowerCase()) {
+        selectedUnitLower === currentItem.secondary_unit.toLowerCase()) {
         // Convert from secondary to primary using item-specific ratio
         convertedQty = qty * parseFloat(currentItem.units_per_secondary);
-        console.log(`Custom conversion: ${qty} ${selectedUnit} × ${currentItem.units_per_secondary} = ${convertedQty} ${baseUnit}`);
-    } else if (currentItem.secondary_unit && currentItem.units_per_secondary &&
-               selectedUnit.toLowerCase() === currentItem.unit_of_measure.toLowerCase()) {
-        // Already in base unit
-        convertedQty = qty;
+        console.log(`Legacy conversion: ${qty} ${selectedUnit} × ${currentItem.units_per_secondary} = ${convertedQty} ${baseUnit}`);
     } else {
         // Use standard conversion
         convertedQty = convertUnit(qty, selectedUnit, baseUnit);
@@ -970,40 +998,28 @@ function displayItems() {
     const countedItems = items.filter(i => i.counted_quantity !== null && i.counted_quantity !== undefined);
     const uncountedItems = items.filter(i => i.counted_quantity === null || i.counted_quantity === undefined);
 
+    // Mobile-friendly list layout
     container.innerHTML = `
-        <div class="table-responsive">
-            <table class="table table-hover">
-                <thead class="table-dark">
-                    <tr>
-                        <th>Item</th>
-                        <th class="text-end">Counted</th>
-                        <th>Unit</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${items.map(item => {
-                        const counted = item.counted_quantity !== null && item.counted_quantity !== undefined ? parseFloat(item.counted_quantity) : null;
-                        const isCounted = counted !== null;
-                        const rowClass = !isCounted ? 'table-warning' : '';
+        <div class="list-group list-group-flush">
+            ${items.map(item => {
+                const counted = item.counted_quantity !== null && item.counted_quantity !== undefined ? parseFloat(item.counted_quantity) : null;
+                const isCounted = counted !== null;
+                const bgClass = !isCounted ? 'list-group-item-warning' : '';
 
-                        return `
-                        <tr class="${rowClass}">
-                            <td>
-                                <strong>${item.item_name}</strong>
-                                ${!isCounted ? '<span class="badge bg-warning text-dark ms-2">Not Counted</span>' : ''}
-                            </td>
-                            <td class="text-end">${counted !== null ? counted.toFixed(2) : '<span class="text-muted">-</span>'}</td>
-                            <td>${item.item_unit}</td>
-                            <td>
-                                <button class="btn btn-sm ${isCounted ? 'btn-primary' : 'btn-success'}" onclick="openCountModal(${item.master_item_id})">
-                                    <i class="bi bi-${isCounted ? 'pencil' : 'plus-circle'}"></i> ${isCounted ? 'Edit' : 'Count'}
-                                </button>
-                            </td>
-                        </tr>
-                    `}).join('')}
-                </tbody>
-            </table>
+                return `
+                <div class="list-group-item ${bgClass} d-flex justify-content-between align-items-center py-2 px-2">
+                    <div class="flex-grow-1 me-2" style="min-width: 0;">
+                        <div class="fw-bold text-truncate">${item.item_name}</div>
+                        <small class="text-muted">
+                            ${isCounted ? `<span class="text-success">${counted.toFixed(2)} ${item.item_unit}</span>` : `<span class="text-warning">Not counted</span>`}
+                        </small>
+                    </div>
+                    <button class="btn btn-sm ${isCounted ? 'btn-primary' : 'btn-success'} flex-shrink-0" onclick="openCountModal(${item.master_item_id})">
+                        <i class="bi bi-${isCounted ? 'pencil' : 'plus-circle'}"></i>
+                        <span class="d-none d-sm-inline">${isCounted ? 'Edit' : 'Count'}</span>
+                    </button>
+                </div>
+            `}).join('')}
         </div>
     `;
 

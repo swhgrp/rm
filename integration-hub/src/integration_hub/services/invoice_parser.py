@@ -762,6 +762,36 @@ class InvoiceParser:
             invoice.is_statement = parsed_data.get('is_statement', False)  # AI-detected statement flag
             invoice.raw_data = parsed_data
 
+            # Check for duplicate invoice (same invoice_number + vendor_name, different record)
+            if invoice.invoice_number and invoice.vendor_name:
+                # Normalize vendor name for comparison (case-insensitive, trim whitespace)
+                normalized_vendor = invoice.vendor_name.strip().upper()
+
+                duplicate = db.query(HubInvoice).filter(
+                    HubInvoice.id != invoice_id,
+                    HubInvoice.invoice_number == invoice.invoice_number,
+                    db.func.upper(db.func.trim(HubInvoice.vendor_name)) == normalized_vendor
+                ).first()
+
+                if duplicate:
+                    # This is a duplicate - mark it and return
+                    logger.warning(f"Duplicate invoice detected: {invoice.invoice_number} from {invoice.vendor_name} "
+                                   f"(original ID: {duplicate.id}, duplicate ID: {invoice_id})")
+
+                    # Delete any items we may have created
+                    db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).delete()
+
+                    # Delete this duplicate invoice
+                    db.delete(invoice)
+                    db.commit()
+
+                    return {
+                        "success": False,
+                        "message": f"Duplicate invoice detected. Invoice #{invoice.invoice_number} from {invoice.vendor_name} already exists (ID: {duplicate.id}). This duplicate has been removed.",
+                        "is_duplicate": True,
+                        "original_invoice_id": duplicate.id
+                    }
+
             # Parse dates
             if parsed_data.get('invoice_date'):
                 try:

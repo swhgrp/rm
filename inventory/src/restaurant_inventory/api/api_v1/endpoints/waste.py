@@ -93,7 +93,7 @@ def get_waste_record(
     record_dict = WasteRecordInDB.from_orm(record).dict()
     record_dict["location_name"] = record.location.name if record.location else None
     record_dict["item_name"] = record.master_item.name if record.master_item else None
-    record_dict["item_unit"] = record.master_item.unit_of_measure if record.master_item else None
+    record_dict["item_unit"] = record.master_item.unit.name if record.master_item and record.master_item.unit else None
     record_dict["recorded_by_name"] = record.recorder.full_name if record.recorder else None
 
     return WasteRecordWithDetails(**record_dict)

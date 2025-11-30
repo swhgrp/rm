@@ -66,7 +66,9 @@ class MasterItemResponse(MasterItemBase):
     unit_name: Optional[str] = None
     secondary_unit_name: Optional[str] = None
     count_unit_2_name: Optional[str] = None
+    count_unit_2_factor: Optional[float] = None  # Conversion factor (contains_quantity)
     count_unit_3_name: Optional[str] = None
+    count_unit_3_factor: Optional[float] = None  # Conversion factor (contains_quantity)
     # Last price paid from vendor items
     last_price_paid: Optional[float] = None
     last_price_unit: Optional[str] = None

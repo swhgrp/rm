@@ -98,12 +98,17 @@ async def create_count_session(
         )
 
     # Create session at location level
+    # Map inventory_type string to enum
+    from restaurant_inventory.models.count_session import InventoryType
+    inv_type = InventoryType.FULL if session_data.inventory_type == "FULL" else InventoryType.PARTIAL
+
     session = CountSession(
         location_id=session_data.location_id,
         storage_area_id=None,  # Not used in new workflow
         template_id=None,
         name=session_data.name,
         notes=session_data.notes,
+        inventory_type=inv_type,
         status=CountStatus.IN_PROGRESS,
         started_by=current_user.id
     )
@@ -527,7 +532,7 @@ def _format_count_session_item(item: CountSessionItem, db: Session = None) -> Co
         storage_area_name=item.storage_area.name if item.storage_area else None,
         item_name=item.master_item.name if item.master_item else None,
         item_category=item.master_item.category if item.master_item else None,
-        item_unit=item.master_item.unit_of_measure if item.master_item else None,
+        item_unit=item.master_item.unit.name if item.master_item and item.master_item.unit else None,
         item_barcode=item.master_item.barcode if item.master_item else None
     )
 
@@ -573,7 +578,20 @@ async def delete_count_session(
         changes={"session_name": session.name, "status": session.status.value}
     )
 
-    # Delete the session (cascade will handle items)
+    # Delete related records first (foreign key constraints)
+    from restaurant_inventory.models.count_session import CountSessionStorageArea, CountSessionItem
+
+    # Delete storage area records
+    db.query(CountSessionStorageArea).filter(
+        CountSessionStorageArea.session_id == session_id
+    ).delete(synchronize_session=False)
+
+    # Delete session items
+    db.query(CountSessionItem).filter(
+        CountSessionItem.session_id == session_id
+    ).delete(synchronize_session=False)
+
+    # Delete the session
     db.delete(session)
     db.commit()
 

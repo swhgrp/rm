@@ -15,6 +15,7 @@ class StorageArea(Base):
     location_id = Column(Integer, ForeignKey("locations.id"), nullable=False)
     name = Column(String, nullable=False)  # e.g., "Main Bar", "Walk-in Cooler", "Dry Storage"
     description = Column(String, nullable=True)
+    display_order = Column(Integer, nullable=False, default=0)  # Order to display storage areas
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

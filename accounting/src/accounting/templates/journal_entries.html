@@ -92,6 +92,15 @@
         color: white;
     }
 
+    .badge-credit {
+        background: #8b5cf6;
+        color: white;
+        font-size: 0.7rem;
+        padding: 0.2rem 0.4rem;
+        border-radius: 3px;
+        margin-left: 0.5rem;
+    }
+
     .btn-sm {
         padding: 0.35rem 0.75rem;
         font-size: 0.85rem;
@@ -462,6 +471,9 @@ async function loadEntries() {
         const status = document.getElementById('statusFilter').value;
         if (status) url += `&status=${status}`;
 
+        const locationId = document.getElementById('locationFilter').value;
+        if (locationId) url += `&location_id=${locationId}`;
+
         const startDate = document.getElementById('startDateFilter').value;
         if (startDate) url += `&start_date=${startDate}`;
 
@@ -518,9 +530,16 @@ function renderEntriesTable() {
             ? Array.from(uniqueAreas).join(', ')
             : '<span style="color: #8b949e;">Corporate</span>';
 
+        // Check if this is a credit memo (AP account debited instead of credited)
+        // Credit memos have AP (account 2100) with a debit amount
+        const isCreditMemo = entry.lines.some(line =>
+            line.account_number === '2100' && parseFloat(line.debit_amount) > 0
+        );
+        const creditBadge = isCreditMemo ? '<span class="badge-credit">CREDIT</span>' : '';
+
         return `
             <tr onclick="viewEntry(${entry.id})" style="cursor: pointer;">
-                <td>${entry.entry_number}</td>
+                <td>${entry.entry_number}${creditBadge}</td>
                 <td>${formatDate(entry.entry_date)}</td>
                 <td>${entry.description}</td>
                 <td>${locationDisplay}</td>
@@ -533,6 +552,7 @@ function renderEntriesTable() {
                         <button class="btn btn-danger btn-sm" onclick="deleteEntry(${entry.id})">Delete</button>
                     ` : ''}
                     ${entry.status === 'POSTED' ? `
+                        <button class="btn btn-warning btn-sm" onclick="correctEntry(${entry.id})" title="Reverse and create corrected entry">Correct</button>
                         <button class="btn btn-primary btn-sm" onclick="showReverseModal(${entry.id})">Reverse</button>
                     ` : ''}
                 </td>
@@ -546,6 +566,7 @@ function showListView() {
     document.getElementById('createView').classList.remove('active');
     document.getElementById('showListBtn').classList.add('active');
     document.getElementById('showCreateBtn').classList.remove('active');
+    correctingEntryId = null;  // Clear correction mode
     loadEntries();
 }
 
@@ -554,6 +575,9 @@ function showCreateView() {
     document.getElementById('createView').classList.add('active');
     document.getElementById('showListBtn').classList.remove('active');
     document.getElementById('showCreateBtn').classList.add('active');
+
+    // Clear correction mode when clicking "+ New Entry"
+    correctingEntryId = null;
 
     // Reset form
     document.getElementById('journalEntryForm').reset();
@@ -708,6 +732,23 @@ async function handleSubmit(event) {
     };
 
     try {
+        // If we're in correction mode, first reverse the original entry
+        if (correctingEntryId) {
+            const today = new Date().toISOString().split('T')[0];
+            const reverseResponse = await fetch(`/accounting/api/journal-entries/${correctingEntryId}/reverse?reversal_date=${today}`, {
+                method: 'POST'
+            });
+
+            if (!reverseResponse.ok) {
+                const error = await reverseResponse.json();
+                showMessage(error.detail || 'Failed to reverse original entry', 'error');
+                return;
+            }
+
+            const reverseResult = await reverseResponse.json();
+            console.log(`Reversed original entry: ${reverseResult.reversal_entry}`);
+        }
+
         const response = await fetch('/accounting/api/journal-entries/', {
             method: 'POST',
             headers: {
@@ -718,7 +759,12 @@ async function handleSubmit(event) {
 
         if (response.ok) {
             const result = await response.json();
-            showMessage(`Journal entry ${result.entry_number} created successfully`, 'success');
+            if (correctingEntryId) {
+                showMessage(`Correction saved as ${result.entry_number}. Original entry has been reversed.`, 'success');
+            } else {
+                showMessage(`Journal entry ${result.entry_number} created successfully`, 'success');
+            }
+            correctingEntryId = null;  // Clear correction mode
             showListView();
         } else {
             const error = await response.json();
@@ -803,7 +849,106 @@ async function reverseEntry(entryId, reversalDate) {
     }
 }
 
-function viewEntry(entryId) {
+// Track if we're in correction mode and which entry we're correcting
+let correctingEntryId = null;
+
+async function correctEntry(entryId) {
+    // Find the entry to get its data
+    const entry = entries.find(e => e.id === entryId);
+    if (!entry) {
+        showMessage('Entry not found', 'error');
+        return;
+    }
+
+    // Confirm the correction
+    if (!await showConfirm(
+        `This will open a form to create a corrected entry. The original entry (${entry.entry_number}) will be reversed when you save the corrected entry. Continue?`,
+        'Correct Journal Entry'
+    )) {
+        return;
+    }
+
+    // Store the entry ID we're correcting - will be reversed on save
+    correctingEntryId = entryId;
+
+    const today = new Date().toISOString().split('T')[0];
+
+    // Switch to create view
+    document.getElementById('listView').classList.remove('active');
+    document.getElementById('createView').classList.add('active');
+    document.getElementById('showListBtn').classList.remove('active');
+    document.getElementById('showCreateBtn').classList.add('active');
+
+    // Reset form
+    document.getElementById('journalEntryForm').reset();
+    document.getElementById('lineItemsBody').innerHTML = '';
+    lineItemCounter = 0;
+
+    // Pre-populate with original entry data
+    document.getElementById('entry_date').value = today;
+    document.getElementById('description').value = `Corrected: ${entry.description}`;
+    document.getElementById('reference_type').value = entry.reference_type || '';
+
+    // Add line items from the original entry
+    for (const line of entry.lines) {
+        lineItemCounter++;
+        const lineId = `line_${lineItemCounter}`;
+
+        const accountOptions = accounts.map(acc =>
+            `<option value="${acc.id}" ${acc.id === line.account_id ? 'selected' : ''}>
+                ${acc.account_number} - ${acc.account_name}
+            </option>`
+        ).join('');
+
+        const areaOptions = areas.map(area =>
+            `<option value="${area.id}" ${line.area_id === area.id ? 'selected' : ''}>
+                ${area.code} - ${area.name}
+            </option>`
+        ).join('');
+
+        const row = document.createElement('tr');
+        row.id = lineId;
+        row.innerHTML = `
+            <td>
+                <select class="account-select line-account" data-line="${lineId}" required>
+                    <option value="">Select Account...</option>
+                    ${accountOptions}
+                </select>
+            </td>
+            <td>
+                <select class="line-area" data-line="${lineId}">
+                    <option value="">Corporate/Unassigned</option>
+                    ${areaOptions}
+                </select>
+            </td>
+            <td>
+                <input type="number" class="line-debit" data-line="${lineId}"
+                       step="0.01" min="0" placeholder="0.00"
+                       value="${parseFloat(line.debit_amount) > 0 ? parseFloat(line.debit_amount).toFixed(2) : ''}"
+                       oninput="handleAmountChange(this, '${lineId}')">
+            </td>
+            <td>
+                <input type="number" class="line-credit" data-line="${lineId}"
+                       step="0.01" min="0" placeholder="0.00"
+                       value="${parseFloat(line.credit_amount) > 0 ? parseFloat(line.credit_amount).toFixed(2) : ''}"
+                       oninput="handleAmountChange(this, '${lineId}')">
+            </td>
+            <td>
+                <button type="button" class="btn-icon" onclick="removeLineItem('${lineId}')"
+                        title="Remove line">×</button>
+            </td>
+        `;
+
+        document.getElementById('lineItemsBody').appendChild(row);
+    }
+
+    // Update balance display
+    updateBalance();
+
+    showMessage(`Editing correction for ${entry.entry_number}. Original will be reversed when you save.`, 'success');
+}
+
+async function viewEntry(entryId) {
     const entry = entries.find(e => e.id === entryId);
     if (!entry) return;
 
@@ -815,6 +960,44 @@ function viewEntry(entryId) {
         totalCredit += parseFloat(line.credit_amount || 0);
     });
 
+    // Check if this is a credit memo
+    const isCreditMemo = entry.lines.some(line =>
+        line.account_number === '2100' && parseFloat(line.debit_amount) > 0
+    );
+    const creditBadge = isCreditMemo ? '<span class="badge-credit" style="margin-left: 0.5rem;">CREDIT MEMO</span>' : '';
+
+    // For AP entries, try to get PDF link from Hub
+    let pdfLink = '';
+    if (entry.reference_type === 'VENDOR_BILL' && entry.description) {
+        // Extract invoice number from description like "AP Bill: Vendor Name - 12345"
+        const match = entry.description.match(/- ([A-Za-z0-9\-\/]+)$/);
+        if (match) {
+            const invoiceNumber = match[1];
+            try {
+                const response = await fetch(`/hub/api/invoice-lookup?invoice_number=${encodeURIComponent(invoiceNumber)}`);
+                if (response.ok) {
+                    const hubInvoice = await response.json();
+                    if (hubInvoice.has_pdf) {
+                        pdfLink = `
+                        <tr>
+                            <td class="text-muted"><strong>Source PDF:</strong></td>
+                            <td>
+                                <a href="${hubInvoice.pdf_url}" target="_blank" class="btn btn-sm btn-outline-info">
+                                    <i class="bi bi-file-pdf"></i> View PDF
+                                </a>
+                                <a href="${hubInvoice.invoice_url}" target="_blank" class="btn btn-sm btn-outline-secondary ms-1">
+                                    <i class="bi bi-box-arrow-up-right"></i> Hub
+                                </a>
+                            </td>
+                        </tr>`;
+                    }
+                }
+            } catch (e) {
+                console.log('Could not fetch PDF info:', e);
+            }
+        }
+    }
+
     // Build formatted HTML
     let detailsHtml = `
         <div class="journal-entry-details">
@@ -824,7 +1007,7 @@ function viewEntry(entryId) {
                     <table class="table table-sm table-borderless">
                         <tr>
                             <td class="text-muted" style="width: 120px;"><strong>Entry Number:</strong></td>
-                            <td>${entry.entry_number}</td>
+                            <td>${entry.entry_number}${creditBadge}</td>
                         </tr>
                         <tr>
                             <td class="text-muted"><strong>Date:</strong></td>
@@ -834,6 +1017,7 @@ function viewEntry(entryId) {
                             <td class="text-muted"><strong>Status:</strong></td>
                             <td><span class="badge bg-success">${entry.status}</span></td>
                         </tr>
+                        ${pdfLink}
                         ${entry.reference_type === 'hub_invoice' && entry.reference_id ? `
                         <tr>
                             <td class="text-muted"><strong>Source Invoice:</strong></td>
@@ -929,7 +1113,12 @@ function viewEntry(entryId) {
 }
 
 async function cancelEntry() {
-    if (await showConfirm('Cancel creating this journal entry? All data will be lost.', 'Cancel Entry')) {
+    const message = correctingEntryId
+        ? 'Cancel this correction? No changes will be made to the original entry.'
+        : 'Cancel creating this journal entry? All data will be lost.';
+
+    if (await showConfirm(message, 'Cancel Entry')) {
+        correctingEntryId = null;  // Clear correction mode
         showListView();
     }
 }
@@ -942,6 +1131,60 @@ function showMessage(text, type) {
     setTimeout(() => {
         messageEl.classList.remove('show');
     }, 5000);
+}
+
+// Confirmation dialog helper
+async function showConfirm(message, title = 'Confirm') {
+    return new Promise((resolve) => {
+        // Create modal HTML
+        const modalHtml = `
+            <div class="modal fade" id="confirmModal" tabindex="-1">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">${title}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>${message}</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="confirmCancel">Cancel</button>
+                            <button type="button" class="btn btn-primary" id="confirmOk">OK</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove any existing confirm modal
+        const existing = document.getElementById('confirmModal');
+        if (existing) existing.remove();
+
+        // Add modal to page
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        const modalEl = document.getElementById('confirmModal');
+        const modal = new bootstrap.Modal(modalEl);
+
+        // Handle button clicks
+        document.getElementById('confirmOk').addEventListener('click', () => {
+            modal.hide();
+            resolve(true);
+        });
+
+        document.getElementById('confirmCancel').addEventListener('click', () => {
+            modal.hide();
+            resolve(false);
+        });
+
+        // Handle modal hidden (e.g., clicking backdrop or X)
+        modalEl.addEventListener('hidden.bs.modal', () => {
+            modalEl.remove();
+        }, { once: true });
+
+        modal.show();
+    });
 }
 
 // Helper function for date formatting

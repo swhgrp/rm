@@ -38,45 +38,66 @@ class GeneralDashboardService:
     def get_executive_summary(
         self,
         as_of_date: date = None,
-        area_id: Optional[int] = None
+        area_id: Optional[int] = None,
+        period: Optional[str] = None
     ) -> ExecutiveSummaryResponse:
         """Get executive summary metrics"""
         if not as_of_date:
             as_of_date = date.today()
 
-        # Get month-to-date and year-to-date periods
-        month_start = date(as_of_date.year, as_of_date.month, 1)
+        # Calculate period start based on period parameter
+        # yesterday = single day (yesterday)
+        # wtd = week to date (Monday to today)
+        # mtd = month to date (1st to today)
+        # ytd = year to date (Jan 1 to today)
+        if period == 'yesterday':
+            period_start = as_of_date - timedelta(days=1)
+            period_end = period_start
+        elif period == 'wtd':
+            # Week starts on Monday (weekday() returns 0 for Monday)
+            days_since_monday = as_of_date.weekday()
+            period_start = as_of_date - timedelta(days=days_since_monday)
+            period_end = as_of_date
+        elif period == 'ytd':
+            period_start = date(as_of_date.year, 1, 1)
+            period_end = as_of_date
+        else:  # Default to MTD
+            period_start = date(as_of_date.year, as_of_date.month, 1)
+            period_end = as_of_date
+
+        # Get year-to-date period for YTD metrics
         year_start = date(as_of_date.year, 1, 1)
 
-        # Calculate key metrics
-        net_income_mtd = self._calculate_net_income(month_start, as_of_date, area_id)
+        # Calculate key metrics for selected period
+        net_income_period = self._calculate_net_income(period_start, period_end, area_id)
         net_income_ytd = self._calculate_net_income(year_start, as_of_date, area_id)
-        revenue_mtd = self._get_revenue(month_start, as_of_date, area_id)
+        revenue_period = self._get_revenue(period_start, period_end, area_id)
         revenue_ytd = self._get_revenue(year_start, as_of_date, area_id)
 
-        # Calculate margins (use MTD for current period)
-        cogs_mtd = self._get_cogs(month_start, as_of_date, area_id)
-        expenses_mtd = self._get_expenses(month_start, as_of_date, area_id)
-        labor_mtd = self._get_labor_expense(month_start, as_of_date, area_id)
+        # Calculate margins for selected period
+        cogs_period = self._get_cogs(period_start, period_end, area_id)
+        expenses_period = self._get_expenses(period_start, period_end, area_id)
+        labor_period = self._get_labor_expense(period_start, period_end, area_id)
 
-        gross_profit_margin = ((revenue_mtd - cogs_mtd) / revenue_mtd * 100) if revenue_mtd > 0 else Decimal('0.00')
-        operating_margin = ((revenue_mtd - cogs_mtd - expenses_mtd) / revenue_mtd * 100) if revenue_mtd > 0 else Decimal('0.00')
-        prime_cost_pct = ((cogs_mtd + labor_mtd) / revenue_mtd * 100) if revenue_mtd > 0 else Decimal('0.00')
+        gross_profit_margin = ((revenue_period - cogs_period) / revenue_period * 100) if revenue_period > 0 else Decimal('0.00')
+        operating_margin = ((revenue_period - cogs_period - expenses_period) / revenue_period * 100) if revenue_period > 0 else Decimal('0.00')
+        prime_cost_pct = ((cogs_period + labor_period) / revenue_period * 100) if revenue_period > 0 else Decimal('0.00')
 
-        # Prior month comparison
-        prior_month_start = (month_start - timedelta(days=1)).replace(day=1)
-        prior_month_end = month_start - timedelta(days=1)
+        # Prior period comparison (same length period before this one)
+        period_length = (period_end - period_start).days + 1
+        prior_period_end = period_start - timedelta(days=1)
+        prior_period_start = prior_period_end - timedelta(days=period_length - 1)
 
-        revenue_prior = self._get_revenue(prior_month_start, prior_month_end, area_id)
-        net_income_prior = self._calculate_net_income(prior_month_start, prior_month_end, area_id)
+        revenue_prior = self._get_revenue(prior_period_start, prior_period_end, area_id)
+        net_income_prior = self._calculate_net_income(prior_period_start, prior_period_end, area_id)
 
-        revenue_vs_prior = ((revenue_mtd - revenue_prior) / revenue_prior * 100) if revenue_prior > 0 else Decimal('0.00')
-        ni_vs_prior = ((net_income_mtd - net_income_prior) / net_income_prior * 100) if net_income_prior != 0 else Decimal('0.00')
+        revenue_vs_prior = ((revenue_period - revenue_prior) / revenue_prior * 100) if revenue_prior > 0 else Decimal('0.00')
+        ni_vs_prior = ((net_income_period - net_income_prior) / net_income_prior * 100) if net_income_prior != 0 else Decimal('0.00')
 
         metrics = ExecutiveSummaryMetrics(
-            net_income_mtd=net_income_mtd,
+            net_income_mtd=net_income_period,
             net_income_ytd=net_income_ytd,
-            total_revenue_mtd=revenue_mtd,
+            total_revenue_mtd=revenue_period,
             total_revenue_ytd=revenue_ytd,
             gross_profit_margin=gross_profit_margin,
             operating_margin=operating_margin,
@@ -85,14 +106,14 @@ class GeneralDashboardService:
             net_income_vs_prior_month=ni_vs_prior
         )
 
-        # Top 5 expenses
-        top_expenses = self._get_top_expense_categories(month_start, as_of_date, area_id, limit=5)
+        # Top 5 expenses for selected period
+        top_expenses = self._get_top_expense_categories(period_start, period_end, area_id, limit=5)
 
-        # Revenue by location
-        revenue_by_location = self._get_revenue_by_location(month_start, as_of_date)
+        # Revenue by location for selected period
+        revenue_by_location = self._get_revenue_by_location(period_start, period_end)
 
-        # Revenue by category
-        revenue_categories = self._get_revenue_by_category(month_start, as_of_date, area_id)
+        # Revenue by category for selected period
+        revenue_categories = self._get_revenue_by_category(period_start, period_end, area_id)
 
         return ExecutiveSummaryResponse(
             metrics=metrics,
@@ -368,7 +389,13 @@ class GeneralDashboardService:
         )
 
         if area_id:
-            query = query.filter(JournalEntryLine.area_id == area_id)
+            # Filter by area_id on line, or fall back to journal entry header location
+            query = query.filter(
+                or_(
+                    JournalEntryLine.area_id == area_id,
+                    and_(JournalEntryLine.area_id.is_(None), JournalEntry.location_id == area_id)
+                )
+            )
 
         result = query.scalar()
         return Decimal(str(result)) if result else Decimal('0.00')
@@ -661,8 +688,8 @@ class GeneralDashboardService:
         area_id: Optional[int],
         limit: int = 5
     ) -> List[TopExpenseCategory]:
-        """Get top expense categories"""
-        # Query expense accounts
+        """Get top expense categories (includes both COGS and EXPENSE account types)"""
+        # Query expense and COGS accounts
         query = self.db.query(
             Account.account_name.label('category'),
             func.sum(
@@ -674,14 +701,20 @@ class GeneralDashboardService:
         ).join(
             JournalEntry, JournalEntry.id == JournalEntryLine.journal_entry_id
         ).filter(
-            Account.account_type == AccountType.EXPENSE,
+            Account.account_type.in_([AccountType.EXPENSE, AccountType.COGS]),
             JournalEntry.status == JournalEntryStatus.POSTED,
             JournalEntry.entry_date >= start_date,
             JournalEntry.entry_date <= end_date
         )
 
         if area_id:
-            query = query.filter(JournalEntryLine.area_id == area_id)
+            # Filter by area_id on the journal entry line, or fall back to journal entry header
+            query = query.filter(
+                or_(
+                    JournalEntryLine.area_id == area_id,
+                    and_(JournalEntryLine.area_id.is_(None), JournalEntry.location_id == area_id)
+                )
+            )
 
         query = query.group_by(Account.account_name).order_by(
             func.sum(

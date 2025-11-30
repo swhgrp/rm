@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** November 28, 2025
+**Last Updated:** November 30, 2025
 **Status:** ~88% Complete - Core Systems Production Ready ✅
-**Latest:** Inventory key items + unit conversions, Integration Hub invoice fixes (Nov 28, 2025) ✅
+**Latest:** Journal entry correction feature, tax double-counting fix (Nov 30, 2025) ✅
 
 ---
 
@@ -1198,6 +1198,36 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ## 📝 Recent Updates
 
+### November 30, 2025 - Journal Entry Correction Feature & Tax Double-Counting Fix 🔧
+
+**Accounting System - Journal Entry Corrections**
+- ✅ **Correct Entry Feature** - Users can now correct posted journal entries
+  - Click "Correct" on a posted entry to pre-populate form with entry data
+  - Edit amounts/accounts as needed
+  - On Save: Original entry reversed, then new corrected entry created
+  - On Cancel: No changes made (deferred reversal pattern)
+- ✅ **Reversal Auto-Post** - Reversal entries now auto-post instead of DRAFT status
+  - Sets `posted_at` and `posted_by` automatically
+  - No manual posting required for reversals
+- ✅ **Deferred Reversal Pattern** - Reversal only happens when user saves
+  - Prevents orphaned reversals if user cancels correction
+  - Better UX with clear cancel behavior
+
+**Integration Hub - Tax Double-Counting Fix**
+- ✅ **Tax Detection Logic** - Fixed critical bug where tax was added twice
+  - Some invoices have tax as line items (e.g., "State Sales Tax")
+  - Previously, code would also add `invoice.tax_amount` proportionally
+  - Now detects if items_total ≈ invoice_total (within $0.02)
+  - If true: Tax already in items, skip proportional distribution
+  - If false: Distribute tax proportionally across line items
+
+**Files Modified:**
+- `accounting/src/accounting/templates/journal_entries.html` (correction feature)
+- `accounting/src/accounting/api/journal_entries.py` (auto-post reversals)
+- `integration-hub/src/integration_hub/services/accounting_sender.py` (tax fix)
+
+---
+
 ### November 28, 2025 - Inventory Key Items & Integration Hub Invoice Fixes 🔧
 
 **Inventory System - New Data Model Features**
@@ -1572,8 +1602,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 2.9 - Inventory Key Items & Invoice Fixes
-**Last Updated:** November 28, 2025
+**Version:** 3.0 - Journal Entry Corrections & Tax Fix
+**Last Updated:** November 30, 2025
 **Documentation Health:** 95/100 - Excellent ✅
 
-*New inventory features: key item flag, additional count units, item unit conversions. Integration Hub fixes: invoice total mismatch resolution, credit memo support, OCR item code corrections.*
+*Accounting system: Journal entry correction feature with deferred reversal pattern. Integration Hub: Fixed tax double-counting bug for invoices with tax line items.*
