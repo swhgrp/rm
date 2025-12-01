@@ -2,9 +2,38 @@
 
 ## Overview
 
-The Accounting System is a comprehensive double-entry accounting platform providing complete financial management including chart of accounts, journal entries, accounts payable/receivable, banking, and sophisticated financial reporting. This is the **most complex system** in the restaurant management platform with 140 Python files.
+The Accounting System is a comprehensive double-entry accounting platform providing complete financial management including chart of accounts, journal entries, accounts payable/receivable, banking, and sophisticated financial reporting. This is the **most complex system** in the restaurant management platform with 154 Python files.
 
 ## Status: 95% Production Ready ✅
+
+**Last Updated:** November 30, 2025
+
+## Recent Updates
+
+### November 30, 2025 - Journal Entry Corrections & Vendor Aliases 🔧
+
+**Journal Entry Correction Feature:**
+- ✅ Correct posted journal entries via reversal + re-entry
+- ✅ Deferred reversal pattern (reversal only on save, not on form open)
+- ✅ Reversal entries auto-post (POSTED status, not DRAFT)
+- ✅ Pre-populated form for corrections
+
+**Vendor Alias System:**
+- ✅ New `VendorAlias` model for name normalization
+- ✅ Map multiple vendor names to canonical vendors (e.g., "Gordon Food Service Inc." → "Gordon Food Service")
+- ✅ Case-insensitive matching with unique index
+- ✅ VendorService for alias resolution
+- ✅ UI for managing aliases on vendors page
+
+**Credit Memo Indicator:**
+- ✅ Dashboard shows credit memos vs regular entries
+- ✅ PDF link feature for viewing source invoices from Hub
+
+### November 28, 2025 - Banking Dashboard v2 📊
+
+- ✅ Real-time cash position reporting
+- ✅ Cash flow trend analysis
+- ✅ Account-level reconciliation status
 
 ## Purpose
 
@@ -215,7 +244,7 @@ The Accounting System is a comprehensive double-entry accounting platform provid
 
 **Total:** 26+ database tables, 140 Python files
 
-### Key Django Models
+### Key SQLAlchemy Models
 
 **Main Models:**
 ```python
@@ -227,16 +256,18 @@ JournalEntryLine - Individual debits/credits
 
 # AP/AR
 Vendor - Supplier information
-Bill - Vendor bills/invoices
+VendorAlias - Vendor name aliases (NEW - Nov 30, 2025)
+VendorBill - Vendor bills/invoices
 BillPayment - Payment records
 Customer - Customer directory
-Invoice - Customer invoices/bills
+CustomerInvoice - Customer invoices/bills
 Payment - Customer payments
 
 # Banking
 BankAccount - Bank account master
 BankTransaction - Transaction imports
 BankReconciliation - Reconciliation process
+SafeTransaction - Physical cash tracking (safe float)
 
 # Fiscal
 FiscalYear, FiscalPeriod - Period management
@@ -400,10 +431,9 @@ Budget - Budget planning
 # Database
 DATABASE_URL=postgresql://accounting_user:password@accounting-db:5432/accounting_db
 
-# Django Settings
-SECRET_KEY=your-django-secret-key
+# FastAPI Settings
+SECRET_KEY=your-secret-key
 DEBUG=False
-ALLOWED_HOSTS=rm.swhgrp.com,accounting-app
 
 # Portal Integration
 PORTAL_URL=https://rm.swhgrp.com/portal
@@ -469,26 +499,25 @@ docker compose up -d accounting-app accounting-db
 
 3. **Run migrations:**
 ```bash
-docker compose exec accounting-app python manage.py migrate
+docker compose exec accounting-app alembic upgrade head
 ```
 
 4. **Load chart of accounts:**
 ```bash
-# Load default restaurant COA
-docker compose exec accounting-app python manage.py loaddata default_coa
-
-# Or import custom COA
-docker compose exec accounting-app python manage.py import_coa /path/to/coa.csv
+# Load default restaurant COA via Python script
+docker compose exec accounting-app python -c "from accounting.fixtures.load_coa import load_default_coa; load_default_coa()"
 ```
 
 5. **Create fiscal year:**
 ```bash
-docker compose exec accounting-app python manage.py create_fiscal_year 2025
+# Access via API or UI - no CLI command
+# Use the Fiscal Periods page in the UI
 ```
 
-6. **Create superuser:**
+6. **Create admin users:**
 ```bash
-docker compose exec accounting-app python manage.py createsuperuser
+# Admin users are created in HR system (Portal reads from hr_db)
+# Use HR system interface or direct SQL
 ```
 
 7. **Access system:**
@@ -696,17 +725,17 @@ source venv/bin/activate
 pip install -r requirements.txt
 
 # Set up database
-python manage.py migrate
-python manage.py loaddata default_coa
+cd src
+alembic upgrade head
 
 # Run server
-python manage.py runserver
+uvicorn accounting.main:app --reload --port 8000
 ```
 
 ### Running Tests
 
 ```bash
-python manage.py test
+pytest tests/
 ```
 
 ### Creating Custom Reports
@@ -737,15 +766,16 @@ Monitor slow queries in PostgreSQL logs
 ## Dependencies
 
 Key packages (see requirements.txt):
-- Django 4.2
-- djangorestframework
-- psycopg2-binary
+- FastAPI 0.104+
+- SQLAlchemy 2.0+
+- Alembic (database migrations)
+- psycopg2-binary (PostgreSQL driver)
 - reportlab (PDF generation)
 - openpyxl (Excel export)
-- decimal (financial calculations)
-- celery (background jobs)
-- redis
-- pillow
+- APScheduler (background jobs)
+- Pydantic 2.0+
+- python-jose (JWT authentication)
+- Jinja2 (HTML templates)
 
 ## Security & Compliance
 
@@ -801,14 +831,15 @@ Key packages (see requirements.txt):
 
 For issues or questions:
 - Check logs: `docker compose logs accounting-app`
-- Django admin: https://rm.swhgrp.com/accounting/admin/
+- API docs: https://rm.swhgrp.com/accounting/docs (FastAPI Swagger UI)
 - Health check: https://rm.swhgrp.com/accounting/health
 - Trial balance: Always run to verify data integrity
 - Contact: Finance Team / Development Team
 
 ## Additional Resources
 
-- [Django Documentation](https://docs.djangoproject.com/)
+- [FastAPI Documentation](https://fastapi.tiangolo.com/)
+- [SQLAlchemy Documentation](https://docs.sqlalchemy.org/)
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
 - [GAAP Guidelines](https://www.fasb.org/)
 - Internal Training: Accounting System Training Manual

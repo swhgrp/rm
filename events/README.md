@@ -2,9 +2,40 @@
 
 ## Status: 99% Production Ready ✅
 
-**LAST UPDATED:** 2025-11-09 (Session Complete)
+**LAST UPDATED:** 2025-11-30
 
-A comprehensive event planning system with calendar, task management, document generation, email notifications, and role-based access control. The system is **production-ready** and actively used.
+A comprehensive event planning system with calendar, task management, document generation, email notifications, CalDAV sync, and role-based access control. The system is **production-ready** and actively used.
+
+## Recent Updates (Latest)
+
+### November 25, 2025 - Email History UI Improvements 📧
+
+- ✅ Changed email list to clean view with modal for details
+- ✅ Email body fetched on-demand when viewing details
+- ✅ Modal uses iframe to isolate email styles (prevents style leakage)
+- ✅ Fixed UUID quoting in JavaScript onclick handlers
+- ✅ Dark theme styling for modal to match app theme
+
+### November 14, 2025 - CalDAV Sync & Email Link Fixes 🔗
+
+**CalDAV Synchronization Service:**
+- ✅ New `CalDAVSyncService` for Radicale integration
+- ✅ Per-venue calendar organization (separate calendar per venue)
+- ✅ Event details in calendar description (guest count, client info)
+- ✅ Status mapping to iCalendar (DRAFT→TENTATIVE, CONFIRMED→CONFIRMED)
+- ✅ Automatic event removal for canceled/deleted events
+- ✅ Bulk sync for user's assigned venues
+
+**Email Event Detail Links Fixed:**
+- ✅ Fixed 404 errors on email links to event details
+- ✅ Corrected URL patterns in email templates
+- ✅ Event detail page uses query parameters, not path parameters
+
+**Calendar Status Color Indicators:**
+- ✅ Status-based colored left borders on calendar events
+- ✅ Orange=PENDING, Blue=CONFIRMED, Green=CLOSED/COMPLETED
+- ✅ Red=CANCELED, Gray=DRAFT, Purple=IN_PROGRESS
+- ✅ Removed FullCalendar default dots for cleaner UI
 
 ## What's Built
 
@@ -39,6 +70,7 @@ A comprehensive event planning system with calendar, task management, document g
 - ✅ `email_service.py` - SMTP sending, templating, queue management, location-based routing
 - ✅ `pdf_service.py` - WeasyPrint HTML→PDF rendering
 - ✅ `task_service.py` - Auto-task generation from templates, due date calculation
+- ✅ `caldav_sync_service.py` - CalDAV/Radicale calendar synchronization (NEW - Nov 14)
 
 **UI Templates (100%):**
 - ✅ `base.html` - Dark theme base template with sidebar, custom confirm/alert dialogs

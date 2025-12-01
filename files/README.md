@@ -4,21 +4,49 @@ Document management and file storage system for the SW Restaurant Management Sys
 
 ## Overview
 
-The Files system provides centralized file storage, folder organization, and document sharing capabilities. Built with FastAPI and using local file storage, it offers a secure and efficient way to manage restaurant documents, images, and files.
+The Files system provides centralized file storage, folder organization, document sharing, and desktop sync capabilities. Built with FastAPI with WebDAV support, it offers a secure and efficient way to manage restaurant documents, images, and files.
 
 ## Status: 100% Production Ready ✅
 
-**LAST UPDATED:** 2025-10-29
+**LAST UPDATED:** 2025-11-30
 
-The Files system is fully implemented, mobile-friendly, and actively used in production with OnlyOffice Document Server integration.
+The Files system is fully implemented, mobile-friendly, and actively used in production with OnlyOffice Document Server integration and WebDAV desktop sync.
+
+## Recent Updates
+
+### November 14-15, 2025 - WebDAV Desktop Sync 💾
+
+**WebDAV Server for Desktop Sync:**
+- ✅ WsgiDAV 4.3.0 integration mounted at `/files/webdav/`
+- ✅ Offline file access with two-way sync
+- ✅ 10GB file upload support via WebDAV
+- ✅ User-isolated filesystem provider
+- ✅ Nginx WebDAV headers configured (Depth, Destination, Overwrite)
+
+**Desktop Client Support:**
+- ✅ Mountain Duck (macOS/Windows - recommended)
+- ✅ RaiDrive (Windows - free)
+- ✅ macOS Finder (native)
+- ✅ Windows Explorer (native)
+- ✅ davfs2 (Linux)
+
+**Critical Timezone Bug Fix:**
+- ✅ Fixed "Token expired" error from timezone mismatch
+- ✅ Changed to timezone-aware datetime comparison
+
+**Documentation:**
+- ✅ `docs/files-webdav-sync.md` (400+ lines setup guide)
+- ✅ `docs/files-vs-nextcloud-comparison.md` (architecture comparison)
 
 ## Technology Stack
 
 - **Backend:** FastAPI (Python 3.11+)
+- **WebDAV:** WsgiDAV 4.3.0 (desktop sync)
 - **Database:** PostgreSQL 15 (HR database for users, local DB for file metadata)
 - **ORM:** SQLAlchemy 2.0
 - **Storage:** Local filesystem (`/app/storage`)
 - **Authentication:** JWT via Portal SSO
+- **Document Editing:** OnlyOffice Document Server
 - **Containerization:** Docker
 
 ## Core Features

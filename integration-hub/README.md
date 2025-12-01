@@ -6,11 +6,56 @@ The Integration Hub is an **invoice processing and general ledger (GL) mapping s
 
 ## Status: Production Ready (Core Features + Advanced Workflow) ✅
 
-**Last Updated:** November 8, 2025
+**Last Updated:** November 30, 2025
 
 **Note:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
 ## Recent Updates
+
+### November 30, 2025 - Tax Double-Counting Fix 🔥
+
+**Critical Accounting Fix:**
+- ✅ Fixed tax being added twice when invoices have tax line items
+- ✅ Detection logic: checks if items_total ≈ invoice_total (within $0.02)
+- ✅ If tax already in items: skip proportional tax distribution
+- ✅ Prevents "Bill total mismatch" errors in accounting
+
+**Vendor Alias Integration:**
+- ✅ Supports Accounting's new vendor alias system
+- ✅ Better vendor name normalization from OCR
+
+### November 25, 2025 - OCR Item Code Validation 🔧
+
+**OCR Auto-Correction System:**
+- ✅ Post-parse validation compares extracted codes against verified codes
+- ✅ Digit similarity scoring for common OCR confusions (0↔6↔8, 1↔7↔I)
+- ✅ Requires ≥80% similarity AND matching description words
+- ✅ Only corrects against verified codes (is_verified=true OR occurrence_count≥3)
+
+**Item Codes Page Filters:**
+- ✅ "Unverified Only" filter - shows items needing review
+- ✅ "Verified Only" filter - shows confirmed mappings
+- ✅ Sorted by occurrence count DESC (review high-frequency first)
+
+### November 11, 2025 - Multi-Page Invoice Parsing & Tax Handling 🔥
+
+**Multi-Page OCR Fixed:**
+- ✅ Fixed parser only reading page 1 of multi-page invoices
+- ✅ Now processes ALL pages and converts each to base64 for GPT-4o Vision
+- ✅ Increased max_tokens from 4096 to 8192 for multi-page responses
+- ✅ Added "TOTALS FROM LAST PAGE ONLY" to system prompt
+
+**Re-parse Invoice Button:**
+- ✅ Manual re-parsing with updated OCR
+- ✅ Non-blocking JavaScript (navigate away during 30-60 second parse)
+
+**Tax Capitalization Fixed:**
+- ✅ Vendor invoice tax is capitalized into item costs
+- ✅ Tax distributed proportionally across GL accounts
+- ✅ Changed validation to compare total_amount (with tax) vs invoice_total
+
+**UI Improvements:**
+- ✅ Compact "Mark as Statement" button (icon-only with tooltip)
 
 ### November 8, 2025 - Major Workflow Improvements 🚀
 
@@ -192,8 +237,8 @@ The Integration Hub is an **invoice processing and general ledger (GL) mapping s
 - ❌ Request throttling - NOT implemented
 - ❌ Circuit breaker pattern - NOT implemented
 - ❌ Advanced data transformation - NOT implemented
-- ❌ Fuzzy matching for items - NOT implemented
-- ❌ Machine learning suggestions - NOT implemented
+- ✅ **Fuzzy matching for items** - IMPLEMENTED (Nov 25) - OCR digit similarity scoring
+- ❌ Machine learning suggestions - NOT implemented (uses rule-based matching)
 
 ## Architecture
 

@@ -2,6 +2,32 @@
 
 A comprehensive web-based inventory management system built for restaurant operations, featuring multi-location tracking, AI-powered invoice processing, POS integration, recipe management, and advanced analytics.
 
+**Last Updated:** November 30, 2025
+
+## Recent Updates
+
+### November 28-29, 2025 - Key Items, Unit Conversions & Count Fixes 🔧
+
+**New Data Model Features:**
+- ✅ **Key Item Flag** (`is_key_item`) - Highlight important inventory items
+- ✅ **Additional Count Units** - `count_unit_2_id` and `count_unit_3_id` for flexible counting
+- ✅ **Item Unit Conversions** - New `ItemUnitConversion` model for per-item conversions
+  - Example: 1 case of chicken = 40 lbs, 1 LB Sausage = 8 Patties (2oz)
+  - `from_unit_id`, `to_unit_id`, `conversion_factor` (Numeric 20,6)
+  - `individual_weight_oz` and `individual_volume_oz` for reference
+
+**Count Session Fixes:**
+- ✅ Fixed unit display showing "null" - now uses proper unit name via relationship
+- ✅ Fixed count_unit_2/3 not showing in dropdowns
+- ✅ Fixed unit conversion calculations
+- ✅ Fixed variance_percent overflow (increased precision to 10,2)
+- ✅ Fixed inventory_type not saving ("Full" vs "Partial")
+- ✅ Fixed delete count session cascade (count_session_storage_areas)
+
+**Database Migrations:**
+- `20251128_1600_add_key_item_and_count_units.py`
+- `20251128_1800_add_item_unit_conversions.py`
+
 ## System Overview
 
 **Technology Stack:**
