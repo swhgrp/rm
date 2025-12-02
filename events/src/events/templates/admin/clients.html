@@ -1,0 +1,519 @@
+{% extends "base.html" %}
+
+{% block title %}Clients - SW Hospitality Events{% endblock %}
+
+{% block page_title %}Client Management{% endblock %}
+
+{% block content %}
+<div class="clients-container">
+    <!-- Search and Add -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-6">
+                    <label class="form-label">Search Clients</label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search by name, email, or organization...">
+                    </div>
+                </div>
+                <div class="col-md-6 text-end">
+                    <button class="btn btn-primary" onclick="showAddModal()">
+                        <i class="bi bi-plus-circle"></i> Add Client
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clients Table -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="bi bi-people"></i> Clients
+                <span id="clientCount" class="badge bg-primary ms-2">0</span>
+            </h5>
+            <button class="btn btn-sm btn-outline-secondary" onclick="loadClients()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Organization</th>
+                            <th>Events</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clientsTableBody">
+                        <tr>
+                            <td colspan="6" class="text-center py-4">
+                                <div class="spinner-border spinner-border-sm" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                Loading clients...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Client Modal -->
+<div class="modal fade" id="clientModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="clientModalTitle">Add Client</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="clientForm">
+                    <input type="hidden" id="clientId">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="clientName" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email <span class="text-danger">*</span></label>
+                            <input type="email" class="form-control" id="clientEmail" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" class="form-control" id="clientPhone" placeholder="(555) 555-5555">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Organization</label>
+                            <input type="text" class="form-control" id="clientOrg" placeholder="Company or organization name">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" id="clientNotes" rows="3" placeholder="Additional notes about this client..."></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveClient()">
+                    <i class="bi bi-check-lg"></i> Save Client
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View Client Modal -->
+<div class="modal fade" id="viewClientModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-person-circle"></i> <span id="viewClientName"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Email:</strong></p>
+                        <p id="viewClientEmail" class="text-muted"></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Phone:</strong></p>
+                        <p id="viewClientPhone" class="text-muted"></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Organization:</strong></p>
+                        <p id="viewClientOrg" class="text-muted"></p>
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-1"><strong>Client Since:</strong></p>
+                        <p id="viewClientCreated" class="text-muted"></p>
+                    </div>
+                    <div class="col-12">
+                        <p class="mb-1"><strong>Notes:</strong></p>
+                        <p id="viewClientNotes" class="text-muted"></p>
+                    </div>
+                </div>
+
+                <hr>
+
+                <h6><i class="bi bi-calendar-event"></i> Events History</h6>
+                <div id="clientEventsContainer">
+                    <div class="text-center py-3">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        Loading events...
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="editFromViewBtn">
+                    <i class="bi bi-pencil"></i> Edit Client
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.clients-container {
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.table th {
+    background-color: var(--surface-color);
+    border-bottom: 2px solid var(--border-color);
+    font-weight: 600;
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.client-name {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.client-email {
+    color: #58a6ff;
+}
+
+.event-count-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.event-list-item {
+    padding: 0.75rem;
+    margin-bottom: 0.5rem;
+    background-color: var(--surface-color);
+    border-radius: 6px;
+    border-left: 3px solid var(--primary-color);
+}
+
+.event-list-item .event-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.event-list-item .event-meta {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.status-badge {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    text-transform: uppercase;
+}
+
+.status-draft { background-color: rgba(108, 117, 125, 0.2); color: #6c757d; }
+.status-pending { background-color: rgba(255, 193, 7, 0.2); color: #ffc107; }
+.status-confirmed { background-color: rgba(13, 110, 253, 0.2); color: #0d6efd; }
+.status-closed { background-color: rgba(25, 135, 84, 0.2); color: #198754; }
+.status-canceled { background-color: rgba(220, 53, 69, 0.2); color: #dc3545; }
+
+.no-events {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 2rem;
+}
+</style>
+
+<script>
+let allClients = [];
+let currentClientId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadClients();
+
+    // Set up search listener with debounce
+    let searchTimeout;
+    document.getElementById('searchInput').addEventListener('input', function() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(filterClients, 300);
+    });
+});
+
+async function loadClients() {
+    try {
+        const response = await fetch('api/clients/', {
+            credentials: 'same-origin'
+        });
+        if (!response.ok) throw new Error('Failed to load clients');
+
+        allClients = await response.json();
+        filterClients();
+    } catch (error) {
+        console.error('Error loading clients:', error);
+        document.getElementById('clientsTableBody').innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center py-4 text-danger">
+                    <i class="bi bi-exclamation-triangle"></i> Failed to load clients
+                </td>
+            </tr>
+        `;
+    }
+}
+
+function filterClients() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+
+    let filtered = allClients;
+
+    if (search) {
+        filtered = filtered.filter(c =>
+            c.name.toLowerCase().includes(search) ||
+            c.email.toLowerCase().includes(search) ||
+            (c.org && c.org.toLowerCase().includes(search))
+        );
+    }
+
+    renderClients(filtered);
+}
+
+function renderClients(clients) {
+    const tbody = document.getElementById('clientsTableBody');
+    document.getElementById('clientCount').textContent = clients.length;
+
+    if (clients.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center py-4 text-muted">
+                    <i class="bi bi-inbox"></i> No clients found
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = clients.map(client => `
+        <tr>
+            <td>
+                <div class="client-name">${escapeHtml(client.name)}</div>
+            </td>
+            <td>
+                <a href="mailto:${escapeHtml(client.email)}" class="client-email">${escapeHtml(client.email)}</a>
+            </td>
+            <td>${client.phone ? escapeHtml(client.phone) : '<span class="text-muted">-</span>'}</td>
+            <td>${client.org ? escapeHtml(client.org) : '<span class="text-muted">-</span>'}</td>
+            <td>
+                <span class="badge ${client.event_count > 0 ? 'bg-primary' : 'bg-secondary'} event-count-badge">
+                    ${client.event_count} event${client.event_count !== 1 ? 's' : ''}
+                </span>
+            </td>
+            <td>
+                <button class="btn btn-sm btn-outline-info" onclick="viewClient('${client.id}')" title="View Details">
+                    <i class="bi bi-eye"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-primary" onclick="editClient('${client.id}')" title="Edit">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteClient('${client.id}', '${escapeHtml(client.name)}')" title="Delete" ${client.event_count > 0 ? 'disabled' : ''}>
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function showAddModal() {
+    currentClientId = null;
+    document.getElementById('clientModalTitle').textContent = 'Add Client';
+    document.getElementById('clientForm').reset();
+    document.getElementById('clientId').value = '';
+    new bootstrap.Modal(document.getElementById('clientModal')).show();
+}
+
+async function editClient(clientId) {
+    try {
+        const response = await fetch(`api/clients/${clientId}`, {
+            credentials: 'same-origin'
+        });
+        if (!response.ok) throw new Error('Failed to load client');
+
+        const client = await response.json();
+        currentClientId = clientId;
+
+        document.getElementById('clientModalTitle').textContent = 'Edit Client';
+        document.getElementById('clientId').value = client.id;
+        document.getElementById('clientName').value = client.name;
+        document.getElementById('clientEmail').value = client.email;
+        document.getElementById('clientPhone').value = client.phone || '';
+        document.getElementById('clientOrg').value = client.org || '';
+        document.getElementById('clientNotes').value = client.notes || '';
+
+        // Hide view modal if open
+        const viewModal = bootstrap.Modal.getInstance(document.getElementById('viewClientModal'));
+        if (viewModal) viewModal.hide();
+
+        new bootstrap.Modal(document.getElementById('clientModal')).show();
+    } catch (error) {
+        console.error('Error loading client:', error);
+        await showAlert('Failed to load client details', 'Error');
+    }
+}
+
+async function viewClient(clientId) {
+    try {
+        // Fetch client details
+        const clientResponse = await fetch(`api/clients/${clientId}`, {
+            credentials: 'same-origin'
+        });
+        if (!clientResponse.ok) throw new Error('Failed to load client');
+        const client = await clientResponse.json();
+
+        // Populate modal
+        document.getElementById('viewClientName').textContent = client.name;
+        document.getElementById('viewClientEmail').textContent = client.email;
+        document.getElementById('viewClientPhone').textContent = client.phone || '-';
+        document.getElementById('viewClientOrg').textContent = client.org || '-';
+        document.getElementById('viewClientNotes').textContent = client.notes || 'No notes';
+        document.getElementById('viewClientCreated').textContent = new Date(client.created_at).toLocaleDateString();
+
+        // Set up edit button
+        document.getElementById('editFromViewBtn').onclick = () => editClient(clientId);
+
+        // Show modal
+        new bootstrap.Modal(document.getElementById('viewClientModal')).show();
+
+        // Load events
+        loadClientEvents(clientId);
+    } catch (error) {
+        console.error('Error loading client:', error);
+        await showAlert('Failed to load client details', 'Error');
+    }
+}
+
+async function loadClientEvents(clientId) {
+    const container = document.getElementById('clientEventsContainer');
+
+    try {
+        const response = await fetch(`api/clients/${clientId}/events`, {
+            credentials: 'same-origin'
+        });
+        if (!response.ok) throw new Error('Failed to load events');
+
+        const events = await response.json();
+
+        if (events.length === 0) {
+            container.innerHTML = '<div class="no-events"><i class="bi bi-calendar-x"></i><br>No events for this client</div>';
+            return;
+        }
+
+        container.innerHTML = events.map(event => `
+            <div class="event-list-item">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <div class="event-title">
+                            <a href="event?id=${event.id}">${escapeHtml(event.title)}</a>
+                        </div>
+                        <div class="event-meta">
+                            <i class="bi bi-calendar3"></i> ${event.start_at ? new Date(event.start_at).toLocaleDateString() : 'No date'}
+                            ${event.venue_name ? `<span class="ms-2"><i class="bi bi-geo-alt"></i> ${escapeHtml(event.venue_name)}</span>` : ''}
+                            ${event.guest_count ? `<span class="ms-2"><i class="bi bi-people"></i> ${event.guest_count} guests</span>` : ''}
+                        </div>
+                    </div>
+                    <span class="status-badge status-${event.status}">${event.status}</span>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Error loading events:', error);
+        container.innerHTML = '<div class="text-center text-danger py-3">Failed to load events</div>';
+    }
+}
+
+async function saveClient() {
+    const clientId = document.getElementById('clientId').value;
+    const isEdit = !!clientId;
+
+    const data = {
+        name: document.getElementById('clientName').value.trim(),
+        email: document.getElementById('clientEmail').value.trim(),
+        phone: document.getElementById('clientPhone').value.trim() || null,
+        org: document.getElementById('clientOrg').value.trim() || null,
+        notes: document.getElementById('clientNotes').value.trim() || null
+    };
+
+    // Validate required fields
+    if (!data.name || !data.email) {
+        await showAlert('Name and email are required', 'Validation Error');
+        return;
+    }
+
+    try {
+        const url = isEdit ? `api/clients/${clientId}` : 'api/clients/';
+        const method = isEdit ? 'PATCH' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data),
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save client');
+        }
+
+        // Close modal and reload
+        bootstrap.Modal.getInstance(document.getElementById('clientModal')).hide();
+        await loadClients();
+        await showAlert(`Client ${isEdit ? 'updated' : 'created'} successfully`, 'Success');
+    } catch (error) {
+        console.error('Error saving client:', error);
+        await showAlert(error.message, 'Error');
+    }
+}
+
+async function deleteClient(clientId, clientName) {
+    const confirmed = await showConfirm(`Are you sure you want to delete "${clientName}"?\n\nThis action cannot be undone.`, 'Delete Client');
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`api/clients/${clientId}`, {
+            method: 'DELETE',
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete client');
+        }
+
+        await loadClients();
+        await showAlert(`Client "${clientName}" has been deleted`, 'Success');
+    } catch (error) {
+        console.error('Error deleting client:', error);
+        await showAlert(error.message, 'Error');
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

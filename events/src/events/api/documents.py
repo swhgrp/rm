@@ -56,16 +56,18 @@ async def generate_beo_pdf(
             venue=event.venue
         )
 
-        # Create document record
-        document = Document(
-            event_id=event_id,
-            document_type=DocumentType.BEO,
-            title=f"BEO - {event.title}",
-            file_path=f"beo_{event_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-            file_size=len(pdf_bytes)
-        )
-        db.add(document)
-        db.commit()
+        # Create document record (optional - for tracking purposes)
+        try:
+            document = Document(
+                event_id=event_id,
+                doc_type=DocumentType.BEO,
+                storage_url=f"generated/beo_{event_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            )
+            db.add(document)
+            db.commit()
+        except Exception:
+            # Document tracking is optional, don't fail PDF generation
+            db.rollback()
 
         # Return PDF
         filename = f"BEO_{event.title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
@@ -132,16 +134,18 @@ async def generate_event_summary_pdf(
             tasks=tasks
         )
 
-        # Create document record
-        document = Document(
-            event_id=event_id,
-            document_type=DocumentType.SUMMARY,
-            title=f"Event Summary - {event.title}",
-            file_path=f"summary_{event_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-            file_size=len(pdf_bytes)
-        )
-        db.add(document)
-        db.commit()
+        # Create document record (optional - for tracking purposes)
+        try:
+            document = Document(
+                event_id=event_id,
+                doc_type=DocumentType.SUMMARY,
+                storage_url=f"generated/summary_{event_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            )
+            db.add(document)
+            db.commit()
+        except Exception:
+            # Document tracking is optional, don't fail PDF generation
+            db.rollback()
 
         # Return PDF
         filename = f"Summary_{event.title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"

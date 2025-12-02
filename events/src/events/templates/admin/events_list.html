@@ -288,7 +288,7 @@
         <div class="stat-value" id="statConfirmed">0</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Closed</div>
+        <div class="stat-label">Completed</div>
         <div class="stat-value" id="statCompleted">0</div>
     </div>
     <div class="stat-card">
@@ -301,13 +301,22 @@
 <div class="filters-section">
     <div class="filters-grid">
         <div class="filter-group">
+            <label class="form-label-custom">Time Period</label>
+            <select id="filterTimePeriod" class="form-control-custom" onchange="filterEvents()">
+                <option value="upcoming" selected>Upcoming Events</option>
+                <option value="past">Past Events</option>
+                <option value="all">All Events</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
             <label class="form-label-custom">Status</label>
             <select id="filterStatus" class="form-control-custom" onchange="filterEvents()">
                 <option value="">All Statuses</option>
                 <option value="DRAFT">Draft</option>
                 <option value="PENDING">Pending</option>
                 <option value="CONFIRMED">Confirmed</option>
-                <option value="CLOSED">Closed</option>
+                <option value="CLOSED">Completed</option>
                 <option value="CANCELED">Canceled</option>
             </select>
         </div>
@@ -320,19 +329,9 @@
         </div>
 
         <div class="filter-group">
-            <label class="form-label-custom">Start Date</label>
-            <input type="date" id="filterStartDate" class="form-control-custom" onchange="filterEvents()">
+            <label class="form-label-custom">Search</label>
+            <input type="text" id="searchQuery" class="form-control-custom" placeholder="Search events by title..." oninput="filterEvents()">
         </div>
-
-        <div class="filter-group">
-            <label class="form-label-custom">End Date</label>
-            <input type="date" id="filterEndDate" class="form-control-custom" onchange="filterEvents()">
-        </div>
-    </div>
-
-    <div class="filter-group">
-        <label class="form-label-custom">Search</label>
-        <input type="text" id="searchQuery" class="form-control-custom" placeholder="Search events by title..." oninput="filterEvents()">
     </div>
 </div>
 
@@ -372,9 +371,9 @@
             const events = await eventsRes.json();
             allLocations = await venuesRes.json();
 
-            // Filter out CANCELED and CLOSED events (safety net - API also filters)
+            // Filter out CANCELED events only (Completed/CLOSED events should be visible)
             allEvents = events.filter(event =>
-                event.status !== 'CANCELED' && event.status !== 'CLOSED'
+                event.status !== 'CANCELED'
             );
 
             populateLocationFilter();
@@ -426,28 +425,26 @@
     }
 
     function filterEvents() {
+        const timePeriodFilter = document.getElementById('filterTimePeriod').value;
         const statusFilter = document.getElementById('filterStatus').value;
         const locationFilter = document.getElementById('filterLocation').value;
-        const startDateFilter = document.getElementById('filterStartDate').value;
-        const endDateFilter = document.getElementById('filterEndDate').value;
         const searchQuery = document.getElementById('searchQuery').value.toLowerCase();
 
+        // Get today's date at midnight for comparison
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         let filtered = allEvents.filter(event => {
+            // Time period filter (upcoming = today and future, past = before today)
+            const eventDate = new Date(event.start_at);
+            eventDate.setHours(0, 0, 0, 0);
+
+            if (timePeriodFilter === 'upcoming' && eventDate < today) return false;
+            if (timePeriodFilter === 'past' && eventDate >= today) return false;
+
             if (statusFilter && event.status !== statusFilter) return false;
             if (locationFilter && event.venue_name !== locationFilter) return false;
             if (searchQuery && !event.title.toLowerCase().includes(searchQuery)) return false;
-
-            if (startDateFilter) {
-                const eventDate = new Date(event.start_at);
-                const filterDate = new Date(startDateFilter);
-                if (eventDate < filterDate) return false;
-            }
-
-            if (endDateFilter) {
-                const eventDate = new Date(event.start_at);
-                const filterDate = new Date(endDateFilter);
-                if (eventDate > filterDate) return false;
-            }
 
             return true;
         });
@@ -534,6 +531,8 @@
     }
 
     function formatStatus(status) {
+        // Map CLOSED to Completed for display
+        if (status === 'CLOSED') return 'Completed';
         return status.replace('_', ' ').toLowerCase()
             .split(' ')
             .map(word => word.charAt(0).toUpperCase() + word.slice(1))

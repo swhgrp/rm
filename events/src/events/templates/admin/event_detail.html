@@ -445,6 +445,22 @@
             <div class="info-card-title"><i class="bi bi-pin-angle"></i> Special Notes</div>
             <div class="info-card-value" id="overviewNotes">-</div>
         </div>
+
+        <!-- Menu Summary Card -->
+        <div class="info-card" id="overviewMenuCard" style="display: none; margin-top: 15px; border-left-color: #238636;">
+            <div class="info-card-title"><i class="bi bi-egg-fried"></i> Menu Summary</div>
+            <div id="overviewMenuSummary" style="font-size: 14px; color: #c9d1d9;">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+
+        <!-- Financial Summary Card -->
+        <div class="info-card" id="overviewFinancialsCard" style="display: none; margin-top: 15px; border-left-color: #58a6ff;">
+            <div class="info-card-title"><i class="bi bi-currency-dollar"></i> Financial Summary</div>
+            <div id="overviewFinancialsSummary" style="font-size: 14px;">
+                <!-- Populated by JS -->
+            </div>
+        </div>
     </div>
 
     <!-- Details Tab -->
@@ -504,6 +520,14 @@
                         <option value="">Select client...</option>
                     </select>
                 </div>
+
+                <div class="form-group">
+                    <label for="package_id">Package</label>
+                    <select id="package_id">
+                        <option value="">No package selected</option>
+                    </select>
+                    <small style="color: #8b949e; margin-top: 4px; display: block;">Optional - assign a pricing package to this event</small>
+                </div>
             </div>
 
             <div class="form-group">
@@ -518,10 +542,112 @@
         <h3 style="color: #c9d1d9; font-size: 18px; margin-bottom: 15px;">Menu & Catering</h3>
 
         <div id="menuContent">
-            <div class="empty-state">
-                <div class="empty-state-icon"><i class="bi bi-egg-fried"></i></div>
-                <div class="empty-state-title">No Menu Items</div>
-                <div class="empty-state-text">Menu information not available for this event.</div>
+            <!-- Service Style -->
+            <div class="info-card" style="margin-bottom: 20px; border-left-color: #58a6ff;">
+                <div class="info-card-title"><i class="bi bi-layout-text-window"></i> Service Style</div>
+                <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px;">
+                    <select id="menuServiceStyle" class="form-control-custom" style="width: 200px; padding: 8px 12px;">
+                        <option value="">Select style...</option>
+                        <option value="buffet">Buffet</option>
+                        <option value="plated">Plated/Served</option>
+                        <option value="family">Family Style</option>
+                        <option value="stations">Food Stations</option>
+                        <option value="passed">Passed Hors d'oeuvres</option>
+                        <option value="cocktail">Cocktail Reception</option>
+                        <option value="mixed">Mixed Service</option>
+                    </select>
+                    <input type="text" id="menuServiceNotes" class="form-control-custom" placeholder="Service notes (optional)" style="flex: 1; min-width: 200px; padding: 8px 12px;">
+                </div>
+            </div>
+
+            <!-- Menu Sections -->
+            <div class="info-card" style="margin-bottom: 20px; border-left-color: #238636;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div class="info-card-title"><i class="bi bi-list-ul"></i> Menu Items</div>
+                    <button class="btn btn-sm btn-primary-custom" onclick="addMenuSection()">
+                        <i class="bi bi-plus"></i> Add Section
+                    </button>
+                </div>
+                <div id="menuSections">
+                    <!-- Sections will be added here dynamically -->
+                </div>
+                <div id="menuEmptyState" style="color: #8b949e; font-style: italic; text-align: center; padding: 20px;">
+                    No menu sections yet. Click "Add Section" to start building your menu.
+                </div>
+            </div>
+
+            <!-- Beverage Service -->
+            <div class="info-card" style="margin-bottom: 20px; border-left-color: #a371f7;">
+                <div class="info-card-title"><i class="bi bi-cup-straw"></i> Beverage Service</div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 10px;">
+                    <div>
+                        <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Bar Type</label>
+                        <select id="menuBarType" class="form-control-custom" style="width: 100%; padding: 8px 12px;">
+                            <option value="">No bar service</option>
+                            <option value="open">Open Bar</option>
+                            <option value="cash">Cash Bar</option>
+                            <option value="beer_wine">Beer & Wine Only</option>
+                            <option value="limited">Limited Selection</option>
+                            <option value="non_alcoholic">Non-Alcoholic Only</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Service Hours</label>
+                        <input type="text" id="menuBarHours" class="form-control-custom" placeholder="e.g., 6pm - 10pm" style="width: 100%; padding: 8px 12px;">
+                    </div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Beverage Details</label>
+                    <textarea id="menuBeverageDetails" class="form-control-custom" rows="2" placeholder="Specific drinks, brands, signature cocktails, etc." style="width: 100%; padding: 8px 12px;"></textarea>
+                </div>
+            </div>
+
+            <!-- Dietary & Special Requests -->
+            <div class="info-card" style="margin-bottom: 20px; border-left-color: #f0883e;">
+                <div class="info-card-title"><i class="bi bi-heart-pulse"></i> Dietary & Special Requests</div>
+                <div style="margin-top: 10px;">
+                    <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Dietary Accommodations</label>
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;" id="dietaryTags">
+                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                            <input type="checkbox" id="diet_vegetarian" style="width: 16px; height: 16px;"> Vegetarian
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                            <input type="checkbox" id="diet_vegan" style="width: 16px; height: 16px;"> Vegan
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                            <input type="checkbox" id="diet_gluten_free" style="width: 16px; height: 16px;"> Gluten-Free
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                            <input type="checkbox" id="diet_dairy_free" style="width: 16px; height: 16px;"> Dairy-Free
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                            <input type="checkbox" id="diet_nut_free" style="width: 16px; height: 16px;"> Nut-Free
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                            <input type="checkbox" id="diet_kosher" style="width: 16px; height: 16px;"> Kosher
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                            <input type="checkbox" id="diet_halal" style="width: 16px; height: 16px;"> Halal
+                        </label>
+                    </div>
+                    <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Special Requests / Allergies</label>
+                    <textarea id="menuSpecialRequests" class="form-control-custom" rows="2" placeholder="Specific allergies, guest preferences, timing notes, etc." style="width: 100%; padding: 8px 12px;"></textarea>
+                </div>
+            </div>
+
+            <!-- Equipment/Rentals -->
+            <div class="info-card" style="margin-bottom: 20px; border-left-color: #8b949e;">
+                <div class="info-card-title"><i class="bi bi-box-seam"></i> Equipment & Rentals</div>
+                <div style="margin-top: 10px;">
+                    <textarea id="menuEquipment" class="form-control-custom" rows="2" placeholder="Chafing dishes, linens, china, tables, chairs, etc." style="width: 100%; padding: 8px 12px;"></textarea>
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <div style="margin-top: 20px;">
+                <button class="btn btn-primary-custom" onclick="saveMenu()">
+                    <i class="bi bi-check-lg"></i> Save Menu
+                </button>
             </div>
         </div>
     </div>
@@ -531,37 +657,188 @@
         <h3 style="color: #c9d1d9; font-size: 18px; margin-bottom: 15px;">Financial Information</h3>
 
         <div id="financialsContent">
+            <!-- Package Info Card -->
+            <div class="info-card" id="finPackageCard" style="display: none; margin-bottom: 20px; border-left-color: #238636;">
+                <div class="info-card-title"><i class="bi bi-box-seam"></i> Selected Package</div>
+                <div id="finPackageDetails">
+                    <div style="font-size: 16px; font-weight: 600; color: #c9d1d9; margin-bottom: 8px;" id="finPackageName">-</div>
+                    <div style="color: #8b949e; font-size: 14px;" id="finPackagePricing">-</div>
+                    <div style="color: #8b949e; font-size: 13px; margin-top: 6px;" id="finPackageDescription"></div>
+                </div>
+            </div>
+
+            <!-- No Package Warning -->
+            <div class="info-card" id="finNoPackageCard" style="margin-bottom: 20px; border-left-color: #f0883e;">
+                <div class="info-card-title"><i class="bi bi-exclamation-triangle"></i> No Pricing Available</div>
+                <div style="color: #8b949e; font-size: 14px;">
+                    Select a package in the Details tab, or add priced items in the Menu & Catering tab.
+                </div>
+            </div>
+
+            <!-- Menu Items Card (shown when no package but menu has priced items) -->
+            <div class="info-card" id="finMenuItemsCard" style="display: none; margin-bottom: 20px; border-left-color: #238636;">
+                <div class="info-card-title"><i class="bi bi-list-check"></i> Custom Menu Pricing</div>
+                <div id="finMenuItemsList" style="font-size: 14px; margin-top: 10px;">
+                    <!-- Menu items will be listed here -->
+                </div>
+            </div>
+
+            <!-- Tax & Service Charge Overrides -->
+            <div class="info-card" style="margin-bottom: 20px; border-left-color: #58a6ff;">
+                <div class="info-card-title"><i class="bi bi-sliders"></i> Rate Adjustments</div>
+                <div style="display: flex; gap: 30px; flex-wrap: wrap; margin-top: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="finApplyServiceCharge" checked style="width: 18px; height: 18px; cursor: pointer;">
+                        <label for="finApplyServiceCharge" style="color: #c9d1d9; cursor: pointer; margin: 0;">Service Charge</label>
+                        <input type="number" id="finServiceRate" value="21" min="0" max="100" step="0.5"
+                               style="width: 60px; padding: 4px 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; text-align: center;">
+                        <span style="color: #8b949e;">%</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="finApplyTax" checked style="width: 18px; height: 18px; cursor: pointer;">
+                        <label for="finApplyTax" style="color: #c9d1d9; cursor: pointer; margin: 0;">Tax</label>
+                        <input type="number" id="finTaxRate" value="7" min="0" max="100" step="0.5"
+                               style="width: 60px; padding: 4px 8px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9; text-align: center;">
+                        <span style="color: #8b949e;">%</span>
+                    </div>
+                    <button class="btn btn-sm btn-secondary-custom" onclick="recalculateFinancials()" style="padding: 4px 12px;">
+                        <i class="bi bi-calculator"></i> Recalculate
+                    </button>
+                </div>
+                <div style="color: #8b949e; font-size: 12px; margin-top: 8px;">
+                    <i class="bi bi-info-circle"></i> Uncheck to remove for non-profit events or special pricing
+                </div>
+            </div>
+
+            <!-- Pricing Breakdown -->
             <div class="financial-summary">
+                <div class="financial-row" id="finBaseRow" style="display: none;">
+                    <span>Base Price:</span>
+                    <span id="finBase">$0.00</span>
+                </div>
+                <div class="financial-row" id="finPerPersonRow" style="display: none;">
+                    <span id="finPerPersonLabel">Per Person (<span id="finGuestCount">0</span> guests):</span>
+                    <span id="finPerPerson">$0.00</span>
+                </div>
                 <div class="financial-row">
                     <span>Subtotal:</span>
                     <span id="finSubtotal">$0.00</span>
                 </div>
-                <div class="financial-row">
-                    <span>Tax (estimated):</span>
-                    <span id="finTax">$0.00</span>
-                </div>
-                <div class="financial-row">
-                    <span>Service Charge:</span>
+                <div class="financial-row" id="finServiceRow">
+                    <span id="finServiceLabel">Service Charge (21%):</span>
                     <span id="finService">$0.00</span>
                 </div>
-                <div class="financial-row">
+                <div class="financial-row" id="finTaxRow">
+                    <span id="finTaxLabel">Tax (7%):</span>
+                    <span id="finTax">$0.00</span>
+                </div>
+                <div class="financial-row total-row" style="font-weight: 600; font-size: 16px; border-top: 1px solid #30363d; padding-top: 10px; margin-top: 10px;">
                     <span>Estimated Total:</span>
                     <span id="finTotal">$0.00</span>
                 </div>
             </div>
 
-            <div class="info-card">
-                <div class="info-card-title"><i class="bi bi-credit-card"></i> Deposit Information</div>
-                <div class="info-card-value">
-                    <div style="margin-bottom: 5px;">Deposit Required: <strong id="finDepositRequired">$0.00</strong></div>
-                    <div style="margin-bottom: 5px;">Deposit Paid: <strong id="finDepositPaid">$0.00</strong></div>
-                    <div>Balance Due: <strong id="finBalance">$0.00</strong></div>
+            <!-- Service Requirements -->
+            <div class="info-card" id="finServiceReqCard" style="display: none; margin-top: 20px;">
+                <div class="info-card-title"><i class="bi bi-person-badge"></i> Service Staff (Additional)</div>
+                <div id="finServiceReqDetails" style="font-size: 14px; color: #8b949e;"></div>
+            </div>
+
+            <!-- Add-ons Available -->
+            <div class="info-card" id="finAddonsCard" style="display: none; margin-top: 15px;">
+                <div class="info-card-title"><i class="bi bi-plus-circle"></i> Available Add-ons</div>
+                <div id="finAddonsDetails" style="font-size: 14px; color: #8b949e;"></div>
+            </div>
+
+            <!-- Deposit & Payments -->
+            <div class="info-card" style="margin-top: 20px; border-left-color: #238636;">
+                <div class="info-card-title"><i class="bi bi-credit-card"></i> Deposits & Payments</div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 10px;">
+                    <div>
+                        <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Deposit Required</label>
+                        <div style="display: flex; align-items: center; gap: 5px;">
+                            <span style="color: #8b949e;">$</span>
+                            <input type="number" id="finDepositRequiredInput" value="0" min="0" step="0.01"
+                                   style="width: 120px; padding: 6px 10px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9;">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Total Paid</label>
+                        <div style="font-size: 18px; font-weight: 600; color: #58a6ff;" id="finTotalPaid">$0.00</div>
+                    </div>
+                    <div>
+                        <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Balance Due</label>
+                        <div style="font-size: 18px; font-weight: 600; color: #f0883e;" id="finBalance">$0.00</div>
+                    </div>
+                </div>
+
+                <!-- Payment History -->
+                <div style="margin-top: 15px; border-top: 1px solid #30363d; padding-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="color: #c9d1d9; font-weight: 500;">Payment History</span>
+                        <button class="btn btn-sm btn-primary-custom" onclick="showAddPaymentModal()" style="padding: 4px 10px;">
+                            <i class="bi bi-plus"></i> Record Payment
+                        </button>
+                    </div>
+                    <div id="paymentHistory" style="font-size: 14px;">
+                        <div style="color: #8b949e; font-style: italic;">No payments recorded</div>
+                    </div>
                 </div>
             </div>
 
-            <div class="info-card" id="finPaymentTermsCard" style="display: none;">
+            <div class="info-card" id="finPaymentTermsCard" style="display: none; margin-top: 15px;">
                 <div class="info-card-title"><i class="bi bi-file-text"></i> Payment Terms</div>
                 <div class="info-card-value" id="finPaymentTerms">-</div>
+            </div>
+
+            <!-- Save Financials Button -->
+            <div style="margin-top: 20px; display: flex; gap: 10px;">
+                <button class="btn btn-primary-custom" onclick="saveFinancials()">
+                    <i class="bi bi-check-lg"></i> Save Financial Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Payment Modal -->
+    <div id="addPaymentModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
+        <div style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; width: 100%; max-width: 400px; margin: 20px;">
+            <h4 style="color: #c9d1d9; margin: 0 0 20px 0; font-size: 16px;">
+                <i class="bi bi-plus-circle"></i> Record Payment
+            </h4>
+            <div style="margin-bottom: 15px;">
+                <label style="color: #8b949e; font-size: 13px; display: block; margin-bottom: 5px;">Amount</label>
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <span style="color: #8b949e;">$</span>
+                    <input type="number" id="paymentAmount" min="0" step="0.01" placeholder="0.00"
+                           style="flex: 1; padding: 8px 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9;">
+                </div>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="color: #8b949e; font-size: 13px; display: block; margin-bottom: 5px;">Date</label>
+                <input type="date" id="paymentDate"
+                       style="width: 100%; padding: 8px 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="color: #8b949e; font-size: 13px; display: block; margin-bottom: 5px;">Method</label>
+                <select id="paymentMethod" style="width: 100%; padding: 8px 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9;">
+                    <option value="check">Check</option>
+                    <option value="credit_card">Credit Card</option>
+                    <option value="cash">Cash</option>
+                    <option value="wire">Wire Transfer</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 20px;">
+                <label style="color: #8b949e; font-size: 13px; display: block; margin-bottom: 5px;">Note (optional)</label>
+                <input type="text" id="paymentNote" placeholder="e.g., Check #1234"
+                       style="width: 100%; padding: 8px 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 4px; color: #c9d1d9;">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="btn btn-secondary-custom" onclick="hideAddPaymentModal()">Cancel</button>
+                <button class="btn btn-primary-custom" onclick="addPayment()">
+                    <i class="bi bi-check"></i> Add Payment
+                </button>
             </div>
         </div>
     </div>
@@ -714,71 +991,858 @@
         }
         document.getElementById('description').value = event.description || '';
 
-        // Load event types, locations and clients
+        // Load event types, locations, clients and packages
         loadEventTypes(event.event_type);
         loadLocations(event.venue_id);
         loadClients(event.client_id);
+        loadPackages(event.package_id);
 
         // Menu tab
         populateMenu();
 
         // Financials tab
         populateFinancials();
+
+        // Overview summaries
+        populateOverviewSummaries();
+    }
+
+    function populateOverviewSummaries() {
+        const event = currentEvent;
+        const menu = event.menu_json || {};
+        const financials = event.financials_json || {};
+
+        // Menu Summary
+        const menuCard = document.getElementById('overviewMenuCard');
+        const menuSummary = document.getElementById('overviewMenuSummary');
+        const sections = menu.sections || [];
+
+        // Check if there's any menu content
+        const hasMenuContent = sections.length > 0 || menu.service_style || menu.bar_type;
+
+        if (hasMenuContent) {
+            menuCard.style.display = 'block';
+            let html = '';
+
+            // Service style
+            if (menu.service_style) {
+                const styleLabels = {
+                    'buffet': 'Buffet', 'plated': 'Plated/Served', 'family': 'Family Style',
+                    'stations': 'Food Stations', 'passed': 'Passed Hors d\'oeuvres',
+                    'cocktail': 'Cocktail Reception', 'mixed': 'Mixed Service'
+                };
+                html += `<div style="margin-bottom: 8px;"><strong>Service:</strong> ${styleLabels[menu.service_style] || menu.service_style}</div>`;
+            }
+
+            // Menu sections summary (count items)
+            if (sections.length > 0) {
+                let totalItems = 0;
+                const sectionSummaries = [];
+
+                sections.forEach(section => {
+                    const items = section.items || [];
+                    if (items.length > 0) {
+                        const sectionName = section.name || section.type || 'Items';
+                        sectionSummaries.push(`${sectionName} (${items.length})`);
+                        totalItems += items.length;
+                    }
+                });
+
+                if (sectionSummaries.length > 0) {
+                    html += `<div style="margin-bottom: 8px;"><strong>Menu:</strong> ${totalItems} items - ${sectionSummaries.join(', ')}</div>`;
+                }
+            }
+
+            // Beverage service
+            if (menu.bar_type) {
+                const barLabels = {
+                    'open': 'Open Bar', 'cash': 'Cash Bar', 'beer_wine': 'Beer & Wine',
+                    'limited': 'Limited Selection', 'non_alcoholic': 'Non-Alcoholic'
+                };
+                let barText = barLabels[menu.bar_type] || menu.bar_type;
+                if (menu.bar_hours) barText += ` (${menu.bar_hours})`;
+                html += `<div style="margin-bottom: 8px;"><strong>Beverages:</strong> ${barText}</div>`;
+            }
+
+            // Dietary accommodations
+            if (menu.dietary && menu.dietary.length > 0) {
+                const dietLabels = menu.dietary.map(d => d.replace('_', '-')).join(', ');
+                html += `<div style="margin-bottom: 8px;"><strong>Dietary:</strong> ${dietLabels}</div>`;
+            }
+
+            // Special requests (truncated)
+            if (menu.special_requests) {
+                const truncated = menu.special_requests.length > 100 ?
+                    menu.special_requests.substring(0, 100) + '...' : menu.special_requests;
+                html += `<div style="color: #8b949e;"><strong>Notes:</strong> ${truncated}</div>`;
+            }
+
+            menuSummary.innerHTML = html || '<span style="color: #8b949e;">No menu details</span>';
+        } else {
+            menuCard.style.display = 'none';
+        }
+
+        // Financial Summary
+        const finCard = document.getElementById('overviewFinancialsCard');
+        const finSummary = document.getElementById('overviewFinancialsSummary');
+
+        // Only show financial summary if there are actual amounts saved (not just package_id)
+        const subtotal = financials.subtotal || 0;
+        const total = financials.total || 0;
+        const payments = financials.payments || [];
+        const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        const balance = total - totalPaid;
+
+        // Only show if there's an actual subtotal or total greater than 0
+        const hasFinancials = subtotal > 0 || total > 0;
+
+        if (hasFinancials) {
+            finCard.style.display = 'block';
+            let html = '';
+
+            html += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span>Subtotal:</span>
+                <span>${formatCurrency(subtotal)}</span>
+            </div>`;
+
+            if (financials.service_charge && financials.apply_service_charge !== false) {
+                html += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #8b949e;">
+                    <span>Service Charge:</span>
+                    <span>${formatCurrency(financials.service_charge)}</span>
+                </div>`;
+            }
+
+            if (financials.tax && financials.apply_tax !== false) {
+                html += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #8b949e;">
+                    <span>Tax:</span>
+                    <span>${formatCurrency(financials.tax)}</span>
+                </div>`;
+            }
+
+            html += `<div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-weight: 600; padding-top: 4px; border-top: 1px solid #30363d;">
+                <span>Total:</span>
+                <span style="color: #58a6ff;">${formatCurrency(total)}</span>
+            </div>`;
+
+            if (payments.length > 0 || totalPaid > 0) {
+                html += `<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span>Paid:</span>
+                    <span style="color: #3fb950;">${formatCurrency(totalPaid)}</span>
+                </div>`;
+                html += `<div style="display: flex; justify-content: space-between; font-weight: 500;">
+                    <span>Balance:</span>
+                    <span style="color: ${balance > 0 ? '#f0883e' : '#3fb950'};">${formatCurrency(balance)}</span>
+                </div>`;
+            }
+
+            finSummary.innerHTML = html;
+        } else {
+            finCard.style.display = 'none';
+        }
     }
 
     function populateMenu() {
-        const menu = currentEvent.menu_json;
-        const menuContent = document.getElementById('menuContent');
+        const menu = currentEvent.menu_json || {};
 
-        if (!menu || Object.keys(menu).length === 0) {
-            return; // Keep empty state
+        // Service Style
+        if (menu.service_style) {
+            document.getElementById('menuServiceStyle').value = menu.service_style;
+        }
+        if (menu.service_notes) {
+            document.getElementById('menuServiceNotes').value = menu.service_notes;
         }
 
-        menuContent.innerHTML = '';
+        // Beverage Service
+        if (menu.bar_type) {
+            document.getElementById('menuBarType').value = menu.bar_type;
+        }
+        if (menu.bar_hours) {
+            document.getElementById('menuBarHours').value = menu.bar_hours;
+        }
+        if (menu.beverage_details) {
+            document.getElementById('menuBeverageDetails').value = menu.beverage_details;
+        }
 
-        for (const [category, items] of Object.entries(menu)) {
-            if (items && items.length > 0) {
-                const categoryDiv = document.createElement('div');
-                categoryDiv.className = 'menu-category';
+        // Dietary Tags
+        const dietary = menu.dietary || [];
+        dietary.forEach(tag => {
+            const checkbox = document.getElementById(`diet_${tag}`);
+            if (checkbox) checkbox.checked = true;
+        });
 
-                categoryDiv.innerHTML = `
-                    <div class="menu-category-header">
-                        <div class="menu-category-title">${category.replace(/_/g, ' ').toUpperCase()}</div>
+        // Special Requests
+        if (menu.special_requests) {
+            document.getElementById('menuSpecialRequests').value = menu.special_requests;
+        }
+
+        // Equipment
+        if (menu.equipment) {
+            document.getElementById('menuEquipment').value = menu.equipment;
+        }
+
+        // Menu Sections
+        const sections = menu.sections || [];
+        if (sections.length > 0) {
+            document.getElementById('menuEmptyState').style.display = 'none';
+            sections.forEach(section => addMenuSection(section));
+        }
+    }
+
+    let menuSectionCounter = 0;
+
+    function addMenuSection(data = null) {
+        document.getElementById('menuEmptyState').style.display = 'none';
+        const container = document.getElementById('menuSections');
+        const sectionId = menuSectionCounter++;
+
+        const sectionTypes = [
+            { value: 'appetizers', label: 'Appetizers' },
+            { value: 'salads', label: 'Salads' },
+            { value: 'soup', label: 'Soup' },
+            { value: 'entrees', label: 'Entrees' },
+            { value: 'sides', label: 'Sides' },
+            { value: 'desserts', label: 'Desserts' },
+            { value: 'station', label: 'Food Station' },
+            { value: 'passed', label: 'Passed Items' },
+            { value: 'beverages', label: 'Beverages' },
+            { value: 'other', label: 'Other' }
+        ];
+
+        const typeOptions = sectionTypes.map(t =>
+            `<option value="${t.value}" ${data?.type === t.value ? 'selected' : ''}>${t.label}</option>`
+        ).join('');
+
+        const html = `
+            <div class="menu-section" id="menuSection${sectionId}" style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <div style="display: flex; gap: 10px; align-items: center; flex: 1;">
+                        <select class="form-control-custom section-type" style="width: 150px; padding: 6px 10px;">
+                            <option value="">Section Type</option>
+                            ${typeOptions}
+                        </select>
+                        <input type="text" class="form-control-custom section-name" placeholder="Section name (e.g., Carving Station)" value="${data?.name || ''}" style="flex: 1; padding: 6px 10px;">
                     </div>
-                    <ul class="menu-items-list">
-                        ${items.map(item => `
-                            <li class="menu-item">
-                                <div>
-                                    <div class="menu-item-name">${item.name || item}</div>
-                                    ${item.description ? `<div class="menu-item-details">${item.description}</div>` : ''}
-                                </div>
-                                ${item.price ? `<div>$${parseFloat(item.price).toFixed(2)}</div>` : ''}
-                            </li>
-                        `).join('')}
-                    </ul>
-                `;
+                    <button type="button" onclick="removeMenuSection(${sectionId})" style="background: transparent; border: 1px solid #f85149; color: #f85149; border-radius: 4px; padding: 4px 8px; cursor: pointer; margin-left: 10px;">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                <div class="section-items" id="sectionItems${sectionId}">
+                    <!-- Items will be added here -->
+                </div>
+                <button type="button" class="btn btn-sm btn-secondary-custom" onclick="addMenuItem(${sectionId})" style="margin-top: 8px;">
+                    <i class="bi bi-plus"></i> Add Item
+                </button>
+            </div>
+        `;
 
-                menuContent.appendChild(categoryDiv);
+        container.insertAdjacentHTML('beforeend', html);
+
+        // Add existing items if data provided
+        if (data?.items && data.items.length > 0) {
+            data.items.forEach(item => addMenuItem(sectionId, item));
+        }
+    }
+
+    function removeMenuSection(sectionId) {
+        const section = document.getElementById(`menuSection${sectionId}`);
+        if (section) {
+            section.remove();
+            // Show empty state if no sections left
+            if (document.getElementById('menuSections').children.length === 0) {
+                document.getElementById('menuEmptyState').style.display = 'block';
             }
         }
     }
 
-    function populateFinancials() {
+    let menuItemCounter = 0;
+
+    function addMenuItem(sectionId, data = null) {
+        const container = document.getElementById(`sectionItems${sectionId}`);
+        const itemId = menuItemCounter++;
+
+        const html = `
+            <div class="menu-item-row" id="menuItem${itemId}" style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; padding: 8px; background: #161b22; border-radius: 4px;">
+                <div style="flex: 2;">
+                    <input type="text" class="form-control-custom item-name" placeholder="Item name" value="${data?.name || ''}" style="width: 100%; padding: 6px 10px; margin-bottom: 4px;">
+                    <input type="text" class="form-control-custom item-description" placeholder="Description (optional)" value="${data?.description || ''}" style="width: 100%; padding: 6px 10px; font-size: 13px;">
+                </div>
+                <div style="width: 100px;">
+                    <input type="text" class="form-control-custom item-quantity" placeholder="Qty/Serves" value="${data?.quantity || ''}" style="width: 100%; padding: 6px 10px; font-size: 13px;">
+                </div>
+                <div style="width: 90px;">
+                    <div style="display: flex; align-items: center;">
+                        <span style="color: #8b949e; padding: 0 5px;">$</span>
+                        <input type="number" class="form-control-custom item-price" placeholder="Price" value="${data?.price || ''}" step="0.01" min="0" style="width: 100%; padding: 6px 10px; font-size: 13px;">
+                    </div>
+                </div>
+                <button type="button" onclick="removeMenuItem(${itemId})" style="background: transparent; border: none; color: #f85149; cursor: pointer; padding: 6px;">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', html);
+    }
+
+    function removeMenuItem(itemId) {
+        const item = document.getElementById(`menuItem${itemId}`);
+        if (item) item.remove();
+    }
+
+    function collectMenuData() {
+        const menu = {
+            service_style: document.getElementById('menuServiceStyle').value,
+            service_notes: document.getElementById('menuServiceNotes').value,
+            bar_type: document.getElementById('menuBarType').value,
+            bar_hours: document.getElementById('menuBarHours').value,
+            beverage_details: document.getElementById('menuBeverageDetails').value,
+            dietary: [],
+            special_requests: document.getElementById('menuSpecialRequests').value,
+            equipment: document.getElementById('menuEquipment').value,
+            sections: []
+        };
+
+        // Collect dietary tags
+        const dietaryIds = ['vegetarian', 'vegan', 'gluten_free', 'dairy_free', 'nut_free', 'kosher', 'halal'];
+        dietaryIds.forEach(id => {
+            const checkbox = document.getElementById(`diet_${id}`);
+            if (checkbox && checkbox.checked) {
+                menu.dietary.push(id);
+            }
+        });
+
+        // Collect sections
+        const sectionElements = document.querySelectorAll('.menu-section');
+        sectionElements.forEach(sectionEl => {
+            const section = {
+                type: sectionEl.querySelector('.section-type').value,
+                name: sectionEl.querySelector('.section-name').value,
+                items: []
+            };
+
+            const itemRows = sectionEl.querySelectorAll('.menu-item-row');
+            itemRows.forEach(itemEl => {
+                const name = itemEl.querySelector('.item-name').value.trim();
+                if (name) {
+                    section.items.push({
+                        name: name,
+                        description: itemEl.querySelector('.item-description').value.trim(),
+                        quantity: itemEl.querySelector('.item-quantity').value.trim(),
+                        price: itemEl.querySelector('.item-price').value ? parseFloat(itemEl.querySelector('.item-price').value) : null
+                    });
+                }
+            });
+
+            // Only add section if it has a type/name or items
+            if (section.type || section.name || section.items.length > 0) {
+                menu.sections.push(section);
+            }
+        });
+
+        return menu;
+    }
+
+    async function saveMenu() {
+        const menuData = collectMenuData();
+
+        try {
+            const response = await fetch(`api/events/${currentEventId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ menu_json: menuData })
+            });
+
+            if (response.ok) {
+                currentEvent.menu_json = menuData;
+                showSuccess('Menu saved successfully');
+
+                // Recalculate financials if no package is selected
+                if (!currentEvent.package_id) {
+                    populateFinancials();
+                }
+            } else {
+                showError('Failed to save menu');
+            }
+        } catch (error) {
+            console.error('Error saving menu:', error);
+            showError('Error saving menu');
+        }
+    }
+
+    let currentPackageData = null;
+    let currentSubtotal = 0; // Store for recalculations
+
+    async function populateFinancials() {
         const financials = currentEvent.financials_json || {};
+        const guestCount = currentEvent.guest_count || 0;
 
-        document.getElementById('finSubtotal').textContent = formatCurrency(financials.subtotal);
-        document.getElementById('finTax').textContent = formatCurrency(financials.tax);
-        document.getElementById('finService').textContent = formatCurrency(financials.service_charge);
-        document.getElementById('finTotal').textContent = formatCurrency(financials.total);
-        document.getElementById('finDepositRequired').textContent = formatCurrency(financials.deposit_required);
-        document.getElementById('finDepositPaid').textContent = formatCurrency(financials.deposit_paid);
+        // Load saved rate settings from financials
+        const applyServiceCharge = financials.apply_service_charge !== false; // default true
+        const applyTax = financials.apply_tax !== false; // default true
+        const serviceRate = financials.service_rate !== undefined ? financials.service_rate * 100 : 21;
+        const taxRate = financials.tax_rate !== undefined ? financials.tax_rate * 100 : 7;
 
-        const balance = (financials.total || 0) - (financials.deposit_paid || 0);
-        document.getElementById('finBalance').textContent = formatCurrency(balance);
+        // Set checkbox and input states
+        document.getElementById('finApplyServiceCharge').checked = applyServiceCharge;
+        document.getElementById('finApplyTax').checked = applyTax;
+        document.getElementById('finServiceRate').value = serviceRate;
+        document.getElementById('finTaxRate').value = taxRate;
+
+        // Load payments and deposit required
+        const payments = financials.payments || [];
+        const depositRequired = financials.deposit_required || 0;
+        document.getElementById('finDepositRequiredInput').value = depositRequired.toFixed(2);
+        displayPayments(payments, financials.total || 0);
+
+        // Check if event has a package assigned
+        if (currentEvent.package_id) {
+            try {
+                // Fetch the full package details
+                const response = await fetch(`api/packages/${currentEvent.package_id}`);
+                if (response.ok) {
+                    currentPackageData = await response.json();
+                    displayPackageFinancials(currentPackageData, guestCount, financials);
+                    return;
+                }
+            } catch (error) {
+                console.error('Error loading package:', error);
+            }
+        }
+
+        // No package - calculate from menu items if available
+        document.getElementById('finPackageCard').style.display = 'none';
+        document.getElementById('finServiceReqCard').style.display = 'none';
+        document.getElementById('finAddonsCard').style.display = 'none';
+
+        // Calculate subtotal from menu items
+        const menu = currentEvent.menu_json || {};
+        const menuSubtotal = calculateMenuSubtotal(menu);
+
+        if (menuSubtotal > 0) {
+            // We have menu items with prices - use those
+            document.getElementById('finNoPackageCard').style.display = 'none';
+            document.getElementById('finMenuItemsCard').style.display = 'block';
+            currentSubtotal = menuSubtotal;
+
+            // Show menu items breakdown
+            displayMenuItemsBreakdown(menu);
+        } else {
+            // No package and no priced menu items
+            document.getElementById('finNoPackageCard').style.display = 'block';
+            document.getElementById('finMenuItemsCard').style.display = 'none';
+            currentSubtotal = 0;
+        }
+
+        // Calculate totals
+        const serviceRateVal = applyServiceCharge ? (parseFloat(document.getElementById('finServiceRate').value) || 0) / 100 : 0;
+        const taxRateVal = applyTax ? (parseFloat(document.getElementById('finTaxRate').value) || 0) / 100 : 0;
+
+        const serviceCharge = currentSubtotal * serviceRateVal;
+        const taxableAmount = currentSubtotal + serviceCharge;
+        const tax = taxableAmount * taxRateVal;
+        const total = currentSubtotal + serviceCharge + tax;
+
+        document.getElementById('finSubtotal').textContent = formatCurrency(currentSubtotal);
+        document.getElementById('finService').textContent = formatCurrency(serviceCharge);
+        document.getElementById('finTax').textContent = formatCurrency(tax);
+        document.getElementById('finTotal').textContent = formatCurrency(total);
+
+        // Update labels
+        document.getElementById('finServiceLabel').textContent = `Service Charge (${(serviceRateVal * 100).toFixed(0)}%):`;
+        document.getElementById('finTaxLabel').textContent = `Tax (${(taxRateVal * 100).toFixed(0)}%):`;
+
+        // Update row visibility based on settings
+        document.getElementById('finServiceRow').style.display = applyServiceCharge ? 'flex' : 'none';
+        document.getElementById('finTaxRow').style.display = applyTax ? 'flex' : 'none';
+        document.getElementById('finBaseRow').style.display = 'none';
+        document.getElementById('finPerPersonRow').style.display = 'none';
+
+        // Update balance display (payments already declared above)
+        displayPayments(payments, total);
 
         if (financials.payment_terms) {
             document.getElementById('finPaymentTermsCard').style.display = 'block';
             document.getElementById('finPaymentTerms').textContent = financials.payment_terms;
+        }
+    }
+
+    function calculateMenuSubtotal(menu) {
+        let subtotal = 0;
+        const sections = menu.sections || [];
+
+        sections.forEach(section => {
+            const items = section.items || [];
+            items.forEach(item => {
+                if (item.price) {
+                    // If quantity is a number, multiply; otherwise just use price
+                    const qty = parseFloat(item.quantity) || 1;
+                    subtotal += item.price * qty;
+                }
+            });
+        });
+
+        return subtotal;
+    }
+
+    function displayMenuItemsBreakdown(menu) {
+        const container = document.getElementById('finMenuItemsList');
+        const sections = menu.sections || [];
+        let html = '';
+
+        sections.forEach(section => {
+            const items = section.items || [];
+            const pricedItems = items.filter(item => item.price);
+
+            if (pricedItems.length > 0) {
+                const sectionName = section.name || section.type || 'Items';
+                html += `<div style="margin-bottom: 10px;">`;
+                html += `<div style="color: #8b949e; font-size: 12px; margin-bottom: 4px;">${sectionName.toUpperCase()}</div>`;
+
+                pricedItems.forEach(item => {
+                    const qty = parseFloat(item.quantity) || 1;
+                    const lineTotal = item.price * qty;
+                    const qtyDisplay = item.quantity ? ` × ${item.quantity}` : '';
+                    html += `<div style="display: flex; justify-content: space-between; padding: 2px 0;">
+                        <span style="color: #c9d1d9;">${item.name}${qtyDisplay}</span>
+                        <span style="color: #c9d1d9;">${formatCurrency(lineTotal)}</span>
+                    </div>`;
+                });
+
+                html += `</div>`;
+            }
+        });
+
+        container.innerHTML = html || '<div style="color: #8b949e;">No priced items</div>';
+    }
+
+    function displayPackageFinancials(pkg, guestCount, storedFinancials) {
+        const pc = pkg.price_components || {};
+
+        // Show package card, hide no-package warning
+        document.getElementById('finPackageCard').style.display = 'block';
+        document.getElementById('finNoPackageCard').style.display = 'none';
+
+        // Package name and info
+        document.getElementById('finPackageName').textContent = pkg.name;
+
+        // Build pricing description
+        let pricingDesc = '';
+        const pricingType = pc.pricing_type || 'flat_rate';
+
+        if (pricingType === 'per_person' && pc.per_unit_price) {
+            pricingDesc = `$${pc.per_unit_price.toFixed(2)} per person`;
+            if (pc.base_price) pricingDesc += ` + $${pc.base_price.toFixed(2)} base`;
+        } else if (pricingType === 'per_piece' && pc.per_unit_price) {
+            pricingDesc = `$${pc.per_unit_price.toFixed(2)} per piece`;
+        } else if (pricingType === 'flat_rate' && pc.base_price) {
+            pricingDesc = `$${pc.base_price.toFixed(2)} flat rate`;
+            if (pc.serves_count) pricingDesc += ` (serves ${pc.serves_count})`;
+        } else if (pricingType === 'hourly' && pc.per_unit_price) {
+            pricingDesc = `$${pc.per_unit_price.toFixed(2)} per hour`;
+        }
+
+        if (pc.portion_size) {
+            pricingDesc += ` • ${pc.portion_size} portions`;
+        }
+
+        document.getElementById('finPackagePricing').textContent = pricingDesc;
+        document.getElementById('finPackageDescription').textContent = pc.description || '';
+
+        // Calculate pricing
+        let baseAmount = 0;
+        let perPersonAmount = 0;
+        let subtotal = 0;
+
+        if (pricingType === 'per_person' && pc.per_unit_price) {
+            perPersonAmount = pc.per_unit_price * guestCount;
+            baseAmount = pc.base_price || 0;
+            subtotal = baseAmount + perPersonAmount;
+
+            document.getElementById('finBaseRow').style.display = baseAmount > 0 ? 'flex' : 'none';
+            document.getElementById('finBase').textContent = formatCurrency(baseAmount);
+
+            document.getElementById('finPerPersonRow').style.display = 'flex';
+            document.getElementById('finGuestCount').textContent = guestCount;
+            document.getElementById('finPerPerson').textContent = `$${pc.per_unit_price.toFixed(2)} × ${guestCount} = ${formatCurrency(perPersonAmount)}`;
+        } else if (pricingType === 'flat_rate' && pc.base_price) {
+            subtotal = pc.base_price;
+            document.getElementById('finBaseRow').style.display = 'flex';
+            document.getElementById('finBase').textContent = formatCurrency(subtotal);
+            document.getElementById('finPerPersonRow').style.display = 'none';
+        } else {
+            subtotal = pc.base_price || 0;
+            document.getElementById('finBaseRow').style.display = subtotal > 0 ? 'flex' : 'none';
+            document.getElementById('finBase').textContent = formatCurrency(subtotal);
+            document.getElementById('finPerPersonRow').style.display = 'none';
+        }
+
+        // Store subtotal for recalculations
+        currentSubtotal = subtotal;
+
+        // Get rate settings from UI (they're already loaded from stored financials)
+        const applyServiceCharge = document.getElementById('finApplyServiceCharge').checked;
+        const applyTax = document.getElementById('finApplyTax').checked;
+        const serviceRatePercent = parseFloat(document.getElementById('finServiceRate').value) || 0;
+        const taxRatePercent = parseFloat(document.getElementById('finTaxRate').value) || 0;
+
+        const serviceRate = applyServiceCharge ? serviceRatePercent / 100 : 0;
+        const taxRate = applyTax ? taxRatePercent / 100 : 0;
+
+        const serviceCharge = subtotal * serviceRate;
+        const taxableAmount = subtotal + serviceCharge; // Service charge is taxable
+        const tax = taxableAmount * taxRate;
+        const total = subtotal + serviceCharge + tax;
+
+        // Update labels and values
+        document.getElementById('finServiceLabel').textContent = `Service Charge (${serviceRatePercent.toFixed(0)}%):`;
+        document.getElementById('finTaxLabel').textContent = `Tax (${taxRatePercent.toFixed(0)}%):`;
+
+        document.getElementById('finSubtotal').textContent = formatCurrency(subtotal);
+        document.getElementById('finService').textContent = formatCurrency(serviceCharge);
+        document.getElementById('finTax').textContent = formatCurrency(tax);
+        document.getElementById('finTotal').textContent = formatCurrency(total);
+
+        // Show/hide rows based on checkboxes
+        document.getElementById('finServiceRow').style.display = applyServiceCharge ? 'flex' : 'none';
+        document.getElementById('finTaxRow').style.display = applyTax ? 'flex' : 'none';
+
+        // Service requirements
+        if (pc.service_requirements && pc.service_requirements.length > 0) {
+            document.getElementById('finServiceReqCard').style.display = 'block';
+            const reqHtml = pc.service_requirements.map(sr => {
+                let reqText = `<div style="margin-bottom: 6px;"><strong>${sr.role}</strong>: $${sr.hourly_rate.toFixed(2)}/hour`;
+                if (sr.min_hours) reqText += ` (${sr.min_hours} hour min)`;
+                if (sr.description) reqText += ` - ${sr.description}`;
+                reqText += '</div>';
+                return reqText;
+            }).join('');
+            document.getElementById('finServiceReqDetails').innerHTML = reqHtml;
+        } else {
+            document.getElementById('finServiceReqCard').style.display = 'none';
+        }
+
+        // Add-ons
+        if (pc.addons && pc.addons.length > 0) {
+            document.getElementById('finAddonsCard').style.display = 'block';
+            const addonsHtml = pc.addons.map(addon => {
+                const typeLabel = addon.pricing_type === 'per_person' ? '/person' :
+                                  addon.pricing_type === 'per_piece' ? '/piece' :
+                                  addon.pricing_type === 'hourly' ? '/hour' : '';
+                return `<div style="margin-bottom: 4px;">• ${addon.name}: +$${addon.price.toFixed(2)}${typeLabel}</div>`;
+            }).join('');
+            document.getElementById('finAddonsDetails').innerHTML = addonsHtml;
+        } else {
+            document.getElementById('finAddonsCard').style.display = 'none';
+        }
+
+        // Load payments and update balance
+        const payments = storedFinancials.payments || [];
+        displayPayments(payments, total);
+
+        // Set deposit required (use stored or default to 50%)
+        const depositRequired = storedFinancials.deposit_required || (total * 0.5);
+        document.getElementById('finDepositRequiredInput').value = depositRequired.toFixed(2);
+
+        if (storedFinancials.payment_terms) {
+            document.getElementById('finPaymentTermsCard').style.display = 'block';
+            document.getElementById('finPaymentTerms').textContent = storedFinancials.payment_terms;
+        }
+    }
+
+    function recalculateFinancials() {
+        const subtotal = currentSubtotal;
+        const applyServiceCharge = document.getElementById('finApplyServiceCharge').checked;
+        const applyTax = document.getElementById('finApplyTax').checked;
+        const serviceRatePercent = parseFloat(document.getElementById('finServiceRate').value) || 0;
+        const taxRatePercent = parseFloat(document.getElementById('finTaxRate').value) || 0;
+
+        const serviceRate = applyServiceCharge ? serviceRatePercent / 100 : 0;
+        const taxRate = applyTax ? taxRatePercent / 100 : 0;
+
+        const serviceCharge = subtotal * serviceRate;
+        const taxableAmount = subtotal + serviceCharge;
+        const tax = taxableAmount * taxRate;
+        const total = subtotal + serviceCharge + tax;
+
+        // Update labels
+        document.getElementById('finServiceLabel').textContent = `Service Charge (${serviceRatePercent.toFixed(0)}%):`;
+        document.getElementById('finTaxLabel').textContent = `Tax (${taxRatePercent.toFixed(0)}%):`;
+
+        // Update values
+        document.getElementById('finService').textContent = formatCurrency(serviceCharge);
+        document.getElementById('finTax').textContent = formatCurrency(tax);
+        document.getElementById('finTotal').textContent = formatCurrency(total);
+
+        // Show/hide rows
+        document.getElementById('finServiceRow').style.display = applyServiceCharge ? 'flex' : 'none';
+        document.getElementById('finTaxRow').style.display = applyTax ? 'flex' : 'none';
+
+        // Update balance
+        const financials = currentEvent.financials_json || {};
+        const payments = financials.payments || [];
+        const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+        const balance = total - totalPaid;
+        document.getElementById('finBalance').textContent = formatCurrency(balance);
+    }
+
+    function displayPayments(payments, total) {
+        const container = document.getElementById('paymentHistory');
+        const totalPaid = payments.reduce((sum, p) => sum + (p.amount || 0), 0);
+
+        document.getElementById('finTotalPaid').textContent = formatCurrency(totalPaid);
+        document.getElementById('finBalance').textContent = formatCurrency(total - totalPaid);
+
+        if (payments.length === 0) {
+            container.innerHTML = '<div style="color: #8b949e; font-style: italic;">No payments recorded</div>';
+            return;
+        }
+
+        const methodLabels = {
+            'check': 'Check',
+            'credit_card': 'Credit Card',
+            'cash': 'Cash',
+            'wire': 'Wire Transfer',
+            'other': 'Other'
+        };
+
+        const html = payments.map((p, index) => {
+            const date = p.date ? new Date(p.date).toLocaleDateString() : 'N/A';
+            const method = methodLabels[p.method] || p.method || '';
+            const note = p.note ? ` - ${p.note}` : '';
+            return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #21262d;">
+                    <div>
+                        <span style="color: #c9d1d9;">${date}</span>
+                        <span style="color: #8b949e; margin-left: 10px;">${method}${note}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="color: #58a6ff; font-weight: 500;">${formatCurrency(p.amount)}</span>
+                        <button class="btn btn-sm" onclick="removePayment(${index})" style="padding: 2px 6px; background: transparent; border: 1px solid #f85149; color: #f85149; border-radius: 4px; cursor: pointer;" title="Remove payment">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        container.innerHTML = html;
+    }
+
+    function showAddPaymentModal() {
+        document.getElementById('addPaymentModal').style.display = 'flex';
+        document.getElementById('paymentDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('paymentAmount').value = '';
+        document.getElementById('paymentNote').value = '';
+        document.getElementById('paymentMethod').value = 'check';
+    }
+
+    function hideAddPaymentModal() {
+        document.getElementById('addPaymentModal').style.display = 'none';
+    }
+
+    function addPayment() {
+        const amount = parseFloat(document.getElementById('paymentAmount').value);
+        const date = document.getElementById('paymentDate').value;
+        const method = document.getElementById('paymentMethod').value;
+        const note = document.getElementById('paymentNote').value;
+
+        if (!amount || amount <= 0) {
+            alert('Please enter a valid payment amount');
+            return;
+        }
+
+        if (!date) {
+            alert('Please enter a payment date');
+            return;
+        }
+
+        // Add to financials
+        const financials = currentEvent.financials_json || {};
+        if (!financials.payments) {
+            financials.payments = [];
+        }
+
+        financials.payments.push({
+            amount: amount,
+            date: date,
+            method: method,
+            note: note,
+            recorded_at: new Date().toISOString()
+        });
+
+        currentEvent.financials_json = financials;
+
+        // Update display
+        const totalText = document.getElementById('finTotal').textContent;
+        const total = parseFloat(totalText.replace(/[$,]/g, '')) || 0;
+        displayPayments(financials.payments, total);
+
+        hideAddPaymentModal();
+
+        // Auto-save
+        saveFinancials();
+    }
+
+    function removePayment(index) {
+        if (!confirm('Remove this payment record?')) return;
+
+        const financials = currentEvent.financials_json || {};
+        if (financials.payments && financials.payments[index]) {
+            financials.payments.splice(index, 1);
+            currentEvent.financials_json = financials;
+
+            const totalText = document.getElementById('finTotal').textContent;
+            const total = parseFloat(totalText.replace(/[$,]/g, '')) || 0;
+            displayPayments(financials.payments, total);
+
+            // Auto-save
+            saveFinancials();
+        }
+    }
+
+    async function saveFinancials() {
+        const applyServiceCharge = document.getElementById('finApplyServiceCharge').checked;
+        const applyTax = document.getElementById('finApplyTax').checked;
+        const serviceRate = parseFloat(document.getElementById('finServiceRate').value) / 100;
+        const taxRate = parseFloat(document.getElementById('finTaxRate').value) / 100;
+        const depositRequired = parseFloat(document.getElementById('finDepositRequiredInput').value) || 0;
+
+        // Get calculated values
+        const subtotal = currentSubtotal;
+        const serviceCharge = applyServiceCharge ? subtotal * serviceRate : 0;
+        const taxableAmount = subtotal + serviceCharge;
+        const tax = applyTax ? taxableAmount * taxRate : 0;
+        const total = subtotal + serviceCharge + tax;
+
+        const financials = currentEvent.financials_json || {};
+
+        // Update financials object
+        financials.apply_service_charge = applyServiceCharge;
+        financials.apply_tax = applyTax;
+        financials.service_rate = serviceRate;
+        financials.tax_rate = taxRate;
+        financials.subtotal = subtotal;
+        financials.service_charge = serviceCharge;
+        financials.tax = tax;
+        financials.total = total;
+        financials.deposit_required = depositRequired;
+
+        try {
+            const response = await fetch(`api/events/${currentEventId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ financials_json: financials })
+            });
+
+            if (response.ok) {
+                currentEvent.financials_json = financials;
+                showSuccess('Financial settings saved');
+            } else {
+                showError('Failed to save financial settings');
+            }
+        } catch (error) {
+            console.error('Error saving financials:', error);
+            showError('Error saving financial settings');
         }
     }
 
@@ -855,6 +1919,37 @@
             });
         } catch (error) {
             console.error('Error loading clients:', error);
+        }
+    }
+
+    async function loadPackages(selectedId = null) {
+        try {
+            const response = await fetch('api/packages/');
+            const packages = await response.json();
+
+            const select = document.getElementById('package_id');
+            packages.forEach(pkg => {
+                const option = document.createElement('option');
+                option.value = pkg.id;
+                // Show package name with pricing info
+                let priceInfo = '';
+                if (pkg.pricing_type === 'per_person' && pkg.per_unit_price) {
+                    priceInfo = ` ($${pkg.per_unit_price}/person)`;
+                } else if (pkg.pricing_type === 'flat_rate' && pkg.base_price) {
+                    priceInfo = ` ($${pkg.base_price})`;
+                } else if (pkg.per_unit_price) {
+                    priceInfo = ` ($${pkg.per_unit_price})`;
+                } else if (pkg.base_price) {
+                    priceInfo = ` ($${pkg.base_price})`;
+                }
+                option.textContent = pkg.name + priceInfo;
+                if (selectedId && pkg.id === selectedId) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Error loading packages:', error);
         }
     }
 
@@ -940,6 +2035,7 @@
                     new Date(document.getElementById('end_at').value).toISOString() : null,
                 venue_id: venue_id,
                 client_id: document.getElementById('client_id').value || null,
+                package_id: document.getElementById('package_id').value || null,
                 description: document.getElementById('description').value || null,
             };
 

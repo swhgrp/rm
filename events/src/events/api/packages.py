@@ -44,13 +44,24 @@ async def list_packages(
             "name": pkg.name,
             "event_type": pkg.event_type,
             "created_at": pkg.created_at,
+            "pricing_type": None,
             "base_price": None,
-            "per_guest_price": None
+            "per_unit_price": None,
+            "portion_size": None,
+            "serves_count": None,
+            "has_addons": False,
+            "has_service_requirements": False
         }
 
         if pkg.price_components_json:
-            item["base_price"] = pkg.price_components_json.get("base_price")
-            item["per_guest_price"] = pkg.price_components_json.get("per_guest_price")
+            pc = pkg.price_components_json
+            item["pricing_type"] = pc.get("pricing_type", "flat_rate")
+            item["base_price"] = pc.get("base_price")
+            item["per_unit_price"] = pc.get("per_unit_price") or pc.get("per_guest_price")  # backward compat
+            item["portion_size"] = pc.get("portion_size")
+            item["serves_count"] = pc.get("serves_count")
+            item["has_addons"] = bool(pc.get("addons"))
+            item["has_service_requirements"] = bool(pc.get("service_requirements"))
 
         result.append(EventPackageListItem(**item))
 

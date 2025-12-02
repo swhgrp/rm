@@ -113,14 +113,12 @@ async def list_events(
             # User has no assigned locations - return empty result
             return []
 
-    # By default, exclude CANCELED and CLOSED events unless explicitly requested
+    # By default, exclude only CANCELED events unless a specific status is requested
+    # CLOSED (Completed) events should be visible in the list
     if status:
         query = query.filter(Event.status == status)
     else:
-        query = query.filter(
-            Event.status != EventStatus.CANCELED,
-            Event.status != EventStatus.CLOSED
-        )
+        query = query.filter(Event.status != EventStatus.CANCELED)
 
     if event_type:
         query = query.filter(Event.event_type == event_type)

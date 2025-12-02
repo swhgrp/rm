@@ -37,6 +37,7 @@ class EventUpdate(BaseModel):
     event_type: Optional[str] = None
     status: Optional[EventStatus] = None
     venue_id: Optional[UUID] = None
+    package_id: Optional[UUID] = None
     start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
     guest_count: Optional[int] = None

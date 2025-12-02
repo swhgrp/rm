@@ -29,7 +29,7 @@
 
 <!-- Modal for Add/Edit Package -->
 <div class="modal fade" id="packageModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="modalTitle">Add Package</h5>
@@ -42,7 +42,7 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="packageName" class="form-label">Package Name *</label>
-                            <input type="text" class="form-control-custom" id="packageName" required>
+                            <input type="text" class="form-control-custom" id="packageName" required placeholder="e.g., Tuscan Chicken, Open Bar Package">
                         </div>
 
                         <div class="col-md-6 mb-3">
@@ -53,71 +53,99 @@
                         </div>
                     </div>
 
-                    <h6 class="mt-4 mb-3">Pricing Components</h6>
+                    <h6 class="section-header mt-4">
+                        <i class="bi bi-currency-dollar"></i> Pricing
+                    </h6>
 
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="basePrice" class="form-label">Base Price *</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control-custom" id="basePrice" step="0.01" min="0" required>
-                            </div>
-                            <small class="text-muted">Fixed base price for the package</small>
+                        <div class="col-md-4 mb-3">
+                            <label for="pricingType" class="form-label">Pricing Type *</label>
+                            <select class="form-control-custom" id="pricingType" onchange="updatePricingLabels()">
+                                <option value="per_person">Per Person</option>
+                                <option value="per_piece">Per Piece/Item</option>
+                                <option value="flat_rate">Flat Rate</option>
+                                <option value="hourly">Hourly</option>
+                            </select>
                         </div>
 
-                        <div class="col-md-6 mb-3">
-                            <label for="perGuestPrice" class="form-label">Per Guest Price</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control-custom" id="perGuestPrice" step="0.01" min="0" value="0">
+                        <div class="col-md-4 mb-3" id="basePriceGroup">
+                            <label for="basePrice" class="form-label" id="basePriceLabel">Flat Rate Price</label>
+                            <div class="input-group-custom">
+                                <span class="input-prefix">$</span>
+                                <input type="number" class="form-control-custom" id="basePrice" step="0.01" min="0">
                             </div>
-                            <small class="text-muted">Additional cost per guest</small>
+                            <small class="text-muted" id="basePriceHelp">Fixed price for the package</small>
+                        </div>
+
+                        <div class="col-md-4 mb-3" id="perUnitPriceGroup">
+                            <label for="perUnitPrice" class="form-label" id="perUnitPriceLabel">Price Per Person</label>
+                            <div class="input-group-custom">
+                                <span class="input-prefix">$</span>
+                                <input type="number" class="form-control-custom" id="perUnitPrice" step="0.01" min="0">
+                            </div>
+                            <small class="text-muted" id="perUnitPriceHelp">Cost per guest</small>
                         </div>
                     </div>
 
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="setupFee" class="form-label">Setup Fee</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control-custom" id="setupFee" step="0.01" min="0">
-                            </div>
-                            <small class="text-muted">Setup and breakdown fee</small>
+                        <div class="col-md-4 mb-3">
+                            <label for="portionSize" class="form-label">Portion Size</label>
+                            <input type="text" class="form-control-custom" id="portionSize" placeholder="e.g., 5oz, 3-4oz">
+                            <small class="text-muted">Optional portion info for catering items</small>
                         </div>
 
-                        <div class="col-md-6 mb-3">
-                            <label for="overtimeRate" class="form-label">Overtime Rate (per hour)</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control-custom" id="overtimeRate" step="0.01" min="0">
-                            </div>
-                            <small class="text-muted">Hourly rate for overtime</small>
+                        <div class="col-md-4 mb-3" id="servesCountGroup">
+                            <label for="servesCount" class="form-label">Serves (Guests)</label>
+                            <input type="number" class="form-control-custom" id="servesCount" min="1" placeholder="e.g., 30">
+                            <small class="text-muted">Number of guests served (for flat rate items)</small>
                         </div>
                     </div>
+
+                    <h6 class="section-header mt-4">
+                        <i class="bi bi-percent"></i> Tax & Service Charge
+                    </h6>
 
                     <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="taxRate" class="form-label">Tax Rate (%)</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control-custom" id="taxRate" step="0.01" min="0" max="100">
-                                <span class="input-group-text">%</span>
+                        <div class="col-md-4 mb-3">
+                            <label for="taxRate" class="form-label">Tax Rate</label>
+                            <div class="input-group-custom">
+                                <input type="number" class="form-control-custom" id="taxRate" step="0.01" min="0" max="100" value="7">
+                                <span class="input-suffix">%</span>
                             </div>
-                            <small class="text-muted">Sales tax percentage</small>
                         </div>
 
-                        <div class="col-md-6 mb-3">
-                            <label for="gratuityRate" class="form-label">Gratuity Rate (%)</label>
-                            <div class="input-group">
-                                <input type="number" class="form-control-custom" id="gratuityRate" step="0.01" min="0" max="100">
-                                <span class="input-group-text">%</span>
+                        <div class="col-md-4 mb-3">
+                            <label for="gratuityRate" class="form-label">Service Charge</label>
+                            <div class="input-group-custom">
+                                <input type="number" class="form-control-custom" id="gratuityRate" step="0.01" min="0" max="100" value="21">
+                                <span class="input-suffix">%</span>
                             </div>
-                            <small class="text-muted">Service gratuity percentage</small>
                         </div>
                     </div>
 
+                    <h6 class="section-header mt-4">
+                        <i class="bi bi-person-badge"></i> Service Requirements
+                        <button type="button" class="btn-sm btn-secondary-custom ms-2" onclick="addServiceRequirement()">
+                            <i class="bi bi-plus"></i> Add
+                        </button>
+                    </h6>
+                    <p class="text-muted small">Staff required for this package (e.g., Bartender, Carving Attendant)</p>
+                    <div id="serviceRequirements"></div>
+
+                    <h6 class="section-header mt-4">
+                        <i class="bi bi-plus-circle"></i> Add-Ons / Upgrades
+                        <button type="button" class="btn-sm btn-secondary-custom ms-2" onclick="addAddon()">
+                            <i class="bi bi-plus"></i> Add
+                        </button>
+                    </h6>
+                    <p class="text-muted small">Optional upgrades (e.g., Add Shrimp +$6/person, Premium Spirits +$3/hr)</p>
+                    <div id="addons"></div>
+
+                    <h6 class="section-header mt-4">
+                        <i class="bi bi-card-text"></i> Description
+                    </h6>
                     <div class="mb-3">
-                        <label for="priceDescription" class="form-label">Pricing Description</label>
-                        <textarea class="form-control-custom" id="priceDescription" rows="2" placeholder="Additional pricing notes or what's included..."></textarea>
+                        <textarea class="form-control-custom" id="priceDescription" rows="3" placeholder="What's included, special notes, etc."></textarea>
                     </div>
                 </form>
             </div>
@@ -206,6 +234,124 @@
     font-weight: 600;
     color: #58a6ff;
 }
+
+.pricing-type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 8px;
+}
+
+.pricing-type-per_person { background: #238636; color: #fff; }
+.pricing-type-per_piece { background: #1f6feb; color: #fff; }
+.pricing-type-flat_rate { background: #8957e5; color: #fff; }
+.pricing-type-hourly { background: #f0883e; color: #fff; }
+
+.section-header {
+    color: #c9d1d9;
+    border-bottom: 1px solid #30363d;
+    padding-bottom: 0.5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.service-req-item, .addon-item {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+}
+
+.package-extras {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.extra-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: #21262d;
+    border: 1px solid #30363d;
+    border-radius: 16px;
+    font-size: 0.75rem;
+    color: #8b949e;
+}
+
+.extra-badge i {
+    color: #58a6ff;
+}
+
+/* Custom Input Groups for dark theme */
+.input-group-custom {
+    display: flex;
+    align-items: stretch;
+}
+
+.input-group-custom .input-prefix,
+.input-group-custom .input-suffix {
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    background-color: #21262d;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.input-group-custom .input-prefix {
+    border-right: none;
+    border-radius: 6px 0 0 6px;
+}
+
+.input-group-custom .input-suffix {
+    border-left: none;
+    border-radius: 0 6px 6px 0;
+}
+
+.input-group-custom input.form-control-custom {
+    border-radius: 0;
+    flex: 1;
+    min-width: 0;
+}
+
+.input-group-custom input.form-control-custom:first-child {
+    border-radius: 6px 0 0 6px;
+}
+
+.input-group-custom input.form-control-custom:last-child {
+    border-radius: 0 6px 6px 0;
+}
+
+.input-group-custom .input-prefix + input.form-control-custom {
+    border-radius: 0 6px 6px 0;
+}
+
+.input-group-custom input.form-control-custom:focus {
+    z-index: 1;
+}
+
+/* Small variant for service requirements and addons */
+.input-group-custom.input-group-sm .input-prefix,
+.input-group-custom.input-group-sm .input-suffix {
+    padding: 0 8px;
+    font-size: 12px;
+}
+
+.input-group-custom.input-group-sm input.form-control-custom {
+    padding: 8px 10px;
+    font-size: 14px;
+    min-height: 36px;
+}
 </style>
 
 <script>
@@ -226,7 +372,6 @@ async function loadEventTypes() {
 
         eventTypes = await response.json();
 
-        // Populate event type selects
         const eventTypeSelect = document.getElementById('eventType');
         const filterSelect = document.getElementById('eventTypeFilter');
 
@@ -249,7 +394,6 @@ async function loadPackages() {
         if (!response.ok) throw new Error('Failed to load packages');
 
         const packages = await response.json();
-
         const container = document.getElementById('packagesTable');
 
         if (packages.length === 0) {
@@ -257,11 +401,45 @@ async function loadPackages() {
             return;
         }
 
-        container.innerHTML = packages.map(pkg => `
+        container.innerHTML = packages.map(pkg => {
+            const pricingType = pkg.pricing_type || 'flat_rate';
+            const pricingLabel = getPricingTypeLabel(pricingType);
+
+            let priceDisplay = '';
+            if (pricingType === 'flat_rate' && pkg.base_price) {
+                priceDisplay = `$${pkg.base_price.toFixed(2)}`;
+                if (pkg.serves_count) priceDisplay += ` (serves ${pkg.serves_count})`;
+            } else if (pkg.per_unit_price) {
+                const unit = pricingType === 'per_person' ? '/person' :
+                            pricingType === 'per_piece' ? '/piece' : '/hour';
+                priceDisplay = `$${pkg.per_unit_price.toFixed(2)}${unit}`;
+            } else if (pkg.base_price) {
+                priceDisplay = `$${pkg.base_price.toFixed(2)}`;
+            }
+
+            let extrasHtml = '';
+            if (pkg.has_service_requirements || pkg.has_addons || pkg.portion_size) {
+                extrasHtml = '<div class="package-extras">';
+                if (pkg.portion_size) {
+                    extrasHtml += `<span class="extra-badge"><i class="bi bi-rulers"></i> ${pkg.portion_size}</span>`;
+                }
+                if (pkg.has_service_requirements) {
+                    extrasHtml += `<span class="extra-badge"><i class="bi bi-person-badge"></i> Service Staff Required</span>`;
+                }
+                if (pkg.has_addons) {
+                    extrasHtml += `<span class="extra-badge"><i class="bi bi-plus-circle"></i> Add-ons Available</span>`;
+                }
+                extrasHtml += '</div>';
+            }
+
+            return `
             <div class="package-card">
                 <div class="package-header">
                     <div>
-                        <div class="package-title">${pkg.name}</div>
+                        <div class="package-title">
+                            ${pkg.name}
+                            <span class="pricing-type-badge pricing-type-${pricingType}">${pricingLabel}</span>
+                        </div>
                         <div class="package-type"><i class="bi bi-tag"></i> ${pkg.event_type}</div>
                     </div>
                     <div class="package-actions">
@@ -275,21 +453,69 @@ async function loadPackages() {
                 </div>
                 <div class="pricing-grid">
                     <div class="pricing-item">
-                        <div class="pricing-label">Base Price</div>
-                        <div class="pricing-value">$${pkg.base_price ? pkg.base_price.toFixed(2) : '0.00'}</div>
+                        <div class="pricing-label">Price</div>
+                        <div class="pricing-value">${priceDisplay || 'Not set'}</div>
                     </div>
-                    ${pkg.per_guest_price ? `
-                    <div class="pricing-item">
-                        <div class="pricing-label">Per Guest</div>
-                        <div class="pricing-value">$${pkg.per_guest_price.toFixed(2)}</div>
-                    </div>
-                    ` : ''}
                 </div>
+                ${extrasHtml}
             </div>
-        `).join('');
+        `}).join('');
     } catch (error) {
         console.error('Error loading packages:', error);
         document.getElementById('packagesTable').innerHTML = '<p class="text-center text-danger p-4">Error loading packages</p>';
+    }
+}
+
+function getPricingTypeLabel(type) {
+    const labels = {
+        'per_person': 'Per Person',
+        'per_piece': 'Per Piece',
+        'flat_rate': 'Flat Rate',
+        'hourly': 'Hourly'
+    };
+    return labels[type] || type;
+}
+
+function updatePricingLabels() {
+    const pricingType = document.getElementById('pricingType').value;
+    const basePriceLabel = document.getElementById('basePriceLabel');
+    const basePriceHelp = document.getElementById('basePriceHelp');
+    const basePriceGroup = document.getElementById('basePriceGroup');
+    const perUnitPriceLabel = document.getElementById('perUnitPriceLabel');
+    const perUnitPriceHelp = document.getElementById('perUnitPriceHelp');
+    const perUnitPriceGroup = document.getElementById('perUnitPriceGroup');
+    const servesCountGroup = document.getElementById('servesCountGroup');
+
+    // Reset visibility
+    basePriceGroup.style.display = 'block';
+    perUnitPriceGroup.style.display = 'block';
+    servesCountGroup.style.display = 'none';
+
+    switch (pricingType) {
+        case 'per_person':
+            basePriceLabel.textContent = 'Base Price (Optional)';
+            basePriceHelp.textContent = 'Optional fixed base before per-person pricing';
+            perUnitPriceLabel.textContent = 'Price Per Person *';
+            perUnitPriceHelp.textContent = 'Cost per guest';
+            break;
+        case 'per_piece':
+            basePriceLabel.textContent = 'Base Price (Optional)';
+            basePriceHelp.textContent = 'Optional fixed base before per-piece pricing';
+            perUnitPriceLabel.textContent = 'Price Per Piece *';
+            perUnitPriceHelp.textContent = 'Cost per piece/item';
+            break;
+        case 'flat_rate':
+            basePriceLabel.textContent = 'Flat Rate Price *';
+            basePriceHelp.textContent = 'Fixed price for the entire package';
+            perUnitPriceGroup.style.display = 'none';
+            servesCountGroup.style.display = 'block';
+            break;
+        case 'hourly':
+            basePriceLabel.textContent = 'Base Price (Optional)';
+            basePriceHelp.textContent = 'Optional fixed base before hourly pricing';
+            perUnitPriceLabel.textContent = 'Hourly Rate *';
+            perUnitPriceHelp.textContent = 'Cost per hour';
+            break;
     }
 }
 
@@ -298,6 +524,12 @@ function showAddModal() {
     document.getElementById('modalTitle').textContent = 'Add Package';
     document.getElementById('packageForm').reset();
     document.getElementById('packageId').value = '';
+    document.getElementById('serviceRequirements').innerHTML = '';
+    document.getElementById('addons').innerHTML = '';
+    document.getElementById('pricingType').value = 'per_person';
+    document.getElementById('taxRate').value = '7';
+    document.getElementById('gratuityRate').value = '21';
+    updatePricingLabels();
     bootstrapModal.show();
 }
 
@@ -314,16 +546,33 @@ async function editPackage(id) {
         document.getElementById('packageName').value = pkg.name;
         document.getElementById('eventType').value = pkg.event_type;
 
+        // Clear dynamic sections
+        document.getElementById('serviceRequirements').innerHTML = '';
+        document.getElementById('addons').innerHTML = '';
+
         if (pkg.price_components) {
-            document.getElementById('basePrice').value = pkg.price_components.base_price || '';
-            document.getElementById('perGuestPrice').value = pkg.price_components.per_guest_price || 0;
-            document.getElementById('setupFee').value = pkg.price_components.setup_fee || '';
-            document.getElementById('overtimeRate').value = pkg.price_components.overtime_rate || '';
-            document.getElementById('taxRate').value = pkg.price_components.tax_rate ? (pkg.price_components.tax_rate * 100) : '';
-            document.getElementById('gratuityRate').value = pkg.price_components.gratuity_rate ? (pkg.price_components.gratuity_rate * 100) : '';
-            document.getElementById('priceDescription').value = pkg.price_components.description || '';
+            const pc = pkg.price_components;
+            document.getElementById('pricingType').value = pc.pricing_type || 'flat_rate';
+            document.getElementById('basePrice').value = pc.base_price || '';
+            document.getElementById('perUnitPrice').value = pc.per_unit_price || pc.per_guest_price || '';
+            document.getElementById('portionSize').value = pc.portion_size || '';
+            document.getElementById('servesCount').value = pc.serves_count || '';
+            document.getElementById('taxRate').value = pc.tax_rate ? (pc.tax_rate * 100) : '7';
+            document.getElementById('gratuityRate').value = pc.gratuity_rate ? (pc.gratuity_rate * 100) : '21';
+            document.getElementById('priceDescription').value = pc.description || '';
+
+            // Load service requirements
+            if (pc.service_requirements) {
+                pc.service_requirements.forEach(sr => addServiceRequirement(sr));
+            }
+
+            // Load add-ons
+            if (pc.addons) {
+                pc.addons.forEach(addon => addAddon(addon));
+            }
         }
 
+        updatePricingLabels();
         bootstrapModal.show();
     } catch (error) {
         console.error('Error loading package:', error);
@@ -331,10 +580,137 @@ async function editPackage(id) {
     }
 }
 
+function addServiceRequirement(data = null) {
+    const container = document.getElementById('serviceRequirements');
+    const index = container.children.length;
+
+    const html = `
+        <div class="service-req-item" id="serviceReq${index}">
+            <div class="row align-items-end">
+                <div class="col-md-3 mb-2">
+                    <label class="form-label small">Role</label>
+                    <input type="text" class="form-control-custom sr-role"
+                           placeholder="e.g., Bartender" value="${data?.role || ''}" style="padding: 8px 12px; min-height: 38px;">
+                </div>
+                <div class="col-md-2 mb-2">
+                    <label class="form-label small">Hourly Rate</label>
+                    <div class="input-group-custom input-group-sm">
+                        <span class="input-prefix">$</span>
+                        <input type="number" class="form-control-custom sr-rate"
+                               step="0.01" min="0" value="${data?.hourly_rate || ''}">
+                    </div>
+                </div>
+                <div class="col-md-2 mb-2">
+                    <label class="form-label small">Min Hours</label>
+                    <input type="number" class="form-control-custom sr-min-hours"
+                           min="1" value="${data?.min_hours || ''}" style="padding: 8px 12px; min-height: 38px;">
+                </div>
+                <div class="col-md-4 mb-2">
+                    <label class="form-label small">Description</label>
+                    <input type="text" class="form-control-custom sr-desc"
+                           placeholder="Optional" value="${data?.description || ''}" style="padding: 8px 12px; min-height: 38px;">
+                </div>
+                <div class="col-md-1 mb-2">
+                    <button type="button" class="btn-danger-custom btn-sm" onclick="this.closest('.service-req-item').remove()" style="height: 38px;">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    container.insertAdjacentHTML('beforeend', html);
+}
+
+function addAddon(data = null) {
+    const container = document.getElementById('addons');
+    const index = container.children.length;
+
+    const html = `
+        <div class="addon-item" id="addon${index}">
+            <div class="row align-items-end">
+                <div class="col-md-3 mb-2">
+                    <label class="form-label small">Name</label>
+                    <input type="text" class="form-control-custom addon-name"
+                           placeholder="e.g., Add Shrimp" value="${data?.name || ''}" style="padding: 8px 12px; min-height: 38px;">
+                </div>
+                <div class="col-md-2 mb-2">
+                    <label class="form-label small">Price</label>
+                    <div class="input-group-custom input-group-sm">
+                        <span class="input-prefix">$</span>
+                        <input type="number" class="form-control-custom addon-price"
+                               step="0.01" min="0" value="${data?.price || ''}">
+                    </div>
+                </div>
+                <div class="col-md-2 mb-2">
+                    <label class="form-label small">Pricing Type</label>
+                    <select class="form-control-custom addon-pricing-type" style="padding: 8px 12px; min-height: 38px;">
+                        <option value="per_person" ${data?.pricing_type === 'per_person' || !data?.pricing_type ? 'selected' : ''}>Per Person</option>
+                        <option value="per_piece" ${data?.pricing_type === 'per_piece' ? 'selected' : ''}>Per Piece</option>
+                        <option value="flat_rate" ${data?.pricing_type === 'flat_rate' ? 'selected' : ''}>Flat Rate</option>
+                        <option value="hourly" ${data?.pricing_type === 'hourly' ? 'selected' : ''}>Hourly</option>
+                    </select>
+                </div>
+                <div class="col-md-4 mb-2">
+                    <label class="form-label small">Description</label>
+                    <input type="text" class="form-control-custom addon-desc"
+                           placeholder="Optional" value="${data?.description || ''}" style="padding: 8px 12px; min-height: 38px;">
+                </div>
+                <div class="col-md-1 mb-2">
+                    <button type="button" class="btn-danger-custom btn-sm" onclick="this.closest('.addon-item').remove()" style="height: 38px;">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    container.insertAdjacentHTML('beforeend', html);
+}
+
+function collectServiceRequirements() {
+    const items = document.querySelectorAll('.service-req-item');
+    const result = [];
+    items.forEach(item => {
+        const role = item.querySelector('.sr-role').value.trim();
+        const rate = item.querySelector('.sr-rate').value;
+        if (role && rate) {
+            result.push({
+                role: role,
+                hourly_rate: parseFloat(rate),
+                min_hours: item.querySelector('.sr-min-hours').value ? parseInt(item.querySelector('.sr-min-hours').value) : null,
+                description: item.querySelector('.sr-desc').value.trim() || null
+            });
+        }
+    });
+    return result.length > 0 ? result : null;
+}
+
+function collectAddons() {
+    const items = document.querySelectorAll('.addon-item');
+    const result = [];
+    items.forEach(item => {
+        const name = item.querySelector('.addon-name').value.trim();
+        const price = item.querySelector('.addon-price').value;
+        if (name && price) {
+            result.push({
+                name: name,
+                price: parseFloat(price),
+                pricing_type: item.querySelector('.addon-pricing-type').value,
+                description: item.querySelector('.addon-desc').value.trim() || null
+            });
+        }
+    });
+    return result.length > 0 ? result : null;
+}
+
 async function savePackage() {
     const form = document.getElementById('packageForm');
-    if (!form.checkValidity()) {
-        form.reportValidity();
+
+    const name = document.getElementById('packageName').value.trim();
+    const eventType = document.getElementById('eventType').value;
+    const pricingType = document.getElementById('pricingType').value;
+
+    if (!name || !eventType) {
+        await showAlert('Please fill in Package Name and Event Type', 'Validation Error');
         return;
     }
 
@@ -342,16 +718,19 @@ async function savePackage() {
     const gratuityRate = document.getElementById('gratuityRate').value;
 
     const data = {
-        name: document.getElementById('packageName').value,
-        event_type: document.getElementById('eventType').value,
+        name: name,
+        event_type: eventType,
         price_components: {
-            base_price: parseFloat(document.getElementById('basePrice').value),
-            per_guest_price: parseFloat(document.getElementById('perGuestPrice').value) || 0,
-            setup_fee: document.getElementById('setupFee').value ? parseFloat(document.getElementById('setupFee').value) : null,
-            overtime_rate: document.getElementById('overtimeRate').value ? parseFloat(document.getElementById('overtimeRate').value) : null,
+            pricing_type: pricingType,
+            base_price: document.getElementById('basePrice').value ? parseFloat(document.getElementById('basePrice').value) : null,
+            per_unit_price: document.getElementById('perUnitPrice').value ? parseFloat(document.getElementById('perUnitPrice').value) : null,
+            portion_size: document.getElementById('portionSize').value.trim() || null,
+            serves_count: document.getElementById('servesCount').value ? parseInt(document.getElementById('servesCount').value) : null,
+            service_requirements: collectServiceRequirements(),
+            addons: collectAddons(),
             tax_rate: taxRate ? parseFloat(taxRate) / 100 : null,
             gratuity_rate: gratuityRate ? parseFloat(gratuityRate) / 100 : null,
-            description: document.getElementById('priceDescription').value || null
+            description: document.getElementById('priceDescription').value.trim() || null
         }
     };
 

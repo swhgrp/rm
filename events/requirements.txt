@@ -16,6 +16,7 @@ redis==5.0.1
 pypdf2==3.0.1
 reportlab==4.0.9
 weasyprint==60.2
+pydyf<0.10
 pillow==10.2.0
 pyyaml==6.0.1
 python-dotenv==1.0.0

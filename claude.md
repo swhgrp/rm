@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** November 30, 2025
-**System Status:** Production (88% Complete - Core systems operational)
+**Last Updated:** December 2, 2025
+**System Status:** Production (89% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -9,7 +9,69 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Nov 30, 2025)
+### Most Recent Work (Current Session - Dec 2, 2025)
+
+**EVENTS: BEO PDF TEMPLATE REDESIGN + FINANCIAL DISPLAY FIXES** ✅ **COMPLETE**
+
+1. **BEO Template Complete Redesign** 📄 **MAJOR FEATURE**
+   - **Problem:** Original BEO template was basic, not matching industry-standard catering BEO formats
+   - **Solution:** Complete redesign to match comprehensive catering industry BEO format
+   - **New Layout:** One-sheet, two-column design with condensed fonts (8-9pt)
+   - **Left Column Sections:**
+     - EVENT INFORMATION - Event name, client, organization, date, time, guests, type, status, contact info
+     - ROOM & SETUP - Room/venue, setup style, tables, head table, dance floor, AV needs, decor
+     - TIMELINE - Auto-generated from setup/start/end times, or custom timeline entries
+     - STAFFING - Banquet captain, servers, bartenders, culinary, bussers (shows TBD if not set)
+   - **Right Column Sections:**
+     - FOOD SERVICE - Service style, service time, menu courses/items by section
+     - BEVERAGE SERVICE - Bar type, bar hours, signature cocktails, details
+     - RENTALS / EQUIPMENT - Equipment and rental information
+     - FINANCIAL SUMMARY - Only shows when actual amounts exist (subtotal > 0 or total > 0)
+   - **Bottom Section:**
+     - Special Notes / Instructions box (full width)
+     - Footer with generation timestamp and BEO reference
+   - **File Modified:** `events/src/events/templates/pdf/beo_template.html` (complete rewrite)
+
+2. **BEO PDF Generation Fixes** 🔧 **CRITICAL FIXES**
+   - **WeasyPrint/pydyf Incompatibility:**
+     - Error: `PDF.__init__() takes 1 positional argument but 3 were given`
+     - Fix: Added `pydyf<0.10` to requirements.txt (WeasyPrint 60.2 incompatible with pydyf 0.10+)
+   - **Jinja2 Dict Method Conflict:**
+     - Error: `'builtin_function_or_method' object is not iterable`
+     - Root cause: `section.items` interpreted as dict.items() method instead of key
+     - Fix: Changed to `section['items']` in template
+   - **Document Model Field Names:**
+     - Error: `'document_type' is an invalid keyword argument for Document`
+     - Fix: Changed `document_type` → `doc_type`, `file_path` → `storage_url`, removed `title`/`file_size`
+   - **Template Field Errors:**
+     - Fixed `event.attendee_count` → `event.guest_count`
+     - Fixed enum handling: `event.status.value if event.status.value else event.status`
+   - **Files Modified:**
+     - `events/requirements.txt` (added pydyf<0.10)
+     - `events/src/events/api/documents.py` (Document model field names)
+     - `events/src/events/templates/pdf/beo_template.html` (multiple template fixes)
+
+3. **Financial Summary Display Fix** 💰 **UI FIX**
+   - **Problem:** Overview tab showed financial summary card when amounts were $0.00
+   - **Root Cause:** Condition checked for `package_id` existence instead of actual amounts
+   - **Solution:** Changed condition to `subtotal > 0 || total > 0`
+   - **File Modified:** `events/src/events/templates/admin/event_detail.html` (populateOverviewSummaries function)
+
+4. **Stale Financials Data Cleanup** 🧹 **DATA FIX**
+   - **Problem:** BEO showing old financial data even when Financials tab showed $0.00
+   - **Root Cause:** `financials_json` in database had stale amounts from previous saves
+   - **Solution:** Cleared stale amounts while preserving settings (rates, deposit_required)
+   - **SQL:** Updated Red Reef Golf event to set subtotal/service_charge/tax/total to 0
+
+**Files Modified This Session:**
+- `events/requirements.txt` (pydyf version constraint)
+- `events/src/events/api/documents.py` (Document model fields)
+- `events/src/events/templates/pdf/beo_template.html` (complete template redesign)
+- `events/src/events/templates/admin/event_detail.html` (financial summary condition)
+
+---
+
+### Previous Session Work (Nov 30, 2025)
 
 **ACCOUNTING: JOURNAL ENTRY CORRECTION FEATURE + TAX DOUBLE-COUNTING FIX** ✅ **COMPLETE**
 

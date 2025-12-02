@@ -18,7 +18,7 @@ import sys
 
 from events.core.config import settings
 from events.core.deps import require_auth
-from events.api import public, events, tasks, documents, auth, settings as settings_api, packages, users, emails, calendar_items
+from events.api import public, events, tasks, documents, auth, settings as settings_api, packages, users, emails, calendar_items, clients
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -182,6 +182,15 @@ async def emails_page(request: Request, current_user=Depends(require_auth)):
         "user": current_user
     })
 
+# Clients management page
+@app.get("/clients", response_class=HTMLResponse)
+async def clients_page(request: Request, current_user=Depends(require_auth)):
+    """Serve the clients management page"""
+    return templates.TemplateResponse("admin/clients.html", {
+        "request": request,
+        "user": current_user
+    })
+
 # Include API routers
 app.include_router(auth.router, tags=["Authentication"])
 app.include_router(public.router, prefix="/public", tags=["Public"])
@@ -193,6 +202,7 @@ app.include_router(settings_api.router, prefix="/api/settings", tags=["Settings"
 app.include_router(users.router, prefix="/api/users", tags=["Users & Roles"])
 app.include_router(emails.router, prefix="/api/emails", tags=["Email History"])
 app.include_router(calendar_items.router, prefix="/api", tags=["Calendar Items"])
+app.include_router(clients.router, prefix="/api/clients", tags=["Clients"])
 
 # Mount static files AFTER routers (matching HR pattern)
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
