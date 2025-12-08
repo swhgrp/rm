@@ -32,13 +32,13 @@
 The SW Hospitality Group Restaurant Management System is a comprehensive microservices platform handling all aspects of restaurant operations including inventory management, human resources, accounting, event planning, and third-party integrations.
 
 ### Key Statistics (Corrected)
-- **7 microservices** running in production
-- **417 Python files** across all systems (updated Nov 11, 2025)
-- **112 HTML templates** for user interfaces (updated Nov 11, 2025)
-- **125+ database models** with full relationships (not 74!)
-- **500+ API endpoints** for system integration (not 150!)
-- **16 Docker containers** orchestrated via Docker Compose
-- **~78% completion** - core systems production ready with caveats
+- **8 microservices** running in production (including new Websites CMS)
+- **430+ Python files** across all systems (updated Dec 8, 2025)
+- **140+ HTML templates** for user interfaces (updated Dec 8, 2025)
+- **130+ database models** with full relationships
+- **550+ API endpoints** for system integration
+- **17 Docker containers** orchestrated via Docker Compose
+- **~90% completion** - core systems production ready
 
 ---
 
@@ -132,6 +132,17 @@ restaurant-system/
 │   ├── .env
 │   └── README.md       # Files system documentation (340 lines)
 │
+├── websites/           # Website CMS Service (NEW - Dec 2025) 🌟
+│   ├── src/            # FastAPI application code (6 Python files)
+│   ├── alembic/        # Database migrations
+│   ├── templates/      # 28+ HTML templates (admin + preview)
+│   │   ├── admin/      # Admin interface templates
+│   │   └── preview/    # Website preview templates
+│   ├── uploads/        # Site image uploads
+│   ├── Dockerfile
+│   ├── requirements.txt
+│   └── .env
+│
 ├── shared/             # Shared Infrastructure
 │   ├── nginx/          # Reverse proxy configuration
 │   │   └── conf.d/     # Site configurations
@@ -174,6 +185,7 @@ restaurant-system/
 │  /hub/        → integration-hub:8000                    │
 │  /files/      → files-app:8000     (Web UI)            │
 │  /files/webdav/ → files-app:8000   (Desktop Sync)      │
+│  /websites/   → websites-app:8000  (Website CMS)       │
 └─────────────────────────────────────────────────────────┘
          │           │           │           │
          ▼           ▼           ▼           ▼
@@ -677,6 +689,76 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 
 ---
 
+### 8. Websites System ✅ **Production Ready (NEW - Dec 2025)** 🌟
+**Restaurant website CMS with block-based page builder and mobile-responsive admin**
+
+- **URL:** https://rm.swhgrp.com/websites/
+- **Database:** websites_db (PostgreSQL 15)
+- **Technology:** FastAPI, SQLAlchemy, Jinja2, Bootstrap 5, HTMX, Pillow
+- **Files:** 6 Python files, 28+ templates
+- **Status:** Production ready with full feature set ✅
+
+**Features:**
+
+**Site Management:**
+- ✅ Multi-site support (manage multiple restaurant websites)
+- ✅ Site settings (domain, branding colors, contact info)
+- ✅ Social media integration (Instagram, Facebook links)
+- ✅ Online ordering and reservation URL integration
+- ✅ Business hours management with special hours
+- ✅ Site publishing workflow
+
+**Page Builder:**
+- ✅ Block-based page editor (drag-and-drop ready)
+- ✅ Block types: Hero, Text, Menu Preview, Hours, Contact Form, Map, Gallery, Two-Column, Image
+- ✅ Visual block editing with live preview
+- ✅ Block visibility toggles
+- ✅ Block reordering
+
+**Menu Management:**
+- ✅ Menu CRUD with categories
+- ✅ Menu items with descriptions, prices, dietary flags
+- ✅ Menu preview block on pages
+- ✅ Multiple menus per site (Lunch, Dinner, Drinks, etc.)
+
+**Image Management:**
+- ✅ Image upload with automatic thumbnails
+- ✅ Image library per site
+- ✅ Image picker for blocks
+- ✅ Alt text and captions
+
+**Contact Form Submissions:**
+- ✅ Form submission capture from public websites
+- ✅ Submission management (read/unread, spam marking)
+- ✅ Email notifications for new submissions
+- ✅ Reply via email links
+
+**Activity Logging:**
+- ✅ Full activity audit trail
+- ✅ Detailed change tracking (which fields changed)
+- ✅ Paginated activity history
+- ✅ User attribution
+
+**Mobile Responsive Admin:** 🌟
+- ✅ Hamburger menu on mobile
+- ✅ Slide-out sidebar navigation
+- ✅ Touch-friendly interface
+- ✅ Responsive stats cards and buttons
+
+**Website Preview:**
+- ✅ Live preview with edit mode toggle
+- ✅ Social icons in header and footer
+- ✅ Action buttons (Order Online, Reservations)
+- ✅ Responsive design
+
+**Access:**
+- Admin: https://rm.swhgrp.com/websites/
+- Preview: https://rm.swhgrp.com/websites/preview/{site-slug}/
+
+**[→ View Websites Documentation](./websites/README.md)**
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -1071,6 +1153,7 @@ docker compose logs -f inventory-app
 - **Events:** https://rm.swhgrp.com/events/
 - **Integration Hub:** https://rm.swhgrp.com/hub/
 - **Files:** https://rm.swhgrp.com/files/
+- **Websites:** https://rm.swhgrp.com/websites/
 
 ### Contact Information
 - **Development Team:** [Contact Info]
@@ -1172,24 +1255,25 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 | HR | ✅ Production | 56 | 14 | 12 | **100%** ✅ | Email notifications, admin delete, doc security (Nov 3) |
 | Accounting | ⚠️ Active | 154 | 38 | 60+ | ~75% | ✅ **Framework corrected (Nov 9)** - FastAPI documented |
 | Events | ✅ Production | 51 | 14 | 17 | ~75% | ✅ SSO complete (Nov 1) |
-| Integration Hub | ✅ Production | 36 | 9 | 7+ | 100%+ 🌟 | **NEW: Multi-page parsing, bulk mapping workflow** 🚀 |
-| Files | ⚠️ Active | 14 | 3 | 6 | 75-80% | Migration syntax error |
+| Integration Hub | ✅ Production | 36 | 9 | 7+ | 100%+ 🌟 | Multi-page parsing, bulk mapping workflow |
+| Files | ⚠️ Active | 14 | 3 | 6 | 75-80% | WebDAV sync working |
+| **Websites** | ✅ Production | 6 | 28 | 10+ | **100%** 🌟 | **NEW: Restaurant CMS with mobile admin** 🚀 |
 
-**Total:** 417 Python files, 112 templates, 128+ database models (updated Nov 11, 2025)
+**Total:** 430+ Python files, 140+ templates, 130+ database models (updated Dec 8, 2025)
 
-**Overall Status:** ~85% Complete - Core Systems Production Ready ✅ with Caveats ⚠️
+**Overall Status:** ~90% Complete - Core Systems Production Ready ✅
 
 **Critical Issues:**
 - ✅ ~~Events System: Authentication not implemented~~ - RESOLVED (Nov 1, 2025)
 - ✅ ~~Accounting System: Wrong framework documented~~ - RESOLVED (Nov 11, 2025) - FastAPI confirmed
 - ✅ ~~HR System: Wrong framework documented~~ - RESOLVED (Nov 11, 2025) - FastAPI confirmed
-- Files System: Production-blocking migration error (needs fix)
-- ~~Integration Hub: Major feature misrepresentation corrected~~ - RESOLVED (Oct 31, 2025)
+- ✅ ~~Integration Hub: Major feature misrepresentation corrected~~ - RESOLVED (Oct 31, 2025)
+- ✅ **NEW: Websites CMS added** - Full restaurant website management (Dec 8, 2025)
 
 ---
 
-**Version:** 2.9
-**Last Updated:** November 28, 2025
+**Version:** 3.1
+**Last Updated:** December 8, 2025
 **Maintained By:** SW Hospitality Group Development Team
 
 **For complete system details, see [SYSTEM_DOCUMENTATION.md](./SYSTEM_DOCUMENTATION.md)**
