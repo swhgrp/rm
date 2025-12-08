@@ -1,0 +1,327 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ page.title }} - {{ site.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1">
+                <li class="breadcrumb-item"><a href="/websites/sites/{{ site.id }}/pages">Pages</a></li>
+                <li class="breadcrumb-item active">{{ page.title }}</li>
+            </ol>
+        </nav>
+        <h1><i class="bi bi-file-earmark-text"></i> {{ page.title }}</h1>
+    </div>
+    <div class="btn-group">
+        <button class="btn btn-outline-secondary" onclick="previewPage()">
+            <i class="bi bi-eye"></i> Preview
+        </button>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#pageSettingsModal">
+            <i class="bi bi-gear"></i> Settings
+        </button>
+    </div>
+</div>
+
+<!-- Auto-save notice -->
+<div class="alert alert-info py-2 mb-3 d-flex align-items-center">
+    <i class="bi bi-info-circle me-2"></i>
+    <small>Changes are saved automatically when you click outside a field</small>
+    <span id="saveIndicator" class="ms-auto d-none">
+        <i class="bi bi-check-circle text-success"></i> Saved
+    </span>
+</div>
+
+<div class="row">
+    <div class="col-lg-9">
+        <!-- Page Blocks -->
+        <div id="blocks-container">
+            {% for block in page.blocks %}
+            {% include "admin/pages/partials/block_card.html" %}
+            {% endfor %}
+        </div>
+
+        <!-- Add Block Button -->
+        <div class="text-center my-4">
+            <div class="btn-group">
+                <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="bi bi-plus-lg"></i> Add Block
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="#" onclick="addBlock('hero')">
+                        <i class="bi bi-image"></i> Hero Section
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="addBlock('text')">
+                        <i class="bi bi-text-paragraph"></i> Text Content
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="addBlock('two_column')">
+                        <i class="bi bi-layout-split"></i> Two Columns
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="addBlock('image')">
+                        <i class="bi bi-card-image"></i> Full Width Image
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="addBlock('gallery')">
+                        <i class="bi bi-images"></i> Image Gallery
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="addBlock('cta')">
+                        <i class="bi bi-megaphone"></i> Call to Action
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="addBlock('menu_preview')">
+                        <i class="bi bi-list-ul"></i> Menu Preview
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="addBlock('hours')">
+                        <i class="bi bi-clock"></i> Hours Display
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="addBlock('map')">
+                        <i class="bi bi-geo-alt"></i> Map Embed
+                    </a></li>
+                    <li><a class="dropdown-item" href="#" onclick="addBlock('contact_form')">
+                        <i class="bi bi-envelope"></i> Contact Form
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-3">
+        <!-- Page Status -->
+        <div class="card mb-3">
+            <div class="card-header">Status</div>
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between mb-3">
+                    <span>Published</span>
+                    <div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input" id="pagePublishedToggle"
+                               {% if page.is_published %}checked{% endif %}
+                               onchange="togglePublished(this)">
+                    </div>
+                </div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <span>Show in Nav</span>
+                    <div class="form-check form-switch">
+                        <input type="checkbox" class="form-check-input" id="pageNavToggle"
+                               {% if page.is_in_nav %}checked{% endif %}
+                               onchange="toggleNav(this)">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEO -->
+        <div class="card">
+            <div class="card-header">SEO</div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label small">SEO Title</label>
+                    <input type="text" class="form-control form-control-sm"
+                           value="{{ page.seo_title or '' }}"
+                           hx-put="/websites/htmx/pages/{{ page.id }}"
+                           hx-trigger="blur changed"
+                           hx-vals='{"seo_title": event.target.value}'
+                           name="seo_title">
+                </div>
+                <div class="mb-0">
+                    <label class="form-label small">SEO Description</label>
+                    <textarea class="form-control form-control-sm" rows="3"
+                              hx-put="/websites/htmx/pages/{{ page.id }}"
+                              hx-trigger="blur changed"
+                              hx-vals='{"seo_description": event.target.value}'
+                              name="seo_description">{{ page.seo_description or '' }}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Page Settings Modal -->
+<div class="modal fade" id="pageSettingsModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form hx-put="/websites/htmx/pages/{{ page.id }}"
+                  hx-swap="none">
+                <div class="modal-header">
+                    <h5 class="modal-title">Page Settings</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Page Title</label>
+                        <input type="text" name="title" class="form-control" value="{{ page.title }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">URL Slug</label>
+                        <div class="input-group">
+                            <span class="input-group-text">/</span>
+                            <input type="text" name="slug" class="form-control" value="{{ page.slug }}">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Template</label>
+                        <select name="template" class="form-select">
+                            <option value="page" {% if page.template == 'page' %}selected{% endif %}>Standard Page</option>
+                            <option value="home" {% if page.template == 'home' %}selected{% endif %}>Home Page</option>
+                            <option value="menu" {% if page.template == 'menu' %}selected{% endif %}>Menu Page</option>
+                            <option value="contact" {% if page.template == 'contact' %}selected{% endif %}>Contact Page</option>
+                            <option value="gallery" {% if page.template == 'gallery' %}selected{% endif %}>Gallery Page</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Navigation Order</label>
+                        <input type="number" name="nav_order" class="form-control" value="{{ page.nav_order }}">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-danger me-auto"
+                            hx-delete="/websites/htmx/pages/{{ page.id }}"
+                            hx-confirm="Delete this page?"
+                            hx-target="body">
+                        Delete Page
+                    </button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+new Sortable(document.getElementById('blocks-container'), {
+    handle: '.block-handle',
+    animation: 150,
+    onEnd: function(evt) {
+        const items = Array.from(evt.target.querySelectorAll('.block-card')).map((el, idx) => ({
+            id: parseInt(el.dataset.id),
+            sort_order: idx
+        }));
+
+        fetch('/websites/htmx/blocks/reorder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({items: items})
+        });
+    }
+});
+
+function addBlock(blockType) {
+    fetch('/websites/htmx/pages/{{ page.id }}/blocks', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({block_type: blockType, content: {}, sort_order: 999})
+    })
+    .then(response => response.text())
+    .then(html => {
+        document.getElementById('blocks-container').insertAdjacentHTML('beforeend', html);
+    });
+}
+
+function togglePublished(checkbox) {
+    fetch('/websites/htmx/pages/{{ page.id }}', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({is_published: checkbox.checked})
+    });
+}
+
+function toggleNav(checkbox) {
+    fetch('/websites/htmx/pages/{{ page.id }}', {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({is_in_nav: checkbox.checked})
+    });
+}
+
+function previewPage() {
+    window.open('/websites/preview/{{ site.slug }}/{{ page.slug }}', '_blank');
+}
+
+// Show save indicator on successful htmx requests
+document.body.addEventListener('htmx:afterRequest', function(evt) {
+    if (evt.detail.successful && evt.detail.requestConfig.verb !== 'get') {
+        const indicator = document.getElementById('saveIndicator');
+        indicator.classList.remove('d-none');
+        setTimeout(() => indicator.classList.add('d-none'), 2000);
+    }
+});
+
+// Image picker
+let currentBlockId = null;
+let currentFieldName = null;
+
+function openImagePicker(blockId, fieldName) {
+    currentBlockId = blockId;
+    currentFieldName = fieldName;
+
+    // Fetch images for this site
+    fetch('/websites/api/sites/{{ site.id }}/images')
+        .then(response => response.json())
+        .then(images => {
+            const grid = document.getElementById('imagePickerGrid');
+            grid.innerHTML = '';
+
+            if (images.length === 0) {
+                grid.innerHTML = '<div class="col-12 text-center text-muted py-4">No images uploaded yet. <a href="/websites/sites/{{ site.id }}/images">Upload images</a> first.</div>';
+            } else {
+                images.forEach(img => {
+                    const col = document.createElement('div');
+                    col.className = 'col-4 col-md-3';
+                    col.innerHTML = `
+                        <div class="image-picker-item border rounded p-1" style="cursor: pointer;" onclick="selectImage('${img.url}')">
+                            <img src="${img.thumb_url || img.url}" class="img-fluid" style="width: 100%; height: 80px; object-fit: cover;">
+                            <small class="d-block text-truncate">${img.original_filename || img.filename}</small>
+                        </div>
+                    `;
+                    grid.appendChild(col);
+                });
+            }
+
+            new bootstrap.Modal(document.getElementById('imagePickerModal')).show();
+        });
+}
+
+function selectImage(url) {
+    // Update the block content with the selected image
+    fetch(`/websites/htmx/blocks/${currentBlockId}/content`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `${currentFieldName}=${encodeURIComponent(url)}`
+    })
+    .then(() => {
+        // Update the preview in the block card
+        const blockCard = document.querySelector(`.block-card[data-id="${currentBlockId}"]`);
+        const picker = blockCard.querySelector('.image-picker');
+        if (picker) {
+            picker.innerHTML = `<img src="${url}" class="img-fluid" style="max-height: 100px;">`;
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('imagePickerModal')).hide();
+        showToast('Image selected');
+    });
+}
+</script>
+
+<!-- Image Picker Modal -->
+<div class="modal fade" id="imagePickerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Select Image</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-2" id="imagePickerGrid">
+                    <!-- Images loaded dynamically -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="/websites/sites/{{ site.id }}/images" class="btn btn-outline-primary me-auto">
+                    <i class="bi bi-upload"></i> Upload New
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -321,6 +321,45 @@ services:
     volumes:
     - onlyoffice_data:/var/www/onlyoffice/Data
     - onlyoffice_logs:/var/log/onlyoffice
+  websites-db:
+    image: postgres:15
+    container_name: websites-db
+    environment:
+      POSTGRES_USER: websites_user
+      POSTGRES_PASSWORD: W3bs1t3s_Pr0d_2024!
+      POSTGRES_DB: websites_db
+      TZ: America/New_York
+    volumes:
+    - websites_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U websites_user -d websites_db
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+    - restaurant-network
+  websites-app:
+    build: ./websites
+    container_name: websites-app
+    volumes:
+    - ./websites/src/websites:/app
+    - ./websites/alembic:/app/alembic
+    - ./websites/generated:/app/generated
+    - ./websites/uploads:/app/uploads
+    environment:
+    - TZ=America/New_York
+    - DATABASE_URL=postgresql://websites_user:W3bs1t3s_Pr0d_2024!@websites-db:5432/websites_db
+    - SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    - PORTAL_SSO_SECRET=your-super-secret-key-change-in-production-galveston34
+    depends_on:
+      websites-db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+    - restaurant-network
   nginx:
     image: nginx:alpine
     container_name: nginx-proxy
@@ -344,6 +383,7 @@ services:
     - portal-app
     - files-app
     - onlyoffice
+    - websites-app
     restart: unless-stopped
     networks:
     - restaurant-network
@@ -385,6 +425,8 @@ volumes:
     name: restaurant-onlyoffice_data
   onlyoffice_logs:
     name: restaurant-onlyoffice_logs
+  websites_data:
+    name: restaurant-websites_data
 networks:
   restaurant-network:
     name: restaurant-network

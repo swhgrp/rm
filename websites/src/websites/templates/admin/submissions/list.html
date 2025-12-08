@@ -1,0 +1,300 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Form Submissions - {{ site.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2">
+    <h1><i class="bi bi-envelope"></i> Form Submissions</h1>
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-primary">{{ unread_count }} unread</span>
+        <button class="btn btn-outline-secondary btn-sm" onclick="markAllRead()">
+            <i class="bi bi-check-all"></i> <span class="d-none d-sm-inline">Mark All Read</span><span class="d-sm-none">All Read</span>
+        </button>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body py-2">
+        <div class="row align-items-center">
+            <div class="col-auto">
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="statusFilter" id="filterAll"
+                           value="all" checked onchange="filterSubmissions()">
+                    <label class="form-check-label" for="filterAll">All</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="statusFilter" id="filterUnread"
+                           value="unread" onchange="filterSubmissions()">
+                    <label class="form-check-label" for="filterUnread">Unread</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="statusFilter" id="filterSpam"
+                           value="spam" onchange="filterSubmissions()">
+                    <label class="form-check-label" for="filterSpam">Spam</label>
+                </div>
+            </div>
+            <div class="col">
+                <input type="search" class="form-control form-control-sm" placeholder="Search..."
+                       id="submissionSearch" onkeyup="filterSubmissions()">
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if submissions %}
+<div class="list-group" id="submissionsList">
+    {% for sub in submissions %}
+    <div class="list-group-item list-group-item-action submission-item {% if not sub.is_read %}border-start border-primary border-3{% endif %}"
+         data-id="{{ sub.id }}"
+         data-read="{{ 'true' if sub.is_read else 'false' }}"
+         data-spam="{{ 'true' if sub.is_spam else 'false' }}"
+         data-searchable="{{ sub.name }} {{ sub.email }} {{ sub.subject }} {{ sub.message }}"
+         onclick="viewSubmission({{ sub.id }})">
+        <div class="d-flex w-100 justify-content-between align-items-start">
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center mb-1">
+                    {% if not sub.is_read %}
+                    <span class="badge bg-primary me-2">New</span>
+                    {% endif %}
+                    {% if sub.is_spam %}
+                    <span class="badge bg-danger me-2">Spam</span>
+                    {% endif %}
+                    <h6 class="mb-0 {% if not sub.is_read %}fw-bold{% endif %}">
+                        {{ sub.name or 'No name' }}
+                    </h6>
+                    <small class="text-muted ms-2">{{ sub.email or 'No email' }}</small>
+                </div>
+                <p class="mb-1 {% if not sub.is_read %}fw-semibold{% endif %}">
+                    {{ sub.subject or '(No subject)' }}
+                </p>
+                <p class="mb-0 text-muted small text-truncate" style="max-width: 600px;">
+                    {{ sub.message[:150] if sub.message else '(No message)' }}{% if sub.message and sub.message|length > 150 %}...{% endif %}
+                </p>
+            </div>
+            <div class="text-end">
+                <small class="text-muted">{{ sub.created_at.strftime('%b %d, %Y') }}</small>
+                <br>
+                <small class="text-muted">{{ sub.created_at.strftime('%I:%M %p') }}</small>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-5">
+    <i class="bi bi-inbox text-muted" style="font-size: 4rem;"></i>
+    <p class="text-muted mt-3">No form submissions yet</p>
+    <p class="text-muted small">When visitors submit the contact form on your website, submissions will appear here.</p>
+</div>
+{% endif %}
+
+<!-- Submission Detail Modal -->
+<div class="modal fade" id="submissionModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Message Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted">Name</label>
+                        <p id="modalName" class="mb-0">-</p>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted">Email</label>
+                        <p class="mb-0">
+                            <a href="#" id="modalEmail">-</a>
+                        </p>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted">Phone</label>
+                        <p id="modalPhone" class="mb-0">-</p>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small text-muted">Received</label>
+                        <p id="modalDate" class="mb-0">-</p>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small text-muted">Subject</label>
+                    <p id="modalSubject" class="mb-0">-</p>
+                </div>
+                <div class="mb-0">
+                    <label class="form-label small text-muted">Message</label>
+                    <div id="modalMessage" class="p-3 bg-dark rounded" style="white-space: pre-wrap;">-</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <input type="hidden" id="modalSubmissionId">
+                <button type="button" class="btn btn-outline-warning me-auto" onclick="toggleSpam()">
+                    <i class="bi bi-exclamation-triangle"></i> <span id="spamBtnText">Mark as Spam</span>
+                </button>
+                <button type="button" class="btn btn-danger" onclick="showDeleteConfirm()">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+                <a href="#" id="replyBtn" class="btn btn-primary">
+                    <i class="bi bi-reply"></i> Reply
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title">
+                    <i class="bi bi-exclamation-triangle text-danger me-2"></i>Delete Submission
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-0">Are you sure you want to delete this submission? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer border-0 pt-0">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmDelete()">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const siteId = {{ site.id }};
+let currentSubmission = null;
+
+function filterSubmissions() {
+    const statusFilter = document.querySelector('input[name="statusFilter"]:checked').value;
+    const search = document.getElementById('submissionSearch').value.toLowerCase();
+
+    document.querySelectorAll('.submission-item').forEach(item => {
+        let show = true;
+
+        if (statusFilter === 'unread' && item.dataset.read === 'true') show = false;
+        if (statusFilter === 'spam' && item.dataset.spam !== 'true') show = false;
+        if (statusFilter === 'all' && item.dataset.spam === 'true') show = false;
+
+        if (search && !item.dataset.searchable.toLowerCase().includes(search)) {
+            show = false;
+        }
+
+        item.style.display = show ? '' : 'none';
+    });
+}
+
+function viewSubmission(id) {
+    fetch(`/websites/api/submissions/${id}`)
+        .then(response => response.json())
+        .then(data => {
+            currentSubmission = data;
+            document.getElementById('modalSubmissionId').value = data.id;
+            document.getElementById('modalName').textContent = data.name || '-';
+            document.getElementById('modalEmail').textContent = data.email || '-';
+            document.getElementById('modalEmail').href = data.email ? `mailto:${data.email}` : '#';
+            document.getElementById('modalPhone').textContent = data.phone || '-';
+            document.getElementById('modalSubject').textContent = data.subject || '(No subject)';
+            document.getElementById('modalMessage').textContent = data.message || '(No message)';
+            document.getElementById('modalDate').textContent = new Date(data.created_at).toLocaleString();
+            document.getElementById('replyBtn').href = data.email ? `mailto:${data.email}?subject=Re: ${data.subject || ''}` : '#';
+            document.getElementById('spamBtnText').textContent = data.is_spam ? 'Not Spam' : 'Mark as Spam';
+
+            // Mark as read
+            if (!data.is_read) {
+                fetch(`/websites/htmx/submissions/${id}`, {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({is_read: true})
+                });
+                const item = document.querySelector(`.submission-item[data-id="${id}"]`);
+                if (item) {
+                    item.classList.remove('border-start', 'border-primary', 'border-3');
+                    item.dataset.read = 'true';
+                    const badge = item.querySelector('.badge.bg-primary');
+                    if (badge && badge.textContent === 'New') badge.remove();
+                }
+            }
+
+            new bootstrap.Modal(document.getElementById('submissionModal')).show();
+        });
+}
+
+function toggleSpam() {
+    const id = document.getElementById('modalSubmissionId').value;
+    const newValue = !currentSubmission.is_spam;
+
+    fetch(`/websites/htmx/submissions/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({is_spam: newValue})
+    })
+    .then(() => {
+        currentSubmission.is_spam = newValue;
+        document.getElementById('spamBtnText').textContent = newValue ? 'Not Spam' : 'Mark as Spam';
+
+        const item = document.querySelector(`.submission-item[data-id="${id}"]`);
+        if (item) {
+            item.dataset.spam = newValue ? 'true' : 'false';
+            if (newValue) {
+                const badge = document.createElement('span');
+                badge.className = 'badge bg-danger me-2';
+                badge.textContent = 'Spam';
+                item.querySelector('.d-flex').prepend(badge);
+            } else {
+                const spamBadge = item.querySelector('.badge.bg-danger');
+                if (spamBadge) spamBadge.remove();
+            }
+        }
+
+        filterSubmissions();
+        showToast(newValue ? 'Marked as spam' : 'Removed from spam');
+    });
+}
+
+function showDeleteConfirm() {
+    // Hide the details modal and show the confirm modal
+    const detailModal = bootstrap.Modal.getInstance(document.getElementById('submissionModal'));
+    detailModal.hide();
+
+    // Wait for the first modal to close, then show confirm
+    document.getElementById('submissionModal').addEventListener('hidden.bs.modal', function handler() {
+        new bootstrap.Modal(document.getElementById('deleteConfirmModal')).show();
+        this.removeEventListener('hidden.bs.modal', handler);
+    });
+}
+
+function confirmDelete() {
+    const id = document.getElementById('modalSubmissionId').value;
+    fetch(`/websites/htmx/submissions/${id}`, {method: 'DELETE'})
+        .then(() => {
+            bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal')).hide();
+            const item = document.querySelector(`.submission-item[data-id="${id}"]`);
+            if (item) item.remove();
+            showToast('Submission deleted');
+        });
+}
+
+function markAllRead() {
+    fetch(`/websites/htmx/sites/${siteId}/submissions/mark-read`, {method: 'POST'})
+        .then(() => {
+            document.querySelectorAll('.submission-item').forEach(item => {
+                item.classList.remove('border-start', 'border-primary', 'border-3');
+                item.dataset.read = 'true';
+                const badge = item.querySelector('.badge.bg-primary');
+                if (badge && badge.textContent === 'New') badge.remove();
+            });
+            showToast('All marked as read');
+        });
+}
+</script>
+{% endblock %}

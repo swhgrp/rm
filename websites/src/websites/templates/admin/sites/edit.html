@@ -1,0 +1,281 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% if is_new %}New Site{% else %}{{ site.name }} Settings{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>
+        <i class="bi bi-{% if is_new %}plus-circle{% else %}gear{% endif %}"></i>
+        {% if is_new %}New Site{% else %}Site Settings{% endif %}
+    </h1>
+    <p>{% if is_new %}Create a new restaurant website{% else %}Configure {{ site.name }}{% endif %}</p>
+</div>
+
+<form {% if is_new %}
+      hx-post="/websites/htmx/sites"
+      {% else %}
+      hx-put="/websites/htmx/sites/{{ site.id }}"
+      hx-swap="none"
+      hx-on::after-request="if(event.detail.successful) showToast('Settings saved')"
+      {% endif %}>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Basic Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-info-circle"></i> Basic Information
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Site Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control"
+                                   value="{{ site.name if site else '' }}" required
+                                   placeholder="Seaside Grill">
+                            <div class="form-text">The restaurant name</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Slug <span class="text-danger">*</span></label>
+                            <input type="text" name="slug" class="form-control"
+                                   value="{{ site.slug if site else '' }}" required
+                                   placeholder="seaside-grill" pattern="[a-z0-9-]+"
+                                   {% if not is_new %}readonly{% endif %}>
+                            <div class="form-text">URL-friendly identifier (lowercase, no spaces)</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Domain</label>
+                            <input type="text" name="domain" class="form-control"
+                                   value="{{ site.domain if site else '' }}"
+                                   placeholder="seasidegrillvero.com">
+                            <div class="form-text">The domain where this site will be published</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if not is_new %}
+            <!-- Contact Info -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-geo-alt"></i> Contact Information
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Address</label>
+                            <input type="text" name="address" class="form-control"
+                                   value="{{ site.address or '' }}"
+                                   placeholder="123 Ocean Drive">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">City</label>
+                            <input type="text" name="city" class="form-control"
+                                   value="{{ site.city or '' }}"
+                                   placeholder="Vero Beach">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">State</label>
+                            <input type="text" name="state" class="form-control"
+                                   value="{{ site.state or '' }}"
+                                   placeholder="FL">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">ZIP</label>
+                            <input type="text" name="zip_code" class="form-control"
+                                   value="{{ site.zip_code or '' }}"
+                                   placeholder="32963">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone</label>
+                            <input type="tel" name="phone" class="form-control"
+                                   value="{{ site.phone or '' }}"
+                                   placeholder="(772) 555-1234">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="email" class="form-control"
+                                   value="{{ site.email or '' }}"
+                                   placeholder="info@seasidegrill.com">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Social & External Links -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-link-45deg"></i> Links
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-instagram"></i> Instagram URL</label>
+                            <input type="url" name="instagram_url" class="form-control"
+                                   value="{{ site.instagram_url or '' }}"
+                                   placeholder="https://instagram.com/seasidegrill">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-facebook"></i> Facebook URL</label>
+                            <input type="url" name="facebook_url" class="form-control"
+                                   value="{{ site.facebook_url or '' }}"
+                                   placeholder="https://facebook.com/seasidegrill">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-cart"></i> Online Ordering URL</label>
+                            <input type="url" name="online_ordering_url" class="form-control"
+                                   value="{{ site.online_ordering_url or '' }}"
+                                   placeholder="https://order.clover.com/...">
+                            <div class="form-text">Clover or other ordering system link</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label"><i class="bi bi-calendar-check"></i> Reservation URL</label>
+                            <input type="url" name="reservation_url" class="form-control"
+                                   value="{{ site.reservation_url or '' }}"
+                                   placeholder="https://opentable.com/...">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEO -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-search"></i> SEO Settings
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">SEO Title</label>
+                            <input type="text" name="seo_title" class="form-control"
+                                   value="{{ site.seo_title or '' }}"
+                                   placeholder="Seaside Grill | Fresh Coastal Dining in Vero Beach">
+                            <div class="form-text">Title shown in search results (50-60 characters recommended)</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">SEO Description</label>
+                            <textarea name="seo_description" class="form-control" rows="3"
+                                      placeholder="Experience fresh seafood and coastal cuisine at Seaside Grill...">{{ site.seo_description or '' }}</textarea>
+                            <div class="form-text">Description shown in search results (150-160 characters recommended)</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Google Analytics ID</label>
+                            <input type="text" name="google_analytics_id" class="form-control"
+                                   value="{{ site.google_analytics_id or '' }}"
+                                   placeholder="G-XXXXXXXXXX">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-4">
+            {% if not is_new %}
+            <!-- Branding -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <i class="bi bi-palette"></i> Branding
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Logo URL</label>
+                        <input type="text" name="logo_url" class="form-control"
+                               value="{{ site.logo_url or '' }}"
+                               placeholder="/websites/uploads/{{ site.slug }}/logo.png">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Primary Color</label>
+                        <div class="input-group">
+                            <input type="color" name="primary_color" class="form-control form-control-color"
+                                   value="{{ site.primary_color or '#1a1a1a' }}">
+                            <input type="text" class="form-control" value="{{ site.primary_color or '#1a1a1a' }}" readonly>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Secondary Color</label>
+                        <div class="input-group">
+                            <input type="color" name="secondary_color" class="form-control form-control-color"
+                                   value="{{ site.secondary_color or '#ffffff' }}">
+                            <input type="text" class="form-control" value="{{ site.secondary_color or '#ffffff' }}" readonly>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Accent Color</label>
+                        <div class="input-group">
+                            <input type="color" name="accent_color" class="form-control form-control-color"
+                                   value="{{ site.accent_color or '#c9a227' }}">
+                            <input type="text" class="form-control" value="{{ site.accent_color or '#c9a227' }}" readonly>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Heading Font</label>
+                        <select name="font_heading" class="form-select">
+                            <option value="Playfair Display" {% if site and site.font_heading == 'Playfair Display' %}selected{% endif %}>Playfair Display</option>
+                            <option value="Cormorant Garamond" {% if site and site.font_heading == 'Cormorant Garamond' %}selected{% endif %}>Cormorant Garamond</option>
+                            <option value="Libre Baskerville" {% if site and site.font_heading == 'Libre Baskerville' %}selected{% endif %}>Libre Baskerville</option>
+                            <option value="Lora" {% if site and site.font_heading == 'Lora' %}selected{% endif %}>Lora</option>
+                            <option value="Merriweather" {% if site and site.font_heading == 'Merriweather' %}selected{% endif %}>Merriweather</option>
+                        </select>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label">Body Font</label>
+                        <select name="font_body" class="form-select">
+                            <option value="Open Sans" {% if site and site.font_body == 'Open Sans' %}selected{% endif %}>Open Sans</option>
+                            <option value="Lato" {% if site and site.font_body == 'Lato' %}selected{% endif %}>Lato</option>
+                            <option value="Roboto" {% if site and site.font_body == 'Roboto' %}selected{% endif %}>Roboto</option>
+                            <option value="Source Sans Pro" {% if site and site.font_body == 'Source Sans Pro' %}selected{% endif %}>Source Sans Pro</option>
+                            <option value="Nunito" {% if site and site.font_body == 'Nunito' %}selected{% endif %}>Nunito</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Actions -->
+            <div class="card">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-primary w-100 mb-2">
+                        <i class="bi bi-check-lg"></i>
+                        {% if is_new %}Create Site{% else %}Save Changes{% endif %}
+                    </button>
+                    {% if not is_new %}
+                    <a href="/websites/sites/{{ site.id }}" class="btn btn-outline-secondary w-100">
+                        Cancel
+                    </a>
+                    {% else %}
+                    <a href="/websites/" class="btn btn-outline-secondary w-100">
+                        Cancel
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Sync color picker with text input
+    document.querySelectorAll('input[type="color"]').forEach(picker => {
+        const textInput = picker.parentElement.querySelector('input[type="text"]');
+        picker.addEventListener('input', () => {
+            textInput.value = picker.value;
+        });
+    });
+
+    // Auto-generate slug from name for new sites
+    {% if is_new %}
+    const nameInput = document.querySelector('input[name="name"]');
+    const slugInput = document.querySelector('input[name="slug"]');
+
+    nameInput.addEventListener('input', () => {
+        slugInput.value = nameInput.value
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/(^-|-$)/g, '');
+    });
+    {% endif %}
+</script>
+{% endblock %}

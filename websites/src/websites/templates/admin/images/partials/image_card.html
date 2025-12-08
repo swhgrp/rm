@@ -1,0 +1,42 @@
+<div class="col-6 col-md-4 col-lg-3 col-xl-2 image-item"
+     data-folder="{{ image.folder }}"
+     data-name="{{ image.original_filename or image.filename }}">
+    <div class="card h-100 image-card">
+        <div class="image-preview" style="height: 150px; overflow: hidden;"
+             onclick="showImageDetail({{ image.id }})">
+            <img src="{{ image.thumb_url or ('/websites/uploads/' ~ site.slug ~ '/' ~ image.filename) }}"
+                 class="card-img-top"
+                 style="object-fit: cover; height: 100%; width: 100%;"
+                 alt="{{ image.alt_text or image.filename }}">
+        </div>
+        <div class="card-body p-2">
+            <p class="card-text small text-truncate mb-0" title="{{ image.original_filename or image.filename }}">
+                {{ image.original_filename or image.filename }}
+            </p>
+            <small class="text-muted">
+                {{ (image.file_size / 1024) | round(1) if image.file_size else 0 }}KB
+                {% if image.width and image.height %}
+                &middot; {{ image.width }}x{{ image.height }}
+                {% endif %}
+            </small>
+        </div>
+        <div class="card-footer p-1 d-flex justify-content-between">
+            <button class="btn btn-sm btn-link text-light" onclick="copyImageUrl({{ image.id }}, '{{ image.filename }}')"
+                    title="Copy URL">
+                <i class="bi bi-link-45deg"></i>
+            </button>
+            <button class="btn btn-sm btn-link text-light" onclick="showImageDetail({{ image.id }})"
+                    title="Edit">
+                <i class="bi bi-pencil"></i>
+            </button>
+            <button class="btn btn-sm btn-link text-danger"
+                    hx-delete="/websites/htmx/images/{{ image.id }}"
+                    hx-target="closest .col-6"
+                    hx-swap="outerHTML"
+                    hx-confirm="Delete this image?"
+                    title="Delete">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    </div>
+</div>

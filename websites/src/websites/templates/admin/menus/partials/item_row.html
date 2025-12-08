@@ -1,0 +1,105 @@
+<div class="item-row" data-id="{{ item.id }}">
+    <div class="d-flex align-items-start gap-2">
+        <i class="bi bi-grip-vertical item-drag-handle drag-handle mt-2"></i>
+
+        <div class="flex-grow-1">
+            <div class="row g-2">
+                <div class="col-md-5">
+                    <input type="text"
+                           class="form-control form-control-sm"
+                           value="{{ item.name }}"
+                           name="name"
+                           placeholder="Item name"
+                           hx-put="/websites/htmx/items/{{ item.id }}"
+                           hx-trigger="blur changed"
+                           hx-swap="none">
+                </div>
+                <div class="col-md-2">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text">$</span>
+                        <input type="number"
+                               class="form-control"
+                               value="{{ item.price if item.price else '' }}"
+                               name="price"
+                               step="0.01"
+                               min="0"
+                               placeholder="0.00"
+                               hx-put="/websites/htmx/items/{{ item.id }}"
+                               hx-trigger="blur changed"
+                               hx-swap="none">
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <input type="text"
+                           class="form-control form-control-sm"
+                           value="{{ item.description or '' }}"
+                           name="description"
+                           placeholder="Description"
+                           hx-put="/websites/htmx/items/{{ item.id }}"
+                           hx-trigger="blur changed"
+                           hx-swap="none">
+                </div>
+            </div>
+            <div class="mt-2 d-flex gap-3 align-items-center">
+                <div class="form-check form-check-inline">
+                    <input type="checkbox"
+                           class="form-check-input"
+                           id="veg-{{ item.id }}"
+                           name="dietary_vegetarian"
+                           {% if item.dietary_flags and 'vegetarian' in item.dietary_flags %}checked{% endif %}
+                           hx-put="/websites/htmx/items/{{ item.id }}"
+                           hx-trigger="change"
+                           hx-swap="none">
+                    <label class="form-check-label small" for="veg-{{ item.id }}">
+                        <span class="badge bg-success dietary-badge">V</span> Vegetarian
+                    </label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input type="checkbox"
+                           class="form-check-input"
+                           id="gf-{{ item.id }}"
+                           name="dietary_gluten-free"
+                           {% if item.dietary_flags and 'gluten-free' in item.dietary_flags %}checked{% endif %}
+                           hx-put="/websites/htmx/items/{{ item.id }}"
+                           hx-trigger="change"
+                           hx-swap="none">
+                    <label class="form-check-label small" for="gf-{{ item.id }}">
+                        <span class="badge bg-info dietary-badge">GF</span> Gluten-Free
+                    </label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input type="checkbox"
+                           class="form-check-input"
+                           id="spicy-{{ item.id }}"
+                           name="dietary_spicy"
+                           {% if item.dietary_flags and 'spicy' in item.dietary_flags %}checked{% endif %}
+                           hx-put="/websites/htmx/items/{{ item.id }}"
+                           hx-trigger="change"
+                           hx-swap="none">
+                    <label class="form-check-label small" for="spicy-{{ item.id }}">
+                        <span class="badge bg-danger dietary-badge">🌶</span> Spicy
+                    </label>
+                </div>
+                <div class="form-check form-check-inline ms-auto">
+                    <input type="checkbox"
+                           class="form-check-input"
+                           id="avail-{{ item.id }}"
+                           name="is_available"
+                           {% if item.is_available %}checked{% endif %}
+                           hx-put="/websites/htmx/items/{{ item.id }}"
+                           hx-trigger="change"
+                           hx-swap="none">
+                    <label class="form-check-label small" for="avail-{{ item.id }}">Available</label>
+                </div>
+            </div>
+        </div>
+
+        <button class="btn btn-sm btn-outline-danger"
+                hx-delete="/websites/htmx/items/{{ item.id }}"
+                hx-target="closest .item-row"
+                hx-swap="outerHTML"
+                hx-confirm="Delete this item?">
+            <i class="bi bi-trash"></i>
+        </button>
+    </div>
+</div>

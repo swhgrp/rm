@@ -1,0 +1,226 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ site.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1><i class="bi bi-speedometer2"></i> {{ site.name }}</h1>
+        {% if site.domain %}
+        <p><i class="bi bi-globe"></i> {{ site.domain }}</p>
+        {% else %}
+        <p class="text-warning"><i class="bi bi-exclamation-triangle"></i> No domain configured</p>
+        {% endif %}
+    </div>
+    <div class="d-flex gap-2">
+        {% if site.domain %}
+        <a href="https://{{ site.domain }}" target="_blank" class="btn btn-outline-secondary">
+            <i class="bi bi-box-arrow-up-right"></i> View Site
+        </a>
+        {% endif %}
+        <button class="btn btn-primary"
+                hx-post="/websites/api/sites/{{ site.id }}/publish"
+                hx-swap="none"
+                hx-confirm="Publish this site? This will regenerate all pages.">
+            <i class="bi bi-cloud-upload"></i> Publish
+        </button>
+    </div>
+</div>
+
+<!-- Quick Stats -->
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0">{{ menu_count }}</h3>
+                        <small class="text-muted">Menus</small>
+                    </div>
+                    <i class="bi bi-list-ul display-6 text-muted d-none d-sm-block"></i>
+                </div>
+            </div>
+            <a href="/websites/sites/{{ site.id }}/menus" class="card-footer bg-transparent text-decoration-none d-flex justify-content-between align-items-center">
+                <span>Manage</span>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0">{{ page_count }}</h3>
+                        <small class="text-muted">Pages</small>
+                    </div>
+                    <i class="bi bi-file-earmark-text display-6 text-muted d-none d-sm-block"></i>
+                </div>
+            </div>
+            <a href="/websites/sites/{{ site.id }}/pages" class="card-footer bg-transparent text-decoration-none d-flex justify-content-between align-items-center">
+                <span>Manage</span>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0">{{ image_count }}</h3>
+                        <small class="text-muted">Images</small>
+                    </div>
+                    <i class="bi bi-images display-6 text-muted d-none d-sm-block"></i>
+                </div>
+            </div>
+            <a href="/websites/sites/{{ site.id }}/images" class="card-footer bg-transparent text-decoration-none d-flex justify-content-between align-items-center">
+                <span>Manage</span>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="card h-100 {% if unread_submissions > 0 %}border-warning{% endif %}">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h3 class="mb-0">{{ unread_submissions }}</h3>
+                        <small class="text-muted">Messages</small>
+                    </div>
+                    <i class="bi bi-envelope{% if unread_submissions > 0 %}-fill text-warning{% endif %} display-6 text-muted d-none d-sm-block"></i>
+                </div>
+            </div>
+            <a href="/websites/sites/{{ site.id }}/submissions" class="card-footer bg-transparent text-decoration-none d-flex justify-content-between align-items-center">
+                <span>View</span>
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Site Status -->
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> Site Status
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td class="text-muted">Status</td>
+                        <td>
+                            {% if site.is_published %}
+                            <span class="badge badge-published"><i class="bi bi-check-circle"></i> Published</span>
+                            {% else %}
+                            <span class="badge badge-draft"><i class="bi bi-pencil"></i> Draft</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Domain</td>
+                        <td>{{ site.domain or 'Not configured' }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Last Published</td>
+                        <td>
+                            {% if site.last_generated_at %}
+                            {{ site.last_generated_at.strftime('%B %d, %Y at %I:%M %p') }}
+                            {% else %}
+                            Never
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Created</td>
+                        <td>{{ site.created_at.strftime('%B %d, %Y') }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-activity"></i> Recent Activity</span>
+                {% if total_activity_count > 5 %}
+                <a href="/websites/sites/{{ site.id }}/activity" class="btn btn-sm btn-outline-secondary">
+                    View All ({{ total_activity_count }})
+                </a>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                {% if recent_activity %}
+                <ul class="list-group list-group-flush">
+                    {% for log in recent_activity %}
+                    <li class="list-group-item bg-transparent">
+                        <div class="d-flex justify-content-between">
+                            <div>
+                                <strong>{{ log.user_name }}</strong>
+                                <span class="text-muted">{{ log.action }}d</span>
+                                {{ log.entity_type }}
+                                {% if log.entity_name %}"{{ log.entity_name }}"{% endif %}
+                                {% if log.details %}
+                                    {% if log.details.get('changed_fields') %}
+                                    <br><small class="text-muted">Changed: {{ log.details.changed_fields | join(', ') }}</small>
+                                    {% endif %}
+                                    {% if log.details.get('block_type') %}
+                                    <br><small class="text-muted">Block: {{ log.details.block_type }}</small>
+                                    {% endif %}
+                                    {% if log.details.get('description') %}
+                                    <br><small class="text-muted">{{ log.details.description }}</small>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                            <small class="text-muted">{{ log.created_at.strftime('%b %d, %I:%M %p') }}</small>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-clock-history display-6"></i>
+                    <p class="mb-0 mt-2">No recent activity</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card">
+    <div class="card-header">
+        <i class="bi bi-lightning"></i> Quick Actions
+    </div>
+    <div class="card-body">
+        <div class="row g-2">
+            <div class="col-6 col-sm-auto">
+                <a href="/websites/sites/{{ site.id }}/menus/new" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-plus-lg"></i> Add Menu
+                </a>
+            </div>
+            <div class="col-6 col-sm-auto">
+                <a href="/websites/sites/{{ site.id }}/pages/new" class="btn btn-outline-primary w-100">
+                    <i class="bi bi-plus-lg"></i> Add Page
+                </a>
+            </div>
+            <div class="col-6 col-sm-auto">
+                <a href="/websites/sites/{{ site.id }}/hours" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-clock"></i> Hours
+                </a>
+            </div>
+            <div class="col-6 col-sm-auto">
+                <a href="/websites/sites/{{ site.id }}/settings" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-gear"></i> Settings
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,360 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Images - {{ site.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-images"></i> Image Library</h1>
+    <div>
+        <button class="btn btn-primary" onclick="document.getElementById('imageUpload').click()">
+            <i class="bi bi-upload"></i> Upload Images
+        </button>
+        <input type="file" id="imageUpload" multiple accept="image/*" style="display: none;"
+               onchange="uploadImages(this.files)">
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card mb-4">
+    <div class="card-body py-2">
+        <div class="row align-items-center">
+            <div class="col-auto">
+                <label class="small text-muted me-2">Folder:</label>
+                <select class="form-select form-select-sm d-inline-block w-auto" id="folderFilter"
+                        onchange="filterImages()">
+                    <option value="">All Folders</option>
+                    <option value="general">General</option>
+                    <option value="hero">Hero Images</option>
+                    <option value="menu">Menu</option>
+                    <option value="gallery">Gallery</option>
+                    <option value="logo">Logos</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="small text-muted me-2">Sort:</label>
+                <select class="form-select form-select-sm d-inline-block w-auto" id="sortOrder"
+                        onchange="filterImages()">
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="name">Name</option>
+                    <option value="size">Size</option>
+                </select>
+            </div>
+            <div class="col">
+                <div class="input-group input-group-sm">
+                    <input type="search" class="form-control" placeholder="Search images..."
+                           id="imageSearch" onkeyup="filterImages()">
+                    <button class="btn btn-outline-secondary" type="button">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Upload Progress -->
+<div id="uploadProgress" class="alert alert-info d-none mb-4">
+    <div class="d-flex align-items-center">
+        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+        <span>Uploading <span id="uploadCount">0</span> images...</span>
+    </div>
+    <div class="progress mt-2" style="height: 4px;">
+        <div class="progress-bar" id="uploadProgressBar" style="width: 0%"></div>
+    </div>
+</div>
+
+<!-- Image Grid -->
+<div class="row g-3" id="imageGrid">
+    {% for image in images %}
+    <div class="col-6 col-md-4 col-lg-3 col-xl-2 image-item"
+         data-folder="{{ image.folder }}"
+         data-name="{{ image.original_filename or image.filename }}">
+        <div class="card h-100 image-card">
+            <div class="image-preview" style="height: 150px; overflow: hidden;"
+                 onclick="showImageDetail({{ image.id }})">
+                <img src="{{ image.thumb_url or ('/websites/uploads/' ~ site.slug ~ '/' ~ image.filename) }}"
+                     class="card-img-top"
+                     style="object-fit: cover; height: 100%; width: 100%;"
+                     alt="{{ image.alt_text or image.filename }}">
+            </div>
+            <div class="card-body p-2">
+                <p class="card-text small text-truncate mb-0" title="{{ image.original_filename or image.filename }}">
+                    {{ image.original_filename or image.filename }}
+                </p>
+                <small class="text-muted">
+                    {{ (image.file_size / 1024) | round(1) }}KB
+                    {% if image.width and image.height %}
+                    &middot; {{ image.width }}x{{ image.height }}
+                    {% endif %}
+                </small>
+            </div>
+            <div class="card-footer p-1 d-flex justify-content-between">
+                <button class="btn btn-sm btn-link text-light" onclick="copyImageUrl({{ image.id }}, '{{ image.filename }}')"
+                        title="Copy URL">
+                    <i class="bi bi-link-45deg"></i>
+                </button>
+                <button class="btn btn-sm btn-link text-light" onclick="showImageDetail({{ image.id }})"
+                        title="Edit">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-link text-danger"
+                        hx-delete="/websites/htmx/images/{{ image.id }}"
+                        hx-target="closest .col-6"
+                        hx-swap="outerHTML"
+                        hx-confirm="Delete this image?"
+                        title="Delete">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-12">
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-images" style="font-size: 4rem;"></i>
+            <p class="mt-3">No images uploaded yet</p>
+            <button class="btn btn-primary" onclick="document.getElementById('imageUpload').click()">
+                <i class="bi bi-upload"></i> Upload Your First Image
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Image Detail Modal -->
+<div class="modal fade" id="imageDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Image Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-7">
+                        <img id="detailImage" src="" class="img-fluid rounded">
+                    </div>
+                    <div class="col-md-5">
+                        <form id="imageDetailForm">
+                            <input type="hidden" id="detailImageId">
+                            <div class="mb-3">
+                                <label class="form-label small">Filename</label>
+                                <input type="text" class="form-control form-control-sm" id="detailFilename" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small">Alt Text</label>
+                                <input type="text" class="form-control form-control-sm" id="detailAltText"
+                                       placeholder="Describe this image">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small">Folder</label>
+                                <select class="form-select form-select-sm" id="detailFolder">
+                                    <option value="general">General</option>
+                                    <option value="hero">Hero Images</option>
+                                    <option value="menu">Menu</option>
+                                    <option value="gallery">Gallery</option>
+                                    <option value="logo">Logos</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small">Dimensions</label>
+                                <input type="text" class="form-control form-control-sm" id="detailDimensions" readonly>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label small">File Size</label>
+                                <input type="text" class="form-control form-control-sm" id="detailSize" readonly>
+                            </div>
+                            <hr>
+                            <div class="mb-3">
+                                <label class="form-label small">Image URLs</label>
+                                <div class="input-group input-group-sm mb-2">
+                                    <span class="input-group-text">Original</span>
+                                    <input type="text" class="form-control" id="urlOriginal" readonly>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="copyUrl('urlOriginal')">
+                                        <i class="bi bi-clipboard"></i>
+                                    </button>
+                                </div>
+                                <div class="input-group input-group-sm mb-2">
+                                    <span class="input-group-text">Medium</span>
+                                    <input type="text" class="form-control" id="urlMedium" readonly>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="copyUrl('urlMedium')">
+                                        <i class="bi bi-clipboard"></i>
+                                    </button>
+                                </div>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text">Thumb</span>
+                                    <input type="text" class="form-control" id="urlThumb" readonly>
+                                    <button type="button" class="btn btn-outline-secondary" onclick="copyUrl('urlThumb')">
+                                        <i class="bi bi-clipboard"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger me-auto" onclick="deleteCurrentImage()">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="saveImageDetails()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const siteSlug = '{{ site.slug }}';
+const siteId = {{ site.id }};
+
+function uploadImages(files) {
+    if (!files.length) return;
+
+    const progressEl = document.getElementById('uploadProgress');
+    const countEl = document.getElementById('uploadCount');
+    const progressBar = document.getElementById('uploadProgressBar');
+
+    progressEl.classList.remove('d-none');
+    countEl.textContent = files.length;
+
+    let uploaded = 0;
+    const totalFiles = files.length;
+
+    function finishUpload() {
+        uploaded++;
+        progressBar.style.width = (uploaded / totalFiles * 100) + '%';
+
+        if (uploaded >= totalFiles) {
+            setTimeout(() => {
+                progressEl.classList.add('d-none');
+                progressBar.style.width = '0%';
+            }, 1000);
+        }
+    }
+
+    Array.from(files).forEach(file => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        fetch(`/websites/htmx/sites/${siteId}/images`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Upload failed');
+            }
+            return response.text();
+        })
+        .then(html => {
+            // Insert new image card
+            const grid = document.getElementById('imageGrid');
+            const emptyMsg = grid.querySelector('.col-12');
+            if (emptyMsg) emptyMsg.remove();
+            grid.insertAdjacentHTML('afterbegin', html);
+            finishUpload();
+        })
+        .catch(error => {
+            console.error('Upload error:', error);
+            showToast('Failed to upload ' + file.name, 'danger');
+            finishUpload();
+        });
+    });
+
+    // Clear the file input
+    document.getElementById('imageUpload').value = '';
+}
+
+function filterImages() {
+    const folder = document.getElementById('folderFilter').value;
+    const search = document.getElementById('imageSearch').value.toLowerCase();
+
+    document.querySelectorAll('.image-item').forEach(item => {
+        const matchesFolder = !folder || item.dataset.folder === folder;
+        const matchesSearch = !search || item.dataset.name.toLowerCase().includes(search);
+        item.style.display = (matchesFolder && matchesSearch) ? '' : 'none';
+    });
+}
+
+function showImageDetail(imageId) {
+    fetch(`/websites/api/images/${imageId}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('detailImageId').value = data.id;
+            document.getElementById('detailImage').src = `/websites/uploads/${siteSlug}/${data.filename}`;
+            document.getElementById('detailFilename').value = data.original_filename || data.filename;
+            document.getElementById('detailAltText').value = data.alt_text || '';
+            document.getElementById('detailFolder').value = data.folder || 'general';
+            document.getElementById('detailDimensions').value = data.width && data.height ? `${data.width} x ${data.height}` : 'Unknown';
+            document.getElementById('detailSize').value = data.file_size ? `${(data.file_size / 1024).toFixed(1)} KB` : 'Unknown';
+
+            const baseUrl = `https://${siteSlug.replace(/-/g, '')}.com/images`;
+            document.getElementById('urlOriginal').value = `/websites/uploads/${siteSlug}/${data.filename}`;
+            document.getElementById('urlMedium').value = data.medium_url || '';
+            document.getElementById('urlThumb').value = data.thumb_url || '';
+
+            new bootstrap.Modal(document.getElementById('imageDetailModal')).show();
+        });
+}
+
+function saveImageDetails() {
+    const id = document.getElementById('detailImageId').value;
+    const data = {
+        alt_text: document.getElementById('detailAltText').value,
+        folder: document.getElementById('detailFolder').value
+    };
+
+    fetch(`/websites/htmx/images/${id}`, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(() => {
+        bootstrap.Modal.getInstance(document.getElementById('imageDetailModal')).hide();
+        showToast('Image updated');
+    });
+}
+
+function deleteCurrentImage() {
+    if (!confirm('Delete this image?')) return;
+
+    const id = document.getElementById('detailImageId').value;
+    fetch(`/websites/htmx/images/${id}`, {method: 'DELETE'})
+        .then(() => {
+            bootstrap.Modal.getInstance(document.getElementById('imageDetailModal')).hide();
+            const card = document.querySelector(`.image-item [onclick*="${id}"]`);
+            if (card) card.closest('.image-item').remove();
+            showToast('Image deleted');
+        });
+}
+
+function copyImageUrl(id, filename) {
+    const url = `/websites/uploads/${siteSlug}/${filename}`;
+    navigator.clipboard.writeText(url).then(() => showToast('URL copied'));
+}
+
+function copyUrl(inputId) {
+    const input = document.getElementById(inputId);
+    navigator.clipboard.writeText(input.value).then(() => showToast('URL copied'));
+}
+
+// Drag and drop upload
+const dropZone = document.getElementById('imageGrid');
+dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropZone.classList.add('border', 'border-primary');
+});
+dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('border', 'border-primary');
+});
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('border', 'border-primary');
+    uploadImages(e.dataTransfer.files);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Website Manager{% endblock %} - SW Hospitality</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <!-- htmx -->
+    <script>
+        // Configure htmx before loading
+        document.addEventListener('htmx:load', function() {
+            htmx.config.includeIndicatorStyles = false;
+        });
+    </script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <!-- Sortable.js for drag-drop -->
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+    <style>
+        :root {
+            --sidebar-width: 250px;
+        }
+
+        body {
+            background-color: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+        }
+
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background-color: #161b22;
+            border-bottom: 1px solid #30363d;
+            z-index: 1001;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .mobile-header .brand {
+            color: #58a6ff;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .hamburger-btn {
+            background: none;
+            border: none;
+            color: #c9d1d9;
+            font-size: 1.5rem;
+            padding: 0.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hamburger-btn:hover {
+            color: #58a6ff;
+        }
+
+        /* Sidebar Overlay (mobile) */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .sidebar-overlay.show {
+            display: block;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background-color: #161b22;
+            border-right: 1px solid #30363d;
+            padding: 1rem 0;
+            overflow-y: auto;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+        }
+
+        .sidebar-brand {
+            padding: 0.5rem 1rem 1rem;
+            border-bottom: 1px solid #30363d;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-brand a {
+            color: #58a6ff;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .sidebar-brand span {
+            color: #58a6ff;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .sidebar-brand small {
+            display: block;
+            color: #8b949e;
+            font-size: 0.75rem;
+        }
+
+        .sidebar-close {
+            display: none;
+            background: none;
+            border: none;
+            color: #8b949e;
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.25rem;
+        }
+
+        .sidebar-close:hover {
+            color: #c9d1d9;
+        }
+
+        /* Site switcher */
+        .site-switcher {
+            padding: 0 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .site-switcher select {
+            background-color: #21262d;
+            border-color: #30363d;
+            color: #c9d1d9;
+        }
+
+        .site-switcher select:focus {
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 0.2rem rgba(88, 166, 255, 0.25);
+        }
+
+        /* Nav links */
+        .sidebar-nav {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .sidebar-nav a {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem 1rem;
+            color: #8b949e;
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+
+        .sidebar-nav a:hover {
+            background-color: #21262d;
+            color: #c9d1d9;
+        }
+
+        .sidebar-nav a.active {
+            background-color: #21262d;
+            color: #58a6ff;
+            border-left: 3px solid #58a6ff;
+        }
+
+        .sidebar-nav a i {
+            font-size: 1.1rem;
+            width: 1.5rem;
+            text-align: center;
+        }
+
+        .sidebar-nav .nav-divider {
+            height: 1px;
+            background-color: #30363d;
+            margin: 0.75rem 1rem;
+        }
+
+        /* Main content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            padding: 1.5rem 2rem;
+            min-height: 100vh;
+        }
+
+        /* Page header */
+        .page-header {
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .page-header h1 {
+            font-size: 1.5rem;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .page-header p {
+            margin: 0.25rem 0 0;
+            color: #8b949e;
+            font-size: 0.9rem;
+        }
+
+        /* Cards */
+        .card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+        }
+
+        .card-header {
+            background-color: #21262d;
+            border-bottom: 1px solid #30363d;
+            font-weight: 500;
+        }
+
+        /* Form controls */
+        .form-control, .form-select {
+            background-color: #0d1117;
+            border-color: #30363d;
+            color: #c9d1d9;
+        }
+
+        .form-control:focus, .form-select:focus {
+            background-color: #0d1117;
+            border-color: #58a6ff;
+            color: #c9d1d9;
+            box-shadow: 0 0 0 0.2rem rgba(88, 166, 255, 0.25);
+        }
+
+        .form-control::placeholder {
+            color: #6e7681;
+        }
+
+        .form-label {
+            color: #c9d1d9;
+            font-weight: 500;
+            margin-bottom: 0.35rem;
+        }
+
+        .form-text {
+            color: #8b949e;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            background-color: #238636;
+            border-color: #238636;
+        }
+
+        .btn-primary:hover {
+            background-color: #2ea043;
+            border-color: #2ea043;
+        }
+
+        /* Tables */
+        .table {
+            color: #c9d1d9;
+        }
+
+        .table thead th {
+            background-color: #21262d;
+            border-color: #30363d;
+            font-weight: 500;
+        }
+
+        .table tbody td {
+            border-color: #30363d;
+            vertical-align: middle;
+        }
+
+        /* Drag handle */
+        .drag-handle {
+            cursor: grab;
+            color: #6e7681;
+        }
+
+        .drag-handle:hover {
+            color: #8b949e;
+        }
+
+        .sortable-ghost {
+            opacity: 0.4;
+        }
+
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+        }
+
+        /* Status badges */
+        .badge-published {
+            background-color: #238636;
+        }
+
+        .badge-draft {
+            background-color: #6e7681;
+        }
+
+        /* Color picker */
+        input[type="color"] {
+            height: 38px;
+            padding: 0.25rem;
+            cursor: pointer;
+        }
+
+        /* Loading indicator */
+        .htmx-indicator {
+            display: none;
+        }
+
+        .htmx-request .htmx-indicator {
+            display: inline-block;
+        }
+
+        .htmx-request.htmx-indicator {
+            display: inline-block;
+        }
+
+        /* =====================================================
+           Mobile Responsive Styles
+           ===================================================== */
+        @media (max-width: 991.98px) {
+            .mobile-header {
+                display: flex;
+            }
+
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.show {
+                transform: translateX(0);
+            }
+
+            .sidebar-close {
+                display: block;
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 1rem;
+                padding-top: calc(56px + 1rem);
+            }
+
+            /* Adjust page header for mobile */
+            .page-header {
+                flex-direction: column;
+                align-items: flex-start !important;
+                gap: 1rem;
+            }
+
+            .page-header h1 {
+                font-size: 1.25rem;
+            }
+
+            .page-header .btn-group,
+            .page-header .d-flex {
+                width: 100%;
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            /* Make cards stack properly */
+            .row.g-4 > [class*="col-"] {
+                margin-bottom: 0;
+            }
+
+            /* Toast position for mobile */
+            .toast-container {
+                top: 60px;
+                left: 1rem;
+                right: 1rem;
+            }
+
+            /* Make tables scrollable */
+            .table-responsive {
+                margin: 0 -1rem;
+                padding: 0 1rem;
+                overflow-x: auto;
+            }
+
+            /* Button groups on mobile */
+            .btn-group-mobile {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .btn-group-mobile .btn {
+                width: 100%;
+            }
+
+            /* Modal adjustments */
+            .modal-dialog {
+                margin: 0.5rem;
+            }
+
+            .modal-lg {
+                max-width: calc(100vw - 1rem);
+            }
+        }
+
+        @media (max-width: 575.98px) {
+            .main-content {
+                padding: 0.75rem;
+                padding-top: calc(56px + 0.75rem);
+            }
+
+            .card-body {
+                padding: 1rem;
+            }
+
+            /* Stack form buttons */
+            .form-actions {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .form-actions .btn {
+                width: 100%;
+            }
+
+            /* Smaller headings */
+            .page-header h1 {
+                font-size: 1.1rem;
+            }
+
+            /* Adjust stats cards */
+            .col-md-3 {
+                margin-bottom: 0.5rem;
+            }
+        }
+
+        {% block extra_styles %}{% endblock %}
+    </style>
+</head>
+<body>
+    <!-- Mobile Header -->
+    <header class="mobile-header">
+        <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
+            <i class="bi bi-list"></i>
+        </button>
+        <span class="brand">Website Manager</span>
+        <div style="width: 44px;"></div> <!-- Spacer for centering -->
+    </header>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" onclick="closeSidebar()"></div>
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+        <div class="sidebar-brand">
+            <span>Website Manager</span>
+            <button class="sidebar-close" onclick="closeSidebar()" aria-label="Close menu">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        {% if site is defined and site %}
+        <!-- Site switcher -->
+        <div class="site-switcher">
+            <select class="form-select form-select-sm" onchange="window.location.href='/websites/sites/' + this.value">
+                {% for s in all_sites %}
+                <option value="{{ s.id }}" {% if s.id == site.id %}selected{% endif %}>{{ s.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <ul class="sidebar-nav">
+            <li>
+                <a href="/portal/" onclick="closeSidebar()">
+                    <i class="bi bi-house"></i> Portal Home
+                </a>
+            </li>
+            <li>
+                <a href="/websites/sites/{{ site.id }}" onclick="closeSidebar()" class="{% if active_page == 'dashboard' %}active{% endif %}">
+                    <i class="bi bi-speedometer2"></i> Dashboard
+                </a>
+            </li>
+            <li>
+                <a href="/websites/sites/{{ site.id }}/pages" onclick="closeSidebar()" class="{% if active_page == 'pages' %}active{% endif %}">
+                    <i class="bi bi-file-earmark-text"></i> Pages
+                </a>
+            </li>
+            <li>
+                <a href="/websites/sites/{{ site.id }}/menus" onclick="closeSidebar()" class="{% if active_page == 'menus' %}active{% endif %}">
+                    <i class="bi bi-list-ul"></i> Menus
+                </a>
+            </li>
+            <li>
+                <a href="/websites/sites/{{ site.id }}/hours" onclick="closeSidebar()" class="{% if active_page == 'hours' %}active{% endif %}">
+                    <i class="bi bi-clock"></i> Hours
+                </a>
+            </li>
+            <li>
+                <a href="/websites/sites/{{ site.id }}/images" onclick="closeSidebar()" class="{% if active_page == 'images' %}active{% endif %}">
+                    <i class="bi bi-images"></i> Images
+                </a>
+            </li>
+            <li>
+                <a href="/websites/sites/{{ site.id }}/submissions" onclick="closeSidebar()" class="{% if active_page == 'submissions' %}active{% endif %}">
+                    <i class="bi bi-envelope"></i> Submissions
+                    {% if unread_submissions is defined and unread_submissions > 0 %}
+                    <span class="badge bg-danger ms-auto">{{ unread_submissions }}</span>
+                    {% endif %}
+                </a>
+            </li>
+            <li class="nav-divider"></li>
+            <li>
+                <a href="/websites/sites/{{ site.id }}/settings" onclick="closeSidebar()" class="{% if active_page == 'settings' %}active{% endif %}">
+                    <i class="bi bi-gear"></i> Site Settings
+                </a>
+            </li>
+            <li>
+                <a href="/websites/" onclick="closeSidebar()">
+                    <i class="bi bi-arrow-repeat"></i> Switch Site
+                </a>
+            </li>
+        </ul>
+        {% else %}
+        <ul class="sidebar-nav">
+            <li>
+                <a href="/portal/" onclick="closeSidebar()">
+                    <i class="bi bi-house"></i> Portal Home
+                </a>
+            </li>
+            <li>
+                <a href="/websites/" onclick="closeSidebar()" class="{% if active_page == 'dashboard' %}active{% endif %}">
+                    <i class="bi bi-grid-3x3-gap"></i> All Sites
+                </a>
+            </li>
+        </ul>
+        {% endif %}
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal fade" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmTitle">Confirm Action</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="confirmMessage"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="confirmCancelBtn">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="confirmOkBtn">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Mobile sidebar toggle functions
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('show');
+            document.querySelector('.sidebar-overlay').classList.toggle('show');
+            document.body.style.overflow = document.querySelector('.sidebar').classList.contains('show') ? 'hidden' : '';
+        }
+
+        function closeSidebar() {
+            document.querySelector('.sidebar').classList.remove('show');
+            document.querySelector('.sidebar-overlay').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        // Close sidebar on window resize if desktop
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 992) {
+                closeSidebar();
+            }
+        });
+
+        // Close sidebar on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSidebar();
+            }
+        });
+
+        // htmx configuration
+        document.body.addEventListener('htmx:beforeSwap', function(evt) {
+            // Handle toast notifications
+            if (evt.detail.xhr.getResponseHeader('HX-Trigger')) {
+                // Toast logic handled by htmx
+            }
+        });
+
+        // Show toasts
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast align-items-center text-white bg-${type === 'success' ? 'success' : 'danger'} border-0`;
+            toast.setAttribute('role', 'alert');
+            toast.innerHTML = `
+                <div class="d-flex">
+                    <div class="toast-body">${message}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            `;
+            document.getElementById('toast-container').appendChild(toast);
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+            toast.addEventListener('hidden.bs.toast', () => toast.remove());
+        }
+
+        // Handle htmx events for toasts
+        document.body.addEventListener('showToast', function(evt) {
+            showToast(evt.detail.message, evt.detail.type);
+        });
+
+        // Custom confirm dialog
+        function showConfirm(message, title = 'Confirm Action') {
+            return new Promise((resolve) => {
+                document.getElementById('confirmTitle').textContent = title;
+                document.getElementById('confirmMessage').textContent = message;
+
+                const modalElement = document.getElementById('confirmModal');
+                const modal = new bootstrap.Modal(modalElement);
+
+                let resolved = false;
+
+                const okBtn = document.getElementById('confirmOkBtn');
+                const cancelBtn = document.getElementById('confirmCancelBtn');
+                okBtn.disabled = false;
+                cancelBtn.disabled = false;
+
+                okBtn.onclick = function(e) {
+                    if (!resolved) {
+                        resolved = true;
+                        modal.hide();
+                        setTimeout(() => resolve(true), 100);
+                    }
+                };
+
+                cancelBtn.onclick = function(e) {
+                    if (!resolved) {
+                        resolved = true;
+                        modal.hide();
+                        setTimeout(() => resolve(false), 100);
+                    }
+                };
+
+                modalElement.addEventListener('hidden.bs.modal', function handler() {
+                    modalElement.removeEventListener('hidden.bs.modal', handler);
+                    if (!resolved) {
+                        resolved = true;
+                        resolve(false);
+                    }
+                });
+
+                modal.show();
+            });
+        }
+
+        // Override htmx confirm to use our custom modal
+        // Only intercept when there's an actual hx-confirm question
+        window.addEventListener('htmx:confirm', function(evt) {
+            const question = evt.detail.question;
+
+            // Only show modal if there's a confirm question
+            // Otherwise let htmx proceed normally
+            if (!question) {
+                return true;
+            }
+
+            // Prevent the default browser confirm
+            evt.preventDefault();
+
+            const issueRequest = evt.detail.issueRequest;
+
+            showConfirm(question, 'Confirm Action').then(function(confirmed) {
+                if (confirmed) {
+                    issueRequest(true);
+                }
+            });
+
+            return false;
+        }, true);
+
+        // =====================================================
+        // Inactivity Auto-Logout (30 minutes)
+        // =====================================================
+        (function() {
+            const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+            const WARNING_TIME = 2 * 60 * 1000; // Show warning 2 minutes before logout
+            let inactivityTimer;
+            let warningTimer;
+            let warningShown = false;
+
+            function resetTimers() {
+                // Clear existing timers
+                clearTimeout(inactivityTimer);
+                clearTimeout(warningTimer);
+                warningShown = false;
+
+                // Hide warning if visible
+                const warningEl = document.getElementById('inactivityWarning');
+                if (warningEl) {
+                    warningEl.style.display = 'none';
+                }
+
+                // Set warning timer (fires 2 minutes before logout)
+                warningTimer = setTimeout(function() {
+                    showInactivityWarning();
+                }, INACTIVITY_TIMEOUT - WARNING_TIME);
+
+                // Set logout timer
+                inactivityTimer = setTimeout(function() {
+                    performLogout();
+                }, INACTIVITY_TIMEOUT);
+            }
+
+            function showInactivityWarning() {
+                if (warningShown) return;
+                warningShown = true;
+
+                // Create warning banner if it doesn't exist
+                let warningEl = document.getElementById('inactivityWarning');
+                if (!warningEl) {
+                    warningEl = document.createElement('div');
+                    warningEl.id = 'inactivityWarning';
+                    warningEl.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#dc3545;color:white;padding:12px 20px;text-align:center;z-index:99999;font-weight:500;';
+                    warningEl.innerHTML = '<i class="bi bi-exclamation-triangle"></i> You will be logged out in 2 minutes due to inactivity. <button onclick="window.resetInactivityTimer()" style="margin-left:15px;background:white;color:#dc3545;border:none;padding:5px 15px;border-radius:4px;cursor:pointer;font-weight:600;">Stay Logged In</button>';
+                    document.body.appendChild(warningEl);
+                }
+                warningEl.style.display = 'block';
+            }
+
+            function performLogout() {
+                // Clear any session data
+                sessionStorage.clear();
+                // Redirect to portal login
+                window.location.href = '/portal/login?next=/websites/&reason=inactivity';
+            }
+
+            // Expose reset function globally for the "Stay Logged In" button
+            window.resetInactivityTimer = resetTimers;
+
+            // Events that count as user activity
+            const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+
+            // Throttle activity detection to avoid excessive timer resets
+            let lastActivity = Date.now();
+            function handleActivity() {
+                const now = Date.now();
+                // Only reset if more than 1 second since last reset (throttle)
+                if (now - lastActivity > 1000) {
+                    lastActivity = now;
+                    resetTimers();
+                }
+            }
+
+            // Attach activity listeners
+            activityEvents.forEach(function(event) {
+                document.addEventListener(event, handleActivity, { passive: true });
+            });
+
+            // Also reset on htmx requests (user is actively using the app)
+            document.body.addEventListener('htmx:beforeRequest', handleActivity);
+
+            // Start the timers
+            resetTimers();
+        })();
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

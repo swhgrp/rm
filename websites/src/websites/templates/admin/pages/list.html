@@ -1,0 +1,159 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Pages - {{ site.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-file-earmark-text"></i> Pages</h1>
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addPageModal">
+        <i class="bi bi-plus-lg"></i> Add Page
+    </button>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th style="width: 40px;"></th>
+                    <th>Title</th>
+                    <th>Slug</th>
+                    <th>Template</th>
+                    <th style="width: 100px;">Status</th>
+                    <th style="width: 80px;">Nav</th>
+                    <th style="width: 100px;"></th>
+                </tr>
+            </thead>
+            <tbody id="pages-list">
+                {% for page in pages %}
+                <tr data-id="{{ page.id }}">
+                    <td class="handle"><i class="bi bi-grip-vertical text-muted"></i></td>
+                    <td>
+                        <a href="/websites/sites/{{ site.id }}/pages/{{ page.id }}" class="text-light">
+                            {{ page.title }}
+                        </a>
+                    </td>
+                    <td><code>/{{ page.slug }}</code></td>
+                    <td>{{ page.template }}</td>
+                    <td>
+                        {% if page.is_published %}
+                        <span class="badge bg-success">Published</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Draft</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if page.is_in_nav %}
+                        <i class="bi bi-check-circle text-success"></i>
+                        {% else %}
+                        <i class="bi bi-dash-circle text-muted"></i>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <a href="/websites/sites/{{ site.id }}/pages/{{ page.id }}"
+                               class="btn btn-outline-primary">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <button class="btn btn-outline-danger"
+                                    hx-delete="/websites/htmx/pages/{{ page.id }}"
+                                    hx-target="closest tr"
+                                    hx-swap="outerHTML"
+                                    hx-confirm="Delete this page?">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        No pages yet. Create your first page!
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Page Modal -->
+<div class="modal fade" id="addPageModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form hx-post="/websites/htmx/sites/{{ site.id }}/pages"
+                  hx-target="#pages-list"
+                  hx-swap="beforeend">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Page</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Page Title</label>
+                        <input type="text" name="title" class="form-control" required
+                               placeholder="About Us">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">URL Slug</label>
+                        <div class="input-group">
+                            <span class="input-group-text">/</span>
+                            <input type="text" name="slug" class="form-control" required
+                                   placeholder="about">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Template</label>
+                        <select name="template" class="form-select">
+                            <option value="page">Standard Page</option>
+                            <option value="home">Home Page</option>
+                            <option value="menu">Menu Page</option>
+                            <option value="contact">Contact Page</option>
+                            <option value="gallery">Gallery Page</option>
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col">
+                            <div class="form-check">
+                                <input type="checkbox" name="is_published" class="form-check-input" id="pagePublished">
+                                <label class="form-check-label" for="pagePublished">Published</label>
+                            </div>
+                        </div>
+                        <div class="col">
+                            <div class="form-check">
+                                <input type="checkbox" name="is_in_nav" class="form-check-input" id="pageInNav" checked>
+                                <label class="form-check-label" for="pageInNav">Show in Navigation</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Page</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+new Sortable(document.getElementById('pages-list'), {
+    handle: '.handle',
+    animation: 150,
+    onEnd: function(evt) {
+        const items = Array.from(evt.target.querySelectorAll('tr[data-id]')).map((el, idx) => ({
+            id: parseInt(el.dataset.id),
+            sort_order: idx
+        }));
+
+        fetch('/websites/htmx/pages/reorder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({items: items})
+        });
+    }
+});
+</script>
+{% endblock %}

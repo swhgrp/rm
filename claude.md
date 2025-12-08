@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** December 2, 2025
-**System Status:** Production (89% Complete - Core systems operational)
+**Last Updated:** December 8, 2025
+**System Status:** Production (90% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -9,7 +9,65 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Dec 2, 2025)
+### Most Recent Work (Current Session - Dec 8, 2025)
+
+**WEBSITES SYSTEM: ACTIVITY LOGGING ENHANCEMENTS + MOBILE RESPONSIVE ADMIN** ✅ **COMPLETE**
+
+1. **Dashboard Activity Pagination** 📄 **UX IMPROVEMENT**
+   - **Problem:** Dashboard showed all activity entries with no limit, needed pagination
+   - **Solution:** Limited dashboard to 5 recent items with "View All" link to full activity page
+   - **New Route:** `/websites/sites/{site_id}/activity` with pagination (20 per page)
+   - **Files Modified:**
+     - `websites/src/websites/main.py` (added activity route, limited dashboard to 5)
+     - `websites/templates/admin/sites/dashboard.html` (added View All button)
+     - `websites/templates/admin/sites/activity.html` (NEW - full activity with pagination)
+
+2. **Enhanced Activity Log Detail** 🔍 **FEATURE IMPROVEMENT**
+   - **Problem:** Activity entries only showed "Andy created site" with no detail
+   - **Solution:** Activity log now captures and displays specific changes
+   - **Details Tracked:**
+     - Site updates: Shows which fields changed (e.g., "Changed: Name, Domain, Phone")
+     - Block operations: Shows block type (e.g., "Block: hero", "Block: two_column")
+     - Custom descriptions for important actions
+   - **Files Modified:**
+     - `websites/src/websites/main.py` (added details tracking to site update & block operations)
+     - Dashboard and activity templates (display `log.details` fields)
+
+3. **Social Media & Action Links on Website Preview** 🔗 **FEATURE**
+   - **Problem:** Settings page had social/ordering/reservation URLs but they weren't displayed
+   - **Solution:** Added social links and action buttons to header navbar AND footer
+   - **Header:** Social icons (Instagram/Facebook) + Reservations/Order Online buttons
+   - **Footer:** Order Online + Reservations buttons + Social icons
+   - **Added Font Awesome CDN** for proper social media icons (fa-instagram, fa-facebook)
+   - **File Modified:** `websites/templates/preview/page.html`
+
+4. **Website Manager Mobile Responsive Design** 📱 **MAJOR UX IMPROVEMENT**
+   - **Problem:** Admin interface (Website Manager) not usable on mobile devices
+   - **Solution:** Complete mobile-responsive overhaul of admin base template
+   - **Features Added:**
+     - **Hamburger Menu:** Fixed header with hamburger button on screens < 992px
+     - **Slide-out Sidebar:** Sidebar slides in from left with dark overlay
+     - **Close Options:** X button, overlay click, or Escape key to close
+     - **Touch-friendly:** All nav links close sidebar after click
+     - **Responsive Stats Cards:** 2-column grid on mobile (col-6)
+     - **Responsive Quick Actions:** Buttons stack 2 per row on mobile
+     - **Responsive Typography:** Smaller headings, condensed button text on mobile
+   - **Files Modified:**
+     - `websites/templates/admin/base.html` (major mobile overhaul)
+     - `websites/templates/admin/sites/dashboard.html` (responsive grid)
+     - `websites/templates/admin/submissions/list.html` (responsive header)
+
+**Files Modified This Session:**
+- `websites/src/websites/main.py` (activity pagination, detail tracking)
+- `websites/templates/admin/base.html` (mobile responsive)
+- `websites/templates/admin/sites/dashboard.html` (responsive cards, View All button)
+- `websites/templates/admin/sites/activity.html` (NEW - pagination)
+- `websites/templates/admin/submissions/list.html` (responsive header)
+- `websites/templates/preview/page.html` (social links, action buttons)
+
+---
+
+### Previous Session Work (Dec 2, 2025)
 
 **EVENTS: BEO PDF TEMPLATE REDESIGN + FINANCIAL DISPLAY FIXES** ✅ **COMPLETE**
 

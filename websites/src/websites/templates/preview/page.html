@@ -1,0 +1,1880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ page.seo_title or page.title }} - {{ site.name }}</title>
+    <meta name="description" content="{{ page.seo_description or site.seo_description or '' }}">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family={{ site.font_heading|default('Playfair Display')|replace(' ', '+') }}:wght@400;700&family={{ site.font_body|default('Open Sans')|replace(' ', '+') }}:wght@400;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: {{ site.primary_color or '#1a1a1a' }};
+            --secondary-color: {{ site.secondary_color or '#ffffff' }};
+            --accent-color: {{ site.accent_color or '#c9a227' }};
+            --font-heading: '{{ site.font_heading or 'Playfair Display' }}', serif;
+            --font-body: '{{ site.font_body or 'Open Sans' }}', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-body);
+            line-height: 1.6;
+            color: #333;
+            background: var(--secondary-color);
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: var(--font-heading);
+            font-weight: 700;
+        }
+
+        /* Preview Banner */
+        .preview-banner {
+            background: #ff9800;
+            color: #000;
+            text-align: center;
+            padding: 10px;
+            font-weight: 600;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .preview-banner a.back-link {
+            color: #000;
+            position: absolute;
+            right: 20px;
+        }
+
+        .edit-mode-btn {
+            background: #333;
+            color: #fff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .edit-mode-btn:hover {
+            background: #000;
+        }
+
+        .edit-mode-btn.active {
+            background: #4CAF50;
+        }
+
+        /* Edit Mode Styles */
+        body.edit-mode .block-wrapper {
+            position: relative;
+            cursor: pointer;
+            transition: outline 0.2s;
+        }
+
+        body.edit-mode .block-wrapper:hover {
+            outline: 3px dashed var(--accent-color);
+            outline-offset: -3px;
+        }
+
+        body.edit-mode .block-wrapper::after {
+            content: attr(data-block-type);
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: var(--accent-color);
+            color: #000;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 4px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 100;
+            font-family: var(--font-body);
+            text-transform: uppercase;
+        }
+
+        body.edit-mode .block-wrapper:hover::after {
+            opacity: 1;
+        }
+
+        /* Edit Panel Slide-out */
+        .edit-panel {
+            position: fixed;
+            top: 40px;
+            right: -400px;
+            width: 400px;
+            height: calc(100vh - 40px);
+            background: #fff;
+            box-shadow: -4px 0 20px rgba(0,0,0,0.2);
+            z-index: 10000;
+            transition: right 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .edit-panel.open {
+            right: 0;
+        }
+
+        .edit-panel-header {
+            background: #333;
+            color: #fff;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .edit-panel-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .edit-panel-close {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .edit-panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .edit-panel .form-group {
+            margin-bottom: 1.25rem;
+        }
+
+        .edit-panel .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+            font-size: 0.9rem;
+        }
+
+        .edit-panel .form-group input,
+        .edit-panel .form-group textarea,
+        .edit-panel .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.95rem;
+        }
+
+        .edit-panel .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .edit-panel .form-group input:focus,
+        .edit-panel .form-group textarea:focus,
+        .edit-panel .form-group select:focus {
+            border-color: var(--accent-color);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.2);
+        }
+
+        .edit-panel-footer {
+            padding: 15px 20px;
+            border-top: 1px solid #eee;
+            background: #f8f9fa;
+        }
+
+        .edit-panel .save-btn {
+            background: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 12px 24px;
+            width: 100%;
+            border-radius: 4px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .edit-panel .save-btn:hover {
+            background: #b8922a;
+        }
+
+        .edit-panel .image-picker-btn {
+            background: #f0f0f0;
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .edit-panel .image-picker-btn:hover {
+            border-color: var(--accent-color);
+            background: #fafafa;
+        }
+
+        .edit-panel .image-picker-btn img {
+            max-width: 100%;
+            max-height: 150px;
+            margin-bottom: 10px;
+        }
+
+        .edit-panel .color-input {
+            display: flex;
+            gap: 10px;
+        }
+
+        .edit-panel .color-input input[type="color"] {
+            width: 50px;
+            height: 38px;
+            padding: 2px;
+            cursor: pointer;
+        }
+
+        .edit-panel .color-input input[type="text"] {
+            flex: 1;
+        }
+
+        /* Style Section Controls */
+        .style-section {
+            margin-top: 1.5rem;
+            border-top: 1px solid #eee;
+            padding-top: 1rem;
+        }
+
+        .style-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            padding: 0.5rem 0;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .style-section-header:hover {
+            color: #333;
+        }
+
+        .style-section-body {
+            padding-top: 0.5rem;
+        }
+
+        .style-section-body.collapsed {
+            display: none;
+        }
+
+        .toggle-icon {
+            font-size: 0.75rem;
+            color: #888;
+        }
+
+        .btn-group-toggle {
+            display: flex;
+            gap: 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .align-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            background: #f8f9fa;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            border-right: 1px solid #ddd;
+        }
+
+        .align-btn:last-child {
+            border-right: none;
+        }
+
+        .align-btn:hover {
+            background: #e9ecef;
+        }
+
+        .align-btn.active {
+            background: var(--accent-color);
+            color: #000;
+        }
+
+        .edit-save-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4CAF50;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-weight: 600;
+            z-index: 10001;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .edit-save-indicator.show {
+            opacity: 1;
+        }
+
+        /* Navigation */
+        .navbar {
+            background: var(--primary-color);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: {% if is_preview %}40px{% else %}0{% endif %};
+            z-index: 1000;
+        }
+
+        .navbar-brand {
+            color: var(--secondary-color);
+            font-family: var(--font-heading);
+            font-size: 1.5rem;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .navbar-brand img {
+            height: 50px;
+            width: auto;
+        }
+
+        .navbar-nav {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
+
+        .navbar-nav a {
+            color: var(--secondary-color);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .navbar-nav a:hover {
+            color: var(--accent-color);
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 60vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 4rem 2rem;
+            background: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), var(--primary-color);
+            color: var(--secondary-color);
+            background-size: cover;
+            background-position: center;
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .hero p {
+            font-size: 1.25rem;
+            margin-bottom: 2rem;
+            max-width: 600px;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            background: var(--accent-color);
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 600;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        /* Content Sections */
+        .section {
+            padding: 4rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        /* Full-width section wrapper for background colors */
+        .section-fullwidth {
+            width: 100%;
+            padding: 4rem 2rem;
+        }
+
+        .section-fullwidth > .hours-block,
+        .section-fullwidth > .text-block {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .section-heading {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .section-heading h2 {
+            font-size: 2.5rem;
+            color: var(--primary-color);
+        }
+
+        /* Text Block */
+        .text-block {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .text-block h2 {
+            margin-bottom: 1rem;
+            color: var(--primary-color);
+        }
+
+        .text-block p {
+            margin-bottom: 1rem;
+        }
+
+        /* Hours Block */
+        .hours-block {
+            background: #f8f9fa;
+            padding: 3rem 2rem;
+            border-radius: 8px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .hours-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        .hours-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .hours-item:last-child {
+            border-bottom: none;
+        }
+
+        .hours-item .day {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .hours-item .time {
+            color: #555;
+        }
+
+        .hours-item.closed {
+            color: #999;
+        }
+
+        .hours-item.closed .day {
+            color: #999;
+        }
+
+        /* Contact Info */
+        .contact-info {
+            text-align: center;
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #dee2e6;
+        }
+
+        .contact-info p {
+            margin-bottom: 0.5rem;
+            color: #555;
+        }
+
+        .contact-info a {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        /* CTA Block */
+        .cta-block {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--secondary-color);
+        }
+
+        .cta-block h2 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .cta-block p {
+            font-size: 1.25rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Menu Preview */
+        .menu-page-section {
+            max-width: 1000px;
+        }
+
+        /* Menu Tabs */
+        .menu-tabs {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 3rem;
+            padding: 1rem 0;
+        }
+
+        .menu-tab {
+            background: transparent;
+            border: 2px solid transparent;
+            padding: 0.75rem 1.5rem;
+            font-family: var(--font-heading);
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .menu-tab:hover {
+            color: var(--accent-color);
+        }
+
+        .menu-tab.active {
+            border: 2px solid var(--primary-color);
+            border-radius: 4px;
+        }
+
+        .menu-tab-divider {
+            color: var(--primary-color);
+            font-size: 1.25rem;
+            opacity: 0.5;
+        }
+
+        /* Menu Panels */
+        .menu-panel {
+            display: none;
+        }
+
+        .menu-panel.active {
+            display: block;
+        }
+
+        .menu-section {
+            margin-bottom: 3rem;
+        }
+
+        .menu-category {
+            margin-bottom: 3rem;
+        }
+
+        .category-title {
+            font-size: 1.5rem;
+            color: var(--accent-color);
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1.5rem;
+        }
+
+        .category-title::before,
+        .category-title::after {
+            content: '';
+            flex: 1;
+            max-width: 150px;
+            height: 2px;
+            background: var(--accent-color);
+        }
+
+        .category-description {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            margin-bottom: 2rem;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Menu Items Grid - Two Column Layout */
+        .menu-items-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem 3rem;
+        }
+
+        @media (max-width: 768px) {
+            .menu-items-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .category-title {
+                font-size: 1.25rem;
+                gap: 1rem;
+            }
+
+            .category-title::before,
+            .category-title::after {
+                max-width: 60px;
+            }
+
+            .menu-tabs {
+                gap: 0.25rem;
+            }
+
+            .menu-tab {
+                padding: 0.5rem 1rem;
+                font-size: 0.9rem;
+            }
+
+            .menu-tab-divider {
+                display: none;
+            }
+        }
+
+        .menu-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 0.75rem 0;
+            border-bottom: 1px dotted #ddd;
+        }
+
+        .menu-item-info h4 {
+            font-family: var(--font-body);
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: var(--primary-color);
+        }
+
+        .menu-item-info p {
+            font-size: 0.875rem;
+            color: #666;
+            line-height: 1.4;
+        }
+
+        .menu-item-price {
+            font-weight: 600;
+            color: var(--primary-color);
+            white-space: nowrap;
+            margin-left: 1rem;
+            font-size: 1rem;
+        }
+
+        /* Contact Form */
+        .contact-form {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+
+        .form-group textarea {
+            min-height: 150px;
+            resize: vertical;
+        }
+
+        /* Map Block */
+        .map-block iframe {
+            width: 100%;
+            height: 400px;
+            border: 0;
+            border-radius: 8px;
+        }
+
+        /* Image Block */
+        .image-block img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .image-block figcaption {
+            text-align: center;
+            padding: 1rem;
+            font-style: italic;
+            color: #666;
+        }
+
+        /* Footer */
+        .footer {
+            background: var(--primary-color);
+            color: var(--secondary-color);
+            padding: 3rem 2rem;
+            text-align: center;
+        }
+
+        .footer-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .footer h3 {
+            margin-bottom: 1rem;
+        }
+
+        .footer p {
+            margin-bottom: 0.5rem;
+            opacity: 0.9;
+        }
+
+        .footer a {
+            color: var(--accent-color);
+        }
+
+        .social-links {
+            margin-top: 1.5rem;
+        }
+
+        .social-links a {
+            display: inline-block;
+            margin: 0 10px;
+            font-size: 1.5rem;
+        }
+
+        /* Two Column */
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            align-items: center;
+        }
+
+        @media (max-width: 768px) {
+            .two-column {
+                grid-template-columns: 1fr;
+            }
+
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+
+            .navbar {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .navbar-nav {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 1rem;
+            }
+        }
+    </style>
+    <!-- Font Awesome for social icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+    {% if is_preview %}
+    <div class="preview-banner">
+        <span id="previewModeText">Preview Mode</span>
+        <button id="editModeToggle" onclick="toggleEditMode()" class="edit-mode-btn">
+            <span class="edit-icon">✏️</span> Enable Edit Mode
+        </button>
+        <a href="/websites/sites/{{ site.id }}/pages/{{ page.id }}" class="back-link">Back to Editor</a>
+    </div>
+    {% endif %}
+
+    <!-- Navigation -->
+    <nav class="navbar">
+        <a href="/websites/preview/{{ site.slug }}/home" class="navbar-brand">
+            {% if site.logo_url %}
+            <img src="{{ site.logo_url }}" alt="{{ site.name }}">
+            {% endif %}
+            <span>{{ site.name }}</span>
+        </a>
+        <ul class="navbar-nav">
+            {% for nav_page in nav_pages %}
+            <li><a href="/websites/preview/{{ site.slug }}/{{ nav_page.slug }}" {% if nav_page.id == page.id %}style="color: var(--accent-color);"{% endif %}>{{ nav_page.title }}</a></li>
+            {% endfor %}
+        </ul>
+        <div class="navbar-actions" style="display: flex; align-items: center; gap: 0.75rem; margin-left: 1rem;">
+            {% if site.instagram_url or site.facebook_url %}
+            <div class="navbar-social" style="display: flex; gap: 0.75rem; margin-right: 0.5rem;">
+                {% if site.instagram_url %}
+                <a href="{{ site.instagram_url }}" target="_blank" title="Instagram" style="color: var(--secondary-color); font-size: 1.25rem; text-decoration: none; opacity: 0.8; transition: opacity 0.2s;">
+                    <i class="fab fa-instagram"></i>
+                </a>
+                {% endif %}
+                {% if site.facebook_url %}
+                <a href="{{ site.facebook_url }}" target="_blank" title="Facebook" style="color: var(--secondary-color); font-size: 1.25rem; text-decoration: none; opacity: 0.8; transition: opacity 0.2s;">
+                    <i class="fab fa-facebook"></i>
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+            {% if site.reservation_url %}
+            <a href="{{ site.reservation_url }}" target="_blank" style="background: transparent; border: 1px solid var(--accent-color); color: var(--accent-color); padding: 0.5rem 1rem; text-decoration: none; border-radius: 4px; font-size: 0.875rem; font-weight: 500;">Reservations</a>
+            {% endif %}
+            {% if site.online_ordering_url %}
+            <a href="{{ site.online_ordering_url }}" target="_blank" style="background: var(--accent-color); color: #000; padding: 0.5rem 1rem; text-decoration: none; border-radius: 4px; font-size: 0.875rem; font-weight: 600;">Order Online</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- Page Content -->
+    <main>
+        {% for block in page.blocks|sort(attribute='sort_order') %}
+            {% if block.is_visible %}
+                {% if block.block_type == 'hero' %}
+                <div class="block-wrapper" data-block-id="{{ block.id }}" data-block-type="Hero">
+                <section class="hero" {% if block.content.get('background_image') %}style="background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('{{ block.content.background_image }}');"{% endif %}>
+                    {% if block.content.get('headline') %}
+                    <h1>{{ block.content.headline }}</h1>
+                    {% endif %}
+                    {% if block.content.get('subheadline') %}
+                    <p>{{ block.content.subheadline }}</p>
+                    {% endif %}
+                    {% if block.content.get('button_text') %}
+                    <a href="{{ block.content.get('button_url', '#') }}" class="btn">{{ block.content.button_text }}</a>
+                    {% endif %}
+                </section>
+                </div>
+
+                {% elif block.block_type == 'text' %}
+                {% set padding_map = {'none': '0', 'small': '1rem', 'medium': '3rem', 'large': '5rem', 'xlarge': '8rem'} %}
+                {% set heading_size_map = {'small': '1.5rem', 'medium': '2rem', 'large': '2.5rem', 'xlarge': '3rem'} %}
+                {% set body_size_map = {'small': '14px', 'medium': '16px', 'large': '18px', 'xlarge': '20px'} %}
+                <div class="block-wrapper" data-block-id="{{ block.id }}" data-block-type="Text">
+                <div class="section-fullwidth" style="
+                    {% if block.content.get('padding') %}padding-top: {{ padding_map.get(block.content.padding, '3rem') }}; padding-bottom: {{ padding_map.get(block.content.padding, '3rem') }};{% endif %}
+                    {% if block.content.get('section_bg_color') %}background-color: {{ block.content.section_bg_color }};{% endif %}
+                ">
+                    <div class="text-block" style="
+                        {% if block.content.get('text_color') %}color: {{ block.content.text_color }};{% endif %}
+                        {% if block.content.get('text_align') %}text-align: {{ block.content.text_align }};{% endif %}
+                    ">
+                        {% if block.content.get('heading') %}
+                        <h2 style="{% if block.content.get('heading_size') %}font-size: {{ heading_size_map.get(block.content.heading_size, '2rem') }};{% endif %}{% if block.content.get('text_color') %}color: {{ block.content.text_color }};{% endif %}">{{ block.content.heading }}</h2>
+                        {% endif %}
+                        <p style="{% if block.content.get('body_size') %}font-size: {{ body_size_map.get(block.content.body_size, '16px') }};{% endif %}">{{ block.content.get('body', '')|replace('\n', '</p><p>')|safe }}</p>
+                    </div>
+                </div>
+                </div>
+
+                {% elif block.block_type == 'hours' %}
+                {% set padding_map = {'none': '0', 'small': '1rem', 'medium': '3rem', 'large': '5rem', 'xlarge': '8rem'} %}
+                <div class="block-wrapper" data-block-id="{{ block.id }}" data-block-type="Hours">
+                <div class="section-fullwidth" style="
+                    {% if block.content.get('padding') %}padding-top: {{ padding_map.get(block.content.padding, '3rem') }}; padding-bottom: {{ padding_map.get(block.content.padding, '3rem') }};{% endif %}
+                    {% if block.content.get('section_bg_color') %}background-color: {{ block.content.section_bg_color }};{% endif %}
+                ">
+                    <div class="hours-block" style="
+                        {% if block.content.get('text_color') %}color: {{ block.content.text_color }};{% endif %}
+                        {% if block.content.get('text_align') %}text-align: {{ block.content.text_align }};{% endif %}
+                    ">
+                        <div class="section-heading">
+                            <h2>{{ block.content.get('heading', 'Hours') }}</h2>
+                        </div>
+                        <div class="hours-list">
+                            {% for i in range(7) %}
+                            {% set h = hours_dict.get(i) %}
+                            <div class="hours-item {% if h and h.is_closed %}closed{% endif %}">
+                                <span class="day">{{ days[i] }}</span>
+                                <span class="time">
+                                    {% if h and not h.is_closed %}
+                                        {{ format_time_12h(h.open_time) }} - {{ format_time_12h(h.close_time) }}
+                                    {% else %}
+                                        Closed
+                                    {% endif %}
+                                </span>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                </div>
+
+                {% elif block.block_type == 'cta' %}
+                <div class="block-wrapper" data-block-id="{{ block.id }}" data-block-type="CTA">
+                <section class="cta-block" style="background: {{ block.content.get('bg_color', 'var(--primary-color)') }};">
+                    <h2>{{ block.content.get('title', 'Ready to Visit?') }}</h2>
+                    {% if block.content.get('subtitle') %}
+                    <p>{{ block.content.subtitle }}</p>
+                    {% endif %}
+                    {% if block.content.get('button_text') %}
+                    <a href="{{ block.content.get('button_url', '#') }}" class="btn">{{ block.content.button_text }}</a>
+                    {% endif %}
+                </section>
+                </div>
+
+                {% elif block.block_type == 'menu_preview' %}
+                <div class="block-wrapper" data-block-id="{{ block.id }}" data-block-type="Menu">
+                <section class="section menu-page-section">
+                    <!-- Menu Tabs Navigation -->
+                    {% if menus|length > 1 %}
+                    <div class="menu-tabs">
+                        {% for menu in menus %}
+                        <button class="menu-tab {% if loop.first %}active{% endif %}"
+                                onclick="showMenu('menu-{{ menu.id }}', this)">
+                            {{ menu.name|upper }}
+                        </button>
+                        {% if not loop.last %}
+                        <span class="menu-tab-divider">•</span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+
+                    <!-- Menu Content Panels -->
+                    {% for menu in menus %}
+                    <div id="menu-{{ menu.id }}" class="menu-panel {% if loop.first %}active{% endif %}">
+                        {% for category in menu.categories|sort(attribute='sort_order') %}
+                        <div class="menu-category">
+                            <h3 class="category-title">{{ category.name }}</h3>
+                            {% if category.description %}
+                            <p class="category-description">{{ category.description }}</p>
+                            {% endif %}
+                            <div class="menu-items-grid">
+                                {% for item in category.items|sort(attribute='sort_order') %}
+                                {% if item.is_available %}
+                                <div class="menu-item">
+                                    <div class="menu-item-info">
+                                        <h4>{{ item.name }}</h4>
+                                        {% if item.description %}
+                                        <p>{{ item.description }}</p>
+                                        {% endif %}
+                                    </div>
+                                    {% if block.content.get('show_prices', True) and item.price %}
+                                    <span class="menu-item-price">${{ "%.2f"|format(item.price) }}</span>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </section>
+                </div>
+
+                {% elif block.block_type == 'contact_form' %}
+                <div class="block-wrapper" data-block-id="{{ block.id }}" data-block-type="Contact">
+                <section class="section">
+                    <div class="contact-form" id="contact-form-{{ block.id }}">
+                        <div class="section-heading">
+                            <h2>{{ block.content.get('heading', 'Contact Us') }}</h2>
+                        </div>
+                        <form onsubmit="submitContactForm(event, '{{ site.slug }}', {{ block.id }}, '{{ block.content.get('success_message', 'Thank you for your message! We will get back to you soon.') | e }}')">
+                            <div class="form-group">
+                                <label>Name</label>
+                                <input type="text" name="name" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Email</label>
+                                <input type="email" name="email" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Phone</label>
+                                <input type="tel" name="phone">
+                            </div>
+                            <div class="form-group">
+                                <label>Message</label>
+                                <textarea name="message" required></textarea>
+                            </div>
+                            <button type="submit" class="btn">Send Message</button>
+                        </form>
+                        <div class="contact-success" style="display: none; text-align: center; padding: 2rem;">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">✓</div>
+                            <h3 style="color: var(--primary-color); margin-bottom: 0.5rem;">Message Sent!</h3>
+                            <p class="success-message" style="color: #666;"></p>
+                        </div>
+                    </div>
+                </section>
+                </div>
+
+                {% elif block.block_type == 'map' %}
+                <div class="block-wrapper" data-block-id="{{ block.id }}" data-block-type="Map">
+                <section class="section">
+                    <div class="map-block">
+                        {% if block.content.get('embed_url') %}
+                        <iframe src="{{ block.content.embed_url }}" allowfullscreen="" loading="lazy"></iframe>
+                        {% else %}
+                        <div style="background: #eee; height: 400px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                            <p style="color: #999;">Map not configured</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </section>
+                </div>
+
+                {% elif block.block_type == 'image' %}
+                <div class="block-wrapper" data-block-id="{{ block.id }}" data-block-type="Image">
+                <section class="section">
+                    <figure class="image-block">
+                        {% if block.content.get('image_url') %}
+                        <img src="{{ block.content.image_url }}" alt="{{ block.content.get('alt_text', '') }}">
+                        {% else %}
+                        <div style="background: #eee; height: 300px; display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+                            <p style="color: #999;">Image not selected</p>
+                        </div>
+                        {% endif %}
+                        {% if block.content.get('caption') %}
+                        <figcaption>{{ block.content.caption }}</figcaption>
+                        {% endif %}
+                    </figure>
+                </section>
+                </div>
+
+                {% elif block.block_type == 'two_column' %}
+                {% set padding_map = {'none': '0', 'small': '1rem', 'medium': '3rem', 'large': '5rem', 'xlarge': '8rem'} %}
+                {% set image_size_map = {'small': '30%', 'medium': '50%', 'large': '75%', 'full': '100%'} %}
+                {% set max_height = block.content.get('image_max_height', 'auto') %}
+                <div class="block-wrapper" data-block-id="{{ block.id }}" data-block-type="Two Column">
+                <div class="section-fullwidth" style="
+                    {% if block.content.get('padding') %}padding-top: {{ padding_map.get(block.content.padding, '3rem') }}; padding-bottom: {{ padding_map.get(block.content.padding, '3rem') }};{% endif %}
+                    {% if block.content.get('section_bg_color') %}background-color: {{ block.content.section_bg_color }};{% endif %}
+                ">
+                <section class="section" style="padding-top: 0; padding-bottom: 0;
+                    {% if block.content.get('text_color') %}color: {{ block.content.text_color }};{% endif %}
+                ">
+                    <div class="two-column">
+                        <div>
+                            {% if block.content.get('left_image') %}
+                            {% set left_size = image_size_map.get(block.content.get('left_image_size', 'full'), '100%') %}
+                            <img src="{{ block.content.left_image }}" alt="" style="width: {{ left_size }}; max-width: 100%; {% if max_height != 'auto' %}height: {{ max_height }}px; object-fit: cover;{% endif %} border-radius: 8px; margin-bottom: 1rem;">
+                            {% endif %}
+                            {% if block.content.get('left_heading') %}
+                            <h2 style="{% if block.content.get('text_color') %}color: {{ block.content.text_color }};{% endif %}">{{ block.content.left_heading }}</h2>
+                            {% endif %}
+                            {% if block.content.get('left_content') %}
+                            <p>{{ block.content.left_content }}</p>
+                            {% endif %}
+                        </div>
+                        <div>
+                            {% if block.content.get('right_image') %}
+                            {% set right_size = image_size_map.get(block.content.get('right_image_size', 'full'), '100%') %}
+                            <img src="{{ block.content.right_image }}" alt="" style="width: {{ right_size }}; max-width: 100%; {% if max_height != 'auto' %}height: {{ max_height }}px; object-fit: cover;{% endif %} border-radius: 8px; margin-bottom: 1rem;">
+                            {% endif %}
+                            {% if block.content.get('right_heading') %}
+                            <h2 style="{% if block.content.get('text_color') %}color: {{ block.content.text_color }};{% endif %}">{{ block.content.right_heading }}</h2>
+                            {% endif %}
+                            {% if block.content.get('right_content') %}
+                            <p>{{ block.content.right_content }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </section>
+                </div>
+                </div>
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <h3>{{ site.name }}</h3>
+            {% if site.address %}
+            <p>{{ site.address }}, {{ site.city }}, {{ site.state }} {{ site.zip_code }}</p>
+            {% endif %}
+            {% if site.phone %}
+            <p><a href="tel:{{ site.phone }}">{{ site.phone }}</a></p>
+            {% endif %}
+            {% if site.email %}
+            <p><a href="mailto:{{ site.email }}">{{ site.email }}</a></p>
+            {% endif %}
+
+            {% if site.online_ordering_url or site.reservation_url %}
+            <div class="footer-actions" style="margin: 1.5rem 0; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                {% if site.online_ordering_url %}
+                <a href="{{ site.online_ordering_url }}" target="_blank" class="btn" style="background: var(--accent-color); color: #000; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 4px; font-weight: 600;">
+                    Order Online
+                </a>
+                {% endif %}
+                {% if site.reservation_url %}
+                <a href="{{ site.reservation_url }}" target="_blank" class="btn" style="background: transparent; border: 2px solid var(--accent-color); color: var(--accent-color); padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 4px; font-weight: 600;">
+                    Make a Reservation
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if site.instagram_url or site.facebook_url %}
+            <div class="social-links" style="display: flex; gap: 1.5rem; justify-content: center; margin-top: 1.5rem;">
+                {% if site.instagram_url %}
+                <a href="{{ site.instagram_url }}" target="_blank" title="Instagram" style="font-size: 1.75rem; color: var(--accent-color); text-decoration: none;">
+                    <i class="fab fa-instagram"></i>
+                </a>
+                {% endif %}
+                {% if site.facebook_url %}
+                <a href="{{ site.facebook_url }}" target="_blank" title="Facebook" style="font-size: 1.75rem; color: var(--accent-color); text-decoration: none;">
+                    <i class="fab fa-facebook"></i>
+                </a>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <p style="margin-top: 2rem; opacity: 0.7; font-size: 0.875rem;">
+                &copy; {{ now().year }} {{ site.name }}. All rights reserved.
+            </p>
+        </div>
+    </footer>
+
+    <!-- Menu Tab Switching (always available) -->
+    <script>
+    function showMenu(menuId, tabElement) {
+        // Hide all menu panels
+        document.querySelectorAll('.menu-panel').forEach(panel => {
+            panel.classList.remove('active');
+        });
+
+        // Remove active from all tabs
+        document.querySelectorAll('.menu-tab').forEach(tab => {
+            tab.classList.remove('active');
+        });
+
+        // Show selected panel and activate tab
+        document.getElementById(menuId).classList.add('active');
+        tabElement.classList.add('active');
+    }
+
+    // Contact form submission
+    function submitContactForm(event, siteSlug, blockId, successMessage) {
+        event.preventDefault();
+        const form = event.target;
+        const container = document.getElementById('contact-form-' + blockId);
+        const submitBtn = form.querySelector('button[type="submit"]');
+        const originalBtnText = submitBtn.textContent;
+
+        // Disable button and show loading
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending...';
+
+        // Collect form data
+        const formData = new FormData(form);
+        const data = {
+            name: formData.get('name'),
+            email: formData.get('email'),
+            phone: formData.get('phone'),
+            message: formData.get('message')
+        };
+
+        // Submit via fetch
+        fetch('/websites/api/public/contact?site_slug=' + siteSlug, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.status === 'success') {
+                // Hide form, show success message
+                form.style.display = 'none';
+                const successDiv = container.querySelector('.contact-success');
+                successDiv.querySelector('.success-message').textContent = successMessage;
+                successDiv.style.display = 'block';
+            } else {
+                alert('Error sending message. Please try again.');
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalBtnText;
+            }
+        })
+        .catch(error => {
+            console.error('Contact form error:', error);
+            alert('Error sending message. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
+        });
+    }
+    </script>
+
+    {% if is_preview %}
+    <!-- Edit Panel Slide-out -->
+    <div id="editPanel" class="edit-panel">
+        <div class="edit-panel-header">
+            <h3 id="editPanelTitle">Edit Block</h3>
+            <button class="edit-panel-close" onclick="closeEditPanel()">&times;</button>
+        </div>
+        <div class="edit-panel-body" id="editPanelBody">
+            <!-- Form fields loaded dynamically -->
+        </div>
+        <div class="edit-panel-footer">
+            <button class="save-btn" onclick="saveBlockContent()">Save Changes</button>
+        </div>
+    </div>
+
+    <!-- Save Indicator -->
+    <div id="saveIndicator" class="edit-save-indicator">Saved!</div>
+
+    <!-- Image Picker Modal -->
+    <div id="imagePickerModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 20000;">
+        <div style="background: #fff; max-width: 800px; margin: 50px auto; border-radius: 8px; max-height: calc(100vh - 100px); display: flex; flex-direction: column;">
+            <div style="padding: 15px 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0;">Select Image</h3>
+                <button onclick="closeImagePicker()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+            </div>
+            <div id="imagePickerGrid" style="padding: 20px; overflow-y: auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px;">
+                <!-- Images loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const siteId = {{ site.id }};
+    const siteSlug = '{{ site.slug }}';
+    // Persist edit mode state across page reloads
+    let editModeEnabled = sessionStorage.getItem('editModeEnabled') === 'true';
+    let currentBlockId = null;
+    let currentBlockType = null;
+    let currentBlockContent = {};
+    let currentImageField = null;
+
+    // Restore edit mode state on page load
+    if (editModeEnabled) {
+        document.body.classList.add('edit-mode');
+        const btn = document.getElementById('editModeToggle');
+        const text = document.getElementById('previewModeText');
+        if (btn) {
+            btn.classList.add('active');
+            btn.innerHTML = '<span class="edit-icon">✏️</span> Edit Mode ON';
+        }
+        if (text) {
+            text.textContent = 'Edit Mode - Click any block to edit';
+        }
+    }
+
+    // Block type mapping from data-block-type to internal type
+    const blockTypeMap = {
+        'Hero': 'hero',
+        'Text': 'text',
+        'Hours': 'hours',
+        'CTA': 'cta',
+        'Menu': 'menu_preview',
+        'Contact': 'contact_form',
+        'Map': 'map',
+        'Image': 'image',
+        'Two Column': 'two_column',
+        'Gallery': 'gallery'
+    };
+
+    // Toggle edit mode on/off
+    function toggleEditMode() {
+        editModeEnabled = !editModeEnabled;
+        // Persist state across page reloads
+        sessionStorage.setItem('editModeEnabled', editModeEnabled);
+
+        const btn = document.getElementById('editModeToggle');
+        const text = document.getElementById('previewModeText');
+
+        if (editModeEnabled) {
+            document.body.classList.add('edit-mode');
+            btn.classList.add('active');
+            btn.innerHTML = '<span class="edit-icon">✏️</span> Edit Mode ON';
+            text.textContent = 'Edit Mode - Click any block to edit';
+        } else {
+            document.body.classList.remove('edit-mode');
+            btn.classList.remove('active');
+            btn.innerHTML = '<span class="edit-icon">✏️</span> Enable Edit Mode';
+            text.textContent = 'Preview Mode';
+            closeEditPanel();
+        }
+    }
+
+    // Event delegation for block clicks
+    document.addEventListener('click', function(e) {
+        if (!editModeEnabled) return;
+
+        // Find the closest block-wrapper
+        const blockWrapper = e.target.closest('.block-wrapper');
+        if (!blockWrapper) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const blockId = parseInt(blockWrapper.dataset.blockId);
+        const displayType = blockWrapper.dataset.blockType;
+        const blockType = blockTypeMap[displayType] || displayType.toLowerCase();
+
+        // Fetch block content from API
+        fetch(`/websites/api/blocks/${blockId}`)
+            .then(response => response.json())
+            .then(data => {
+                openBlockEditor(blockId, blockType, data.content || {});
+            })
+            .catch(err => {
+                console.error('Error fetching block content:', err);
+                openBlockEditor(blockId, blockType, {});
+            });
+    });
+
+    // Open block editor panel
+    function openBlockEditor(blockId, blockType, content) {
+        currentBlockId = blockId;
+        currentBlockType = blockType;
+        currentBlockContent = content || {};
+
+        const panel = document.getElementById('editPanel');
+        const title = document.getElementById('editPanelTitle');
+        const body = document.getElementById('editPanelBody');
+
+        // Set panel title
+        const blockNames = {
+            'hero': 'Hero Section',
+            'text': 'Text Block',
+            'hours': 'Hours Display',
+            'cta': 'Call to Action',
+            'menu_preview': 'Menu Preview',
+            'contact_form': 'Contact Form',
+            'map': 'Map Embed',
+            'image': 'Image Block',
+            'two_column': 'Two Columns',
+            'gallery': 'Image Gallery'
+        };
+        title.textContent = 'Edit ' + (blockNames[blockType] || blockType);
+
+        // Build form fields based on block type
+        body.innerHTML = buildFormFields(blockType, currentBlockContent);
+
+        // Open panel
+        panel.classList.add('open');
+    }
+
+    // Close edit panel
+    function closeEditPanel() {
+        document.getElementById('editPanel').classList.remove('open');
+        currentBlockId = null;
+        currentBlockType = null;
+        currentBlockContent = {};
+    }
+
+    // Build styling controls (shared across block types)
+    function buildStyleControls(content, options = {}) {
+        const showTextAlign = options.showTextAlign !== false;
+        const showFontSize = options.showFontSize !== false;
+        const showPadding = options.showPadding !== false;
+        const showBgColor = options.showBgColor !== false;
+        const showTextColor = options.showTextColor !== false;
+
+        return `
+            <div class="style-section">
+                <div class="style-section-header" onclick="toggleStyleSection(this)">
+                    <span>Style Options</span>
+                    <span class="toggle-icon">▼</span>
+                </div>
+                <div class="style-section-body">
+                    ${showTextAlign ? `
+                    <div class="form-group">
+                        <label>Text Alignment</label>
+                        <div class="btn-group-toggle">
+                            <button type="button" class="align-btn ${content.text_align === 'left' || !content.text_align ? 'active' : ''}" onclick="setAlignment('left')" title="Left">
+                                <svg width="16" height="16" viewBox="0 0 16 16"><path fill="currentColor" d="M2 3h12v1H2zm0 3h8v1H2zm0 3h12v1H2zm0 3h8v1H2z"/></svg>
+                            </button>
+                            <button type="button" class="align-btn ${content.text_align === 'center' ? 'active' : ''}" onclick="setAlignment('center')" title="Center">
+                                <svg width="16" height="16" viewBox="0 0 16 16"><path fill="currentColor" d="M2 3h12v1H2zm2 3h8v1H4zm-2 3h12v1H2zm2 3h8v1H4z"/></svg>
+                            </button>
+                            <button type="button" class="align-btn ${content.text_align === 'right' ? 'active' : ''}" onclick="setAlignment('right')" title="Right">
+                                <svg width="16" height="16" viewBox="0 0 16 16"><path fill="currentColor" d="M2 3h12v1H2zm4 3h8v1H6zm-4 3h12v1H2zm4 3h8v1H6z"/></svg>
+                            </button>
+                        </div>
+                        <input type="hidden" id="field_text_align" value="${content.text_align || 'left'}">
+                    </div>
+                    ` : ''}
+
+                    ${showFontSize ? `
+                    <div class="form-group">
+                        <label>Heading Size</label>
+                        <select id="field_heading_size">
+                            <option value="small" ${content.heading_size === 'small' ? 'selected' : ''}>Small</option>
+                            <option value="medium" ${content.heading_size === 'medium' || !content.heading_size ? 'selected' : ''}>Medium</option>
+                            <option value="large" ${content.heading_size === 'large' ? 'selected' : ''}>Large</option>
+                            <option value="xlarge" ${content.heading_size === 'xlarge' ? 'selected' : ''}>Extra Large</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Body Text Size</label>
+                        <select id="field_body_size">
+                            <option value="small" ${content.body_size === 'small' ? 'selected' : ''}>Small (14px)</option>
+                            <option value="medium" ${content.body_size === 'medium' || !content.body_size ? 'selected' : ''}>Medium (16px)</option>
+                            <option value="large" ${content.body_size === 'large' ? 'selected' : ''}>Large (18px)</option>
+                            <option value="xlarge" ${content.body_size === 'xlarge' ? 'selected' : ''}>Extra Large (20px)</option>
+                        </select>
+                    </div>
+                    ` : ''}
+
+                    ${showPadding ? `
+                    <div class="form-group">
+                        <label>Padding (Top/Bottom)</label>
+                        <select id="field_padding">
+                            <option value="none" ${content.padding === 'none' ? 'selected' : ''}>None</option>
+                            <option value="small" ${content.padding === 'small' ? 'selected' : ''}>Small (1rem)</option>
+                            <option value="medium" ${content.padding === 'medium' || !content.padding ? 'selected' : ''}>Medium (3rem)</option>
+                            <option value="large" ${content.padding === 'large' ? 'selected' : ''}>Large (5rem)</option>
+                            <option value="xlarge" ${content.padding === 'xlarge' ? 'selected' : ''}>Extra Large (8rem)</option>
+                        </select>
+                    </div>
+                    ` : ''}
+
+                    ${showBgColor ? `
+                    <div class="form-group">
+                        <label>Background Color</label>
+                        <div class="color-input">
+                            <input type="color" id="field_section_bg_color_picker" value="${content.section_bg_color || '#ffffff'}" onchange="document.getElementById('field_section_bg_color').value = this.value">
+                            <input type="text" id="field_section_bg_color" value="${content.section_bg_color || ''}">
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    ${showTextColor ? `
+                    <div class="form-group">
+                        <label>Text Color</label>
+                        <div class="color-input">
+                            <input type="color" id="field_text_color_picker" value="${content.text_color || '#333333'}" onchange="document.getElementById('field_text_color').value = this.value">
+                            <input type="text" id="field_text_color" value="${content.text_color || ''}">
+                        </div>
+                    </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    function toggleStyleSection(header) {
+        const body = header.nextElementSibling;
+        const icon = header.querySelector('.toggle-icon');
+        body.classList.toggle('collapsed');
+        icon.textContent = body.classList.contains('collapsed') ? '▶' : '▼';
+    }
+
+    function setAlignment(align) {
+        document.getElementById('field_text_align').value = align;
+        document.querySelectorAll('.align-btn').forEach(btn => btn.classList.remove('active'));
+        event.target.closest('.align-btn').classList.add('active');
+    }
+
+    // Build form fields based on block type
+    function buildFormFields(blockType, content) {
+        let html = '';
+
+        switch(blockType) {
+            case 'hero':
+                html = `
+                    <div class="form-group">
+                        <label>Headline</label>
+                        <input type="text" id="field_headline" value="${escapeHtml(content.headline || '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Subheadline</label>
+                        <textarea id="field_subheadline">${escapeHtml(content.subheadline || '')}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Background Image</label>
+                        <div class="image-picker-btn" onclick="openImagePicker('background_image')">
+                            ${content.background_image
+                                ? `<img src="${content.background_image}" style="max-height: 120px;"><br><small>Click to change</small>`
+                                : '<p>Click to select image</p>'}
+                        </div>
+                        <input type="hidden" id="field_background_image" value="${escapeHtml(content.background_image || '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Button Text</label>
+                        <input type="text" id="field_button_text" value="${escapeHtml(content.button_text || '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Button URL</label>
+                        <input type="text" id="field_button_url" value="${escapeHtml(content.button_url || '')}">
+                    </div>
+                    ${buildStyleControls(content, {showBgColor: false})}
+                `;
+                break;
+
+            case 'text':
+                html = `
+                    <div class="form-group">
+                        <label>Heading</label>
+                        <input type="text" id="field_heading" value="${escapeHtml(content.heading || '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Body Text</label>
+                        <textarea id="field_body" rows="8">${escapeHtml(content.body || '')}</textarea>
+                    </div>
+                    ${buildStyleControls(content)}
+                `;
+                break;
+
+            case 'hours':
+                html = `
+                    <div class="form-group">
+                        <label>Section Heading</label>
+                        <input type="text" id="field_heading" value="${escapeHtml(content.heading || 'Hours')}">
+                    </div>
+                    <p style="color: #666; font-size: 0.9rem;">Hours are managed in Site Settings.</p>
+                    ${buildStyleControls(content, {showFontSize: false})}
+                `;
+                break;
+
+            case 'cta':
+                html = `
+                    <div class="form-group">
+                        <label>Title</label>
+                        <input type="text" id="field_title" value="${escapeHtml(content.title || '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Subtitle</label>
+                        <textarea id="field_subtitle">${escapeHtml(content.subtitle || '')}</textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Background Color</label>
+                        <div class="color-input">
+                            <input type="color" id="field_bg_color_picker" value="${content.bg_color || '#1a1a1a'}" onchange="document.getElementById('field_bg_color').value = this.value">
+                            <input type="text" id="field_bg_color" value="${content.bg_color || 'var(--primary-color)'}">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Button Text</label>
+                        <input type="text" id="field_button_text" value="${escapeHtml(content.button_text || '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Button URL</label>
+                        <input type="text" id="field_button_url" value="${escapeHtml(content.button_url || '')}">
+                    </div>
+                    ${buildStyleControls(content, {showBgColor: false})}
+                `;
+                break;
+
+            case 'menu_preview':
+                html = `
+                    <div class="form-group">
+                        <label>Show Prices</label>
+                        <select id="field_show_prices">
+                            <option value="true" ${content.show_prices !== false ? 'selected' : ''}>Yes</option>
+                            <option value="false" ${content.show_prices === false ? 'selected' : ''}>No</option>
+                        </select>
+                    </div>
+                    <p style="color: #666; font-size: 0.9rem;">Menu items are managed in the Menu section.</p>
+                `;
+                break;
+
+            case 'contact_form':
+                html = `
+                    <div class="form-group">
+                        <label>Form Heading</label>
+                        <input type="text" id="field_heading" value="${escapeHtml(content.heading || 'Contact Us')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Success Message</label>
+                        <input type="text" id="field_success_message" value="${escapeHtml(content.success_message || 'Thank you for your message!')}">
+                    </div>
+                `;
+                break;
+
+            case 'map':
+                html = `
+                    <div class="form-group">
+                        <label>Google Maps Embed URL</label>
+                        <textarea id="field_embed_url" rows="4" placeholder="https://www.google.com/maps/embed?...">${escapeHtml(content.embed_url || '')}</textarea>
+                        <small style="color: #666;">Get this from Google Maps > Share > Embed a map</small>
+                    </div>
+                `;
+                break;
+
+            case 'image':
+                html = `
+                    <div class="form-group">
+                        <label>Image</label>
+                        <div class="image-picker-btn" onclick="openImagePicker('image_url')">
+                            ${content.image_url
+                                ? `<img src="${content.image_url}" style="max-height: 150px;"><br><small>Click to change</small>`
+                                : '<p>Click to select image</p>'}
+                        </div>
+                        <input type="hidden" id="field_image_url" value="${escapeHtml(content.image_url || '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Alt Text</label>
+                        <input type="text" id="field_alt_text" value="${escapeHtml(content.alt_text || '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Caption</label>
+                        <input type="text" id="field_caption" value="${escapeHtml(content.caption || '')}">
+                    </div>
+                `;
+                break;
+
+            case 'two_column':
+                html = `
+                    <div class="form-group" style="background: #f8f9fa; padding: 12px; border-radius: 6px; margin-bottom: 1.5rem;">
+                        <label style="margin-bottom: 8px;">Image Height (applies to both)</label>
+                        <select id="field_image_max_height">
+                            <option value="auto" ${!content.image_max_height || content.image_max_height === 'auto' ? 'selected' : ''}>Auto (natural height)</option>
+                            <option value="200" ${content.image_max_height === '200' ? 'selected' : ''}>Small (200px)</option>
+                            <option value="300" ${content.image_max_height === '300' ? 'selected' : ''}>Medium (300px)</option>
+                            <option value="400" ${content.image_max_height === '400' ? 'selected' : ''}>Large (400px)</option>
+                            <option value="500" ${content.image_max_height === '500' ? 'selected' : ''}>Extra Large (500px)</option>
+                        </select>
+                        <small style="display: block; margin-top: 6px; color: #666;">Set the same height for both images</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Left Column Image</label>
+                        <div class="image-picker-btn" onclick="openImagePicker('left_image')">
+                            ${content.left_image
+                                ? `<img src="${content.left_image}" style="max-height: 100px;"><br><small>Click to change</small>`
+                                : '<p>Click to select image (optional)</p>'}
+                        </div>
+                        <input type="hidden" id="field_left_image" value="${escapeHtml(content.left_image || '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Left Image Width</label>
+                        <select id="field_left_image_size">
+                            <option value="small" ${content.left_image_size === 'small' ? 'selected' : ''}>Small (30%)</option>
+                            <option value="medium" ${content.left_image_size === 'medium' ? 'selected' : ''}>Medium (50%)</option>
+                            <option value="large" ${content.left_image_size === 'large' ? 'selected' : ''}>Large (75%)</option>
+                            <option value="full" ${content.left_image_size === 'full' || !content.left_image_size ? 'selected' : ''}>Full Width (100%)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Left Column Heading</label>
+                        <input type="text" id="field_left_heading" value="${escapeHtml(content.left_heading || '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Left Column Content</label>
+                        <textarea id="field_left_content" rows="4">${escapeHtml(content.left_content || '')}</textarea>
+                    </div>
+                    <hr style="margin: 20px 0;">
+                    <div class="form-group">
+                        <label>Right Column Image</label>
+                        <div class="image-picker-btn" onclick="openImagePicker('right_image')">
+                            ${content.right_image
+                                ? `<img src="${content.right_image}" style="max-height: 100px;"><br><small>Click to change</small>`
+                                : '<p>Click to select image (optional)</p>'}
+                        </div>
+                        <input type="hidden" id="field_right_image" value="${escapeHtml(content.right_image || '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Right Image Width</label>
+                        <select id="field_right_image_size">
+                            <option value="small" ${content.right_image_size === 'small' ? 'selected' : ''}>Small (30%)</option>
+                            <option value="medium" ${content.right_image_size === 'medium' ? 'selected' : ''}>Medium (50%)</option>
+                            <option value="large" ${content.right_image_size === 'large' ? 'selected' : ''}>Large (75%)</option>
+                            <option value="full" ${content.right_image_size === 'full' || !content.right_image_size ? 'selected' : ''}>Full Width (100%)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Right Column Heading</label>
+                        <input type="text" id="field_right_heading" value="${escapeHtml(content.right_heading || '')}">
+                    </div>
+                    <div class="form-group">
+                        <label>Right Column Content</label>
+                        <textarea id="field_right_content" rows="4">${escapeHtml(content.right_content || '')}</textarea>
+                    </div>
+                ` + buildStyleControls(content, { showTextAlign: false, showFontSize: false });
+                break;
+
+            default:
+                html = '<p>No editable fields for this block type.</p>';
+        }
+
+        return html;
+    }
+
+    // Escape HTML for safe display
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Save block content
+    function saveBlockContent() {
+        if (!currentBlockId || !currentBlockType) return;
+
+        const content = {};
+
+        // Collect field values based on block type
+        const fields = document.querySelectorAll('#editPanelBody input, #editPanelBody textarea, #editPanelBody select');
+        fields.forEach(field => {
+            if (field.id && field.id.startsWith('field_')) {
+                const key = field.id.replace('field_', '');
+                if (key.endsWith('_picker')) return; // Skip color picker duplicates
+
+                let value = field.value;
+
+                // Handle boolean values
+                if (value === 'true') value = true;
+                else if (value === 'false') value = false;
+
+                content[key] = value;
+            }
+        });
+
+        // Send to server
+        fetch(`/websites/htmx/blocks/${currentBlockId}/content`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(content)
+        })
+        .then(response => {
+            if (response.ok) {
+                showSaveIndicator();
+                // Reload page to show changes
+                setTimeout(() => location.reload(), 500);
+            } else {
+                alert('Failed to save changes');
+            }
+        })
+        .catch(err => {
+            console.error('Save error:', err);
+            alert('Failed to save changes');
+        });
+    }
+
+    // Show save indicator
+    function showSaveIndicator() {
+        const indicator = document.getElementById('saveIndicator');
+        indicator.classList.add('show');
+        setTimeout(() => indicator.classList.remove('show'), 2000);
+    }
+
+    // Image picker
+    function openImagePicker(fieldName) {
+        currentImageField = fieldName;
+
+        fetch(`/websites/api/sites/${siteId}/images`)
+            .then(response => response.json())
+            .then(images => {
+                const grid = document.getElementById('imagePickerGrid');
+                grid.innerHTML = '';
+
+                if (images.length === 0) {
+                    grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: #666;">No images uploaded yet. <a href="/websites/sites/' + siteId + '/images" target="_blank">Upload images</a> first.</div>';
+                } else {
+                    images.forEach(img => {
+                        const div = document.createElement('div');
+                        div.style.cssText = 'cursor: pointer; border: 2px solid transparent; border-radius: 4px; overflow: hidden;';
+                        div.innerHTML = `
+                            <img src="${img.thumb_url || img.url}" style="width: 100%; height: 100px; object-fit: cover;">
+                            <small style="display: block; padding: 4px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; font-size: 11px;">${img.original_filename || img.filename}</small>
+                        `;
+                        div.onclick = () => selectImage(img.url);
+                        div.onmouseover = () => div.style.borderColor = 'var(--accent-color)';
+                        div.onmouseout = () => div.style.borderColor = 'transparent';
+                        grid.appendChild(div);
+                    });
+                }
+
+                document.getElementById('imagePickerModal').style.display = 'block';
+            });
+    }
+
+    function closeImagePicker() {
+        document.getElementById('imagePickerModal').style.display = 'none';
+        currentImageField = null;
+    }
+
+    function selectImage(url) {
+        if (currentImageField) {
+            // Update hidden input
+            const input = document.getElementById('field_' + currentImageField);
+            if (input) input.value = url;
+
+            // Update preview in the picker button
+            const btn = input.previousElementSibling;
+            if (btn && btn.classList.contains('image-picker-btn')) {
+                btn.innerHTML = `<img src="${url}" style="max-height: 120px;"><br><small>Click to change</small>`;
+            }
+        }
+        closeImagePicker();
+    }
+
+    // Close image picker on background click
+    document.getElementById('imagePickerModal').addEventListener('click', function(e) {
+        if (e.target === this) closeImagePicker();
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', function(e) {
+        // ESC to close panel
+        if (e.key === 'Escape') {
+            if (document.getElementById('imagePickerModal').style.display === 'block') {
+                closeImagePicker();
+            } else if (document.getElementById('editPanel').classList.contains('open')) {
+                closeEditPanel();
+            } else if (editModeEnabled) {
+                toggleEditMode();
+            }
+        }
+        // Ctrl+E to toggle edit mode
+        if (e.ctrlKey && e.key === 'e') {
+            e.preventDefault();
+            toggleEditMode();
+        }
+    });
+    </script>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,284 @@
+<div class="card mb-3 block-card" data-id="{{ block.id }}">
+    <div class="card-header d-flex align-items-center">
+        <span class="block-handle me-2" style="cursor: grab;">
+            <i class="bi bi-grip-vertical"></i>
+        </span>
+        <span class="badge bg-secondary me-2">{{ block.block_type }}</span>
+        <span class="flex-grow-1">
+            {% if block.block_type == 'hero' %}
+            Hero Section
+            {% elif block.block_type == 'text' %}
+            Text Content
+            {% elif block.block_type == 'two_column' %}
+            Two Columns
+            {% elif block.block_type == 'image' %}
+            Full Width Image
+            {% elif block.block_type == 'gallery' %}
+            Image Gallery
+            {% elif block.block_type == 'cta' %}
+            Call to Action
+            {% elif block.block_type == 'menu_preview' %}
+            Menu Preview
+            {% elif block.block_type == 'hours' %}
+            Hours Display
+            {% elif block.block_type == 'map' %}
+            Map Embed
+            {% elif block.block_type == 'contact_form' %}
+            Contact Form
+            {% else %}
+            {{ block.block_type|title }}
+            {% endif %}
+        </span>
+        <div class="form-check form-switch me-3">
+            <input type="checkbox" class="form-check-input" id="blockVisible{{ block.id }}"
+                   {% if block.is_visible %}checked{% endif %}
+                   hx-put="/websites/htmx/blocks/{{ block.id }}"
+                   hx-vals='{"is_visible": event.target.checked}'
+                   hx-swap="none">
+            <label class="form-check-label small" for="blockVisible{{ block.id }}">Visible</label>
+        </div>
+        <button class="btn btn-sm btn-outline-danger"
+                hx-delete="/websites/htmx/blocks/{{ block.id }}"
+                hx-target="closest .block-card"
+                hx-swap="outerHTML"
+                hx-confirm="Delete this block?">
+            <i class="bi bi-trash"></i>
+        </button>
+    </div>
+    <div class="card-body">
+        {% if block.block_type == 'hero' %}
+        <!-- Hero Block Editor -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label small">Headline</label>
+                    <input type="text" class="form-control"
+                           value="{{ block.content.get('headline', '') }}"
+                           hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                           hx-trigger="blur changed"
+                           hx-vals='{"headline": event.target.value}'
+                           hx-swap="none">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small">Subheadline</label>
+                    <input type="text" class="form-control"
+                           value="{{ block.content.get('subheadline', '') }}"
+                           hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                           hx-trigger="blur changed"
+                           hx-vals='{"subheadline": event.target.value}'
+                           hx-swap="none">
+                </div>
+                <div class="row">
+                    <div class="col-6">
+                        <label class="form-label small">Button Text</label>
+                        <input type="text" class="form-control form-control-sm"
+                               value="{{ block.content.get('button_text', '') }}"
+                               hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                               hx-trigger="blur changed"
+                               hx-vals='{"button_text": event.target.value}'
+                               hx-swap="none">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Button URL</label>
+                        <input type="text" class="form-control form-control-sm"
+                               value="{{ block.content.get('button_url', '') }}"
+                               hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                               hx-trigger="blur changed"
+                               hx-vals='{"button_url": event.target.value}'
+                               hx-swap="none">
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small">Background Image</label>
+                <div class="image-picker border rounded p-3 text-center"
+                     onclick="openImagePicker({{ block.id }}, 'background_image')"
+                     style="cursor: pointer; min-height: 120px;">
+                    {% if block.content.get('background_image') %}
+                    <img src="{{ block.content.background_image }}" class="img-fluid" style="max-height: 100px;">
+                    {% else %}
+                    <i class="bi bi-image text-muted" style="font-size: 2rem;"></i>
+                    <p class="text-muted mb-0 small">Click to select image</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% elif block.block_type == 'text' %}
+        <!-- Text Block Editor -->
+        <div class="mb-3">
+            <label class="form-label small">Heading (optional)</label>
+            <input type="text" class="form-control"
+                   value="{{ block.content.get('heading', '') }}"
+                   hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                   hx-trigger="blur changed"
+                   hx-vals='{"heading": event.target.value}'
+                   hx-swap="none">
+        </div>
+        <div class="mb-0">
+            <label class="form-label small">Content</label>
+            <textarea class="form-control" rows="5"
+                      hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                      hx-trigger="blur changed"
+                      hx-vals='{"body": event.target.value}'
+                      hx-swap="none">{{ block.content.get('body', '') }}</textarea>
+            <small class="text-muted">Markdown supported</small>
+        </div>
+
+        {% elif block.block_type == 'cta' %}
+        <!-- CTA Block Editor -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label small">Title</label>
+                    <input type="text" class="form-control"
+                           value="{{ block.content.get('title', '') }}"
+                           hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                           hx-trigger="blur changed"
+                           hx-vals='{"title": event.target.value}'
+                           hx-swap="none">
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="mb-3">
+                    <label class="form-label small">Subtitle</label>
+                    <input type="text" class="form-control"
+                           value="{{ block.content.get('subtitle', '') }}"
+                           hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                           hx-trigger="blur changed"
+                           hx-vals='{"subtitle": event.target.value}'
+                           hx-swap="none">
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-4">
+                <label class="form-label small">Button Text</label>
+                <input type="text" class="form-control form-control-sm"
+                       value="{{ block.content.get('button_text', '') }}"
+                       hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                       hx-trigger="blur changed"
+                       hx-vals='{"button_text": event.target.value}'
+                       hx-swap="none">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small">Button URL</label>
+                <input type="text" class="form-control form-control-sm"
+                       value="{{ block.content.get('button_url', '') }}"
+                       hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                       hx-trigger="blur changed"
+                       hx-vals='{"button_url": event.target.value}'
+                       hx-swap="none">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small">Background Color</label>
+                <input type="color" class="form-control form-control-sm form-control-color"
+                       value="{{ block.content.get('bg_color', '#1a1a1a') }}"
+                       hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                       hx-trigger="change"
+                       hx-vals='{"bg_color": event.target.value}'
+                       hx-swap="none">
+            </div>
+        </div>
+
+        {% elif block.block_type == 'image' %}
+        <!-- Image Block Editor -->
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="image-picker border rounded p-3 text-center"
+                     onclick="openImagePicker({{ block.id }}, 'image_url')"
+                     style="cursor: pointer; min-height: 150px;">
+                    {% if block.content.get('image_url') %}
+                    <img src="{{ block.content.image_url }}" class="img-fluid" style="max-height: 140px;">
+                    {% else %}
+                    <i class="bi bi-image text-muted" style="font-size: 3rem;"></i>
+                    <p class="text-muted mb-0">Click to select image</p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="mb-3">
+                    <label class="form-label small">Alt Text</label>
+                    <input type="text" class="form-control form-control-sm"
+                           value="{{ block.content.get('alt_text', '') }}"
+                           hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                           hx-trigger="blur changed"
+                           hx-vals='{"alt_text": event.target.value}'
+                           hx-swap="none">
+                </div>
+                <div class="mb-0">
+                    <label class="form-label small">Caption</label>
+                    <input type="text" class="form-control form-control-sm"
+                           value="{{ block.content.get('caption', '') }}"
+                           hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                           hx-trigger="blur changed"
+                           hx-vals='{"caption": event.target.value}'
+                           hx-swap="none">
+                </div>
+            </div>
+        </div>
+
+        {% elif block.block_type == 'map' %}
+        <!-- Map Block Editor -->
+        <div class="mb-3">
+            <label class="form-label small">Google Maps Embed URL</label>
+            <input type="text" class="form-control"
+                   value="{{ block.content.get('embed_url', '') }}"
+                   placeholder="https://www.google.com/maps/embed?pb=..."
+                   hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                   hx-trigger="blur changed"
+                   hx-vals='{"embed_url": event.target.value}'
+                   hx-swap="none">
+            <small class="text-muted">Get embed code from Google Maps and paste the URL here</small>
+        </div>
+
+        {% elif block.block_type == 'contact_form' %}
+        <!-- Contact Form Block Editor -->
+        <p class="text-muted mb-0">
+            <i class="bi bi-info-circle"></i> This block displays a contact form.
+            Submissions appear in the <a href="/websites/sites/{{ site.id if site else page.site_id }}/submissions">Submissions</a> section.
+        </p>
+
+        {% elif block.block_type == 'hours' %}
+        <!-- Hours Block Editor -->
+        <p class="text-muted mb-0">
+            <i class="bi bi-info-circle"></i> This block displays the operating hours.
+            Edit hours in the <a href="/websites/sites/{{ site.id if site else page.site_id }}/hours">Hours</a> section.
+        </p>
+
+        {% elif block.block_type == 'menu_preview' %}
+        <!-- Menu Preview Block Editor -->
+        <div class="mb-3">
+            <label class="form-label small">Select Menu</label>
+            <select class="form-select"
+                    hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                    hx-trigger="change"
+                    hx-vals='{"menu_id": event.target.value}'
+                    hx-swap="none">
+                <option value="">-- Select a menu --</option>
+                <!-- Menu options would be populated dynamically -->
+            </select>
+        </div>
+        <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="menuShowPrices{{ block.id }}"
+                   {% if block.content.get('show_prices', True) %}checked{% endif %}
+                   hx-put="/websites/htmx/blocks/{{ block.id }}/content"
+                   hx-trigger="change"
+                   hx-vals='{"show_prices": event.target.checked}'
+                   hx-swap="none">
+            <label class="form-check-label" for="menuShowPrices{{ block.id }}">Show prices</label>
+        </div>
+
+        {% else %}
+        <!-- Generic JSON Editor -->
+        <div class="mb-0">
+            <label class="form-label small">Block Content (JSON)</label>
+            <textarea class="form-control font-monospace" rows="4"
+                      hx-put="/websites/htmx/blocks/{{ block.id }}"
+                      hx-trigger="blur changed"
+                      hx-vals='{"content": JSON.parse(event.target.value)}'
+                      hx-swap="none">{{ block.content | tojson(indent=2) }}</textarea>
+        </div>
+        {% endif %}
+    </div>
+</div>

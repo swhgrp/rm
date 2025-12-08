@@ -1,0 +1,179 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Hours - {{ site.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-clock"></i> Operating Hours</h1>
+    <p>Set regular and special hours for {{ site.name }}</p>
+</div>
+
+<!-- Regular Hours -->
+<div class="card mb-4">
+    <div class="card-header">
+        <i class="bi bi-calendar-week"></i> Regular Hours
+    </div>
+    <div class="card-body">
+        <form hx-put="/websites/htmx/sites/{{ site.id }}/hours"
+              hx-swap="none">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th>Day</th>
+                        <th style="width: 150px;">Open</th>
+                        <th style="width: 150px;">Close</th>
+                        <th style="width: 100px;">Closed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for i in range(7) %}
+                    {% set h = hours_dict.get(i) %}
+                    <tr>
+                        <td>{{ days[i] }}</td>
+                        <td>
+                            <input type="time" name="open_{{ i }}" class="form-control form-control-sm"
+                                   value="{{ h.open_time.strftime('%H:%M') if h and h.open_time else '07:00' }}"
+                                   {% if h and h.is_closed %}disabled{% endif %}>
+                        </td>
+                        <td>
+                            <input type="time" name="close_{{ i }}" class="form-control form-control-sm"
+                                   value="{{ h.close_time.strftime('%H:%M') if h and h.close_time else '21:00' }}"
+                                   {% if h and h.is_closed %}disabled{% endif %}>
+                        </td>
+                        <td>
+                            <div class="form-check">
+                                <input type="checkbox" name="closed_{{ i }}" class="form-check-input"
+                                       {% if h and h.is_closed %}checked{% endif %}
+                                       onchange="toggleTimeInputs(this, {{ i }})">
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg"></i> Save Hours
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Special Hours -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-calendar-event"></i> Special Hours & Closures</span>
+        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#addSpecialHoursModal">
+            <i class="bi bi-plus"></i> Add
+        </button>
+    </div>
+    <div class="card-body">
+        {% if special_hours %}
+        <table class="table mb-0">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Label</th>
+                    <th>Hours</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sh in special_hours %}
+                <tr>
+                    <td>{{ sh.date.strftime('%B %d, %Y') }}</td>
+                    <td>{{ sh.label or '-' }}</td>
+                    <td>
+                        {% if sh.is_closed %}
+                        <span class="text-danger">Closed</span>
+                        {% else %}
+                        {{ format_time_12h(sh.open_time) }} - {{ format_time_12h(sh.close_time) }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger"
+                                hx-delete="/websites/htmx/special-hours/{{ sh.id }}"
+                                hx-target="closest tr"
+                                hx-swap="outerHTML"
+                                hx-confirm="Delete this special hours entry?">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted mb-0">No special hours configured. Add holiday closures or modified hours here.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Add Special Hours Modal -->
+<div class="modal fade" id="addSpecialHoursModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form hx-post="/websites/htmx/sites/{{ site.id }}/special-hours"
+                  hx-target="#special-hours-list"
+                  hx-swap="beforeend">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add Special Hours</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Date</label>
+                        <input type="date" name="date" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Label</label>
+                        <input type="text" name="label" class="form-control"
+                               placeholder="e.g., Thanksgiving, Christmas Eve">
+                    </div>
+                    <div class="form-check mb-3">
+                        <input type="checkbox" name="is_closed" class="form-check-input" id="specialClosed"
+                               onchange="toggleSpecialTimes(this)">
+                        <label class="form-check-label" for="specialClosed">Closed all day</label>
+                    </div>
+                    <div id="specialTimesRow" class="row">
+                        <div class="col-6">
+                            <label class="form-label">Open</label>
+                            <input type="time" name="open_time" class="form-control">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label">Close</label>
+                            <input type="time" name="close_time" class="form-control">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleTimeInputs(checkbox, day) {
+    const row = checkbox.closest('tr');
+    const inputs = row.querySelectorAll('input[type="time"]');
+    inputs.forEach(input => {
+        input.disabled = checkbox.checked;
+    });
+}
+
+function toggleSpecialTimes(checkbox) {
+    const timesRow = document.getElementById('specialTimesRow');
+    const inputs = timesRow.querySelectorAll('input');
+    inputs.forEach(input => {
+        input.disabled = checkbox.checked;
+    });
+    timesRow.style.opacity = checkbox.checked ? '0.5' : '1';
+}
+</script>
+{% endblock %}

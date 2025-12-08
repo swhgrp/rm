@@ -1,0 +1,85 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Activity - {{ site.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex justify-content-between align-items-center">
+    <div>
+        <h1><i class="bi bi-activity"></i> Activity Log</h1>
+        <p>{{ total_count }} total activities</p>
+    </div>
+    <a href="/websites/sites/{{ site.id }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Dashboard
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        {% if activity %}
+        <ul class="list-group list-group-flush">
+            {% for log in activity %}
+            <li class="list-group-item bg-transparent">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <strong>{{ log.user_name }}</strong>
+                        <span class="text-muted">{{ log.action }}d</span>
+                        {{ log.entity_type }}
+                        {% if log.entity_name %}"{{ log.entity_name }}"{% endif %}
+                        {% if log.details %}
+                            {% if log.details.get('changed_fields') %}
+                            <br><small class="text-muted">Changed: {{ log.details.changed_fields | join(', ') }}</small>
+                            {% endif %}
+                            {% if log.details.get('block_type') %}
+                            <br><small class="text-muted">Block: {{ log.details.block_type }}</small>
+                            {% endif %}
+                            {% if log.details.get('description') %}
+                            <br><small class="text-muted">{{ log.details.description }}</small>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    <small class="text-muted">{{ log.created_at.strftime('%b %d, %Y %I:%M %p') }}</small>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-clock-history display-4"></i>
+            <p class="mb-0 mt-3">No activity found</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if total_pages > 1 %}
+    <div class="card-footer bg-transparent">
+        <nav aria-label="Activity pagination">
+            <ul class="pagination mb-0 justify-content-center">
+                <li class="page-item {% if current_page == 1 %}disabled{% endif %}">
+                    <a class="page-link" href="/websites/sites/{{ site.id }}/activity?page={{ current_page - 1 }}" {% if current_page == 1 %}tabindex="-1"{% endif %}>
+                        <i class="bi bi-chevron-left"></i> Previous
+                    </a>
+                </li>
+
+                {% for p in range(1, total_pages + 1) %}
+                    {% if p == 1 or p == total_pages or (p >= current_page - 2 and p <= current_page + 2) %}
+                <li class="page-item {% if p == current_page %}active{% endif %}">
+                    <a class="page-link" href="/websites/sites/{{ site.id }}/activity?page={{ p }}">{{ p }}</a>
+                </li>
+                    {% elif p == current_page - 3 or p == current_page + 3 %}
+                <li class="page-item disabled">
+                    <span class="page-link">...</span>
+                </li>
+                    {% endif %}
+                {% endfor %}
+
+                <li class="page-item {% if current_page == total_pages %}disabled{% endif %}">
+                    <a class="page-link" href="/websites/sites/{{ site.id }}/activity?page={{ current_page + 1 }}" {% if current_page == total_pages %}tabindex="-1"{% endif %}>
+                        Next <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

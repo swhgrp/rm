@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SW Hospitality Group - Portal</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
         * {
@@ -361,6 +364,8 @@
                         <i class="bi bi-folder"></i>
                     {% elif system.system_key == 'monitoring' %}
                         <i class="bi bi-graph-up"></i>
+                    {% elif system.system_key == 'websites' %}
+                        <i class="bi bi-globe"></i>
                     {% else %}
                         <i class="bi bi-grid"></i>
                     {% endif %}
@@ -379,26 +384,85 @@
     </div>
 
     <script>
-        // Inactivity timeout - 30 minutes
-        let inactivityTimer;
-        const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+        // =====================================================
+        // Inactivity Auto-Logout (30 minutes)
+        // =====================================================
+        (function() {
+            const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+            const WARNING_TIME = 2 * 60 * 1000; // Show warning 2 minutes before logout
+            let inactivityTimer;
+            let warningTimer;
+            let warningShown = false;
 
-        function resetInactivityTimer() {
-            clearTimeout(inactivityTimer);
-            inactivityTimer = setTimeout(() => {
-                // Log out user after 30 minutes of inactivity
-                alert('You have been logged out due to inactivity.');
-                window.location.href = '/portal/logout';
-            }, INACTIVITY_TIMEOUT);
-        }
+            function resetTimers() {
+                // Clear existing timers
+                clearTimeout(inactivityTimer);
+                clearTimeout(warningTimer);
+                warningShown = false;
 
-        // Reset timer on user activity
-        ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'].forEach(event => {
-            document.addEventListener(event, resetInactivityTimer, true);
-        });
+                // Hide warning if visible
+                const warningEl = document.getElementById('inactivityWarning');
+                if (warningEl) {
+                    warningEl.style.display = 'none';
+                }
 
-        // Initialize timer
-        resetInactivityTimer();
+                // Set warning timer (fires 2 minutes before logout)
+                warningTimer = setTimeout(function() {
+                    showInactivityWarning();
+                }, INACTIVITY_TIMEOUT - WARNING_TIME);
+
+                // Set logout timer
+                inactivityTimer = setTimeout(function() {
+                    performLogout();
+                }, INACTIVITY_TIMEOUT);
+            }
+
+            function showInactivityWarning() {
+                if (warningShown) return;
+                warningShown = true;
+
+                // Create warning banner if it doesn't exist
+                let warningEl = document.getElementById('inactivityWarning');
+                if (!warningEl) {
+                    warningEl = document.createElement('div');
+                    warningEl.id = 'inactivityWarning';
+                    warningEl.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#dc3545;color:white;padding:12px 20px;text-align:center;z-index:99999;font-weight:500;';
+                    warningEl.innerHTML = '<i class="bi bi-exclamation-triangle"></i> You will be logged out in 2 minutes due to inactivity. <button onclick="window.resetInactivityTimer()" style="margin-left:15px;background:white;color:#dc3545;border:none;padding:5px 15px;border-radius:4px;cursor:pointer;font-weight:600;">Stay Logged In</button>';
+                    document.body.appendChild(warningEl);
+                }
+                warningEl.style.display = 'block';
+            }
+
+            function performLogout() {
+                // Redirect to logout
+                window.location.href = '/portal/logout?reason=inactivity';
+            }
+
+            // Expose reset function globally for the "Stay Logged In" button
+            window.resetInactivityTimer = resetTimers;
+
+            // Events that count as user activity
+            const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+
+            // Throttle activity detection to avoid excessive timer resets
+            let lastActivity = Date.now();
+            function handleActivity() {
+                const now = Date.now();
+                // Only reset if more than 1 second since last reset (throttle)
+                if (now - lastActivity > 1000) {
+                    lastActivity = now;
+                    resetTimers();
+                }
+            }
+
+            // Attach activity listeners
+            activityEvents.forEach(function(event) {
+                document.addEventListener(event, handleActivity, { passive: true });
+            });
+
+            // Start the timers
+            resetTimers();
+        })();
 
         // Clear loading states when page becomes visible (e.g., back button)
         document.addEventListener('visibilitychange', function() {
@@ -449,6 +513,5 @@
             }
         }
     </script>
-    <script src="/portal/static/js/inactivity-warning.js"></script>
 </body>
 </html>

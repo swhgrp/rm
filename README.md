@@ -1,15 +1,15 @@
 # SW Hospitality Group - Restaurant Management System
 
 [![Status](https://img.shields.io/badge/status-production-yellow)]()
-[![Completion](https://img.shields.io/badge/completion-85%25-orange)]()
+[![Completion](https://img.shields.io/badge/completion-90%25-green)]()
 [![Documentation](https://img.shields.io/badge/docs-updated-blue)]()
 
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** November 30, 2025
-**Status:** ~88% Complete - Core Systems Production Ready ✅
-**Latest:** Journal entry correction feature, tax double-counting fix (Nov 30, 2025) ✅
+**Last Updated:** December 8, 2025
+**Status:** ~90% Complete - Core Systems Production Ready ✅
+**Latest:** Website Manager mobile responsive + activity logging enhancements (Dec 8, 2025) ✅
 
 ---
 
@@ -1198,6 +1198,38 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ## 📝 Recent Updates
 
+### December 8, 2025 - Website Manager Mobile Responsive + Activity Logging 📱
+
+**Websites System - Mobile Responsive Admin Interface**
+- ✅ **Hamburger Menu** - Fixed header with hamburger button on screens < 992px
+- ✅ **Slide-out Sidebar** - Sidebar slides in from left with dark overlay
+- ✅ **Touch-friendly Navigation** - All nav links close sidebar after click
+- ✅ **Responsive Stats Cards** - 2-column grid on mobile (col-6)
+- ✅ **Responsive Quick Actions** - Buttons stack 2 per row on mobile
+- ✅ **Close Options** - X button, overlay click, or Escape key to close
+
+**Websites System - Enhanced Activity Logging**
+- ✅ **Dashboard Activity Limit** - Limited to 5 recent items with "View All" link
+- ✅ **Full Activity Page** - New route `/websites/sites/{id}/activity` with pagination (20 per page)
+- ✅ **Change Detail Tracking** - Shows which fields changed on site updates
+- ✅ **Block Operation Logging** - Logs block type for create/update/delete operations
+
+**Websites System - Social Media & Action Links**
+- ✅ **Header Social Icons** - Instagram/Facebook icons in navbar
+- ✅ **Header Action Buttons** - Reservations/Order Online buttons
+- ✅ **Footer Links** - Order Online, Reservations, and social icons
+- ✅ **Font Awesome CDN** - Added for proper social media icons
+
+**Files Modified:**
+- `websites/templates/admin/base.html` (major mobile overhaul)
+- `websites/templates/admin/sites/dashboard.html` (responsive grid)
+- `websites/templates/admin/sites/activity.html` (NEW - pagination)
+- `websites/templates/admin/submissions/list.html` (responsive header)
+- `websites/templates/preview/page.html` (social links, action buttons)
+- `websites/src/websites/main.py` (activity pagination, detail tracking)
+
+---
+
 ### November 30, 2025 - Journal Entry Correction Feature & Tax Double-Counting Fix 🔧
 
 **Accounting System - Journal Entry Corrections**
@@ -1602,8 +1634,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 3.0 - Journal Entry Corrections & Tax Fix
-**Last Updated:** November 30, 2025
+**Version:** 3.1 - Website Manager Mobile Responsive
+**Last Updated:** December 8, 2025
 **Documentation Health:** 95/100 - Excellent ✅
 
-*Accounting system: Journal entry correction feature with deferred reversal pattern. Integration Hub: Fixed tax double-counting bug for invoices with tax line items.*
+*Websites system: Mobile-responsive admin interface, enhanced activity logging with pagination and change details, social media and action links on website preview.*
