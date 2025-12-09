@@ -31,13 +31,13 @@
 
 The SW Hospitality Group Restaurant Management System is a comprehensive microservices platform handling all aspects of restaurant operations including inventory management, human resources, accounting, event planning, and third-party integrations.
 
-### Key Statistics (Corrected)
-- **8 microservices** running in production (including new Websites CMS)
-- **430+ Python files** across all systems (updated Dec 8, 2025)
-- **140+ HTML templates** for user interfaces (updated Dec 8, 2025)
+### Key Statistics (Verified Dec 8, 2025)
+- **8 microservices** running in production (including Websites CMS)
+- **437 Python files** across all systems
+- **136 HTML templates** for user interfaces
 - **130+ database models** with full relationships
-- **550+ API endpoints** for system integration
-- **17 Docker containers** orchestrated via Docker Compose
+- **700+ API endpoints** for system integration
+- **20 Docker containers** orchestrated via Docker Compose
 - **~90% completion** - core systems production ready
 
 ---
@@ -58,9 +58,9 @@ restaurant-system/
 │   └── README.md       # Portal documentation
 │
 ├── inventory/          # Inventory Management Service
-│   ├── src/            # FastAPI application code (101 Python files)
+│   ├── src/            # FastAPI application code (104 Python files)
 │   ├── alembic/        # Database migrations
-│   ├── templates/      # 28 HTML templates
+│   ├── templates/      # 30 HTML templates
 │   ├── static/         # CSS, JS, images
 │   ├── uploads/        # File uploads
 │   ├── Dockerfile
@@ -79,7 +79,7 @@ restaurant-system/
 │   └── README.md       # HR system documentation
 │
 ├── accounting/         # Accounting Service (LARGEST SYSTEM)
-│   ├── src/            # FastAPI application code (154 Python files!)
+│   ├── src/            # FastAPI application code (157 Python files)
 │   ├── alembic/        # 50+ database migrations
 │   ├── templates/      # 38 HTML templates
 │   ├── static/         # CSS, JS, charts
@@ -90,9 +90,9 @@ restaurant-system/
 │   └── README.md       # Comprehensive accounting docs
 │
 ├── events/             # Event Planning & Catering Service
-│   ├── src/            # FastAPI application code (51 Python files)
+│   ├── src/            # FastAPI application code (53 Python files)
 │   ├── alembic/        # Database migrations
-│   ├── templates/      # 14 HTML templates
+│   ├── templates/      # 16 HTML templates
 │   │   ├── admin/      # Dashboard, calendar, tasks
 │   │   ├── public/     # Public intake form
 │   │   ├── pdf/        # BEO PDF templates
@@ -111,20 +111,20 @@ restaurant-system/
 │   └── data/           # Persistent calendar storage (venue-based)
 │
 ├── integration-hub/    # Integration Hub Service
-│   ├── src/            # FastAPI application code (36 Python files)
+│   ├── src/            # FastAPI application code (39 Python files)
 │   ├── alembic/        # Database migrations
-│   ├── templates/      # 9 HTML templates
+│   ├── templates/      # 10 HTML templates
 │   ├── services/       # APScheduler background jobs (email monitoring)
 │   ├── Dockerfile
 │   ├── requirements.txt
 │   ├── .env
 │   └── README.md       # Integration Hub documentation
 │
-├── files/              # Files Management Service + WebDAV Sync
-│   ├── src/            # FastAPI application code (15 Python files)
+├── files/              # Files Management Service + WebDAV Sync + OnlyOffice
+│   ├── src/            # FastAPI application code (18 Python files)
 │   │   └── webdav_server.py  # WebDAV server for desktop sync
 │   ├── alembic/        # Database migrations
-│   ├── templates/      # 3 HTML templates (file manager interface)
+│   ├── templates/      # 4 HTML templates (file manager interface)
 │   ├── storage/        # User file storage (isolated per user)
 │   ├── logs/           # Application logs
 │   ├── Dockerfile
@@ -133,9 +133,9 @@ restaurant-system/
 │   └── README.md       # Files system documentation (340 lines)
 │
 ├── websites/           # Website CMS Service (NEW - Dec 2025) 🌟
-│   ├── src/            # FastAPI application code (6 Python files)
+│   ├── src/            # FastAPI application code (7 Python files)
 │   ├── alembic/        # Database migrations
-│   ├── templates/      # 28+ HTML templates (admin + preview)
+│   ├── templates/      # 18 HTML templates (admin + preview)
 │   │   ├── admin/      # Admin interface templates
 │   │   └── preview/    # Website preview templates
 │   ├── uploads/        # Site image uploads
@@ -171,22 +171,23 @@ restaurant-system/
 **Important:** This diagram shows the **routing architecture**. All services use the Portal for **SSO authentication** (JWT tokens), but traffic is routed directly from Nginx to each service.
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│              Nginx Reverse Proxy (SSL/TLS)              │
-│              rm.swhgrp.com (172.233.172.92)             │
-│                                                          │
-│  Routes:                                                 │
-│  /portal/     → portal-app:8000    (SSO Auth)          │
-│  /inventory/  → inventory-app:8000                      │
-│  /accounting/ → accounting-app:8000                     │
-│  /hr/         → hr-app:8000                             │
-│  /events/     → events-app:8000                         │
-│  /caldav/     → caldav:5232        (Calendar Sync)     │
-│  /hub/        → integration-hub:8000                    │
-│  /files/      → files-app:8000     (Web UI)            │
-│  /files/webdav/ → files-app:8000   (Desktop Sync)      │
-│  /websites/   → websites-app:8000  (Website CMS)       │
-└─────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                Nginx Reverse Proxy (SSL/TLS)                  │
+│                rm.swhgrp.com (172.233.172.92)                 │
+│                                                               │
+│  Routes:                                                      │
+│  /portal/       → portal-app:8000      (SSO Auth)            │
+│  /inventory/    → inventory-app:8000                         │
+│  /accounting/   → accounting-app:8000                        │
+│  /hr/           → hr-app:8000                                │
+│  /events/       → events-app:8000                            │
+│  /caldav/       → caldav:5232          (Calendar Sync)       │
+│  /hub/          → integration-hub:8000                       │
+│  /files/        → files-app:8000       (Web UI)              │
+│  /files/webdav/ → files-app:8000       (Desktop Sync)        │
+│  /websites/     → websites-app:8000    (Website CMS)         │
+│  /onlyoffice/   → onlyoffice:80        (Document Editing)    │
+└──────────────────────────────────────────────────────────────┘
          │           │           │           │
          ▼           ▼           ▼           ▼
     ┌────────┐  ┌──────────┐  ┌────┐  ┌──────────┐
@@ -204,19 +205,25 @@ restaurant-system/
               │  databases)  │
               └──────┬───────┘
                      │
-         ┌───────────┼───────────┐
-         ▼           ▼           ▼
-    ┌────────┐  ┌────────┐  ┌──────────────┐
-    │Events  │  │  Hub   │  │    Files     │
-    │ :8000  │  │ :8000  │  │   Storage    │
-    └────────┘  └────────┘  └──────────────┘
-         │           │
-         └─────┬─────┘
-               ▼
-          ┌────────┐
-          │Redis 7 │
-          │ Cache  │
-          └────────┘
+    ┌────────────────┼────────────────┐
+    ▼                ▼                ▼
+┌────────┐  ┌──────────────┐  ┌──────────────┐
+│Events  │  │     Hub      │  │    Files     │
+│ :8000  │  │    :8000     │  │   Storage    │
+└────┬───┘  └──────────────┘  └──────┬───────┘
+     │                               │
+     ▼                               ▼
+┌────────┐                    ┌──────────────┐
+│CalDAV  │                    │  OnlyOffice  │
+│Radicale│                    │  Doc Server  │
+└────────┘                    └──────────────┘
+
+┌────────────────────────────────────┐
+│           Shared Services          │
+├────────────────────────────────────┤
+│ Redis 7       - Caching            │
+│ Websites :8000 - CMS               │
+└────────────────────────────────────┘
 ```
 
 ### Authentication Flow
@@ -305,7 +312,7 @@ restaurant-system/
 - **URL:** https://rm.swhgrp.com/inventory/
 - **Database:** inventory_db (PostgreSQL 15) - **32 tables, 25+ models**
 - **Technology:** FastAPI, SQLAlchemy, OpenAI GPT-4, Redis, APScheduler, ReportLab
-- **Files:** 101 Python files, **28 templates (940KB)**, 177+ API routes across 21 modules
+- **Files:** 104 Python files, **30 templates**, 190+ API routes across 21 modules
 
 **Core Inventory Features:**
 - ✅ Master item catalog with SKUs and categorization
@@ -356,8 +363,8 @@ restaurant-system/
 
 **System Statistics:**
 - **32 database tables** with full relationships
-- **27 HTML templates** (940KB total)
-- **21 API endpoint modules** with 177+ routes
+- **30 HTML templates**
+- **21 API endpoint modules** with 190+ routes
 - **15,000+ lines of code**
 - **Complete audit logging** for all transactions
 
@@ -493,7 +500,7 @@ restaurant-system/
 - **Public Form:** https://rm.swhgrp.com/events/public/intake (NO AUTH REQUIRED)
 - **Database:** events_db (PostgreSQL 15)
 - **Technology:** FastAPI, SQLAlchemy, WeasyPrint (PDF), FullCalendar.js
-- **Files:** 51 Python files, 14 templates
+- **Files:** 53 Python files, 16 templates
 
 **✅ Portal SSO Integration Complete (Nov 1, 2025):**
 - ✅ JWT token validation from Portal
@@ -581,7 +588,7 @@ restaurant-system/
 - **URL:** https://rm.swhgrp.com/hub/
 - **Database:** hub_db (PostgreSQL 15) - 7+ models
 - **Technology:** **FastAPI**, SQLAlchemy, OpenAI GPT-4o Vision, APScheduler, PyPDF2, pdf2image
-- **Files:** 36 Python files, 9 templates (includes mapped_items.html)
+- **Files:** 39 Python files, 10 templates
 
 **Critical Correction:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
@@ -649,8 +656,8 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 
 - **URL:** https://rm.swhgrp.com/files/
 - **WebDAV:** https://rm.swhgrp.com/files/webdav/ (Desktop sync endpoint)
-- **Technology:** FastAPI, WsgiDAV 4.3.0, LibreOffice (document conversion)
-- **Files:** 15 Python files, 3 templates
+- **Technology:** FastAPI, WsgiDAV 4.3.0, OnlyOffice Document Server, LibreOffice (document conversion)
+- **Files:** 18 Python files, 4 templates
 - **Storage:** Persistent volume on server (`/app/storage`)
 - **Status:** Core features operational, WebDAV sync production-ready ✅
 
@@ -672,7 +679,7 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 - ✅ **10GB file upload support** via WebDAV 🌟
 - ⚠️ Bulk upload - CLAIMED but NOT IMPLEMENTED
 - ⚠️ Bulk operations - CLAIMED but NO API endpoints
-- ❌ Collaborative document editing - NOT IMPLEMENTED
+- ✅ OnlyOffice document editing integration (Word, Excel, PowerPoint)
 - ❌ Calendar integration - NOT IMPLEMENTED
 - ❌ Contacts management - NOT IMPLEMENTED
 - ❌ Tasks/To-do lists - NOT IMPLEMENTED
@@ -695,7 +702,7 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 - **URL:** https://rm.swhgrp.com/websites/
 - **Database:** websites_db (PostgreSQL 15)
 - **Technology:** FastAPI, SQLAlchemy, Jinja2, Bootstrap 5, HTMX, Pillow
-- **Files:** 6 Python files, 28+ templates
+- **Files:** 7 Python files, 18 templates
 - **Status:** Production ready with full feature set ✅
 
 **Features:**
@@ -863,6 +870,8 @@ Each system has comprehensive README documentation:
 - **[Accounting README](./accounting/README.md)** - Financial management, AP/AR
 - **[Events README](./events/README.md)** - Event planning, public intake (278 lines)
 - **[Integration Hub README](./integration-hub/README.md)** - API integrations, vendor sync
+- **[Files README](./files/README.md)** - Document management, WebDAV sync, OnlyOffice
+- **[Websites README](./websites/README.md)** - Restaurant CMS, page builder, menus
 
 ### Master Documentation
 - **[SYSTEM_DOCUMENTATION.md](./SYSTEM_DOCUMENTATION.md)** - 80-page comprehensive system overview
@@ -1231,7 +1240,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ## 🎉 Acknowledgments
 
 **Built with:**
-- **FastAPI** - Modern async framework for ALL 7 systems (Portal, HR, Inventory, Accounting, Integration Hub, Events, Files)
+- **FastAPI** - Modern async framework for ALL 8 systems (Portal, HR, Inventory, Accounting, Integration Hub, Events, Files, Websites)
 - PostgreSQL 15 - Reliable database system
 - **SQLAlchemy** - ORM for all systems
 - Redis 7 - Caching and task queues
@@ -1239,9 +1248,13 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 - Docker & Docker Compose - Containerization
 - Nginx - High-performance web server
 - Bootstrap 5 - UI framework
+- HTMX - Dynamic frontend interactions
 - FullCalendar.js - Event calendar
 - Chart.js - Data visualization
 - WeasyPrint - PDF generation
+- **OnlyOffice Document Server** - Collaborative document editing
+- **WsgiDAV** - WebDAV server for desktop sync
+- **Radicale** - CalDAV server for calendar sync
 - Local File Storage - Document management
 
 ---
@@ -1250,16 +1263,16 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 | System | Status | Python Files | Templates | Models | Completion | Notes |
 |--------|--------|--------------|-----------|--------|------------|-------|
-| Portal | ✅ Production | 3 | 5 | 1 | 99%+ | ✅ **Fully documented (Nov 9)** - Monitoring, password sync |
-| Inventory | ✅ Production | 101 | 28 | 25+ | **100%+** 🌟 | ✅ README updated (Nov 3) - AI invoices, POS, recipes fully documented |
-| HR | ✅ Production | 56 | 14 | 12 | **100%** ✅ | Email notifications, admin delete, doc security (Nov 3) |
-| Accounting | ⚠️ Active | 154 | 38 | 60+ | ~75% | ✅ **Framework corrected (Nov 9)** - FastAPI documented |
-| Events | ✅ Production | 51 | 14 | 17 | ~75% | ✅ SSO complete (Nov 1) |
-| Integration Hub | ✅ Production | 36 | 9 | 7+ | 100%+ 🌟 | Multi-page parsing, bulk mapping workflow |
-| Files | ⚠️ Active | 14 | 3 | 6 | 75-80% | WebDAV sync working |
-| **Websites** | ✅ Production | 6 | 28 | 10+ | **100%** 🌟 | **NEW: Restaurant CMS with mobile admin** 🚀 |
+| Portal | ✅ Production | 3 | 6 | 1 | 99%+ | ✅ **Fully documented (Nov 9)** - Monitoring, password sync |
+| Inventory | ✅ Production | 104 | 30 | 25+ | **100%+** 🌟 | ✅ AI invoices, POS, recipes fully documented |
+| HR | ✅ Production | 56 | 14 | 12 | **100%** ✅ | Email notifications, admin delete, doc security |
+| Accounting | ⚠️ Active | 157 | 38 | 60+ | ~78% | ✅ **Framework corrected** - FastAPI documented |
+| Events | ✅ Production | 53 | 16 | 17 | ~75% | ✅ SSO + CalDAV sync complete |
+| Integration Hub | ✅ Production | 39 | 10 | 7+ | 100%+ 🌟 | Multi-page parsing, bulk mapping workflow |
+| Files | ✅ Production | 18 | 4 | 6 | ~85% | WebDAV sync + OnlyOffice editing |
+| **Websites** | ✅ Production | 7 | 18 | 10+ | **100%** 🌟 | Restaurant CMS with mobile admin 🚀 |
 
-**Total:** 430+ Python files, 140+ templates, 130+ database models (updated Dec 8, 2025)
+**Total:** 437 Python files, 136 templates, 130+ database models (verified Dec 8, 2025)
 
 **Overall Status:** ~90% Complete - Core Systems Production Ready ✅
 

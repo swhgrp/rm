@@ -48,8 +48,8 @@ A comprehensive web-based inventory management system built for restaurant opera
 - **Status:** Production Ready (100%+ Complete)
 
 **Statistics:**
-- **101 Python files** across the codebase
-- **27 HTML templates** (totaling 940KB)
+- **104 Python files** across the codebase
+- **30 HTML templates**
 - **32 database tables** with full relationships
 - **21 API endpoint modules** with 177+ routes
 - **25+ database models** with SQLAlchemy ORM
@@ -499,7 +499,7 @@ All API endpoints are prefixed with `/inventory/api/`:
 - **Profile** (`/profile`) - User profile management
 - **Setup Password** (`/setup-password`) - Password setup for new users
 
-**Total Templates:** 27 HTML files (940KB total)
+**Total Templates:** 30 HTML files
 
 ---
 
@@ -727,7 +727,7 @@ PGPASSWORD=inventory_pass psql -h localhost -U inventory_user -d inventory_db
 │   │   ├── js/auth.js
 │   │   ├── js/main.js
 │   │   └── images/sw-logo.png
-│   ├── templates/                # 27 HTML templates (940KB total)
+│   ├── templates/                # 30 HTML templates
 │   │   ├── analytics.html       # 28KB - Analytics dashboard
 │   │   ├── base.html            # 29KB - Base template
 │   │   ├── categories.html      # 12KB
@@ -918,8 +918,8 @@ grep REDIS_URL /opt/restaurant-system/inventory/.env
 - **Database Tables:** 32
 - **Database Models:** 25+
 - **API Endpoints:** 177+ routes across 21 modules
-- **HTML Templates:** 27 files (940KB total)
-- **Python Files:** 101 files
+- **HTML Templates:** 30 files
+- **Python Files:** 104 files
 - **Lines of Code:** ~15,000+ LOC
 - **Completion Status:** 100%+ (Core + Advanced Features)
 - **Production Status:** ✅ Production Ready
@@ -981,6 +981,6 @@ All rights reserved. Unauthorized use, distribution, or modification is prohibit
 
 ---
 
-**Last Updated:** November 3, 2025
-**Document Version:** 2.0
+**Last Updated:** December 8, 2025
+**Document Version:** 2.1
 **System Version:** v2.0.0 Production

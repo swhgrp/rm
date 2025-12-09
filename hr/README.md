@@ -20,11 +20,11 @@ The HR System is an employee information management platform that serves as the 
 
 ## Technology Stack
 
-- **Framework:** Django 4.2 (Python)
+- **Framework:** FastAPI (Python 3.11)
 - **Database:** PostgreSQL 15
-- **Task Queue:** Celery with Redis
-- **Frontend:** Bootstrap 5, jQuery
-- **Authentication:** Django auth + Portal integration
+- **ORM:** SQLAlchemy 2.0
+- **Frontend:** Bootstrap 5, Jinja2 templates
+- **Authentication:** Portal SSO via JWT tokens
 
 ## Features
 
@@ -156,7 +156,7 @@ The HR System is an employee information management platform that serves as the 
 
 ### Models
 
-**Implemented Django Models:**
+**Implemented SQLAlchemy Models:**
 - `Employee` - Core employee profile with encrypted sensitive fields
 - `Department` - Organizational units
 - `Position` - Job titles with pay rate ranges
@@ -266,32 +266,19 @@ The HR System is an employee information management platform that serves as the 
 # Database
 DATABASE_URL=postgresql://hr_user:password@hr-db:5432/hr_db
 
-# Django Settings
-SECRET_KEY=your-django-secret-key
+# FastAPI Settings
+SECRET_KEY=your-secret-key
 DEBUG=False
-ALLOWED_HOSTS=rm.swhgrp.com,hr-app
-
-# Celery (Background Jobs)
-CELERY_BROKER_URL=redis://hr-redis:6379/0
-CELERY_RESULT_BACKEND=redis://hr-redis:6379/0
-
-# Email (for notifications)
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USE_TLS=True
-EMAIL_HOST_USER=your-email@example.com
-EMAIL_HOST_PASSWORD=your-app-password
 
 # Portal Integration
 PORTAL_URL=https://rm.swhgrp.com/portal
 PORTAL_SECRET_KEY=same-as-portal-secret
 
 # File Storage
-MEDIA_ROOT=/app/media
-MEDIA_URL=/media/
+DOCUMENTS_PATH=/app/documents
 
-# Timezone
-TIME_ZONE=America/New_York
+# Encryption
+FIELD_ENCRYPTION_KEY=your-encryption-key-for-sensitive-data
 ```
 
 ## Installation & Setup
@@ -299,7 +286,6 @@ TIME_ZONE=America/New_York
 ### Prerequisites
 - Docker and Docker Compose
 - PostgreSQL 15
-- Redis 7
 
 ### Quick Start
 
@@ -312,26 +298,16 @@ cp .env.example .env
 
 2. **Build and start:**
 ```bash
-docker compose up -d hr-app hr-db hr-redis
+docker compose up -d hr-app hr-db
 ```
 
-3. **Run migrations:**
-```bash
-docker compose exec hr-app python manage.py migrate
-```
+3. **Database tables are auto-created:**
+The FastAPI app creates tables automatically on startup via SQLAlchemy.
 
-4. **Create superuser:**
-```bash
-docker compose exec hr-app python manage.py createsuperuser
-```
+4. **Create initial admin:**
+Use Portal admin interface or direct database insert.
 
-5. **Load initial data (optional):**
-```bash
-docker compose exec hr-app python manage.py loaddata departments
-docker compose exec hr-app python manage.py loaddata positions
-```
-
-6. **Access system:**
+5. **Access system:**
 ```
 https://rm.swhgrp.com/hr/
 ```
@@ -380,38 +356,30 @@ https://rm.swhgrp.com/hr/
 hr/
 ├── src/
 │   └── hr/
-│       ├── models/              # Django models
+│       ├── models/              # SQLAlchemy models
 │       │   ├── employee.py     # Employee profiles
-│       │   ├── department.py   # Departments and positions
+│       │   ├── position.py     # Positions and departments
 │       │   ├── user.py         # User accounts and RBAC
 │       │   ├── document.py     # Employee documents
-│       │   ├── audit.py        # Audit logging
-│       │   └── email.py        # Email settings
-│       ├── api/                 # API routes
-│       │   ├── employees.py    # Employee endpoints
-│       │   ├── departments.py  # Department endpoints
-│       │   ├── documents.py    # Document endpoints
+│       │   └── audit.py        # Audit logging
+│       ├── api/                 # FastAPI routers
+│       │   ├── api_v1/
+│       │   │   └── endpoints/  # API endpoint modules
+│       │   ├── auth.py         # Authentication/SSO
 │       │   ├── users.py        # User endpoints
-│       │   ├── audit.py        # Audit log endpoints
-│       │   └── auth.py         # Authentication/SSO
-│       ├── templates/           # Django HTML templates
+│       │   └── auth_helpers.py # Auth decorators
+│       ├── schemas/             # Pydantic schemas
+│       ├── services/            # Business logic services
+│       ├── templates/           # Jinja2 HTML templates
 │       │   ├── base.html       # Base template with sidebar
 │       │   ├── dashboard.html  # HR dashboard
-│       │   ├── employees/      # Employee management pages
-│       │   ├── documents/      # Document management pages
-│       │   ├── audit/          # Audit log pages
-│       │   └── settings/       # Email settings pages
+│       │   └── employees/      # Employee management pages
 │       ├── static/              # CSS, JS, images
-│       │   ├── css/
-│       │   ├── js/
-│       │   └── images/
-│       ├── core/                # Django settings
-│       │   ├── settings.py
-│       │   ├── urls.py
-│       │   └── wsgi.py
-│       ├── manage.py            # Django management
-│       └── __init__.py
-├── migrations/                  # Database migrations
+│       ├── core/                # Configuration
+│       │   └── config.py       # Settings
+│       ├── db/                  # Database connection
+│       │   └── database.py     # SQLAlchemy setup
+│       └── main.py              # FastAPI application
 ├── documents/                   # Uploaded employee documents
 ├── Dockerfile
 ├── requirements.txt
@@ -502,14 +470,12 @@ Potential future integration:
 **Solution:**
 - Verify `FIELD_ENCRYPTION_KEY` environment variable is set
 - Check encryption key hasn't changed (data encrypted with old key)
-- Review Django cryptography library installation
+- Review cryptography library installation
 
 ### Issue: Audit logs not recording
 **Solution:**
-- Check Celery worker is running
-- Verify Redis connection for task queue
 - Review application logs for errors
-- Ensure audit logging middleware is enabled
+- Ensure audit logging is properly configured
 
 ## Development
 
@@ -525,27 +491,18 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Run migrations
-python manage.py migrate
-
-# Create superuser
-python manage.py createsuperuser
+# Set environment variables
+export DATABASE_URL=postgresql://...
+export SECRET_KEY=your-secret
 
 # Run development server
-python manage.py runserver
+uvicorn hr.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ### Running Tests
 
 ```bash
-python manage.py test
-```
-
-### Creating Migrations
-
-```bash
-python manage.py makemigrations
-python manage.py migrate
+pytest
 ```
 
 ## Monitoring
@@ -560,27 +517,22 @@ curl https://rm.swhgrp.com/hr/health
 docker compose logs -f hr-app
 ```
 
-### Celery Tasks
-```bash
-docker compose logs -f hr-celery-worker
-```
-
 ## Dependencies
 
 Key packages (see requirements.txt for complete list):
-- Django 4.2
-- djangorestframework
+- FastAPI
+- SQLAlchemy 2.0
 - psycopg2-binary
-- celery
-- redis
-- pillow (image handling)
-- reportlab (PDF generation)
-- openpyxl (Excel export)
+- python-jose (JWT)
+- pydantic / pydantic-settings
+- jinja2
+- python-multipart (file uploads)
+- uvicorn (ASGI server)
 
 ## Security
 
 **Authentication & Authorization:**
-- Password hashing with bcrypt (via Django's default hasher)
+- Password hashing with bcrypt (via passlib)
 - Role-based access control (RBAC) with granular permissions
 - User session management with timeout warnings
 - SSO integration with Portal via JWT tokens
@@ -592,14 +544,13 @@ Key packages (see requirements.txt for complete list):
   - Emergency contact information
   - Other PII as configured
 - Environment variable for encryption key (`FIELD_ENCRYPTION_KEY`)
-- Django cryptography library
+- cryptography library for encryption
 
 **Application Security:**
-- CSRF protection (Django built-in)
-- SQL injection prevention (Django ORM parameterized queries)
-- XSS protection (Django template auto-escaping)
+- SQL injection prevention (SQLAlchemy ORM parameterized queries)
+- XSS protection (Jinja2 template auto-escaping)
 - Secure session cookies (HttpOnly, Secure flags)
-- Content Security Policy headers
+- Input validation via Pydantic schemas
 
 **Audit & Compliance:**
 - Comprehensive audit logging for all employee data access
@@ -673,7 +624,6 @@ Key packages (see requirements.txt for complete list):
 
 For issues or questions:
 - Check logs: `docker compose logs hr-app`
-- Django admin: https://rm.swhgrp.com/hr/admin/
 - Health check: https://rm.swhgrp.com/hr/health
 - Contact: Development Team
 

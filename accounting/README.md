@@ -2,11 +2,11 @@
 
 ## Overview
 
-The Accounting System is a comprehensive double-entry accounting platform providing complete financial management including chart of accounts, journal entries, accounts payable/receivable, banking, and sophisticated financial reporting. This is the **most complex system** in the restaurant management platform with 154 Python files.
+The Accounting System is a comprehensive double-entry accounting platform providing complete financial management including chart of accounts, journal entries, accounts payable/receivable, banking, and sophisticated financial reporting. This is the **most complex system** in the restaurant management platform with 157 Python files.
 
 ## Status: 95% Production Ready ✅
 
-**Last Updated:** November 30, 2025
+**Last Updated:** December 8, 2025
 
 ## Recent Updates
 
@@ -242,7 +242,7 @@ The Accounting System is a comprehensive double-entry accounting platform provid
 - `cogs` - Cost of goods sold
 - `gl_learning` - Auto-categorization ML (future)
 
-**Total:** 26+ database tables, 140 Python files
+**Total:** 26+ database tables, 157 Python files
 
 ### Key SQLAlchemy Models
 
@@ -638,7 +638,7 @@ accounting/
 │       │   ├── reconciliation_service.py
 │       │   ├── tax_service.py
 │       │   └── ...
-│       ├── templates/           # 37 HTML templates
+│       ├── templates/           # 38 HTML templates
 │       │   ├── accounts/
 │       │   ├── journal_entries/
 │       │   ├── vendors/
@@ -850,4 +850,4 @@ Proprietary - SW Hospitality Group Internal Use Only
 
 ---
 
-**Note:** This is the most sophisticated system in the platform with 140 Python files and complex financial logic. Proper accounting knowledge is recommended for advanced usage.
+**Note:** This is the most sophisticated system in the platform with 157 Python files and 38 templates and complex financial logic. Proper accounting knowledge is recommended for advanced usage.

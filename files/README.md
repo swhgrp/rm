@@ -8,7 +8,7 @@ The Files system provides centralized file storage, folder organization, documen
 
 ## Status: 100% Production Ready ✅
 
-**LAST UPDATED:** 2025-11-30
+**LAST UPDATED:** 2025-12-08
 
 The Files system is fully implemented, mobile-friendly, and actively used in production with OnlyOffice Document Server integration and WebDAV desktop sync.
 
@@ -509,7 +509,7 @@ docker exec files-app du -sh /app/storage/user_*
 - [ ] Bulk download (zip archives)
 - [ ] File tagging and metadata
 - [ ] Activity logs (who accessed what)
-- [ ] WebDAV support
+- [x] WebDAV support (IMPLEMENTED - Nov 2025)
 - [ ] Mobile app support
 - [ ] Commenting on files
 - [ ] Email notifications for shares
