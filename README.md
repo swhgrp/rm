@@ -866,7 +866,7 @@ Each system has comprehensive README documentation:
 
 - **[Portal README](./portal/README.md)** - Authentication, SSO, user management
 - **[Inventory README](./inventory/README.md)** - Complete guide (426 lines)
-- **[HR README](./hr/README.md)** - Employees, scheduling, time tracking
+- **[HR README](./hr/README.md)** - Employee management, documents, user accounts
 - **[Accounting README](./accounting/README.md)** - Financial management, AP/AR
 - **[Events README](./events/README.md)** - Event planning, public intake (278 lines)
 - **[Integration Hub README](./integration-hub/README.md)** - API integrations, vendor sync
