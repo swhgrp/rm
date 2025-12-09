@@ -62,16 +62,15 @@
                         <tr>
                             <th>Name</th>
                             <th>Email</th>
-                            <th>Department</th>
+                            <th>Venue Access</th>
                             <th>Roles</th>
-                            <th>Source</th>
                             <th>Status</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="usersTableBody">
                         <tr>
-                            <td colspan="7" class="text-center py-4">
+                            <td colspan="6" class="text-center py-4">
                                 <div class="spinner-border spinner-border-sm" role="status">
                                     <span class="visually-hidden">Loading...</span>
                                 </div>
@@ -151,6 +150,42 @@
     </div>
 </div>
 
+<!-- Modal for Venue Location Assignment -->
+<div class="modal fade" id="venueModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-geo-alt"></i> Manage Venue Access</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Admin users</strong> always have access to all venues.
+                    <strong>Other users</strong>: Select specific venues or leave empty for access to all venues.
+                </div>
+                <p class="mb-3">
+                    <strong id="venueModalUserName"></strong>
+                    <span class="text-muted small" id="venueModalUserEmail"></span>
+                </p>
+
+                <div id="venueCheckboxes">
+                    <div class="text-center py-3">
+                        <div class="spinner-border spinner-border-sm" role="status"></div>
+                        Loading venues...
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveUserVenues()">
+                    <i class="bi bi-check-circle"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
 .users-container {
     max-width: 1400px;
@@ -207,15 +242,46 @@
     font-size: 0.75rem;
     padding: 0.25rem 0.5rem;
 }
+
+.venue-badge {
+    font-size: 0.7rem;
+    padding: 0.2em 0.5em;
+    margin-right: 0.2rem;
+    margin-bottom: 0.2rem;
+    display: inline-block;
+    background-color: #0d6efd;
+}
+
+.venue-all-access {
+    background-color: rgba(25, 135, 84, 0.1);
+    color: #198754;
+    font-size: 0.75rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+}
+
+.venue-checkbox-item {
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+    background-color: var(--surface-color, #2d2d2d);
+}
+
+.venue-checkbox-item:hover {
+    background-color: var(--hover-color, #3d3d3d);
+}
 </style>
 
 <script>
 let currentUser = null;
 let allUsers = [];
+let allVenues = [];
+let currentVenueUserId = null;
 
 // Load users on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadUsers();
+    loadVenues();
 
     // Set up filter listeners
     document.getElementById('searchInput').addEventListener('input', filterUsers);
@@ -223,6 +289,19 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('deptFilter').addEventListener('input', filterUsers);
     document.getElementById('includeInactive').addEventListener('change', loadUsers);
 });
+
+async function loadVenues() {
+    try {
+        const response = await fetch('api/events/venues/actual', {
+            credentials: 'same-origin'
+        });
+        if (response.ok) {
+            allVenues = await response.json();
+        }
+    } catch (error) {
+        console.error('Error loading venues:', error);
+    }
+}
 
 async function loadUsers() {
     const includeInactive = document.getElementById('includeInactive').checked;
@@ -286,7 +365,7 @@ function renderUsers(users) {
     if (users.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" class="text-center py-4 text-muted">
+                <td colspan="6" class="text-center py-4 text-muted">
                     <i class="bi bi-inbox"></i> No users found
                 </td>
             </tr>
@@ -294,20 +373,24 @@ function renderUsers(users) {
         return;
     }
 
-    tbody.innerHTML = users.map(user => `
+    tbody.innerHTML = users.map(user => {
+        const isAdmin = user.roles.some(r => r.code === 'admin');
+        return `
         <tr>
             <td>
                 <div class="fw-bold">${escapeHtml(user.full_name)}</div>
             </td>
             <td>${escapeHtml(user.email)}</td>
-            <td>${user.department || '<span class="text-muted">—</span>'}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-info" onclick="showVenueModal('${user.id}')" title="Manage Venue Access">
+                    <i class="bi bi-geo-alt"></i> Manage
+                </button>
+                ${isAdmin ? '<span class="venue-all-access ms-1">All Access</span>' : ''}
+            </td>
             <td>
                 ${user.roles.map(role => `
                     <span class="badge badge-role badge-${role.code}">${role.name}</span>
                 `).join('')}
-            </td>
-            <td>
-                <span class="badge source-badge bg-secondary">${user.source}</span>
             </td>
             <td>
                 <span class="status-badge ${user.is_active ? 'status-active' : 'status-inactive'}">
@@ -329,7 +412,7 @@ function renderUsers(users) {
                 `}
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 }
 
 function showRoleModal(user) {
@@ -463,6 +546,117 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ========== VENUE LOCATION MANAGEMENT ==========
+
+async function showVenueModal(userId) {
+    currentVenueUserId = userId;
+    const user = allUsers.find(u => u.id === userId);
+
+    if (!user) {
+        await showAlert('User not found', 'Error');
+        return;
+    }
+
+    document.getElementById('venueModalUserName').textContent = user.full_name;
+    document.getElementById('venueModalUserEmail').textContent = ` (${user.email})`;
+
+    // Show loading state
+    document.getElementById('venueCheckboxes').innerHTML = `
+        <div class="text-center py-3">
+            <div class="spinner-border spinner-border-sm" role="status"></div>
+            Loading venues...
+        </div>
+    `;
+
+    // Show modal first
+    new bootstrap.Modal(document.getElementById('venueModal')).show();
+
+    try {
+        // Get user's current venue assignments
+        const response = await fetch(`api/users/${userId}/locations`, {
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load user venues');
+        }
+
+        const userData = await response.json();
+        const assignedVenueIds = userData.assigned_venues.map(v => v.id);
+
+        const isAdmin = user.roles.some(r => r.code === 'admin');
+
+        // Render venue checkboxes
+        if (allVenues.length === 0) {
+            document.getElementById('venueCheckboxes').innerHTML = '<p class="text-muted">No venues configured</p>';
+        } else {
+            document.getElementById('venueCheckboxes').innerHTML = allVenues.map(venue => `
+                <div class="venue-checkbox-item">
+                    <div class="form-check">
+                        <input
+                            class="form-check-input"
+                            type="checkbox"
+                            id="venue_${venue.id}"
+                            value="${venue.id}"
+                            ${assignedVenueIds.includes(venue.id) ? 'checked' : ''}
+                            ${isAdmin ? 'disabled' : ''}
+                        >
+                        <label class="form-check-label" for="venue_${venue.id}">
+                            <strong>${venue.name}</strong>
+                            ${venue.address ? `<br><small class="text-muted">${venue.address}</small>` : ''}
+                        </label>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+    } catch (error) {
+        console.error('Error loading user venues:', error);
+        document.getElementById('venueCheckboxes').innerHTML = `
+            <div class="text-danger">
+                <i class="bi bi-exclamation-triangle"></i> Error loading venues: ${error.message}
+            </div>
+        `;
+    }
+}
+
+async function saveUserVenues() {
+    if (!currentVenueUserId) return;
+
+    try {
+        // Get selected venue IDs
+        const checkboxes = document.querySelectorAll('#venueCheckboxes input[type="checkbox"]:not(:disabled)');
+        const selectedVenueIds = Array.from(checkboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+
+        // Save to server
+        const response = await fetch(`api/users/${currentVenueUserId}/locations`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ venue_ids: selectedVenueIds })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save venue assignments');
+        }
+
+        await showAlert('Venue access updated successfully!', 'Success');
+
+        // Close modal
+        const modalElement = document.getElementById('venueModal');
+        const modal = bootstrap.Modal.getInstance(modalElement);
+        modal.hide();
+
+    } catch (error) {
+        console.error('Error saving user venues:', error);
+        await showAlert(`Error: ${error.message}`, 'Error');
+    }
 }
 </script>
 {% endblock %}

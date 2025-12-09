@@ -7,7 +7,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from jose import JWTError, jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel
 import os
 import sys
@@ -57,7 +57,7 @@ async def session_refresh_middleware(request: Request, call_next):
 
         if token_exp and user:
             # Check if token expires in less than 10 minutes
-            time_until_expiry = token_exp - datetime.utcnow().timestamp()
+            time_until_expiry = token_exp - datetime.now(timezone.utc).timestamp()
 
             if 0 < time_until_expiry < 600:  # Less than 10 minutes (600 seconds)
                 # Issue a new token with fresh expiration (include full user data for SSO)
@@ -114,6 +114,7 @@ class User(Base):
     can_access_hr = Column(Boolean, default=True)
     can_access_events = Column(Boolean, default=True)
     can_access_files = Column(Boolean, default=True)
+    can_access_websites = Column(Boolean, default=True)
     accounting_role_id = Column(Integer, nullable=True)
 
 
@@ -136,9 +137,9 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     """Create JWT access token"""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=SESSION_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=SESSION_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -248,6 +249,18 @@ async def home(request: Request, db: Session = Depends(get_db)):
             "icon": "📁",
             "system_key": "files"
         })
+
+    # Websites - always show for admins
+    logger.info(f"User {user.username}: is_admin={user.is_admin}, can_access_websites={getattr(user, 'can_access_websites', 'NOT_FOUND')}")
+    if getattr(user, 'can_access_websites', False) or user.is_admin:
+        systems.append({
+            "name": "Websites",
+            "description": "Manage restaurant websites, menus, and content",
+            "url": "/websites/",
+            "icon": "🌐",
+            "system_key": "websites"
+        })
+        logger.info(f"Added Websites to systems list for user {user.username}")
 
     # Admin-only: Monitoring Dashboard
     if user.is_admin:
@@ -442,6 +455,8 @@ async def update_user_permissions(
         user.can_access_hr = form_data.get("can_access_hr") == "on"
         user.can_access_events = form_data.get("can_access_events") == "on"
         user.can_access_files = form_data.get("can_access_files") == "on"
+        if hasattr(user, 'can_access_websites'):
+            user.can_access_websites = form_data.get("can_access_websites") == "on"
     else:
         # Admins get full access to everything
         user.can_access_portal = True
@@ -451,6 +466,8 @@ async def update_user_permissions(
         user.can_access_hr = True
         user.can_access_events = True
         user.can_access_files = True
+        if hasattr(user, 'can_access_websites'):
+            user.can_access_websites = True
 
     # Update accounting role if provided
     accounting_role = form_data.get("accounting_role_id")
@@ -481,8 +498,10 @@ async def generate_system_token(
         raise HTTPException(status_code=403, detail="No access to Events system")
     elif system == "files" and not user.can_access_files:
         raise HTTPException(status_code=403, detail="No access to Files system")
+    elif system == "websites" and not getattr(user, 'can_access_websites', False) and not user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Websites system")
 
-    # Create a short-lived token (5 minutes) for system authentication
+    # Create SSO token for system authentication (30 minutes to match session timeout)
     token_data = {
         "sub": user.username,
         "email": user.email,
@@ -490,7 +509,7 @@ async def generate_system_token(
         "user_id": user.id,
         "is_admin": user.is_admin,
         "system": system,
-        "exp": datetime.utcnow() + timedelta(minutes=5)
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=30)
     }
 
     # Add accounting role if accessing accounting system

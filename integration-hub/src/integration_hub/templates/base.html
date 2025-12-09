@@ -10,6 +10,11 @@
     <base href="/hub/">
     <title>{% block title %}SW Hospitality Group - Integration Hub{% endblock %}</title>
 
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
+
     <!-- Bootstrap CSS and Icons -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
@@ -355,7 +360,8 @@
             <li><a href="/hub/unmapped-items" class="{% if '/unmapped-items' in request.url.path %}active{% endif %}"><i class="bi bi-question-circle"></i> Unmapped Items</a></li>
             <li><a href="/hub/mapped-items" class="{% if '/mapped-items' in request.url.path %}active{% endif %}"><i class="bi bi-check-circle"></i> Mapped Items</a></li>
             <li><a href="/hub/category-mappings" class="{% if '/category-mappings' in request.url.path %}active{% endif %}"><i class="bi bi-list-ul"></i> Category Mappings</a></li>
-            <li><a href="/hub/item-codes" class="{% if '/item-codes' in request.url.path %}active{% endif %}"><i class="bi bi-upc-scan"></i> Item Codes</a></li>
+            <!-- Item Codes page still accessible at /hub/item-codes but removed from main nav -->
+            <!-- Fix Code functionality now integrated into Unmapped Items page -->
             <li><a href="/hub/vendors" class="{% if '/vendors' in request.url.path %}active{% endif %}"><i class="bi bi-building"></i> Vendors</a></li>
             <li><a href="/hub/settings" class="{% if '/settings' in request.url.path %}active{% endif %}"><i class="bi bi-gear"></i> Settings</a></li>
         </ul>
@@ -574,5 +580,6 @@
     </script>
 
     {% block extra_scripts %}{% endblock %}
+    <script src="/hub/static/js/inactivity-warning.js"></script>
 </body>
 </html>

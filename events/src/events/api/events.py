@@ -107,11 +107,9 @@ async def list_events(
         user_venue_ids = [v[0] for v in user_venues]
 
         if user_venue_ids:
-            # Filter to only events at user's assigned venues
+            # User has specific venue assignments - filter to only those venues
             query = query.filter(Event.venue_id.in_(user_venue_ids))
-        else:
-            # User has no assigned locations - return empty result
-            return []
+        # else: User has no assignments = unrestricted access to all venues
 
     # By default, exclude only CANCELED events unless a specific status is requested
     # CLOSED (Completed) events should be visible in the list
@@ -186,11 +184,9 @@ async def get_calendar_events(
         user_venue_ids = [v[0] for v in user_venues]
 
         if user_venue_ids:
-            # Filter to only events at user's assigned venues
+            # User has specific venue assignments - filter to only those venues
             query = query.filter(Event.venue_id.in_(user_venue_ids))
-        else:
-            # User has no assigned locations - return empty result
-            return []
+        # else: User has no assignments = unrestricted access to all venues
 
     if location:
         query = query.filter(Event.location == location)

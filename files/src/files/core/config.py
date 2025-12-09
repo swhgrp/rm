@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     PORTAL_SECRET_KEY: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    
-    # File Browser
-    FILEBROWSER_URL: str = "http://filebrowser:80"
+
+    # OnlyOffice Integration
+    ONLYOFFICE_JWT_SECRET: str = "your-super-secret-jwt-key-change-in-production"
     
     # CORS
     ALLOWED_ORIGINS: List[str] = ["*"]

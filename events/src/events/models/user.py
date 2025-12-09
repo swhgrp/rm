@@ -3,6 +3,7 @@ from sqlalchemy import Column, String, Boolean, ForeignKey, Table, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from .base import BaseModel
+from events.core.database import Base
 import sqlalchemy as sa
 
 
@@ -48,12 +49,16 @@ class Role(BaseModel):
         return f"<Role(code={self.code}, name={self.name})>"
 
 
-class UserLocation(BaseModel):
-    """User-Location assignment model for location-based permissions"""
+class UserLocation(Base):
+    """User-Location assignment model for location-based permissions.
+    This is a join table with composite primary key (user_id, venue_id).
+    Does not extend BaseModel since it doesn't need an id column.
+    """
     __tablename__ = "user_locations"
 
     user_id = Column(UUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), primary_key=True, nullable=False)
     venue_id = Column(UUID(as_uuid=True), ForeignKey('venues.id', ondelete='CASCADE'), primary_key=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=sa.func.now(), nullable=False)
 
     def __repr__(self):
         return f"<UserLocation(user_id={self.user_id}, venue_id={self.venue_id})>"

@@ -19,8 +19,8 @@ router = APIRouter()
 
 # OnlyOffice configuration
 ONLYOFFICE_URL = "https://rm.swhgrp.com/onlyoffice"
-ONLYOFFICE_JWT_SECRET = "your-super-secret-jwt-key-change-in-production"
 STORAGE_PATH = Path("/app/storage")
+# Use centralized configuration for JWT secret
 
 
 def check_folder_access(db: Session, folder_id: int, user_id: int):
@@ -143,7 +143,7 @@ async def get_editor_config(
         "user_id": current_user.id,
         "exp": datetime.now(timezone.utc).timestamp() + 86400  # 24 hours
     }
-    download_token = jwt.encode(download_token_payload, ONLYOFFICE_JWT_SECRET, algorithm='HS256')
+    download_token = jwt.encode(download_token_payload, settings.ONLYOFFICE_JWT_SECRET, algorithm='HS256')
 
     # Build file URLs
     download_url = f"https://rm.swhgrp.com/files/api/files/files/{file_id}/download?token={download_token}"
@@ -201,7 +201,7 @@ async def get_editor_config(
     }
 
     # Sign the configuration with JWT
-    token = jwt.encode(config, ONLYOFFICE_JWT_SECRET, algorithm='HS256')
+    token = jwt.encode(config, settings.ONLYOFFICE_JWT_SECRET, algorithm='HS256')
     config["token"] = token
 
     return config
@@ -228,7 +228,7 @@ async def onlyoffice_callback(
 
     if token:
         try:
-            jwt.decode(token, ONLYOFFICE_JWT_SECRET, algorithms=['HS256'])
+            jwt.decode(token, settings.ONLYOFFICE_JWT_SECRET, algorithms=['HS256'])
         except JWTError:
             raise HTTPException(status_code=403, detail="Invalid token")
 

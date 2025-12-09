@@ -51,6 +51,7 @@ DATABASES=(
     "hr-db:hr_user:hr_db"
     "events-db:events_user:events_db"
     "hub-db:hub_user:integration_hub_db"
+    "websites-db:websites_user:websites_db"
 )
 
 BACKUP_COUNT=0

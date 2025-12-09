@@ -65,7 +65,7 @@ echo '  },'
 # Services
 echo '  "services": {'
 
-SERVICES=("portal-app" "inventory-app" "hr-app" "accounting-app" "events-app" "integration-hub" "files-app")
+SERVICES=("portal-app" "inventory-app" "hr-app" "accounting-app" "events-app" "integration-hub" "files-app" "websites-app")
 SERVICE_COUNT=0
 TOTAL_SERVICES=${#SERVICES[@]}
 
@@ -107,7 +107,7 @@ echo '  },'
 # Databases with connection counts
 echo '  "databases": {'
 
-DBS=("inventory-db" "accounting-db" "hr-db" "events-db" "hub-db")
+DBS=("inventory-db" "accounting-db" "hr-db" "events-db" "hub-db" "websites-db")
 DB_COUNT=0
 TOTAL_DBS=${#DBS[@]}
 
@@ -138,6 +138,10 @@ for db in "${DBS[@]}"; do
                 SIZE=$(docker exec $db psql -U hub_user -d integration_hub_db -t -c "SELECT pg_size_pretty(pg_database_size('integration_hub_db'));" 2>/dev/null | xargs || echo "unknown")
                 CONNECTIONS=$(docker exec $db psql -U hub_user -d integration_hub_db -t -c "SELECT count(*) FROM pg_stat_activity WHERE datname='integration_hub_db';" 2>/dev/null | xargs || echo 0)
                 ;;
+            "websites-db")
+                SIZE=$(docker exec $db psql -U websites_user -d websites_db -t -c "SELECT pg_size_pretty(pg_database_size('websites_db'));" 2>/dev/null | xargs || echo "unknown")
+                CONNECTIONS=$(docker exec $db psql -U websites_user -d websites_db -t -c "SELECT count(*) FROM pg_stat_activity WHERE datname='websites_db';" 2>/dev/null | xargs || echo 0)
+                ;;
         esac
     else
         STATUS="down"
@@ -163,7 +167,7 @@ echo '  },'
 echo '  "backup_details": {'
 
 BACKUP_DIR="/opt/restaurant-system/backups"
-DB_NAMES=("inventory_db" "accounting_db" "hr_db" "events_db" "integration_hub_db")
+DB_NAMES=("inventory_db" "accounting_db" "hr_db" "events_db" "integration_hub_db" "websites_db")
 DETAIL_COUNT=0
 TOTAL_DETAILS=${#DB_NAMES[@]}
 

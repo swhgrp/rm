@@ -615,8 +615,8 @@ async def download_file(
     if token:
         try:
             from jose import jwt, JWTError
-            ONLYOFFICE_JWT_SECRET = "your-super-secret-jwt-key-change-in-production"
-            payload = jwt.decode(token, ONLYOFFICE_JWT_SECRET, algorithms=['HS256'])
+            from files.core.config import settings
+            payload = jwt.decode(token, settings.ONLYOFFICE_JWT_SECRET, algorithms=['HS256'])
 
             # Verify token is for this file
             if payload.get('file_id') != file_id:
@@ -1225,7 +1225,7 @@ async def search_files(
 
     # Apply date range filter
     if date_range:
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         if date_range == "today":
             start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
         elif date_range == "week":

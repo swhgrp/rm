@@ -256,3 +256,111 @@ async def list_users_by_role(
         )
 
     return role.users
+
+
+# ============= USER LOCATIONS (VENUE ASSIGNMENTS) =============
+
+@router.get("/{user_id}/locations")
+async def get_user_locations(
+    user_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
+):
+    """
+    Get assigned venue locations for a user (admin only)
+
+    Returns the list of venues the user has access to.
+    If empty, user has no location restrictions (can see all events).
+    """
+    from events.models.user import UserLocation
+    from events.models.client import Venue
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    # Get user's assigned venues
+    user_locations = db.query(UserLocation).filter(
+        UserLocation.user_id == user_id
+    ).all()
+
+    venue_ids = [ul.venue_id for ul in user_locations]
+    venues = db.query(Venue).filter(Venue.id.in_(venue_ids)).all() if venue_ids else []
+
+    return {
+        "user_id": str(user.id),
+        "email": user.email,
+        "full_name": user.full_name,
+        "assigned_venues": [
+            {"id": str(v.id), "name": v.name, "address": v.address}
+            for v in venues
+        ]
+    }
+
+
+@router.post("/{user_id}/locations")
+async def assign_user_locations(
+    user_id: UUID,
+    location_data: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
+):
+    """
+    Assign venue locations to a user (admin only)
+
+    Body should be: {"venue_ids": ["uuid1", "uuid2", ...]}
+    Empty array means user has access to all venues (no restrictions).
+    """
+    from events.models.user import UserLocation
+    from events.models.client import Venue
+    import logging
+    logger = logging.getLogger(__name__)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+
+    venue_ids = location_data.get('venue_ids', [])
+
+    # Convert string UUIDs to UUID objects if needed
+    from uuid import UUID as UUIDType
+    venue_uuids = []
+    for vid in venue_ids:
+        if isinstance(vid, str):
+            venue_uuids.append(UUIDType(vid))
+        else:
+            venue_uuids.append(vid)
+
+    # Validate all venue IDs exist
+    if venue_uuids:
+        venues = db.query(Venue).filter(Venue.id.in_(venue_uuids)).all()
+        if len(venues) != len(venue_uuids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="One or more venue IDs are invalid"
+            )
+
+    # Delete existing assignments
+    db.query(UserLocation).filter(UserLocation.user_id == user_id).delete()
+
+    # Create new assignments
+    for venue_id in venue_uuids:
+        user_location = UserLocation(user_id=user_id, venue_id=venue_id)
+        db.add(user_location)
+
+    db.commit()
+
+    logger.info(f"Updated venue assignments for user {user.email}: {len(venue_uuids)} venues")
+
+    return {
+        "message": "User venue assignments updated successfully",
+        "user_id": str(user.id),
+        "assigned_venue_count": len(venue_uuids),
+        "has_restrictions": len(venue_uuids) > 0
+    }

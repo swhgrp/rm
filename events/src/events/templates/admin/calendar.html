@@ -566,7 +566,60 @@
 
                 <div class="form-group-custom">
                     <label for="itemDescription">Description</label>
-                    <textarea id="itemDescription" class="form-control-custom" rows="4" placeholder="Add details..."></textarea>
+                    <textarea id="itemDescription" class="form-control-custom" rows="3" placeholder="Add details..."></textarea>
+                </div>
+
+                <!-- Recurrence Section -->
+                <div class="form-group-custom">
+                    <label for="itemRecurrence">Repeat</label>
+                    <select id="itemRecurrence" class="form-control-custom" onchange="toggleRecurrenceOptions()">
+                        <option value="NONE">Does not repeat</option>
+                        <option value="DAILY">Daily</option>
+                        <option value="WEEKLY">Weekly</option>
+                        <option value="BIWEEKLY">Every 2 weeks</option>
+                        <option value="MONTHLY">Monthly</option>
+                        <option value="YEARLY">Yearly</option>
+                    </select>
+                </div>
+
+                <div id="recurrenceOptions" style="display: none;">
+                    <div class="form-group-custom" id="weeklyDaysGroup" style="display: none;">
+                        <label>Repeat on</label>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                                <input type="checkbox" class="day-checkbox" value="0"> Mon
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                                <input type="checkbox" class="day-checkbox" value="1"> Tue
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                                <input type="checkbox" class="day-checkbox" value="2"> Wed
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                                <input type="checkbox" class="day-checkbox" value="3"> Thu
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                                <input type="checkbox" class="day-checkbox" value="4"> Fri
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                                <input type="checkbox" class="day-checkbox" value="5"> Sat
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                                <input type="checkbox" class="day-checkbox" value="6"> Sun
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="form-group-custom">
+                        <label for="itemRecurrenceEnd">Ends</label>
+                        <div style="display: flex; gap: 10px; align-items: center;">
+                            <select id="recurrenceEndType" class="form-control-custom" style="width: auto;" onchange="toggleRecurrenceEndDate()">
+                                <option value="never">Never</option>
+                                <option value="on">On date</option>
+                            </select>
+                            <input type="date" id="itemRecurrenceEnd" class="form-control-custom" style="flex: 1; display: none;">
+                        </div>
+                    </div>
                 </div>
             </form>
         </div>
@@ -774,19 +827,8 @@
                         info.el.style.borderLeft = `3px solid ${statusColor}`;
                     }
                 } else if (props.type === 'calendar_item') {
-                    // For calendar items, add icon based on item_type
-                    const iconMap = {
-                        'MEETING': '👥',
-                        'REMINDER': '🔔',
-                        'NOTE': '📝',
-                        'BLOCKED_TIME': '🚫'
-                    };
-                    const icon = iconMap[props.item_type] || '📌';
-
-                    const titleEl = info.el.querySelector('.fc-event-title');
-                    if (titleEl) {
-                        titleEl.textContent = `${icon} ${info.event.title}`;
-                    }
+                    // For calendar items, add a dashed left border to distinguish from events
+                    info.el.style.borderLeft = '3px dashed #8b949e';
                 }
             }
         });
@@ -1102,6 +1144,9 @@
         document.getElementById('itemStartTime').value = timeStr;
         document.getElementById('calendarItemModalTitle').textContent = 'New Calendar Item';
 
+        // Reset recurrence form
+        resetRecurrenceForm();
+
         // Reset modal actions
         const modalActions = document.querySelector('#calendarItemModal .modal-actions');
         modalActions.innerHTML = `
@@ -1119,6 +1164,56 @@
         }
     }
 
+    function toggleRecurrenceOptions() {
+        const pattern = document.getElementById('itemRecurrence').value;
+        const optionsDiv = document.getElementById('recurrenceOptions');
+        const weeklyDaysGroup = document.getElementById('weeklyDaysGroup');
+
+        if (pattern === 'NONE') {
+            optionsDiv.style.display = 'none';
+        } else {
+            optionsDiv.style.display = 'block';
+            // Show weekly days selector only for weekly recurrence
+            weeklyDaysGroup.style.display = pattern === 'WEEKLY' ? 'block' : 'none';
+        }
+    }
+
+    function toggleRecurrenceEndDate() {
+        const endType = document.getElementById('recurrenceEndType').value;
+        const endDateInput = document.getElementById('itemRecurrenceEnd');
+        endDateInput.style.display = endType === 'on' ? 'block' : 'none';
+        if (endType === 'never') {
+            endDateInput.value = '';
+        }
+    }
+
+    function getSelectedDaysOfWeek() {
+        const checkboxes = document.querySelectorAll('.day-checkbox:checked');
+        return Array.from(checkboxes).map(cb => parseInt(cb.value));
+    }
+
+    function setSelectedDaysOfWeek(days) {
+        // Clear all checkboxes first
+        document.querySelectorAll('.day-checkbox').forEach(cb => cb.checked = false);
+        // Check the specified days
+        if (days && Array.isArray(days)) {
+            days.forEach(day => {
+                const cb = document.querySelector(`.day-checkbox[value="${day}"]`);
+                if (cb) cb.checked = true;
+            });
+        }
+    }
+
+    function resetRecurrenceForm() {
+        document.getElementById('itemRecurrence').value = 'NONE';
+        document.getElementById('recurrenceEndType').value = 'never';
+        document.getElementById('itemRecurrenceEnd').value = '';
+        document.getElementById('recurrenceOptions').style.display = 'none';
+        document.getElementById('weeklyDaysGroup').style.display = 'none';
+        document.getElementById('itemRecurrenceEnd').style.display = 'none';
+        setSelectedDaysOfWeek([]);
+    }
+
     async function saveCalendarItem() {
         try {
             // Get form values
@@ -1130,6 +1225,12 @@
             const endDate = document.getElementById('itemEndDate').value;
             const endTime = document.getElementById('itemEndTime').value;
             const description = document.getElementById('itemDescription').value.trim() || null;
+
+            // Get recurrence values
+            const recurrencePattern = document.getElementById('itemRecurrence').value;
+            const recurrenceEndType = document.getElementById('recurrenceEndType').value;
+            const recurrenceEndDate = document.getElementById('itemRecurrenceEnd').value || null;
+            const daysOfWeek = recurrencePattern === 'WEEKLY' ? getSelectedDaysOfWeek() : null;
 
             // Validate required fields
             if (!title || !itemType || !startDate || !startTime) {
@@ -1152,7 +1253,10 @@
                 description: description,
                 start_at: startDateTime.toISOString(),
                 end_at: endDateTime ? endDateTime.toISOString() : null,
-                location_id: venueId
+                location_id: venueId,
+                recurrence_pattern: recurrencePattern,
+                recurrence_end_date: recurrenceEndType === 'on' && recurrenceEndDate ? recurrenceEndDate : null,
+                recurrence_days_of_week: daysOfWeek && daysOfWeek.length > 0 ? daysOfWeek : null
             };
 
             const isEditing = editingCalendarItemId !== null;
@@ -1211,6 +1315,27 @@
             const endDate = new Date(item.end_at);
             document.getElementById('itemEndDate').value = endDate.toISOString().split('T')[0];
             document.getElementById('itemEndTime').value = endDate.toTimeString().slice(0, 5);
+        }
+
+        // Populate recurrence fields
+        const recurrencePattern = item.recurrence_pattern || 'NONE';
+        document.getElementById('itemRecurrence').value = recurrencePattern;
+        toggleRecurrenceOptions();
+
+        if (item.recurrence_end_date) {
+            document.getElementById('recurrenceEndType').value = 'on';
+            document.getElementById('itemRecurrenceEnd').value = item.recurrence_end_date;
+            document.getElementById('itemRecurrenceEnd').style.display = 'block';
+        } else {
+            document.getElementById('recurrenceEndType').value = 'never';
+            document.getElementById('itemRecurrenceEnd').value = '';
+            document.getElementById('itemRecurrenceEnd').style.display = 'none';
+        }
+
+        if (item.recurrence_days_of_week) {
+            setSelectedDaysOfWeek(item.recurrence_days_of_week);
+        } else {
+            setSelectedDaysOfWeek([]);
         }
 
         // Update modal title and show delete button

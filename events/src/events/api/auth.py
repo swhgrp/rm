@@ -4,7 +4,7 @@ Authentication API endpoints for Events system
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import secrets
 
@@ -27,7 +27,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optiona
         return None
 
     session = _sessions[session_token]
-    if session['expires_at'] < datetime.utcnow():
+    if session['expires_at'] < datetime.now(timezone.utc):
         del _sessions[session_token]
         return None
 
@@ -94,7 +94,7 @@ async def sso_login(
 
     # Generate session token
     session_token = secrets.token_urlsafe(32)
-    expires_at = datetime.utcnow() + timedelta(minutes=30)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
 
     # Store session
     _sessions[session_token] = {

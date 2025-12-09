@@ -11,6 +11,71 @@
 
 ### Most Recent Work (Current Session - Dec 8, 2025)
 
+**COMPREHENSIVE SYSTEM AUDIT & CLEANUP + EVENTS CALDAV/PERMISSIONS** ✅ **COMPLETE**
+
+1. **Events CalDAV Sync Fix** 🔧 **CRITICAL FIX**
+   - **Problem:** CalDAV sync returning 409 Conflict errors
+   - **Root Cause:** iOS devices connected with username `andy`, but app synced to `/andy@swhgrp.com/`
+   - **Solution:** Added `_get_caldav_username()` helper to extract username from email
+   - **Files Modified:** `events/src/events/services/caldav_sync_service.py`
+
+2. **CalDAV Event Details Enhanced** 📅 **FEATURE**
+   - **Added to calendar events:** Event type, guest count, status, client info (name/phone/email/org), setup/teardown times, venue address
+   - **Files Modified:** `events/src/events/services/caldav_sync_service.py`
+
+3. **Events Venue Permissions System** 🔒 **NEW FEATURE**
+   - **Feature:** Users can be assigned to specific venues and only see those events
+   - **Logic:** Users with no venue assignments have unrestricted access (see all events)
+   - **API Endpoints Added:**
+     - `GET /api/users/{user_id}/locations` - Get user's venue assignments
+     - `POST /api/users/{user_id}/locations` - Set user's venue assignments
+   - **UI:** Added venue management modal in Users admin page
+   - **Files Modified:**
+     - `events/src/events/models/user.py` (added UserLocation model)
+     - `events/src/events/api/users.py` (added location endpoints)
+     - `events/src/events/api/events.py` (added venue filtering to list/calendar)
+     - `events/src/events/templates/admin/users.html` (venue management UI)
+
+4. **Comprehensive System Audit** 🔍 **CODE QUALITY**
+   - Ran detailed audits on all 8 microservices
+   - **Total Issues Found:** 200+ across all systems
+
+5. **Critical Security Fixes** 🔥 **SECURITY**
+   - **Integration Hub:** Moved hardcoded DB credentials to environment variable
+     - `accounting_sender.py` now uses `ACCOUNTING_DATABASE_URL` env var
+   - **Files System:** Centralized OnlyOffice JWT secret to config.py
+     - Removed duplicates from `onlyoffice.py` and `filemanager.py`
+   - **Websites:** Fixed `secure=False` → `secure=True` for session cookies
+
+6. **Documentation Fixes** 📚 **ACCURACY**
+   - **HR README:** Fixed - was claiming Django 4.2, actually uses FastAPI
+     - Updated technology stack, file structure, commands, dependencies
+   - **Websites README:** Created - system had no README.md at all
+
+7. **Code Cleanup** 🧹 **MAINTENANCE**
+   - Removed orphaned files: `apply_location_filtering.py`, `docker-compose.yml.backup`
+   - Removed all `__pycache__` directories across all services
+   - Fixed deprecated `datetime.utcnow()` → `datetime.now(timezone.utc)` in Files system
+
+**Files Modified This Session:**
+- `events/src/events/services/caldav_sync_service.py` (CalDAV fix + enhanced details)
+- `events/src/events/models/user.py` (UserLocation model)
+- `events/src/events/api/users.py` (location endpoints)
+- `events/src/events/api/events.py` (venue filtering)
+- `events/src/events/templates/admin/users.html` (venue UI)
+- `integration-hub/src/integration_hub/services/accounting_sender.py` (env var)
+- `files/src/files/core/config.py` (OnlyOffice JWT setting)
+- `files/src/files/api/onlyoffice.py` (use settings)
+- `files/src/files/api/filemanager.py` (use settings)
+- `files/src/files/core/security.py` (datetime fix)
+- `websites/src/websites/main.py` (secure cookie)
+- `websites/README.md` (NEW - created)
+- `hr/README.md` (Django → FastAPI corrections)
+
+---
+
+### Previous Session Work (Dec 8, 2025 - Earlier)
+
 **WEBSITES SYSTEM: ACTIVITY LOGGING ENHANCEMENTS + MOBILE RESPONSIVE ADMIN** ✅ **COMPLETE**
 
 1. **Dashboard Activity Pagination** 📄 **UX IMPROVEMENT**
@@ -29,41 +94,14 @@
      - Site updates: Shows which fields changed (e.g., "Changed: Name, Domain, Phone")
      - Block operations: Shows block type (e.g., "Block: hero", "Block: two_column")
      - Custom descriptions for important actions
-   - **Files Modified:**
-     - `websites/src/websites/main.py` (added details tracking to site update & block operations)
-     - Dashboard and activity templates (display `log.details` fields)
 
 3. **Social Media & Action Links on Website Preview** 🔗 **FEATURE**
    - **Problem:** Settings page had social/ordering/reservation URLs but they weren't displayed
    - **Solution:** Added social links and action buttons to header navbar AND footer
-   - **Header:** Social icons (Instagram/Facebook) + Reservations/Order Online buttons
-   - **Footer:** Order Online + Reservations buttons + Social icons
-   - **Added Font Awesome CDN** for proper social media icons (fa-instagram, fa-facebook)
-   - **File Modified:** `websites/templates/preview/page.html`
 
 4. **Website Manager Mobile Responsive Design** 📱 **MAJOR UX IMPROVEMENT**
    - **Problem:** Admin interface (Website Manager) not usable on mobile devices
    - **Solution:** Complete mobile-responsive overhaul of admin base template
-   - **Features Added:**
-     - **Hamburger Menu:** Fixed header with hamburger button on screens < 992px
-     - **Slide-out Sidebar:** Sidebar slides in from left with dark overlay
-     - **Close Options:** X button, overlay click, or Escape key to close
-     - **Touch-friendly:** All nav links close sidebar after click
-     - **Responsive Stats Cards:** 2-column grid on mobile (col-6)
-     - **Responsive Quick Actions:** Buttons stack 2 per row on mobile
-     - **Responsive Typography:** Smaller headings, condensed button text on mobile
-   - **Files Modified:**
-     - `websites/templates/admin/base.html` (major mobile overhaul)
-     - `websites/templates/admin/sites/dashboard.html` (responsive grid)
-     - `websites/templates/admin/submissions/list.html` (responsive header)
-
-**Files Modified This Session:**
-- `websites/src/websites/main.py` (activity pagination, detail tracking)
-- `websites/templates/admin/base.html` (mobile responsive)
-- `websites/templates/admin/sites/dashboard.html` (responsive cards, View All button)
-- `websites/templates/admin/sites/activity.html` (NEW - pagination)
-- `websites/templates/admin/submissions/list.html` (responsive header)
-- `websites/templates/preview/page.html` (social links, action buttons)
 
 ---
 

@@ -653,13 +653,14 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
     logger = logging.getLogger(__name__)
 
     # Get unique item descriptions with aggregated data
-    # Query returns: (item_description, item_code, count, list of invoice numbers, list of vendors)
+    # Query returns: (item_description, item_code, count, list of invoice numbers, list of vendors, list of invoice ids)
     unique_items_query = db.query(
         HubInvoiceItem.item_description,
         HubInvoiceItem.item_code,
         func.count(HubInvoiceItem.id).label('occurrence_count'),
         func.array_agg(distinct(HubInvoice.invoice_number)).label('invoice_numbers'),
-        func.array_agg(distinct(HubInvoice.vendor_name)).label('vendor_names')
+        func.array_agg(distinct(HubInvoice.vendor_name)).label('vendor_names'),
+        func.array_agg(distinct(HubInvoice.id)).label('invoice_ids')
     ).join(HubInvoice).filter(
         HubInvoiceItem.is_mapped == False
     ).group_by(
@@ -669,15 +670,84 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
         func.count(HubInvoiceItem.id).desc()  # Show most frequent items first
     ).all()
 
-    # Format results for template
+    # Get item code info from item_code_mapping for suspicious code detection
+    from sqlalchemy import text as sql_text
+    item_code_info = {}
+    try:
+        code_info_results = db.execute(sql_text("""
+            SELECT item_code, canonical_description, occurrence_count, is_verified
+            FROM item_code_mapping
+            WHERE item_code IS NOT NULL
+        """)).fetchall()
+        for code, canonical_desc, occ_count, is_verified in code_info_results:
+            item_code_info[code] = {
+                'canonical_description': canonical_desc,
+                'total_occurrences': occ_count or 0,
+                'is_verified': is_verified or False
+            }
+    except Exception as e:
+        logger.warning(f"Failed to fetch item code info: {str(e)}")
+
+    # Get list of vendor SKUs from inventory for checking if code exists there
+    inventory_skus = set()
+    try:
+        sku_results = db.execute(sql_text("""
+            SELECT vendor_sku FROM dblink(
+                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                'SELECT vendor_sku FROM vendor_items WHERE vendor_sku IS NOT NULL'
+            ) AS t(vendor_sku VARCHAR)
+        """)).fetchall()
+        inventory_skus = {row[0] for row in sku_results}
+    except Exception as e:
+        logger.warning(f"Failed to fetch inventory SKUs: {str(e)}")
+
+    # Format results for template with suspicious code detection
     unique_items = []
-    for desc, item_code, count, invoice_nums, vendors in unique_items_query:
+    for desc, item_code, count, invoice_nums, vendors, invoice_ids in unique_items_query:
+        # Determine if code is suspicious
+        code_status = 'none'  # no code
+        is_suspicious = False
+        suspicious_reasons = []
+
+        if item_code:
+            code_info = item_code_info.get(item_code, {})
+            is_verified = code_info.get('is_verified', False)
+            total_occurrences = code_info.get('total_occurrences', count)
+            in_inventory = item_code in inventory_skus
+
+            if is_verified and in_inventory:
+                code_status = 'verified'
+            elif is_verified:
+                code_status = 'verified_no_inventory'
+            elif in_inventory:
+                code_status = 'in_inventory'
+            else:
+                code_status = 'unknown'
+
+            # Check if suspicious
+            if not is_verified and not in_inventory:
+                is_suspicious = True
+                if total_occurrences == 1:
+                    suspicious_reasons.append('Single occurrence (possible OCR error)')
+                else:
+                    suspicious_reasons.append('Not verified, not in inventory')
+
+        # Pair invoice numbers with IDs for linking to PDFs
+        invoice_list = []
+        if invoice_nums and invoice_ids:
+            for inv_num, inv_id in zip(invoice_nums, invoice_ids):
+                invoice_list.append({'number': inv_num, 'id': inv_id})
+
         unique_items.append({
             'item_description': desc,
             'item_code': item_code,
             'occurrence_count': count,
             'invoice_numbers': invoice_nums if invoice_nums else [],
-            'vendor_names': vendors if vendors else []
+            'invoice_list': invoice_list,
+            'vendor_names': vendors if vendors else [],
+            'code_status': code_status,
+            'is_suspicious': is_suspicious,
+            'suspicious_reasons': suspicious_reasons
         })
 
     # Fetch GL accounts from Accounting API
@@ -705,6 +775,43 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
                 logger.warning(f"Failed to fetch vendor items: status {response.status_code}")
     except Exception as e:
         logger.error(f"Failed to fetch vendor items from Inventory API: {str(e)}")
+
+    # Also fetch verified item codes from item_code_mapping that don't have vendor items yet
+    # This allows mapping by item code even when vendor item isn't in inventory system
+    from sqlalchemy import text as sql_text
+    try:
+        verified_codes = db.execute(sql_text("""
+            SELECT icm.item_code, icm.canonical_description
+            FROM item_code_mapping icm
+            WHERE icm.is_verified = true
+            AND icm.item_code NOT IN (
+                SELECT vendor_sku FROM dblink(
+                    'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                    'SELECT vendor_sku FROM vendor_items WHERE vendor_sku IS NOT NULL'
+                ) AS t(vendor_sku VARCHAR)
+            )
+            ORDER BY icm.canonical_description
+        """)).fetchall()
+
+        # Add verified item codes as special entries that can be mapped
+        for code, description in verified_codes:
+            inventory_items.append({
+                "id": None,  # No inventory ID yet
+                "vendor_id": None,
+                "vendor_name": "[Item Code]",
+                "vendor_sku": code,
+                "vendor_product_name": description,
+                "vendor_description": f"Item Code: {code}",
+                "master_item_id": None,
+                "master_item_name": None,
+                "pack_size": None,
+                "unit_price": None,
+                "is_active": True,
+                "is_preferred": False,
+                "is_item_code": True  # Flag to identify these
+            })
+    except Exception as e:
+        logger.warning(f"Failed to fetch verified item codes: {str(e)}")
 
     # Get active category mappings for the dropdown
     category_mappings = db.query(CategoryGLMapping).filter(
@@ -1050,6 +1157,43 @@ async def map_items_by_description(
                     "notes": f"Auto-created from bulk mapping"
                 }
             )
+
+    # Auto-verify item codes when user maps items
+    # This confirms the item code is correct since user is mapping it
+    item_codes_to_verify = set()
+    for item in items:
+        if item.item_code:
+            item_codes_to_verify.add(item.item_code)
+
+    if item_codes_to_verify:
+        for code in item_codes_to_verify:
+            # Check if item code already exists in mapping
+            existing_code = db.execute(
+                sql_text("SELECT id, is_verified FROM item_code_mapping WHERE item_code = :code"),
+                {"code": code}
+            ).fetchone()
+
+            if existing_code:
+                # Mark as verified if not already
+                if not existing_code[1]:  # is_verified
+                    db.execute(
+                        sql_text("""
+                            UPDATE item_code_mapping
+                            SET is_verified = true, updated_at = NOW()
+                            WHERE item_code = :code
+                        """),
+                        {"code": code}
+                    )
+            else:
+                # Create new verified item code mapping
+                db.execute(
+                    sql_text("""
+                        INSERT INTO item_code_mapping
+                        (item_code, canonical_description, occurrence_count, is_verified, created_at)
+                        VALUES (:code, :desc, :count, true, NOW())
+                    """),
+                    {"code": code, "desc": item_description, "count": len(items)}
+                )
 
     db.commit()
 
@@ -1842,6 +1986,93 @@ async def fix_item_code(
         "items_updated": items_updated,
         "wrong_code": wrong_code,
         "correct_code": correct_code
+    }
+
+
+@app.post("/api/item-codes/add")
+async def add_item_code(
+    item_description: str = Form(...),
+    item_code: str = Form(...),
+    new_description: Optional[str] = Form(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Add an item code to invoice items that currently have no code.
+    This is used when OCR failed to capture the item code from the invoice.
+    """
+    from sqlalchemy import text as sql_text
+
+    if not item_code.strip():
+        raise HTTPException(status_code=400, detail="Item code cannot be empty")
+
+    item_code = item_code.strip()
+
+    # Update all invoice items with this description that have no code
+    if new_description and new_description.strip():
+        # Also update the description if provided
+        result = db.execute(
+            sql_text("""
+                UPDATE hub_invoice_items
+                SET item_code = :item_code,
+                    item_description = :new_description
+                WHERE item_description = :description
+                  AND (item_code IS NULL OR item_code = '')
+            """),
+            {
+                "item_code": item_code,
+                "new_description": new_description.strip(),
+                "description": item_description
+            }
+        )
+    else:
+        result = db.execute(
+            sql_text("""
+                UPDATE hub_invoice_items
+                SET item_code = :item_code
+                WHERE item_description = :description
+                  AND (item_code IS NULL OR item_code = '')
+            """),
+            {"item_code": item_code, "description": item_description}
+        )
+
+    items_updated = result.rowcount
+
+    # Check if this code already exists in item_code_mapping
+    existing = db.execute(
+        sql_text("SELECT id FROM item_code_mapping WHERE item_code = :code"),
+        {"code": item_code}
+    ).fetchone()
+
+    final_description = new_description.strip() if new_description and new_description.strip() else item_description
+
+    if existing:
+        # Update existing entry
+        db.execute(
+            sql_text("""
+                UPDATE item_code_mapping
+                SET occurrence_count = occurrence_count + :added,
+                    updated_at = NOW()
+                WHERE item_code = :code
+            """),
+            {"added": items_updated, "code": item_code}
+        )
+    else:
+        # Create new entry in item_code_mapping
+        db.execute(
+            sql_text("""
+                INSERT INTO item_code_mapping (item_code, canonical_description, occurrence_count, is_verified, created_at, updated_at)
+                VALUES (:code, :desc, :count, false, NOW(), NOW())
+            """),
+            {"code": item_code, "desc": final_description, "count": items_updated}
+        )
+
+    db.commit()
+
+    return {
+        "success": True,
+        "items_updated": items_updated,
+        "item_code": item_code,
+        "description": final_description
     }
 
 

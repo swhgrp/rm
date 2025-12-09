@@ -3,7 +3,7 @@ Authentication API endpoints
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from accounting.db.database import get_db
@@ -26,7 +26,7 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optiona
     session = db.query(UserSession).filter(
         UserSession.session_id == session_token,
         UserSession.is_active == True,
-        UserSession.expires_at > datetime.utcnow()
+        UserSession.expires_at > datetime.now(timezone.utc)
     ).first()
 
     if not session:
@@ -85,7 +85,7 @@ async def login(
 
     # Generate session token
     session_token = generate_session_token()
-    expires_at = datetime.utcnow() + timedelta(minutes=30)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
 
     # Create session
     session = UserSession(
@@ -96,7 +96,7 @@ async def login(
     db.add(session)
 
     # Update last login
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc)
     db.commit()
 
     # Set session cookie
@@ -155,7 +155,7 @@ async def sso_login(
 
     # Generate session token
     session_token = generate_session_token()
-    expires_at = datetime.utcnow() + timedelta(minutes=30)
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
 
     # Create session
     session = UserSession(
@@ -166,7 +166,7 @@ async def sso_login(
     db.add(session)
 
     # Update last login
-    user.last_login = datetime.utcnow()
+    user.last_login = datetime.now(timezone.utc)
     db.commit()
 
     # Set session cookie

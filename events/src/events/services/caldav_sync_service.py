@@ -19,6 +19,18 @@ class CalDAVSyncService:
         self.caldav_url = settings.CALDAV_URL or "http://caldav:5232"
         self.use_internal_api = True  # Internal service bypasses nginx auth
 
+    def _get_caldav_username(self, user_email: str) -> str:
+        """
+        Extract username from email for CalDAV path.
+        CalDAV calendars are organized by username (before @), not full email.
+        This ensures consistency between iOS/Android clients and server-side sync.
+
+        Example: andy@swhgrp.com -> andy
+        """
+        if '@' in user_email:
+            return user_email.split('@')[0]
+        return user_email
+
     def sync_event_to_caldav(self, event: Event, user_email: str):
         """
         Sync a single event to CalDAV calendar
@@ -45,14 +57,46 @@ class CalDAVSyncService:
 
             # Build comprehensive description with all event details
             description_parts = []
+
+            # Event description/notes first (main content)
             if event.description:
                 description_parts.append(event.description)
+
+            # Separator if we have description and more details
+            if event.description and (event.guest_count or event.client or event.event_type):
+                description_parts.append("\n---")
+
+            # Event details section
+            if event.event_type:
+                description_parts.append(f"Type: {event.event_type}")
             if event.guest_count:
-                description_parts.append(f"\nGuests: {event.guest_count}")
+                description_parts.append(f"Guests: {event.guest_count}")
+            if event.status:
+                status_display = str(event.status.value) if hasattr(event.status, 'value') else str(event.status)
+                description_parts.append(f"Status: {status_display}")
+
+            # Client information
             if event.client:
+                description_parts.append("")  # Blank line before client section
                 description_parts.append(f"Client: {event.client.name}")
+                if event.client.phone:
+                    description_parts.append(f"Phone: {event.client.phone}")
                 if event.client.email:
                     description_parts.append(f"Email: {event.client.email}")
+                if event.client.org:
+                    description_parts.append(f"Organization: {event.client.org}")
+
+            # Setup/teardown times if different from event times
+            if event.setup_start_at and event.setup_start_at != event.start_at:
+                setup_time = event.setup_start_at.strftime("%I:%M %p")
+                description_parts.append(f"\nSetup: {setup_time}")
+            if event.teardown_end_at and event.teardown_end_at != event.end_at:
+                teardown_time = event.teardown_end_at.strftime("%I:%M %p")
+                description_parts.append(f"Teardown: {teardown_time}")
+
+            # Venue address if available
+            if event.venue and event.venue.address:
+                description_parts.append(f"\nAddress: {event.venue.address}")
 
             if description_parts:
                 ical_event.add('description', '\n'.join(description_parts))
@@ -75,20 +119,22 @@ class CalDAVSyncService:
 
             # Connect to CalDAV server
             # Set X-Remote-User header for http_x_remote_user auth
+            # Use username only (not full email) for consistent CalDAV paths
+            caldav_username = self._get_caldav_username(user_email)
             client = caldav.DAVClient(
                 url=self.caldav_url,
-                headers={'X-Remote-User': user_email}
+                headers={'X-Remote-User': caldav_username}
             )
 
             # Use venue-specific calendar
-            calendar_url = f"{self.caldav_url}/{user_email}/{calendar_name}/"
+            calendar_url = f"{self.caldav_url}/{caldav_username}/{calendar_name}/"
             from caldav import Calendar as CalDAVCalendar
             venue_cal = CalDAVCalendar(client=client, url=calendar_url, name=calendar_display_name)
 
             # Add or update event in calendar
             venue_cal.save_event(cal.to_ical())
 
-            logger.info(f"Synced event {event.id} to CalDAV calendar '{calendar_display_name}' for {user_email}")
+            logger.info(f"Synced event {event.id} to CalDAV calendar '{calendar_display_name}' for {caldav_username}")
 
         except Exception as e:
             logger.error(f"Failed to sync event {event.id} to CalDAV: {e}")
@@ -154,15 +200,17 @@ class CalDAVSyncService:
                 else:
                     venue_calendars = ['unassigned']
 
+            # Use username only for consistent CalDAV paths
+            caldav_username = self._get_caldav_username(user_email)
             client = caldav.DAVClient(
                 url=self.caldav_url,
-                headers={'X-Remote-User': user_email}
+                headers={'X-Remote-User': caldav_username}
             )
 
             # Try to delete from relevant venue calendar(s)
             for calendar_name in venue_calendars:
                 try:
-                    calendar_url = f"{self.caldav_url}/{user_email}/{calendar_name}/"
+                    calendar_url = f"{self.caldav_url}/{caldav_username}/{calendar_name}/"
                     from caldav import Calendar as CalDAVCalendar
                     venue_cal = CalDAVCalendar(client=client, url=calendar_url)
 
@@ -173,12 +221,12 @@ class CalDAVSyncService:
 
                     # Use requests to delete with proper auth header
                     response = requests.delete(
-                        delete_url.replace('http://caldav:5232', 'http://caldav:5232'),
-                        headers={'X-Remote-User': user_email}
+                        delete_url,
+                        headers={'X-Remote-User': caldav_username}
                     )
 
                     if response.status_code in [200, 204, 404]:
-                        logger.info(f"Deleted event {event_id} from CalDAV calendar '{calendar_name}' for {user_email}")
+                        logger.info(f"Deleted event {event_id} from CalDAV calendar '{calendar_name}' for {caldav_username}")
                         return
                 except Exception as e:
                     logger.debug(f"Event {event_id} not in calendar {calendar_name}: {e}")

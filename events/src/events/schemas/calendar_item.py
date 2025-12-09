@@ -1,9 +1,9 @@
 """Calendar item schemas"""
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional
-from datetime import datetime
+from typing import Optional, List
+from datetime import datetime, date
 from uuid import UUID
-from events.models.calendar_item import CalendarItemType
+from events.models.calendar_item import CalendarItemType, RecurrencePattern
 
 
 class CalendarItemBase(BaseModel):
@@ -14,6 +14,10 @@ class CalendarItemBase(BaseModel):
     start_at: datetime
     end_at: Optional[datetime] = None
     location_id: Optional[UUID] = None
+    # Recurrence fields
+    recurrence_pattern: RecurrencePattern = RecurrencePattern.NONE
+    recurrence_end_date: Optional[date] = None
+    recurrence_days_of_week: Optional[List[int]] = None  # 0=Mon, 1=Tue, etc.
 
 
 class CalendarItemCreate(CalendarItemBase):
@@ -29,6 +33,10 @@ class CalendarItemUpdate(BaseModel):
     start_at: Optional[datetime] = None
     end_at: Optional[datetime] = None
     location_id: Optional[UUID] = None
+    # Recurrence fields
+    recurrence_pattern: Optional[RecurrencePattern] = None
+    recurrence_end_date: Optional[date] = None
+    recurrence_days_of_week: Optional[List[int]] = None
 
 
 class LocationInfo(BaseModel):
@@ -59,3 +67,5 @@ class CalendarItemResponse(CalendarItemBase):
     updated_at: datetime
     location: Optional[LocationInfo] = None
     creator: Optional[UserInfo] = None
+    parent_item_id: Optional[UUID] = None
+    is_occurrence: bool = False  # Computed field for virtual occurrences

@@ -5,10 +5,13 @@ and pushes new vendors to both systems
 
 import asyncio
 import httpx
+import logging
 import os
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
 from integration_hub.models.vendor import Vendor
+
+logger = logging.getLogger(__name__)
 
 
 class VendorSyncService:
@@ -26,7 +29,7 @@ class VendorSyncService:
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            print(f"Error fetching inventory vendors: {e}")
+            logger.error(f"Error fetching inventory vendors: {e}")
             return []
 
     async def fetch_accounting_vendors(self) -> List[Dict]:
@@ -36,7 +39,7 @@ class VendorSyncService:
             response.raise_for_status()
             return response.json()
         except Exception as e:
-            print(f"Error fetching accounting vendors: {e}")
+            logger.error(f"Error fetching accounting vendors: {e}")
             return []
 
     async def sync_vendors_to_hub(self, db: Session) -> Dict:

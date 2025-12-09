@@ -73,7 +73,7 @@ async def sso_login(token: str):
             max_age=1800,  # 30 minutes - matches session timeout
             path="/",
             samesite="lax",
-            secure=False  # nginx handles HTTPS
+            secure=True  # Always use secure cookies in production
         )
 
         return response
@@ -1252,7 +1252,6 @@ async def htmx_reorder_pages(
 
 # ============ Image htmx Routes ============
 
-import os
 import uuid
 from PIL import Image as PILImage
 
