@@ -10,6 +10,7 @@ from .transfer import Transfer
 from .waste import WasteRecord
 from .audit_log import AuditLog
 from .vendor import Vendor
+from .vendor_alias import VendorAlias
 from .invoice import Invoice, InvoiceItem, InvoiceStatus
 from .recipe import Recipe, RecipeIngredient, RecipeCategory
 from .category import Category
@@ -22,7 +23,7 @@ from .item_unit_conversion import ItemUnitConversion
 __all__ = [
     "Location", "StorageArea", "User", "MasterItem", "VendorItem", "Inventory", "POSSale", "POSSaleItem",
     "InventoryTransaction", "TransactionType", "Transfer",
-    "WasteRecord", "AuditLog", "Vendor", "Invoice", "InvoiceItem", "InvoiceStatus",
+    "WasteRecord", "AuditLog", "Vendor", "VendorAlias", "Invoice", "InvoiceItem", "InvoiceStatus",
     "Recipe", "RecipeIngredient", "RecipeCategory", "Category", "CountTemplate", "CountSession",
     "UnitCategory", "UnitOfMeasure", "Role", "ItemUnitConversion"
 ]

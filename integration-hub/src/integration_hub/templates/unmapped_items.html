@@ -511,7 +511,7 @@ async function saveFixCode() {
                 formData.append('new_description', newDescription);
             }
 
-            const response = await fetch('/api/item-codes/add', {
+            const response = await fetch('/hub/api/item-codes/add', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData
@@ -535,7 +535,7 @@ async function saveFixCode() {
             const formData = new URLSearchParams();
             formData.append('item_code', wrongCode);
 
-            const response = await fetch('/api/item-codes/verify', {
+            const response = await fetch('/hub/api/item-codes/verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData
@@ -566,7 +566,7 @@ async function saveFixCode() {
                 formData.append('correct_description', correctDescription);
             }
 
-            const response = await fetch('/api/item-codes/merge', {
+            const response = await fetch('/hub/api/item-codes/merge', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData
@@ -749,7 +749,7 @@ async function fetchCategoryGLAccounts(category) {
     if (!category) return null;
 
     try {
-        const response = await fetch(`/hub/api/category-mappings/${category}`);
+        const response = await fetch(`/hub/api/category-mappings/${encodeURIComponent(category)}`);
         if (!response.ok) return null;
 
         const data = await response.json();

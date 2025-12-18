@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** December 8, 2025
+**Last Updated:** December 18, 2025
 **System Status:** Production (90% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -9,7 +9,61 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Dec 8, 2025)
+### Most Recent Work (Current Session - Dec 18, 2025)
+
+**INVENTORY VENDOR ALIASES + INTEGRATION HUB FIXES** ✅ **COMPLETE**
+
+1. **Vendor Aliases System** 🔗 **NEW FEATURE**
+   - **Problem:** Duplicate vendors with slight name variations (e.g., "Gordon Food Service" vs "Gordon Food Service Inc.")
+   - **Solution:** Implemented vendor alias system mirroring the Accounting system's approach
+   - **Database:** Created `vendor_aliases` table with case-insensitive matching option
+   - **API Endpoints:**
+     - `GET /api/vendors/aliases/all` - Get all aliases system-wide
+     - `GET /api/vendors/{vendor_id}/aliases` - Get aliases for specific vendor
+     - `POST /api/vendors/{vendor_id}/aliases` - Add alias
+     - `DELETE /api/vendors/{vendor_id}/aliases/{alias_id}` - Delete alias
+     - `POST /api/vendors/resolve-name` - Resolve vendor name (for Integration Hub)
+   - **UI:** Added "Manage Aliases" button and per-vendor alias management in vendors.html
+   - **Files Created/Modified:**
+     - `inventory/alembic/versions/20251218_add_vendor_aliases.py` (NEW - migration)
+     - `inventory/src/restaurant_inventory/models/vendor_alias.py` (NEW - model)
+     - `inventory/src/restaurant_inventory/models/__init__.py` (added VendorAlias)
+     - `inventory/src/restaurant_inventory/api/api_v1/endpoints/vendors.py` (alias endpoints)
+     - `inventory/src/restaurant_inventory/templates/vendors.html` (alias UI)
+
+2. **Duplicate Vendor Merge** 🧹 **DATA CLEANUP**
+   - Merged duplicate vendors and created aliases:
+     - "Gordon Food Service Inc." → alias of "Gordon Food Service"
+     - "Gordon Food Service Store" → alias of "Gordon Food Service"
+     - "GOLD COAST BEVERAGE LLC" → alias of "Gold Coast Beverage"
+     - "Amerigas" → alias of "AmeriGas"
+   - Reassigned all invoices from duplicates to canonical vendors
+   - Deleted inactive duplicate vendors
+
+3. **Vendor Delete Protection** 🛡️ **SAFETY FIX**
+   - **Problem:** Deleting vendors with invoices caused foreign key errors
+   - **Solution:** Added check for related invoices before deletion
+   - **Behavior:** Shows user-friendly error with invoice count if vendor has invoices
+
+4. **Category GL Mapping Fix** 🔧 **BUG FIX**
+   - **Problem:** Categories with "/" in name (e.g., "Liquor - Bourbon/Whiskey/Scotch") failed lookup
+   - **Solution:** Added `encodeURIComponent()` for category parameter and `{category:path}` route pattern
+   - **Files Modified:**
+     - `integration-hub/src/integration_hub/templates/unmapped_items.html`
+     - `integration-hub/src/integration_hub/main.py`
+
+5. **Expense Categories Cleanup** 🗑️ **DATA CLEANUP**
+   - **Problem:** Expense categories appearing in Category Mappings page
+   - **Explanation:** Category Mappings is for inventory→GL mapping only, not expenses
+   - **Action:** Removed 8 expense categories (Expense - Cleaning, Equipment, etc.) from `category_gl_mapping` table
+
+6. **Invoice Detail GL Names** 📝 **UX IMPROVEMENT**
+   - Added GL account names display on invoice detail page
+   - Shows abbreviated name with full name on hover tooltip
+
+---
+
+### Previous Session Work (Dec 8, 2025)
 
 **COMPREHENSIVE SYSTEM AUDIT & CLEANUP + EVENTS CALDAV/PERMISSIONS** ✅ **COMPLETE**
 
@@ -2062,15 +2116,67 @@ All services use identical pattern:
 
 Documented in: `docs/reference/DESIGN_STANDARD.md`
 
+**Current Theme: Warm Neutral + Copper (December 2024)**
+
+Applied to: Portal, Inventory System
+
+CSS Variables (defined in each template's `<style>` block):
+```css
+:root {
+    /* Background colors - warm neutrals */
+    --bg-primary: #1c1917;      /* Warm stone black */
+    --bg-secondary: #292524;    /* Warm stone dark */
+    --bg-tertiary: #352f2c;     /* Elevated warm */
+    --bg-elevated: #44403c;     /* Hover state */
+
+    /* Border colors - warm stone tones */
+    --border-primary: #57534e;
+    --border-secondary: #78716c;
+
+    /* Text colors - warm off-whites */
+    --text-primary: #fafaf9;    /* Warm white */
+    --text-secondary: #a8a29e;  /* Stone gray */
+    --text-muted: #78716c;      /* Muted stone */
+
+    /* Accent colors - copper/amber */
+    --accent-primary: #d97706;  /* Copper/amber - primary actions */
+    --accent-secondary: #b45309; /* Deep copper */
+    --accent-hover: #f59e0b;    /* Bright amber - hover states */
+    --accent-muted: #92400e;    /* Dark copper */
+
+    /* Semantic colors */
+    --success: #4ade80;         /* Green */
+    --error: #f87171;           /* Red */
+    --warning: #fbbf24;         /* Yellow */
+    --info: #d97706;            /* Copper (matches theme) */
+}
+```
+
+**Key Design Decisions:**
+- All "info" elements (alerts, badges, buttons) use copper (#d97706) instead of blue
+- Bootstrap overrides for `.btn-info`, `.alert-info`, `.badge.bg-info`, `.bg-info`, `.text-info`
+- Nav tabs use copper accent for active state
+- Form focus states use copper glow: `box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15)`
+
+**Files Updated (Theme):**
+- Portal: `portal/css/style.css`, `portal/templates/*.html`
+- Inventory: `inventory/src/restaurant_inventory/templates/base.html`
+- Individual templates with inline styles: `setup_password.html`, `pos_item_mapping.html`, `waste.html`, `storage_areas.html`
+
+**Previous Theme (if reverting):**
+- Blue accent: `#58a6ff` or `#60a5fa`
+- Info color: `#60a5fa`
+- Alternative CSS file exists: `portal/css/style-slate-blue.css`
+
 **Sidebar:**
 - SW Hospitality Group logo only (no system name)
 - Navigation links: font-size 14px
-- Dark theme (#161b22 background)
+- Background: var(--bg-secondary)
 
 **Top Navbar:**
 - System name with Bootstrap icon
 - User name on right
-- Dark theme (#0d1117 background)
+- Background: var(--bg-secondary)
 
 **Dashboard Titles:**
 - `<h2 class="mb-0">` with icon

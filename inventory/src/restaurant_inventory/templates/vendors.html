@@ -15,6 +15,9 @@
             <button class="btn btn-outline-secondary" onclick="clearVendorSearch()">Clear</button>
         </div>
         <div>
+            <button class="btn btn-outline-info me-2" onclick="showAllAliases()">
+                <i class="bi bi-link-45deg"></i> Manage Aliases
+            </button>
             <button class="btn btn-outline-primary me-2" onclick="showVendorItemUploadModal()">
                 <i class="bi bi-upload"></i> Import Vendor Items
             </button>
@@ -221,6 +224,113 @@
     </div>
 </div>
 
+<!-- Vendor Aliases Modal (single vendor) -->
+<div class="modal fade" id="vendorAliasesModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-link-45deg"></i> Vendor Aliases
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    Aliases allow different vendor name variations (from invoices, OCR, etc.) to map to this canonical vendor.
+                </div>
+
+                <h6 id="aliasVendorName" class="mb-3">Vendor Name</h6>
+
+                <!-- Add alias form -->
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" id="newAliasName" placeholder="Enter alias name...">
+                    <button class="btn btn-primary" onclick="addAlias()">
+                        <i class="bi bi-plus"></i> Add
+                    </button>
+                </div>
+
+                <!-- Current aliases list -->
+                <div id="vendorAliasesList">
+                    <p class="text-muted">Loading aliases...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- All Aliases Modal (system-wide) -->
+<div class="modal fade" id="allAliasesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-link-45deg"></i> All Vendor Aliases
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    Aliases map alternative vendor names to canonical vendors. When an invoice arrives with an alias name, it will automatically resolve to the canonical vendor.
+                </div>
+
+                <!-- Quick add form -->
+                <div class="card mb-3">
+                    <div class="card-header">Quick Add Alias</div>
+                    <div class="card-body">
+                        <div class="row g-2">
+                            <div class="col-md-5">
+                                <input type="text" class="form-control" id="quickAliasName" placeholder="Alias name (as it appears on invoices)">
+                            </div>
+                            <div class="col-md-5">
+                                <select class="form-select" id="quickAliasVendor">
+                                    <option value="">Select canonical vendor...</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-primary w-100" onclick="quickAddAlias()">
+                                    <i class="bi bi-plus"></i> Add
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search -->
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="aliasSearch" placeholder="Search aliases...">
+                </div>
+
+                <!-- Aliases table -->
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover table-sm">
+                        <thead class="table-dark sticky-top">
+                            <tr>
+                                <th>Alias Name</th>
+                                <th>→</th>
+                                <th>Canonical Vendor</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allAliasesTableBody">
+                            <tr>
+                                <td colspan="4" class="text-center">Loading aliases...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -329,10 +439,13 @@
                     </span>
                 </td>
                 <td>
+                    <button class="btn btn-sm btn-outline-info" onclick="showVendorAliases(${vendor.id})" title="Aliases">
+                        <i class="bi bi-link-45deg"></i>
+                    </button>
                     <button class="btn btn-sm btn-outline-primary" onclick="editVendor(${vendor.id})" title="Edit">
                         <i class="bi bi-pencil"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="deleteVendor(${vendor.id}, '${vendor.name.replace(/'/g, "\\'")}'))" title="Delete">
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteVendor(${vendor.id}, '${vendor.name.replace(/'/g, "\\'")}')" title="Delete">
                         <i class="bi bi-trash"></i>
                     </button>
                 </td>
@@ -645,6 +758,195 @@
         bootstrap.Modal.getInstance(document.getElementById('vendorItemUploadModal')).hide();
     }
 
+    // ========== VENDOR ALIASES ==========
+    let currentAliasVendorId = null;
+    let allAliases = [];
+
+    async function showVendorAliases(vendorId) {
+        currentAliasVendorId = vendorId;
+        const vendor = vendors.find(v => v.id === vendorId);
+
+        if (!vendor) {
+            showAlert('Vendor not found', 'danger');
+            return;
+        }
+
+        document.getElementById('aliasVendorName').textContent = `Canonical Vendor: ${vendor.name}`;
+
+        const modal = new bootstrap.Modal(document.getElementById('vendorAliasesModal'));
+        modal.show();
+
+        await loadVendorAliases(vendorId);
+    }
+
+    async function loadVendorAliases(vendorId) {
+        const container = document.getElementById('vendorAliasesList');
+        container.innerHTML = '<p class="text-muted">Loading aliases...</p>';
+
+        try {
+            const data = await apiRequest(`api/vendors/${vendorId}/aliases`);
+            const aliases = data.aliases || [];
+
+            if (aliases.length === 0) {
+                container.innerHTML = '<p class="text-muted">No aliases defined for this vendor.</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <ul class="list-group">
+                    ${aliases.map(a => `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                                <strong>${a.alias_name}</strong>
+                                <small class="text-muted ms-2">${a.created_at ? new Date(a.created_at).toLocaleDateString() : ''}</small>
+                            </span>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteAlias(${vendorId}, ${a.id}, '${a.alias_name.replace(/'/g, "\\'")}')">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </li>
+                    `).join('')}
+                </ul>
+            `;
+        } catch (error) {
+            container.innerHTML = `<p class="text-danger">Error loading aliases: ${error.message}</p>`;
+        }
+    }
+
+    async function addAlias() {
+        const aliasName = document.getElementById('newAliasName').value.trim();
+
+        if (!aliasName) {
+            showAlert('Please enter an alias name', 'warning');
+            return;
+        }
+
+        try {
+            await apiRequest(`api/vendors/${currentAliasVendorId}/aliases`, {
+                method: 'POST',
+                body: JSON.stringify({ alias_name: aliasName })
+            });
+
+            document.getElementById('newAliasName').value = '';
+            showAlert('Alias added successfully', 'success');
+            await loadVendorAliases(currentAliasVendorId);
+
+            // Refresh all aliases if that modal is open
+            if (document.getElementById('allAliasesModal').classList.contains('show')) {
+                await loadAllAliases();
+            }
+        } catch (error) {
+            showAlert('Error adding alias: ' + error.message, 'danger');
+        }
+    }
+
+    async function deleteAlias(vendorId, aliasId, aliasName) {
+        showConfirmation(
+            'Delete Alias',
+            `Are you sure you want to delete alias "${aliasName}"?`,
+            async () => {
+                try {
+                    await apiRequest(`api/vendors/${vendorId}/aliases/${aliasId}`, {
+                        method: 'DELETE'
+                    });
+                    showAlert('Alias deleted successfully', 'success');
+
+                    // Refresh the appropriate modal
+                    if (currentAliasVendorId === vendorId) {
+                        await loadVendorAliases(vendorId);
+                    }
+                    if (document.getElementById('allAliasesModal').classList.contains('show')) {
+                        await loadAllAliases();
+                    }
+                } catch (error) {
+                    showAlert('Error deleting alias: ' + error.message, 'danger');
+                }
+            }
+        );
+    }
+
+    async function showAllAliases() {
+        // Populate vendor dropdown
+        const vendorSelect = document.getElementById('quickAliasVendor');
+        vendorSelect.innerHTML = '<option value="">Select canonical vendor...</option>' +
+            vendors.filter(v => v.is_active).map(v =>
+                `<option value="${v.id}">${v.name}</option>`
+            ).join('');
+
+        const modal = new bootstrap.Modal(document.getElementById('allAliasesModal'));
+        modal.show();
+
+        await loadAllAliases();
+    }
+
+    async function loadAllAliases() {
+        const tbody = document.getElementById('allAliasesTableBody');
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center">Loading aliases...</td></tr>';
+
+        try {
+            allAliases = await apiRequest('api/vendors/aliases/all');
+            displayAllAliases();
+        } catch (error) {
+            tbody.innerHTML = `<tr><td colspan="4" class="text-danger">Error: ${error.message}</td></tr>`;
+        }
+    }
+
+    function displayAllAliases() {
+        const tbody = document.getElementById('allAliasesTableBody');
+        const searchTerm = (document.getElementById('aliasSearch')?.value || '').toLowerCase();
+
+        const filtered = allAliases.filter(a =>
+            a.alias_name.toLowerCase().includes(searchTerm) ||
+            a.canonical_name.toLowerCase().includes(searchTerm)
+        );
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No aliases found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = filtered.map(a => `
+            <tr>
+                <td><strong>${a.alias_name}</strong></td>
+                <td><i class="bi bi-arrow-right text-muted"></i></td>
+                <td>${a.canonical_name}</td>
+                <td>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteAlias(${a.vendor_id}, ${a.id}, '${a.alias_name.replace(/'/g, "\\'")}')">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function quickAddAlias() {
+        const aliasName = document.getElementById('quickAliasName').value.trim();
+        const vendorId = document.getElementById('quickAliasVendor').value;
+
+        if (!aliasName) {
+            showAlert('Please enter an alias name', 'warning');
+            return;
+        }
+
+        if (!vendorId) {
+            showAlert('Please select a canonical vendor', 'warning');
+            return;
+        }
+
+        try {
+            await apiRequest(`api/vendors/${vendorId}/aliases`, {
+                method: 'POST',
+                body: JSON.stringify({ alias_name: aliasName })
+            });
+
+            document.getElementById('quickAliasName').value = '';
+            document.getElementById('quickAliasVendor').value = '';
+            showAlert('Alias added successfully', 'success');
+            await loadAllAliases();
+        } catch (error) {
+            showAlert('Error adding alias: ' + error.message, 'danger');
+        }
+    }
+
     // Initialize
     document.addEventListener('DOMContentLoaded', async function() {
         // Check authentication
@@ -657,8 +959,9 @@
         // Load vendors
         await loadVendors();
 
-        // Setup search listener
+        // Setup search listeners
         document.getElementById('vendorSearch')?.addEventListener('input', displayVendors);
+        document.getElementById('aliasSearch')?.addEventListener('input', displayAllAliases);
     });
 </script>
 {% endblock %}

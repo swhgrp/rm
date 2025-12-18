@@ -233,12 +233,32 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
     # Get vendors from hub database for vendor dropdown
     vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
 
+    # Build GL account name lookup from category_gl_mapping
+    gl_names = {}
+    try:
+        from sqlalchemy import text as sql_text
+        gl_mappings = db.execute(sql_text("""
+            SELECT DISTINCT gl_asset_account, asset_account_name, gl_cogs_account, cogs_account_name
+            FROM category_gl_mapping
+            WHERE gl_asset_account IS NOT NULL OR gl_cogs_account IS NOT NULL
+        """)).fetchall()
+        for row in gl_mappings:
+            if row[0] and row[1]:  # asset account
+                gl_names[row[0]] = row[1]
+            if row[2] and row[3]:  # cogs account
+                gl_names[row[2]] = row[3]
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error fetching GL names: {str(e)}")
+
     return templates.TemplateResponse("invoice_detail.html", {
         "request": request,
         "invoice": invoice,
         "items": items,
         "locations": locations,
-        "vendors": vendors
+        "vendors": vendors,
+        "gl_names": gl_names
     })
 
 
@@ -1335,7 +1355,7 @@ async def list_category_mappings(request: Request, db: Session = Depends(get_db)
     })
 
 
-@app.get("/api/category-mappings/{category}")
+@app.get("/api/category-mappings/{category:path}")
 async def get_category_mapping(category: str, db: Session = Depends(get_db)):
     """Get GL account mapping for a specific category"""
 

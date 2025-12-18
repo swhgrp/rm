@@ -271,14 +271,20 @@
                             </td>
                             <td>
                                 {% if item.gl_asset_account %}
-                                {{ item.gl_asset_account }}
+                                <span class="gl-account" title="{{ gl_names.get(item.gl_asset_account, 'Unknown') }}" data-bs-toggle="tooltip">
+                                    {{ item.gl_asset_account }}
+                                    <small class="text-muted d-block" style="font-size: 10px; line-height: 1;">{{ gl_names.get(item.gl_asset_account, '')[:15] }}{% if gl_names.get(item.gl_asset_account, '')|length > 15 %}...{% endif %}</small>
+                                </span>
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if item.gl_cogs_account %}
-                                {{ item.gl_cogs_account }}
+                                <span class="gl-account" title="{{ gl_names.get(item.gl_cogs_account, 'Unknown') }}" data-bs-toggle="tooltip">
+                                    {{ item.gl_cogs_account }}
+                                    <small class="text-muted d-block" style="font-size: 10px; line-height: 1;">{{ gl_names.get(item.gl_cogs_account, '')[:15] }}{% if gl_names.get(item.gl_cogs_account, '')|length > 15 %}...{% endif %}</small>
+                                </span>
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}
