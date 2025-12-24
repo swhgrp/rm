@@ -19,7 +19,7 @@ from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.models.vendor import Vendor
 from sqlalchemy.orm import Session
-from sqlalchemy import text as sql_text
+from sqlalchemy import text as sql_text, func
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +112,116 @@ def to_title_case(text: str) -> str:
 
         processed = process_word(word, i == 0)
         result_words.append(processed + suffix)
+
+    return ' '.join(result_words)
+
+
+def normalize_vendor_name(name: str) -> str:
+    """
+    Normalize vendor name to title case with smart handling for company names.
+
+    Handles:
+    - All caps names ("GORDON FOOD SERVICE, INC." -> "Gordon Food Service, Inc.")
+    - Common suffixes (Inc, LLC, Corp, Co, etc.)
+    - Preserves acronyms, abbreviations, and state codes
+    - Preserves known brand name capitalizations
+
+    Examples:
+    - "GORDON FOOD SERVICE, INC." -> "Gordon Food Service, Inc."
+    - "GOLD COAST BEVERAGE LLC" -> "Gold Coast Beverage LLC"
+    - "US FOODS" -> "US Foods"
+    - "Southern Glazer's of FL" -> "Southern Glazer's of FL"
+    - "AmeriGas" -> "AmeriGas"
+    """
+    if not name:
+        return name
+
+    # Known brand names with specific capitalizations
+    brand_names = {
+        'AMERIGAS': 'AmeriGas',
+        'SYSCO': 'Sysco',
+        'USFOODS': 'US Foods',
+        'MCDONALDS': "McDonald's",
+        'MCDONALD\'S': "McDonald's",
+    }
+
+    # Check if the entire name (normalized) matches a known brand
+    name_upper = name.upper().strip()
+    if name_upper in brand_names:
+        return brand_names[name_upper]
+
+    # Common company suffixes to handle specially
+    company_suffixes = {
+        'INC': 'Inc.',
+        'INC.': 'Inc.',
+        'LLC': 'LLC',
+        'LLC.': 'LLC',
+        'CORP': 'Corp.',
+        'CORP.': 'Corp.',
+        'CO': 'Co.',
+        'CO.': 'Co.',
+        'LTD': 'Ltd.',
+        'LTD.': 'Ltd.',
+        'LP': 'LP',
+        'LLP': 'LLP',
+    }
+
+    # Common abbreviations to preserve in uppercase (including state codes)
+    preserve_upper = {
+        'US', 'USA', 'GFS', 'LLC', 'LP', 'LLP', 'DBA', 'ATT', 'IBM',
+        # State codes
+        'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+        'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+        'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+        'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+        'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC',
+    }
+
+    # Common words to keep lowercase (unless first word)
+    lowercase_words = {'of', 'the', 'and', 'for', 'in', 'at', 'by', 'to'}
+
+    # Split by spaces
+    words = name.strip().split()
+    result_words = []
+
+    for i, word in enumerate(words):
+        # Check for punctuation at end
+        suffix = ''
+        clean_word = word
+        if word.endswith(','):
+            suffix = ','
+            clean_word = word[:-1]
+        elif word.endswith('.'):
+            suffix = '.'
+            clean_word = word[:-1]
+
+        word_upper = clean_word.upper()
+        word_lower = clean_word.lower()
+
+        # Check if it's a company suffix
+        check_suffix = word_upper + suffix if suffix == '.' else word_upper
+        if check_suffix in company_suffixes:
+            result_words.append(company_suffixes[check_suffix])
+            continue
+
+        # Check if it should be preserved as uppercase
+        if word_upper in preserve_upper:
+            result_words.append(word_upper + suffix)
+            continue
+
+        # Check for lowercase words (not first word)
+        if i > 0 and word_lower in lowercase_words:
+            result_words.append(word_lower + suffix)
+            continue
+
+        # Check for possessives
+        if clean_word.upper().endswith("'S"):
+            base = clean_word[:-2]
+            result_words.append(base.capitalize() + "'s" + suffix)
+            continue
+
+        # Standard title case
+        result_words.append(clean_word.capitalize() + suffix)
 
     return ' '.join(result_words)
 
@@ -338,6 +448,16 @@ class InvoiceParser:
                         - The subtotal, tax_amount, and total_amount fields must come from the LAST page's final totals section
                         - Common locations: bottom right of last page, in a box labeled "Total" or "Amount Due"
 
+                        *** CRITICAL - ITEM CODE vs UPC/BARCODE ***
+                        - Many invoices have BOTH an "Item Code" (or ITEM#, SKU, Product Code) AND a "UPC" (barcode number)
+                        - The item_code field should contain the vendor's ITEM#/SKU/Product Code, NOT the UPC barcode
+                        - UPC barcodes are typically 12-13 digits and often start with leading zeros (e.g., 0007199030106)
+                        - Item codes/SKUs are typically shorter (4-8 digits) and are what vendors use for ordering
+                        - For beverage distributors (Gold Coast, Southern Glaziers, etc.):
+                          * Look for columns labeled "ITEM#", "Item", "SKU", "Prod#", or "Code" - use this value
+                          * IGNORE columns labeled "UPC", "Barcode", or very long numeric codes starting with 000
+                          * Example: If invoice shows ITEM# "14889" and UPC "0007199030106", use "14889" as item_code
+
                         - Verify that the sum of all line_total values approximately equals the subtotal
                         - For pack_size, look for packaging info in item description or separate column
                         - If any field is not visible/present, use null
@@ -509,6 +629,456 @@ class InvoiceParser:
             logger.error(f"Error matching location '{location_name}': {str(e)}")
             return None
 
+    def _fix_upc_as_item_code(self, invoice_id: int, db: Session) -> dict:
+        """
+        Fix cases where UPC barcode was extracted instead of item code.
+
+        UPC codes are typically 12-13 digits starting with leading zeros (e.g., 0007199030106).
+        Item codes are typically shorter (4-8 digits).
+
+        This learns from historical data - if we've seen this item description before
+        with a proper item code, we use that. Also checks inventory vendor_items.
+
+        Returns dict with fix stats.
+        """
+        fixes = []
+
+        try:
+            # Get invoice items that look like UPC codes (>10 digits, starts with 000)
+            items_result = db.execute(
+                sql_text("""
+                    SELECT id, item_code, item_description
+                    FROM hub_invoice_items
+                    WHERE invoice_id = :invoice_id
+                      AND item_code IS NOT NULL
+                      AND LENGTH(item_code) > 10
+                      AND item_code LIKE '000%'
+                """),
+                {"invoice_id": invoice_id}
+            ).fetchall()
+
+            if not items_result:
+                return {"fixed": 0, "fixes": []}
+
+            for item in items_result:
+                item_id, upc_code, description = item
+
+                # Strategy 1: Look up by description in previous invoices
+                # Find items with same description that have a proper short item code
+                # Normalize description for matching (remove extra spaces, case-insensitive)
+                desc_normalized = ' '.join(description.split()).upper()
+                historical = db.execute(
+                    sql_text("""
+                        SELECT item_code, COUNT(*) as cnt
+                        FROM hub_invoice_items
+                        WHERE UPPER(REPLACE(item_description, '  ', ' ')) = :desc
+                          AND item_code IS NOT NULL
+                          AND LENGTH(item_code) <= 10
+                          AND item_code NOT LIKE '000%'
+                        GROUP BY item_code
+                        ORDER BY cnt DESC
+                        LIMIT 1
+                    """),
+                    {"desc": desc_normalized}
+                ).fetchone()
+
+                if historical:
+                    correct_code = historical[0]
+                    db.execute(
+                        sql_text("""
+                            UPDATE hub_invoice_items
+                            SET item_code = :correct_code
+                            WHERE id = :item_id
+                        """),
+                        {"item_id": item_id, "correct_code": correct_code}
+                    )
+                    fixes.append({
+                        "original_upc": upc_code,
+                        "corrected_code": correct_code,
+                        "description": description,
+                        "method": "historical_match"
+                    })
+                    logger.info(f"Fixed UPC->ItemCode: {upc_code} -> {correct_code} (from history)")
+                    continue
+
+                # Strategy 2: Check item_code_mapping_deprecated for description match
+                mapping = db.execute(
+                    sql_text("""
+                        SELECT item_code
+                        FROM item_code_mapping_deprecated
+                        WHERE UPPER(REPLACE(canonical_description, '  ', ' ')) = :desc
+                          AND LENGTH(item_code) <= 10
+                          AND item_code NOT LIKE '000%'
+                        LIMIT 1
+                    """),
+                    {"desc": desc_normalized}
+                ).fetchone()
+
+                if mapping:
+                    correct_code = mapping[0]
+                    db.execute(
+                        sql_text("""
+                            UPDATE hub_invoice_items
+                            SET item_code = :correct_code
+                            WHERE id = :item_id
+                        """),
+                        {"item_id": item_id, "correct_code": correct_code}
+                    )
+                    fixes.append({
+                        "original_upc": upc_code,
+                        "corrected_code": correct_code,
+                        "description": description,
+                        "method": "mapping_table"
+                    })
+                    logger.info(f"Fixed UPC->ItemCode: {upc_code} -> {correct_code} (from mapping table)")
+                    continue
+
+            if fixes:
+                db.commit()
+
+            return {"fixed": len(fixes), "fixes": fixes}
+
+        except Exception as e:
+            logger.error(f"Error fixing UPC codes for invoice {invoice_id}: {str(e)}")
+            db.rollback()
+            return {"fixed": 0, "fixes": [], "error": str(e)}
+
+    def _fix_ocr_by_description(self, invoice_id: int, db: Session) -> dict:
+        """
+        Fix OCR errors by matching descriptions against inventory.
+
+        When item codes don't match but descriptions are very similar,
+        use the inventory SKU instead of the OCR'd code.
+
+        This handles cases like:
+        - Parsed: 820001 "Bread Wh Ht Crwn 3/4"
+        - Inventory: 622471 "Bread, White, High Crown, 3/4 Inch Sliced"
+
+        Returns dict with fix stats.
+        """
+        import os
+        from sqlalchemy import create_engine, text
+
+        fixes = []
+
+        try:
+            # Get unmapped invoice items
+            items_result = db.execute(
+                sql_text("""
+                    SELECT id, item_code, item_description
+                    FROM hub_invoice_items
+                    WHERE invoice_id = :invoice_id
+                      AND is_mapped = false
+                      AND item_code IS NOT NULL
+                      AND item_code != ''
+                """),
+                {"invoice_id": invoice_id}
+            ).fetchall()
+
+            if not items_result:
+                return {"fixed": 0, "fixes": []}
+
+            # Get vendor_name from invoice (use name matching, not ID, since IDs differ between systems)
+            invoice_vendor = db.execute(
+                sql_text("""
+                    SELECT vendor_name FROM hub_invoices WHERE id = :invoice_id
+                """),
+                {"invoice_id": invoice_id}
+            ).fetchone()
+
+            if not invoice_vendor or not invoice_vendor[0]:
+                return {"fixed": 0, "fixes": []}
+
+            vendor_name = invoice_vendor[0]
+
+            # Get inventory items for vendors matching this name
+            inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
+                'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+            engine = create_engine(inventory_db_url)
+
+            # Extract base vendor name for matching (e.g., "Gordon Food Service" from "Gordon Food Service Inc.")
+            # Strip common suffixes: Inc., Inc, LLC, L.L.C., Corp., Corporation
+            base_vendor = vendor_name
+            for suffix in ['Inc.', 'Inc', 'LLC', 'L.L.C.', 'Corp.', 'Corporation', 'Co.', 'Company']:
+                base_vendor = base_vendor.replace(suffix, '')
+            base_vendor = base_vendor.replace(',', '').strip()
+
+            with engine.connect() as inv_conn:
+                inv_items = inv_conn.execute(text("""
+                    SELECT vi.vendor_sku, vi.vendor_product_name
+                    FROM vendor_items vi
+                    JOIN vendors v ON v.id = vi.vendor_id
+                    WHERE v.name ILIKE :vendor_pattern AND vi.is_active = true
+                """), {"vendor_pattern": f"%{base_vendor}%"}).fetchall()
+
+            if not inv_items:
+                return {"fixed": 0, "fixes": []}
+
+            # Build normalized description lookup
+            # Common abbreviation expansions for food service items
+            ABBREVIATIONS = {
+                # Colors
+                'wh': 'white', 'wht': 'white', 'whl': 'whole',
+                'grn': 'green', 'gn': 'green',
+                'rd': 'red', 'yel': 'yellow', 'ylw': 'yellow',
+                # Sizes
+                'sml': 'small', 'sm': 'small',
+                'med': 'medium', 'md': 'medium',
+                'lg': 'large', 'lrg': 'large',
+                'xlg': 'xlarge', 'xl': 'xlarge',
+                # Units
+                'oz': 'ounce', 'lb': 'pound', 'lbs': 'pound',
+                'gal': 'gallon', 'qt': 'quart', 'pt': 'pint',
+                'cs': 'case', 'ct': 'count',
+                'btl': 'bottle', 'can': 'can', 'bag': 'bag',
+                # Bread-related
+                'ht': 'high', 'hi': 'high', 'hn': 'high',
+                'crwn': 'crown', 'crn': 'crown', 'rcnw': 'crown', 'rcrwn': 'crown',
+                'srdgh': 'sourdough', 'srdh': 'sourdough', 'srgh': 'sourdough', 'srdough': 'sourdough',
+                'evrthng': 'everything', 'evrthing': 'everything', 'evtthng': 'everything',
+                'pnni': 'panini', 'panni': 'panini',
+                'ciab': 'ciabatta', 'ciabta': 'ciabatta',
+                'focac': 'focaccia', 'foccia': 'focaccia',
+                'baguet': 'baguette', 'bagut': 'baguette',
+                'brioch': 'brioche', 'brich': 'brioche',
+                'hoagi': 'hoagie', 'hoag': 'hoagie',
+                'srcld': 'sliced', 'slcid': 'sliced',
+                'slcd': 'sliced', 'sli': 'sliced',
+                # Proteins
+                'chix': 'chicken', 'chik': 'chicken', 'chkn': 'chicken',
+                'bf': 'beef', 'bef': 'beef',
+                'prk': 'pork',
+                # Temperature/State
+                'frz': 'frozen', 'frzn': 'frozen',
+                'frsh': 'fresh',
+                # Food service abbreviations (common on invoices)
+                'pty': 'patties', 'pty': 'patties', 'ptty': 'patties',
+                'seas': 'seasoned', 'ssnd': 'seasoned',
+                'grnd': 'ground', 'grd': 'ground',
+                'bnls': 'boneless', 'bnlss': 'boneless',
+                'sknls': 'skinless', 'sklss': 'skinless',
+                'brst': 'breast',
+                'tdr': 'tender', 'tndr': 'tender',
+                'flt': 'fillet', 'filt': 'fillet',
+                'wng': 'wing', 'wngs': 'wings',
+                'thgh': 'thigh',
+                'drm': 'drum', 'drmstk': 'drumstick',
+                'sldr': 'slider',
+                'burg': 'burger', 'brgr': 'burger',
+                'stk': 'steak',
+                'rst': 'roast',
+                'smkd': 'smoked', 'smk': 'smoked',
+                'crspy': 'crispy',
+                'brd': 'breaded', 'brdd': 'breaded',
+                'frttr': 'fritter',
+                'cvp': 'cup',
+                'hmstyl': 'homestyle',
+                'org': 'original',
+                'reg': 'regular',
+                'spc': 'spicy',
+                'bbq': 'barbecue',
+                'trky': 'turkey', 'trk': 'turkey',
+                'ssg': 'sausage', 'saus': 'sausage',
+                'bcon': 'bacon', 'bcn': 'bacon',
+                'ham': 'ham',
+                # Equipment/Supplies
+                'grill': 'griddle', 'gril': 'griddle', 'drill': 'griddle',  # OCR often misreads G as D
+                'brck': 'brick', 'brik': 'brick',
+                # Dairy
+                'chz': 'cheese', 'chs': 'cheese',
+                'mzz': 'mozzarella', 'mozz': 'mozzarella',
+                'parm': 'parmesan',
+                'ched': 'cheddar',
+                'swss': 'swiss',
+                'amrc': 'american',
+                'crm': 'cream',
+                'btr': 'butter',
+                # Produce
+                'tom': 'tomato', 'tmo': 'tomato',
+                'let': 'lettuce', 'ltt': 'lettuce',
+                'onin': 'onion', 'onn': 'onion',
+                'pep': 'pepper', 'ppr': 'pepper',
+                'pot': 'potato', 'pto': 'potato',
+                'mush': 'mushroom', 'mshm': 'mushroom',
+                'jlpn': 'jalapeno',
+                'clntr': 'cilantro',
+                # Sauces/Condiments
+                'sce': 'sauce', 'sc': 'sauce',
+                'drsg': 'dressing',
+                'may': 'mayo', 'myo': 'mayo',
+                'mstrd': 'mustard',
+                'ktchp': 'ketchup',
+                'rnch': 'ranch',
+                'alf': 'alfredo',
+                'mrnra': 'marinara',
+                # Packaging
+                'pk': 'pack',
+                'bx': 'box',
+                'tub': 'tub',
+                'jug': 'jug',
+                'pch': 'pouch',
+                'wrp': 'wrap', 'wrpd': 'wrapped',
+                # Other common
+                'asst': 'assorted',
+                'var': 'variety',
+                'mix': 'mix',
+                'blnd': 'blend',
+                'prem': 'premium',
+                'sel': 'select',
+                'chc': 'choice',
+                'prm': 'prime',
+                # Fries/potato related
+                'wskin': 'skin', 'skinn': 'skin',
+                'xlng': 'long', 'klng': 'long', 'lng': 'long',
+                'xtra': 'extra',
+                'fncy': 'fancy',
+                # Beverages
+                'lite': 'light', 'lt': 'light', 'lte': 'light',
+                'bud': 'budweiser',
+                'mic': 'michelob', 'mich': 'michelob',
+                'mill': 'miller', 'mlr': 'miller',
+                'cor': 'corona', 'crna': 'corona',
+                'hein': 'heineken', 'hnkn': 'heineken',
+                'mod': 'modelo', 'mdlo': 'modelo',
+                'yng': 'yuengling', 'yngl': 'yuengling',
+                'stla': 'stella', 'stl': 'stella',
+                'blu': 'blue', 'bl': 'blue',
+                'mtn': 'mountain', 'mt': 'mountain',
+                'dew': 'dew',
+                'sprt': 'sprite', 'spri': 'sprite',
+                'fnt': 'fanta', 'fnta': 'fanta',
+            }
+
+            def normalize_desc(desc):
+                """Normalize description for matching, expanding abbreviations"""
+                if not desc:
+                    return ""
+                # Remove punctuation, lowercase, split into words
+                import re
+                words = re.findall(r'[a-z0-9]+', desc.lower())
+                # Expand abbreviations
+                expanded = []
+                for w in words:
+                    if w in ABBREVIATIONS:
+                        expanded.append(ABBREVIATIONS[w])
+                    else:
+                        expanded.append(w)
+                # Remove common filler words
+                stopwords = {'inch', 'sliced', 'frozen', 'fresh', 'the', 'a', 'an', 'with', 'and', 'case'}
+                words = [w for w in expanded if w not in stopwords and len(w) > 1]
+                return set(words)
+
+            inv_lookup = {}
+            for sku, name in inv_items:
+                norm_words = normalize_desc(name)
+                inv_lookup[sku] = {"name": name, "words": norm_words}
+
+            for item in items_result:
+                item_id, parsed_code, parsed_desc = item
+
+                # Check if code already exists in inventory
+                if parsed_code in inv_lookup:
+                    continue
+
+                # Normalize parsed description
+                parsed_words = normalize_desc(parsed_desc)
+                if len(parsed_words) < 2:
+                    continue
+
+                # Find best matching inventory item by description
+                best_match = None
+                best_score = 0
+
+                for sku, info in inv_lookup.items():
+                    inv_words = info["words"]
+                    if len(inv_words) < 2:
+                        continue
+
+                    # Calculate word overlap (Jaccard similarity)
+                    common = parsed_words & inv_words
+                    total = parsed_words | inv_words
+                    if not total:
+                        continue
+
+                    similarity = len(common) / len(total)
+
+                    # Also check if parsed code is similar to inventory SKU (handles OCR)
+                    code_sim = digit_similarity_score(parsed_code, sku)
+
+                    # Combined score: heavily weight description match
+                    # Count significant common words (non-numeric, length > 2)
+                    significant_common = [w for w in common if not w.isdigit() and len(w) > 2]
+
+                    # Acceptance criteria (in priority order):
+                    # 1. Very strong description match (>=0.8) - accept regardless of code similarity
+                    #    (When descriptions match almost perfectly, OCR likely corrupted the code entirely)
+                    # 2. Strong description match (>=0.6) with some code similarity (>=0.16)
+                    # 3. Good description match (>=0.4) with moderate code similarity (>=0.33)
+                    # 4. Multiple significant matching words (>=3) even with lower Jaccard
+                    #    (Handles cases where inventory has long description but invoice is abbreviated)
+                    accept = False
+                    if similarity >= 0.8:
+                        accept = True  # Very strong description match overrides any code mismatch
+                    elif similarity >= 0.6 and code_sim >= 0.16:
+                        accept = True  # Strong description match can override poor code match
+                    elif similarity >= 0.4 and code_sim >= 0.33:
+                        accept = True  # Moderate match on both
+                    elif len(significant_common) >= 3 and similarity >= 0.3:
+                        accept = True  # Multiple significant words match (e.g., angus, patties, seasoned)
+
+                    if accept:
+                        # Score calculation: when code_sim is 0 or very low, use description similarity alone
+                        # This handles cases where OCR completely corrupted the code
+                        if code_sim < 0.1:
+                            combined = similarity  # Use description similarity directly
+                        else:
+                            combined = similarity * 0.8 + code_sim * 0.2  # Weight description more heavily
+
+                        if combined > best_score:
+                            best_score = combined
+                            best_match = {
+                                "sku": sku,
+                                "name": info["name"],
+                                "desc_similarity": similarity,
+                                "code_similarity": code_sim
+                            }
+
+                if best_match and best_score >= 0.35:
+                    # Update the item code
+                    db.execute(
+                        sql_text("""
+                            UPDATE hub_invoice_items
+                            SET item_code = :correct_code
+                            WHERE id = :item_id
+                        """),
+                        {"item_id": item_id, "correct_code": best_match["sku"]}
+                    )
+
+                    fixes.append({
+                        "original_code": parsed_code,
+                        "corrected_code": best_match["sku"],
+                        "original_desc": parsed_desc,
+                        "matched_desc": best_match["name"],
+                        "desc_similarity": round(best_match["desc_similarity"], 2),
+                        "code_similarity": round(best_match["code_similarity"], 2)
+                    })
+
+                    logger.info(
+                        f"Fixed by description: {parsed_code} -> {best_match['sku']} "
+                        f"(desc_sim: {best_match['desc_similarity']:.2f}, "
+                        f"code_sim: {best_match['code_similarity']:.2f})"
+                    )
+
+            if fixes:
+                db.commit()
+
+            return {"fixed": len(fixes), "fixes": fixes}
+
+        except Exception as e:
+            logger.error(f"Error fixing by description for invoice {invoice_id}: {str(e)}")
+            db.rollback()
+            return {"fixed": 0, "fixes": [], "error": str(e)}
+
     def _validate_and_correct_item_codes(self, invoice_id: int, db: Session) -> dict:
         """
         Validate extracted item codes against verified codes and correct OCR errors.
@@ -546,7 +1116,7 @@ class InvoiceParser:
             verified_codes = db.execute(
                 sql_text("""
                     SELECT item_code, canonical_description, occurrence_count
-                    FROM item_code_mapping
+                    FROM item_code_mapping_deprecated
                     WHERE is_verified = true OR occurrence_count >= 3
                     ORDER BY occurrence_count DESC
                 """)
@@ -647,7 +1217,7 @@ class InvoiceParser:
         """
         Normalize item descriptions based on item codes.
 
-        If an item code already exists in the item_code_mapping table with a canonical description,
+        If an item code already exists in the item_code_mapping_deprecated table with a canonical description,
         update the item description to match. This fixes OCR variations where the same product
         gets parsed with slightly different descriptions.
 
@@ -659,7 +1229,7 @@ class InvoiceParser:
                 sql_text("""
                     UPDATE hub_invoice_items hi
                     SET item_description = icm.canonical_description
-                    FROM item_code_mapping icm
+                    FROM item_code_mapping_deprecated icm
                     WHERE hi.invoice_id = :invoice_id
                       AND hi.item_code IS NOT NULL
                       AND hi.item_code != ''
@@ -677,14 +1247,14 @@ class InvoiceParser:
             # Also add any new item codes to the mapping table for future normalization
             db.execute(
                 sql_text("""
-                    INSERT INTO item_code_mapping (item_code, canonical_description, occurrence_count)
+                    INSERT INTO item_code_mapping_deprecated (item_code, canonical_description, occurrence_count)
                     SELECT item_code, item_description, 1
                     FROM hub_invoice_items
                     WHERE invoice_id = :invoice_id
                       AND item_code IS NOT NULL
                       AND item_code != ''
                     ON CONFLICT (item_code) DO UPDATE SET
-                        occurrence_count = item_code_mapping.occurrence_count + 1,
+                        occurrence_count = item_code_mapping_deprecated.occurrence_count + 1,
                         updated_at = NOW()
                 """),
                 {"invoice_id": invoice_id}
@@ -753,8 +1323,9 @@ class InvoiceParser:
                     invoice.location_name = location_match[1]
                     location_matched = True
 
-            # Update invoice with parsed data
-            invoice.vendor_name = parsed_data.get('vendor_name') or 'Unknown Vendor'
+            # Update invoice with parsed data (normalize vendor name to title case)
+            raw_vendor_name = parsed_data.get('vendor_name') or 'Unknown Vendor'
+            invoice.vendor_name = normalize_vendor_name(raw_vendor_name)
             invoice.vendor_account_number = parsed_data.get('vendor_account_number')
             invoice.invoice_number = parsed_data.get('invoice_number')
             invoice.total_amount = parsed_data.get('total_amount')
@@ -770,7 +1341,7 @@ class InvoiceParser:
                 duplicate = db.query(HubInvoice).filter(
                     HubInvoice.id != invoice_id,
                     HubInvoice.invoice_number == invoice.invoice_number,
-                    db.func.upper(db.func.trim(HubInvoice.vendor_name)) == normalized_vendor
+                    func.upper(func.trim(HubInvoice.vendor_name)) == normalized_vendor
                 ).first()
 
                 if duplicate:
@@ -874,6 +1445,12 @@ class InvoiceParser:
             invoice.status = 'mapping'
             db.commit()
 
+            # Step 0: Fix UPC codes extracted as item codes
+            # This detects long codes starting with 000 and corrects them using historical data
+            upc_fix_stats = self._fix_upc_as_item_code(invoice_id, db)
+            if upc_fix_stats.get('fixed', 0) > 0:
+                logger.info(f"Fixed {upc_fix_stats['fixed']} UPC codes incorrectly parsed as item codes")
+
             # Step 1: Validate and correct OCR errors in item codes
             # This compares parsed codes against verified codes and fixes common OCR mistakes
             ocr_correction_stats = self._validate_and_correct_item_codes(invoice_id, db)
@@ -883,6 +1460,12 @@ class InvoiceParser:
             # Step 2: Normalize item descriptions based on item codes
             # This fixes OCR variations where the same item code has different parsed descriptions
             self._normalize_item_descriptions(invoice_id, db)
+
+            # Step 3: Fix OCR errors using description matching
+            # When codes don't match but descriptions are very similar, use inventory SKU
+            desc_fix_stats = self._fix_ocr_by_description(invoice_id, db)
+            if desc_fix_stats.get('fixed', 0) > 0:
+                logger.info(f"Fixed {desc_fix_stats['fixed']} items by description matching")
 
             items_count = len(line_items)
 
@@ -898,9 +1481,11 @@ class InvoiceParser:
                 # Don't fail the parsing if auto-mapping fails
 
             ocr_corrected = ocr_correction_stats.get('corrected', 0)
+            upc_fixed = upc_fix_stats.get('fixed', 0)
+            desc_fixed = desc_fix_stats.get('fixed', 0)
             return {
                 "success": True,
-                "message": f"Invoice parsed successfully with {items_count} items. Auto-mapped: {mapping_stats.get('mapped_count', 0)}, Unmapped: {mapping_stats.get('unmapped_count', 0)}, OCR corrected: {ocr_corrected}.",
+                "message": f"Invoice parsed successfully with {items_count} items. Auto-mapped: {mapping_stats.get('mapped_count', 0)}, Unmapped: {mapping_stats.get('unmapped_count', 0)}, OCR corrected: {ocr_corrected}, UPC fixed: {upc_fixed}, Desc fixed: {desc_fixed}.",
                 "invoice_id": invoice_id,
                 "confidence_score": confidence_score,
                 "items_parsed": items_count,
@@ -908,6 +1493,10 @@ class InvoiceParser:
                 "items_unmapped": mapping_stats.get('unmapped_count', 0),
                 "ocr_corrected": ocr_corrected,
                 "ocr_corrections": ocr_correction_stats.get('corrections', []),
+                "upc_fixed": upc_fixed,
+                "upc_fixes": upc_fix_stats.get('fixes', []),
+                "desc_fixed": desc_fixed,
+                "desc_fixes": desc_fix_stats.get('fixes', []),
                 "mapping_methods": mapping_stats.get('methods', {}),
                 "vendor_matched": vendor is not None,
                 "vendor_name": parsed_data.get('vendor_name'),

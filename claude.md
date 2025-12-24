@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** December 18, 2025
-**System Status:** Production (90% Complete - Core systems operational)
+**Last Updated:** December 23, 2025
+**System Status:** Production (95% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -9,7 +9,182 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Dec 18, 2025)
+### Most Recent Work (Current Session - Dec 23, 2025)
+
+**INTEGRATION HUB: INVOICE ITEM MAPPING IMPROVEMENTS + OCR FIXES + INVENTORY CLEANUP** ✅ **COMPLETE**
+
+#### 1. **Massive Inventory Item Import** 📦 **MAJOR DATA WORK**
+- **Problem:** 142 unmapped GFS (Gordon Food Service) items preventing full mapping
+- **Solution:** Systematically added all items to inventory system
+- **Results:**
+  - **Before:** 93.4% mapping rate (2,431/2,604 items)
+  - **After:** 99.5% mapping rate (2,592/2,604 items)
+- **Items Added by Category:**
+  | Category | New Master Items | Vendor Items |
+  |----------|-----------------|--------------|
+  | Beef | Beef Strip Loin | 5 |
+  | Produce | Arugula Baby, Romaine Hearts, Avocado Hass | 16 |
+  | Bakery | Bun Brioche Round, Empanada Chicken, Pretzel Bites | 10 |
+  | Seafood | (linked to existing) | 8 |
+  | Pork | Pork Spareribs, Sausage Italian Links | 5 |
+  | Frozen | Tater Tots, Onion Rings Breaded | 6 |
+  | Dairy | Milk Whole Gallon, Ice Cream (3 flavors), Whipped Topping | 11 |
+  | Grocery | Croutons, Pudding Mix, BBQ Rub, Mandarin Oranges, Beans Refried, Chips Tortilla | 22 |
+  | Supplies | Containers (2), Foil, Pick Bamboo, Tray Food, Tissue Toilet | 25 |
+  | Wine | Conundrum Red, La Crema Pinot Gris, Meiomi Sauvignon Blanc, Rodney Strong Cabernet, Uptown Cocktails (2) | 10 |
+- **Naming Convention:** Simple, clean names (e.g., "Beef Flap Meat", "Arugula, Baby", "Tater Tots")
+- **Store Items:** GFS Store items (with trailing 0 in item code) linked to same master items as delivery items
+
+#### 2. **Duplicate Master Item Cleanup** 🧹 **DATA QUALITY**
+- **Problem:** Multiple master items for same product (user-identified via UI screenshots)
+- **Duplicates Consolidated:**
+  - Beef Flap items (3 entries) → "Beef Flap Meat" (id=242)
+  - Angel's Envy Bourbon (2 entries) → "Angel's Envy Bourbon 86.6" (id=422)
+  - Makers Mark Bourbon (2 entries) → consolidated
+  - Ham Natural Juice (2 entries) → consolidated
+  - Marinara Sauce (3 entries) → consolidated
+  - Tea items (4 entries) → consolidated
+  - Vegetable Blend Caribbean (2 entries) → consolidated
+  - Soft Drink Cola Diet (2 entries) → consolidated
+  - Balsamic Vinaigrette (2 entries) → consolidated
+  - Drink Concentrates (4 entries) → consolidated
+- **Method:** Move vendor_items and waste_records to canonical item, then delete duplicate
+- **Total Deleted:** ~15 duplicate master items
+
+#### 3. **Category Cleanup** 🏷️ **DATA QUALITY**
+- **Problem:** Many items incorrectly in "Uncategorized" category
+- **Fixed:** ~50 items moved to proper categories:
+  - Angus Strip Steaks → Beef
+  - Bananas → Produce
+  - Bread items → Bakery
+  - Cheesecake → Bakery
+  - Coffee → Grocery
+  - Coke/Coca-Cola → Beverages - Non Alcoholic
+  - Detergent/Sanitizer → Cleaning & Chemical
+  - Don Julio Tequila → Tequila
+  - Gloves → Supplies - Disposable
+  - Hash Browns → Frozen
+  - And many more...
+- **Remaining:** 96 items still in Uncategorized (mostly BJ's/Sam's bulk items with long descriptions)
+
+#### 4. **OCR Error Fixes Applied** 🔧 **DATA FIXES**
+- Fixed vendor name matching (LLC suffix stripping added)
+- Fixed Grill Brick OCR errors (780170 misread as 780117, 780710, 768170)
+- Added grill→griddle abbreviation for OCR recovery
+- Deleted 128 duplicate invoice items from Invoice 9030397136
+
+#### 5. **Invoice Parser Enhancements** 🤖 **CODE IMPROVEMENTS**
+- **UPC vs Item Code Detection:** Added `_fix_upc_as_item_code()` method
+  - Detects long codes (>10 digits) starting with 000
+  - Corrects using historical invoice data or mapping table
+- **Description-Based OCR Fix:** Added `_fix_ocr_by_description()` method
+  - When item codes don't match but descriptions are similar
+  - Uses Jaccard similarity with abbreviation expansion
+  - Includes 100+ food service abbreviations (chix→chicken, bf→beef, etc.)
+- **Processing Order:** UPC fix → OCR correction → Description normalization → Description-based fix → Auto-map
+
+#### 6. **Remaining Unmapped Items (12)**
+- Miller Lite (intentionally unmapped per user request - not in inventory)
+- Non-product entries: Invoice, Transaction, Unknown, Final-Notification (9 items)
+- Daily's Lime Juice (item code embedded in description text)
+- Pest Control Service (service, not product)
+
+**Files Modified:**
+- `integration-hub/src/integration_hub/services/invoice_parser.py` (UPC fix, description fix, abbreviations)
+- Inventory database: Created ~30 new master items, ~150 new vendor items
+- Hub database: Fixed 128 duplicates, corrected OCR errors
+
+---
+
+### Previous Session Work (Dec 21, 2025)
+
+**INTEGRATION HUB DATA FIXES + LOCATION SYNC IMPROVEMENTS** ✅ **COMPLETE**
+
+1. **Expense Items Display Fix** 🔧 **BUG FIX**
+   - **Problem:** Invoice detail showed "Expense" but mapped items page showed "Uncategorized"
+   - **Solution:** Updated template logic to show "Expense" badge for items with `inventory_category='Uncategorized'` and only `gl_cogs_account`
+   - **Files Modified:**
+     - `integration-hub/src/integration_hub/templates/mapped_items.html`
+     - `integration-hub/src/integration_hub/templates/unmapped_items.html`
+     - `integration-hub/src/integration_hub/templates/invoice_detail.html`
+   - **Database:** Updated 558 expense items to have `inventory_category='Uncategorized'`, cleared `gl_asset_account` for 548 expense items
+
+2. **Dashboard Badge Styling** 🎨 **UI FIX**
+   - **Problem:** Status badges (mapping, ready) had white text on light backgrounds (unreadable)
+   - **Solution:** Added missing CSS classes for badge colors
+   - **File Modified:** `integration-hub/src/integration_hub/templates/base.html`
+   - **Added:** `.badge-mapping`, `.badge-partial`, `.badge-statement`, `.badge-parse_failed`, `.badge-parsing`
+
+3. **Vendor Name Normalization** 📝 **NEW FEATURE**
+   - **Problem:** Inconsistent vendor name capitalization across invoices
+   - **Solution:** Created `normalize_vendor_name()` function in invoice_parser.py
+   - **Features:**
+     - Title case with smart handling for company suffixes (Inc., LLC, Corp.)
+     - Preserves state codes (FL, GA) and brand names (AmeriGas, Sysco)
+     - Handles lowercase words (of, the, and)
+   - **File Modified:** `integration-hub/src/integration_hub/services/invoice_parser.py`
+   - **Database:** Updated 107 existing invoices with normalized vendor names
+
+4. **Expense Vendor Sync Status Fix** 🛡️ **DATA FIX**
+   - **Problem:** Expense vendors (City Fire, Cozzini Bros, Gold Coast Linen, Tillman) incorrectly showing as synced to inventory
+   - **Solution:** Cleared invalid `inventory_vendor_id` for expense vendors in hub database
+   - **Vendors Fixed:** City Fire, Cozzini Bros., Gold Coast Linen, Tillman, Amerigas
+
+5. **Invoice Location Fix - CRITICAL** 🔥 **BUG FIX**
+   - **Problem:** Invoices sent to inventory system all had wrong location (Seaside Grill)
+   - **Root Cause:** `inventory_sender.py` was not sending `location_id` in payload
+   - **Solution:** Added `"location_id": invoice.location_id` to payload
+   - **File Modified:** `integration-hub/src/integration_hub/services/inventory_sender.py`
+   - **Database Cleanup:** Corrected locations for all 18 invoices in inventory system
+
+6. **Accounting Journal Entry Location Fix** 📍 **DATA FIX**
+   - **Problem:** Journal entries showing "Corporate" instead of correct restaurant location
+   - **Root Cause:** Journal entry **lines** have `area_id`, not just the header's `location_id`
+   - **Solution:** Updated `area_id` on journal_entry_lines for affected entries
+   - **Key Learning:** Accounting UI reads location from `journal_entry_lines.area_id`, not `journal_entries.location_id`
+   - **Entries Fixed:** AP-20251217-0001, AP-20251217-0002, AP-20251217-0005, AP-20251221-0003
+
+7. **Invoice Sync Status Display Fix** 🔧 **UI FIX**
+   - **Problem:** Expense invoices showed "Sent" to inventory when they weren't
+   - **Root Cause:** Template checked `inventory_sync_at` timestamp instead of `sent_to_inventory` flag
+   - **Solution:** Updated template logic to check `sent_to_inventory` flag first
+   - **File Modified:** `integration-hub/src/integration_hub/templates/invoice_detail.html`
+   - **New Display Logic:**
+     - "Sent" - if `sent_to_inventory=true`
+     - "Not Applicable" - if `sent_to_inventory=false` but `inventory_sync_at` has timestamp
+     - "Not Sent" - otherwise
+
+8. **Duplicate Data Cleanup** 🧹 **DATA FIX**
+   - Deleted 20+ duplicate bills in accounting
+   - Merged duplicate vendors (GOLD COAST BEVERAGE LLC, Southern Glazier's of FL)
+   - Deleted orphaned invoice data
+
+---
+
+### Location ID Reference
+
+**Integration Hub & Inventory System (IDs 1-6):**
+| ID | Location Name | Inventory Store ID |
+|----|---------------|-------------------|
+| 1 | Seaside Grill | 400 |
+| 2 | The Nest Eatery | 300 |
+| 3 | SW Grill | 500 |
+| 4 | Okee Grill | 200 |
+| 5 | Park Bistro | 700 |
+| 6 | Links Grill | 600 |
+
+**Accounting System (Areas 1-7):**
+- IDs 1-6 match the above locations
+- ID 7 = "SW Hospitality Group" (Corporate - should NOT be used for AP bills)
+
+**Key Points:**
+- Integration Hub uses `location_id` (1-6) from inventory system
+- Accounting uses `area_id` on journal_entry_lines (1-6 for restaurants, 7 for corporate)
+- Corporate (ID 7) should NEVER be assigned to vendor bills - it indicates missing location data
+
+---
+
+### Previous Session Work (Dec 18, 2025)
 
 **INVENTORY VENDOR ALIASES + INTEGRATION HUB FIXES** ✅ **COMPLETE**
 
@@ -1872,6 +2047,16 @@ Email → PDF Extract → AI Parse → Auto-Map → Ready for Review → Route t
    - Two-factor authentication (future)
    - Fixed asset management (accounting)
    - Job costing (accounting)
+
+### Recently Fixed (Dec 21, 2025)
+
+7. **Integration Hub Location Sync** ✅ FIXED
+   - `inventory_sender.py` now includes `location_id` in payload
+   - All future invoice syncs will have correct location
+
+8. **Accounting Journal Entry Locations** ✅ FIXED
+   - Must set `area_id` on `journal_entry_lines`, not just `journal_entries.location_id`
+   - UI displays location from line-level `area_id`
 
 ---
 

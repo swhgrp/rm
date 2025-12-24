@@ -1,5 +1,98 @@
 # Changelog
 
+## [2025-12-23] - Integration Hub: Invoice Mapping Improvements & Inventory Cleanup
+
+### Summary
+Massively improved invoice item mapping rate from 93.4% to 99.5% by systematically adding unmapped GFS (Gordon Food Service) items to the inventory system. Enhanced the invoice parser with UPC detection and description-based OCR correction. Cleaned up duplicate master items and fixed category assignments.
+
+### Added - Integration Hub
+- **UPC vs Item Code Detection:** New `_fix_upc_as_item_code()` method
+  - Detects UPC barcodes (>10 digits, starts with 000) incorrectly parsed as item codes
+  - Corrects using historical invoice data or mapping table lookup
+  - Example: `0007199030106` (UPC) → `14889` (item code)
+
+- **Description-Based OCR Fix:** New `_fix_ocr_by_description()` method
+  - Uses Jaccard similarity to match item descriptions when codes don't match
+  - Includes 100+ food service abbreviations for expansion:
+    - `chix` → `chicken`, `bf` → `beef`, `wht` → `white`
+    - `slcd` → `sliced`, `frz` → `frozen`, `brst` → `breast`
+    - `grill` → `griddle` (handles OCR G/D confusion)
+  - Acceptance criteria: ≥80% description match, or ≥60% with code similarity
+
+- **Processing Pipeline Enhanced:**
+  1. UPC code fix (new)
+  2. OCR code correction
+  3. Description normalization
+  4. Description-based fix (new)
+  5. Auto-mapping
+
+### Added - Inventory System
+- **~30 New Master Items** across categories:
+  - Beef: Beef Strip Loin
+  - Produce: Arugula Baby, Romaine Hearts, Avocado Hass
+  - Bakery: Bun Brioche Round 5.5", Empanada Chicken, Pretzel Bites Bavarian
+  - Pork: Pork Spareribs, Sausage Italian Links
+  - Frozen: Tater Tots, Onion Rings Breaded
+  - Dairy: Milk Whole Gallon, Ice Cream (Butter Pecan, Mint Chocolate Chip, Salted Caramel), Whipped Topping
+  - Grocery: Croutons Seasoned, Pudding Mix Vanilla, BBQ Rub, Mandarin Oranges, Beans Refried, Chips Tortilla
+  - Supplies: Container SmartLock (5.75" and 7.5"), Foil Cutter Box, Pick Bamboo Paddle, Tray Food Paper, Tissue Toilet Roll
+  - Wine: Conundrum Red, La Crema Pinot Gris, Meiomi Sauvignon Blanc, Rodney Strong Cabernet Sauvignon, Uptown Wine Cocktails (Mango & Strawberry Margarita)
+
+- **~150 New Vendor Items** for GFS (vendor_id=1) and Southern Glaziers (vendor_id=6)
+
+### Fixed - Inventory System
+- **Duplicate Master Items Consolidated:**
+  - 3 Beef Flap entries → "Beef Flap Meat" (id=242)
+  - 2 Angel's Envy entries → "Angel's Envy Bourbon 86.6" (id=422)
+  - 2 Makers Mark entries → consolidated
+  - 2 Ham Natural Juice entries → consolidated
+  - 3 Marinara Sauce entries → consolidated
+  - 4 Tea entries (sweetened/unsweetened) → consolidated
+  - 2 Vegetable Blend Caribbean entries → consolidated
+  - 2 Soft Drink Cola Diet entries → consolidated
+  - 2 Balsamic Vinaigrette entries → consolidated
+  - 4 Drink Concentrate entries → consolidated
+
+- **~50 Items Recategorized** from "Uncategorized" to proper categories:
+  - Angus Strip Steaks → Beef
+  - Bananas, Cilantro, Watermelon → Produce
+  - Bread, Cheesecake, Pretzels → Bakery
+  - Coffee, Croutons, Chips → Grocery
+  - Coca-Cola, Sparkling Water → Beverages - Non Alcoholic
+  - Don Julio Tequila → Tequila
+  - Cupcake Moscato → Wine
+  - Detergent, Sanitizer → Cleaning & Chemical
+  - Gloves, Cups, Containers → Supplies - Disposable
+  - Hash Browns → Frozen
+  - Shrimp, Snapper → Seafood
+
+### Fixed - Integration Hub
+- **Vendor Name Matching:** Added LLC suffix stripping for better matching
+  - "Gold Coast Beverage LLC" now matches "Gold Coast Beverage"
+- **Grill Brick OCR Errors:** Fixed item code 780170 (was being misread as 780117, 780710, 768170)
+- **128 Duplicate Invoice Items Deleted** from Invoice 9030397136
+
+### Results
+- **Mapping Rate:** 93.4% → 99.5% (2,431 → 2,592 of 2,604 items)
+- **Remaining Unmapped (12):**
+  - Miller Lite (intentionally unmapped - not in inventory)
+  - Invoice/Transaction/Unknown entries (9 non-product items)
+  - Daily's Lime Juice (item code in description text)
+  - Pest Control Service (service, not product)
+
+### Files Modified
+- `integration-hub/src/integration_hub/services/invoice_parser.py`
+  - Added `_fix_upc_as_item_code()` method (lines 622-734)
+  - Added `_fix_ocr_by_description()` method (lines 736-1070)
+  - Added 100+ food service abbreviations
+  - Updated processing pipeline to call new methods
+
+### Database Changes
+- **Inventory DB:** Created 30+ master_items, 150+ vendor_items, deleted 15 duplicate master_items
+- **Hub DB:** Deleted 128 duplicate hub_invoice_items, corrected OCR errors in item_code
+
+---
+
 ## [2025-10-31] - Mail System Migration: SnappyMail → Mailcow SOGo
 
 ### Summary
