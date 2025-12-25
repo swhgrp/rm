@@ -204,12 +204,14 @@ async def account_detail_page(
 @app.get("/journal-entries", response_class=HTMLResponse)
 async def journal_entries_page(
     request: Request,
+    source: str = None,
     user: User = Depends(require_auth)
 ):
     """Journal Entries page"""
     return templates.TemplateResponse("journal_entries.html", {
         "request": request,
-        "current_user": user
+        "current_user": user,
+        "source": source
     })
 
 

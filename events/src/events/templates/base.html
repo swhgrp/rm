@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
@@ -20,14 +20,35 @@
     {% block head %}{% endblock %}
 
     <style>
-        /* Dark theme matching portal */
+        /* =====================================================
+           SW Hospitality Group - Slate Blue Light Theme
+           Events System
+           ===================================================== */
+
+        :root {
+            --bg-primary: #ECEFF1;
+            --bg-secondary: #FFFFFF;
+            --bg-tertiary: #F5F5F5;
+            --bg-elevated: #E0E0E0;
+            --border-primary: #CFD8DC;
+            --border-secondary: #B0BEC5;
+            --text-primary: #263238;
+            --text-secondary: #546E7A;
+            --text-muted: #78909C;
+            --accent-primary: #455A64;
+            --accent-secondary: #37474F;
+            --accent-hover: #263238;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
         * {
             box-sizing: border-box;
         }
 
         body {
-            background-color: #0d1117;
-            color: #c9d1d9;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
             margin: 0;
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
@@ -42,14 +63,15 @@
             left: 0;
             height: 100vh;
             width: 260px;
-            background-color: #161b22;
+            background-color: #455A64;
             padding-top: 20px;
             z-index: 1000;
             overflow-y: auto;
             overflow-x: hidden;
-            border-right: 1px solid #30363d;
+            border-right: none;
             transition: transform 0.3s ease-in-out;
             -webkit-overflow-scrolling: touch;
+            box-shadow: 2px 0 8px rgba(69, 90, 100, 0.25);
         }
 
         .sidebar.collapsed {
@@ -62,9 +84,9 @@
             top: 12px;
             left: 12px;
             z-index: 1001;
-            background-color: #161b22;
-            border: 1px solid #30363d;
-            color: #c9d1d9;
+            background-color: #455A64;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #FFFFFF;
             padding: 10px 14px;
             border-radius: 6px;
             cursor: pointer;
@@ -77,8 +99,8 @@
         }
 
         .sidebar-toggle:hover {
-            background-color: #21262d;
-            color: #58a6ff;
+            background-color: #37474F;
+            color: #FFFFFF;
         }
 
         .sidebar-toggle i {
@@ -92,7 +114,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.6);
+            background-color: rgba(0, 0, 0, 0.5);
             z-index: 999;
         }
 
@@ -103,11 +125,11 @@
         .sidebar-brand {
             padding: 20px 15px;
             text-align: center;
-            color: #58a6ff;
+            color: #FFFFFF;
             font-size: 20px;
             font-weight: 700;
             text-decoration: none;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             margin-bottom: 10px;
         }
 
@@ -115,6 +137,7 @@
             max-width: 180px;
             height: auto;
             margin-bottom: 0px;
+            filter: brightness(0) invert(1);
         }
 
         .sidebar-nav {
@@ -132,7 +155,7 @@
             align-items: center;
             gap: 12px;
             padding: 12px 15px;
-            color: #8b949e;
+            color: rgba(255, 255, 255, 0.85);
             text-decoration: none;
             border-radius: 6px;
             transition: all 0.2s;
@@ -141,13 +164,13 @@
         }
 
         .sidebar-nav a:hover {
-            background-color: #21262d;
-            color: #c9d1d9;
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
         }
 
         .sidebar-nav a.active {
-            background-color: #21262d;
-            color: #58a6ff;
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
             font-weight: 500;
         }
 
@@ -163,8 +186,8 @@
             bottom: 0;
             width: 100%;
             padding: 15px;
-            border-top: 1px solid #30363d;
-            background-color: #161b22;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            background-color: #455A64;
         }
 
         .sidebar-footer a {
@@ -172,7 +195,7 @@
             align-items: center;
             gap: 10px;
             padding: 12px;
-            color: #8b949e;
+            color: rgba(255, 255, 255, 0.85);
             text-decoration: none;
             border-radius: 6px;
             transition: all 0.2s;
@@ -181,8 +204,8 @@
         }
 
         .sidebar-footer a:hover {
-            background-color: #21262d;
-            color: #c9d1d9;
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
         }
 
         /* Main Content */
@@ -197,8 +220,8 @@
         }
 
         .top-bar {
-            background-color: #161b22;
-            border-bottom: 1px solid #30363d;
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-primary);
             padding: 15px 20px;
             display: flex;
             justify-content: space-between;
@@ -209,14 +232,19 @@
             flex-wrap: wrap;
             gap: 12px;
             min-height: 64px;
+            box-shadow: var(--shadow-sm);
         }
 
         .page-title {
             font-size: 18px;
             font-weight: 600;
-            color: #c9d1d9;
+            color: var(--text-primary);
             flex: 1;
             min-width: 150px;
+        }
+
+        .page-title i {
+            color: var(--accent-primary);
         }
 
         .top-bar-actions {
@@ -231,15 +259,15 @@
             align-items: center;
             gap: 8px;
             padding: 8px 12px;
-            background-color: #21262d;
-            border: 1px solid #30363d;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
             border-radius: 6px;
             font-size: 14px;
             white-space: nowrap;
         }
 
         .user-info i {
-            color: #58a6ff;
+            color: var(--accent-primary);
             font-size: 16px;
         }
 
@@ -276,76 +304,77 @@
         }
 
         .btn-primary-custom {
-            background-color: #238636;
+            background-color: var(--accent-primary);
             color: white;
-            border: 1px solid #2ea043;
+            border: 1px solid var(--accent-primary);
         }
 
         .btn-primary-custom:hover {
-            background-color: #2ea043;
+            background-color: var(--accent-hover);
             color: white;
         }
 
         .btn-secondary-custom {
-            background-color: #21262d;
-            color: #c9d1d9;
-            border: 1px solid #30363d;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-primary);
         }
 
         .btn-secondary-custom:hover {
-            background-color: #30363d;
-            color: #c9d1d9;
+            background-color: var(--bg-elevated);
+            color: var(--text-primary);
         }
 
         .btn-danger-custom {
-            background-color: #da3633;
+            background-color: #E53935;
             color: white;
-            border: 1px solid #f85149;
+            border: 1px solid #E53935;
         }
 
         .btn-danger-custom:hover {
-            background-color: #f85149;
+            background-color: #C62828;
             color: white;
         }
 
         /* Base heading styles */
         h2 {
-            font-size: 1.75rem;  /* ~28px, matches Accounting, Inventory, and HR */
+            font-size: 1.75rem;
             font-weight: 600;
-            color: #c9d1d9;
+            color: var(--text-primary);
         }
 
         /* Cards */
         .card-custom {
-            background-color: #161b22;
-            border: 1px solid #30363d;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
             border-radius: 6px;
             padding: 20px;
             margin-bottom: 20px;
+            box-shadow: var(--shadow-md);
         }
 
         .card-custom-header {
             font-size: 16px;
             font-weight: 600;
-            color: #c9d1d9;
+            color: var(--text-primary);
             margin-bottom: 15px;
             padding-bottom: 10px;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid var(--border-primary);
         }
 
         /* Tables - Mobile Responsive */
         .table-custom {
             width: 100%;
             border-collapse: collapse;
-            background-color: #161b22;
-            border: 1px solid #30363d;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
             border-radius: 6px;
             overflow: hidden;
             display: table;
         }
 
         .table-custom thead {
-            background-color: #21262d;
+            background-color: var(--bg-tertiary);
         }
 
         .table-custom th {
@@ -353,27 +382,27 @@
             text-align: left;
             font-size: 14px;
             font-weight: 600;
-            color: #c9d1d9;
-            border-bottom: 1px solid #30363d;
+            color: var(--text-primary);
+            border-bottom: 1px solid var(--border-primary);
             white-space: nowrap;
         }
 
         .table-custom td {
             padding: 12px 16px;
             font-size: 14px;
-            color: #8b949e;
-            border-bottom: 1px solid #30363d;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-primary);
         }
 
         .table-custom tbody tr:hover {
-            background-color: #21262d;
+            background-color: #CFD8DC;
         }
 
         /* Form Controls - Mobile Friendly */
         .form-control-custom {
-            background-color: #0d1117;
-            border: 1px solid #30363d;
-            color: #c9d1d9;
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-primary);
+            color: var(--text-primary);
             padding: 12px 14px;
             border-radius: 6px;
             font-size: 16px;
@@ -384,8 +413,8 @@
 
         .form-control-custom:focus {
             outline: none;
-            border-color: #58a6ff;
-            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.1);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(69, 90, 100, 0.15);
         }
 
         .form-label-custom {
@@ -393,12 +422,12 @@
             margin-bottom: 8px;
             font-size: 14px;
             font-weight: 500;
-            color: #c9d1d9;
+            color: var(--text-primary);
         }
 
         select.form-control-custom {
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23546E7A' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 12px center;
             padding-right: 40px;
@@ -413,21 +442,21 @@
         }
 
         .alert-success {
-            background-color: #1f6feb;
-            color: #c9d1d9;
-            border: 1px solid #388bfd;
+            background-color: rgba(67, 160, 71, 0.1);
+            color: #43A047;
+            border: 1px solid #43A047;
         }
 
         .alert-error {
-            background-color: #da3633;
-            color: white;
-            border: 1px solid #f85149;
+            background-color: rgba(229, 57, 53, 0.1);
+            color: #E53935;
+            border: 1px solid #E53935;
         }
 
         .alert-warning {
-            background-color: #9e6a03;
-            color: white;
-            border: 1px solid #bb8009;
+            background-color: rgba(251, 140, 0, 0.1);
+            color: #FB8C00;
+            border: 1px solid #FB8C00;
         }
 
         /* Mobile Responsive */
@@ -509,8 +538,8 @@
 
             .table-custom tr {
                 margin-bottom: 15px;
-                background-color: #161b22;
-                border: 1px solid #30363d;
+                background-color: var(--bg-secondary);
+                border: 1px solid var(--border-primary);
                 border-radius: 6px;
                 padding: 12px;
             }
@@ -530,7 +559,7 @@
                 width: 45%;
                 padding-right: 10px;
                 font-weight: 600;
-                color: #c9d1d9;
+                color: var(--text-primary);
             }
         }
 
@@ -887,7 +916,7 @@
                     left: 0;
                     right: 0;
                     bottom: 0;
-                    background: rgba(0, 0, 0, 0.7);
+                    background: rgba(0, 0, 0, 0.5);
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -896,35 +925,35 @@
 
                 const modal = document.createElement('div');
                 modal.style.cssText = `
-                    background: #161b22;
-                    border: 1px solid #30363d;
+                    background: #FFFFFF;
+                    border: 1px solid #CFD8DC;
                     border-radius: 8px;
                     padding: 24px;
                     max-width: 400px;
                     width: 90%;
-                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
                 `;
 
                 modal.innerHTML = `
-                    <div style="color: #c9d1d9; font-size: 18px; font-weight: 600; margin-bottom: 16px;">
+                    <div style="color: #263238; font-size: 18px; font-weight: 600; margin-bottom: 16px;">
                         ${title}
                     </div>
-                    <div style="color: #8b949e; margin-bottom: 24px; line-height: 1.5;">
+                    <div style="color: #546E7A; margin-bottom: 24px; line-height: 1.5;">
                         ${message}
                     </div>
                     <div style="display: flex; gap: 12px; justify-content: flex-end;">
                         <button class="confirmCancel" style="
-                            background: #21262d;
-                            border: 1px solid #30363d;
-                            color: #c9d1d9;
+                            background: #F5F5F5;
+                            border: 1px solid #CFD8DC;
+                            color: #263238;
                             padding: 8px 16px;
                             border-radius: 6px;
                             cursor: pointer;
                             font-size: 14px;
                         ">Cancel</button>
                         <button class="confirmOk" style="
-                            background: #da3633;
-                            border: 1px solid #f85149;
+                            background: #E53935;
+                            border: 1px solid #E53935;
                             color: white;
                             padding: 8px 16px;
                             border-radius: 6px;
@@ -968,7 +997,7 @@
                     left: 0;
                     right: 0;
                     bottom: 0;
-                    background: rgba(0, 0, 0, 0.7);
+                    background: rgba(0, 0, 0, 0.5);
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -977,26 +1006,26 @@
 
                 const modal = document.createElement('div');
                 modal.style.cssText = `
-                    background: #161b22;
-                    border: 1px solid #30363d;
+                    background: #FFFFFF;
+                    border: 1px solid #CFD8DC;
                     border-radius: 8px;
                     padding: 24px;
                     max-width: 400px;
                     width: 90%;
-                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+                    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
                 `;
 
                 modal.innerHTML = `
-                    <div style="color: #c9d1d9; font-size: 18px; font-weight: 600; margin-bottom: 16px;">
+                    <div style="color: #263238; font-size: 18px; font-weight: 600; margin-bottom: 16px;">
                         ${title}
                     </div>
-                    <div style="color: #8b949e; margin-bottom: 24px; line-height: 1.5;">
+                    <div style="color: #546E7A; margin-bottom: 24px; line-height: 1.5;">
                         ${message}
                     </div>
                     <div style="display: flex; justify-content: flex-end;">
                         <button class="alertOk" style="
-                            background: #238636;
-                            border: 1px solid #2ea043;
+                            background: #43A047;
+                            border: 1px solid #43A047;
                             color: white;
                             padding: 8px 16px;
                             border-radius: 6px;

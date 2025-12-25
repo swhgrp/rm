@@ -140,6 +140,13 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
     ready_to_send = db.query(HubInvoice).filter(HubInvoice.status == 'ready').count()
     sent_invoices = db.query(HubInvoice).filter(HubInvoice.status == 'sent').count()
     error_invoices = db.query(HubInvoice).filter(HubInvoice.status == 'error').count()
+    parse_failed = db.query(HubInvoice).filter(HubInvoice.status == 'parse_failed').count()
+    pending_parse = db.query(HubInvoice).filter(HubInvoice.status == 'pending').count()
+    # Awaiting retry = pending invoices that have been attempted at least once
+    awaiting_retry = db.query(HubInvoice).filter(
+        HubInvoice.status == 'pending',
+        HubInvoice.parse_attempts > 0
+    ).count()
 
     # Get unmapped items count (unique item descriptions, not total line items)
     from sqlalchemy import func
@@ -162,6 +169,9 @@ async def dashboard(request: Request, db: Session = Depends(get_db)):
         "ready_to_send": ready_to_send,
         "sent_invoices": sent_invoices,
         "error_invoices": error_invoices,
+        "parse_failed": parse_failed,
+        "pending_parse": pending_parse,
+        "awaiting_retry": awaiting_retry,
         "unmapped_items": unmapped_items,
         "recent_invoices": recent_invoices,
         "vendors": vendors
@@ -244,9 +254,9 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
         """)).fetchall()
         for row in gl_mappings:
             if row[0] and row[1]:  # asset account
-                gl_names[row[0]] = row[1]
+                gl_names[str(row[0])] = row[1]
             if row[2] and row[3]:  # cogs account
-                gl_names[row[2]] = row[3]
+                gl_names[str(row[2])] = row[3]
     except Exception as e:
         import logging
         logger = logging.getLogger(__name__)
@@ -673,14 +683,15 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
     logger = logging.getLogger(__name__)
 
     # Get unique item descriptions with aggregated data
-    # Query returns: (item_description, item_code, count, list of invoice numbers, list of vendors, list of invoice ids)
+    # Query returns: (item_description, item_code, count, list of invoice numbers, list of vendors, list of invoice ids, inventory_item_id)
     unique_items_query = db.query(
         HubInvoiceItem.item_description,
         HubInvoiceItem.item_code,
         func.count(HubInvoiceItem.id).label('occurrence_count'),
         func.array_agg(distinct(HubInvoice.invoice_number)).label('invoice_numbers'),
         func.array_agg(distinct(HubInvoice.vendor_name)).label('vendor_names'),
-        func.array_agg(distinct(HubInvoice.id)).label('invoice_ids')
+        func.array_agg(distinct(HubInvoice.id)).label('invoice_ids'),
+        func.max(HubInvoiceItem.inventory_item_id).label('inventory_item_id')  # Track if SKU matched in inventory
     ).join(HubInvoice).filter(
         HubInvoiceItem.is_mapped == False
     ).group_by(
@@ -723,7 +734,7 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
 
     # Format results for template with suspicious code detection
     unique_items = []
-    for desc, item_code, count, invoice_nums, vendors, invoice_ids in unique_items_query:
+    for desc, item_code, count, invoice_nums, vendors, invoice_ids, inv_item_id in unique_items_query:
         # Determine if code is suspicious
         code_status = 'none'  # no code
         is_suspicious = False
@@ -758,6 +769,9 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
             for inv_num, inv_id in zip(invoice_nums, invoice_ids):
                 invoice_list.append({'number': inv_num, 'id': inv_id})
 
+        # Determine if this is a partial match (SKU found but no category in inventory)
+        has_partial_match = inv_item_id is not None
+
         unique_items.append({
             'item_description': desc,
             'item_code': item_code,
@@ -767,7 +781,9 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
             'vendor_names': vendors if vendors else [],
             'code_status': code_status,
             'is_suspicious': is_suspicious,
-            'suspicious_reasons': suspicious_reasons
+            'suspicious_reasons': suspicious_reasons,
+            'has_partial_match': has_partial_match,
+            'inventory_item_id': inv_item_id
         })
 
     # Fetch GL accounts from Accounting API

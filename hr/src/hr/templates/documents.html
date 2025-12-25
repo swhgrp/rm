@@ -7,8 +7,8 @@
 <div style="max-width: 1400px; margin: 0 auto;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
         <div>
-            <h1 style="margin: 0 0 5px 0;">Document Management</h1>
-            <p style="color: #8b949e; margin: 0;">Centralized employee document repository with expiration tracking</p>
+            <h1 style="margin: 0 0 5px 0; color: var(--text-primary);">Document Management</h1>
+            <p style="color: var(--text-secondary); margin: 0;">Centralized employee document repository with expiration tracking</p>
         </div>
         <button class="btn btn-primary" onclick="showUploadModal()" style="white-space: nowrap;">
             <i class="bi bi-upload"></i> Upload Document
@@ -52,14 +52,14 @@
         <div style="padding: 20px;">
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
                 <div>
-                    <label for="filterType" style="display: block; margin-bottom: 5px; color: #c9d1d9; font-size: 14px;">Document Type</label>
-                    <select id="filterType" onchange="loadDocuments()" style="width: 100%; padding: 8px 12px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                    <label for="filterType" style="display: block; margin-bottom: 5px; color: var(--text-primary); font-size: 14px;">Document Type</label>
+                    <select id="filterType" onchange="loadDocuments()" style="width: 100%; padding: 8px 12px; background: var(--bg-secondary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px;">
                         <option value="">All Types</option>
                     </select>
                 </div>
                 <div>
-                    <label for="filterStatus" style="display: block; margin-bottom: 5px; color: #c9d1d9; font-size: 14px;">Status</label>
-                    <select id="filterStatus" onchange="loadDocuments()" style="width: 100%; padding: 8px 12px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                    <label for="filterStatus" style="display: block; margin-bottom: 5px; color: var(--text-primary); font-size: 14px;">Status</label>
+                    <select id="filterStatus" onchange="loadDocuments()" style="width: 100%; padding: 8px 12px; background: var(--bg-secondary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px;">
                         <option value="">All Statuses</option>
                         <option value="Current">Current</option>
                         <option value="Expiring Soon">Expiring Soon</option>
@@ -67,8 +67,8 @@
                     </select>
                 </div>
                 <div>
-                    <label for="filterEmployee" style="display: block; margin-bottom: 5px; color: #c9d1d9; font-size: 14px;">Employee</label>
-                    <select id="filterEmployee" onchange="loadDocuments()" style="width: 100%; padding: 8px 12px; background: #0d1117; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                    <label for="filterEmployee" style="display: block; margin-bottom: 5px; color: var(--text-primary); font-size: 14px;">Employee</label>
+                    <select id="filterEmployee" onchange="loadDocuments()" style="width: 100%; padding: 8px 12px; background: var(--bg-secondary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px;">
                         <option value="">All Employees</option>
                     </select>
                 </div>
@@ -90,19 +90,19 @@
         <div id="documentsTableContainer" style="overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse;">
                 <thead>
-                    <tr style="background: #161b22; border-bottom: 1px solid #30363d;">
-                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Employee</th>
-                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Document Type</th>
-                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">File Name</th>
-                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Uploaded</th>
-                        <th style="padding: 12px; text-align: left; color: #8b949e; font-weight: 600;">Expiration</th>
-                        <th style="padding: 12px; text-align: center; color: #8b949e; font-weight: 600;">Status</th>
-                        <th style="padding: 12px; text-align: center; color: #8b949e; font-weight: 600;">Actions</th>
+                    <tr style="background: var(--bg-tertiary); border-bottom: 1px solid var(--border-primary);">
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Employee</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Document Type</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">File Name</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Uploaded</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Expiration</th>
+                        <th style="padding: 12px; text-align: center; color: var(--text-secondary); font-weight: 600;">Status</th>
+                        <th style="padding: 12px; text-align: center; color: var(--text-secondary); font-weight: 600;">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="documentsTableBody">
                     <tr>
-                        <td colspan="7" style="padding: 40px; text-align: center; color: #8b949e;">
+                        <td colspan="7" style="padding: 40px; text-align: center; color: var(--text-secondary);">
                             <i class="bi bi-hourglass-split" style="font-size: 24px; display: block; margin-bottom: 10px;"></i>
                             Loading documents...
                         </td>
@@ -114,64 +114,64 @@
 </div>
 
 <!-- Document Preview Modal -->
-<div id="previewModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 1001; align-items: center; justify-content: center;">
-    <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; max-width: 90vw; width: 1200px; max-height: 90vh; display: flex; flex-direction: column;">
-        <div style="padding: 20px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0;" id="previewTitle"><i class="bi bi-eye"></i> Document Preview</h3>
-            <button onclick="closePreviewModal()" style="background: none; border: none; color: #8b949e; font-size: 24px; cursor: pointer; padding: 0; line-height: 1;">&times;</button>
+<div id="previewModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1001; align-items: center; justify-content: center;">
+    <div style="background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 6px; max-width: 90vw; width: 1200px; max-height: 90vh; display: flex; flex-direction: column;">
+        <div style="padding: 20px; border-bottom: 1px solid var(--border-primary); display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; color: var(--text-primary);" id="previewTitle"><i class="bi bi-eye"></i> Document Preview</h3>
+            <button onclick="closePreviewModal()" style="background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; padding: 0; line-height: 1;">&times;</button>
         </div>
         <div id="previewContent" style="flex: 1; overflow: auto; padding: 20px; display: flex; align-items: center; justify-content: center; min-height: 400px;">
-            <p style="color: #8b949e;"><i class="bi bi-hourglass-split"></i> Loading preview...</p>
+            <p style="color: var(--text-secondary);"><i class="bi bi-hourglass-split"></i> Loading preview...</p>
         </div>
     </div>
 </div>
 
 <!-- Upload Modal -->
-<div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
-    <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
-        <div style="padding: 20px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="margin: 0;"><i class="bi bi-upload"></i> Upload Document</h2>
-            <button onclick="hideUploadModal()" style="background: none; border: none; color: #8b949e; font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px;">&times;</button>
+<div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 6px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+        <div style="padding: 20px; border-bottom: 1px solid var(--border-primary); display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0; color: var(--text-primary);"><i class="bi bi-upload"></i> Upload Document</h2>
+            <button onclick="hideUploadModal()" style="background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px;">&times;</button>
         </div>
 
         <form id="uploadForm" enctype="multipart/form-data" style="padding: 20px;">
             <div class="form-group">
-                <label for="uploadEmployee">Employee <span style="color: #f85149;">*</span></label>
-                <select id="uploadEmployee" name="employee_id" required style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                <label for="uploadEmployee" style="color: var(--text-primary);">Employee <span style="color: var(--danger-color);">*</span></label>
+                <select id="uploadEmployee" name="employee_id" required style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px;">
                     <option value="">Select Employee</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label for="uploadType">Document Type <span style="color: #f85149;">*</span></label>
-                <select id="uploadType" name="document_type" required style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                <label for="uploadType" style="color: var(--text-primary);">Document Type <span style="color: var(--danger-color);">*</span></label>
+                <select id="uploadType" name="document_type" required style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px;">
                     <option value="">Select Type</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label for="uploadFile">File <span style="color: #f85149;">*</span></label>
+                <label for="uploadFile" style="color: var(--text-primary);">File <span style="color: var(--danger-color);">*</span></label>
                 <input type="file" id="uploadFile" name="file" required
                        accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.txt,.xlsx,.xls"
-                       style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
-                <small style="color: #8b949e; font-size: 12px;">
+                       style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px;">
+                <small style="color: var(--text-secondary); font-size: 12px;">
                     <i class="bi bi-info-circle"></i> Max 10MB. Allowed: PDF, Word, Excel, Images, Text
                 </small>
             </div>
 
             <div class="form-group">
-                <label for="uploadExpiration">Expiration Date (Optional)</label>
+                <label for="uploadExpiration" style="color: var(--text-primary);">Expiration Date (Optional)</label>
                 <input type="date" id="uploadExpiration" name="expiration_date"
-                       style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
-                <small style="color: #8b949e; font-size: 12px;">
+                       style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px;">
+                <small style="color: var(--text-secondary); font-size: 12px;">
                     <i class="bi bi-info-circle"></i> For certifications, licenses, etc.
                 </small>
             </div>
 
             <div class="form-group">
-                <label for="uploadNotes">Notes (Optional)</label>
+                <label for="uploadNotes" style="color: var(--text-primary);">Notes (Optional)</label>
                 <textarea id="uploadNotes" name="notes" rows="3"
-                          style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;"
+                          style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px;"
                           placeholder="Additional information about this document..."></textarea>
             </div>
 
@@ -238,23 +238,23 @@
 }
 
 table tbody tr {
-    border-bottom: 1px solid #21262d;
+    border-bottom: 1px solid var(--border-primary);
     transition: background 0.2s;
 }
 
 table tbody tr:hover {
-    background: #161b22;
+    background: var(--bg-tertiary);
 }
 
 table td {
     padding: 12px;
-    color: #c9d1d9;
+    color: var(--text-primary);
 }
 
 .action-btn {
     background: none;
-    border: 1px solid #30363d;
-    color: #58a6ff;
+    border: 1px solid var(--border-primary);
+    color: var(--accent-primary);
     padding: 6px 12px;
     border-radius: 6px;
     cursor: pointer;
@@ -264,16 +264,16 @@ table td {
 }
 
 .action-btn:hover {
-    background: #1c2128;
-    border-color: #58a6ff;
+    background: var(--bg-tertiary);
+    border-color: var(--accent-primary);
 }
 
 .action-btn.danger {
-    color: #f85149;
+    color: var(--danger-color);
 }
 
 .action-btn.danger:hover {
-    border-color: #f85149;
+    border-color: var(--danger-color);
 }
 </style>
 
@@ -372,7 +372,7 @@ function renderDocuments() {
     if (allDocuments.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="7" style="padding: 40px; text-align: center; color: #8b949e;">
+                <td colspan="7" style="padding: 40px; text-align: center; color: var(--text-secondary);">
                     <i class="bi bi-inbox" style="font-size: 24px; display: block; margin-bottom: 10px;"></i>
                     No documents found
                 </td>
@@ -392,13 +392,13 @@ function renderDocuments() {
         return `
             <tr>
                 <td>
-                    <div style="font-weight: 500;">${doc.employee_name}</div>
-                    <div style="font-size: 12px; color: #8b949e;">${doc.employee_number}</div>
+                    <div style="font-weight: 500; color: var(--text-primary);">${doc.employee_name}</div>
+                    <div style="font-size: 12px; color: var(--text-secondary);">${doc.employee_number}</div>
                 </td>
-                <td>${doc.document_type}</td>
+                <td style="color: var(--text-primary);">${doc.document_type}</td>
                 <td>
                     <i class="bi bi-file-earmark"></i> ${doc.file_name}
-                    <div style="font-size: 11px; color: #8b949e;">${formatFileSize(doc.file_size)}</div>
+                    <div style="font-size: 11px; color: var(--text-secondary);">${formatFileSize(doc.file_size)}</div>
                 </td>
                 <td>${uploadedDate}</td>
                 <td>${expirationDate}</td>
@@ -555,7 +555,7 @@ async function previewDocument(documentId, fileName, fileType) {
     const title = document.getElementById('previewTitle');
 
     title.innerHTML = `<i class="bi bi-eye"></i> Preview: ${fileName}`;
-    content.innerHTML = '<p style="color: #8b949e;"><i class="bi bi-hourglass-split"></i> Loading preview...</p>';
+    content.innerHTML = '<p style="color: var(--text-secondary);"><i class="bi bi-hourglass-split"></i> Loading preview...</p>';
     modal.style.display = 'flex';
 
     try {
@@ -591,7 +591,7 @@ async function previewDocument(documentId, fileName, fileType) {
         } else {
             // Unsupported file type
             content.innerHTML = `
-                <div style="text-align: center; color: #8b949e;">
+                <div style="text-align: center; color: var(--text-secondary);">
                     <i class="bi bi-file-earmark" style="font-size: 48px; margin-bottom: 15px;"></i>
                     <p>Preview not available for this file type.</p>
                     <p style="font-size: 14px; margin-top: 10px;">File type: ${extension.toUpperCase()}</p>
@@ -604,7 +604,7 @@ async function previewDocument(documentId, fileName, fileType) {
     } catch (error) {
         console.error('Error previewing document:', error);
         content.innerHTML = `
-            <p style="color: #f85149; text-align: center;">
+            <p style="color: var(--danger-color); text-align: center;">
                 <i class="bi bi-exclamation-triangle"></i> Error loading preview
             </p>
         `;

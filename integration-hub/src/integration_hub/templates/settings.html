@@ -12,10 +12,10 @@
 <div style="max-width: 1200px; margin: 0 auto;">
     <!-- Page Header -->
     <div style="margin-bottom: 30px;">
-        <h1 style="margin: 0 0 10px 0; color: #c9d1d9; font-size: 32px;">
+        <h1 style="margin: 0 0 10px 0; color: var(--text-primary); font-size: 32px;">
             <i class="bi bi-gear"></i> Settings
         </h1>
-        <p style="color: #8b949e; margin: 0;">Configure Integration Hub system settings</p>
+        <p style="color: var(--text-secondary); margin: 0;">Configure Integration Hub system settings</p>
     </div>
 
     <!-- Alert Container -->
@@ -25,7 +25,7 @@
     <div class="card" style="margin-bottom: 30px;">
         <div class="card-header">
             <h2><i class="bi bi-envelope"></i> Email Invoice Capture</h2>
-            <small style="color: #8b949e;">Configure email account for automatic invoice capture</small>
+            <small style="color: var(--text-secondary);">Configure email account for automatic invoice capture</small>
         </div>
 
         <form id="emailSettingsForm" style="padding: 25px;">
@@ -33,55 +33,55 @@
                 <!-- Email Address -->
                 <div class="form-group">
                     <label for="email_address">
-                        Email Address <span style="color: #f85149;">*</span>
+                        Email Address <span style="color: #E53935;">*</span>
                     </label>
                     <input type="email" id="email_address" name="email_address" required
                            placeholder="ap@swhgrp.com"
-                           style="width: 100%; padding: 10px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
-                    <small style="color: #8b949e; font-size: 12px;">Email address that receives vendor invoices</small>
+                           style="width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
+                    <small style="color: var(--text-secondary); font-size: 12px;">Email address that receives vendor invoices</small>
                 </div>
 
                 <!-- IMAP Username -->
                 <div class="form-group">
                     <label for="imap_username">
-                        IMAP Username <span style="color: #f85149;">*</span>
+                        IMAP Username <span style="color: #E53935;">*</span>
                     </label>
                     <input type="text" id="imap_username" name="imap_username" required
                            placeholder="ap"
-                           style="width: 100%; padding: 10px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
-                    <small style="color: #8b949e; font-size: 12px;">Username for IMAP login (may differ from email address)</small>
+                           style="width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
+                    <small style="color: var(--text-secondary); font-size: 12px;">Username for IMAP login (may differ from email address)</small>
                 </div>
 
                 <!-- Email Password -->
                 <div class="form-group">
                     <label for="email_password">
-                        App Password <span style="color: #f85149;">*</span>
+                        App Password <span style="color: #E53935;">*</span>
                     </label>
                     <input type="password" id="email_password" name="email_password" required
                            placeholder="Enter app password"
-                           style="width: 100%; padding: 10px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
-                    <small style="color: #8b949e; font-size: 12px;">Gmail app password or email password</small>
+                           style="width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
+                    <small style="color: var(--text-secondary); font-size: 12px;">Gmail app password or email password</small>
                 </div>
 
                 <!-- IMAP Server -->
                 <div class="form-group">
                     <label for="imap_host">
-                        IMAP Server <span style="color: #f85149;">*</span>
+                        IMAP Server <span style="color: #E53935;">*</span>
                     </label>
                     <input type="text" id="imap_host" name="imap_host" required
                            placeholder="imap.gmail.com"
-                           style="width: 100%; padding: 10px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
-                    <small style="color: #8b949e; font-size: 12px;">IMAP server address</small>
+                           style="width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
+                    <small style="color: var(--text-secondary); font-size: 12px;">IMAP server address</small>
                 </div>
 
                 <!-- IMAP Port -->
                 <div class="form-group">
                     <label for="imap_port">
-                        IMAP Port <span style="color: #f85149;">*</span>
+                        IMAP Port <span style="color: #E53935;">*</span>
                     </label>
                     <input type="number" id="imap_port" name="imap_port" required value="993"
-                           style="width: 100%; padding: 10px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
-                    <small style="color: #8b949e; font-size: 12px;">Usually 993 for SSL/TLS</small>
+                           style="width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
+                    <small style="color: var(--text-secondary); font-size: 12px;">Usually 993 for SSL/TLS</small>
                 </div>
 
                 <!-- Use SSL -->
@@ -91,7 +91,7 @@
                                style="width: auto; margin: 0;">
                         <span>Use SSL/TLS</span>
                     </label>
-                    <small style="color: #8b949e; font-size: 12px; display: block; margin-top: 5px;">
+                    <small style="color: var(--text-secondary); font-size: 12px; display: block; margin-top: 5px;">
                         Recommended for secure connection
                     </small>
                 </div>
@@ -103,7 +103,7 @@
                                style="width: auto; margin: 0;">
                         <span>Enable Auto-Processing</span>
                     </label>
-                    <small style="color: #8b949e; font-size: 12px; display: block; margin-top: 5px;">
+                    <small style="color: var(--text-secondary); font-size: 12px; display: block; margin-top: 5px;">
                         Automatically process new invoices (requires OCR setup)
                     </small>
                 </div>
@@ -115,14 +115,14 @@
                     Check Interval (minutes)
                 </label>
                 <input type="number" id="check_interval" name="check_interval" value="5" min="1" max="60"
-                       style="width: 200px; padding: 10px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
-                <small style="color: #8b949e; font-size: 12px; display: block; margin-top: 5px;">
+                       style="width: 200px; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
+                <small style="color: var(--text-secondary); font-size: 12px; display: block; margin-top: 5px;">
                     How often to check for new emails (1-60 minutes)
                 </small>
             </div>
 
             <!-- Action Buttons -->
-            <div style="display: flex; gap: 10px; margin-top: 25px; padding-top: 20px; border-top: 1px solid #21262d;">
+            <div style="display: flex; gap: 10px; margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--border-primary);">
                 <button type="button" id="testConnectionBtn" class="btn btn-secondary">
                     <i class="bi bi-lightning"></i> Test Connection
                 </button>
@@ -133,7 +133,7 @@
                     <i class="bi bi-save"></i> Save Settings
                 </button>
                 <div style="flex: 1;"></div>
-                <div id="connectionStatus" style="display: flex; align-items: center; gap: 8px; color: #8b949e; font-size: 14px;">
+                <div id="connectionStatus" style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 14px;">
                     <i class="bi bi-info-circle"></i> <span>Not tested</span>
                 </div>
             </div>
@@ -144,7 +144,7 @@
     <div class="card" style="margin-bottom: 30px;">
         <div class="card-header">
             <h2><i class="bi bi-file-text"></i> OCR & Data Extraction</h2>
-            <small style="color: #8b949e;">Configure OCR service for automatic invoice parsing</small>
+            <small style="color: var(--text-secondary);">Configure OCR service for automatic invoice parsing</small>
         </div>
 
         <form id="ocrSettingsForm" style="padding: 25px;">
@@ -153,13 +153,13 @@
                 <div class="form-group">
                     <label for="ocr_provider">OCR Provider</label>
                     <select id="ocr_provider" name="ocr_provider"
-                            style="width: 100%; padding: 10px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
+                            style="width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
                         <option value="">None (Manual Entry Only)</option>
                         <option value="aws_textract">AWS Textract</option>
                         <option value="google_document_ai">Google Document AI</option>
                         <option value="azure_form_recognizer">Azure Form Recognizer</option>
                     </select>
-                    <small style="color: #8b949e; font-size: 12px;">Select OCR service for invoice parsing</small>
+                    <small style="color: var(--text-secondary); font-size: 12px;">Select OCR service for invoice parsing</small>
                 </div>
 
                 <!-- Confidence Threshold -->
@@ -167,26 +167,26 @@
                     <label for="confidence_threshold">Confidence Threshold</label>
                     <input type="number" id="confidence_threshold" name="confidence_threshold"
                            value="0.85" min="0" max="1" step="0.05"
-                           style="width: 100%; padding: 10px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
-                    <small style="color: #8b949e; font-size: 12px;">Minimum confidence for auto-approval (0-1)</small>
+                           style="width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
+                    <small style="color: var(--text-secondary); font-size: 12px;">Minimum confidence for auto-approval (0-1)</small>
                 </div>
             </div>
 
             <!-- API Credentials Section (appears when provider selected) -->
-            <div id="apiCredentialsSection" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid #21262d;">
-                <h3 style="margin-bottom: 15px; color: #c9d1d9; font-size: 16px;">API Credentials</h3>
+            <div id="apiCredentialsSection" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-primary);">
+                <h3 style="margin-bottom: 15px; color: var(--text-primary); font-size: 16px;">API Credentials</h3>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <div class="form-group">
                         <label for="ocr_api_key">API Key</label>
                         <input type="password" id="ocr_api_key" name="ocr_api_key"
                                placeholder="Enter API key"
-                               style="width: 100%; padding: 10px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
+                               style="width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
                     </div>
                     <div class="form-group">
                         <label for="ocr_region">Region (if applicable)</label>
                         <input type="text" id="ocr_region" name="ocr_region"
                                placeholder="us-east-1"
-                               style="width: 100%; padding: 10px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
+                               style="width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
                     </div>
                 </div>
             </div>
@@ -204,7 +204,7 @@
     <div class="card">
         <div class="card-header">
             <h2><i class="bi bi-shield-check"></i> Deduplication</h2>
-            <small style="color: #8b949e;">Configure invoice deduplication settings</small>
+            <small style="color: var(--text-secondary);">Configure invoice deduplication settings</small>
         </div>
 
         <form id="dedupSettingsForm" style="padding: 25px;">
@@ -214,7 +214,7 @@
                            style="width: auto; margin: 0;">
                     <span>Enable Invoice Deduplication</span>
                 </label>
-                <small style="color: #8b949e; font-size: 12px; display: block; margin-top: 5px;">
+                <small style="color: var(--text-secondary); font-size: 12px; display: block; margin-top: 5px;">
                     Prevents processing duplicate invoices based on SHA-256 hash
                 </small>
             </div>
@@ -222,8 +222,8 @@
             <div class="form-group" style="margin-top: 20px;">
                 <label for="dedup_window">Deduplication Window (days)</label>
                 <input type="number" id="dedup_window" name="dedup_window" value="90" min="1" max="365"
-                       style="width: 200px; padding: 10px; background: #0d1117; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;">
-                <small style="color: #8b949e; font-size: 12px; display: block; margin-top: 5px;">
+                       style="width: 200px; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
+                <small style="color: var(--text-secondary); font-size: 12px; display: block; margin-top: 5px;">
                     Check for duplicates within this many days
                 </small>
             </div>
@@ -281,7 +281,7 @@ document.getElementById('testConnectionBtn').addEventListener('click', async fun
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Testing...';
     statusDiv.innerHTML = '<i class="bi bi-hourglass-split"></i> <span>Testing connection...</span>';
-    statusDiv.style.color = '#8b949e';
+    statusDiv.style.color = 'var(--text-secondary)';
 
     try {
         const response = await fetch('/hub/api/settings/test-email', {
@@ -302,16 +302,16 @@ document.getElementById('testConnectionBtn').addEventListener('click', async fun
 
         if (result.success) {
             statusDiv.innerHTML = '<i class="bi bi-check-circle-fill"></i> <span>Connection successful!</span>';
-            statusDiv.style.color = '#3fb950';
+            statusDiv.style.color = '#43A047';
             showAlert('Email connection test successful! ' + (result.message || ''), 'success');
         } else {
             statusDiv.innerHTML = '<i class="bi bi-x-circle-fill"></i> <span>Connection failed</span>';
-            statusDiv.style.color = '#f85149';
+            statusDiv.style.color = '#E53935';
             showAlert('Connection failed: ' + (result.message || result.error || 'Unknown error'), 'error');
         }
     } catch (error) {
         statusDiv.innerHTML = '<i class="bi bi-x-circle-fill"></i> <span>Connection failed</span>';
-        statusDiv.style.color = '#f85149';
+        statusDiv.style.color = '#E53935';
         showAlert('Error testing connection: ' + error.message, 'error');
     } finally {
         btn.disabled = false;
@@ -455,7 +455,7 @@ document.getElementById('ocr_provider').addEventListener('change', function() {
 // Alert helper
 function showAlert(message, type) {
     const alertHtml = `
-        <div class="alert alert-${type}" style="margin-bottom: 20px; padding: 12px 16px; border-radius: 6px; background: ${type === 'success' ? '#1a472a' : '#3d1212'}; border: 1px solid ${type === 'success' ? '#2da44e' : '#d1242f'}; color: ${type === 'success' ? '#3fb950' : '#f85149'};">
+        <div class="alert alert-${type}" style="margin-bottom: 20px; padding: 12px 16px; border-radius: 6px; background: ${type === 'success' ? '#E8F5E9' : '#FFEBEE'}; border: 1px solid ${type === 'success' ? '#43A047' : '#E53935'}; color: ${type === 'success' ? '#2E7D32' : '#C62828'};">
             <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}-fill"></i> ${message}
         </div>
     `;

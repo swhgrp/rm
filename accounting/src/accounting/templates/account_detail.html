@@ -6,8 +6,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
     .account-header {
-        background: #161b22;
-        border: 1px solid #30363d;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 8px;
         padding: 2rem;
         margin-bottom: 2rem;
@@ -15,7 +15,7 @@
 
     .account-header h1 {
         font-size: 2rem;
-        color: #c9d1d9;
+        color: var(--text-primary);
         margin-bottom: 0.5rem;
     }
 
@@ -33,22 +33,22 @@
 
     .meta-label {
         font-size: 0.85rem;
-        color: #8b949e;
+        color: var(--text-secondary);
         margin-bottom: 0.25rem;
     }
 
     .meta-value {
         font-size: 1.1rem;
-        color: #c9d1d9;
+        color: var(--text-primary);
         font-weight: 500;
     }
 
     .balance-positive {
-        color: #238636;
+        color: #43A047;
     }
 
     .balance-negative {
-        color: #da3633;
+        color: #C62828;
     }
 
     .action-bar {
@@ -65,35 +65,35 @@
         gap: 1rem;
         flex-wrap: wrap;
         align-items: center;
-        background: #161b22;
+        background: var(--bg-secondary);
         padding: 1rem;
         border-radius: 6px;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
     }
 
     .filters label {
         font-weight: 500;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .filters input, .filters select {
         padding: 0.5rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
-        background: #0d1117;
-        color: #c9d1d9;
+        background: var(--bg-primary);
+        color: var(--text-primary);
     }
 
     .transaction-list {
-        background: #161b22;
+        background: var(--bg-secondary);
         border-radius: 8px;
         overflow: hidden;
         box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     }
 
     .balance-chart {
-        background: #161b22;
-        border: 1px solid #30363d;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 8px;
         padding: 2rem;
         margin-bottom: 2rem;
@@ -104,8 +104,8 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        color: #8b949e;
-        border: 2px dashed #30363d;
+        color: var(--text-secondary);
+        border: 2px dashed var(--border-primary);
         border-radius: 4px;
     }
 
@@ -117,15 +117,15 @@
     }
 
     .summary-card {
-        background: #161b22;
-        border: 1px solid #30363d;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 8px;
         padding: 1.5rem;
     }
 
     .summary-card h3 {
         font-size: 0.85rem;
-        color: #8b949e;
+        color: var(--text-secondary);
         margin-bottom: 0.5rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -133,14 +133,14 @@
 
     .summary-card .value {
         font-size: 1.75rem;
-        color: #c9d1d9;
+        color: var(--text-primary);
         font-weight: 600;
     }
 
     .empty-state {
         text-align: center;
         padding: 4rem 2rem;
-        color: #8b949e;
+        color: var(--text-secondary);
     }
 
     .empty-state i {
@@ -162,7 +162,7 @@
     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem;">
         <div>
             <h1 id="accountTitle">Loading...</h1>
-            <p style="color: #8b949e; margin: 0;">Account Number: <span id="accountNumber"></span></p>
+            <p style="color: var(--text-secondary); margin: 0;">Account Number: <span id="accountNumber"></span></p>
         </div>
         <span id="accountStatusBadge" class="badge"></span>
     </div>
@@ -186,7 +186,7 @@
         </div>
     </div>
 
-    <div id="accountDescription" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #30363d; color: #8b949e; display: none;">
+    <div id="accountDescription" style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border-primary); color: var(--text-secondary); display: none;">
     </div>
 </div>
 
@@ -373,7 +373,7 @@ function displayTransactions(data) {
         return `
             <tr>
                 <td>${new Date(txn.entry_date).toLocaleDateString()}</td>
-                <td><a href="/accounting/journal-entries" style="color: #58a6ff;">${txn.entry_number}</a></td>
+                <td><a href="/accounting/journal-entries" style="color: var(--accent-primary);">${txn.entry_number}</a></td>
                 <td>${txn.description}</td>
                 <td class="number">${debit > 0 ? formatCurrency(debit) : '-'}</td>
                 <td class="number">${credit > 0 ? formatCurrency(credit) : '-'}</td>
@@ -452,15 +452,15 @@ function renderBalanceChart(data) {
             datasets: [{
                 label: 'Account Balance',
                 data: balances,
-                borderColor: '#58a6ff',
+                borderColor: 'var(--accent-primary)',
                 backgroundColor: 'rgba(88, 166, 255, 0.1)',
                 borderWidth: 2,
                 tension: 0.1,
                 fill: true,
                 pointRadius: 4,
                 pointHoverRadius: 6,
-                pointBackgroundColor: '#58a6ff',
-                pointBorderColor: '#0d1117',
+                pointBackgroundColor: 'var(--accent-primary)',
+                pointBorderColor: 'var(--bg-primary)',
                 pointBorderWidth: 2
             }]
         },
@@ -475,17 +475,17 @@ function renderBalanceChart(data) {
                 legend: {
                     display: true,
                     labels: {
-                        color: '#c9d1d9',
+                        color: 'var(--text-primary)',
                         font: {
                             size: 12
                         }
                     }
                 },
                 tooltip: {
-                    backgroundColor: '#161b22',
-                    titleColor: '#c9d1d9',
-                    bodyColor: '#c9d1d9',
-                    borderColor: '#30363d',
+                    backgroundColor: 'var(--bg-secondary)',
+                    titleColor: 'var(--text-primary)',
+                    bodyColor: 'var(--text-primary)',
+                    borderColor: 'var(--border-primary)',
                     borderWidth: 1,
                     padding: 12,
                     displayColors: false,
@@ -499,11 +499,11 @@ function renderBalanceChart(data) {
             scales: {
                 x: {
                     grid: {
-                        color: '#30363d',
+                        color: 'var(--border-primary)',
                         drawBorder: false
                     },
                     ticks: {
-                        color: '#8b949e',
+                        color: 'var(--text-secondary)',
                         maxRotation: 45,
                         minRotation: 0,
                         font: {
@@ -513,11 +513,11 @@ function renderBalanceChart(data) {
                 },
                 y: {
                     grid: {
-                        color: '#30363d',
+                        color: 'var(--border-primary)',
                         drawBorder: false
                     },
                     ticks: {
-                        color: '#8b949e',
+                        color: 'var(--text-secondary)',
                         font: {
                             size: 11
                         },

@@ -45,6 +45,7 @@ class AccountResponse(BaseModel):
 
     class Config:
         from_attributes = True
+        use_enum_values = True
 
 
 router = APIRouter(prefix="/api/accounts", tags=["Accounts"])

@@ -98,8 +98,13 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     """Handle HTTP exceptions - redirect 401 to Portal login for HTML requests"""
     if exc.status_code == 401:  # HTTP_401_UNAUTHORIZED
         # Check if this is an HTML request (not API)
+        # API requests go through /api/ path and should get JSON responses
         accept = request.headers.get("accept", "")
-        if "text/html" in accept or "/inventory/" in request.url.path:
+        path = str(request.url.path)
+        is_api_request = "/api/" in path
+
+        # Only redirect for HTML page requests, not API requests
+        if not is_api_request and "text/html" in accept:
             # Redirect to Portal login instead of local login
             from fastapi.responses import RedirectResponse
             return RedirectResponse(url="/portal/login?redirect=/inventory/", status_code=302)

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Journal Entries - Restaurant Accounting{% endblock %}
-{% block nav_journal %}active{% endblock %}
+{% block title %}{% if source == 'sale' %}DSS Journal Entries{% elif source == 'bill' %}Bill Journal Entries{% else %}Journal Entries{% endif %} - Restaurant Accounting{% endblock %}
+{% if source == 'sale' %}{% block nav_dss_journal %}active{% endblock %}{% elif source == 'bill' %}{% block nav_bill_journal %}active{% endblock %}{% else %}{% block nav_journal %}active{% endblock %}{% endif %}
 
 {% block extra_head %}
 <style>
@@ -14,7 +14,7 @@
 
     .page-header h1 {
         font-size: 2rem;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .view-toggle {
@@ -24,17 +24,17 @@
 
     .view-toggle button {
         padding: 0.5rem 1rem;
-        border: 1px solid #30363d;
-        background: #161b22;
-        color: #c9d1d9;
+        border: 1px solid var(--border-primary);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
         cursor: pointer;
         border-radius: 4px;
     }
 
     .view-toggle button.active {
-        background: #238636;
+        background: #43A047;
         color: white;
-        border-color: #238636;
+        border-color: #43A047;
     }
 
     #listView, #createView {
@@ -51,44 +51,44 @@
         margin-bottom: 1.5rem;
         flex-wrap: wrap;
         align-items: center;
-        background: #161b22;
+        background: var(--bg-secondary);
         padding: 1rem;
         border-radius: 6px;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
     }
 
     .filters label {
         font-weight: 500;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .filters select, .filters input {
         padding: 0.5rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
-        background: #0d1117;
-        color: #c9d1d9;
+        background: var(--bg-primary);
+        color: var(--text-primary);
     }
 
     .entries-table {
-        background: #161b22;
+        background: var(--bg-secondary);
         border-radius: 8px;
         overflow: hidden;
         box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     }
 
     .status-draft {
-        background: #9e6a03;
+        background: #F57C00;
         color: white;
     }
 
     .status-posted {
-        background: #238636;
+        background: #43A047;
         color: white;
     }
 
     .status-reversed {
-        background: #da3633;
+        background: #C62828;
         color: white;
     }
 
@@ -107,17 +107,17 @@
     }
 
     .form-section {
-        background: #161b22;
+        background: var(--bg-secondary);
         padding: 2rem;
         border-radius: 8px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         margin-bottom: 2rem;
     }
 
     .form-section h3 {
         margin-bottom: 1.5rem;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .form-group {
@@ -128,17 +128,17 @@
         display: block;
         margin-bottom: 0.5rem;
         font-weight: 500;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .form-group input, .form-group select, .form-group textarea {
         width: 100%;
         padding: 0.5rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
         font-size: 1rem;
-        background: #0d1117;
-        color: #c9d1d9;
+        background: var(--bg-primary);
+        color: var(--text-primary);
     }
 
     .form-row {
@@ -155,22 +155,22 @@
 
     .line-items-table th, .line-items-table td {
         padding: 0.75rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         text-align: left;
     }
 
     .line-items-table th {
-        background: #21262d;
+        background: var(--bg-tertiary);
         font-weight: 600;
     }
 
     .line-items-table input, .line-items-table select {
         width: 100%;
         padding: 0.4rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
-        background: #0d1117;
-        color: #c9d1d9;
+        background: var(--bg-primary);
+        color: var(--text-primary);
     }
 
     .line-items-table .account-select {
@@ -178,7 +178,7 @@
     }
 
     .balance-summary {
-        background: #21262d;
+        background: var(--bg-tertiary);
         padding: 1rem;
         border-radius: 4px;
         margin-bottom: 1rem;
@@ -206,11 +206,11 @@
     }
 
     .balanced {
-        color: #238636;
+        color: #43A047;
     }
 
     .unbalanced {
-        color: #da3633;
+        color: #C62828;
     }
 
     .message {
@@ -225,15 +225,15 @@
     }
 
     .message.success {
-        background: #238636;
+        background: #43A047;
         color: white;
-        border: 1px solid #2ea043;
+        border: 1px solid #388E3C;
     }
 
     .message.error {
-        background: #da3633;
+        background: #C62828;
         color: white;
-        border: 1px solid #f85149;
+        border: 1px solid #E53935;
     }
 
     .form-actions {
@@ -247,7 +247,7 @@
         background: none;
         border: none;
         cursor: pointer;
-        color: #da3633;
+        color: #C62828;
         font-size: 1.2rem;
         padding: 0.25rem;
     }
@@ -528,7 +528,7 @@ function renderEntriesTable() {
 
         const locationDisplay = uniqueAreas.size > 0
             ? Array.from(uniqueAreas).join(', ')
-            : '<span style="color: #8b949e;">Corporate</span>';
+            : '<span style="color: var(--text-secondary);">Corporate</span>';
 
         // Check if this is a credit memo (AP account debited instead of credited)
         // Credit memos have AP (account 2100) with a debit amount

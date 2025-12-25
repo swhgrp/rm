@@ -16,6 +16,12 @@
             <button class="btn btn-outline-secondary" onclick="clearItemSearch()">Clear</button>
         </div>
         <div>
+            <button class="btn btn-warning me-2" id="mergeSelectedBtn" onclick="showMergeSelectedModal()" style="display: none;">
+                <i class="bi bi-arrow-left-right"></i> Merge Selected (<span id="mergeSelectedCount">0</span>)
+            </button>
+            <button class="btn btn-outline-warning me-2" onclick="findDuplicates()">
+                <i class="bi bi-files"></i> Find Duplicates
+            </button>
             <button class="btn btn-outline-primary me-2" onclick="showMasterItemUploadModal()">
                 <i class="bi bi-upload"></i> Import Master Items
             </button>
@@ -30,6 +36,7 @@
             <table class="table table-hover mb-0">
                 <thead class="table-dark">
                     <tr>
+                        <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="selectAllItems" onchange="toggleSelectAll(this)" title="Select all for merge"></th>
                         <th>Name</th>
                         <th>Category</th>
                         <th>Unit</th>
@@ -40,7 +47,7 @@
                 </thead>
                 <tbody id="itemsTableBody">
                     <tr>
-                        <td colspan="6" class="text-center">
+                        <td colspan="7" class="text-center">
                             <div class="spinner-border spinner-border-sm" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
@@ -260,6 +267,103 @@
         </div>
     </div>
 </div>
+
+<!-- Duplicates Modal -->
+<div class="modal fade" id="duplicatesModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Potential Duplicate Items</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="duplicatesLoading" class="text-center py-3">
+                    <div class="spinner-border spinner-border-sm" role="status"></div>
+                    <p class="mt-2">Scanning for duplicates...</p>
+                </div>
+                <div id="duplicatesContent" style="display: none;">
+                    <div class="alert alert-info mb-3">
+                        <i class="bi bi-info-circle"></i> Select which item to <strong>keep</strong> (target) and which to <strong>merge</strong> (source).
+                        All vendor items, invoices, and records from the source will be moved to the target, then the source will be deleted.
+                    </div>
+                    <div id="duplicatesList"></div>
+                </div>
+                <div id="duplicatesEmpty" style="display: none;" class="alert alert-success">
+                    <i class="bi bi-check-circle"></i> No duplicate items found! Your master items list is clean.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Merge Confirmation Modal -->
+<div class="modal fade" id="mergeConfirmModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-exclamation-triangle"></i> Confirm Merge</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>You are about to merge:</p>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <p class="mb-1"><strong>Source (will be deleted):</strong></p>
+                        <p class="text-danger mb-0" id="mergeSourceName">-</p>
+                    </div>
+                </div>
+                <div class="text-center mb-3">
+                    <i class="bi bi-arrow-down fs-3 text-primary"></i>
+                </div>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <p class="mb-1"><strong>Target (will be kept):</strong></p>
+                        <p class="text-success mb-0" id="mergeTargetName">-</p>
+                    </div>
+                </div>
+                <div class="alert alert-warning">
+                    <strong>This action cannot be undone!</strong> All vendor items, invoices, inventory records, and other references
+                    will be moved from the source to the target item.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="confirmMergeBtn" onclick="executeMerge()">
+                    <i class="bi bi-arrow-left-right"></i> Merge Items
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Manual Merge Selection Modal -->
+<div class="modal fade" id="manualMergeModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Merge Selected Items</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Select which item to <strong class="text-success">KEEP</strong>. All others will be merged into it and deleted.</p>
+                <div id="manualMergeItemsList"></div>
+                <div class="alert alert-warning mt-3">
+                    <strong>This action cannot be undone!</strong> All vendor items, invoices, inventory records, and other references
+                    from deleted items will be moved to the kept item.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="executeManualMergeBtn" onclick="executeManualMerge()">
+                    <i class="bi bi-arrow-left-right"></i> Merge Items
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -273,6 +377,10 @@
     let itemModal = null;
     let confirmCallback = null;
 
+    // Manual merge selection
+    let selectedForMerge = new Map(); // Map of itemId -> {id, name}
+    let manualMergeModal = null;
+
     // API helper
     async function apiRequest(url, options = {}) {
         const token = localStorage.getItem('access_token');
@@ -285,9 +393,25 @@
 
         const response = await fetch(url, { ...defaultOptions, ...options });
 
+        // Check if we were redirected to login page (302 redirect followed by browser)
+        // This happens when the server returns 302 but browser follows it automatically
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('text/html')) {
+            // We got HTML instead of JSON - likely redirected to login page
+            const text = await response.text();
+            if (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('login')) {
+                // Session expired or invalid - redirect to login
+                localStorage.clear();
+                const redirectUrl = encodeURIComponent(window.location.href);
+                window.location.replace('/portal/login?redirect=' + redirectUrl);
+                throw new Error('Session expired. Redirecting to login...');
+            }
+        }
+
         if (response.status === 401) {
             localStorage.clear();
-            window.location.href = '/login';
+            const redirectUrl = encodeURIComponent(window.location.href);
+            window.location.replace('/portal/login?redirect=' + redirectUrl);
             throw new Error('Unauthorized');
         }
 
@@ -295,7 +419,6 @@
             // Try to parse JSON error, but handle non-JSON responses
             let errorMessage = 'Request failed';
             try {
-                const contentType = response.headers.get('content-type');
                 if (contentType && contentType.includes('application/json')) {
                     const error = await response.json();
                     errorMessage = error.detail || error.message || 'Request failed';
@@ -375,7 +498,7 @@
         const displayList = filteredItems || items;
 
         if (displayList.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="6" class="text-center">No items found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No items found</td></tr>';
             return;
         }
 
@@ -400,8 +523,17 @@
                 }
             }
 
+            // Check if this item is in our selected set
+            const isChecked = selectedForMerge.has(item.id) ? 'checked' : '';
+
             return `
-                <tr style="cursor: pointer;" onclick="goToItemDetail(${item.id})">
+                <tr style="cursor: pointer;" onclick="goToItemDetail(${item.id})" data-item-id="${item.id}">
+                    <td onclick="event.stopPropagation();">
+                        <input type="checkbox" class="form-check-input item-select-checkbox"
+                               data-item-id="${item.id}"
+                               data-item-name="${escapeHtml(item.name)}"
+                               onchange="updateMergeSelection(this)" ${isChecked}>
+                    </td>
                     <td><a href="item-detail?id=${item.id}" class="text-decoration-none text-primary" onclick="event.stopPropagation();">${item.name}</a></td>
                     <td>${item.category || '-'}</td>
                     <td>${item.unit_of_measure || '-'}</td>
@@ -418,6 +550,9 @@
                 </tr>
             `;
         }).join('');
+
+        // Update select all checkbox state
+        updateSelectAllState();
     }
 
     // Navigate to item detail page
@@ -1029,6 +1164,405 @@
 
     function closeMasterItemUploadModal() {
         bootstrap.Modal.getInstance(document.getElementById('masterItemUploadModal')).hide();
+    }
+
+    // ========== MERGE DUPLICATES ==========
+    let pendingMerge = { sourceId: null, targetId: null };
+    let duplicatesModal = null;
+    let mergeConfirmModal = null;
+
+    async function findDuplicates() {
+        // Show duplicates modal with loading state
+        document.getElementById('duplicatesLoading').style.display = 'block';
+        document.getElementById('duplicatesContent').style.display = 'none';
+        document.getElementById('duplicatesEmpty').style.display = 'none';
+
+        if (!duplicatesModal) {
+            duplicatesModal = new bootstrap.Modal(document.getElementById('duplicatesModal'));
+        }
+        duplicatesModal.show();
+
+        try {
+            const response = await apiRequest('api/items/duplicates');
+            document.getElementById('duplicatesLoading').style.display = 'none';
+
+            if (!response.potential_duplicates || response.potential_duplicates.length === 0) {
+                document.getElementById('duplicatesEmpty').style.display = 'block';
+                return;
+            }
+
+            // Render duplicates list
+            renderDuplicatesList(response.potential_duplicates);
+            document.getElementById('duplicatesContent').style.display = 'block';
+
+        } catch (error) {
+            document.getElementById('duplicatesLoading').style.display = 'none';
+            showAlert('Error finding duplicates: ' + error.message, 'danger');
+            duplicatesModal.hide();
+        }
+    }
+
+    function renderDuplicatesList(duplicates) {
+        const container = document.getElementById('duplicatesList');
+        container.innerHTML = '';
+
+        duplicates.forEach((dup, index) => {
+            // Create a unique ID for this pair based on the item IDs
+            const pairId = `${dup.item1.id}_${dup.item2.id}`;
+            const card = document.createElement('div');
+            card.className = 'card mb-3';
+            card.id = `dup_card_${pairId}`;
+            card.innerHTML = `
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><strong>Category:</strong> ${dup.category || 'N/A'}</span>
+                    <span class="badge bg-secondary">Pair ${index + 1}</span>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-2">Select which item to <strong class="text-success">KEEP</strong>. The other will be <strong class="text-danger">DELETED</strong> and its records merged.</p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-check border rounded p-2 h-100" id="card_${pairId}_1">
+                                <input class="form-check-input" type="radio" name="merge_target_${pairId}" id="target_${pairId}_1" value="${dup.item1.id}" checked onchange="updateDupCards('${pairId}')">
+                                <label class="form-check-label w-100" for="target_${pairId}_1">
+                                    <span class="badge bg-success mb-1">KEEP</span>
+                                    <br><strong>${dup.item1.name}</strong>
+                                    <br><small class="text-muted">ID: ${dup.item1.id}</small>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check border rounded p-2 h-100" id="card_${pairId}_2">
+                                <input class="form-check-input" type="radio" name="merge_target_${pairId}" id="target_${pairId}_2" value="${dup.item2.id}" onchange="updateDupCards('${pairId}')">
+                                <label class="form-check-label w-100" for="target_${pairId}_2">
+                                    <span class="badge bg-danger mb-1">DELETE</span>
+                                    <br><strong>${dup.item2.name}</strong>
+                                    <br><small class="text-muted">ID: ${dup.item2.id}</small>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-end">
+                        <button class="btn btn-sm btn-outline-secondary me-2" onclick="skipDuplicate('${pairId}')">
+                            <i class="bi bi-x"></i> Not Duplicates
+                        </button>
+                        <button class="btn btn-sm btn-warning" onclick="confirmMerge('${pairId}', ${dup.item1.id}, '${escapeHtml(dup.item1.name)}', ${dup.item2.id}, '${escapeHtml(dup.item2.name)}')">
+                            <i class="bi bi-arrow-left-right"></i> Merge
+                        </button>
+                    </div>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+
+        // Initialize card styles
+        duplicates.forEach((dup) => {
+            const pairId = `${dup.item1.id}_${dup.item2.id}`;
+            updateDupCards(pairId);
+        });
+    }
+
+    function updateDupCards(pairId) {
+        const radio1 = document.getElementById(`target_${pairId}_1`);
+        const radio2 = document.getElementById(`target_${pairId}_2`);
+        const card1 = document.getElementById(`card_${pairId}_1`);
+        const card2 = document.getElementById(`card_${pairId}_2`);
+
+        if (!card1 || !card2) return;
+
+        const label1 = card1.querySelector('.badge');
+        const label2 = card2.querySelector('.badge');
+
+        if (radio1.checked) {
+            card1.classList.add('border-success', 'bg-success', 'bg-opacity-10');
+            card1.classList.remove('border-danger', 'bg-danger', 'bg-opacity-10');
+            label1.classList.add('bg-success');
+            label1.classList.remove('bg-danger');
+            label1.textContent = 'KEEP';
+
+            card2.classList.add('border-danger', 'bg-danger', 'bg-opacity-10');
+            card2.classList.remove('border-success', 'bg-success', 'bg-opacity-10');
+            label2.classList.add('bg-danger');
+            label2.classList.remove('bg-success');
+            label2.textContent = 'DELETE';
+        } else {
+            card2.classList.add('border-success', 'bg-success', 'bg-opacity-10');
+            card2.classList.remove('border-danger', 'bg-danger', 'bg-opacity-10');
+            label2.classList.add('bg-success');
+            label2.classList.remove('bg-danger');
+            label2.textContent = 'KEEP';
+
+            card1.classList.add('border-danger', 'bg-danger', 'bg-opacity-10');
+            card1.classList.remove('border-success', 'bg-success', 'bg-opacity-10');
+            label1.classList.add('bg-danger');
+            label1.classList.remove('bg-success');
+            label1.textContent = 'DELETE';
+        }
+    }
+
+    function skipDuplicate(pairId) {
+        // Hide this card (not actually duplicates)
+        const card = document.getElementById(`dup_card_${pairId}`);
+        if (card) {
+            card.style.display = 'none';
+            checkRemainingCards();
+        }
+    }
+
+    function checkRemainingCards() {
+        const remainingCards = document.querySelectorAll('#duplicatesList > .card:not([style*="display: none"])');
+        if (remainingCards.length === 0) {
+            document.getElementById('duplicatesContent').style.display = 'none';
+            document.getElementById('duplicatesEmpty').style.display = 'block';
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML.replace(/'/g, "\\'");
+    }
+
+    function confirmMerge(pairId, item1Id, item1Name, item2Id, item2Name) {
+        // Determine which item is the target (to keep) based on radio selection
+        const selectedRadio = document.querySelector(`input[name="merge_target_${pairId}"]:checked`);
+        const targetId = parseInt(selectedRadio.value);
+
+        let sourceId, sourceName, targetName;
+        if (targetId === item1Id) {
+            sourceId = item2Id;
+            sourceName = item2Name;
+            targetName = item1Name;
+        } else {
+            sourceId = item1Id;
+            sourceName = item1Name;
+            targetName = item2Name;
+        }
+
+        // Store pending merge info (including pairId for removal after merge)
+        pendingMerge = { sourceId, targetId, pairId };
+
+        // Update confirmation modal
+        document.getElementById('mergeSourceName').textContent = `${sourceName} (ID: ${sourceId})`;
+        document.getElementById('mergeTargetName').textContent = `${targetName} (ID: ${targetId})`;
+
+        // Show confirmation modal
+        if (!mergeConfirmModal) {
+            mergeConfirmModal = new bootstrap.Modal(document.getElementById('mergeConfirmModal'));
+        }
+        mergeConfirmModal.show();
+    }
+
+    function removeDuplicateCard(pairId) {
+        // Remove the card from the list with a fade animation
+        const card = document.getElementById(`dup_card_${pairId}`);
+        if (card) {
+            card.style.transition = 'opacity 0.3s, transform 0.3s';
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.95)';
+            setTimeout(() => {
+                card.remove();
+                checkRemainingCards();
+            }, 300);
+        }
+    }
+
+    async function executeMerge() {
+        const { sourceId, targetId, pairId } = pendingMerge;
+
+        if (!sourceId || !targetId) {
+            showAlert('Invalid merge selection', 'danger');
+            return;
+        }
+
+        // Disable button and show loading
+        const btn = document.getElementById('confirmMergeBtn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Merging...';
+
+        try {
+            const response = await apiRequest(`api/items/merge?source_id=${sourceId}&target_id=${targetId}`, {
+                method: 'POST'
+            });
+
+            // Only hide the confirmation modal, keep duplicates modal open
+            mergeConfirmModal.hide();
+
+            // Remove the merged pair from the list
+            removeDuplicateCard(pairId);
+
+            // Show success message with details
+            const recordsMoved = response.total_records_moved || 0;
+            showAlert(`Successfully merged items! ${recordsMoved} records were moved.`, 'success');
+
+            // Reload items list in background
+            loadItems();
+
+        } catch (error) {
+            // Hide confirmation modal first
+            mergeConfirmModal.hide();
+
+            // If item not found (404), it was already merged - just remove the card
+            if (error.message && (error.message.includes('404') || error.message.includes('not found'))) {
+                removeDuplicateCard(pairId);
+                showAlert('Item was already merged or deleted. Removing from list.', 'warning');
+                loadItems();
+            } else {
+                showAlert('Error merging items: ' + error.message, 'danger');
+            }
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+
+    // ========== MANUAL MERGE SELECTION ==========
+
+    function updateMergeSelection(checkbox) {
+        const itemId = parseInt(checkbox.dataset.itemId);
+        const itemName = checkbox.dataset.itemName;
+
+        if (checkbox.checked) {
+            selectedForMerge.set(itemId, { id: itemId, name: itemName });
+        } else {
+            selectedForMerge.delete(itemId);
+        }
+
+        updateMergeButton();
+    }
+
+    function updateMergeButton() {
+        const btn = document.getElementById('mergeSelectedBtn');
+        const countSpan = document.getElementById('mergeSelectedCount');
+        const count = selectedForMerge.size;
+
+        countSpan.textContent = count;
+
+        if (count >= 2) {
+            btn.style.display = 'inline-block';
+        } else {
+            btn.style.display = 'none';
+        }
+    }
+
+    function toggleSelectAll(masterCheckbox) {
+        const checkboxes = document.querySelectorAll('.item-select-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = masterCheckbox.checked;
+            updateMergeSelection(cb);
+        });
+    }
+
+    function updateSelectAllState() {
+        const masterCheckbox = document.getElementById('selectAllItems');
+        const checkboxes = document.querySelectorAll('.item-select-checkbox');
+        const checkedCount = document.querySelectorAll('.item-select-checkbox:checked').length;
+
+        if (checkboxes.length === 0) {
+            masterCheckbox.checked = false;
+            masterCheckbox.indeterminate = false;
+        } else if (checkedCount === 0) {
+            masterCheckbox.checked = false;
+            masterCheckbox.indeterminate = false;
+        } else if (checkedCount === checkboxes.length) {
+            masterCheckbox.checked = true;
+            masterCheckbox.indeterminate = false;
+        } else {
+            masterCheckbox.checked = false;
+            masterCheckbox.indeterminate = true;
+        }
+    }
+
+    function showMergeSelectedModal() {
+        if (selectedForMerge.size < 2) {
+            showAlert('Please select at least 2 items to merge', 'warning');
+            return;
+        }
+
+        // Build the list of items with radio buttons
+        const container = document.getElementById('manualMergeItemsList');
+        container.innerHTML = '';
+
+        const itemsArray = Array.from(selectedForMerge.values());
+
+        itemsArray.forEach((item, index) => {
+            const div = document.createElement('div');
+            div.className = 'form-check border rounded p-2 mb-2';
+            div.innerHTML = `
+                <input class="form-check-input" type="radio" name="manual_merge_target"
+                       id="manual_target_${item.id}" value="${item.id}" ${index === 0 ? 'checked' : ''}>
+                <label class="form-check-label w-100" for="manual_target_${item.id}">
+                    <strong>${item.name}</strong>
+                    <br><small class="text-muted">ID: ${item.id}</small>
+                </label>
+            `;
+            container.appendChild(div);
+        });
+
+        // Show modal
+        if (!manualMergeModal) {
+            manualMergeModal = new bootstrap.Modal(document.getElementById('manualMergeModal'));
+        }
+        manualMergeModal.show();
+    }
+
+    async function executeManualMerge() {
+        const selectedRadio = document.querySelector('input[name="manual_merge_target"]:checked');
+        if (!selectedRadio) {
+            showAlert('Please select which item to keep', 'warning');
+            return;
+        }
+
+        const targetId = parseInt(selectedRadio.value);
+        const sourceIds = Array.from(selectedForMerge.keys()).filter(id => id !== targetId);
+
+        if (sourceIds.length === 0) {
+            showAlert('No items to merge', 'warning');
+            return;
+        }
+
+        // Disable button and show loading
+        const btn = document.getElementById('executeManualMergeBtn');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Merging...';
+
+        let mergedCount = 0;
+        let errors = [];
+
+        // Merge each source into target one by one
+        for (const sourceId of sourceIds) {
+            try {
+                await apiRequest(`api/items/merge?source_id=${sourceId}&target_id=${targetId}`, {
+                    method: 'POST'
+                });
+                mergedCount++;
+            } catch (error) {
+                // If 404, item was already merged or deleted - continue
+                if (error.message && (error.message.includes('404') || error.message.includes('not found'))) {
+                    mergedCount++;
+                } else {
+                    errors.push(`Item ${sourceId}: ${error.message}`);
+                }
+            }
+        }
+
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+        manualMergeModal.hide();
+
+        // Clear selection
+        selectedForMerge.clear();
+        updateMergeButton();
+
+        // Reload items and show result
+        loadItems();
+
+        if (errors.length > 0) {
+            showAlert(`Merged ${mergedCount} items. Errors: ${errors.join(', ')}`, 'warning');
+        } else {
+            showAlert(`Successfully merged ${mergedCount} items into the target item!`, 'success');
+        }
     }
 </script>
 {% endblock %}

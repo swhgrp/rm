@@ -798,8 +798,8 @@
                         <button class="btn btn-sm btn-outline-primary me-1" onclick="editVendorItem(${vi.id})" title="Edit">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="confirmDeleteVendorItem(${vi.id}, '${vi.vendor_name}')" title="Delete">
-                            <i class="bi bi-trash"></i>
+                        <button class="btn btn-sm btn-outline-warning" onclick="confirmUnlinkVendorItem(${vi.id}, '${vi.vendor_name}')" title="Unlink from this master item">
+                            <i class="bi bi-link-45deg"></i>
                         </button>
                     </td>
                 </tr>
@@ -1229,19 +1229,29 @@
         }
     }
 
-    // Confirm delete vendor item
-    function confirmDeleteVendorItem(vendorItemId, vendorName) {
+    // Confirm unlink vendor item (removes association, does NOT delete the vendor item)
+    function confirmUnlinkVendorItem(vendorItemId, vendorName) {
         document.getElementById('confirmDeleteBody').textContent =
-            `Are you sure you want to remove ${vendorName} as a vendor for this item?`;
+            `Unlink ${vendorName} from this master item? The vendor item will remain in the system but won't be associated with this master item.`;
+
+        document.getElementById('confirmDeleteBtn').textContent = 'Unlink';
+        document.getElementById('confirmDeleteBtn').className = 'btn btn-warning';
 
         document.getElementById('confirmDeleteBtn').onclick = async function() {
             try {
-                await apiRequest(`api/vendor-items/${vendorItemId}`, { method: 'DELETE' });
-                showAlert('Vendor removed successfully!', 'success');
+                // Set master_item_id to null instead of deleting
+                await apiRequest(`api/vendor-items/${vendorItemId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify({ master_item_id: null })
+                });
+                showAlert('Vendor item unlinked successfully!', 'success');
                 confirmDeleteModal.hide();
+                // Reset button style
+                document.getElementById('confirmDeleteBtn').textContent = 'Delete';
+                document.getElementById('confirmDeleteBtn').className = 'btn btn-danger';
                 await loadVendorItems();
             } catch (error) {
-                showAlert('Error removing vendor: ' + error.message, 'danger');
+                showAlert('Error unlinking vendor: ' + error.message, 'danger');
             }
         };
 
@@ -1281,9 +1291,12 @@
         select.innerHTML = allowNone
             ? '<option value="">None</option>'
             : '<option value="">Select unit...</option>';
-        unitsOfMeasure.forEach(unit => {
-            select.innerHTML += `<option value="${unit.id}">${unit.name} (${unit.abbreviation})</option>`;
-        });
+        // Sort units alphabetically by name
+        [...unitsOfMeasure]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .forEach(unit => {
+                select.innerHTML += `<option value="${unit.id}">${unit.name} (${unit.abbreviation})</option>`;
+            });
     }
 
     // Populate vendor dropdown

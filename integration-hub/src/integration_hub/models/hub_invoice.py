@@ -63,12 +63,19 @@ class HubInvoice(Base):
 
     # Overall status
     status = Column(String(50), default='pending', index=True)
-    # 'pending' - just received
+    # 'pending' - just received, awaiting parsing
+    # 'parsing' - currently being parsed
+    # 'parse_failed' - parsing failed after max retries
     # 'mapping' - items being mapped
     # 'ready' - all items mapped, ready to send
     # 'sent' - sent to both systems
     # 'error' - sync error
     # 'partial' - sent to one system but not other
+
+    # Parse retry tracking
+    parse_attempts = Column(Integer, default=0)  # Number of parse attempts
+    parse_error = Column(Text, nullable=True)  # Last parse error message
+    next_parse_retry_at = Column(DateTime(timezone=True), nullable=True)  # When to retry parsing
 
     # Approval tracking
     approved_by = Column(Integer, nullable=True)

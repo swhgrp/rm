@@ -109,25 +109,25 @@
     </div>
 
     <!-- Search and Filters -->
-    <div style="padding: 1.5rem; border-bottom: 1px solid #30363d; background: #161b22;">
+    <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-primary); background: var(--bg-tertiary);">
         <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1rem; align-items: end;">
             <div>
-                <label for="searchInput" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9; font-size: 14px;">Search</label>
+                <label for="searchInput" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary); font-size: 14px;">Search</label>
                 <input type="text" id="searchInput" placeholder="Search by name, email, or phone..."
-                       style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9; font-size: 14px;"
+                       style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-primary); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;"
                        oninput="filterEmployees()">
             </div>
             <div>
-                <label for="locationFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9; font-size: 14px;">Location</label>
+                <label for="locationFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary); font-size: 14px;">Location</label>
                 <select id="locationFilter" onchange="filterEmployees()"
-                        style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9; font-size: 14px;">
+                        style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-primary); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;">
                     <option value="all">All Locations</option>
                 </select>
             </div>
             <div>
-                <label for="statusFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9; font-size: 14px;">Status</label>
+                <label for="statusFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary); font-size: 14px;">Status</label>
                 <select id="statusFilter" onchange="filterEmployees()"
-                        style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9; font-size: 14px;">
+                        style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-primary); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;">
                     <option value="all">All Statuses</option>
                     <option value="Active" selected>Active Only</option>
                     <option value="Terminated">Terminated Only</option>
@@ -164,17 +164,17 @@
 </div>
 
 <!-- Bulk Upload Modal -->
-<div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
-    <div style="background: #0d1117; border: 1px solid #30363d; border-radius: 6px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
-        <div style="padding: 20px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center;">
-            <h2 style="margin: 0;"><i class="bi bi-upload"></i> Bulk Upload Employees</h2>
-            <button onclick="hideUploadModal()" style="background: none; border: none; color: #8b949e; font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px;">&times;</button>
+<div id="uploadModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center;">
+    <div style="background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 6px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+        <div style="padding: 20px; border-bottom: 1px solid var(--border-primary); display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0; color: var(--text-primary);"><i class="bi bi-upload"></i> Bulk Upload Employees</h2>
+            <button onclick="hideUploadModal()" style="background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; padding: 0; width: 30px; height: 30px;">&times;</button>
         </div>
 
         <div style="padding: 20px;">
-            <div style="background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
-                <h4 style="margin: 0 0 10px 0; color: #58a6ff;"><i class="bi bi-info-circle"></i> Instructions</h4>
-                <ol style="margin: 0; padding-left: 20px; color: #c9d1d9; font-size: 14px; line-height: 1.6;">
+            <div style="background: var(--bg-tertiary); border: 1px solid var(--border-primary); border-radius: 6px; padding: 15px; margin-bottom: 20px;">
+                <h4 style="margin: 0 0 10px 0; color: var(--accent-primary);"><i class="bi bi-info-circle"></i> Instructions</h4>
+                <ol style="margin: 0; padding-left: 20px; color: var(--text-primary); font-size: 14px; line-height: 1.6;">
                     <li>Download the CSV template below</li>
                     <li>Fill in your employee data (one row per employee)</li>
                     <li>For locations, use pipe-separated names (e.g., "Seaside Grill|SW Grill")</li>
@@ -188,11 +188,11 @@
 
             <form id="uploadForm" onsubmit="handleBulkUpload(event)">
                 <div class="form-group">
-                    <label for="csvFile" style="display: block; margin-bottom: 8px; font-weight: 600;">
-                        CSV File <span style="color: #f85149;">*</span>
+                    <label for="csvFile" style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-primary);">
+                        CSV File <span style="color: var(--danger-color);">*</span>
                     </label>
                     <input type="file" id="csvFile" accept=".csv" required
-                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                           style="width: 100%; padding: 10px; background: var(--bg-secondary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px;">
                 </div>
 
                 <div id="uploadResults"></div>
@@ -562,30 +562,30 @@ async function handleBulkUpload(e) {
         // Show results
         resultsDiv.style.display = 'block';
         resultsDiv.innerHTML = `
-            <div style="padding: 15px; background: #161b22; border: 1px solid #30363d; border-radius: 6px; margin-top: 15px;">
-                <h4 style="margin: 0 0 10px 0; color: #58a6ff;">Upload Results</h4>
+            <div style="padding: 15px; background: var(--bg-tertiary); border: 1px solid var(--border-primary); border-radius: 6px; margin-top: 15px;">
+                <h4 style="margin: 0 0 10px 0; color: var(--accent-primary);">Upload Results</h4>
                 <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
-                    <div style="padding: 10px; background: #0d1117; border-radius: 4px;">
-                        <div style="font-size: 24px; font-weight: bold; color: #58a6ff;">${results.total}</div>
-                        <div style="font-size: 12px; color: #8b949e;">Total Rows</div>
+                    <div style="padding: 10px; background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 4px;">
+                        <div style="font-size: 24px; font-weight: bold; color: var(--accent-primary);">${results.total}</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">Total Rows</div>
                     </div>
-                    <div style="padding: 10px; background: #0d1117; border-radius: 4px;">
-                        <div style="font-size: 24px; font-weight: bold; color: #238636;">${results.created}</div>
-                        <div style="font-size: 12px; color: #8b949e;">Created</div>
+                    <div style="padding: 10px; background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 4px;">
+                        <div style="font-size: 24px; font-weight: bold; color: var(--success-color);">${results.created}</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">Created</div>
                     </div>
-                    <div style="padding: 10px; background: #0d1117; border-radius: 4px;">
-                        <div style="font-size: 24px; font-weight: bold; color: #d29922;">${results.updated}</div>
-                        <div style="font-size: 12px; color: #8b949e;">Updated</div>
+                    <div style="padding: 10px; background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 4px;">
+                        <div style="font-size: 24px; font-weight: bold; color: var(--warning-color);">${results.updated}</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">Updated</div>
                     </div>
                 </div>
                 ${results.errors.length > 0 ? `
                     <div style="margin-top: 10px;">
-                        <h5 style="color: #f85149; margin: 0 0 5px 0;">Errors (${results.errors.length}):</h5>
-                        <div style="max-height: 200px; overflow-y: auto; padding: 10px; background: #0d1117; border-radius: 4px;">
-                            ${results.errors.map(err => `<div style="color: #f85149; font-size: 13px; margin-bottom: 5px;">• ${err}</div>`).join('')}
+                        <h5 style="color: var(--danger-color); margin: 0 0 5px 0;">Errors (${results.errors.length}):</h5>
+                        <div style="max-height: 200px; overflow-y: auto; padding: 10px; background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 4px;">
+                            ${results.errors.map(err => `<div style="color: var(--danger-color); font-size: 13px; margin-bottom: 5px;">• ${err}</div>`).join('')}
                         </div>
                     </div>
-                ` : '<div style="color: #238636; margin-top: 10px;"><i class="bi bi-check-circle"></i> All employees processed successfully!</div>'}
+                ` : '<div style="color: var(--success-color); margin-top: 10px;"><i class="bi bi-check-circle"></i> All employees processed successfully!</div>'}
             </div>
         `;
 

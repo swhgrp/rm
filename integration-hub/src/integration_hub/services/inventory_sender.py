@@ -61,6 +61,25 @@ class InventorySenderService:
             response.raise_for_status()
             result = response.json()
 
+            # Check for duplicate response
+            if result.get('status') == 'duplicate':
+                logger.warning(f"Duplicate invoice detected: {invoice.invoice_number} - {result.get('message')}")
+
+                # Mark as sent since it already exists in inventory
+                invoice.sent_to_inventory = True
+                invoice.inventory_invoice_id = result.get('existing_invoice_id')
+                invoice.inventory_sync_at = datetime.utcnow()
+                invoice.inventory_error = f"Duplicate: {result.get('message')}"
+
+                db.commit()
+
+                return {
+                    "success": True,
+                    "duplicate": True,
+                    "inventory_invoice_id": result.get('existing_invoice_id'),
+                    "message": result.get('message')
+                }
+
             # Update invoice with inventory reference
             invoice.sent_to_inventory = True
             invoice.inventory_invoice_id = result.get('invoice_id')
@@ -115,6 +134,7 @@ class InventorySenderService:
             "invoice_date": "2025-10-19",
             "due_date": "2025-11-19",
             "total_amount": 1234.56,
+            "location_id": 4,
             "source": "hub",
             "hub_invoice_id": 123,
             "items": [
@@ -136,6 +156,7 @@ class InventorySenderService:
             "invoice_date": invoice.invoice_date.isoformat() if invoice.invoice_date else None,
             "due_date": invoice.due_date.isoformat() if invoice.due_date else None,
             "total_amount": float(invoice.total_amount),
+            "location_id": invoice.location_id,  # Required for proper routing
             "source": "hub",
             "hub_invoice_id": invoice.id,
             "items": []

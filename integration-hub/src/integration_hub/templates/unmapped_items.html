@@ -49,6 +49,27 @@
         padding: 0.15rem 0.4rem;
         font-size: 0.75rem;
     }
+    /* Partial match indicator */
+    .partial-match-badge {
+        background-color: #fd7e14;
+        color: white;
+        font-size: 0.65rem;
+        padding: 0.15rem 0.35rem;
+        border-radius: 0.25rem;
+        cursor: help;
+        white-space: nowrap;
+        display: block;
+        margin-top: 3px;
+        width: fit-content;
+    }
+    .item-desc-cell {
+        vertical-align: top !important;
+    }
+    /* Align all table cells to top for consistent row heights */
+    #itemsTable tbody td {
+        vertical-align: top;
+        padding-top: 0.75rem;
+    }
 </style>
 {% endblock %}
 
@@ -101,7 +122,14 @@
                                        data-count="{{ item.occurrence_count }}"
                                        onchange="updateSelectedCount()">
                             </td>
-                            <td><strong>{{ item.item_description }}</strong></td>
+                            <td class="item-desc-cell">
+                                <strong>{{ item.item_description }}</strong>
+                                {% if item.has_partial_match %}
+                                <span class="partial-match-badge" title="SKU matched in inventory but vendor item has no category assigned. Item needs category in Inventory system.">
+                                    <i class="bi bi-exclamation-circle"></i> No Category
+                                </span>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if item.item_code %}
                                     {% if item.code_status == 'verified' %}
@@ -213,6 +241,13 @@
                                 <br><small class="text-muted">Non-inventory expenses (linen, propane, supplies, services)</small>
                             </label>
                         </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="radio" name="item_type" id="itemTypeDeposit" value="deposit">
+                            <label class="form-check-label" for="itemTypeDeposit">
+                                <strong>Deposit Item</strong> - Refundable deposit (Asset account)
+                                <br><small class="text-muted">Keg deposits, bottle deposits, equipment deposits (refundable)</small>
+                            </label>
+                        </div>
                     </div>
 
                     <hr>
@@ -224,28 +259,22 @@
                         <div class="mb-3">
                             <label class="form-label">Vendor Item (Product) <span class="text-danger">*</span></label>
                             <div class="searchable-select-wrapper">
-                                <input type="text" class="form-control search-input" id="searchInventoryItem" placeholder="Search by name, SKU, item code, or vendor...">
-                                <select class="form-select" id="inventoryItemId" name="inventory_item_id" size="6">
+                                <input type="text" class="form-control search-input" id="searchInventoryItem" placeholder="Search by name, SKU, or vendor...">
+                                <select class="form-select" id="inventoryItemId" name="inventory_item_id" size="8">
                                     <option value="">-- Select vendor item --</option>
                                     {% for item in inventory_items %}
-                                    <option value="{% if item.id %}{{ item.id }}{% else %}itemcode:{{ item.vendor_sku }}{% endif %}" data-is-item-code="{{ 'true' if item.get('is_item_code') else 'false' }}">
-                                        {% if item.get('is_item_code') %}[Code: {{ item.vendor_sku }}] {{ item.vendor_product_name }}{% else %}{{ item.vendor_name }}: {{ item.vendor_product_name }}{% if item.vendor_sku %} [{{ item.vendor_sku }}]{% endif %}{% if item.pack_size %} - {{ item.pack_size }}{% endif %}{% endif %}
+                                    <option value="{{ item.id }}" data-category="{{ item.master_item_category or '' }}">
+                                        {{ item.vendor_name }}: {{ item.vendor_product_name }}{% if item.vendor_sku %} [{{ item.vendor_sku }}]{% endif %}{% if item.pack_size %} - {{ item.pack_size }}{% endif %}{% if item.master_item_category %} ({{ item.master_item_category }}){% endif %}
                                     </option>
                                     {% endfor %}
                                 </select>
                             </div>
-                            <small class="text-muted">Select vendor product or verified item code</small>
+                            <small class="text-muted">Select the vendor product from inventory. Category and GL accounts are determined automatically.</small>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Category <span class="text-danger">*</span></label>
-                            <select class="form-select" id="inventoryCategory" name="inventory_category">
-                                <option value="">-- Select category --</option>
-                                {% for cat in category_mappings %}
-                                <option value="{{ cat.inventory_category }}">{{ cat.inventory_category }}</option>
-                                {% endfor %}
-                            </select>
-                            <small class="text-muted">GL accounts will be automatically assigned based on category mapping</small>
+                        <div id="selectedItemInfo" class="alert alert-light" style="display: none;">
+                            <strong>Category:</strong> <span id="selectedCategory">-</span><br>
+                            <small class="text-muted">GL accounts will be assigned based on this category</small>
                         </div>
                     </div>
 
@@ -269,6 +298,29 @@
                                 </select>
                             </div>
                             <small class="text-muted">Select the GL account for this expense (e.g., 7165 - Linen Expense)</small>
+                        </div>
+                    </div>
+
+                    <!-- Deposit Item Fields -->
+                    <div id="depositItemFields" style="display: none;">
+                        <h6 class="mb-3">Deposit Item Mapping</h6>
+
+                        <div class="mb-3">
+                            <label class="form-label">Deposit Asset Account <span class="text-danger">*</span></label>
+                            <div class="searchable-select-wrapper">
+                                <input type="text" class="form-control search-input" id="searchDepositAccount" placeholder="Search accounts...">
+                                <select class="form-select" id="glDepositAccount" name="gl_deposit_account" size="6">
+                                    <option value="">-- Select deposit asset account --</option>
+                                    {% for account in gl_accounts %}
+                                        {% if account.account_type == 'ASSET' %}
+                                        <option value="{{ account.account_number }}">
+                                            {{ account.account_number }} - {{ account.account_name }}
+                                        </option>
+                                        {% endif %}
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <small class="text-muted">Select the asset account for refundable deposits (e.g., 1610 - Other Assets: Deposits)</small>
                         </div>
                     </div>
 
@@ -727,21 +779,48 @@ function openBulkMapModal() {
 function setupItemTypeListeners() {
     const inventoryRadio = document.getElementById('itemTypeInventory');
     const expenseRadio = document.getElementById('itemTypeExpense');
+    const depositRadio = document.getElementById('itemTypeDeposit');
     const inventoryFields = document.getElementById('inventoryItemFields');
     const expenseFields = document.getElementById('expenseItemFields');
+    const depositFields = document.getElementById('depositItemFields');
 
     function toggleFields() {
         if (inventoryRadio.checked) {
             inventoryFields.style.display = 'block';
             expenseFields.style.display = 'none';
-        } else {
+            depositFields.style.display = 'none';
+        } else if (expenseRadio.checked) {
             inventoryFields.style.display = 'none';
             expenseFields.style.display = 'block';
+            depositFields.style.display = 'none';
+        } else if (depositRadio.checked) {
+            inventoryFields.style.display = 'none';
+            expenseFields.style.display = 'none';
+            depositFields.style.display = 'block';
         }
     }
 
     inventoryRadio.addEventListener('change', toggleFields);
     expenseRadio.addEventListener('change', toggleFields);
+    depositRadio.addEventListener('change', toggleFields);
+
+    // Set up vendor item selection to show category
+    const inventoryItemSelect = document.getElementById('inventoryItemId');
+    if (inventoryItemSelect) {
+        inventoryItemSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const category = selectedOption.getAttribute('data-category');
+            const infoDiv = document.getElementById('selectedItemInfo');
+            const categorySpan = document.getElementById('selectedCategory');
+
+            if (category && this.value) {
+                categorySpan.textContent = category;
+                infoDiv.style.display = 'block';
+            } else {
+                infoDiv.style.display = 'none';
+            }
+        });
+    }
 }
 
 // Fetch GL accounts for a category from category mappings
@@ -768,7 +847,8 @@ async function fetchCategoryGLAccounts(category) {
 function setupSearchListeners() {
     const searchInputs = [
         {inputId: 'searchInventoryItem', selectId: 'inventoryItemId'},
-        {inputId: 'searchExpenseAccount', selectId: 'glExpenseAccount'}
+        {inputId: 'searchExpenseAccount', selectId: 'glExpenseAccount'},
+        {inputId: 'searchDepositAccount', selectId: 'glDepositAccount'}
     ];
 
     searchInputs.forEach(({inputId, selectId}) => {
@@ -853,28 +933,23 @@ async function saveMapping() {
     const itemType = document.querySelector('input[name="item_type"]:checked').value;
 
     let inventoryItemId, category, assetAccount, cogsAccount, wasteAccount;
-    let isItemCode = false;
 
     if (itemType === 'inventory') {
         // Inventory item validation
-        let selectedValue = document.getElementById('inventoryItemId').value;
-        category = document.getElementById('inventoryCategory').value;
+        const inventorySelect = document.getElementById('inventoryItemId');
+        inventoryItemId = inventorySelect.value;
 
-        if (!selectedValue) {
-            await showAlert('Please select a vendor item or item code', 'Validation Error');
+        if (!inventoryItemId) {
+            await showAlert('Please select a vendor item from inventory', 'Validation Error');
             return;
         }
 
-        // Check if it's an item code (prefixed with "itemcode:")
-        if (selectedValue.startsWith('itemcode:')) {
-            isItemCode = true;
-            inventoryItemId = null;  // No inventory ID for item codes
-        } else {
-            inventoryItemId = selectedValue;
-        }
+        // Get category from selected option's data attribute
+        const selectedOption = inventorySelect.options[inventorySelect.selectedIndex];
+        category = selectedOption.getAttribute('data-category');
 
         if (!category) {
-            await showAlert('Please select a category', 'Validation Error');
+            await showAlert('Selected vendor item has no category assigned. Please select a different item or contact admin.', 'Error');
             return;
         }
 
@@ -895,7 +970,7 @@ async function saveMapping() {
         document.getElementById('glCogsAccount').value = cogsAccount;
         document.getElementById('glWasteAccount').value = wasteAccount || '';
 
-    } else {
+    } else if (itemType === 'expense') {
         // Expense item validation
         const expenseAccount = document.getElementById('glExpenseAccount').value;
 
@@ -904,11 +979,33 @@ async function saveMapping() {
             return;
         }
 
-        // For expense items: no vendor item, no category, expense account goes to COGS field
+        // For expense items: no vendor item, category='Uncategorized', expense account goes to COGS field
+        inventoryItemId = null;
+        category = 'Uncategorized';  // Mark as expense item
+        assetAccount = null;
+        cogsAccount = expenseAccount;
+        wasteAccount = null;
+
+        // Update hidden fields
+        document.getElementById('glAssetAccount').value = '';
+        document.getElementById('glCogsAccount').value = cogsAccount;
+        document.getElementById('glWasteAccount').value = '';
+
+    } else if (itemType === 'deposit') {
+        // Deposit item validation
+        const depositAccount = document.getElementById('glDepositAccount').value;
+
+        if (!depositAccount) {
+            await showAlert('Please select a deposit asset account', 'Validation Error');
+            return;
+        }
+
+        // For deposit items: no vendor item, no category, deposit account goes to COGS field
+        // (The accounting_sender will debit this asset account instead of expense)
         inventoryItemId = null;
         category = null;
         assetAccount = null;
-        cogsAccount = expenseAccount;
+        cogsAccount = depositAccount;  // Reuse cogs field for the GL account
         wasteAccount = null;
 
         // Update hidden fields

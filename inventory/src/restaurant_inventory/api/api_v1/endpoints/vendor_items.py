@@ -57,6 +57,7 @@ def get_vendor_items_for_hub(
             "vendor_description": vi.vendor_description,
             "master_item_id": vi.master_item_id,
             "master_item_name": vi.master_item.name if vi.master_item else None,
+            "master_item_category": vi.master_item.category if vi.master_item else None,
             "pack_size": vi.pack_size,
             "unit_price": float(vi.unit_price) if vi.unit_price else None,
             "is_active": vi.is_active,
@@ -71,10 +72,15 @@ async def get_vendor_items(
     vendor_id: Optional[int] = None,
     master_item_id: Optional[int] = None,
     is_active: Optional[bool] = None,
+    linked: Optional[bool] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all vendor items with optional filtering"""
+    """Get all vendor items with optional filtering
+
+    Args:
+        linked: Filter by master item link status (True=linked, False=not linked, None=all)
+    """
     query = db.query(VendorItem).options(
         joinedload(VendorItem.vendor),
         joinedload(VendorItem.master_item),
@@ -88,6 +94,11 @@ async def get_vendor_items(
         query = query.filter(VendorItem.master_item_id == master_item_id)
     if is_active is not None:
         query = query.filter(VendorItem.is_active == is_active)
+    if linked is not None:
+        if linked:
+            query = query.filter(VendorItem.master_item_id.isnot(None))
+        else:
+            query = query.filter(VendorItem.master_item_id.is_(None))
 
     vendor_items = query.order_by(VendorItem.vendor_id, VendorItem.master_item_id).all()
 

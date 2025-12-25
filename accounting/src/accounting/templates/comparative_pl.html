@@ -5,6 +5,7 @@
 
 {% block extra_head %}
 <style>
+    /* Slate Blue Light Theme - Comparative P&L */
     .comparative-report {
         padding: 20px;
         max-width: 1400px;
@@ -14,22 +15,23 @@
     .report-header {
         margin-bottom: 30px;
         padding-bottom: 20px;
-        border-bottom: 2px solid #30363d;
+        border-bottom: 2px solid var(--border-primary);
     }
 
     .report-title {
         font-size: 24px;
         font-weight: 600;
-        color: #e6edf3;
+        color: var(--text-primary);
         margin-bottom: 10px;
     }
 
     .period-selector {
-        background: #0d1117;
-        border: 1px solid #30363d;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         padding: 20px;
         border-radius: 6px;
         margin-bottom: 20px;
+        box-shadow: var(--shadow-md);
     }
 
     .period-row {
@@ -46,15 +48,15 @@
 
     .form-label {
         font-size: 12px;
-        color: #8b949e;
+        color: var(--text-secondary);
         margin-bottom: 5px;
         font-weight: 500;
     }
 
     .form-input, .form-select {
-        background: #161b22;
-        border: 1px solid #30363d;
-        color: #e6edf3;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-primary);
+        color: var(--text-primary);
         padding: 8px 12px;
         border-radius: 4px;
         font-size: 14px;
@@ -62,11 +64,12 @@
 
     .form-input:focus, .form-select:focus {
         outline: none;
-        border-color: #58a6ff;
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 3px rgba(69, 90, 100, 0.15);
     }
 
     .btn-generate {
-        background: #238636;
+        background: #43A047;
         color: white;
         border: none;
         padding: 10px 20px;
@@ -77,30 +80,32 @@
     }
 
     .btn-generate:hover {
-        background: #2ea043;
+        background: #388E3C;
     }
 
     .btn-generate:disabled {
-        background: #30363d;
+        background: var(--bg-elevated);
         cursor: not-allowed;
+        color: var(--text-muted);
     }
 
     .comparison-table {
         width: 100%;
         border-collapse: collapse;
-        background: #0d1117;
-        border: 1px solid #30363d;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         overflow: hidden;
+        box-shadow: var(--shadow-md);
     }
 
     .comparison-table th {
-        background: #161b22;
-        color: #8b949e;
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
         font-weight: 600;
         text-align: right;
         padding: 12px;
-        border-bottom: 2px solid #30363d;
+        border-bottom: 2px solid var(--border-primary);
         font-size: 13px;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -112,13 +117,13 @@
 
     .comparison-table td {
         padding: 10px 12px;
-        border-bottom: 1px solid #21262d;
-        color: #e6edf3;
+        border-bottom: 1px solid var(--border-primary);
+        color: var(--text-primary);
         font-size: 14px;
     }
 
     .comparison-table tr:hover {
-        background: #161b22;
+        background: #CFD8DC;
     }
 
     .comparison-table td:nth-child(2),
@@ -130,7 +135,7 @@
     }
 
     .account-name {
-        color: #e6edf3;
+        color: var(--text-primary);
     }
 
     .account-indent-0 { padding-left: 12px; }
@@ -140,23 +145,23 @@
     .account-indent-4 { padding-left: 92px !important; }
 
     .section-header {
-        background: #161b22 !important;
+        background: var(--bg-tertiary) !important;
         font-weight: 700;
-        color: #58a6ff !important;
+        color: var(--accent-primary) !important;
         text-transform: uppercase;
         letter-spacing: 1px;
         font-size: 13px;
     }
 
     .section-total {
-        background: #161b22 !important;
+        background: var(--bg-tertiary) !important;
         font-weight: 700;
-        border-top: 2px solid #30363d;
-        border-bottom: 2px solid #30363d;
+        border-top: 2px solid var(--border-primary);
+        border-bottom: 2px solid var(--border-primary);
     }
 
     .grand-total {
-        background: #238636 !important;
+        background: #43A047 !important;
         color: white !important;
         font-weight: 700;
         font-size: 15px;
@@ -167,21 +172,21 @@
     }
 
     .variance-positive {
-        color: #3fb950;
+        color: #43A047;
     }
 
     .variance-negative {
-        color: #f85149;
+        color: #E53935;
     }
 
     .variance-neutral {
-        color: #8b949e;
+        color: var(--text-muted);
     }
 
     .loading-state {
         text-align: center;
         padding: 40px;
-        color: #8b949e;
+        color: var(--text-secondary);
     }
 
     .quick-periods {
@@ -192,9 +197,9 @@
     }
 
     .quick-period-btn {
-        background: #21262d;
-        border: 1px solid #30363d;
-        color: #c9d1d9;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-primary);
+        color: var(--text-primary);
         padding: 6px 12px;
         border-radius: 4px;
         cursor: pointer;
@@ -203,8 +208,8 @@
     }
 
     .quick-period-btn:hover {
-        background: #30363d;
-        border-color: #58a6ff;
+        background: var(--bg-elevated);
+        border-color: var(--accent-primary);
     }
 
     @media (max-width: 768px) {
@@ -229,7 +234,7 @@
 <div class="comparative-report">
     <div class="report-header">
         <h1 class="report-title"><i class="bi bi-bar-chart-line"></i> Comparative Profit & Loss</h1>
-        <p style="color: #8b949e;">Compare financial performance across multiple periods</p>
+        <p style="color: var(--text-secondary);">Compare financial performance across multiple periods</p>
     </div>
 
     <div class="period-selector">
@@ -237,7 +242,7 @@
         <div class="form-group" style="margin-bottom: 20px;">
             <label class="form-label">Comparison Mode</label>
             <div style="display: flex; gap: 10px;">
-                <button id="twoPeriodbtn" class="quick-period-btn" onclick="setTwoPeriodMode()" style="background: #238636;">Two Period</button>
+                <button id="twoPeriodbtn" class="quick-period-btn" onclick="setTwoPeriodMode()" style="background: #43A047; color: white;">Two Period</button>
                 <button id="multiPeriodBtn" class="quick-period-btn" onclick="setMultiPeriodMode()">Multi-Period Trend</button>
             </div>
         </div>
@@ -320,7 +325,7 @@
             </div>
             <div class="form-group">
                 <label class="form-label">Options</label>
-                <label style="color: #c9d1d9; margin-top: 8px;">
+                <label style="color: var(--text-primary); margin-top: 8px;">
                     <input type="checkbox" id="hideZero" style="margin-right: 5px;" />
                     Hide zero balances
                 </label>
@@ -353,8 +358,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 function setTwoPeriodMode() {
     comparisonMode = 'two-period';
-    document.getElementById('twoPeriodbtn').style.background = '#238636';
-    document.getElementById('multiPeriodBtn').style.background = '#21262d';
+    document.getElementById('twoPeriodbtn').style.background = '#43A047';
+    document.getElementById('twoPeriodbtn').style.color = 'white';
+    document.getElementById('multiPeriodBtn').style.background = '';
+    document.getElementById('multiPeriodBtn').style.color = '';
     document.getElementById('twoPeriodSection').style.display = 'grid';
     document.getElementById('multiPeriodSection').style.display = 'none';
     document.getElementById('twoPeriodQuickBtns').style.display = 'flex';
@@ -363,8 +370,10 @@ function setTwoPeriodMode() {
 
 function setMultiPeriodMode() {
     comparisonMode = 'multi-period';
-    document.getElementById('twoPeriodbtn').style.background = '#21262d';
-    document.getElementById('multiPeriodBtn').style.background = '#238636';
+    document.getElementById('twoPeriodbtn').style.background = '';
+    document.getElementById('twoPeriodbtn').style.color = '';
+    document.getElementById('multiPeriodBtn').style.background = '#43A047';
+    document.getElementById('multiPeriodBtn').style.color = 'white';
     document.getElementById('twoPeriodSection').style.display = 'none';
     document.getElementById('multiPeriodSection').style.display = 'grid';
     document.getElementById('twoPeriodQuickBtns').style.display = 'none';
@@ -555,7 +564,7 @@ async function loadReport() {
             }
         }
         document.getElementById('reportContent').innerHTML = `
-            <div class="loading-state" style="color: #f85149;">
+            <div class="loading-state" style="color: #E53935;">
                 <i class="bi bi-exclamation-triangle"></i> Error loading report: ${errorMsg}
                 <br><small>Check browser console for details</small>
             </div>

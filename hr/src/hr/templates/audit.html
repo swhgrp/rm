@@ -15,12 +15,12 @@
     </div>
 
     <!-- Filters -->
-    <div style="padding: 1.5rem; border-bottom: 1px solid #30363d; background: #161b22;">
+    <div style="padding: 1.5rem; border-bottom: 1px solid var(--border-primary); background: var(--bg-tertiary);">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
             <div>
-                <label for="actionFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9; font-size: 14px;">Action</label>
+                <label for="actionFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary); font-size: 14px;">Action</label>
                 <select id="actionFilter" onchange="loadAuditLogs()"
-                        style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9; font-size: 14px;">
+                        style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-primary); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;">
                     <option value="">All Actions</option>
                     <option value="view">View</option>
                     <option value="create">Create</option>
@@ -29,9 +29,9 @@
                 </select>
             </div>
             <div>
-                <label for="entityFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9; font-size: 14px;">Entity Type</label>
+                <label for="entityFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary); font-size: 14px;">Entity Type</label>
                 <select id="entityFilter" onchange="loadAuditLogs()"
-                        style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9; font-size: 14px;">
+                        style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-primary); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;">
                     <option value="">All Types</option>
                     <option value="employee">Employee</option>
                     <option value="user">User</option>
@@ -39,9 +39,9 @@
                 </select>
             </div>
             <div>
-                <label for="userFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9; font-size: 14px;">User</label>
+                <label for="userFilter" style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary); font-size: 14px;">User</label>
                 <input type="text" id="userFilter" placeholder="Username..." onkeyup="filterByUsername()"
-                       style="width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px; background: #0d1117; color: #c9d1d9; font-size: 14px;">
+                       style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-primary); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); font-size: 14px;">
             </div>
         </div>
     </div>

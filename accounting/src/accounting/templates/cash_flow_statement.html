@@ -6,10 +6,10 @@
 {% block extra_head %}
 <style>
     .filters {
-        background: #161b22;
+        background: var(--bg-secondary);
         padding: 1rem;
         border-radius: 4px;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         margin-bottom: 1rem;
         display: flex;
         gap: 1rem;
@@ -24,41 +24,41 @@
     .form-group label {
         font-size: 0.85rem;
         font-weight: 500;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
     .form-group input, .form-group select {
         padding: 0.5rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
         font-size: 0.9rem;
-        background: #0d1117;
-        color: #c9d1d9;
+        background: var(--bg-primary);
+        color: var(--text-primary);
     }
     .report-header {
         text-align: center;
         margin-bottom: 2rem;
         padding-bottom: 1rem;
-        border-bottom: 2px solid #30363d;
+        border-bottom: 2px solid var(--border-primary);
     }
     .report-header h2 {
-        color: #c9d1d9;
+        color: var(--text-primary);
         font-size: 1.75rem;
         margin-bottom: 0.5rem;
     }
     .report-header .subtitle {
-        color: #8b949e;
+        color: var(--text-secondary);
         font-size: 1rem;
     }
     .report-section {
         margin-bottom: 2rem;
     }
     .section-header {
-        background: #21262d;
-        color: #58a6ff;
+        background: var(--bg-tertiary);
+        color: var(--accent-primary);
         padding: 0.75rem;
         font-weight: 600;
         font-size: 1.05rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         border-bottom: none;
         margin-top: 1.5rem;
     }
@@ -69,10 +69,10 @@
     }
     .report-table td {
         padding: 0.5rem 0.75rem;
-        border-bottom: 1px solid #30363d;
+        border-bottom: 1px solid var(--border-primary);
     }
     .report-table tr:hover {
-        background: #161b22;
+        background: var(--bg-secondary);
     }
     .report-table .number {
         text-align: right;
@@ -85,26 +85,26 @@
     .report-table .subsection-label {
         padding-left: 2.5rem;
         font-style: italic;
-        color: #8b949e;
+        color: var(--text-secondary);
     }
     .subtotal-row {
-        background: #21262d;
+        background: var(--bg-tertiary);
         font-weight: 600;
-        border-top: 1px solid #30363d;
+        border-top: 1px solid var(--border-primary);
     }
     .total-row {
         background: #1f6feb;
         color: white;
         font-weight: 700;
         font-size: 1.05rem;
-        border-top: 2px solid #58a6ff;
+        border-top: 2px solid var(--accent-primary);
     }
     .final-total-row {
-        background: #238636;
+        background: #43A047;
         color: white;
         font-weight: 700;
         font-size: 1.1rem;
-        border-top: 3px double #2ea043;
+        border-top: 3px double #388E3C;
     }
     .report-actions {
         display: flex;
@@ -115,17 +115,17 @@
     .loading {
         text-align: center;
         padding: 2rem;
-        color: #8b949e;
+        color: var(--text-secondary);
     }
     .no-data {
         text-align: center;
         padding: 3rem;
-        color: #8b949e;
+        color: var(--text-secondary);
         font-size: 1.1rem;
     }
     .cash-summary-box {
-        background: #161b22;
-        border: 1px solid #30363d;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
         padding: 1rem;
         margin-top: 2rem;
@@ -136,11 +136,11 @@
         padding: 0.5rem 0;
     }
     .cash-summary-row.total {
-        border-top: 2px solid #58a6ff;
+        border-top: 2px solid var(--accent-primary);
         padding-top: 0.75rem;
         font-weight: 700;
         font-size: 1.1rem;
-        color: #58a6ff;
+        color: var(--accent-primary);
     }
 </style>
 {% endblock %}
@@ -271,7 +271,7 @@
 
     <!-- No Data -->
     <div id="noData" class="no-data" style="display: none;">
-        <i class="bi bi-inbox" style="font-size: 3rem; color: #30363d;"></i>
+        <i class="bi bi-inbox" style="font-size: 3rem; color: var(--border-primary);"></i>
         <p>No data available for the selected period</p>
     </div>
 </div>
@@ -378,13 +378,13 @@ function displayCashFlowStatement(data) {
 
     // Net Operating
     document.getElementById('netOperating').textContent = formatCurrency(data.net_cash_from_operating);
-    document.getElementById('netOperating').style.color = data.net_cash_from_operating >= 0 ? '#2ea043' : '#f85149';
+    document.getElementById('netOperating').style.color = data.net_cash_from_operating >= 0 ? '#388E3C' : '#E53935';
 
     // Investing Activities
     const investingTable = document.getElementById('investingActivities');
     investingTable.innerHTML = '';
     if (data.investing_activities.length === 0) {
-        investingTable.innerHTML = '<tr><td class="label" style="font-style: italic; color: #8b949e;">No investing activities</td><td class="number">$0.00</td></tr>';
+        investingTable.innerHTML = '<tr><td class="label" style="font-style: italic; color: var(--text-secondary);">No investing activities</td><td class="number">$0.00</td></tr>';
     } else {
         data.investing_activities.forEach(item => {
             const row = createLineItemRow(item);
@@ -392,13 +392,13 @@ function displayCashFlowStatement(data) {
         });
     }
     document.getElementById('netInvesting').textContent = formatCurrency(data.net_cash_from_investing);
-    document.getElementById('netInvesting').style.color = data.net_cash_from_investing >= 0 ? '#2ea043' : '#f85149';
+    document.getElementById('netInvesting').style.color = data.net_cash_from_investing >= 0 ? '#388E3C' : '#E53935';
 
     // Financing Activities
     const financingTable = document.getElementById('financingActivities');
     financingTable.innerHTML = '';
     if (data.financing_activities.length === 0) {
-        financingTable.innerHTML = '<tr><td class="label" style="font-style: italic; color: #8b949e;">No financing activities</td><td class="number">$0.00</td></tr>';
+        financingTable.innerHTML = '<tr><td class="label" style="font-style: italic; color: var(--text-secondary);">No financing activities</td><td class="number">$0.00</td></tr>';
     } else {
         data.financing_activities.forEach(item => {
             const row = createLineItemRow(item);
@@ -406,11 +406,11 @@ function displayCashFlowStatement(data) {
         });
     }
     document.getElementById('netFinancing').textContent = formatCurrency(data.net_cash_from_financing);
-    document.getElementById('netFinancing').style.color = data.net_cash_from_financing >= 0 ? '#2ea043' : '#f85149';
+    document.getElementById('netFinancing').style.color = data.net_cash_from_financing >= 0 ? '#388E3C' : '#E53935';
 
     // Summary
     document.getElementById('netIncrease').textContent = formatCurrency(data.net_increase_in_cash);
-    document.getElementById('netIncrease').style.color = data.net_increase_in_cash >= 0 ? '#2ea043' : '#f85149';
+    document.getElementById('netIncrease').style.color = data.net_increase_in_cash >= 0 ? '#388E3C' : '#E53935';
     document.getElementById('cashBeginning').textContent = formatCurrency(data.cash_beginning_of_period);
     document.getElementById('cashEnding').textContent = formatCurrency(data.cash_end_of_period);
 
@@ -429,7 +429,7 @@ function createLineItemRow(item) {
     const amountCell = document.createElement('td');
     amountCell.className = 'number';
     amountCell.textContent = formatCurrency(item.amount);
-    amountCell.style.color = item.amount >= 0 ? '#c9d1d9' : '#f85149';
+    amountCell.style.color = item.amount >= 0 ? 'var(--text-primary)' : '#E53935';
     row.appendChild(amountCell);
 
     return row;

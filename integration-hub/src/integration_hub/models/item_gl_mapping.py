@@ -1,5 +1,8 @@
 """
 Item to GL Account Mapping - Master mapping table for automatic matching
+
+NOTE: ItemGLMapping is DEPRECATED - replaced by category_gl_mapping table.
+The table has been renamed to item_gl_mapping_deprecated.
 """
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, UniqueConstraint
 from sqlalchemy.sql import func
@@ -8,10 +11,11 @@ from integration_hub.db.database import Base
 
 class ItemGLMapping(Base):
     """
-    Master mapping table: Inventory Item → GL Accounts
-    Used for automatic mapping of future invoices
+    DEPRECATED: Master mapping table: Inventory Item → GL Accounts
+    Replaced by CategoryGLMapping - GL accounts now come from category, not individual items.
+    Table renamed to item_gl_mapping_deprecated.
     """
-    __tablename__ = "item_gl_mapping"
+    __tablename__ = "item_gl_mapping_deprecated"
 
     id = Column(Integer, primary_key=True, index=True)
 

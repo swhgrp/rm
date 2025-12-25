@@ -14,7 +14,7 @@
 
     .page-header h1 {
         font-size: 2rem;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .action-buttons {
@@ -23,24 +23,24 @@
     }
 
     .periods-table {
-        background: #161b22;
+        background: var(--bg-secondary);
         border-radius: 8px;
         overflow: hidden;
         box-shadow: 0 1px 3px rgba(0,0,0,0.3);
     }
 
     .status-open {
-        background: #238636;
+        background: #43A047;
         color: white;
     }
 
     .status-closed {
-        background: #9e6a03;
+        background: #F57C00;
         color: white;
     }
 
     .status-locked {
-        background: #da3633;
+        background: #C62828;
         color: white;
     }
 
@@ -67,8 +67,8 @@
     }
 
     .modal-content {
-        background: #161b22;
-        border: 1px solid #30363d;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         padding: 2rem;
         border-radius: 8px;
         max-width: 600px;
@@ -87,19 +87,19 @@
     .modal-header h2 {
         margin: 0;
         font-size: 1.5rem;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .close {
         font-size: 2rem;
         cursor: pointer;
-        color: #8b949e;
+        color: var(--text-secondary);
         background: none;
         border: none;
     }
 
     .close:hover {
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .form-group {
@@ -110,24 +110,24 @@
         display: block;
         margin-bottom: 0.5rem;
         font-weight: 500;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .form-group input,
     .form-group select {
         width: 100%;
         padding: 0.5rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
         font-size: 1rem;
-        background: #0d1117;
-        color: #c9d1d9;
+        background: var(--bg-primary);
+        color: var(--text-primary);
     }
 
     .form-group input:focus,
     .form-group select:focus {
         outline: none;
-        border-color: #58a6ff;
+        border-color: var(--accent-primary);
         box-shadow: 0 0 0 0.25rem rgba(88, 166, 255, 0.25);
     }
 
@@ -150,15 +150,15 @@
     }
 
     .message.success {
-        background: #238636;
+        background: #43A047;
         color: white;
-        border: 1px solid #2ea043;
+        border: 1px solid #388E3C;
     }
 
     .message.error {
-        background: #da3633;
+        background: #C62828;
         color: white;
-        border: 1px solid #f85149;
+        border: 1px solid #E53935;
     }
 
     .year-filter {
@@ -170,15 +170,15 @@
 
     .year-filter label {
         font-weight: 500;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .year-filter select {
         padding: 0.5rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
-        background: #0d1117;
-        color: #c9d1d9;
+        background: var(--bg-primary);
+        color: var(--text-primary);
     }
 </style>
 {% endblock %}

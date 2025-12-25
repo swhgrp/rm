@@ -6,12 +6,14 @@
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
+    /* Slate Blue Light Theme - Dashboard */
     .metric-card {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         padding: 1.5rem;
         margin-bottom: 1.5rem;
+        box-shadow: var(--shadow-md);
     }
 
     .metric-header {
@@ -23,7 +25,7 @@
 
     .metric-title {
         font-size: 0.875rem;
-        color: #8b949e;
+        color: var(--text-secondary);
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
@@ -32,7 +34,7 @@
     .metric-value {
         font-size: 2rem;
         font-weight: 700;
-        color: #c9d1d9;
+        color: var(--text-primary);
         margin: 0.5rem 0;
     }
 
@@ -43,13 +45,13 @@
     }
 
     .metric-change.positive {
-        color: #3fb950;
-        background-color: rgba(63, 185, 80, 0.15);
+        color: #43A047;
+        background-color: rgba(67, 160, 71, 0.15);
     }
 
     .metric-change.negative {
-        color: #f85149;
-        background-color: rgba(248, 81, 73, 0.15);
+        color: #E53935;
+        background-color: rgba(229, 57, 53, 0.15);
     }
 
     .period-tabs {
@@ -60,28 +62,28 @@
 
     .period-tab {
         padding: 0.5rem 1rem;
-        background-color: #21262d;
-        border: 1px solid #30363d;
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
-        color: #8b949e;
+        color: var(--text-secondary);
         cursor: pointer;
         font-size: 0.875rem;
         transition: all 0.2s;
     }
 
     .period-tab.active {
-        background-color: #238636;
-        border-color: #238636;
+        background-color: #43A047;
+        border-color: #43A047;
         color: white;
     }
 
     .period-tab:hover:not(.active) {
-        background-color: #30363d;
-        color: #c9d1d9;
+        background-color: var(--bg-elevated);
+        color: var(--text-primary);
     }
 
     .cash-card {
-        background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+        background: linear-gradient(135deg, #43A047 0%, #388E3C 100%);
         color: white;
         padding: 1.5rem;
         border-radius: 6px;
@@ -100,40 +102,42 @@
     }
 
     .alert-card {
-        background-color: #161b22;
-        border-left: 4px solid #f85149;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-left: 4px solid #E53935;
         padding: 1rem;
         margin-bottom: 0.75rem;
         border-radius: 4px;
         cursor: pointer;
         transition: all 0.2s;
+        box-shadow: var(--shadow-sm);
     }
 
     .alert-card:hover {
-        background-color: #21262d;
+        background-color: var(--bg-tertiary);
     }
 
     .alert-card.warning {
-        border-left-color: #d29922;
+        border-left-color: #FB8C00;
     }
 
     .alert-card.info {
-        border-left-color: #58a6ff;
+        border-left-color: #1E88E5;
     }
 
     .alert-title {
         font-weight: 600;
-        color: #c9d1d9;
+        color: var(--text-primary);
         margin-bottom: 0.25rem;
     }
 
     .alert-description {
         font-size: 0.875rem;
-        color: #8b949e;
+        color: var(--text-secondary);
     }
 
     .alert-count {
-        background-color: #f85149;
+        background-color: #E53935;
         color: white;
         padding: 0.25rem 0.5rem;
         border-radius: 12px;
@@ -146,27 +150,27 @@
         justify-content: space-between;
         align-items: center;
         padding: 0.75rem;
-        background-color: #21262d;
+        background-color: var(--bg-tertiary);
         border-radius: 4px;
         margin-bottom: 0.5rem;
     }
 
     .aging-label {
         font-size: 0.875rem;
-        color: #8b949e;
+        color: var(--text-secondary);
     }
 
     .aging-amount {
         font-size: 1rem;
         font-weight: 600;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .breakdown-item {
         display: flex;
         justify-content: space-between;
         padding: 0.5rem 0;
-        border-bottom: 1px solid #30363d;
+        border-bottom: 1px solid var(--border-primary);
     }
 
     .breakdown-item:last-child {
@@ -176,10 +180,10 @@
     .section-title {
         font-size: 1.25rem;
         font-weight: 700;
-        color: #c9d1d9;
+        color: var(--text-primary);
         margin: 2.5rem 0 1.5rem 0;
         padding-bottom: 0.75rem;
-        border-bottom: 2px solid #30363d;
+        border-bottom: 2px solid var(--border-primary);
         display: flex;
         align-items: center;
         gap: 0.5rem;
@@ -194,31 +198,31 @@
         justify-content: space-between;
         align-items: center;
         padding: 0.75rem;
-        background-color: #21262d;
+        background-color: var(--bg-tertiary);
         border-radius: 4px;
         margin-bottom: 0.5rem;
         transition: background-color 0.2s;
     }
 
     .expense-item:hover {
-        background-color: #30363d;
+        background-color: var(--bg-elevated);
     }
 
     .expense-label {
         font-size: 0.875rem;
-        color: #c9d1d9;
+        color: var(--text-primary);
         font-weight: 500;
     }
 
     .expense-amount {
         font-size: 1rem;
         font-weight: 600;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .expense-bar {
         height: 4px;
-        background-color: #30363d;
+        background-color: var(--border-primary);
         border-radius: 2px;
         margin-top: 0.5rem;
         overflow: hidden;
@@ -226,7 +230,7 @@
 
     .expense-bar-fill {
         height: 100%;
-        background: linear-gradient(90deg, #f85149, #d29922);
+        background: linear-gradient(90deg, #E53935, #FB8C00);
         border-radius: 2px;
         transition: width 0.5s ease;
     }
@@ -909,7 +913,7 @@ function createLineChart(canvasId, data, label, color) {
                 fill: true,
                 pointRadius: 4,
                 pointBackgroundColor: color,
-                pointBorderColor: '#0d1117',
+                pointBorderColor: '#FFFFFF',
                 pointBorderWidth: 2
             }]
         },
@@ -925,10 +929,10 @@ function createLineChart(canvasId, data, label, color) {
                 y: {
                     beginAtZero: true,
                     grid: {
-                        color: '#30363d'
+                        color: '#CFD8DC'
                     },
                     ticks: {
-                        color: '#8b949e'
+                        color: '#546E7A'
                     }
                 },
                 x: {
@@ -936,7 +940,7 @@ function createLineChart(canvasId, data, label, color) {
                         display: false
                     },
                     ticks: {
-                        color: '#8b949e'
+                        color: '#546E7A'
                     }
                 }
             }

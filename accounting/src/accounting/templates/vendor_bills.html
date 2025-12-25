@@ -14,7 +14,7 @@
 
     .page-header h1 {
         font-size: 2rem;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .view-toggle {
@@ -24,17 +24,17 @@
 
     .view-toggle button {
         padding: 0.5rem 1rem;
-        border: 1px solid #30363d;
-        background: #161b22;
-        color: #c9d1d9;
+        border: 1px solid var(--border-primary);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
         cursor: pointer;
         border-radius: 4px;
     }
 
     .view-toggle button.active {
-        background: #238636;
+        background: #43A047;
         color: white;
-        border-color: #238636;
+        border-color: #43A047;
     }
 
     #listView, #createView {
@@ -52,10 +52,10 @@
         margin-bottom: 1.5rem;
         flex-wrap: wrap;
         align-items: flex-end;
-        background: #161b22;
+        background: var(--bg-secondary);
         padding: 1rem;
         border-radius: 6px;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
     }
 
     .filter-group {
@@ -66,22 +66,22 @@
 
     .filter-group label {
         font-weight: 500;
-        color: #c9d1d9;
+        color: var(--text-primary);
         font-size: 0.875rem;
     }
 
     .filter-group select, .filter-group input {
         padding: 0.5rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
-        background: #0d1117;
-        color: #c9d1d9;
+        background: var(--bg-primary);
+        color: var(--text-primary);
         min-width: 150px;
     }
 
     /* Bills Table */
     .bills-table {
-        background: #161b22;
+        background: var(--bg-secondary);
         border-radius: 8px;
         overflow: hidden;
         box-shadow: 0 1px 3px rgba(0,0,0,0.3);
@@ -102,7 +102,7 @@
     }
 
     .status-pending_approval {
-        background: #9e6a03;
+        background: #F57C00;
         color: white;
     }
 
@@ -112,22 +112,22 @@
     }
 
     .status-partially_paid {
-        background: #58a6ff;
-        color: #0d1117;
+        background: var(--accent-primary);
+        color: var(--bg-primary);
     }
 
     .status-paid {
-        background: #238636;
+        background: #43A047;
         color: white;
     }
 
     .status-void {
-        background: #da3633;
+        background: #C62828;
         color: white;
     }
 
     .overdue-badge {
-        background: #da3633;
+        background: #C62828;
         color: white;
         padding: 0.25rem 0.5rem;
         border-radius: 4px;
@@ -138,17 +138,17 @@
 
     /* Form Section */
     .form-section {
-        background: #161b22;
+        background: var(--bg-secondary);
         padding: 2rem;
         border-radius: 8px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         margin-bottom: 2rem;
     }
 
     .form-section h3 {
         margin-bottom: 1.5rem;
-        color: #c9d1d9;
+        color: var(--text-primary);
         font-size: 1.25rem;
     }
 
@@ -160,26 +160,26 @@
         display: block;
         margin-bottom: 0.5rem;
         font-weight: 500;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .form-group label .required {
-        color: #f85149;
+        color: #E53935;
     }
 
     .form-group input, .form-group select, .form-group textarea {
         width: 100%;
         padding: 0.5rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
         font-size: 1rem;
-        background: #0d1117;
-        color: #c9d1d9;
+        background: var(--bg-primary);
+        color: var(--text-primary);
     }
 
     .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
         outline: none;
-        border-color: #58a6ff;
+        border-color: var(--accent-primary);
     }
 
     .form-row {
@@ -197,26 +197,26 @@
 
     .line-items-table th, .line-items-table td {
         padding: 0.75rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         text-align: left;
     }
 
     .line-items-table th {
-        background: #0d1117;
+        background: var(--bg-primary);
         font-weight: 600;
     }
 
     .line-items-table select, .line-items-table input {
         width: 100%;
         padding: 0.4rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
-        background: #0d1117;
-        color: #c9d1d9;
+        background: var(--bg-primary);
+        color: var(--text-primary);
     }
 
     .btn-remove {
-        background: #da3633;
+        background: #C62828;
         color: white;
         border: none;
         padding: 0.4rem 0.6rem;
@@ -231,10 +231,10 @@
 
     /* Totals Summary */
     .totals-summary {
-        background: #0d1117;
+        background: var(--bg-primary);
         padding: 1.5rem;
         border-radius: 6px;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         margin-top: 1rem;
     }
 
@@ -242,7 +242,7 @@
         display: flex;
         justify-content: space-between;
         padding: 0.5rem 0;
-        border-bottom: 1px solid #30363d;
+        border-bottom: 1px solid var(--border-primary);
     }
 
     .totals-row:last-child {
@@ -251,21 +251,21 @@
         font-size: 1.1rem;
         padding-top: 1rem;
         margin-top: 0.5rem;
-        border-top: 2px solid #30363d;
+        border-top: 2px solid var(--border-primary);
     }
 
     .totals-row label {
-        color: #8b949e;
+        color: var(--text-secondary);
     }
 
     .totals-row .amount {
-        color: #c9d1d9;
+        color: var(--text-primary);
         font-weight: 500;
     }
 
     .totals-row:last-child label,
     .totals-row:last-child .amount {
-        color: #58a6ff;
+        color: var(--accent-primary);
     }
 
     /* Action Buttons */
@@ -284,7 +284,7 @@
     .empty-state {
         text-align: center;
         padding: 3rem;
-        color: #8b949e;
+        color: var(--text-secondary);
     }
 
     .empty-state i {
@@ -312,8 +312,8 @@
     }
 
     .modal-content {
-        background: #161b22;
-        border: 1px solid #30363d;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 8px;
         max-width: 600px;
         width: 90%;
@@ -324,7 +324,7 @@
 
     .modal-header {
         padding: 1.5rem;
-        border-bottom: 1px solid #30363d;
+        border-bottom: 1px solid var(--border-primary);
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -332,13 +332,13 @@
 
     .modal-header h3 {
         margin: 0;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .modal-close {
         background: none;
         border: none;
-        color: #8b949e;
+        color: var(--text-secondary);
         font-size: 1.5rem;
         cursor: pointer;
         padding: 0;
@@ -351,8 +351,8 @@
     }
 
     .modal-close:hover {
-        background: #21262d;
-        color: #c9d1d9;
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
     }
 
     .modal-body {
@@ -361,7 +361,7 @@
 
     .modal-footer {
         padding: 1.5rem;
-        border-top: 1px solid #30363d;
+        border-top: 1px solid var(--border-primary);
         display: flex;
         gap: 0.5rem;
         justify-content: flex-end;
@@ -369,10 +369,10 @@
 
     /* Bill Summary Box */
     .bill-summary {
-        background: #0d1117;
+        background: var(--bg-primary);
         padding: 1rem;
         border-radius: 6px;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         margin-bottom: 1.5rem;
     }
 
@@ -380,21 +380,21 @@
         display: flex;
         justify-content: space-between;
         padding: 0.5rem 0;
-        border-bottom: 1px solid #30363d;
+        border-bottom: 1px solid var(--border-primary);
     }
 
     .bill-summary-row:last-child {
         border-bottom: none;
         font-weight: 600;
-        color: #58a6ff;
+        color: var(--accent-primary);
     }
 
     .bill-summary-row label {
-        color: #8b949e;
+        color: var(--text-secondary);
     }
 
     .bill-summary-row .value {
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     /* Payment History */
@@ -403,10 +403,10 @@
     }
 
     .payment-item {
-        background: #0d1117;
+        background: var(--bg-primary);
         padding: 1rem;
         border-radius: 6px;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         margin-bottom: 0.75rem;
     }
 
@@ -420,7 +420,7 @@
     .payment-amount {
         font-size: 1.25rem;
         font-weight: 600;
-        color: #238636;
+        color: #43A047;
     }
 
     .payment-method-badge {
@@ -433,7 +433,7 @@
     }
 
     .payment-details {
-        color: #8b949e;
+        color: var(--text-secondary);
         font-size: 0.875rem;
     }
 </style>
@@ -700,7 +700,7 @@
                 <div class="form-group">
                     <label>Payment Amount <span class="required">*</span></label>
                     <input type="number" id="paymentAmount" step="0.01" min="0.01" required placeholder="0.00">
-                    <small style="color: #8b949e; display: block; margin-top: 0.25rem;">
+                    <small style="color: var(--text-secondary); display: block; margin-top: 0.25rem;">
                         Maximum: <span id="payMaxAmount">$0.00</span>
                     </small>
                 </div>
@@ -739,7 +739,7 @@
 
             <!-- Payment History -->
             <div class="payment-history" id="paymentHistory" style="display: none;">
-                <h4 style="color: #c9d1d9; margin-bottom: 1rem;">Payment History</h4>
+                <h4 style="color: var(--text-primary); margin-bottom: 1rem;">Payment History</h4>
                 <div id="paymentHistoryList"></div>
             </div>
         </div>

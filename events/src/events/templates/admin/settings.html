@@ -219,11 +219,11 @@
     }
 
     .nav-tabs {
-        border-bottom: 1px solid #30363d;
+        border-bottom: 1px solid var(--border-primary);
     }
 
     .nav-tabs .nav-link {
-        color: #8b949e;
+        color: var(--text-secondary);
         border: none;
         padding: 12px 20px;
         margin-right: 8px;
@@ -232,14 +232,14 @@
     }
 
     .nav-tabs .nav-link:hover {
-        color: #c9d1d9;
-        background-color: #21262d;
+        color: var(--text-primary);
+        background-color: var(--bg-tertiary);
     }
 
     .nav-tabs .nav-link.active {
-        color: #58a6ff;
-        background-color: #0d1117;
-        border-bottom: 2px solid #58a6ff;
+        color: var(--accent-primary);
+        background-color: var(--bg-secondary);
+        border-bottom: 2px solid var(--accent-primary);
     }
 
     .nav-tabs .nav-link i {
@@ -256,15 +256,15 @@
     }
 
     .settings-header h3 {
-        color: #c9d1d9;
+        color: var(--text-primary);
         font-size: 20px;
         font-weight: 600;
         margin: 0;
     }
 
     .settings-table {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         overflow: hidden;
     }
@@ -275,21 +275,21 @@
     }
 
     .settings-table th {
-        background-color: #21262d;
-        color: #8b949e;
+        background-color: var(--bg-tertiary);
+        color: var(--text-secondary);
         padding: 12px 15px;
         text-align: left;
         font-size: 12px;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        border-bottom: 1px solid #30363d;
+        border-bottom: 1px solid var(--border-primary);
     }
 
     .settings-table td {
         padding: 12px 15px;
-        color: #c9d1d9;
-        border-bottom: 1px solid #30363d;
+        color: var(--text-primary);
+        border-bottom: 1px solid var(--border-primary);
     }
 
     .settings-table tr:last-child td {
@@ -297,12 +297,12 @@
     }
 
     .settings-table tr:hover {
-        background-color: #0d1117;
+        background-color: var(--bg-tertiary);
     }
 
     .badge-active {
-        background-color: #238636;
-        color: #4ac26b;
+        background-color: #43A047;
+        color: white;
         padding: 4px 8px;
         border-radius: 12px;
         font-size: 11px;
@@ -311,8 +311,8 @@
     }
 
     .badge-inactive {
-        background-color: #6e7681;
-        color: #c9d1d9;
+        background-color: var(--text-muted);
+        color: white;
         padding: 4px 8px;
         border-radius: 12px;
         font-size: 11px;
@@ -328,7 +328,7 @@
     .btn-icon {
         background: none;
         border: none;
-        color: #8b949e;
+        color: var(--text-secondary);
         cursor: pointer;
         padding: 6px;
         border-radius: 4px;
@@ -337,57 +337,53 @@
     }
 
     .btn-icon:hover {
-        color: #58a6ff;
-        background-color: #21262d;
+        color: var(--accent-primary);
+        background-color: var(--bg-tertiary);
     }
 
     .btn-icon.delete:hover {
-        color: #f85149;
+        color: #E53935;
     }
 
     .modal-content {
-        background-color: #161b22;
-        border: 1px solid #30363d;
-        color: #c9d1d9;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        color: var(--text-primary);
     }
 
     .modal-header {
-        border-bottom: 1px solid #30363d;
+        border-bottom: 1px solid var(--border-primary);
     }
 
     .modal-footer {
-        border-top: 1px solid #30363d;
-    }
-
-    .btn-close {
-        filter: invert(1);
+        border-top: 1px solid var(--border-primary);
     }
 
     .form-label {
-        color: #8b949e;
+        color: var(--text-secondary);
         font-size: 14px;
         font-weight: 500;
         margin-bottom: 8px;
     }
 
     .form-check-input {
-        background-color: #21262d;
-        border: 1px solid #30363d;
+        background-color: var(--bg-primary);
+        border: 1px solid var(--border-primary);
     }
 
     .form-check-input:checked {
-        background-color: #238636;
-        border-color: #238636;
+        background-color: #43A047;
+        border-color: #43A047;
     }
 
     .form-check-label {
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .empty-state {
         text-align: center;
         padding: 40px 20px;
-        color: #8b949e;
+        color: var(--text-muted);
     }
 
     .empty-state i {
@@ -415,8 +411,8 @@
 
     /* Task Builder Styles */
     .task-card {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         padding: 15px;
         margin-bottom: 15px;
@@ -430,7 +426,7 @@
     }
 
     .task-number {
-        color: #58a6ff;
+        color: var(--accent-primary);
         font-weight: 600;
         font-size: 14px;
     }
@@ -447,7 +443,7 @@
     }
 
     .btn-remove-task {
-        background-color: #f85149;
+        background-color: #E53935;
         color: white;
         border: none;
         padding: 4px 8px;
@@ -457,12 +453,12 @@
     }
 
     .btn-remove-task:hover {
-        background-color: #da3633;
+        background-color: #C62828;
     }
 
     .btn-remove-checklist {
         background-color: transparent;
-        color: #f85149;
+        color: #E53935;
         border: none;
         padding: 4px;
         cursor: pointer;
@@ -470,8 +466,8 @@
 
     .btn-add-checklist {
         background-color: transparent;
-        color: #58a6ff;
-        border: 1px solid #30363d;
+        color: var(--accent-primary);
+        border: 1px solid var(--border-primary);
         padding: 4px 8px;
         border-radius: 4px;
         cursor: pointer;
@@ -480,8 +476,8 @@
     }
 
     .btn-add-checklist:hover {
-        border-color: #58a6ff;
-        background-color: #0d1117;
+        border-color: var(--accent-primary);
+        background-color: var(--bg-tertiary);
     }
 </style>
 {% endblock %}

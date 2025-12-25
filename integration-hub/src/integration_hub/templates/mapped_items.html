@@ -73,10 +73,11 @@
                             <td>
                                 {% if item.vendor_item_details %}
                                     <span class="badge bg-success">{{ item.vendor_item_details }}</span>
-                                {% elif item.inventory_category %}
+                                {% elif item.inventory_category and item.inventory_category != 'Uncategorized' %}
                                     <span class="badge bg-info">{{ item.inventory_category }}</span>
-                                {% elif item.gl_cogs_account %}
-                                    <span class="badge bg-warning">GL: {{ item.gl_cogs_account }} - {{ item.gl_cogs_account_name }}</span>
+                                {% elif item.inventory_category == 'Uncategorized' or (not item.inventory_category and not item.inventory_item_id and item.gl_cogs_account) %}
+                                    <span class="badge bg-secondary">Expense</span>
+                                    <small class="text-muted ms-1">GL: {{ item.gl_cogs_account }}{% if item.gl_cogs_account_name %} - {{ item.gl_cogs_account_name }}{% endif %}</small>
                                 {% else %}
                                     <span class="badge bg-secondary">Not Specified</span>
                                 {% endif %}
@@ -152,28 +153,22 @@
                         <div class="mb-3">
                             <label class="form-label">Vendor Item (Product) <span class="text-danger">*</span></label>
                             <div class="searchable-select-wrapper">
-                                <input type="text" class="form-control search-input" id="searchInventoryItem" placeholder="Search vendor items by name, SKU, or vendor...">
-                                <select class="form-select" id="inventoryItemId" name="inventory_item_id" size="6">
+                                <input type="text" class="form-control search-input" id="searchInventoryItem" placeholder="Search by name, SKU, or vendor...">
+                                <select class="form-select" id="inventoryItemId" name="inventory_item_id" size="8">
                                     <option value="">-- Select vendor item --</option>
                                     {% for item in inventory_items %}
-                                    <option value="{{ item.id }}">
-                                        {{ item.vendor_name }}: {{ item.vendor_product_name }}{% if item.vendor_sku %} [{{ item.vendor_sku }}]{% endif %}{% if item.pack_size %} - {{ item.pack_size }}{% endif %}
+                                    <option value="{{ item.id }}" data-category="{{ item.master_item_category or '' }}">
+                                        {{ item.vendor_name }}: {{ item.vendor_product_name }}{% if item.vendor_sku %} [{{ item.vendor_sku }}]{% endif %}{% if item.pack_size %} - {{ item.pack_size }}{% endif %}{% if item.master_item_category %} ({{ item.master_item_category }}){% endif %}
                                     </option>
                                     {% endfor %}
                                 </select>
                             </div>
-                            <small class="text-muted">Select the specific vendor product with SKU and pack size</small>
+                            <small class="text-muted">Select the vendor product from inventory. Category and GL accounts are determined automatically.</small>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Category <span class="text-danger">*</span></label>
-                            <select class="form-select" id="inventoryCategory" name="inventory_category">
-                                <option value="">-- Select category --</option>
-                                {% for cat in category_mappings %}
-                                <option value="{{ cat.inventory_category }}">{{ cat.inventory_category }}</option>
-                                {% endfor %}
-                            </select>
-                            <small class="text-muted">GL accounts will be automatically assigned based on category mapping</small>
+                        <div id="selectedItemInfo" class="alert alert-light" style="display: none;">
+                            <strong>Category:</strong> <span id="selectedCategory">-</span><br>
+                            <small class="text-muted">GL accounts will be assigned based on this category</small>
                         </div>
                     </div>
 
@@ -345,6 +340,24 @@ function setupItemTypeListeners() {
             }
         });
     }
+
+    // Set up vendor item selection to show category
+    const inventoryItemSelect = document.getElementById('inventoryItemId');
+    if (inventoryItemSelect) {
+        inventoryItemSelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const category = selectedOption.getAttribute('data-category');
+            const infoDiv = document.getElementById('selectedItemInfo');
+            const categorySpan = document.getElementById('selectedCategory');
+
+            if (category && this.value) {
+                categorySpan.textContent = category;
+                infoDiv.style.display = 'block';
+            } else {
+                infoDiv.style.display = 'none';
+            }
+        });
+    }
 }
 
 // Filter select options based on search input
@@ -423,7 +436,7 @@ function openEditModal(description, occurrenceCount, inventoryItemId, inventoryC
     document.getElementById('itemDescription').value = description;
 
     // Determine if this is an inventory item or expense item
-    const isInventoryItem = inventoryItemId || inventoryCategory;
+    const isInventoryItem = inventoryItemId || (inventoryCategory && inventoryCategory !== 'Uncategorized');
     const isExpenseItem = !isInventoryItem && cogsAccount;
 
     // Set the item type radio button
@@ -431,11 +444,14 @@ function openEditModal(description, occurrenceCount, inventoryItemId, inventoryC
     const expenseRadio = document.getElementById('itemTypeExpense');
     const inventoryFields = document.getElementById('inventoryItemFields');
     const expenseFields = document.getElementById('expenseItemFields');
+    const infoDiv = document.getElementById('selectedItemInfo');
+    const categorySpan = document.getElementById('selectedCategory');
 
     if (isExpenseItem) {
         expenseRadio.checked = true;
         inventoryFields.style.display = 'none';
         expenseFields.style.display = 'block';
+        infoDiv.style.display = 'none';
         // Pre-fill expense account
         if (cogsAccount) {
             document.getElementById('glExpenseAccount').value = cogsAccount;
@@ -447,9 +463,18 @@ function openEditModal(description, occurrenceCount, inventoryItemId, inventoryC
         // Pre-fill inventory fields
         if (inventoryItemId) {
             document.getElementById('inventoryItemId').value = inventoryItemId;
-        }
-        if (inventoryCategory) {
-            document.getElementById('inventoryCategory').value = inventoryCategory;
+            // Show category info
+            const inventorySelect = document.getElementById('inventoryItemId');
+            const selectedOption = inventorySelect.options[inventorySelect.selectedIndex];
+            const category = selectedOption ? selectedOption.getAttribute('data-category') : null;
+            if (category) {
+                categorySpan.textContent = category;
+                infoDiv.style.display = 'block';
+            } else {
+                infoDiv.style.display = 'none';
+            }
+        } else {
+            infoDiv.style.display = 'none';
         }
     }
 
@@ -472,16 +497,20 @@ async function saveMapping() {
 
     if (itemType === 'inventory') {
         // Inventory item validation
-        inventoryItemId = document.getElementById('inventoryItemId').value;
-        category = document.getElementById('inventoryCategory').value;
+        const inventorySelect = document.getElementById('inventoryItemId');
+        inventoryItemId = inventorySelect.value;
 
         if (!inventoryItemId) {
-            await showAlert('Please select a vendor item', 'Validation Error');
+            await showAlert('Please select a vendor item from inventory', 'Validation Error');
             return;
         }
 
+        // Get category from selected option's data attribute
+        const selectedOption = inventorySelect.options[inventorySelect.selectedIndex];
+        category = selectedOption.getAttribute('data-category');
+
         if (!category) {
-            await showAlert('Please select a category', 'Validation Error');
+            await showAlert('Selected vendor item has no category assigned. Please select a different item or contact admin.', 'Error');
             return;
         }
 
@@ -511,9 +540,9 @@ async function saveMapping() {
             return;
         }
 
-        // For expense items: no vendor item, no category, expense account goes to COGS field
+        // For expense items: no vendor item, category='Uncategorized', expense account goes to COGS field
         inventoryItemId = null;
-        category = null;
+        category = 'Uncategorized';  // Mark as expense item
         assetAccount = null;
         cogsAccount = expenseAccount;
         wasteAccount = null;

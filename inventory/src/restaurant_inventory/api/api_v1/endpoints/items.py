@@ -142,6 +142,231 @@ async def get_categories(
     categories = db.query(MasterItem.category).distinct().all()
     return {"categories": [cat[0] for cat in categories if cat[0]]}
 
+
+@router.get("/duplicates")
+async def find_duplicate_items(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Find potential duplicate master items.
+
+    Returns items that are likely duplicates based on:
+    1. Same category
+    2. Same primary type (first part before comma)
+    3. Very similar secondary attributes
+    """
+    from sqlalchemy import text
+
+    # Find items with same primary type (text before first comma) in same category
+    # This is much more accurate than just matching first word
+    results = db.execute(text("""
+        WITH item_parts AS (
+            SELECT
+                id,
+                name,
+                category,
+                -- Get the primary type (everything before first comma, trimmed and lowercased)
+                LOWER(TRIM(SPLIT_PART(name, ',', 1))) as primary_type,
+                -- Get everything after the first comma (secondary attributes)
+                LOWER(TRIM(SUBSTRING(name FROM POSITION(',' IN name) + 1))) as secondary_attrs
+            FROM master_items
+            WHERE is_active = true
+        )
+        SELECT
+            i1.id as id1, i1.name as name1,
+            i2.id as id2, i2.name as name2,
+            i1.category,
+            i1.primary_type,
+            i1.secondary_attrs as attrs1,
+            i2.secondary_attrs as attrs2
+        FROM item_parts i1
+        JOIN item_parts i2 ON
+            i1.id < i2.id
+            AND i1.category = i2.category
+            AND i1.primary_type = i2.primary_type
+            AND LENGTH(i1.primary_type) > 3
+        WHERE
+            -- Secondary attributes must be very similar (same or very close)
+            (
+                -- Exact match on secondary attributes
+                i1.secondary_attrs = i2.secondary_attrs
+                OR
+                -- One is a substring of the other (one has more detail)
+                i1.secondary_attrs LIKE '%' || i2.secondary_attrs || '%'
+                OR
+                i2.secondary_attrs LIKE '%' || i1.secondary_attrs || '%'
+                OR
+                -- Very similar length and same first few chars after comma
+                (
+                    ABS(LENGTH(i1.secondary_attrs) - LENGTH(i2.secondary_attrs)) < 10
+                    AND LEFT(i1.secondary_attrs, 15) = LEFT(i2.secondary_attrs, 15)
+                )
+            )
+            -- Exclude alcohol categories from loose matching (too many similar items)
+            AND i1.primary_type NOT IN ('beer', 'wine', 'bourbon', 'vodka', 'gin', 'tequila',
+                                        'rum', 'whiskey', 'scotch', 'cordial', 'liqueur')
+        ORDER BY i1.category, i1.name
+        LIMIT 50
+    """)).fetchall()
+
+    duplicates = []
+    for row in results:
+        duplicates.append({
+            "item1": {"id": row[0], "name": row[1]},
+            "item2": {"id": row[2], "name": row[3]},
+            "category": row[4]
+        })
+
+    return {
+        "potential_duplicates": duplicates,
+        "count": len(duplicates)
+    }
+
+
+@router.post("/merge")
+async def merge_master_items(
+    source_id: int,
+    target_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager_or_admin)
+):
+    """
+    Merge two master items into one.
+
+    Moves all vendor_items, waste_records, invoice_items, inventory records,
+    count_session_items, recipe_ingredients, and pos_mappings from source to target,
+    then deletes the source item.
+
+    Args:
+        source_id: The ID of the item to merge FROM (will be deleted)
+        target_id: The ID of the item to merge INTO (will be kept)
+
+    Returns:
+        Summary of merged records
+    """
+    from restaurant_inventory.models.inventory import Inventory
+    from restaurant_inventory.models.pos_sale import POSItemMapping
+    from restaurant_inventory.models.recipe import RecipeIngredient
+    from restaurant_inventory.models.waste import WasteRecord
+    from restaurant_inventory.models.count_session import CountSessionItem
+    from restaurant_inventory.models.invoice import InvoiceItem
+    from restaurant_inventory.models.inventory_transaction import InventoryTransaction
+
+    # Validate source and target exist
+    source_item = db.query(MasterItem).filter(MasterItem.id == source_id).first()
+    target_item = db.query(MasterItem).filter(MasterItem.id == target_id).first()
+
+    if not source_item:
+        raise HTTPException(status_code=404, detail=f"Source item {source_id} not found")
+    if not target_item:
+        raise HTTPException(status_code=404, detail=f"Target item {target_id} not found")
+    if source_id == target_id:
+        raise HTTPException(status_code=400, detail="Source and target cannot be the same item")
+
+    merge_stats = {
+        "vendor_items": 0,
+        "waste_records": 0,
+        "invoice_items": 0,
+        "inventory_records": 0,
+        "count_session_items": 0,
+        "recipe_ingredients": 0,
+        "pos_mappings": 0,
+        "inventory_transactions": 0
+    }
+
+    try:
+        # Move vendor_items
+        vendor_items_moved = db.query(VendorItem).filter(
+            VendorItem.master_item_id == source_id
+        ).update({VendorItem.master_item_id: target_id})
+        merge_stats["vendor_items"] = vendor_items_moved
+
+        # Move waste_records
+        waste_moved = db.query(WasteRecord).filter(
+            WasteRecord.master_item_id == source_id
+        ).update({WasteRecord.master_item_id: target_id})
+        merge_stats["waste_records"] = waste_moved
+
+        # Move invoice_items
+        invoice_moved = db.query(InvoiceItem).filter(
+            InvoiceItem.master_item_id == source_id
+        ).update({InvoiceItem.master_item_id: target_id})
+        merge_stats["invoice_items"] = invoice_moved
+
+        # Move inventory records
+        inventory_moved = db.query(Inventory).filter(
+            Inventory.master_item_id == source_id
+        ).update({Inventory.master_item_id: target_id})
+        merge_stats["inventory_records"] = inventory_moved
+
+        # Move count_session_items
+        count_moved = db.query(CountSessionItem).filter(
+            CountSessionItem.master_item_id == source_id
+        ).update({CountSessionItem.master_item_id: target_id})
+        merge_stats["count_session_items"] = count_moved
+
+        # Move recipe_ingredients
+        recipe_moved = db.query(RecipeIngredient).filter(
+            RecipeIngredient.master_item_id == source_id
+        ).update({RecipeIngredient.master_item_id: target_id})
+        merge_stats["recipe_ingredients"] = recipe_moved
+
+        # Move pos_mappings
+        pos_moved = db.query(POSItemMapping).filter(
+            POSItemMapping.master_item_id == source_id
+        ).update({POSItemMapping.master_item_id: target_id})
+        merge_stats["pos_mappings"] = pos_moved
+
+        # Move inventory_transactions
+        trans_moved = db.query(InventoryTransaction).filter(
+            InventoryTransaction.master_item_id == source_id
+        ).update({InventoryTransaction.master_item_id: target_id})
+        merge_stats["inventory_transactions"] = trans_moved
+
+        # Log audit event before deletion
+        log_audit_event(
+            db=db,
+            action="MERGE",
+            entity_type="item",
+            entity_id=target_id,
+            user=current_user,
+            changes={
+                "merged_from": {
+                    "id": source_item.id,
+                    "name": source_item.name,
+                    "category": source_item.category
+                },
+                "merged_into": {
+                    "id": target_item.id,
+                    "name": target_item.name,
+                    "category": target_item.category
+                },
+                "records_moved": merge_stats
+            },
+            request=request
+        )
+
+        # Delete source item
+        source_name = source_item.name
+        db.delete(source_item)
+        db.commit()
+
+        return {
+            "success": True,
+            "message": f"Successfully merged '{source_name}' into '{target_item.name}'",
+            "source_deleted": source_id,
+            "target_id": target_id,
+            "records_moved": merge_stats,
+            "total_records_moved": sum(merge_stats.values())
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Merge failed: {str(e)}")
+
+
 @router.get("/{item_id}", response_model=MasterItemResponse)
 async def get_master_item(
     item_id: int,

@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** December 23, 2025
+**Last Updated:** December 24, 2025
 **System Status:** Production (95% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -9,7 +9,55 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Dec 23, 2025)
+### Most Recent Work (Current Session - Dec 24, 2025)
+
+**UI CONSISTENCY: SIDEBAR HIGHLIGHTING & SUBMENU BEHAVIOR FIXES** ✅ **COMPLETE**
+
+#### 1. **Sidebar Active State Audit** 🔍 **ALL SYSTEMS**
+- Audited all 6 systems for consistent sidebar highlighting behavior
+- **Approaches Found:**
+  | System | Method |
+  |--------|--------|
+  | Accounting | Jinja template blocks (`{% block nav_xxx %}active{% endblock %}`) |
+  | Events | Jinja conditionals (`{% if 'path' in request.path %}active{% endif %}`) |
+  | Integration Hub | Jinja conditionals |
+  | HR | Jinja template blocks |
+  | Inventory | JavaScript-based (path matching) |
+  | Websites | Jinja conditionals with `active_page` variable |
+
+#### 2. **Inventory Sidebar Fix** 🔧 **BUG FIX**
+- **Problem:** Count History page also highlighted Take Inventory menu item
+- **Root Cause:** JavaScript `startsWith()` matching `/inventory/count` matched both `/inventory/count` and `/inventory/count/history`
+- **Solution:** Rewrote path matching to use exact match or proper segment boundaries
+- **File Modified:** `inventory/src/restaurant_inventory/templates/base.html`
+
+#### 3. **Accounting Submenu Fixes** 🔧 **BUG FIXES**
+- **Reports Submenu Closing:** Added `comparative-pl` and `cash-flow-statement` to auto-open logic
+- **Recurring Invoices Submenu Closing:** Added `/recurring-invoices` to AR section auto-open logic
+- **DSS Journal Entries Wrong Highlight:**
+  - Updated `main.py` to pass `source` query parameter to template
+  - Updated `journal_entries.html` to conditionally set nav block based on source
+  - Now correctly highlights DSS Journal Entries (source=sale) or Bill Journal Entries (source=bill)
+- **ACH Batches Text Wrapping:** Added `white-space: nowrap` to submenu items
+- **Files Modified:**
+  - `accounting/src/accounting/main.py` (added source parameter)
+  - `accounting/src/accounting/templates/journal_entries.html` (conditional nav blocks)
+  - `accounting/src/accounting/templates/base.html` (CSS fix, auto-open logic)
+
+#### 4. **Events System Theme Fix** 🎨 **UI FIX** (from previous session)
+- **Problem:** Settings and Tasks pages had dark theme colors instead of light theme
+- **Solution:** Replaced hardcoded dark colors with CSS variables
+- **Files Modified:** `events/src/events/templates/admin/settings.html`, `tasks.html`
+
+#### 5. **Integration Hub GL Names Fix** 🔧 **BUG FIX** (from previous session)
+- **Problem:** GL account descriptions missing on invoice detail page
+- **Root Cause:** Dictionary keys were integers but template looked up strings
+- **Solution:** Convert keys to strings when building `gl_names` dictionary
+- **File Modified:** `integration-hub/src/integration_hub/main.py`
+
+---
+
+### Previous Session Work (Dec 23, 2025)
 
 **INTEGRATION HUB: INVOICE ITEM MAPPING IMPROVEMENTS + OCR FIXES + INVENTORY CLEANUP** ✅ **COMPLETE**
 

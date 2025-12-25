@@ -87,13 +87,20 @@ async def sso_login(
     db: Session = Depends(get_db)
 ):
     """SSO login from Portal"""
+    from fastapi.responses import Response
+
     # Validate Portal token
     portal_user = validate_portal_token(token, "inventory")
 
     if not portal_user:
+        # Return with no-cache headers to prevent caching of 401 errors
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired Portal token"
+            detail="Invalid or expired Portal token",
+            headers={
+                "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+                "Pragma": "no-cache"
+            }
         )
 
     # Find or create user based on Portal information
@@ -244,6 +251,32 @@ async def get_current_user_info(
 ):
     """Get current user information"""
     return UserResponse.from_orm(current_user)
+
+
+@router.post("/refresh-token")
+async def refresh_token(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Refresh the access token for an authenticated user.
+
+    This endpoint issues a new token with a fresh expiration time,
+    effectively extending the session as long as the user is active.
+    The old token remains valid until it expires.
+    """
+    # Create new access token with fresh expiration
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    new_token = create_access_token(
+        subject=current_user.id, expires_delta=access_token_expires
+    )
+
+    return {
+        "access_token": new_token,
+        "token_type": "bearer",
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60  # seconds
+    }
+
 
 @router.post("/logout")
 async def logout():

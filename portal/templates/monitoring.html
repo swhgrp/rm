@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,6 +9,46 @@
     <title>System Monitoring - SW Hospitality Group</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
+        /* =====================================================
+           SW Hospitality Group - Slate Blue Light Theme (Monitoring)
+           ===================================================== */
+
+        :root {
+            /* Background colors - light grey */
+            --bg-primary: #ECEFF1;
+            --bg-secondary: #FFFFFF;
+            --bg-tertiary: #F5F5F5;
+            --bg-elevated: #E0E0E0;
+
+            /* Border colors - blue-grey tones */
+            --border-primary: #CFD8DC;
+            --border-secondary: #B0BEC5;
+
+            /* Text colors - dark for readability */
+            --text-primary: #263238;
+            --text-secondary: #546E7A;
+            --text-muted: #78909C;
+
+            /* Accent colors - Slate Blue */
+            --accent-primary: #455A64;
+            --accent-secondary: #37474F;
+            --accent-hover: #263238;
+            --accent-muted: #546E7A;
+
+            /* Semantic colors */
+            --success: #43A047;
+            --success-bg: rgba(67, 160, 71, 0.1);
+            --error: #E53935;
+            --error-bg: rgba(229, 57, 53, 0.1);
+            --warning: #FB8C00;
+            --warning-bg: rgba(251, 140, 0, 0.1);
+
+            /* Shadows */
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
+            --glow-accent: 0 0 15px rgba(69, 90, 100, 0.15);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -17,18 +57,19 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background-color: #0d1117;
-            color: #c9d1d9;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
         }
 
         .navbar {
-            background-color: #161b22;
-            border-bottom: 1px solid #30363d;
+            background-color: #455A64;
+            border-bottom: none;
             padding: 15px 30px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            box-shadow: 0 2px 8px rgba(69, 90, 100, 0.3);
         }
 
         .navbar-brand {
@@ -40,7 +81,11 @@
         .navbar-brand h1 {
             font-size: 20px;
             font-weight: 600;
-            color: #c9d1d9;
+            color: #FFFFFF;
+        }
+
+        .navbar-brand h1 i {
+            color: #FFFFFF;
         }
 
         .navbar-actions {
@@ -51,19 +96,19 @@
 
         .last-updated {
             font-size: 13px;
-            color: #8b949e;
+            color: rgba(255, 255, 255, 0.8);
         }
 
         .btn-refresh,
         .btn-back {
             padding: 8px 16px;
-            background-color: #21262d;
-            color: #c9d1d9;
-            border: 1px solid #30363d;
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
+            border: 1px solid rgba(255, 255, 255, 0.3);
             border-radius: 6px;
             text-decoration: none;
             font-size: 14px;
-            transition: background 0.2s;
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
             gap: 6px;
@@ -72,8 +117,9 @@
 
         .btn-refresh:hover,
         .btn-back:hover {
-            background-color: #30363d;
-            color: #c9d1d9;
+            background-color: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            color: #FFFFFF;
         }
 
         .container {
@@ -90,15 +136,16 @@
         }
 
         .card {
-            background-color: #161b22;
-            border: 1px solid #30363d;
-            border-radius: 6px;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
             padding: 20px;
-            transition: border-color 0.2s;
+            transition: all 0.2s ease;
         }
 
         .card:hover {
-            border-color: #58a6ff;
+            border-color: var(--accent-muted);
+            box-shadow: var(--glow-accent);
         }
 
         .card-header {
@@ -107,16 +154,20 @@
             align-items: center;
             margin-bottom: 20px;
             padding-bottom: 12px;
-            border-bottom: 1px solid #21262d;
+            border-bottom: 1px solid var(--border-primary);
         }
 
         .card-title {
             font-size: 16px;
             font-weight: 600;
-            color: #c9d1d9;
+            color: var(--text-primary);
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+
+        .card-title i {
+            color: var(--accent-primary);
         }
 
         .status-badge {
@@ -128,18 +179,18 @@
         }
 
         .status-ok {
-            background: #238636;
-            color: #fff;
+            background: var(--success);
+            color: #FFFFFF;
         }
 
         .status-warning {
-            background: #9e6a03;
-            color: #fff;
+            background: var(--warning);
+            color: #FFFFFF;
         }
 
         .status-critical {
-            background: #da3633;
-            color: #fff;
+            background: var(--error);
+            color: #FFFFFF;
         }
 
         .metric {
@@ -148,18 +199,19 @@
 
         .metric-label {
             font-size: 13px;
-            color: #8b949e;
+            color: var(--text-secondary);
             margin-bottom: 6px;
         }
 
         .metric-value {
             font-size: 24px;
             font-weight: 600;
-            color: #c9d1d9;
+            color: var(--text-primary);
         }
 
         .metric-value.large {
             font-size: 32px;
+            color: var(--accent-primary);
         }
 
         .service-list {
@@ -171,7 +223,7 @@
             justify-content: space-between;
             align-items: center;
             padding: 12px 0;
-            border-bottom: 1px solid #21262d;
+            border-bottom: 1px solid var(--border-primary);
         }
 
         .service-item:last-child {
@@ -180,7 +232,7 @@
 
         .service-name {
             font-weight: 500;
-            color: #c9d1d9;
+            color: var(--text-primary);
         }
 
         .service-status {
@@ -188,7 +240,7 @@
             align-items: center;
             gap: 10px;
             font-size: 13px;
-            color: #8b949e;
+            color: var(--text-secondary);
         }
 
         .status-dot {
@@ -199,21 +251,21 @@
         }
 
         .status-dot.green {
-            background: #3fb950;
+            background: var(--success);
         }
 
         .status-dot.red {
-            background: #f85149;
+            background: var(--error);
         }
 
         .status-dot.yellow {
-            background: #d29922;
+            background: var(--warning);
         }
 
         .progress-bar {
             width: 100%;
             height: 8px;
-            background: #21262d;
+            background: var(--bg-tertiary);
             border-radius: 4px;
             overflow: hidden;
             margin-top: 8px;
@@ -226,39 +278,39 @@
         }
 
         .progress-fill.green {
-            background: #3fb950;
+            background: var(--success);
         }
 
         .progress-fill.yellow {
-            background: #d29922;
+            background: var(--warning);
         }
 
         .progress-fill.red {
-            background: #f85149;
+            background: var(--error);
         }
 
         .loading {
             text-align: center;
             padding: 60px 20px;
             font-size: 16px;
-            color: #8b949e;
+            color: var(--text-secondary);
         }
 
         .error {
-            background: #161b22;
-            border: 1px solid #f85149;
+            background: var(--bg-secondary);
+            border: 1px solid var(--error);
             padding: 20px;
-            border-radius: 6px;
+            border-radius: 12px;
             margin: 20px 0;
         }
 
         .error h3 {
-            color: #f85149;
+            color: var(--error);
             margin-bottom: 10px;
         }
 
         .error p {
-            color: #8b949e;
+            color: var(--text-secondary);
             margin: 5px 0;
         }
 
@@ -267,10 +319,10 @@
             font-family: 'Courier New', monospace;
             font-size: 12px;
             padding: 8px;
-            background: #0d1117;
+            background: var(--bg-primary);
             border-radius: 4px;
             margin-bottom: 8px;
-            color: #8b949e;
+            color: var(--text-secondary);
             word-break: break-all;
         }
 
@@ -282,7 +334,7 @@
         .no-items {
             text-align: center;
             padding: 20px;
-            color: #8b949e;
+            color: var(--text-muted);
             font-style: italic;
         }
 

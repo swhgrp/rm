@@ -18,8 +18,8 @@
 {% block extra_css %}
 <style>
     .filters-bar {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         padding: 15px 20px;
         margin-bottom: 20px;
@@ -38,7 +38,7 @@
 
     .filter-item label {
         font-size: 12px;
-        color: #8b949e;
+        color: var(--text-secondary);
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
@@ -52,8 +52,8 @@
     }
 
     .stat-card {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         padding: 15px;
         text-align: center;
@@ -61,7 +61,7 @@
 
     .stat-label {
         font-size: 12px;
-        color: #8b949e;
+        color: var(--text-secondary);
         text-transform: uppercase;
         letter-spacing: 0.5px;
         margin-bottom: 8px;
@@ -70,7 +70,7 @@
     .stat-value {
         font-size: 28px;
         font-weight: 700;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     /* Kanban View */
@@ -81,8 +81,8 @@
     }
 
     .kanban-column {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         padding: 15px;
         min-height: 400px;
@@ -94,20 +94,20 @@
         align-items: center;
         margin-bottom: 15px;
         padding-bottom: 10px;
-        border-bottom: 1px solid #30363d;
+        border-bottom: 1px solid var(--border-primary);
     }
 
     .column-title {
         font-size: 14px;
         font-weight: 600;
-        color: #c9d1d9;
+        color: var(--text-primary);
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
 
     .column-count {
-        background-color: #21262d;
-        color: #8b949e;
+        background-color: var(--bg-tertiary);
+        color: var(--text-secondary);
         padding: 2px 8px;
         border-radius: 12px;
         font-size: 12px;
@@ -115,8 +115,8 @@
     }
 
     .task-card {
-        background-color: #0d1117;
-        border: 1px solid #30363d;
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         padding: 12px;
         margin-bottom: 10px;
@@ -125,14 +125,15 @@
     }
 
     .task-card:hover {
-        border-color: #58a6ff;
+        border-color: var(--accent-primary);
         transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
     }
 
     .task-title {
         font-size: 14px;
         font-weight: 600;
-        color: #c9d1d9;
+        color: var(--text-primary);
         margin-bottom: 8px;
     }
 
@@ -141,7 +142,7 @@
         flex-wrap: wrap;
         gap: 8px;
         font-size: 12px;
-        color: #8b949e;
+        color: var(--text-secondary);
         margin-bottom: 8px;
     }
 
@@ -152,7 +153,7 @@
     }
 
     .task-meta-item i {
-        color: #58a6ff;
+        color: var(--accent-primary);
     }
 
     .priority-badge {
@@ -164,27 +165,27 @@
     }
 
     .priority-urgent {
-        background-color: #da3633;
-        color: #ffa198;
+        background-color: #E53935;
+        color: white;
     }
 
     .priority-high {
-        background-color: #f0883e;
-        color: #ffc680;
+        background-color: #FB8C00;
+        color: white;
     }
 
     .priority-medium {
-        background-color: #9e6a03;
-        color: #ffd33d;
+        background-color: #FDD835;
+        color: #263238;
     }
 
     .priority-low {
-        background-color: #0969da;
-        color: #79c0ff;
+        background-color: #43A047;
+        color: white;
     }
 
     .task-overdue {
-        border-left: 3px solid #da3633;
+        border-left: 3px solid #E53935;
     }
 
     /* List View */
@@ -203,12 +204,12 @@
     .loading {
         text-align: center;
         padding: 40px;
-        color: #8b949e;
+        color: var(--text-muted);
     }
 
     .spinner {
-        border: 3px solid #21262d;
-        border-top: 3px solid #58a6ff;
+        border: 3px solid var(--border-primary);
+        border-top: 3px solid var(--accent-primary);
         border-radius: 50%;
         width: 40px;
         height: 40px;
@@ -224,7 +225,7 @@
     .empty-column {
         text-align: center;
         padding: 40px 20px;
-        color: #8b949e;
+        color: var(--text-muted);
         font-size: 14px;
     }
 

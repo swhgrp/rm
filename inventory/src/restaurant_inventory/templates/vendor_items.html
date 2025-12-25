@@ -37,6 +37,11 @@
             <select class="form-select" id="vendorItemFilterMaster" style="width: 200px;" onchange="loadVendorItems()">
                 <option value="">All Master Items</option>
             </select>
+            <select class="form-select" id="vendorItemFilterLinked" style="width: 150px;" onchange="loadVendorItems()">
+                <option value="">All Items</option>
+                <option value="true">Linked</option>
+                <option value="false">Not Linked</option>
+            </select>
         </div>
         <div>
             <button class="btn btn-outline-primary me-2" onclick="showVendorItemUploadModal()">
@@ -425,11 +430,13 @@
         try {
             const vendorFilter = document.getElementById('vendorItemFilterVendor').value;
             const masterFilter = document.getElementById('vendorItemFilterMaster').value;
+            const linkedFilter = document.getElementById('vendorItemFilterLinked').value;
 
             let url = 'api/vendor-items/';
             const params = new URLSearchParams();
             if (vendorFilter) params.append('vendor_id', vendorFilter);
             if (masterFilter) params.append('master_item_id', masterFilter);
+            if (linkedFilter) params.append('linked', linkedFilter);
             if (params.toString()) url += `?${params.toString()}`;
 
             const response = await apiRequest(url);
@@ -618,6 +625,8 @@
         unitSelect.innerHTML = '<option value="">Select unit...</option>';
 
         if (Array.isArray(unitsResp)) {
+            // Sort units alphabetically by name
+            unitsResp.sort((a, b) => a.name.localeCompare(b.name));
             unitsResp.forEach(u => {
                 unitSelect.innerHTML += `<option value="${u.id}">${u.name} (${u.abbreviation})</option>`;
             });

@@ -147,21 +147,24 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <strong>Inventory System:</strong>
-                        {% if invoice.inventory_sync_at %}
+                        {% set has_inventory_items = items|selectattr('inventory_category')|list|length > 0 %}
+                        {% if invoice.sent_to_inventory and invoice.inventory_invoice_id %}
                         <span class="text-success">
                             <i class="bi bi-check-circle-fill"></i> Sent
                         </span>
-                        {% if invoice.inventory_invoice_id %}
                         <br><small class="text-muted">ID: {{ invoice.inventory_invoice_id }}</small>
-                        {% endif %}
                         {% elif invoice.sent_to_inventory %}
-                        <span class="text-muted">
-                            <i class="bi bi-dash-circle"></i> Not Applicable
+                        <span class="text-success">
+                            <i class="bi bi-check-circle-fill"></i> Sent
                         </span>
-                        <br><small class="text-muted">No inventory items to send</small>
+                        {% elif not has_inventory_items %}
+                        <span class="text-muted">
+                            <i class="bi bi-dash-circle"></i> N/A
+                        </span>
+                        <br><small class="text-muted">Expenses only - no inventory items</small>
                         {% else %}
-                        <span class="text-danger">
-                            <i class="bi bi-x-circle"></i> Not Sent
+                        <span class="text-warning">
+                            <i class="bi bi-clock"></i> Not Sent
                         </span>
                         {% endif %}
                     </div>
@@ -186,8 +189,15 @@
                         {% endif %}
                     </div>
 
-                    {% if invoice.status == 'ready' %}
+                    {% if invoice.status == 'ready' and invoice.location_id %}
                     <button class="btn btn-primary btn-sm w-100" onclick="sendInvoice()">
+                        <i class="bi bi-send"></i> Send Invoice
+                    </button>
+                    {% elif invoice.status == 'ready' and not invoice.location_id %}
+                    <div class="alert alert-warning mb-2">
+                        <small><i class="bi bi-exclamation-triangle"></i> Select a location before sending</small>
+                    </div>
+                    <button class="btn btn-primary btn-sm w-100" disabled>
                         <i class="bi bi-send"></i> Send Invoice
                     </button>
                     {% elif invoice.status == 'partial' or invoice.status == 'error' %}
@@ -263,17 +273,22 @@
                             <td>${{ "{:,.2f}".format(item.unit_price) }}</td>
                             <td><strong>${{ "{:,.2f}".format(item.line_total) }}</strong></td>
                             <td>
-                                {% if item.inventory_category %}
+                                {% if item.inventory_category and item.inventory_category != 'Uncategorized' %}
                                 <span class="badge bg-info">{{ item.inventory_category }}</span>
+                                {% elif item.inventory_category == 'Uncategorized' or (not item.inventory_category and not item.inventory_item_id and item.gl_cogs_account) %}
+                                <span class="badge bg-secondary">Expense</span>
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if item.gl_asset_account %}
-                                <span class="gl-account" title="{{ gl_names.get(item.gl_asset_account, 'Unknown') }}" data-bs-toggle="tooltip">
+                                {% set asset_name = gl_names.get(item.gl_asset_account|string, '') %}
+                                <span class="gl-account" title="{{ asset_name or 'Unknown' }}" data-bs-toggle="tooltip">
                                     {{ item.gl_asset_account }}
-                                    <small class="text-muted d-block" style="font-size: 10px; line-height: 1;">{{ gl_names.get(item.gl_asset_account, '')[:15] }}{% if gl_names.get(item.gl_asset_account, '')|length > 15 %}...{% endif %}</small>
+                                    {% if asset_name %}
+                                    <small class="text-muted d-block" style="font-size: 10px; line-height: 1;">{{ asset_name[:15] }}{% if asset_name|length > 15 %}...{% endif %}</small>
+                                    {% endif %}
                                 </span>
                                 {% else %}
                                 <span class="text-muted">-</span>
@@ -281,9 +296,12 @@
                             </td>
                             <td>
                                 {% if item.gl_cogs_account %}
-                                <span class="gl-account" title="{{ gl_names.get(item.gl_cogs_account, 'Unknown') }}" data-bs-toggle="tooltip">
+                                {% set cogs_name = gl_names.get(item.gl_cogs_account|string, '') %}
+                                <span class="gl-account" title="{{ cogs_name or 'Unknown' }}" data-bs-toggle="tooltip">
                                     {{ item.gl_cogs_account }}
-                                    <small class="text-muted d-block" style="font-size: 10px; line-height: 1;">{{ gl_names.get(item.gl_cogs_account, '')[:15] }}{% if gl_names.get(item.gl_cogs_account, '')|length > 15 %}...{% endif %}</small>
+                                    {% if cogs_name %}
+                                    <small class="text-muted d-block" style="font-size: 10px; line-height: 1;">{{ cogs_name[:15] }}{% if cogs_name|length > 15 %}...{% endif %}</small>
+                                    {% endif %}
                                 </span>
                                 {% else %}
                                 <span class="text-muted">-</span>

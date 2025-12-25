@@ -15,8 +15,8 @@
 <style>
     /* Filters Section */
     .filters-section {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         padding: 20px;
         margin-bottom: 25px;
@@ -43,8 +43,8 @@
     }
 
     .stat-card {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         padding: 15px;
         text-align: center;
@@ -52,12 +52,12 @@
     }
 
     .stat-card:hover {
-        border-color: #58a6ff;
+        border-color: var(--accent-primary);
     }
 
     .stat-label {
         font-size: 12px;
-        color: #8b949e;
+        color: var(--text-muted);
         text-transform: uppercase;
         letter-spacing: 0.5px;
         margin-bottom: 8px;
@@ -66,7 +66,7 @@
     .stat-value {
         font-size: 28px;
         font-weight: 700;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     /* Events Grid */
@@ -78,8 +78,8 @@
     }
 
     .event-card {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         padding: 14px;
         transition: all 0.2s;
@@ -88,28 +88,28 @@
 
     .event-card:hover {
         transform: translateY(-4px);
-        border-color: #58a6ff;
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        border-color: var(--accent-primary);
+        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
     }
 
     .event-card.status-DRAFT {
-        border-left: 4px solid #6e7681;
+        border-left: 4px solid #78909C;
     }
 
     .event-card.status-PENDING {
-        border-left: 4px solid #f0883e;
+        border-left: 4px solid #FB8C00;
     }
 
     .event-card.status-CONFIRMED {
-        border-left: 4px solid #1f6feb;
+        border-left: 4px solid #1E88E5;
     }
 
     .event-card.status-CLOSED {
-        border-left: 4px solid #238636;
+        border-left: 4px solid #43A047;
     }
 
     .event-card.status-CANCELED {
-        border-left: 4px solid #da3633;
+        border-left: 4px solid #E53935;
     }
 
     .event-header {
@@ -122,13 +122,13 @@
     .event-title {
         font-size: 16px;
         font-weight: 600;
-        color: #c9d1d9;
+        color: var(--text-primary);
         margin-bottom: 3px;
     }
 
     .event-type {
         font-size: 12px;
-        color: #8b949e;
+        color: var(--text-muted);
     }
 
     .status-badge {
@@ -140,34 +140,29 @@
     }
 
     .status-badge.status-DRAFT {
-        background-color: #21262d;
-        color: #8b949e;
+        background-color: var(--bg-elevated);
+        color: var(--text-secondary);
     }
 
     .status-badge.status-PENDING {
-        background-color: #9e6a03;
-        color: #ffd33d;
+        background-color: #FFF3E0;
+        color: #E65100;
     }
 
     .status-badge.status-CONFIRMED {
-        background-color: #0969da;
-        color: #79c0ff;
-    }
-
-    .status-badge.status-CLOSED {
-        background-color: #8250df;
-        color: #d2a8ff;
+        background-color: #E3F2FD;
+        color: #1565C0;
     }
 
     .status-badge.status-CLOSED,
     .status-badge.status-CLOSED {
-        background-color: #1a7f37;
-        color: #4ac26b;
+        background-color: #E8F5E9;
+        color: #2E7D32;
     }
 
     .status-badge.status-CANCELED {
-        background-color: #da3633;
-        color: #ffa198;
+        background-color: #FFEBEE;
+        color: #C62828;
     }
 
     .event-info {
@@ -180,11 +175,11 @@
         gap: 6px;
         margin-bottom: 5px;
         font-size: 13px;
-        color: #8b949e;
+        color: var(--text-secondary);
     }
 
     .event-info-row i {
-        color: #58a6ff;
+        color: var(--accent-primary);
         width: 14px;
         font-size: 12px;
     }
@@ -193,15 +188,15 @@
         display: flex;
         gap: 6px;
         padding-top: 10px;
-        border-top: 1px solid #30363d;
+        border-top: 1px solid var(--border-primary);
     }
 
     .action-btn {
         flex: 1;
         padding: 6px 10px;
-        background-color: #21262d;
-        color: #c9d1d9;
-        border: 1px solid #30363d;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
         font-size: 12px;
         text-align: center;
@@ -212,24 +207,24 @@
     }
 
     .action-btn:hover {
-        background-color: #30363d;
-        color: #c9d1d9;
+        background-color: var(--bg-elevated);
+        color: var(--text-primary);
     }
 
     .action-btn-danger {
-        background-color: #21262d;
-        border-color: #da3633;
+        background-color: var(--bg-tertiary);
+        border-color: #E53935;
     }
 
     .action-btn-danger:hover {
-        background-color: #da3633;
+        background-color: #E53935;
         color: white;
     }
 
     .no-events {
         text-align: center;
         padding: 60px 20px;
-        color: #8b949e;
+        color: var(--text-muted);
     }
 
     .no-events i {
@@ -242,12 +237,12 @@
     .loading {
         text-align: center;
         padding: 40px;
-        color: #8b949e;
+        color: var(--text-muted);
     }
 
     .spinner {
-        border: 3px solid #21262d;
-        border-top: 3px solid #58a6ff;
+        border: 3px solid var(--bg-elevated);
+        border-top: 3px solid var(--accent-primary);
         border-radius: 50%;
         width: 40px;
         height: 40px;
@@ -347,7 +342,7 @@
 <!-- No Events State -->
 <div id="noEvents" class="no-events" style="display: none;">
     <i class="bi bi-calendar-x"></i>
-    <h3 style="color: #c9d1d9; margin-bottom: 10px;">No Events Found</h3>
+    <h3 style="color: var(--text-primary); margin-bottom: 10px;">No Events Found</h3>
     <p>No events match your current filters.</p>
     <a href="public/intake" class="btn-primary-custom" style="margin-top: 20px;">
         <i class="bi bi-plus-circle"></i>
@@ -384,8 +379,8 @@
         } catch (error) {
             console.error('Error loading events:', error);
             document.getElementById('loading').innerHTML = `
-                <i class="bi bi-exclamation-triangle" style="font-size: 48px; color: #da3633; margin-bottom: 15px; display: block;"></i>
-                <div style="color: #da3633;">Failed to load events</div>
+                <i class="bi bi-exclamation-triangle" style="font-size: 48px; color: #E53935; margin-bottom: 15px; display: block;"></i>
+                <div style="color: #E53935;">Failed to load events</div>
             `;
         }
     }

@@ -33,13 +33,23 @@
             </button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-sent" data-filter="sent" type="button">
+                <i class="bi bi-send-check"></i> Sent <span class="badge bg-primary ms-1" id="count-sent">0</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-statements" data-filter="statements" type="button">
+                <i class="bi bi-file-text"></i> Statements <span class="badge bg-info ms-1" id="count-statements">0</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link" id="tab-errors" data-filter="errors" type="button">
                 <i class="bi bi-exclamation-triangle"></i> Errors <span class="badge bg-danger ms-1" id="count-errors">0</span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="tab-all" data-filter="all" type="button">
-                <i class="bi bi-list-ul"></i> All Invoices <span class="badge bg-secondary ms-1" id="count-all">0</span>
+                <i class="bi bi-list-ul"></i> All <span class="badge bg-secondary ms-1" id="count-all">0</span>
             </button>
         </li>
     </ul>
@@ -160,8 +170,10 @@
                                 <span class="badge badge-pending">Pending</span>
                                 {% elif invoice.status == 'mapping' %}
                                 <span class="badge badge-pending">Mapping</span>
-                                {% elif invoice.status == 'ready' %}
+                                {% elif invoice.status == 'ready' and invoice.location_id %}
                                 <span class="badge badge-ready">Ready</span>
+                                {% elif invoice.status == 'ready' and not invoice.location_id %}
+                                <span class="badge bg-warning text-dark">Needs Location</span>
                                 {% elif invoice.status == 'statement' %}
                                 <span class="badge bg-info">Statement</span>
                                 {% elif invoice.status == 'sent' %}
@@ -175,10 +187,12 @@
                             <td>
                                 {% if invoice.inventory_sync_at %}
                                 <i class="bi bi-check-circle-fill text-success" title="Sent to Inventory"></i>
+                                {% elif invoice.status == 'sent' and not invoice.inventory_sync_at %}
+                                <i class="bi bi-dash-circle text-muted" title="N/A - Expenses only"></i>
                                 {% elif invoice.sent_to_inventory %}
-                                <i class="bi bi-dash-circle text-muted" title="Not applicable (no inventory items)"></i>
+                                <i class="bi bi-dash-circle text-muted" title="N/A - Expenses only"></i>
                                 {% else %}
-                                <i class="bi bi-x-circle text-danger" title="Not sent"></i>
+                                <i class="bi bi-clock text-warning" title="Not sent"></i>
                                 {% endif %}
                             </td>
                             <td>
@@ -195,7 +209,7 @@
                                     <i class="bi bi-eye"></i> View
                                 </a>
                                 {% if not invoice.is_statement %}
-                                    {% if invoice.status == 'ready' %}
+                                    {% if invoice.status == 'ready' and invoice.location_id %}
                                     <button class="btn btn-sm btn-success me-1" onclick="sendInvoiceFromList({{ invoice.id }}, '{{ invoice.invoice_number }}')">
                                         <i class="bi bi-send"></i> Send
                                     </button>
@@ -332,6 +346,8 @@ function updateTabCounts() {
     const counts = {
         pending: 0,
         ready: 0,
+        sent: 0,
+        statements: 0,
         errors: 0,
         all: rows.length
     };
@@ -339,13 +355,16 @@ function updateTabCounts() {
     rows.forEach(row => {
         const status = row.getAttribute('data-status');
         const hasErrors = row.getAttribute('data-has-errors') === 'true';
-        const isSent = row.getAttribute('data-sent') === 'true';
 
-        // Count for tabs - match the filtering logic
-        if ((status === 'pending' || status === 'mapping') && !hasErrors && !isSent) {
+        // Count based on actual status - simpler and matches database
+        if (status === 'pending' || status === 'mapping') {
             counts.pending++;
-        } else if (status === 'ready' && !hasErrors && !isSent) {
+        } else if (status === 'ready') {
             counts.ready++;
+        } else if (status === 'sent') {
+            counts.sent++;
+        } else if (status === 'statement') {
+            counts.statements++;
         }
 
         if (hasErrors) {
@@ -356,6 +375,8 @@ function updateTabCounts() {
     // Update badge counts
     document.getElementById('count-pending').textContent = counts.pending;
     document.getElementById('count-ready').textContent = counts.ready;
+    document.getElementById('count-sent').textContent = counts.sent;
+    document.getElementById('count-statements').textContent = counts.statements;
     document.getElementById('count-errors').textContent = counts.errors;
     document.getElementById('count-all').textContent = counts.all;
 }
@@ -378,12 +399,16 @@ function filterTable() {
         const matchesSearch = !searchTerm || text.includes(searchTerm);
         const matchesSource = !sourceValue || source === sourceValue;
 
-        // Tab filtering logic
+        // Tab filtering logic - match by actual status
         let matchesTab = true;
         if (currentTabFilter === 'pending') {
-            matchesTab = (status === 'pending' || status === 'mapping') && !hasErrors && !isSent;
+            matchesTab = (status === 'pending' || status === 'mapping');
         } else if (currentTabFilter === 'ready') {
-            matchesTab = (status === 'ready') && !hasErrors && !isSent;
+            matchesTab = (status === 'ready');
+        } else if (currentTabFilter === 'sent') {
+            matchesTab = (status === 'sent');
+        } else if (currentTabFilter === 'statements') {
+            matchesTab = (status === 'statement');
         } else if (currentTabFilter === 'errors') {
             matchesTab = hasErrors;
         }
@@ -474,11 +499,16 @@ function changePage(direction) {
         const matchesSearch = !searchTerm || text.includes(searchTerm);
         const matchesSource = !sourceValue || source === sourceValue;
 
+        // Tab filtering logic - match by actual status
         let matchesTab = true;
         if (currentTabFilter === 'pending') {
-            matchesTab = (status === 'pending' || status === 'mapping') && !hasErrors && !isSent;
+            matchesTab = (status === 'pending' || status === 'mapping');
         } else if (currentTabFilter === 'ready') {
-            matchesTab = (status === 'ready') && !hasErrors && !isSent;
+            matchesTab = (status === 'ready');
+        } else if (currentTabFilter === 'sent') {
+            matchesTab = (status === 'sent');
+        } else if (currentTabFilter === 'statements') {
+            matchesTab = (status === 'statement');
         } else if (currentTabFilter === 'errors') {
             matchesTab = hasErrors;
         }
@@ -543,11 +573,9 @@ if (searchInput) {
         if (savedTabButton) savedTabButton.classList.add('active');
     }
 
-    // Update counts and apply filters
+    // Update counts and always apply filters (default tab is 'pending')
     updateTabCounts();
-    if (savedSearch || savedSource || savedTab) {
-        filterTable();
-    }
+    filterTable();
 
     // Save filter state on change
     searchInput.addEventListener('input', () => {

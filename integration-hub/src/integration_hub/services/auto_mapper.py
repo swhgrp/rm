@@ -1,362 +1,235 @@
 """
-Auto-Mapper Service
+Auto-Mapper Service (Simplified)
 
-Automatically maps invoice line items to inventory items and GL accounts
-using fuzzy matching, vendor catalogs, and category mappings.
+Automatically maps invoice line items to inventory vendor items by SKU lookup.
+All vendor item data lives in the Inventory system - hub just matches against it.
+
+Mapping Logic:
+1. Match by SKU: item_code → inventory vendor_items.vendor_sku
+2. Match by expense mapping: item_description → expense_mappings table
+3. No match: Item goes to unmapped queue
 """
 
 import logging
-from typing import Dict, List, Optional, Tuple
+import httpx
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import text as sql_text
 
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
-from integration_hub.models.item_gl_mapping import ItemGLMapping, CategoryGLMapping
+from integration_hub.models.hub_invoice import HubInvoice
 
 logger = logging.getLogger(__name__)
 
+# Inventory API URL
+INVENTORY_API_URL = "http://inventory-app:8000/api"
+
 
 class AutoMapperService:
-    """Service for automatically mapping invoice items"""
+    """Service for automatically mapping invoice items to inventory vendor items"""
 
     def __init__(self, db: Session):
         self.db = db
+        self._vendor_items_cache = None
 
-    def fetch_inventory_items(self, vendor_id: Optional[int] = None) -> List[Dict]:
+    def fetch_vendor_items_from_inventory(self) -> List[Dict]:
         """
-        Fetch inventory items from Inventory API
-
-        In a real implementation, this would call the Inventory API.
-        For now, we'll use the local mapping tables.
+        Fetch all active vendor items from Inventory API
+        Returns list of vendor items with SKU, name, category, etc.
         """
-        # This would be an API call to inventory system
-        # For now, return from mapping table
-        mappings = self.db.query(ItemGLMapping).filter(
-            ItemGLMapping.is_active == True
-        )
+        if self._vendor_items_cache is not None:
+            return self._vendor_items_cache
 
-        if vendor_id:
-            mappings = mappings.filter(
-                or_(
-                    ItemGLMapping.vendor_id == vendor_id,
-                    ItemGLMapping.vendor_id.is_(None)
+        try:
+            with httpx.Client(timeout=30.0) as client:
+                response = client.get(
+                    f"{INVENTORY_API_URL}/vendor-items/_hub/sync",
+                    params={"is_active": True, "limit": 10000}
                 )
-            )
+                if response.status_code == 200:
+                    self._vendor_items_cache = response.json()
+                    logger.info(f"Fetched {len(self._vendor_items_cache)} vendor items from inventory")
+                    return self._vendor_items_cache
+                else:
+                    logger.error(f"Failed to fetch vendor items: {response.status_code}")
+                    return []
+        except Exception as e:
+            logger.error(f"Error fetching vendor items from inventory: {str(e)}")
+            return []
 
-        return [
-            {
-                'id': m.inventory_item_id,
-                'name': m.inventory_item_name,
-                'category': m.inventory_category,
-                'vendor_id': m.vendor_id,
-                'vendor_item_code': m.vendor_item_code,
-                'gl_asset_account': m.gl_asset_account,
-                'gl_cogs_account': m.gl_cogs_account,
-                'gl_waste_account': m.gl_waste_account
-            }
-            for m in mappings.all()
-        ]
-
-    def calculate_similarity(self, str1: str, str2: str) -> float:
+    def match_by_sku(self, item_code: str) -> Optional[Dict]:
         """
-        Calculate similarity score between two strings (0.0 to 1.0)
+        Match item code against inventory vendor_items.vendor_sku
+        Returns vendor item dict if found, None otherwise
 
-        Uses a simple approach:
-        - Exact match = 1.0
-        - Contains match = 0.8
-        - Word overlap = 0.6
+        Handles leading zeros: invoice may have '390982' while inventory has '000390982'
         """
-        if not str1 or not str2:
-            return 0.0
-
-        str1_lower = str1.lower().strip()
-        str2_lower = str2.lower().strip()
-
-        # Exact match
-        if str1_lower == str2_lower:
-            return 1.0
-
-        # One contains the other
-        if str1_lower in str2_lower:
-            return 0.85 * (len(str1_lower) / len(str2_lower))
-        if str2_lower in str1_lower:
-            return 0.85 * (len(str2_lower) / len(str1_lower))
-
-        # Word overlap
-        words1 = set(str1_lower.split())
-        words2 = set(str2_lower.split())
-
-        if not words1 or not words2:
-            return 0.0
-
-        overlap = len(words1 & words2)
-        total = len(words1 | words2)
-
-        if total > 0:
-            return 0.6 * (overlap / total)
-
-        return 0.0
-
-    def match_by_vendor_item_code(
-        self,
-        item: HubInvoiceItem,
-        vendor_id: Optional[int],
-        inventory_items: List[Dict]
-    ) -> Optional[Tuple[Dict, float]]:
-        """Match by exact vendor item code"""
-        if not item.item_code or not vendor_id:
+        if not item_code:
             return None
 
-        item_code_lower = item.item_code.lower().strip()
+        item_code_clean = str(item_code).strip()
+        # Also create a normalized version without leading zeros
+        item_code_normalized = item_code_clean.lstrip('0') or '0'
 
-        for inv_item in inventory_items:
-            if (inv_item.get('vendor_id') == vendor_id and
-                inv_item.get('vendor_item_code') and
-                inv_item['vendor_item_code'].lower().strip() == item_code_lower):
-                return (inv_item, 1.0)  # Perfect match
+        vendor_items = self.fetch_vendor_items_from_inventory()
 
-        return None
-
-    def match_by_description(
-        self,
-        item: HubInvoiceItem,
-        inventory_items: List[Dict],
-        min_confidence: float = 0.7
-    ) -> Optional[Tuple[Dict, float]]:
-        """Match by description fuzzy matching"""
-        if not item.item_description:
-            return None
-
-        best_match = None
-        best_score = 0.0
-
-        for inv_item in inventory_items:
-            if not inv_item.get('name'):
+        for vi in vendor_items:
+            vendor_sku = vi.get('vendor_sku')
+            if not vendor_sku:
                 continue
 
-            score = self.calculate_similarity(
-                item.item_description,
-                inv_item['name']
-            )
+            vendor_sku_clean = str(vendor_sku).strip()
+            vendor_sku_normalized = vendor_sku_clean.lstrip('0') or '0'
 
-            if score > best_score and score >= min_confidence:
-                best_score = score
-                best_match = inv_item
+            # Try exact match first
+            if vendor_sku_clean == item_code_clean:
+                return vi
 
-        if best_match:
-            return (best_match, best_score)
+            # Try normalized match (handles leading zeros difference)
+            if vendor_sku_normalized == item_code_normalized:
+                return vi
 
         return None
 
-    def get_category_gl_accounts(self, category: str) -> Optional[Dict]:
-        """Get GL accounts for a category"""
-        mapping = self.db.query(CategoryGLMapping).filter(
-            CategoryGLMapping.inventory_category == category,
-            CategoryGLMapping.is_active == True
-        ).first()
+    def match_by_expense_mapping(self, item_description: str) -> Optional[Dict]:
+        """
+        Check if this item description is mapped as an expense item
+        Returns expense mapping dict if found, None otherwise
+        """
+        if not item_description:
+            return None
 
-        if mapping:
+        result = self.db.execute(
+            sql_text("""
+                SELECT gl_expense_account, gl_account_name
+                FROM expense_mappings
+                WHERE item_description = :desc
+            """),
+            {"desc": item_description}
+        ).fetchone()
+
+        if result:
             return {
-                'gl_asset_account': mapping.gl_asset_account,
-                'gl_cogs_account': mapping.gl_cogs_account,
-                'gl_waste_account': mapping.gl_waste_account
+                'is_expense': True,
+                'gl_expense_account': result[0],
+                'gl_account_name': result[1]
             }
 
         return None
 
-    def match_by_previous_mapping(self, item: HubInvoiceItem) -> Optional[Tuple[Dict, float]]:
+    def get_gl_accounts_for_category(self, category: str) -> Optional[Dict]:
         """
-        Match by exact description OR item code from previous manual mappings
-        This is the HIGHEST priority - if user previously mapped this exact item, reuse it
-
-        Checks:
-        1. First by item_code via item_code_mapping -> invoice_item_mapping
-        2. Then by exact description in invoice_item_mapping table
-        3. Fallback to old ItemGLMapping table for backward compatibility
+        Look up GL accounts for an inventory category
         """
-        from sqlalchemy import text as sql_text
+        if not category:
+            return None
 
-        # FIRST: Try to match by item code (most reliable - item codes don't have OCR variations)
-        if item.item_code:
-            # Get canonical description for this item code, then look up mapping by that description
-            result = self.db.execute(
-                sql_text("""
-                    SELECT iim.inventory_item_id, iim.inventory_item_name, iim.inventory_category,
-                           iim.gl_asset_account, iim.gl_cogs_account, iim.gl_waste_account, iim.vendor_id
-                    FROM item_code_mapping icm
-                    JOIN invoice_item_mapping iim ON iim.item_description = icm.canonical_description
-                    WHERE icm.item_code = :item_code AND iim.is_active = true
-                """),
-                {"item_code": item.item_code}
-            ).fetchone()
+        result = self.db.execute(
+            sql_text("""
+                SELECT gl_asset_account, gl_cogs_account, gl_waste_account
+                FROM category_gl_mapping
+                WHERE inventory_category = :category
+                AND is_active = true
+            """),
+            {"category": category}
+        ).fetchone()
 
-            if result:
-                logger.info(f"Matched item {item.id} by item_code {item.item_code}")
-                return ({
-                    'id': result[0],  # inventory_item_id
-                    'name': result[1] or item.item_description,  # inventory_item_name
-                    'category': result[2],  # inventory_category
-                    'vendor_id': result[6],  # vendor_id
-                    'vendor_item_code': item.item_code,
-                    'gl_asset_account': result[3],  # gl_asset_account
-                    'gl_cogs_account': result[4],  # gl_cogs_account
-                    'gl_waste_account': result[5]  # gl_waste_account
-                }, 1.0)  # Perfect match - item code matched
-
-        # SECOND: Query the invoice_item_mapping table for exact description match
-        if item.item_description:
-            result = self.db.execute(
-                sql_text("""
-                    SELECT inventory_item_id, inventory_item_name, inventory_category,
-                           gl_asset_account, gl_cogs_account, gl_waste_account, vendor_id
-                    FROM invoice_item_mapping
-                    WHERE item_description = :desc AND is_active = true
-                """),
-                {"desc": item.item_description}
-            ).fetchone()
-
-            if result:
-                return ({
-                    'id': result[0],  # inventory_item_id
-                    'name': result[1] or item.item_description,  # inventory_item_name
-                    'category': result[2],  # inventory_category
-                    'vendor_id': result[6],  # vendor_id
-                    'vendor_item_code': None,
-                    'gl_asset_account': result[3],  # gl_asset_account
-                    'gl_cogs_account': result[4],  # gl_cogs_account
-                    'gl_waste_account': result[5]  # gl_waste_account
-                }, 1.0)  # Perfect match - previously mapped by user
-
-        # THIRD: Fallback to old ItemGLMapping table for backward compatibility
-        if item.item_description:
-            previous_mapping = self.db.query(ItemGLMapping).filter(
-                ItemGLMapping.inventory_item_name == item.item_description,
-                ItemGLMapping.is_active == True
-            ).first()
-
-            if previous_mapping:
-                return ({
-                    'id': previous_mapping.inventory_item_id,
-                    'name': previous_mapping.inventory_item_name,
-                    'category': previous_mapping.inventory_category,
-                    'vendor_id': previous_mapping.vendor_id,
-                    'vendor_item_code': previous_mapping.vendor_item_code,
-                    'gl_asset_account': previous_mapping.gl_asset_account,
-                    'gl_cogs_account': previous_mapping.gl_cogs_account,
-                    'gl_waste_account': previous_mapping.gl_waste_account
-                }, 1.0)  # Perfect match - previously mapped by user
+        if result:
+            return {
+                'gl_asset_account': result[0],
+                'gl_cogs_account': result[1],
+                'gl_waste_account': result[2]
+            }
 
         return None
 
-    def map_item(
-        self,
-        item: HubInvoiceItem,
-        vendor_id: Optional[int] = None
-    ) -> Dict:
+    def map_item(self, item: HubInvoiceItem) -> Dict:
         """
         Attempt to automatically map a single item
 
         Returns:
-            Dict with mapping result: {
-                'mapped': bool,
-                'method': str,
-                'confidence': float,
-                'inventory_item_id': int,
-                'inventory_item_name': str,
-                'inventory_category': str,
-                'gl_asset_account': int,
-                'gl_cogs_account': int,
-                'gl_waste_account': int
-            }
+            Dict with mapping result
         """
-        # HIGHEST PRIORITY: Check if this exact item description was previously manually mapped
-        match = self.match_by_previous_mapping(item)
-        if match:
-            inv_item, confidence = match
-            logger.info(f"Matched item {item.id} by previous mapping: {inv_item['name']} (confidence: {confidence})")
+        # 1. Try SKU match against inventory
+        if item.item_code:
+            vendor_item = self.match_by_sku(item.item_code)
+            if vendor_item:
+                # Get category from vendor item (comes from master_item)
+                category = vendor_item.get('master_item_category')
+
+                # Get GL accounts from category mapping
+                gl_accounts = self.get_gl_accounts_for_category(category) if category else None
+
+                # Only consider "mapped" if we have the required GL accounts
+                # An item without GL accounts cannot be sent to accounting
+                has_required_gl = gl_accounts and gl_accounts.get('gl_cogs_account')
+
+                return {
+                    'mapped': has_required_gl,  # Only mapped if we have GL accounts
+                    'method': 'sku_match',
+                    'vendor_item_id': vendor_item['id'],
+                    'vendor_item_name': vendor_item.get('vendor_product_name'),
+                    'vendor_name': vendor_item.get('vendor_name'),
+                    'category': category,
+                    'gl_asset_account': gl_accounts['gl_asset_account'] if gl_accounts else None,
+                    'gl_cogs_account': gl_accounts['gl_cogs_account'] if gl_accounts else None,
+                    'gl_waste_account': gl_accounts.get('gl_waste_account') if gl_accounts else None,
+                    'is_expense': False,
+                    'reason': None if has_required_gl else 'no_category_gl_mapping'
+                }
+
+        # 2. Try expense mapping
+        expense = self.match_by_expense_mapping(item.item_description)
+        if expense:
             return {
                 'mapped': True,
-                'method': 'previous_mapping',
-                'confidence': confidence,
-                'inventory_item_id': inv_item['id'],
-                'inventory_item_name': inv_item['name'],
-                'inventory_category': inv_item['category'],
-                'gl_asset_account': inv_item['gl_asset_account'],
-                'gl_cogs_account': inv_item['gl_cogs_account'],
-                'gl_waste_account': inv_item.get('gl_waste_account')
+                'method': 'expense_mapping',
+                'vendor_item_id': None,
+                'vendor_item_name': None,
+                'vendor_name': None,
+                'category': 'Uncategorized',
+                'gl_asset_account': None,
+                'gl_cogs_account': expense['gl_expense_account'],
+                'gl_waste_account': None,
+                'is_expense': True
             }
 
-        # Fetch available inventory items
-        inventory_items = self.fetch_inventory_items(vendor_id)
-
-        if not inventory_items:
-            logger.warning("No inventory items available for mapping")
-            return {'mapped': False, 'reason': 'no_inventory_items'}
-
-        # Try vendor item code match (high priority)
-        match = self.match_by_vendor_item_code(item, vendor_id, inventory_items)
-        if match:
-            inv_item, confidence = match
-            logger.info(f"Matched item {item.id} by vendor code: {inv_item['name']} (confidence: {confidence})")
-            return {
-                'mapped': True,
-                'method': 'vendor_code',
-                'confidence': confidence,
-                'inventory_item_id': inv_item['id'],
-                'inventory_item_name': inv_item['name'],
-                'inventory_category': inv_item['category'],
-                'gl_asset_account': inv_item['gl_asset_account'],
-                'gl_cogs_account': inv_item['gl_cogs_account'],
-                'gl_waste_account': inv_item.get('gl_waste_account')
-            }
-
-        # Try description fuzzy match (medium priority)
-        match = self.match_by_description(item, inventory_items, min_confidence=0.8)
-        if match:
-            inv_item, confidence = match
-            logger.info(f"Matched item {item.id} by description: {inv_item['name']} (confidence: {confidence})")
-            return {
-                'mapped': True,
-                'method': 'fuzzy_description',
-                'confidence': confidence,
-                'inventory_item_id': inv_item['id'],
-                'inventory_item_name': inv_item['name'],
-                'inventory_category': inv_item['category'],
-                'gl_asset_account': inv_item['gl_asset_account'],
-                'gl_cogs_account': inv_item['gl_cogs_account'],
-                'gl_waste_account': inv_item.get('gl_waste_account')
-            }
-
-        # No item-level match found
-        logger.info(f"No item-level match for {item.id}: {item.item_description}")
-        return {'mapped': False, 'reason': 'no_match'}
+        # 3. No match found
+        return {
+            'mapped': False,
+            'reason': 'no_sku_match'
+        }
 
     def apply_mapping(self, item: HubInvoiceItem, mapping_result: Dict) -> bool:
         """
         Apply mapping result to item
+        Returns True if item was fully mapped (has GL accounts)
 
-        Returns True if item was mapped
+        Note: Even partial matches (SKU match but no category/GL) will store
+        the inventory_item_id for reference, but is_mapped stays False.
         """
-        if not mapping_result.get('mapped'):
-            return False
-
         try:
-            item.inventory_item_id = mapping_result['inventory_item_id']
-            item.inventory_item_name = mapping_result['inventory_item_name']
-            item.inventory_category = mapping_result['inventory_category']
-            item.gl_asset_account = mapping_result['gl_asset_account']
-            item.gl_cogs_account = mapping_result['gl_cogs_account']
+            # Always store inventory item ID if we found a match
+            # This allows showing "partial match" status in the UI
+            if mapping_result.get('vendor_item_id'):
+                item.inventory_item_id = mapping_result.get('vendor_item_id')
+                item.mapping_method = mapping_result.get('method')
+
+            # Only fully map if we have required GL accounts
+            if not mapping_result.get('mapped'):
+                return False
+
+            item.inventory_category = mapping_result.get('category')
+            item.gl_asset_account = mapping_result.get('gl_asset_account')
+            item.gl_cogs_account = mapping_result.get('gl_cogs_account')
             item.gl_waste_account = mapping_result.get('gl_waste_account')
             item.is_mapped = True
-            item.mapping_method = mapping_result['method']
-            item.mapping_confidence = mapping_result['confidence']
+            item.mapping_confidence = 1.0  # SKU match is exact
 
-            self.db.commit()
             return True
 
         except Exception as e:
             logger.error(f"Error applying mapping to item {item.id}: {str(e)}")
-            self.db.rollback()
             return False
 
     def map_invoice_items(self, invoice_id: int) -> Dict:
@@ -364,16 +237,9 @@ class AutoMapperService:
         Auto-map all unmapped items for an invoice
 
         Returns:
-            Dict with statistics: {
-                'total_items': int,
-                'mapped_count': int,
-                'unmapped_count': int,
-                'methods': {'vendor_code': int, 'fuzzy_description': int}
-            }
+            Dict with statistics
         """
-        from integration_hub.models.hub_invoice import HubInvoice
-
-        # Get invoice and vendor
+        # Get invoice
         invoice = self.db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
         if not invoice:
             return {'error': 'Invoice not found'}
@@ -392,35 +258,26 @@ class AutoMapperService:
         }
 
         for item in items:
-            mapping_result = self.map_item(item, invoice.vendor_id)
+            mapping_result = self.map_item(item)
 
             if self.apply_mapping(item, mapping_result):
                 stats['mapped_count'] += 1
-                method = mapping_result['method']
+                method = mapping_result.get('method', 'unknown')
                 stats['methods'][method] = stats['methods'].get(method, 0) + 1
             else:
                 stats['unmapped_count'] += 1
 
-        # Update invoice status
-        total_items = self.db.query(HubInvoiceItem).filter(
-            HubInvoiceItem.invoice_id == invoice_id
-        ).count()
-
-        mapped_items = self.db.query(HubInvoiceItem).filter(
-            HubInvoiceItem.invoice_id == invoice_id,
-            HubInvoiceItem.is_mapped == True
-        ).count()
-
-        if mapped_items == total_items:
-            invoice.status = 'ready'  # All items mapped
-        elif mapped_items > 0:
-            invoice.status = 'mapping'  # Partially mapped
-        else:
-            invoice.status = 'mapping'  # No items mapped
-
+        # Commit all changes
         self.db.commit()
 
-        logger.info(f"Auto-mapping complete for invoice {invoice_id}: {stats}")
+        # Update invoice status using proper validation
+        # Import here to avoid circular imports
+        from integration_hub.main import update_invoice_status
+
+        new_status = update_invoice_status(invoice, self.db)
+        self.db.commit()
+
+        logger.info(f"Auto-mapping complete for invoice {invoice_id}: {stats}, status: {new_status}")
         return stats
 
 

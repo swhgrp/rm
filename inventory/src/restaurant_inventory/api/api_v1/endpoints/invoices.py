@@ -658,6 +658,22 @@ def receive_invoice_from_hub(
         invoice_date = datetime.fromisoformat(invoice_date_str) if invoice_date_str else None
         due_date = datetime.fromisoformat(due_date_str) if due_date_str else None
 
+        # Check for duplicate invoice (same invoice_number and vendor)
+        if invoice_number and vendor_name:
+            # First find the vendor
+            existing_vendor = db.query(Vendor).filter(Vendor.name == vendor_name).first()
+            if existing_vendor:
+                existing_invoice = db.query(Invoice).filter(
+                    Invoice.invoice_number == invoice_number,
+                    Invoice.vendor_id == existing_vendor.id
+                ).first()
+                if existing_invoice:
+                    return {
+                        "status": "duplicate",
+                        "message": f"Invoice {invoice_number} from {vendor_name} already exists in inventory (ID: {existing_invoice.id})",
+                        "existing_invoice_id": existing_invoice.id
+                    }
+
         # Find or create vendor
         vendor = db.query(Vendor).filter(Vendor.name == vendor_name).first()
         if not vendor:

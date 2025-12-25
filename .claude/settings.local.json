@@ -36,7 +36,10 @@
       "Bash(docker volume rm:*)",
       "Bash(python3:*)",
       "Bash(claude auth login:*)",
-      "Bash(unset:*)"
+      "Bash(unset:*)",
+      "Bash(docker volume ls:*)",
+      "Bash(docker images:*)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": []

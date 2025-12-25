@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,6 +17,28 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
 
     <style>
+        /* =====================================================
+           SW Hospitality Group - Slate Blue Light Theme
+           HR System
+           ===================================================== */
+
+        :root {
+            --bg-primary: #ECEFF1;
+            --bg-secondary: #FFFFFF;
+            --bg-tertiary: #F5F5F5;
+            --bg-elevated: #E0E0E0;
+            --border-primary: #CFD8DC;
+            --border-secondary: #B0BEC5;
+            --text-primary: #263238;
+            --text-secondary: #546E7A;
+            --text-muted: #78909C;
+            --accent-primary: #455A64;
+            --accent-secondary: #37474F;
+            --accent-hover: #263238;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -25,8 +47,8 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background-color: #0d1117;
-            color: #c9d1d9;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
         }
 
         /* ========== SIDEBAR NAVIGATION ========== */
@@ -36,21 +58,22 @@
             left: 0;
             height: 100vh;
             width: 200px;
-            background-color: #161b22;
+            background-color: #455A64;
             padding-top: 20px;
             z-index: 1000;
             overflow-y: auto;
-            border-right: 1px solid #30363d;
+            border-right: none;
             transition: transform 0.3s ease-in-out;
+            box-shadow: 2px 0 8px rgba(69, 90, 100, 0.25);
         }
 
         .sidebar-brand {
             padding: 20px 15px;
             text-align: center;
-            color: #58a6ff;
+            color: #FFFFFF;
             font-size: 16px;
             font-weight: 600;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             margin-bottom: 10px;
         }
 
@@ -58,6 +81,7 @@
             max-width: 180px;
             height: auto;
             margin-bottom: 0px;
+            filter: brightness(0) invert(1);
         }
 
         .sidebar-nav {
@@ -73,7 +97,7 @@
         .sidebar-nav a {
             display: block;
             padding: 12px 20px;
-            color: #8b949e;
+            color: rgba(255, 255, 255, 0.85);
             text-decoration: none;
             font-size: 14px;
             transition: all 0.2s;
@@ -88,9 +112,9 @@
 
         .sidebar-nav a:hover,
         .sidebar-nav a.active {
-            background-color: #21262d;
-            color: #58a6ff;
-            border-left: 3px solid #58a6ff;
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
+            border-left: 3px solid #FFFFFF;
             padding-left: 17px;
         }
 
@@ -102,14 +126,14 @@
             cursor: pointer;
             user-select: none;
             padding: 12px 20px;
-            color: #8b949e;
+            color: rgba(255, 255, 255, 0.85);
             font-size: 14px;
             transition: all 0.2s;
         }
 
         .sidebar-nav .menu-toggle:hover {
-            background-color: #21262d;
-            color: #58a6ff;
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
         }
 
         .sidebar-nav .menu-toggle i {
@@ -134,7 +158,7 @@
             list-style: none;
             padding: 0;
             margin: 0;
-            background-color: #0d1117;
+            background-color: rgba(0, 0, 0, 0.15);
         }
 
         .sidebar-nav .submenu.expanded {
@@ -148,7 +172,7 @@
         .sidebar-nav .submenu a {
             display: block;
             padding: 10px 20px 10px 45px;
-            color: #8b949e;
+            color: rgba(255, 255, 255, 0.75);
             text-decoration: none;
             font-size: 13px;
             transition: all 0.2s;
@@ -164,9 +188,9 @@
 
         .sidebar-nav .submenu a:hover,
         .sidebar-nav .submenu a.active {
-            background-color: #161b22;
-            color: #58a6ff;
-            border-left: 3px solid #58a6ff;
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
+            border-left: 3px solid #FFFFFF;
             padding-left: 42px;
         }
 
@@ -177,9 +201,9 @@
             top: 15px;
             left: 15px;
             z-index: 1001;
-            background-color: #161b22;
-            border: 1px solid #30363d;
-            color: #c9d1d9;
+            background-color: #455A64;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #FFFFFF;
             padding: 8px 12px;
             border-radius: 4px;
             cursor: pointer;
@@ -187,8 +211,8 @@
         }
 
         .sidebar-toggle:hover {
-            background-color: #21262d;
-            color: #58a6ff;
+            background-color: #37474F;
+            color: #FFFFFF;
         }
 
         /* Mobile Overlay */
@@ -216,18 +240,23 @@
 
         /* Top Navbar */
         .top-navbar {
-            background-color: #161b22;
-            border-bottom: 1px solid #30363d;
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-primary);
             padding: 15px 30px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            box-shadow: var(--shadow-sm);
         }
 
         .page-title {
             font-size: 18px;
             font-weight: 600;
-            color: #c9d1d9;
+            color: var(--text-primary);
+        }
+
+        .page-title i {
+            color: var(--accent-primary);
         }
 
         .user-menu-top {
@@ -240,34 +269,34 @@
         .user-menu-top .dropdown-toggle {
             background: none;
             border: none;
-            color: #c9d1d9;
+            color: var(--text-primary);
             font-size: 20px;
             cursor: pointer;
             padding: 5px 10px;
         }
 
         .user-menu-top .dropdown-toggle:hover {
-            color: #58a6ff;
+            color: var(--accent-primary);
         }
 
         /* Override Bootstrap dropdown styling */
         .dropdown-menu {
-            background-color: #161b22;
-            border: 1px solid #30363d;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            box-shadow: var(--shadow-md);
         }
 
         .dropdown-item {
             display: block;
-            color: #c9d1d9;
+            color: var(--text-primary);
             padding: 8px 16px;
             text-decoration: none;
             transition: all 0.2s;
         }
 
         .dropdown-item:hover {
-            background-color: #21262d;
-            color: #58a6ff;
+            background-color: var(--bg-tertiary);
+            color: var(--accent-primary);
         }
 
         .dropdown-item i {
@@ -275,7 +304,7 @@
         }
 
         .dropdown-header {
-            color: #c9d1d9;
+            color: var(--text-primary);
             padding: 8px 16px;
             font-size: 14px;
             font-weight: 600;
@@ -283,7 +312,7 @@
 
         .dropdown-divider {
             height: 1px;
-            background-color: #30363d;
+            background-color: var(--border-primary);
             margin: 5px 0;
             border: 0;
         }
@@ -297,19 +326,19 @@
 
         /* Base heading styles */
         h2 {
-            font-size: 1.75rem;  /* ~28px, matches Accounting and Inventory */
+            font-size: 1.75rem;
             font-weight: 600;
-            color: #c9d1d9;
+            color: var(--text-primary);
         }
 
         /* ========== CARDS ========== */
         .card {
-            background-color: #161b22;
-            border: 1px solid #30363d;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
             border-radius: 8px;
             padding: 20px;
             margin-bottom: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            box-shadow: var(--shadow-md);
         }
 
         .card-header {
@@ -317,17 +346,19 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 20px;
+            background-color: var(--bg-tertiary);
+            border-bottom: 1px solid var(--border-primary);
         }
 
         .card-header h2 {
             font-size: 18px;
             font-weight: 600;
-            color: #c9d1d9;
+            color: var(--text-primary);
         }
 
         .card-header h2 i {
             margin-right: 10px;
-            color: #58a6ff;
+            color: var(--accent-primary);
         }
 
         /* ========== BUTTONS ========== */
@@ -343,40 +374,42 @@
         }
 
         .btn-primary {
-            background: #58a6ff;
+            background: var(--accent-primary);
             color: #fff;
         }
 
         .btn-primary:hover {
-            background: #1f6feb;
+            background: var(--accent-hover);
         }
 
         .btn-success {
-            background: #3fb950;
+            background: #43A047;
             color: #fff;
         }
 
         .btn-success:hover {
-            background: #2ea043;
+            background: #388E3C;
         }
 
         .btn-danger {
-            background: #f85149;
+            background: #E53935;
             color: #fff;
         }
 
         .btn-danger:hover {
-            background: #da3633;
+            background: #C62828;
         }
 
         .btn-secondary {
-            background: #21262d;
-            color: #c9d1d9;
-            border: 1px solid #30363d;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-primary);
         }
 
         .btn-secondary:hover {
-            background: #30363d;
+            background: var(--bg-elevated);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
         }
 
         /* ========== TABLES ========== */
@@ -392,22 +425,22 @@
         th {
             text-align: left;
             padding: 12px;
-            background-color: #0d1117;
-            color: #8b949e;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
             font-weight: 600;
             font-size: 12px;
             text-transform: uppercase;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid var(--border-primary);
         }
 
         td {
             padding: 12px;
-            border-bottom: 1px solid #30363d;
-            color: #c9d1d9;
+            border-bottom: 1px solid var(--border-primary);
+            color: var(--text-primary);
         }
 
         tr:hover {
-            background-color: #0d1117;
+            background-color: #CFD8DC;
         }
 
         /* ========== MODALS ========== */
@@ -419,7 +452,7 @@
             top: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.7);
+            background: rgba(0,0,0,0.5);
         }
 
         .modal.active {
@@ -427,18 +460,18 @@
         }
 
         .modal-content {
-            background: #161b22;
+            background: var(--bg-secondary);
             margin: 5% auto;
-            border: 1px solid #30363d;
+            border: 1px solid var(--border-primary);
             border-radius: 8px;
             width: 90%;
             max-width: 600px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            box-shadow: var(--shadow-md);
         }
 
         .modal-header {
             padding: 20px;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid var(--border-primary);
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -446,7 +479,7 @@
 
         .modal-header h3 {
             margin: 0;
-            color: #c9d1d9;
+            color: var(--text-primary);
             font-size: 18px;
         }
 
@@ -456,12 +489,12 @@
 
         .modal-footer {
             padding: 15px 20px;
-            border-top: 1px solid #30363d;
+            border-top: 1px solid var(--border-primary);
             text-align: right;
         }
 
         .close-modal {
-            color: #8b949e;
+            color: var(--text-muted);
             font-size: 28px;
             font-weight: bold;
             cursor: pointer;
@@ -470,7 +503,7 @@
         }
 
         .close-modal:hover {
-            color: #c9d1d9;
+            color: var(--text-primary);
         }
 
         /* ========== FORM ELEMENTS ========== */
@@ -481,7 +514,7 @@
         .form-group label {
             display: block;
             margin-bottom: 5px;
-            color: #8b949e;
+            color: var(--text-secondary);
             font-size: 14px;
         }
 
@@ -495,10 +528,10 @@
         .form-group textarea {
             width: 100%;
             padding: 8px 12px;
-            border: 1px solid #30363d;
+            border: 1px solid var(--border-primary);
             border-radius: 4px;
-            background: #0d1117;
-            color: #c9d1d9;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             font-size: 14px;
         }
 
@@ -506,7 +539,8 @@
         .form-group select:focus,
         .form-group textarea:focus {
             outline: none;
-            border-color: #58a6ff;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(69, 90, 100, 0.15);
         }
 
         /* ========== BADGES ========== */
@@ -518,22 +552,22 @@
         }
 
         .badge-success {
-            background: #238636;
+            background: #43A047;
             color: #fff;
         }
 
         .badge-danger {
-            background: #da3633;
+            background: #E53935;
             color: #fff;
         }
 
         .badge-warning {
-            background: #9e6a03;
+            background: #FB8C00;
             color: #fff;
         }
 
         .badge-info {
-            background: #0969da;
+            background: #1E88E5;
             color: #fff;
         }
 
@@ -890,78 +924,54 @@
         });
     </script>
 
-    <!-- Auto-logout after inactivity -->
+    <!-- Auto-logout after 30 minutes of inactivity -->
     <script>
         (function() {
-            // Auto-logout after 30 minutes of inactivity
-            const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
-            const WARNING_TIME = 2 * 60 * 1000; // Show warning 2 minutes before logout
+            let inactivityTimeout;
+            const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes in milliseconds
+            let lastActivity = Date.now();
+            let lastActivityReset = 0; // Throttle activity resets to once per second
 
-            let inactivityTimer;
-            let warningTimer;
-            let warningShown = false;
-
-            // Events that reset the inactivity timer
-            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
-
-            function resetTimer() {
-                // Clear existing timers
-                clearTimeout(inactivityTimer);
-                clearTimeout(warningTimer);
-                warningShown = false;
-
-                // Set warning timer (28 minutes)
-                warningTimer = setTimeout(showWarning, INACTIVITY_TIMEOUT - WARNING_TIME);
-
-                // Set logout timer (30 minutes)
-                inactivityTimer = setTimeout(logout, INACTIVITY_TIMEOUT);
-            }
-
-            function showWarning() {
-                if (warningShown) return;
-                warningShown = true;
-
-                const remainingTime = Math.floor(WARNING_TIME / 60000); // Minutes
-                const proceed = confirm(
-                    `You will be automatically logged out in ${remainingTime} minutes due to inactivity.\n\n` +
-                    `Click OK to stay logged in, or Cancel to logout now.`
-                );
-
-                if (proceed) {
-                    // User wants to stay logged in
-                    resetTimer();
-                } else {
-                    // User chose to logout
-                    logout();
-                }
-            }
-
-            function logout() {
-                // Clear timers
-                clearTimeout(inactivityTimer);
-                clearTimeout(warningTimer);
-
-                // Show logout message
-                alert('You have been logged out due to inactivity.');
-
-                // Redirect to logout endpoint
+            function logoutUser() {
+                console.log('Logging out due to inactivity');
                 window.location.href = '/hr/api/auth/logout';
             }
 
-            // Add event listeners for activity
-            activityEvents.forEach(event => {
-                document.addEventListener(event, resetTimer, true);
+            function resetInactivityTimer() {
+                const now = Date.now();
+                // Throttle: only reset if more than 1 second since last reset
+                if (now - lastActivityReset < 1000) return;
+                lastActivityReset = now;
+                lastActivity = now;
+                clearTimeout(inactivityTimeout);
+                inactivityTimeout = setTimeout(logoutUser, INACTIVITY_LIMIT);
+            }
+
+            // Events that indicate INTENTIONAL user activity (not passive like mousemove)
+            const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+
+            activityEvents.forEach(function(eventName) {
+                document.addEventListener(eventName, resetInactivityTimer, true);
             });
 
-            // Start the timer when page loads
-            console.log('Auto-logout initialized - will logout after 30 minutes of inactivity');
-            resetTimer();
+            // Start initial timer
+            resetInactivityTimer();
+            console.log('Inactivity timer started: will logout after 30 minutes of no clicks/typing/scrolling');
 
-            // Also reset timer on visibility change (user switches tabs)
+            // Check inactivity when tab becomes visible or focused
             document.addEventListener('visibilitychange', function() {
-                if (!document.hidden) {
-                    console.log('Tab became visible - resetting inactivity timer');
-                    resetTimer();
+                if (document.visibilityState === 'visible') {
+                    const timeSinceActivity = Date.now() - lastActivity;
+                    if (timeSinceActivity >= INACTIVITY_LIMIT) {
+                        logoutUser();
+                    }
+                }
+            });
+
+            window.addEventListener('focus', function() {
+                const timeSinceActivity = Date.now() - lastActivity;
+                if (timeSinceActivity >= INACTIVITY_LIMIT) {
+                    logoutUser();
                 }
             });
         })();

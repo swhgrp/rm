@@ -1,0 +1,379 @@
+/* =====================================================
+   SW Hospitality Group - Warm Neutral + Copper Theme
+   Shared CSS Variables and Base Styles
+   Comfortable warm neutrals with copper/amber accents
+   ===================================================== */
+
+:root {
+    /* Background colors - warm neutrals */
+    --bg-primary: #1c1917;
+    --bg-secondary: #292524;
+    --bg-tertiary: #352f2c;
+    --bg-elevated: #44403c;
+
+    /* Border colors - warm stone tones */
+    --border-primary: #57534e;
+    --border-secondary: #78716c;
+
+    /* Text colors - warm off-whites for reduced eye strain */
+    --text-primary: #fafaf9;
+    --text-secondary: #a8a29e;
+    --text-muted: #78716c;
+
+    /* Accent colors - copper/amber for hospitality feel */
+    --accent-primary: #d97706;
+    --accent-secondary: #b45309;
+    --accent-hover: #f59e0b;
+    --accent-muted: #92400e;
+
+    /* Secondary accent - forest green for variety */
+    --accent-forest: #059669;
+    --accent-forest-light: #10b981;
+
+    /* Semantic colors - softened for dark theme */
+    --success: #4ade80;
+    --success-bg: rgba(74, 222, 128, 0.1);
+    --error: #f87171;
+    --error-bg: rgba(248, 113, 113, 0.1);
+    --info: #d97706;
+    --info-bg: rgba(217, 119, 6, 0.1);
+    --warning: #fbbf24;
+    --warning-bg: rgba(251, 191, 36, 0.1);
+
+    /* Shadows - warm tinted */
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.3);
+    --glow-accent: 0 0 20px rgba(217, 119, 6, 0.15);
+
+    /* Spacing - 8px system */
+    --space-1: 8px;
+    --space-2: 16px;
+    --space-3: 24px;
+    --space-4: 32px;
+    --space-5: 40px;
+
+    /* Border radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+}
+
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Logo box styling - matches SW HOSPITALITY GROUP branding */
+.logo-box {
+    display: inline-block;
+    border: 2px solid var(--text-primary);
+    padding: 8px 16px;
+    color: var(--text-primary);
+    font-family: 'Arial', 'Helvetica', sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 2px;
+    text-decoration: none;
+    border-radius: 2px;
+    transition: all 0.3s ease;
+}
+
+.logo-box:hover {
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.logo-box-large {
+    font-size: 20px;
+    padding: 12px 24px;
+    letter-spacing: 3px;
+    margin: 0 auto;
+}
+
+.container {
+    flex: 1;
+}
+
+/* Navbar styling */
+.navbar {
+    background-color: var(--bg-secondary) !important;
+    box-shadow: var(--shadow-sm);
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.3rem;
+    color: var(--text-primary) !important;
+}
+
+/* Module cards */
+.module-card {
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: 12px;
+    box-shadow: var(--shadow-md);
+    transition: all 0.25s ease;
+    cursor: pointer;
+}
+
+.module-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg), var(--glow-accent);
+    border-color: var(--accent-muted);
+}
+
+.module-card .card-body {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+/* Module icons */
+.module-icon {
+    font-size: 5rem;
+    color: var(--accent-primary);
+}
+
+.module-icon-small {
+    font-size: 2.5rem;
+    color: var(--text-muted);
+}
+
+/* Card title and text */
+.module-card .card-title {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.module-card .card-text {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+}
+
+/* Buttons */
+.btn {
+    border-radius: 8px;
+    font-weight: 500;
+    padding: 0.6rem 1.5rem;
+    transition: all 0.2s ease;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+}
+
+.btn-lg {
+    padding: 0.8rem 2rem;
+    font-size: 1.1rem;
+}
+
+.btn-primary {
+    background-color: var(--accent-primary);
+    border-color: var(--accent-primary);
+    color: var(--bg-primary);
+}
+
+.btn-primary:hover {
+    background-color: var(--accent-hover);
+    border-color: var(--accent-hover);
+    color: var(--bg-primary);
+}
+
+.btn-success {
+    background-color: var(--success);
+    border-color: var(--success);
+    color: var(--bg-primary);
+}
+
+.btn-success:hover {
+    background-color: #8ec98e;
+    border-color: #8ec98e;
+    color: var(--bg-primary);
+}
+
+.btn-secondary {
+    background-color: var(--bg-tertiary);
+    border-color: var(--border-primary);
+    color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+    background-color: var(--bg-elevated);
+    border-color: var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+/* Header section */
+.display-4 {
+    color: var(--text-primary);
+}
+
+.lead {
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+}
+
+/* Footer */
+footer {
+    margin-top: auto;
+    background-color: var(--bg-secondary);
+    border-top: 1px solid var(--border-primary);
+}
+
+footer .text-muted {
+    color: var(--text-muted) !important;
+}
+
+/* Coming soon modules */
+.opacity-50 {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.opacity-50:hover {
+    transform: none;
+    box-shadow: var(--shadow-md);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .module-icon {
+        font-size: 3.5rem;
+    }
+
+    .module-icon-small {
+        font-size: 2rem;
+    }
+
+    .module-card .card-body {
+        padding: 2rem !important;
+    }
+
+    .display-4 {
+        font-size: 2.5rem;
+    }
+
+    .lead {
+        font-size: 1rem;
+    }
+
+    .btn-lg {
+        padding: 0.6rem 1.5rem;
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 576px) {
+    .navbar-brand {
+        font-size: 1rem;
+    }
+
+    .navbar-brand img {
+        height: 30px !important;
+    }
+
+    .display-4 {
+        font-size: 2rem;
+    }
+}
+
+/* Animation for page load */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.module-card {
+    animation: fadeInUp 0.6s ease;
+}
+
+.module-card:nth-child(1) {
+    animation-delay: 0.1s;
+}
+
+.module-card:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.module-card:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+.module-card:nth-child(4) {
+    animation-delay: 0.4s;
+}
+
+/* Form elements */
+input, textarea, select {
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-primary);
+    color: var(--text-primary);
+    border-radius: 6px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+}
+
+input::placeholder, textarea::placeholder {
+    color: var(--text-muted);
+}
+
+/* Tables */
+table {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+thead {
+    background-color: var(--bg-tertiary);
+}
+
+th {
+    color: var(--text-primary);
+    border-color: var(--border-primary) !important;
+}
+
+td {
+    border-color: var(--border-primary) !important;
+}
+
+tbody tr:hover {
+    background-color: var(--bg-tertiary);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-primary);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--border-secondary);
+}

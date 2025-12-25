@@ -158,9 +158,8 @@ class AutoSendService:
             # 1. No inventory items needed (has_inventory_items=False), OR
             # 2. Already sent previously (invoice.sent_to_inventory=True)
             inventory_sent = True  # Consider it "done" for status purposes
-            # Only mark as sent if it doesn't need inventory at all
-            if not has_inventory_items:
-                invoice.sent_to_inventory = True  # Mark as sent so UI reflects this
+            # NOTE: Do NOT mark sent_to_inventory=True for expense-only invoices
+            # The UI will check if all items are expenses and show "N/A" accordingly
         if not send_to_accounting:
             # System was skipped because already sent previously (invoice.sent_to_accounting=True)
             accounting_sent = True  # Consider it "done" for status purposes
@@ -262,6 +261,10 @@ class AutoSendService:
         # Check status
         if invoice.status not in ['ready', 'partial']:
             errors.append(f"Invoice status is '{invoice.status}', must be 'ready' or 'partial'")
+
+        # Check location is set (required for proper routing)
+        if not invoice.location_id:
+            errors.append("Invoice must have a location assigned before sending")
 
         # Check items exist
         if not items:

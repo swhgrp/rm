@@ -1,5 +1,51 @@
 # Changelog
 
+## [2025-12-24] - UI Consistency: Sidebar Highlighting & Submenu Behavior Fixes
+
+### Summary
+Fixed sidebar active state highlighting issues across multiple systems. Corrected submenu auto-open behavior in Accounting system. Fixed theme inconsistencies in Events system. Resolved GL account name display issue in Integration Hub.
+
+### Fixed - Inventory System
+- **Sidebar Active State:** Count History page no longer incorrectly highlights Take Inventory
+  - Root cause: JavaScript `startsWith()` matched `/inventory/count` for both paths
+  - Solution: Rewrote path matching to use exact match or segment boundary checks
+  - File: `inventory/src/restaurant_inventory/templates/base.html`
+
+### Fixed - Accounting System
+- **Reports Submenu Auto-Open:** Added `comparative-pl` and `cash-flow-statement` to auto-open logic
+- **Recurring Invoices Submenu:** Added `/recurring-invoices` to AR section auto-open logic
+- **DSS Journal Entries Highlighting:** Now correctly highlights based on `source` query parameter
+  - Journal Entries (no source) → highlights "Journal Entries"
+  - `?source=sale` → highlights "DSS Journal Entries"
+  - `?source=bill` → highlights "Bill Journal Entries"
+- **ACH Batches Text Wrapping:** Added `white-space: nowrap` to prevent text wrapping in submenu
+- Files modified:
+  - `accounting/src/accounting/main.py` (pass source parameter to template)
+  - `accounting/src/accounting/templates/journal_entries.html` (conditional nav blocks)
+  - `accounting/src/accounting/templates/base.html` (CSS fix, auto-open logic)
+
+### Fixed - Events System
+- **Settings Page Theme:** Replaced hardcoded dark colors with CSS variables for light theme
+- **Tasks Page Theme:** Same light theme CSS variable fixes
+- Files: `events/src/events/templates/admin/settings.html`, `tasks.html`
+
+### Fixed - Integration Hub
+- **GL Account Names Missing:** Invoice detail page now shows GL account descriptions
+  - Root cause: Dictionary keys were integers but template looked up strings
+  - Solution: Convert keys to strings when building `gl_names` dictionary
+  - File: `integration-hub/src/integration_hub/main.py`
+
+### Audited - All Systems
+- Documented sidebar highlighting approaches across all 6 systems:
+  - Accounting: Jinja template blocks
+  - Events: Jinja conditionals
+  - Integration Hub: Jinja conditionals
+  - HR: Jinja template blocks
+  - Inventory: JavaScript-based
+  - Websites: Jinja conditionals with `active_page` variable
+
+---
+
 ## [2025-12-23] - Integration Hub: Invoice Mapping Improvements & Inventory Cleanup
 
 ### Summary

@@ -11,7 +11,7 @@
     </div>
 
     <div style="margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center;">
-        <select id="typeFilter" onchange="filterAccounts()" style="padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; background: #0d1117; color: #c9d1d9;">
+        <select id="typeFilter" onchange="filterAccounts()" style="padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
             <option value="">All Types</option>
             <option value="ASSET">Assets</option>
             <option value="LIABILITY">Liabilities</option>
@@ -23,9 +23,9 @@
 
         <input type="text" id="searchBox" placeholder="Search accounts..."
                onkeyup="filterAccounts()"
-               style="padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; flex: 1; background: #0d1117; color: #c9d1d9;">
+               style="padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; flex: 1; background: var(--bg-primary); color: var(--text-primary);">
 
-        <label style="display: flex; align-items: center; gap: 0.5rem; color: #c9d1d9; cursor: pointer;">
+        <label style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-primary); cursor: pointer;">
             <input type="checkbox" id="showHierarchy" checked onchange="renderAccounts()">
             Show Hierarchy
         </label>
@@ -54,26 +54,26 @@
 
 <!-- Create/Edit Modal -->
 <div id="accountModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center;">
-    <div style="background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 2rem; width: 600px; max-width: 90%;">
-        <h3 id="modalTitle" style="margin-bottom: 1.5rem; color: #c9d1d9;">Create New Account</h3>
+    <div style="background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 8px; padding: 2rem; width: 600px; max-width: 90%;">
+        <h3 id="modalTitle" style="margin-bottom: 1.5rem; color: var(--text-primary);">Create New Account</h3>
         <input type="hidden" id="editingAccountId">
 
         <div style="margin-bottom: 1rem;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9;">Account Number <span style="color: #f85149;">*</span></label>
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary);">Account Number <span style="color: #E53935;">*</span></label>
             <input type="text" id="accountNumber" placeholder="e.g., 6950" required
-                   style="width: 100%; padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; background: #0d1117; color: #c9d1d9;">
+                   style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
         </div>
 
         <div style="margin-bottom: 1rem;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9;">Account Name <span style="color: #f85149;">*</span></label>
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary);">Account Name <span style="color: #E53935;">*</span></label>
             <input type="text" id="accountName" placeholder="e.g., Office Rent" required
-                   style="width: 100%; padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; background: #0d1117; color: #c9d1d9;">
+                   style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
         </div>
 
         <div style="margin-bottom: 1rem;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9;">Account Type <span style="color: #f85149;">*</span></label>
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary);">Account Type <span style="color: #E53935;">*</span></label>
             <select id="accountType" onchange="updateParentOptions()" required
-                    style="width: 100%; padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; background: #0d1117; color: #c9d1d9;">
+                    style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
                 <option value="ASSET">Asset</option>
                 <option value="LIABILITY">Liability</option>
                 <option value="EQUITY">Equity</option>
@@ -86,23 +86,23 @@
         <div style="margin-bottom: 1rem;">
             <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                 <input type="checkbox" id="isSummary" onchange="toggleParentField()">
-                <span style="font-weight: 500; color: #c9d1d9;">Summary Account (has child accounts)</span>
+                <span style="font-weight: 500; color: var(--text-primary);">Summary Account (has child accounts)</span>
             </label>
-            <small style="color: #8b949e; margin-left: 1.5rem;">Check this if this account will contain sub-accounts</small>
+            <small style="color: var(--text-secondary); margin-left: 1.5rem;">Check this if this account will contain sub-accounts</small>
         </div>
 
         <div id="parentAccountField" style="margin-bottom: 1rem;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9;">Parent Account (Optional)</label>
-            <select id="parentAccount" style="width: 100%; padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; background: #0d1117; color: #c9d1d9;">
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary);">Parent Account (Optional)</label>
+            <select id="parentAccount" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);">
                 <option value="">-- No Parent (Top Level) --</option>
             </select>
-            <small style="color: #8b949e;">Parent must be a summary account of the same type</small>
+            <small style="color: var(--text-secondary);">Parent must be a summary account of the same type</small>
         </div>
 
         <div style="margin-bottom: 1.5rem;">
-            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #c9d1d9;">Description (Optional)</label>
+            <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-primary);">Description (Optional)</label>
             <textarea id="accountDescription" placeholder="Account description..." rows="3"
-                      style="width: 100%; padding: 0.5rem; border: 1px solid #30363d; border-radius: 4px; background: #0d1117; color: #c9d1d9;"></textarea>
+                      style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-primary); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary);"></textarea>
         </div>
 
         <div id="modalError" class="alert alert-error" style="display: none; margin-bottom: 1rem;"></div>
@@ -122,6 +122,18 @@ let allAccounts = [];
 let filteredAccounts = [];
 let expandedAccounts = new Set();
 
+function getTypeBadgeClass(accountType) {
+    const typeColors = {
+        'ASSET': 'bg-type-asset',
+        'LIABILITY': 'bg-type-liability',
+        'EQUITY': 'bg-type-equity',
+        'REVENUE': 'bg-type-revenue',
+        'EXPENSE': 'bg-type-expense',
+        'COGS': 'bg-type-cogs'
+    };
+    return typeColors[accountType] || 'bg-secondary';
+}
+
 async function loadAccounts() {
     try {
         const response = await fetch('/accounting/api/accounts/?limit=1000');
@@ -132,7 +144,7 @@ async function loadAccounts() {
     } catch (error) {
         console.error('Error loading accounts:', error);
         document.getElementById('accountsTable').innerHTML =
-            '<tr><td colspan="6" style="text-align: center; color: #f85149;">Error loading accounts</td></tr>';
+            '<tr><td colspan="6" style="text-align: center; color: #E53935;">Error loading accounts</td></tr>';
     }
 }
 
@@ -183,7 +195,7 @@ function renderAccountRow(account, level = 0) {
                 ${indent}${expandIcon}
                 <span style="font-weight: ${account.is_summary ? '600' : '400'};">${account.account_name}</span>
             </td>
-            <td><span class="badge">${account.account_type}</span></td>
+            <td><span class="badge ${getTypeBadgeClass(account.account_type)}">${account.account_type}</span></td>
             <td>${account.is_summary ? '<span class="badge bg-info">Summary</span>' : '-'}</td>
             <td>
                 ${account.is_active
@@ -234,7 +246,7 @@ function renderAccounts() {
             <tr>
                 <td>${account.account_number}</td>
                 <td>${account.account_name}</td>
-                <td><span class="badge">${account.account_type}</span></td>
+                <td><span class="badge ${getTypeBadgeClass(account.account_type)}">${account.account_type}</span></td>
                 <td>${account.is_summary ? '<span class="badge bg-info">Summary</span>' : '-'}</td>
                 <td>
                     ${account.is_active
@@ -422,7 +434,7 @@ document.addEventListener('DOMContentLoaded', loadAccounts);
 }
 
 .badge.bg-success {
-    background-color: #238636;
+    background-color: #43A047;
     color: white;
 }
 
@@ -436,8 +448,39 @@ document.addEventListener('DOMContentLoaded', loadAccounts);
     color: white;
 }
 
+/* Account type badge colors */
+.badge.bg-type-asset {
+    background-color: #2196F3;
+    color: white;
+}
+
+.badge.bg-type-liability {
+    background-color: #f44336;
+    color: white;
+}
+
+.badge.bg-type-equity {
+    background-color: #9c27b0;
+    color: white;
+}
+
+.badge.bg-type-revenue {
+    background-color: #4caf50;
+    color: white;
+}
+
+.badge.bg-type-expense {
+    background-color: #ff9800;
+    color: white;
+}
+
+.badge.bg-type-cogs {
+    background-color: #795548;
+    color: white;
+}
+
 table tbody tr:hover {
-    background-color: #161b22;
+    background-color: var(--bg-secondary);
 }
 
 .alert {
@@ -448,15 +491,15 @@ table tbody tr:hover {
 
 .alert-error {
     background-color: #1a0a0a;
-    border-color: #f85149;
-    color: #f85149;
+    border-color: #E53935;
+    color: #E53935;
 }
 
 #accountModal input:focus,
 #accountModal select:focus,
 #accountModal textarea:focus {
     outline: none;
-    border-color: #58a6ff;
+    border-color: var(--accent-primary);
 }
 </style>
 {% endblock %}

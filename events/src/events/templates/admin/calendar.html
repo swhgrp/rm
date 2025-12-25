@@ -15,15 +15,15 @@
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
 <style>
     .calendar-container {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         padding: 20px;
     }
 
     .filters-bar {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         padding: 15px 20px;
         margin-bottom: 20px;
@@ -41,58 +41,58 @@
 
     .filter-item label {
         font-size: 12px;
-        color: #8b949e;
+        color: var(--text-muted);
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
 
-    /* FullCalendar Dark Theme Overrides */
+    /* FullCalendar Light Theme Overrides */
     .fc {
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .fc .fc-toolbar-title {
-        color: #c9d1d9;
+        color: var(--text-primary);
         font-size: 20px;
     }
 
     .fc .fc-button {
-        background-color: #21262d;
-        border-color: #30363d;
-        color: #c9d1d9;
+        background-color: var(--bg-tertiary);
+        border-color: var(--border-primary);
+        color: var(--text-primary);
         text-transform: capitalize;
     }
 
     .fc .fc-button:hover {
-        background-color: #30363d;
-        border-color: #58a6ff;
+        background-color: var(--bg-elevated);
+        border-color: var(--accent-primary);
     }
 
     .fc .fc-button-active {
-        background-color: #0969da;
-        border-color: #1f6feb;
+        background-color: var(--accent-primary);
+        border-color: var(--accent-primary);
     }
 
     .fc .fc-col-header-cell {
-        background-color: #21262d;
-        border-color: #30363d;
+        background-color: var(--bg-tertiary);
+        border-color: var(--border-primary);
     }
 
     .fc .fc-daygrid-day {
-        background-color: #0d1117;
-        border-color: #30363d;
+        background-color: var(--bg-secondary);
+        border-color: var(--border-primary);
     }
 
     .fc .fc-daygrid-day:hover {
-        background-color: #161b22;
+        background-color: var(--bg-tertiary);
     }
 
     .fc .fc-day-today {
-        background-color: #1c2128 !important;
+        background-color: #E3F2FD !important;
     }
 
     .fc .fc-daygrid-day-number {
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .fc .fc-event {
@@ -160,9 +160,9 @@
         align-items: center;
         margin-left: auto;
         padding: 8px 12px;
-        background: rgba(48, 54, 61, 0.4);
+        background: var(--bg-tertiary);
         border-radius: 6px;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
     }
 
     .location-legend-item {
@@ -170,15 +170,15 @@
         align-items: center;
         gap: 7px;
         font-size: 13px;
-        color: #c9d1d9;
+        color: var(--text-primary);
         padding: 4px 8px;
-        background: rgba(22, 27, 34, 0.6);
+        background: var(--bg-secondary);
         border-radius: 4px;
         transition: background-color 0.2s ease;
     }
 
     .location-legend-item:hover {
-        background: rgba(48, 54, 61, 0.8);
+        background: var(--bg-elevated);
     }
 
     .location-color-box {
@@ -208,8 +208,8 @@
     }
 
     .modal-content {
-        background-color: #161b22;
-        border: 1px solid #30363d;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
         padding: 25px;
         max-width: 600px;
@@ -224,19 +224,19 @@
         align-items: center;
         margin-bottom: 20px;
         padding-bottom: 15px;
-        border-bottom: 1px solid #30363d;
+        border-bottom: 1px solid var(--border-primary);
     }
 
     .modal-title {
         font-size: 20px;
         font-weight: 600;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .modal-close {
         background: none;
         border: none;
-        color: #8b949e;
+        color: var(--text-muted);
         font-size: 24px;
         cursor: pointer;
         padding: 0;
@@ -248,11 +248,11 @@
     }
 
     .modal-close:hover {
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .modal-body {
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
 
     .detail-row {
@@ -268,12 +268,12 @@
     }
 
     .detail-label {
-        color: #8b949e;
+        color: var(--text-muted);
         min-width: 100px;
     }
 
     .detail-value {
-        color: #c9d1d9;
+        color: var(--text-primary);
         flex: 1;
     }
 
@@ -282,7 +282,7 @@
         gap: 10px;
         margin-top: 20px;
         padding-top: 15px;
-        border-top: 1px solid #30363d;
+        border-top: 1px solid var(--border-primary);
     }
 
     /* Calendar item form styles */
@@ -299,7 +299,7 @@
     .form-group-custom label {
         display: block;
         margin-bottom: 8px;
-        color: #8b949e;
+        color: var(--text-muted);
         font-size: 14px;
         font-weight: 500;
     }
@@ -311,10 +311,10 @@
     .form-group-custom textarea {
         width: 100%;
         padding: 8px 12px;
-        background-color: #0d1117;
-        border: 1px solid #30363d;
+        background-color: var(--bg-primary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
-        color: #c9d1d9;
+        color: var(--text-primary);
         font-size: 14px;
     }
 
@@ -346,10 +346,10 @@
         min-width: 300px;
         max-width: 500px;
         padding: 16px 20px;
-        background: #161b22;
-        border: 1px solid #30363d;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
         border-radius: 6px;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
         display: flex;
         align-items: flex-start;
         gap: 12px;
@@ -394,20 +394,20 @@
 
     .toast-title {
         font-weight: 600;
-        color: #c9d1d9;
+        color: var(--text-primary);
         margin-bottom: 4px;
     }
 
     .toast-message {
         font-size: 14px;
-        color: #8b949e;
+        color: var(--text-secondary);
         line-height: 1.4;
     }
 
     .toast-close {
         background: none;
         border: none;
-        color: #8b949e;
+        color: var(--text-muted);
         font-size: 20px;
         cursor: pointer;
         padding: 0;
@@ -422,8 +422,8 @@
     }
 
     .toast-close:hover {
-        background-color: #30363d;
-        color: #c9d1d9;
+        background-color: var(--bg-elevated);
+        color: var(--text-primary);
     }
 
     .toast.error {
@@ -586,25 +586,25 @@
                     <div class="form-group-custom" id="weeklyDaysGroup" style="display: none;">
                         <label>Repeat on</label>
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
-                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: var(--bg-tertiary); border-radius: 4px; border: 1px solid var(--border-primary);">
                                 <input type="checkbox" class="day-checkbox" value="0"> Mon
                             </label>
-                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: var(--bg-tertiary); border-radius: 4px; border: 1px solid var(--border-primary);">
                                 <input type="checkbox" class="day-checkbox" value="1"> Tue
                             </label>
-                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: var(--bg-tertiary); border-radius: 4px; border: 1px solid var(--border-primary);">
                                 <input type="checkbox" class="day-checkbox" value="2"> Wed
                             </label>
-                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: var(--bg-tertiary); border-radius: 4px; border: 1px solid var(--border-primary);">
                                 <input type="checkbox" class="day-checkbox" value="3"> Thu
                             </label>
-                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: var(--bg-tertiary); border-radius: 4px; border: 1px solid var(--border-primary);">
                                 <input type="checkbox" class="day-checkbox" value="4"> Fri
                             </label>
-                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: var(--bg-tertiary); border-radius: 4px; border: 1px solid var(--border-primary);">
                                 <input type="checkbox" class="day-checkbox" value="5"> Sat
                             </label>
-                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: #21262d; border-radius: 4px; border: 1px solid #30363d;">
+                            <label style="display: flex; align-items: center; gap: 4px; cursor: pointer; padding: 6px 10px; background: var(--bg-tertiary); border-radius: 4px; border: 1px solid var(--border-primary);">
                                 <input type="checkbox" class="day-checkbox" value="6"> Sun
                             </label>
                         </div>
@@ -703,7 +703,7 @@
                 left: 0;
                 right: 0;
                 bottom: 0;
-                background: rgba(0, 0, 0, 0.7);
+                background: rgba(0, 0, 0, 0.5);
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -713,35 +713,35 @@
             // Create modal
             const modal = document.createElement('div');
             modal.style.cssText = `
-                background: #161b22;
-                border: 1px solid #30363d;
+                background: #FFFFFF;
+                border: 1px solid #CFD8DC;
                 border-radius: 8px;
                 padding: 24px;
                 max-width: 400px;
                 width: 90%;
-                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
             `;
 
             modal.innerHTML = `
-                <div style="color: #c9d1d9; font-size: 18px; font-weight: 600; margin-bottom: 16px;">
+                <div style="color: #263238; font-size: 18px; font-weight: 600; margin-bottom: 16px;">
                     ${title}
                 </div>
-                <div style="color: #8b949e; margin-bottom: 24px; line-height: 1.5;">
+                <div style="color: #546E7A; margin-bottom: 24px; line-height: 1.5;">
                     ${message}
                 </div>
                 <div style="display: flex; gap: 12px; justify-content: flex-end;">
                     <button id="confirmCancel" style="
-                        background: #21262d;
-                        border: 1px solid #30363d;
-                        color: #c9d1d9;
+                        background: #F5F5F5;
+                        border: 1px solid #CFD8DC;
+                        color: #263238;
                         padding: 8px 16px;
                         border-radius: 6px;
                         cursor: pointer;
                         font-size: 14px;
                     ">Cancel</button>
                     <button id="confirmOk" style="
-                        background: #da3633;
-                        border: 1px solid #f85149;
+                        background: #E53935;
+                        border: 1px solid #E53935;
                         color: white;
                         padding: 8px 16px;
                         border-radius: 6px;

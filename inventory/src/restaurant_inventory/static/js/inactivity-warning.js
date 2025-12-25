@@ -2,6 +2,7 @@
  * Inactivity Warning System
  * Shows a warning 2 minutes before session expires
  * Auto-logs out user after 30 minutes of inactivity
+ * Also pings Portal keepalive to prevent cross-system session expiry
  */
 
 (function() {
@@ -9,11 +10,13 @@
     const WARNING_BEFORE_MS = 2 * 60 * 1000;    // Show warning 2 min before
     const WARNING_TIME_MS = SESSION_TIMEOUT_MS - WARNING_BEFORE_MS;
     const THROTTLE_MS = 1000;  // Throttle activity detection to 1 second
+    const KEEPALIVE_INTERVAL_MS = 5 * 60 * 1000;  // Ping Portal every 5 minutes
 
     let activityTimer = null;
     let warningTimer = null;
     let warningModal = null;
     let countdownInterval = null;
+    let keepaliveInterval = null;
     let lastActivityTime = Date.now();
 
     function createWarningModal() {
@@ -39,6 +42,7 @@
 
         document.getElementById('stayLoggedInBtn').addEventListener('click', function() {
             resetActivity(true);  // Force reset
+            pingPortalKeepalive();  // Also refresh Portal session
             warningModal.hide();
         });
     }
@@ -73,10 +77,35 @@
         clearTimeout(activityTimer);
         clearTimeout(warningTimer);
         clearInterval(countdownInterval);
+        clearInterval(keepaliveInterval);
         localStorage.clear();
         sessionStorage.clear();
         // Redirect to portal login with reason
         window.location.href = '/portal/login?reason=inactivity';
+    }
+
+    /**
+     * Ping Portal keepalive endpoint to refresh the Portal session cookie.
+     * This prevents the Portal session from expiring while user is active
+     * in a sub-system, which would cause logout when navigating to another system.
+     */
+    function pingPortalKeepalive() {
+        fetch('/portal/api/keepalive', {
+            method: 'GET',
+            credentials: 'include'  // Include cookies for Portal auth
+        })
+        .then(function(response) {
+            if (response.status === 401) {
+                // Portal session already expired - redirect to login
+                console.log('Portal session expired, redirecting to login');
+                logout();
+            } else if (response.ok) {
+                console.log('Portal session keepalive successful');
+            }
+        })
+        .catch(function(error) {
+            console.log('Portal keepalive ping failed (may be offline):', error);
+        });
     }
 
     function resetActivity(force) {
@@ -103,10 +132,21 @@
     }
 
     function setupActivityTracking() {
-        const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+        // Only track INTENTIONAL user activity (not passive like mousemove)
+        // mousemove was removed because it fires constantly with any mouse movement
+        // preventing proper inactivity detection
+        const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
         events.forEach(function(event) {
             document.addEventListener(event, function() { resetActivity(false); }, { passive: true });
         });
+    }
+
+    function startKeepalive() {
+        // Ping Portal immediately on load to refresh session
+        pingPortalKeepalive();
+
+        // Then ping every 5 minutes to keep Portal session alive
+        keepaliveInterval = setInterval(pingPortalKeepalive, KEEPALIVE_INTERVAL_MS);
     }
 
     // Expose for external use (e.g., "Stay Logged In" buttons)
@@ -116,9 +156,11 @@
         document.addEventListener('DOMContentLoaded', function() {
             setupActivityTracking();
             resetActivity(true);
+            startKeepalive();
         });
     } else {
         setupActivityTracking();
         resetActivity(true);
+        startKeepalive();
     }
 })();

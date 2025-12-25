@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -69,10 +69,52 @@
     {% block head %}{% endblock %}
 
     <style>
-        /* Dark mode custom styles */
+        /* =====================================================
+           SW Hospitality Group - Slate Blue Light Theme
+           Inventory System
+           ===================================================== */
+
+        :root {
+            /* Background colors - more contrast */
+            --bg-primary: #ECEFF1;
+            --bg-secondary: #FFFFFF;
+            --bg-tertiary: #F5F5F5;
+            --bg-elevated: #E0E0E0;
+
+            /* Border colors - slightly darker */
+            --border-primary: #CFD8DC;
+            --border-secondary: #B0BEC5;
+
+            /* Text colors - dark for readability */
+            --text-primary: #263238;
+            --text-secondary: #546E7A;
+            --text-muted: #78909C;
+
+            /* Accent colors - Slate Blue (less saturated) */
+            --accent-primary: #455A64;
+            --accent-secondary: #37474F;
+            --accent-hover: #263238;
+            --accent-muted: #546E7A;
+
+            /* Semantic colors */
+            --success: #43A047;
+            --success-bg: rgba(67, 160, 71, 0.1);
+            --error: #E53935;
+            --error-bg: rgba(229, 57, 53, 0.1);
+            --warning: #FB8C00;
+            --warning-bg: rgba(251, 140, 0, 0.1);
+            --info: #1E88E5;
+            --info-bg: rgba(30, 136, 229, 0.1);
+
+            /* Shadows - more visible for light theme */
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
+            --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.15);
+        }
+
         body {
-            background-color: #0d1117;
-            color: #c9d1d9;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
             margin: 0;
             padding: 0;
         }
@@ -84,12 +126,13 @@
             left: 0;
             height: 100vh;
             width: 200px;
-            background-color: #161b22;
+            background-color: #455A64;
             padding-top: 20px;
             z-index: 1000;
             overflow-y: auto;
-            border-right: 1px solid #30363d;
+            border-right: none;
             transition: transform 0.3s ease-in-out;
+            box-shadow: 2px 0 8px rgba(69, 90, 100, 0.25);
         }
 
         .sidebar.collapsed {
@@ -102,17 +145,17 @@
             top: 15px;
             left: 15px;
             z-index: 1001;
-            background-color: #161b22;
-            border: 1px solid #30363d;
-            color: #c9d1d9;
+            background-color: #455A64;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #FFFFFF;
             padding: 8px 12px;
             border-radius: 4px;
             cursor: pointer;
         }
 
         .sidebar-toggle:hover {
-            background-color: #21262d;
-            color: #58a6ff;
+            background-color: #37474F;
+            color: #FFFFFF;
         }
 
         .sidebar-overlay {
@@ -133,10 +176,10 @@
         .sidebar-brand {
             padding: 20px 15px;
             text-align: center;
-            color: #58a6ff;
+            color: #FFFFFF;
             font-size: 16px;
             font-weight: 600;
-            border-bottom: 1px solid #30363d;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             margin-bottom: 10px;
         }
 
@@ -144,11 +187,12 @@
             max-width: 180px;
             height: auto;
             margin-bottom: 0px;
+            filter: brightness(0) invert(1);
         }
 
         .sidebar-brand .company-name {
             font-size: 12px;
-            color: #8b949e;
+            color: rgba(255, 255, 255, 0.7);
             font-weight: 400;
             display: block;
         }
@@ -167,7 +211,7 @@
             display: block;
             padding: 12px 20px;
             padding-left: 17px;
-            color: #8b949e;
+            color: rgba(255, 255, 255, 0.85);
             text-decoration: none;
             font-size: 14px;
             transition: all 0.2s;
@@ -176,9 +220,9 @@
 
         .sidebar-nav a:hover,
         .sidebar-nav a.active {
-            background-color: #21262d;
-            color: #58a6ff;
-            border-left: 3px solid #58a6ff;
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
+            border-left: 3px solid #FFFFFF;
         }
 
         .sidebar-nav i {
@@ -205,7 +249,7 @@
         .submenu li a {
             padding-left: 47px;
             font-size: 13px;
-            color: #8b949e;
+            color: rgba(255, 255, 255, 0.75);
             white-space: normal;
             line-height: 1.4;
             border-left: 3px solid transparent;
@@ -213,16 +257,16 @@
 
         .submenu li a:hover,
         .submenu li a.active {
-            background-color: #21262d;
-            color: #58a6ff;
-            border-left: 3px solid #58a6ff;
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
+            border-left: 3px solid #FFFFFF;
         }
 
         .nav-section-toggle {
             position: relative;
             font-weight: 600 !important;
-            color: #c9d1d9 !important;
-            background-color: #161b22 !important;
+            color: #FFFFFF !important;
+            background-color: rgba(255, 255, 255, 0.1) !important;
             border-left: none !important;
             padding-left: 20px !important;
             padding-right: 20px !important;
@@ -245,8 +289,8 @@
         }
 
         .nav-section-toggle:hover {
-            background-color: #1c2128 !important;
-            color: #58a6ff !important;
+            background-color: rgba(255, 255, 255, 0.2) !important;
+            color: #FFFFFF !important;
         }
 
         /* Main content area */
@@ -259,18 +303,23 @@
 
         /* Top navbar */
         .top-navbar {
-            background-color: #161b22;
-            border-bottom: 1px solid #30363d;
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-primary);
             padding: 12px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            box-shadow: var(--shadow-sm);
         }
 
         .page-title {
             font-size: 18px;
             font-weight: 600;
-            color: #c9d1d9;
+            color: var(--text-primary);
+        }
+
+        .page-title i {
+            color: var(--accent-primary);
         }
 
         .user-menu-top {
@@ -282,7 +331,7 @@
         .user-menu-top .dropdown-toggle {
             background: none;
             border: none;
-            color: #c9d1d9;
+            color: var(--text-primary);
             font-size: 20px;
             cursor: pointer;
         }
@@ -294,82 +343,315 @@
         }
 
         .card {
-            background-color: #161b22;
-            border: 1px solid #30363d;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            box-shadow: var(--shadow-md);
+            border-radius: 8px;
+        }
+
+        /* Table striping for better readability */
+        .table-striped tbody tr:nth-of-type(odd) {
+            background-color: #F8F9FA;
+        }
+
+        .table-striped tbody tr:nth-of-type(even) {
+            background-color: #FFFFFF;
         }
 
         /* Base heading styles */
         h2 {
-            font-size: 1.75rem;  /* ~28px, matches Accounting */
+            font-size: 1.75rem;
             font-weight: 600;
-            color: #c9d1d9;
+            color: var(--text-primary);
         }
 
         .table {
-            color: #c9d1d9;
+            color: var(--text-primary);
         }
 
-        /* Table header styling - dark background with white text */
+        /* Table header styling */
         .table thead th {
-            background-color: #0d1117 !important;
-            color: #ffffff !important;
-            border-color: #30363d !important;
+            background-color: var(--bg-tertiary) !important;
+            color: var(--text-primary) !important;
+            border-color: var(--border-primary) !important;
             font-weight: 600;
         }
 
         .table-hover tbody tr:hover {
-            background-color: #1c2128;
+            background-color: #CFD8DC !important;
+        }
+
+        .table td, .table th {
+            border-color: var(--border-primary);
         }
 
         .modal-content {
-            background-color: #161b22;
-            border: 1px solid #30363d;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+        }
+
+        .modal-header {
+            border-bottom-color: var(--border-primary);
+        }
+
+        .modal-footer {
+            border-top-color: var(--border-primary);
         }
 
         .form-control, .form-select {
-            background-color: #0d1117;
-            border-color: #30363d;
-            color: #c9d1d9;
+            background-color: var(--bg-primary);
+            border-color: var(--border-primary);
+            color: var(--text-primary);
         }
 
         .form-control:focus, .form-select:focus {
-            background-color: #0d1117;
-            border-color: #58a6ff;
-            color: #c9d1d9;
+            background-color: var(--bg-primary);
+            border-color: var(--accent-primary);
+            color: var(--text-primary);
+            box-shadow: 0 0 0 3px rgba(69, 90, 100, 0.15);
+        }
+
+        .form-control::placeholder {
+            color: var(--text-muted);
+        }
+
+        .form-label {
+            color: var(--text-primary);
         }
 
         .dropdown-menu {
-            background-color: #161b22;
-            border-color: #30363d;
+            background-color: var(--bg-secondary);
+            border-color: var(--border-primary);
         }
 
         .dropdown-item {
-            color: #c9d1d9;
+            color: var(--text-primary);
         }
 
         .dropdown-item:hover {
-            background-color: #21262d;
-            color: #58a6ff;
+            background-color: var(--bg-tertiary);
+            color: var(--accent-primary);
         }
 
         .dropdown-divider {
-            border-color: #30363d;
+            border-color: var(--border-primary);
+        }
+
+        .dropdown-header {
+            color: var(--text-secondary);
         }
 
         footer {
-            background-color: #161b22;
-            border-top: 1px solid #30363d;
+            background-color: var(--bg-secondary);
+            border-top: 1px solid var(--border-primary);
             padding: 15px 0;
             margin-top: auto;
         }
 
         .text-muted {
-            color: #8b949e !important;
+            color: var(--text-muted) !important;
         }
 
         .alert {
-            border-color: #30363d;
+            border-color: var(--border-primary);
+        }
+
+        .alert-success {
+            background-color: var(--success-bg);
+            color: var(--success);
+            border-color: var(--success);
+        }
+
+        .alert-danger {
+            background-color: var(--error-bg);
+            color: var(--error);
+            border-color: var(--error);
+        }
+
+        .alert-warning {
+            background-color: var(--warning-bg);
+            color: var(--warning);
+            border-color: var(--warning);
+        }
+
+        .alert-info {
+            background-color: var(--info-bg);
+            color: var(--info);
+            border-color: var(--info);
+        }
+
+        /* Button overrides for theme */
+        .btn-primary {
+            background-color: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: #FFFFFF;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+            border-color: var(--accent-hover);
+            color: #FFFFFF;
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-tertiary);
+            border-color: var(--border-primary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--bg-elevated);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .btn-outline-primary {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .btn-outline-primary:hover {
+            background-color: var(--accent-primary);
+            color: var(--bg-primary);
+        }
+
+        .btn-success {
+            background-color: var(--success);
+            border-color: var(--success);
+            color: #FFFFFF;
+        }
+
+        .btn-danger {
+            background-color: var(--error);
+            border-color: var(--error);
+            color: #FFFFFF;
+        }
+
+        .btn-warning {
+            background-color: var(--warning);
+            border-color: var(--warning);
+            color: #FFFFFF;
+        }
+
+        .btn-info {
+            background-color: var(--info);
+            border-color: var(--info);
+            color: #FFFFFF;
+        }
+
+        .btn-info:hover {
+            background-color: var(--accent-hover);
+            border-color: var(--accent-hover);
+            color: #FFFFFF;
+        }
+
+        /* Info background override */
+        .bg-info {
+            background-color: var(--info) !important;
+        }
+
+        /* Text info override */
+        .text-info {
+            color: var(--info) !important;
+        }
+
+        /* Badge styling */
+        .badge.bg-primary {
+            background-color: var(--accent-primary) !important;
+        }
+
+        .badge.bg-success {
+            background-color: var(--success) !important;
+            color: var(--bg-primary) !important;
+        }
+
+        .badge.bg-danger {
+            background-color: var(--error) !important;
+        }
+
+        .badge.bg-warning {
+            background-color: var(--warning) !important;
+            color: var(--bg-primary) !important;
+        }
+
+        .badge.bg-info {
+            background-color: var(--info) !important;
+            color: var(--bg-primary) !important;
+        }
+
+        .badge.bg-secondary {
+            background-color: var(--bg-elevated) !important;
+        }
+
+        /* Card header */
+        .card-header {
+            background-color: var(--bg-tertiary);
+            border-bottom-color: var(--border-primary);
+            color: var(--text-primary);
+        }
+
+        /* Pagination */
+        .page-link {
+            background-color: var(--bg-secondary);
+            border-color: var(--border-primary);
+            color: var(--text-primary);
+        }
+
+        .page-link:hover {
+            background-color: var(--bg-tertiary);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .page-item.active .page-link {
+            background-color: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .page-item.disabled .page-link {
+            background-color: var(--bg-tertiary);
+            border-color: var(--border-primary);
+            color: var(--text-muted);
+        }
+
+        /* Nav tabs */
+        .nav-tabs {
+            border-bottom-color: var(--border-primary);
+        }
+
+        .nav-tabs .nav-link {
+            color: var(--text-secondary);
+            border-color: transparent;
+        }
+
+        .nav-tabs .nav-link:hover {
+            border-color: var(--border-primary);
+            color: var(--accent-primary);
+        }
+
+        .nav-tabs .nav-link.active {
+            background-color: var(--bg-secondary);
+            border-color: var(--border-primary) var(--border-primary) var(--bg-secondary);
+            color: var(--accent-primary);
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-primary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-secondary);
         }
 
         /* Mobile responsive styles */
@@ -826,6 +1108,31 @@
                 document.querySelector('[onclick*="purchasingSection"]').classList.add('open');
             }
 
+            // Highlight the current page in the sidebar
+            const sidebarLinks = document.querySelectorAll('.sidebar-nav a:not(.nav-section-toggle)');
+            sidebarLinks.forEach(link => {
+                const href = link.getAttribute('href');
+                if (!href || href === '#') return;
+
+                // Normalize paths for comparison
+                const linkPath = href.startsWith('/') ? href : '/inventory/' + href;
+                const normalizedCurrent = currentPath.replace(/\/$/, '');
+                const normalizedLink = linkPath.replace(/\/$/, '');
+
+                // Check if current path matches - use exact match or next segment check
+                // to avoid /inventory/count matching /inventory/count/history
+                if (normalizedCurrent === normalizedLink) {
+                    link.classList.add('active');
+                } else if (linkPath !== '/inventory/dashboard' && linkPath !== '/portal/') {
+                    // For partial matches, ensure the next char after linkPath is a / or end
+                    // This prevents /count from matching /count/history
+                    if (currentPath.startsWith(normalizedLink + '/') ||
+                        currentPath.startsWith(normalizedLink + '?')) {
+                        link.classList.add('active');
+                    }
+                }
+            });
+
             // Close sidebar when clicking on a link (mobile only)
             // But NOT when clicking on section toggle links
             if (window.innerWidth <= 768) {
@@ -841,33 +1148,110 @@
             }
         });
 
-        // Auto-logout after 30 minutes of inactivity
+        // Auto-logout after 30 minutes of inactivity AND token refresh for active users
         (function() {
             let inactivityTimeout;
+            let tokenRefreshInterval;
             const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes in milliseconds
+            const TOKEN_REFRESH_INTERVAL = 20 * 60 * 1000; // 20 minutes - refresh before 30min expiry
+            let lastActivity = Date.now();
+            let lastActivityReset = 0; // Throttle activity resets to once per second
 
-            function resetInactivityTimer() {
-                clearTimeout(inactivityTimeout);
-                inactivityTimeout = setTimeout(function() {
-                    // Log out the user
-                    // Clear credentials first
-                    localStorage.removeItem('access_token');
-                    localStorage.removeItem('user_name');
-                    localStorage.removeItem('user_role');
-                    window.location.href = '/login';
-                }, INACTIVITY_LIMIT);
+            function logoutUser() {
+                console.log('Logging out due to inactivity');
+                // Clear credentials
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('user');
+                localStorage.removeItem('user_name');
+                localStorage.removeItem('user_role');
+                // Redirect to portal login
+                const redirectUrl = encodeURIComponent(window.location.href);
+                window.location.replace('/portal/login?redirect=' + redirectUrl);
             }
 
-            // Events that indicate user activity
-            const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+            function resetInactivityTimer() {
+                // Throttle: only reset once per second to avoid excessive timer resets
+                const now = Date.now();
+                if (now - lastActivityReset < 1000) return;
+                lastActivityReset = now;
+
+                lastActivity = now;
+                clearTimeout(inactivityTimeout);
+                inactivityTimeout = setTimeout(logoutUser, INACTIVITY_LIMIT);
+            }
+
+            async function refreshToken() {
+                // Only refresh if user has been active in the last 20 minutes
+                const timeSinceActivity = Date.now() - lastActivity;
+                if (timeSinceActivity > TOKEN_REFRESH_INTERVAL) {
+                    // User has been inactive, don't refresh - let inactivity timeout handle logout
+                    return;
+                }
+
+                const token = localStorage.getItem('access_token');
+                if (!token) return;
+
+                try {
+                    const response = await fetch('api/auth/refresh-token', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        localStorage.setItem('access_token', data.access_token);
+                        console.log('Token refreshed successfully');
+                    } else if (response.status === 401) {
+                        // Token is invalid/expired - logout
+                        logoutUser();
+                    }
+                } catch (error) {
+                    console.error('Error refreshing token:', error);
+                }
+            }
+
+            // Events that indicate INTENTIONAL user activity (not passive like mousemove)
+            // mousedown/click = clicking, keypress/keydown = typing, scroll = scrolling, touchstart = mobile tap
+            const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
 
             // Reset timer on any user activity
             activityEvents.forEach(function(eventName) {
                 document.addEventListener(eventName, resetInactivityTimer, true);
             });
 
-            // Start the timer when page loads
+            // Start the inactivity timer when page loads
             resetInactivityTimer();
+            console.log('Inactivity timer started: will logout after 30 minutes of no clicks/typing/scrolling');
+
+            // Start token refresh interval (every 20 minutes)
+            // This ensures active users always have a valid token
+            tokenRefreshInterval = setInterval(refreshToken, TOKEN_REFRESH_INTERVAL);
+
+            // Also refresh token on visibility change (when user returns to tab)
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'visible') {
+                    // User returned to tab - check if they've been away too long
+                    const timeSinceActivity = Date.now() - lastActivity;
+                    if (timeSinceActivity >= INACTIVITY_LIMIT) {
+                        // They were away for 30+ minutes - logout
+                        logoutUser();
+                    } else if (timeSinceActivity < TOKEN_REFRESH_INTERVAL) {
+                        // Active recently - refresh token
+                        refreshToken();
+                    }
+                }
+            });
+
+            // Also check on page focus (handles minimized windows)
+            window.addEventListener('focus', function() {
+                const timeSinceActivity = Date.now() - lastActivity;
+                if (timeSinceActivity >= INACTIVITY_LIMIT) {
+                    logoutUser();
+                }
+            });
         })();
 
         // Custom confirm function to replace browser confirm()

@@ -52,6 +52,7 @@ services:
     - DATABASE_URL=postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db
     - REDIS_URL=redis://inventory-redis:6379
     - DEBUG=true
+    - SECRET_KEY=your-super-secret-key-change-in-production-galveston34
     - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
     depends_on:
       inventory-db:
@@ -244,6 +245,7 @@ services:
     - TZ=America/New_York
     - DATABASE_URL=postgresql://events_user:events_pass@events-db:5432/events_db
     - REDIS_URL=redis://events-redis:6379/0
+    - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
     depends_on:
       events-db:
         condition: service_healthy
@@ -308,6 +310,7 @@ services:
     - restaurant-network
     environment:
     - TZ=America/New_York
+    - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
   onlyoffice:
     image: onlyoffice/documentserver:latest
     container_name: onlyoffice-documentserver

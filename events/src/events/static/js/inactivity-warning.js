@@ -103,7 +103,10 @@
     }
 
     function setupActivityTracking() {
-        const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+        // Only track INTENTIONAL user activity (not passive like mousemove)
+        // mousemove was removed because it fires constantly with any mouse movement
+        // preventing proper inactivity detection
+        const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
         events.forEach(function(event) {
             document.addEventListener(event, function() { resetActivity(false); }, { passive: true });
         });

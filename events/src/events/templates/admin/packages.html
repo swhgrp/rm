@@ -166,15 +166,15 @@
 }
 
 .settings-table {
-    background: #161b22;
-    border: 1px solid #30363d;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
     border-radius: 6px;
     overflow: hidden;
 }
 
 .package-card {
-    background: #161b22;
-    border: 1px solid #30363d;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
     border-radius: 6px;
     padding: 1.5rem;
     margin-bottom: 1rem;
@@ -182,7 +182,7 @@
 }
 
 .package-card:hover {
-    border-color: #58a6ff;
+    border-color: var(--accent-primary);
 }
 
 .package-header {
@@ -195,12 +195,12 @@
 .package-title {
     font-size: 1.25rem;
     font-weight: 600;
-    color: #c9d1d9;
+    color: var(--text-primary);
     margin-bottom: 0.25rem;
 }
 
 .package-type {
-    color: #8b949e;
+    color: var(--text-muted);
     font-size: 0.875rem;
 }
 
@@ -218,13 +218,13 @@
 
 .pricing-item {
     padding: 0.75rem;
-    background: #0d1117;
+    background: var(--bg-tertiary);
     border-radius: 4px;
 }
 
 .pricing-label {
     font-size: 0.75rem;
-    color: #8b949e;
+    color: var(--text-muted);
     text-transform: uppercase;
     margin-bottom: 0.25rem;
 }
@@ -232,7 +232,7 @@
 .pricing-value {
     font-size: 1.125rem;
     font-weight: 600;
-    color: #58a6ff;
+    color: var(--accent-primary);
 }
 
 .pricing-type-badge {
@@ -244,14 +244,14 @@
     margin-left: 8px;
 }
 
-.pricing-type-per_person { background: #238636; color: #fff; }
-.pricing-type-per_piece { background: #1f6feb; color: #fff; }
-.pricing-type-flat_rate { background: #8957e5; color: #fff; }
-.pricing-type-hourly { background: #f0883e; color: #fff; }
+.pricing-type-per_person { background: #43A047; color: #fff; }
+.pricing-type-per_piece { background: #1E88E5; color: #fff; }
+.pricing-type-flat_rate { background: #5E35B1; color: #fff; }
+.pricing-type-hourly { background: #FB8C00; color: #fff; }
 
 .section-header {
-    color: #c9d1d9;
-    border-bottom: 1px solid #30363d;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--border-primary);
     padding-bottom: 0.5rem;
     margin-bottom: 1rem;
     display: flex;
@@ -260,8 +260,8 @@
 }
 
 .service-req-item, .addon-item {
-    background: #0d1117;
-    border: 1px solid #30363d;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
     border-radius: 6px;
     padding: 1rem;
     margin-bottom: 0.75rem;
@@ -279,18 +279,18 @@
     align-items: center;
     gap: 4px;
     padding: 4px 10px;
-    background: #21262d;
-    border: 1px solid #30363d;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
     border-radius: 16px;
     font-size: 0.75rem;
-    color: #8b949e;
+    color: var(--text-secondary);
 }
 
 .extra-badge i {
-    color: #58a6ff;
+    color: var(--accent-primary);
 }
 
-/* Custom Input Groups for dark theme */
+/* Custom Input Groups for light theme */
 .input-group-custom {
     display: flex;
     align-items: stretch;
@@ -301,9 +301,9 @@
     display: flex;
     align-items: center;
     padding: 0 12px;
-    background-color: #21262d;
-    border: 1px solid #30363d;
-    color: #8b949e;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    color: var(--text-secondary);
     font-size: 14px;
     white-space: nowrap;
 }

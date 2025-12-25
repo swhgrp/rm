@@ -115,6 +115,7 @@ class User(Base):
     can_access_events = Column(Boolean, default=True)
     can_access_files = Column(Boolean, default=True)
     can_access_websites = Column(Boolean, default=True)
+    can_access_mail = Column(Boolean, default=False)
     accounting_role_id = Column(Integer, nullable=True)
 
 
@@ -261,6 +262,16 @@ async def home(request: Request, db: Session = Depends(get_db)):
             "system_key": "websites"
         })
         logger.info(f"Added Websites to systems list for user {user.username}")
+
+    # Mail Server (Mailcow) - permission based
+    if getattr(user, 'can_access_mail', False) or user.is_admin:
+        systems.append({
+            "name": "Mail Server",
+            "description": "Email administration, mailboxes, and webmail access",
+            "url": "https://mail.swhgrp.com/",
+            "icon": "📧",
+            "system_key": "mail"
+        })
 
     # Admin-only: Monitoring Dashboard
     if user.is_admin:
@@ -457,6 +468,8 @@ async def update_user_permissions(
         user.can_access_files = form_data.get("can_access_files") == "on"
         if hasattr(user, 'can_access_websites'):
             user.can_access_websites = form_data.get("can_access_websites") == "on"
+        if hasattr(user, 'can_access_mail'):
+            user.can_access_mail = form_data.get("can_access_mail") == "on"
     else:
         # Admins get full access to everything
         user.can_access_portal = True
@@ -468,6 +481,8 @@ async def update_user_permissions(
         user.can_access_files = True
         if hasattr(user, 'can_access_websites'):
             user.can_access_websites = True
+        if hasattr(user, 'can_access_mail'):
+            user.can_access_mail = True
 
     # Update accounting role if provided
     accounting_role = form_data.get("accounting_role_id")
@@ -519,6 +534,59 @@ async def generate_system_token(
     token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
 
     return {"token": token}
+
+
+@app.get("/api/keepalive")
+async def keepalive(request: Request, response: Response, db: Session = Depends(get_db)):
+    """
+    Keep the Portal session alive and return remaining time.
+    Sub-systems (Inventory, Integration Hub, etc.) should ping this endpoint
+    periodically to prevent session timeout during cross-system navigation.
+    """
+    user = get_current_user(request, db)
+    if not user:
+        raise HTTPException(status_code=401, detail="Session expired")
+
+    # Get current token expiration
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    remaining_seconds = 0
+
+    if token:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            exp = payload.get("exp", 0)
+            remaining_seconds = max(0, int(exp - datetime.now(timezone.utc).timestamp()))
+        except jwt.PyJWTError:
+            pass
+
+    # Issue a fresh token to extend the session
+    new_token = create_access_token(data={
+        "sub": user.username,
+        "email": user.email,
+        "full_name": user.full_name,
+        "user_id": user.id,
+        "is_admin": user.is_admin
+    })
+
+    # Update the cookie with the new token
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=new_token,
+        httponly=True,
+        max_age=SESSION_EXPIRE_MINUTES * 60,
+        path="/",
+        samesite="lax",
+        secure=False
+    )
+
+    logger.info(f"Session keepalive for user {user.username} (had {remaining_seconds}s remaining, refreshed to {SESSION_EXPIRE_MINUTES * 60}s)")
+
+    return {
+        "status": "ok",
+        "user": user.username,
+        "session_extended": True,
+        "expires_in_seconds": SESSION_EXPIRE_MINUTES * 60
+    }
 
 
 @app.get("/profile", response_class=HTMLResponse)

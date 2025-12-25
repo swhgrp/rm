@@ -5,30 +5,32 @@
 
 {% block extra_head %}
 <style>
+    /* Slate Blue Light Theme - Reports */
     .tabs {
         display: flex;
         gap: 0;
-        border-bottom: 2px solid #30363d;
+        border-bottom: 2px solid var(--border-primary);
         margin-bottom: 1.5rem;
     }
     .tab {
         padding: 1rem 1.5rem;
-        background: #161b22;
+        background: var(--bg-tertiary);
         border: none;
         cursor: pointer;
         font-size: 1rem;
-        color: #8b949e;
+        color: var(--text-secondary);
         border-bottom: 3px solid transparent;
         transition: all 0.2s;
     }
     .tab:hover {
-        background: #21262d;
-        color: #c9d1d9;
+        background: var(--bg-elevated);
+        color: var(--text-primary);
     }
     .tab.active {
-        border-bottom-color: #58a6ff;
-        color: #c9d1d9;
+        border-bottom-color: var(--accent-primary);
+        color: var(--text-primary);
         font-weight: 500;
+        background: var(--bg-secondary);
     }
     .tab-content {
         display: none;
@@ -37,15 +39,16 @@
         display: block;
     }
     .filters {
-        background: #161b22;
+        background: var(--bg-secondary);
         padding: 1rem;
         border-radius: 4px;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         margin-bottom: 1rem;
         display: flex;
         gap: 1rem;
         align-items: end;
         flex-wrap: wrap;
+        box-shadow: var(--shadow-sm);
     }
     .form-group {
         display: flex;
@@ -55,29 +58,34 @@
     .form-group label {
         font-size: 0.85rem;
         font-weight: 500;
-        color: #c9d1d9;
+        color: var(--text-primary);
     }
     .form-group input, .form-group select {
         padding: 0.5rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
         border-radius: 4px;
         font-size: 0.9rem;
-        background: #0d1117;
-        color: #c9d1d9;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+    }
+    .form-group input:focus, .form-group select:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 3px rgba(69, 90, 100, 0.15);
     }
     .report-header {
         text-align: center;
         margin-bottom: 2rem;
         padding-bottom: 1rem;
-        border-bottom: 2px solid #30363d;
+        border-bottom: 2px solid var(--border-primary);
     }
     .report-header h2 {
-        color: #c9d1d9;
+        color: var(--text-primary);
         font-size: 1.75rem;
         margin-bottom: 0.5rem;
     }
     .report-header .subtitle {
-        color: #8b949e;
+        color: var(--text-secondary);
         font-size: 1rem;
     }
     .report-table {
@@ -86,35 +94,36 @@
         margin-bottom: 1.5rem;
     }
     .report-table th {
-        background: #21262d;
-        color: #c9d1d9;
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
         text-align: left;
         padding: 0.75rem;
         font-weight: 600;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
     }
     .report-table td {
         padding: 0.75rem;
-        border-bottom: 1px solid #30363d;
+        border-bottom: 1px solid var(--border-primary);
+        color: var(--text-primary);
     }
     .report-table tr:hover {
-        background: #161b22;
+        background: #CFD8DC;
     }
     .report-table .number {
         text-align: right;
         font-family: 'Courier New', monospace;
     }
     .report-table .total-row {
-        background: #21262d;
+        background: var(--bg-tertiary);
         font-weight: 600;
-        border-top: 2px solid #30363d;
+        border-top: 2px solid var(--border-primary);
     }
     .report-table .balance-check {
-        background: #238636;
+        background: #43A047;
         color: white;
     }
     .report-table .balance-check.unbalanced {
-        background: #da3633;
+        background: #E53935;
         color: white;
     }
     .report-actions {
@@ -126,24 +135,24 @@
     .loading {
         text-align: center;
         padding: 2rem;
-        color: #8b949e;
+        color: var(--text-secondary);
     }
     .no-data {
         text-align: center;
         padding: 3rem;
-        color: #8b949e;
+        color: var(--text-secondary);
         font-size: 1.1rem;
     }
     .account-type-group {
         margin-top: 1.5rem;
     }
     .account-type-header {
-        background: #21262d;
-        color: #c9d1d9;
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
         padding: 0.5rem 0.75rem;
         font-weight: 600;
         font-size: 0.95rem;
-        border: 1px solid #30363d;
+        border: 1px solid var(--border-primary);
     }
     .gl-transaction {
         font-size: 0.9rem;
@@ -170,10 +179,10 @@
         font-weight: 600;
     }
     .account-summary-total {
-        background: #21262d;
+        background: var(--bg-tertiary);
         font-weight: 600;
-        border-top: 1px solid #30363d;
-        border-bottom: 2px solid #30363d;
+        border-top: 1px solid var(--border-primary);
+        border-bottom: 2px solid var(--border-primary);
     }
 </style>
 {% endblock %}
@@ -181,7 +190,7 @@
 {% block content %}
 <div class="card">
     <h2>📊 Financial Reports</h2>
-    <p style="color: #8b949e; margin-bottom: 1.5rem;">Generate and view accounting reports</p>
+    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Generate and view accounting reports</p>
 
     <!-- Report Tabs -->
     <div class="tabs">
@@ -1453,7 +1462,7 @@
                     <tr>
                         <td>
                             ${vendor.vendor_name}
-                            ${vendor.vendor_id ? `<br><span style="font-size: 0.85rem; color: #8b949e;">${vendor.vendor_id}</span>` : ''}
+                            ${vendor.vendor_id ? `<br><span style="font-size: 0.85rem; color: var(--text-secondary);">${vendor.vendor_id}</span>` : ''}
                         </td>
                         <td class="number">${formatCurrency(vendor.current)}</td>
                         <td class="number">${formatCurrency(vendor.days_31_60)}</td>
@@ -1486,24 +1495,24 @@
                 const aging90PlusPercent = (parseFloat(data.totals.over_90_days) / parseFloat(data.totals.total) * 100).toFixed(1);
 
                 html += `
-                    <div style="margin-top: 2rem; padding: 1rem; background: #161b22; border-radius: 6px; border: 1px solid #30363d;">
-                        <h3 style="color: #c9d1d9; margin-bottom: 1rem;">Aging Analysis</h3>
+                    <div style="margin-top: 2rem; padding: 1rem; background: var(--bg-secondary); border-radius: 6px; border: 1px solid var(--border-primary); box-shadow: var(--shadow-sm);">
+                        <h3 style="color: var(--text-primary); margin-bottom: 1rem;">Aging Analysis</h3>
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
                             <div>
-                                <div style="color: #8b949e; font-size: 0.85rem;">Current (0-30 days)</div>
-                                <div style="color: #2ea043; font-size: 1.25rem; font-weight: 600;">${currentPercent}%</div>
+                                <div style="color: var(--text-secondary); font-size: 0.85rem;">Current (0-30 days)</div>
+                                <div style="color: #43A047; font-size: 1.25rem; font-weight: 600;">${currentPercent}%</div>
                             </div>
                             <div>
-                                <div style="color: #8b949e; font-size: 0.85rem;">31-60 days</div>
-                                <div style="color: #9e6a03; font-size: 1.25rem; font-weight: 600;">${aging3160Percent}%</div>
+                                <div style="color: var(--text-secondary); font-size: 0.85rem;">31-60 days</div>
+                                <div style="color: #FB8C00; font-size: 1.25rem; font-weight: 600;">${aging3160Percent}%</div>
                             </div>
                             <div>
-                                <div style="color: #8b949e; font-size: 0.85rem;">61-90 days</div>
-                                <div style="color: #f85149; font-size: 1.25rem; font-weight: 600;">${aging6190Percent}%</div>
+                                <div style="color: var(--text-secondary); font-size: 0.85rem;">61-90 days</div>
+                                <div style="color: #E53935; font-size: 1.25rem; font-weight: 600;">${aging6190Percent}%</div>
                             </div>
                             <div>
-                                <div style="color: #8b949e; font-size: 0.85rem;">Over 90 days</div>
-                                <div style="color: #da3633; font-size: 1.25rem; font-weight: 600;">${aging90PlusPercent}%</div>
+                                <div style="color: var(--text-secondary); font-size: 0.85rem;">Over 90 days</div>
+                                <div style="color: #C62828; font-size: 1.25rem; font-weight: 600;">${aging90PlusPercent}%</div>
                             </div>
                         </div>
                     </div>
@@ -1838,8 +1847,8 @@
             </div>
 
             <!-- Account Summary -->
-            <div style="background: #161b22; border: 1px solid #30363d; border-radius: 4px; padding: 1rem; margin-bottom: 1.5rem;">
-                <h3 style="margin-top: 0; color: #58a6ff;">Account Summary</h3>
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 4px; padding: 1rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
+                <h3 style="margin-top: 0; color: var(--accent-primary);">Account Summary</h3>
                 <table style="width: 100%;">
                     <tr>
                         <td style="padding: 0.5rem 0; font-weight: 600;">Beginning Balance:</td>
@@ -1853,16 +1862,16 @@
                         <td style="padding: 0.5rem 0; font-weight: 600;">Payments This Period:</td>
                         <td style="text-align: right;">${formatCurrency(Math.abs(Math.min(0, balances.change)))}</td>
                     </tr>
-                    <tr style="border-top: 2px solid #30363d;">
+                    <tr style="border-top: 2px solid var(--border-primary);">
                         <td style="padding: 0.5rem 0; font-weight: bold; font-size: 1.1rem;">Current Balance:</td>
-                        <td style="text-align: right; font-weight: bold; font-size: 1.1rem; color: ${balances.ending_balance > 0 ? '#f85149' : '#3fb950'};">${formatCurrency(balances.ending_balance)}</td>
+                        <td style="text-align: right; font-weight: bold; font-size: 1.1rem; color: ${balances.ending_balance > 0 ? '#E53935' : '#43A047'};">${formatCurrency(balances.ending_balance)}</td>
                     </tr>
                 </table>
             </div>
 
             <!-- Aging Summary -->
-            <div style="background: #161b22; border: 1px solid #30363d; border-radius: 4px; padding: 1rem; margin-bottom: 1.5rem;">
-                <h3 style="margin-top: 0; color: #58a6ff;">Aging Summary</h3>
+            <div style="background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 4px; padding: 1rem; margin-bottom: 1.5rem; box-shadow: var(--shadow-sm);">
+                <h3 style="margin-top: 0; color: var(--accent-primary);">Aging Summary</h3>
                 <table class="report-table">
                     <thead>
                         <tr>
@@ -1878,7 +1887,7 @@
                             <td style="text-align: right;">${formatCurrency(aging.current)}</td>
                             <td style="text-align: right;">${formatCurrency(aging.days_31_60)}</td>
                             <td style="text-align: right;">${formatCurrency(aging.days_61_90)}</td>
-                            <td style="text-align: right; ${aging.over_90 > 0 ? 'color: #f85149; font-weight: 600;' : ''}">${formatCurrency(aging.over_90)}</td>
+                            <td style="text-align: right; ${aging.over_90 > 0 ? 'color: #E53935; font-weight: 600;' : ''}">${formatCurrency(aging.over_90)}</td>
                             <td style="text-align: right; font-weight: bold;">${formatCurrency(aging.total)}</td>
                         </tr>
                     </tbody>
@@ -1888,7 +1897,7 @@
             <!-- Transaction Detail -->
             ${transactions.length > 0 ? `
             <div>
-                <h3 style="color: #58a6ff;">Transaction Detail</h3>
+                <h3 style="color: var(--accent-primary);">Transaction Detail</h3>
                 <table class="report-table">
                     <thead>
                         <tr>
@@ -1907,14 +1916,14 @@
                                 <td><span class="badge bg-${t.type === 'Invoice' ? 'primary' : 'success'}">${t.type}</span></td>
                                 <td>${t.reference}</td>
                                 <td>${t.description}</td>
-                                <td style="text-align: right; ${t.amount < 0 ? 'color: #3fb950;' : ''}">${formatCurrency(t.amount)}</td>
+                                <td style="text-align: right; ${t.amount < 0 ? 'color: #43A047;' : ''}">${formatCurrency(t.amount)}</td>
                                 <td style="text-align: right;">${t.balance !== null ? formatCurrency(t.balance) : '-'}</td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
             </div>
-            ` : '<p style="color: #8b949e; text-align: center; padding: 2rem;">No transactions found for this period.</p>'}
+            ` : '<p style="color: var(--text-secondary); text-align: center; padding: 2rem;">No transactions found for this period.</p>'}
         `;
 
         report.innerHTML = html;
