@@ -592,6 +592,11 @@ restaurant-system/
 
 **Critical Correction:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
+**Source of Truth Architecture (Dec 2025):**
+- **Integration Hub owns:** Invoices, Vendor Items, Vendors (with alias normalization), GL Mappings
+- **Inventory owns:** Master Items, Categories, Units of Measure, Storage Areas, Counts
+- Hub fetches category/unit data from Inventory via PostgreSQL dblink
+
 **🚀 NEW: Major Workflow Improvements (Nov 8, 2025):**
 - ✅ **Bulk mapping by description** - Map once, apply to ALL occurrences (10x faster)
 - ✅ **Unique item grouping** - Unmapped items page shows frequency & affected invoices
