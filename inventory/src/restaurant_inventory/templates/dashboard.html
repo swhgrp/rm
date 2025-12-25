@@ -30,37 +30,41 @@
     </div>
 
     <div class="col-md-3">
-        <div class="card bg-warning text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="mb-1">COGS</h6>
-                        <h3 id="totalCOGS">$0.00</h3>
-                        <small>Last 7 Days</small>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-receipt fs-1"></i>
+        <a href="/hub/dashboard" class="text-decoration-none">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-1">COGS <i class="bi bi-box-arrow-up-right" style="font-size: 0.7em;"></i></h6>
+                            <h3 id="totalCOGS">View in Hub</h3>
+                            <small>Invoice data in Hub</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-receipt fs-1"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
 
     <div class="col-md-3">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="mb-1">Gross Margin</h6>
-                        <h3 id="grossMargin">0%</h3>
-                        <small>Profit Percentage</small>
-                    </div>
-                    <div class="align-self-center">
-                        <i class="bi bi-graph-up fs-1"></i>
+        <a href="/hub/dashboard" class="text-decoration-none">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between">
+                        <div>
+                            <h6 class="mb-1">Gross Margin <i class="bi bi-box-arrow-up-right" style="font-size: 0.7em;"></i></h6>
+                            <h3 id="grossMargin">View in Hub</h3>
+                            <small>Requires COGS data</small>
+                        </div>
+                        <div class="align-self-center">
+                            <i class="bi bi-graph-up fs-1"></i>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </a>
     </div>
 
     <div class="col-md-3">
@@ -116,17 +120,22 @@
         </div>
     </div>
 
-    <!-- Recent Invoices -->
+    <!-- Recent Invoices - Now in Hub -->
     <div class="col-md-6">
         <div class="card">
-            <div class="card-header">
-                <h5><i class="bi bi-file-earmark-text"></i> Recent Invoices</h5>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-file-earmark-text"></i> Recent Invoices</h5>
+                <a href="/hub/invoices" class="btn btn-sm btn-outline-primary">
+                    View in Hub <i class="bi bi-box-arrow-up-right"></i>
+                </a>
             </div>
             <div class="card-body">
-                <div id="recentInvoicesList">
-                    <div class="text-center text-muted py-3">
-                        <div class="spinner-border spinner-border-sm"></div> Loading...
-                    </div>
+                <div class="text-center py-4">
+                    <i class="bi bi-receipt fs-1 text-muted"></i>
+                    <p class="text-muted mt-2 mb-3">Invoice management has moved to the Integration Hub</p>
+                    <a href="/hub/invoices" class="btn btn-primary">
+                        <i class="bi bi-box-arrow-up-right"></i> Go to Hub Invoices
+                    </a>
                 </div>
             </div>
         </div>
@@ -208,8 +217,10 @@ async function loadDashboardData() {
 
         // Update KPIs
         document.getElementById('totalSales').textContent = '$' + data.kpis.total_sales.toFixed(2);
-        document.getElementById('totalCOGS').textContent = '$' + data.kpis.total_cogs.toFixed(2);
-        document.getElementById('grossMargin').textContent = data.kpis.gross_margin.toFixed(1) + '%';
+        // COGS card now shows link to Hub, not dynamic value
+        // document.getElementById('totalCOGS').textContent = '$' + data.kpis.total_cogs.toFixed(2);
+        // Gross margin needs COGS from Hub, so show N/A
+        document.getElementById('grossMargin').textContent = 'N/A';
         document.getElementById('inventoryValue').textContent = '$' + data.kpis.inventory_value.toFixed(2);
 
         // Update Week-over-Week badge
@@ -233,8 +244,8 @@ async function loadDashboardData() {
         // Render Top Items
         renderTopItems(data.top_items);
 
-        // Render Recent Invoices
-        renderRecentInvoices(data.recent_invoices);
+        // Note: Recent Invoices section now shows static link to Hub
+        // renderRecentInvoices(data.recent_invoices);
 
         // Render Recent Transfers
         renderRecentTransfers(data.recent_transfers);

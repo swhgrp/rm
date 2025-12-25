@@ -10,11 +10,11 @@ from sqlalchemy import func
 
 from restaurant_inventory.core.deps import get_db, get_current_user
 from restaurant_inventory.models.vendor import Vendor
-from restaurant_inventory.models.vendor_alias import VendorAlias
-from restaurant_inventory.models.vendor_item import VendorItem
-from restaurant_inventory.models.invoice import Invoice
 from restaurant_inventory.models.user import User
 from restaurant_inventory.core.audit import log_audit_event, create_change_dict
+
+# REMOVED (Dec 25, 2025): VendorItem, VendorAlias, Invoice - Hub is source of truth
+# Vendor aliases are now managed in Hub
 
 router = APIRouter()
 
@@ -298,19 +298,9 @@ async def delete_vendor(
             detail="Vendor not found"
         )
 
-    # Check for related invoices
-    invoice_count = db.query(Invoice).filter(Invoice.vendor_id == vendor_id).count()
-    if invoice_count > 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot delete vendor '{vendor.name}': {invoice_count} invoice(s) are associated with this vendor. Please reassign or delete the invoices first."
-        )
-
-    # Check for related vendor items (informational - they will cascade delete)
-    vendor_item_count = db.query(VendorItem).filter(VendorItem.vendor_id == vendor_id).count()
-
-    # Count aliases that will be deleted
-    alias_count = db.query(VendorAlias).filter(VendorAlias.vendor_id == vendor_id).count()
+    # NOTE: Invoices, vendor items, and aliases are now in Hub (source of truth)
+    # Deleting a vendor here only removes the local vendor record
+    # The Hub should be notified separately if vendor data needs cleanup there
 
     # Log before deletion
     log_audit_event(
@@ -322,62 +312,37 @@ async def delete_vendor(
         changes={"old": {
             "name": vendor.name,
             "contact_name": vendor.contact_name,
-            "email": vendor.email,
-            "vendor_items_deleted": vendor_item_count,
-            "aliases_deleted": alias_count
+            "email": vendor.email
         }},
         request=request
     )
 
-    # Delete aliases first to avoid SQLAlchemy relationship issues
-    db.query(VendorAlias).filter(VendorAlias.vendor_id == vendor_id).delete()
-
     db.delete(vendor)
     db.commit()
 
-    return {"message": f"Vendor deleted successfully. {vendor_item_count} vendor item(s) were also removed."}
+    return {"message": f"Vendor '{vendor.name}' deleted successfully. Note: Related data in Integration Hub should be cleaned up separately."}
 
 
 # ============================================================================
-# VENDOR ALIAS ENDPOINTS
+# VENDOR ALIAS ENDPOINTS - DEPRECATED
+# Vendor aliases are now managed in Integration Hub (source of truth)
+# These endpoints remain for backward compatibility but redirect to Hub
 # ============================================================================
-
-class AliasCreate(BaseModel):
-    alias_name: str
-    case_insensitive: bool = True
-
-
-class AliasResponse(BaseModel):
-    id: int
-    alias_name: str
-    vendor_id: int
-    case_insensitive: bool
-    created_at: Optional[str] = None
-
-    class Config:
-        from_attributes = True
-
 
 @router.get("/aliases/all")
 async def get_all_aliases(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all vendor aliases system-wide"""
-    aliases = db.query(VendorAlias).join(Vendor).order_by(Vendor.name, VendorAlias.alias_name).all()
-
-    result = []
-    for alias in aliases:
-        result.append({
-            "id": alias.id,
-            "alias_name": alias.alias_name,
-            "vendor_id": alias.vendor_id,
-            "canonical_name": alias.vendor.name,
-            "case_insensitive": alias.case_insensitive,
-            "created_at": alias.created_at.isoformat() if alias.created_at else None
-        })
-
-    return result
+    """
+    Get all vendor aliases system-wide.
+    DEPRECATED: Vendor aliases are now managed in Integration Hub.
+    """
+    return {
+        "message": "Vendor aliases have been moved to Integration Hub",
+        "redirect": "/hub/vendors",
+        "aliases": []
+    }
 
 
 @router.get("/{vendor_id}/aliases")
@@ -386,7 +351,10 @@ async def get_vendor_aliases(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get all aliases for a specific vendor"""
+    """
+    Get all aliases for a specific vendor.
+    DEPRECATED: Vendor aliases are now managed in Integration Hub.
+    """
     vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
     if not vendor:
         raise HTTPException(
@@ -394,85 +362,30 @@ async def get_vendor_aliases(
             detail="Vendor not found"
         )
 
-    aliases = db.query(VendorAlias).filter(VendorAlias.vendor_id == vendor_id).order_by(VendorAlias.alias_name).all()
-
     return {
         "vendor_id": vendor_id,
         "vendor_name": vendor.name,
-        "aliases": [
-            {
-                "id": a.id,
-                "alias_name": a.alias_name,
-                "case_insensitive": a.case_insensitive,
-                "created_at": a.created_at.isoformat() if a.created_at else None
-            }
-            for a in aliases
-        ]
+        "message": "Vendor aliases have been moved to Integration Hub",
+        "redirect": "/hub/vendors",
+        "aliases": []
     }
 
 
 @router.post("/{vendor_id}/aliases")
 async def add_vendor_alias(
     vendor_id: int,
-    alias_data: AliasCreate,
     request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Add an alias for a vendor"""
-    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
-    if not vendor:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vendor not found"
-        )
-
-    # Check if alias already exists
-    alias_name = alias_data.alias_name.strip()
-    if not alias_name:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Alias name cannot be empty"
-        )
-
-    existing = db.query(VendorAlias).filter(VendorAlias.alias_name == alias_name).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Alias '{alias_name}' already exists for vendor ID {existing.vendor_id}"
-        )
-
-    # Create alias
-    alias = VendorAlias(
-        alias_name=alias_name,
-        vendor_id=vendor_id,
-        case_insensitive=alias_data.case_insensitive,
-        created_by=current_user.id
+    """
+    Add an alias for a vendor.
+    DEPRECATED: Vendor aliases are now managed in Integration Hub.
+    """
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Vendor aliases are now managed in Integration Hub. Please use the Hub interface."
     )
-    db.add(alias)
-    db.commit()
-    db.refresh(alias)
-
-    # Log audit event
-    log_audit_event(
-        db=db,
-        action="CREATE",
-        entity_type="vendor_alias",
-        entity_id=alias.id,
-        user=current_user,
-        changes={"new": {"alias_name": alias_name, "vendor_id": vendor_id}},
-        request=request
-    )
-
-    return {
-        "success": True,
-        "alias": {
-            "id": alias.id,
-            "alias_name": alias.alias_name,
-            "vendor_id": alias.vendor_id,
-            "case_insensitive": alias.case_insensitive
-        }
-    }
 
 
 @router.delete("/{vendor_id}/aliases/{alias_id}")
@@ -483,35 +396,14 @@ async def delete_vendor_alias(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Delete a vendor alias"""
-    alias = db.query(VendorAlias).filter(
-        VendorAlias.id == alias_id,
-        VendorAlias.vendor_id == vendor_id
-    ).first()
-
-    if not alias:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Alias not found"
-        )
-
-    alias_name = alias.alias_name
-
-    # Log before deletion
-    log_audit_event(
-        db=db,
-        action="DELETE",
-        entity_type="vendor_alias",
-        entity_id=alias_id,
-        user=current_user,
-        changes={"old": {"alias_name": alias_name, "vendor_id": vendor_id}},
-        request=request
+    """
+    Delete a vendor alias.
+    DEPRECATED: Vendor aliases are now managed in Integration Hub.
+    """
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Vendor aliases are now managed in Integration Hub. Please use the Hub interface."
     )
-
-    db.delete(alias)
-    db.commit()
-
-    return {"success": True, "message": f"Alias '{alias_name}' deleted"}
 
 
 @router.post("/resolve-name")
@@ -523,6 +415,9 @@ async def resolve_vendor_name(
     Resolve a vendor name to its canonical vendor.
     Used by Integration Hub for invoice processing.
     No authentication required - internal API.
+
+    NOTE: This endpoint still works for basic vendor name matching.
+    Alias matching is now done in Hub.
     """
     vendor_name = data.get("vendor_name", "").strip()
     if not vendor_name:
@@ -554,39 +449,5 @@ async def resolve_vendor_name(
             "matched_via_alias": False
         }
 
-    # Step 3: Exact match on alias
-    alias = db.query(VendorAlias).filter(
-        VendorAlias.alias_name == vendor_name
-    ).first()
-    if alias:
-        vendor = db.query(Vendor).filter(
-            Vendor.id == alias.vendor_id,
-            Vendor.is_active == True
-        ).first()
-        if vendor:
-            return {
-                "found": True,
-                "vendor_id": vendor.id,
-                "canonical_name": vendor.name,
-                "matched_via_alias": True
-            }
-
-    # Step 4: Case-insensitive match on alias (only if case_insensitive flag is True)
-    alias = db.query(VendorAlias).filter(
-        func.lower(VendorAlias.alias_name) == func.lower(vendor_name),
-        VendorAlias.case_insensitive == True
-    ).first()
-    if alias:
-        vendor = db.query(Vendor).filter(
-            Vendor.id == alias.vendor_id,
-            Vendor.is_active == True
-        ).first()
-        if vendor:
-            return {
-                "found": True,
-                "vendor_id": vendor.id,
-                "canonical_name": vendor.name,
-                "matched_via_alias": True
-            }
-
+    # NOTE: Alias matching removed - now handled by Hub
     return {"found": False, "vendor_id": None, "canonical_name": None}

@@ -13,11 +13,13 @@ from restaurant_inventory.core.deps import get_db, get_current_user, filter_by_u
 from restaurant_inventory.models.user import User
 from restaurant_inventory.models.count_session import CountSession, CountSessionItem, CountStatus
 from restaurant_inventory.models.inventory import Inventory
-from restaurant_inventory.models.invoice import Invoice, InvoiceItem
 from restaurant_inventory.models.vendor import Vendor
 from restaurant_inventory.models.transfer import Transfer
 from restaurant_inventory.models.item import MasterItem
 from restaurant_inventory.models.location import Location
+
+# NOTE (Dec 25, 2025): Invoice and InvoiceItem removed - Hub is source of truth
+# Invoice-based reports now disabled - use Hub for invoice reports
 
 router = APIRouter()
 
@@ -333,7 +335,7 @@ class CostVarianceItem(BaseModel):
         from_attributes = True
 
 
-@router.get("/cost-variance", response_model=List[CostVarianceItem])
+@router.get("/cost-variance")
 async def get_cost_variance_report(
     start_date: Optional[date] = Query(None, description="Start date for analysis"),
     end_date: Optional[date] = Query(None, description="End date for analysis"),
@@ -344,121 +346,16 @@ async def get_cost_variance_report(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Cost Variance Tracker - Identifies changes in product costs over time
-    Helps inform when to adjust menu prices
+    Cost Variance Tracker - DEPRECATED
+
+    Invoice data has been moved to Integration Hub.
+    Use Hub's reporting dashboard for cost variance analysis.
     """
-
-    # Build subquery to get earliest and latest invoice items for each master item
-    from sqlalchemy import case
-
-    # Get all invoice items with their dates
-    query = db.query(
-        InvoiceItem.master_item_id,
-        MasterItem.name.label('item_name'),
-        MasterItem.category,
-        Vendor.name.label('vendor_name'),
-        MasterItem.unit_of_measure.label('unit'),
-        func.min(InvoiceItem.unit_price).label('min_cost'),
-        func.max(InvoiceItem.unit_price).label('max_cost'),
-        func.count(InvoiceItem.id).label('invoice_count')
-    ).join(
-        Invoice, InvoiceItem.invoice_id == Invoice.id
-    ).join(
-        MasterItem, InvoiceItem.master_item_id == MasterItem.id
-    ).outerjoin(
-        Vendor, Invoice.vendor_id == Vendor.id
-    )
-
-    # Apply filters
-    if start_date:
-        query = query.filter(Invoice.invoice_date >= start_date)
-    if end_date:
-        query = query.filter(Invoice.invoice_date <= end_date)
-    if vendor_id:
-        query = query.filter(Invoice.vendor_id == vendor_id)
-    if category:
-        query = query.filter(MasterItem.category == category)
-
-    query = query.group_by(
-        InvoiceItem.master_item_id,
-        MasterItem.name,
-        MasterItem.category,
-        Vendor.name,
-        MasterItem.unit_of_measure
-    )
-
-    results = query.all()
-
-    # Now get earliest and latest dates for each item
-    variance_items = []
-    for r in results:
-        # Get earliest invoice item for this master item
-        earliest = db.query(
-            InvoiceItem.unit_price,
-            Invoice.invoice_date
-        ).join(
-            Invoice, InvoiceItem.invoice_id == Invoice.id
-        ).filter(
-            InvoiceItem.master_item_id == r.master_item_id
-        )
-
-        if start_date:
-            earliest = earliest.filter(Invoice.invoice_date >= start_date)
-        if end_date:
-            earliest = earliest.filter(Invoice.invoice_date <= end_date)
-        if vendor_id:
-            earliest = earliest.filter(Invoice.vendor_id == vendor_id)
-
-        earliest = earliest.order_by(Invoice.invoice_date.asc()).first()
-
-        # Get latest invoice item for this master item
-        latest = db.query(
-            InvoiceItem.unit_price,
-            Invoice.invoice_date
-        ).join(
-            Invoice, InvoiceItem.invoice_id == Invoice.id
-        ).filter(
-            InvoiceItem.master_item_id == r.master_item_id
-        )
-
-        if start_date:
-            latest = latest.filter(Invoice.invoice_date >= start_date)
-        if end_date:
-            latest = latest.filter(Invoice.invoice_date <= end_date)
-        if vendor_id:
-            latest = latest.filter(Invoice.vendor_id == vendor_id)
-
-        latest = latest.order_by(Invoice.invoice_date.desc()).first()
-
-        if earliest and latest:
-            earliest_cost = float(earliest.unit_price)
-            latest_cost = float(latest.unit_price)
-            cost_change = latest_cost - earliest_cost
-            percent_change = ((cost_change / earliest_cost) * 100) if earliest_cost != 0 else 0
-
-            # Apply min percent change filter
-            if min_percent_change is not None and abs(percent_change) < abs(min_percent_change):
-                continue
-
-            variance_items.append(CostVarianceItem(
-                item_id=r.master_item_id,
-                item_name=r.item_name,
-                category=r.category,
-                vendor_name=r.vendor_name,
-                unit=r.unit or '',
-                earliest_cost=earliest_cost,
-                earliest_date=earliest.invoice_date,
-                latest_cost=latest_cost,
-                latest_date=latest.invoice_date,
-                cost_change=cost_change,
-                percent_change=round(percent_change, 2),
-                invoice_count=r.invoice_count
-            ))
-
-    # Sort by percent change (largest changes first)
-    variance_items.sort(key=lambda x: abs(x.percent_change), reverse=True)
-
-    return variance_items
+    return {
+        "message": "This report has been moved to Integration Hub",
+        "redirect": "/hub/dashboard",
+        "reason": "Invoice data is now managed in the Integration Hub (source of truth)"
+    }
 
 
 class VendorSpendItem(BaseModel):
@@ -475,7 +372,7 @@ class VendorSpendItem(BaseModel):
         from_attributes = True
 
 
-@router.get("/vendor-spend", response_model=List[VendorSpendItem])
+@router.get("/vendor-spend")
 async def get_vendor_spend_report(
     start_date: Optional[date] = Query(None, description="Start date"),
     end_date: Optional[date] = Query(None, description="End date"),
@@ -483,44 +380,16 @@ async def get_vendor_spend_report(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Spend by Vendor Report - Shows amount spent by vendor within date range
+    Spend by Vendor Report - DEPRECATED
+
+    Invoice data has been moved to Integration Hub.
+    Use Hub's reporting dashboard for vendor spend analysis.
     """
-
-    query = db.query(
-        Vendor.id.label('vendor_id'),
-        Vendor.name.label('vendor_name'),
-        func.count(Invoice.id).label('invoice_count'),
-        func.sum(Invoice.total).label('total_spent'),
-        func.avg(Invoice.total).label('avg_invoice_amount'),
-        func.min(Invoice.invoice_date).label('earliest_invoice'),
-        func.max(Invoice.invoice_date).label('latest_invoice')
-    ).outerjoin(
-        Invoice, Vendor.id == Invoice.vendor_id
-    )
-
-    # Apply date filters
-    if start_date:
-        query = query.filter(Invoice.invoice_date >= start_date)
-    if end_date:
-        query = query.filter(Invoice.invoice_date <= end_date)
-
-    query = query.group_by(Vendor.id, Vendor.name).order_by(desc('total_spent'))
-
-    results = query.all()
-
-    return [
-        VendorSpendItem(
-            vendor_id=r.vendor_id,
-            vendor_name=r.vendor_name,
-            invoice_count=r.invoice_count or 0,
-            total_spent=float(r.total_spent or 0),
-            avg_invoice_amount=float(r.avg_invoice_amount or 0),
-            earliest_invoice=r.earliest_invoice,
-            latest_invoice=r.latest_invoice
-        )
-        for r in results
-        if r.total_spent and r.total_spent > 0  # Only show vendors with actual spending
-    ]
+    return {
+        "message": "This report has been moved to Integration Hub",
+        "redirect": "/hub/dashboard",
+        "reason": "Invoice data is now managed in the Integration Hub (source of truth)"
+    }
 
 
 class TransferHistoryItem(BaseModel):

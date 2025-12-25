@@ -253,7 +253,7 @@
                         <textarea class="form-control" id="addDescription" rows="2"></textarea>
                     </div>
                     <div class="row">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Category</label>
                             <select class="form-select" id="addCategory">
                                 <option value="">Select Category</option>
@@ -262,26 +262,24 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Purchase Unit <span class="text-danger">*</span></label>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Base Unit <span class="text-danger">*</span></label>
                             <select class="form-select" id="addPurchaseUnit" required>
                                 {% for unit in units %}
                                 <option value="{{ unit.id }}">{{ unit.name }} ({{ unit.abbreviation }})</option>
                                 {% endfor %}
                             </select>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Conversion Factor</label>
-                            <input type="number" class="form-control" id="addConversionFactor" value="1" min="0.001" step="0.001">
+                            <small class="text-muted">What you count inventory in (Each, Pound, Gallon, etc.)</small>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Pack Size</label>
-                            <input type="text" class="form-control" id="addPackSize" placeholder="e.g., Case - 6">
+                            <label class="form-label">Quantity Per Case</label>
+                            <input type="number" class="form-control" id="addConversionFactor" value="1" min="0.001" step="0.001">
+                            <small class="text-muted">How many base units per case (e.g., 25 for 25lb case, 60 for case of 60)</small>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Unit Price</label>
+                            <label class="form-label">Case Price</label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
                                 <input type="number" class="form-control" id="addUnitPrice" min="0" step="0.01">
@@ -334,7 +332,7 @@
                         <textarea class="form-control" id="editDescription" rows="2"></textarea>
                     </div>
                     <div class="row">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-6 mb-3">
                             <label class="form-label">Category</label>
                             <select class="form-select" id="editCategory">
                                 <option value="">Select Category</option>
@@ -343,30 +341,29 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Purchase Unit <span class="text-danger">*</span></label>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Base Unit <span class="text-danger">*</span></label>
                             <select class="form-select" id="editPurchaseUnit" required>
                                 {% for unit in units %}
                                 <option value="{{ unit.id }}">{{ unit.name }} ({{ unit.abbreviation }})</option>
                                 {% endfor %}
                             </select>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label">Conversion Factor</label>
-                            <input type="number" class="form-control" id="editConversionFactor" min="0.001" step="0.001">
+                            <small class="text-muted">What you count inventory in (Each, Pound, Gallon, etc.)</small>
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Pack Size</label>
-                            <input type="text" class="form-control" id="editPackSize">
+                            <label class="form-label">Quantity Per Case</label>
+                            <input type="number" class="form-control" id="editConversionFactor" min="0.001" step="0.001" placeholder="1.00">
+                            <small class="text-muted">How many base units per case (e.g., 25 for 25lb case, 60 for case of 60)</small>
                         </div>
                         <div class="col-md-6 mb-3">
-                            <label class="form-label">Unit Price</label>
+                            <label class="form-label">Last Case Price</label>
                             <div class="input-group">
                                 <span class="input-group-text">$</span>
                                 <input type="number" class="form-control" id="editUnitPrice" min="0" step="0.01">
                             </div>
+                            <small class="text-muted">Auto-updated from invoices</small>
                         </div>
                     </div>
                     <div class="row">
@@ -514,7 +511,6 @@ async function editItem(id) {
         document.getElementById('editCategory').value = item.category || '';
         document.getElementById('editPurchaseUnit').value = item.purchase_unit_id;
         document.getElementById('editConversionFactor').value = item.conversion_factor || 1;
-        document.getElementById('editPackSize').value = item.pack_size || '';
         document.getElementById('editUnitPrice').value = item.unit_price || '';
         document.getElementById('editMasterItemName').value = item.inventory_master_item_name || 'Not linked';
         document.getElementById('editNotes').value = item.notes || '';
@@ -539,7 +535,6 @@ async function submitEditForm(event) {
         category: document.getElementById('editCategory').value || null,
         purchase_unit_id: parseInt(document.getElementById('editPurchaseUnit').value),
         conversion_factor: parseFloat(document.getElementById('editConversionFactor').value) || 1,
-        pack_size: document.getElementById('editPackSize').value || null,
         unit_price: parseFloat(document.getElementById('editUnitPrice').value) || null,
         notes: document.getElementById('editNotes').value || null
     };
@@ -576,7 +571,6 @@ async function submitAddForm(event) {
         category: document.getElementById('addCategory').value || null,
         purchase_unit_id: parseInt(document.getElementById('addPurchaseUnit').value),
         conversion_factor: parseFloat(document.getElementById('addConversionFactor').value) || 1,
-        pack_size: document.getElementById('addPackSize').value || null,
         unit_price: parseFloat(document.getElementById('addUnitPrice').value) || null,
         is_active: true
     };

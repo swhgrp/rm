@@ -1861,23 +1861,58 @@ async def vendor_items_page(request: Request, db: Session = Depends(get_db)):
     # Get active vendors for filters and forms
     vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
 
-    # Get distinct categories
-    categories_query = db.query(HubVendorItem.category).filter(
-        HubVendorItem.category.isnot(None),
-        HubVendorItem.category != ''
-    ).distinct().order_by(HubVendorItem.category).all()
-    categories = [c[0] for c in categories_query]
+    # Get hierarchical categories from Inventory system
+    categories = []
+    try:
+        from sqlalchemy import text as sql_text
+        inv_result = db.execute(sql_text("""
+            SELECT name, parent_name
+            FROM dblink(
+                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                'SELECT c.name, p.name as parent_name
+                 FROM categories c
+                 LEFT JOIN categories p ON c.parent_id = p.id
+                 WHERE c.is_active = true OR c.is_active IS NULL
+                 ORDER BY COALESCE(p.name, c.name), c.name'
+            ) AS t(name VARCHAR, parent_name VARCHAR)
+        """)).fetchall()
 
-    # Fetch units of measure from Inventory
+        for cat in inv_result:
+            cat_name = cat[0]
+            parent_name = cat[1]
+            if parent_name:
+                categories.append(f"{parent_name} - {cat_name}")
+            else:
+                # Only add top-level categories if they have no subcategories
+                # Check if any subcategory references this as parent
+                has_children = any(c[1] == cat_name for c in inv_result)
+                if not has_children:
+                    categories.append(cat_name)
+    except Exception as e:
+        logger.warning(f"Could not fetch categories from Inventory: {e}")
+        # Fallback to existing distinct categories from vendor items
+        categories_query = db.query(HubVendorItem.category).filter(
+            HubVendorItem.category.isnot(None),
+            HubVendorItem.category != ''
+        ).distinct().order_by(HubVendorItem.category).all()
+        categories = [c[0] for c in categories_query]
+
+    # Fetch units of measure from Inventory via dblink
     units = []
     try:
-        import httpx
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.get("http://inventory-app:5000/api/units-of-measure/")
-            if response.status_code == 200:
-                units = response.json()
+        from sqlalchemy import text as sql_text
+        units_result = db.execute(sql_text("""
+            SELECT id, name, abbreviation
+            FROM dblink(
+                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                'SELECT id, name, abbreviation FROM units_of_measure WHERE is_active = true ORDER BY name'
+            ) AS t(id INTEGER, name VARCHAR, abbreviation VARCHAR)
+        """)).fetchall()
+
+        for u in units_result:
+            units.append({"id": u[0], "name": u[1], "abbreviation": u[2]})
     except Exception as e:
-        logger.warning(f"Could not fetch units of measure: {e}")
+        logger.warning(f"Could not fetch units of measure from Inventory: {e}")
         # Fallback to common units
         units = [
             {"id": 1, "name": "Each", "abbreviation": "EA"},

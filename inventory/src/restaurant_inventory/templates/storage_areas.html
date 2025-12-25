@@ -4,45 +4,60 @@
 
 {% block head %}
 <style>
-    /* Accordion styling for dark mode */
+    /* Accordion styling for Slate Blue Light Theme */
     .accordion-item {
-        background-color: #161b22;
-        border-color: #30363d !important;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        margin-bottom: 8px;
     }
 
     .accordion-button {
-        background-color: #21262d;
-        color: #c9d1d9;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
         border: none;
         box-shadow: none;
+        border-radius: 8px 8px 0 0;
+    }
+
+    .accordion-button.collapsed {
+        border-radius: 8px;
     }
 
     .accordion-button:not(.collapsed) {
-        background-color: #21262d;
-        color: #d97706;
+        background-color: var(--accent-secondary);
+        color: #FFFFFF;
     }
 
     .accordion-button:focus {
-        box-shadow: none;
+        box-shadow: 0 0 0 3px rgba(69, 90, 100, 0.15);
         border-color: transparent;
     }
 
     .accordion-button::after {
-        filter: invert(1);
+        filter: brightness(0) invert(1);
     }
 
     .accordion-body {
-        background-color: #0d1117;
+        background-color: var(--bg-secondary);
         padding: 0;
+        border-radius: 0 0 8px 8px;
     }
 
     .accordion-collapse {
-        border-top: 1px solid #30363d;
+        border-top: 1px solid var(--border-primary);
     }
+
+    /* Drag handle styling */
     .storage-area-drag-handle {
         display: inline-flex;
         align-items: center;
         user-select: none;
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .storage-area-drag-handle:hover {
+        color: #FFFFFF;
     }
 
     .storage-area-drag-handle:active {
@@ -51,6 +66,18 @@
 
     .accordion-item[draggable="true"] {
         cursor: move;
+    }
+
+    /* Badge in accordion header */
+    .accordion-button .badge.bg-secondary {
+        background-color: rgba(255, 255, 255, 0.2) !important;
+        color: #FFFFFF !important;
+    }
+
+    /* Action buttons in accordion header */
+    .accordion-button + .btn-group .btn,
+    .bg-dark .btn-group .btn {
+        border-color: rgba(255, 255, 255, 0.3);
     }
 
 </style>
@@ -168,7 +195,7 @@
                 <!-- Items List -->
                 <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
                     <table class="table table-hover table-sm">
-                        <thead class="table-dark sticky-top">
+                        <thead class="sticky-top">
                             <tr>
                                 <th style="width: 40px;">
                                     <input type="checkbox" class="form-check-input" id="selectAllCheckbox" onchange="toggleSelectAll()">
@@ -406,28 +433,28 @@ function renderStorageAreas() {
         html += `
             <div class="accordion-item mb-2 border rounded">
                 <h2 class="accordion-header">
-                    <div class="d-flex align-items-center bg-dark rounded-top">
+                    <div class="d-flex align-items-center accordion-header-wrapper rounded-top" style="background-color: var(--accent-primary);">
                         <button class="accordion-button ${isExpanded ? '' : 'collapsed'} flex-grow-1 py-2" type="button"
                                 data-bs-toggle="collapse" data-bs-target="#${collapseId}"
                                 aria-expanded="${isExpanded}" aria-controls="${collapseId}"
                                 onclick="toggleExpandedArea(${sa.id})">
-                            <i class="bi bi-archive text-primary me-2"></i>
+                            <i class="bi bi-archive me-2" style="color: rgba(255,255,255,0.8);"></i>
                             <strong>${sa.name}</strong>
-                            <span class="badge bg-secondary ms-2">${sa.items.length} items</span>
-                            ${sa.description ? `<small class="text-muted ms-3">${sa.description}</small>` : ''}
+                            <span class="badge ms-2" style="background-color: rgba(255,255,255,0.2); color: #fff;">${sa.items.length} items</span>
+                            ${sa.description ? `<small class="ms-3" style="color: rgba(255,255,255,0.7);">${sa.description}</small>` : ''}
                         </button>
                         <!-- Drag handle for reordering -->
                         <div class="storage-area-drag-handle me-2 px-2" style="cursor: grab;" title="Drag to reorder">
-                            <i class="bi bi-grip-vertical text-muted"></i>
+                            <i class="bi bi-grip-vertical" style="color: rgba(255,255,255,0.7);"></i>
                         </div>
                         <div class="btn-group me-2" onclick="event.stopPropagation();">
                             <button class="btn btn-success btn-sm" onclick="showBulkAddItemsModal(${sa.id}, '${sa.name.replace(/'/g, "\\'")}')" title="Add Items">
                                 <i class="bi bi-plus-circle"></i>
                             </button>
-                            <button class="btn btn-outline-primary btn-sm" onclick="editStorageArea(${sa.id})" title="Edit">
+                            <button class="btn btn-light btn-sm" onclick="editStorageArea(${sa.id})" title="Edit">
                                 <i class="bi bi-pencil"></i>
                             </button>
-                            <button class="btn btn-outline-danger btn-sm" onclick="deleteStorageArea(${sa.id})" title="Delete">
+                            <button class="btn btn-danger btn-sm" onclick="deleteStorageArea(${sa.id})" title="Delete">
                                 <i class="bi bi-trash"></i>
                             </button>
                         </div>
@@ -442,7 +469,7 @@ function renderStorageAreas() {
                         ` : `
                             <div class="table-responsive">
                                 <table class="table table-hover table-sm mb-0">
-                                    <thead class="table-dark">
+                                    <thead>
                                         <tr>
                                             <th style="width: 40px;"></th>
                                             <th>Item Name</th>

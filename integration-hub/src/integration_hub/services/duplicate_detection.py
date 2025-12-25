@@ -70,6 +70,20 @@ class DuplicateDetectionService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _is_same_document_type(self, inv1: HubInvoice, inv2: HubInvoice) -> bool:
+        """
+        Check if two invoices are the same document type.
+
+        Statements and regular invoices are NOT duplicates even if they share
+        the same invoice number - vendors often send both documents with the
+        same reference number.
+
+        Returns True if both are statements or both are non-statements.
+        """
+        inv1_is_statement = inv1.status == 'statement' or getattr(inv1, 'is_statement', False)
+        inv2_is_statement = inv2.status == 'statement' or getattr(inv2, 'is_statement', False)
+        return inv1_is_statement == inv2_is_statement
+
     def find_duplicates_for_invoice(
         self,
         invoice_id: int,
@@ -102,6 +116,10 @@ class DuplicateDetectionService:
         ).all()
 
         for other in same_number_query:
+            # IMPORTANT: Don't consider statement vs invoice as duplicates
+            if not self._is_same_document_type(invoice, other):
+                continue
+
             other_num_normalized = normalize_invoice_number(other.invoice_number)
             if inv_num_normalized and other_num_normalized and inv_num_normalized == other_num_normalized:
                 duplicates.append({
@@ -112,6 +130,7 @@ class DuplicateDetectionService:
                     'total_amount': float(other.total_amount) if other.total_amount else None,
                     'match_type': 'exact_invoice_number',
                     'confidence': 0.95,
+                    'status': other.status,
                     'reason': f"Same vendor, identical invoice number (normalized: {inv_num_normalized})"
                 })
 
@@ -135,6 +154,10 @@ class DuplicateDetectionService:
                 if any(d['invoice_id'] == other.id for d in duplicates):
                     continue
 
+                # IMPORTANT: Don't consider statement vs invoice as duplicates
+                if not self._is_same_document_type(invoice, other):
+                    continue
+
                 if amounts_match(invoice.total_amount, other.total_amount, amount_tolerance):
                     days_diff = abs((invoice.invoice_date - other.invoice_date).days)
                     confidence = 0.8 - (days_diff * 0.05)  # Reduce confidence for larger date gaps
@@ -147,6 +170,7 @@ class DuplicateDetectionService:
                         'total_amount': float(other.total_amount) if other.total_amount else None,
                         'match_type': 'vendor_date_amount',
                         'confidence': max(confidence, 0.5),
+                        'status': other.status,
                         'reason': f"Same vendor, matching amount (${invoice.total_amount}), dates within {days_diff} days"
                     })
 
@@ -170,25 +194,30 @@ class DuplicateDetectionService:
         # Get all invoices
         invoices = self.db.query(HubInvoice).order_by(HubInvoice.created_at.desc()).all()
 
-        # Group by normalized invoice number + vendor
+        # Group by normalized invoice number + vendor + document type (statement vs invoice)
         invoice_groups = {}
         amount_groups = {}
 
         for inv in invoices:
-            # Group by vendor + normalized invoice number
+            # Group by vendor + normalized invoice number + document type
+            # CRITICAL: Separate statements from invoices - they are NOT duplicates
             vendor_key = inv.vendor_id or inv.vendor_name
             inv_num_normalized = normalize_invoice_number(inv.invoice_number)
+            is_statement = inv.status == 'statement' or getattr(inv, 'is_statement', False)
+            doc_type = 'statement' if is_statement else 'invoice'
 
             if inv_num_normalized:
-                key = f"{vendor_key}:{inv_num_normalized}"
+                # Include document type in key so statements don't group with invoices
+                key = f"{vendor_key}:{inv_num_normalized}:{doc_type}"
                 if key not in invoice_groups:
                     invoice_groups[key] = []
                 invoice_groups[key].append(inv)
 
-            # Group by vendor + amount + date range
+            # Group by vendor + amount + date range + document type
             if inv.invoice_date and inv.total_amount:
                 # Round amount to whole dollars for grouping
-                amount_key = f"{vendor_key}:{int(inv.total_amount)}"
+                # Include document type so statements don't group with invoices
+                amount_key = f"{vendor_key}:{int(inv.total_amount)}:{doc_type}"
                 if amount_key not in amount_groups:
                     amount_groups[amount_key] = []
                 amount_groups[amount_key].append(inv)

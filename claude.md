@@ -11,6 +11,57 @@
 
 ### Most Recent Work (Current Session - Dec 25, 2025)
 
+**HUB VENDOR ITEMS: UI IMPROVEMENTS & SOURCE OF TRUTH CONSOLIDATION** ✅ **COMPLETE**
+
+#### 1. **Vendor Item Modal Field Improvements** 🎨 **UI/UX**
+- **Field Label Changes** - Updated Add/Edit modals for clarity:
+  - "Purchase Unit" → "Base Unit" (what you count inventory in)
+  - "Conversion Factor" → "Quantity Per Case" (how many base units per case)
+  - "Unit Price" → "Case Price" / "Last Case Price" (auto-updated from invoices)
+- **Removed Pack Size Field** - Redundant since Base Unit + Quantity Per Case already defines the pack
+- **Added Helpful Descriptions** - Each field now has explanatory text
+- **Files Modified:**
+  - `integration-hub/src/integration_hub/templates/hub_vendor_items.html`
+
+#### 2. **Hierarchical Categories via dblink** 📂 **DATA INTEGRATION**
+- **Problem:** Category dropdown showed flat list ("Bottled", "Draft") instead of nested ("Beer - Bottled", "Beer - Draft")
+- **Solution:** Query Inventory database via dblink for parent-child category relationships
+- **Result:** Categories now display as "Parent - Child" format matching Inventory system
+- **Files Modified:**
+  - `integration-hub/src/integration_hub/main.py` (vendor_items_page function)
+
+#### 3. **Units of Measure via dblink** 📐 **DATA INTEGRATION**
+- **Problem:** Hub only had 4 fallback units; needed full 37 units from Inventory
+- **Previous Attempt:** httpx API call to Inventory (failed - required authentication)
+- **Solution:** Query Inventory database directly via dblink (like categories)
+- **Result:** All 37 units now available (Each, Pound, Case, Gallon, etc.)
+- **Files Modified:**
+  - `integration-hub/src/integration_hub/main.py` (vendor_items_page function)
+
+#### 4. **Hub as Source of Truth - Inventory Cleanup** 🗑️ **ARCHITECTURE**
+- **Removed from Inventory System** (Hub now owns these):
+  - `invoices.py` endpoint and template
+  - `vendor_items.py` endpoint (replaced with hub_vendor_items.py proxy)
+  - `invoice_parser.py` and `vendor_item_parser.py`
+  - Models: Invoice, InvoiceItem, VendorItem, VendorAlias
+  - Schemas: invoice.py, vendor_item.py
+- **Deprecated Files** moved to `_deprecated/` folders
+- **Hub Client Updated** - Simplified to proxy operations to Hub
+- **Files Deleted/Deprecated:**
+  - `inventory/src/restaurant_inventory/api/api_v1/endpoints/invoices.py`
+  - `inventory/src/restaurant_inventory/api/api_v1/endpoints/vendor_items.py`
+  - `inventory/src/restaurant_inventory/core/invoice_parser.py`
+  - `inventory/src/restaurant_inventory/core/vendor_item_parser.py`
+  - `inventory/src/restaurant_inventory/models/invoice.py`
+  - `inventory/src/restaurant_inventory/models/vendor_item.py`
+  - `inventory/src/restaurant_inventory/models/vendor_alias.py`
+  - `inventory/src/restaurant_inventory/schemas/invoice.py`
+  - `inventory/src/restaurant_inventory/schemas/vendor_item.py`
+
+---
+
+### Previous Session Work (Dec 25, 2025 - Earlier)
+
 **INTEGRATION HUB: VENDOR NORMALIZATION, BATCH OPERATIONS, REPORTING & DUPLICATE DETECTION** ✅ **COMPLETE**
 
 #### 1. **Invoice Batch Operations** 📦 **NEW API**
@@ -2448,67 +2499,62 @@ All services use identical pattern:
 
 Documented in: `docs/reference/DESIGN_STANDARD.md`
 
-**Current Theme: Warm Neutral + Copper (December 2024)**
+**Current Theme: Slate Blue Light (December 2025)**
 
 Applied to: Portal, Inventory System
 
-CSS Variables (defined in each template's `<style>` block):
+CSS Variables (defined in `inventory/src/restaurant_inventory/templates/base.html`):
 ```css
 :root {
-    /* Background colors - warm neutrals */
-    --bg-primary: #1c1917;      /* Warm stone black */
-    --bg-secondary: #292524;    /* Warm stone dark */
-    --bg-tertiary: #352f2c;     /* Elevated warm */
-    --bg-elevated: #44403c;     /* Hover state */
+    /* Background colors - light theme */
+    --bg-primary: #ECEFF1;      /* Light gray background */
+    --bg-secondary: #FFFFFF;    /* White cards/content */
+    --bg-tertiary: #F5F5F5;     /* Slightly darker for headers */
+    --bg-elevated: #E0E0E0;     /* Hover states */
 
-    /* Border colors - warm stone tones */
-    --border-primary: #57534e;
-    --border-secondary: #78716c;
+    /* Border colors */
+    --border-primary: #CFD8DC;
+    --border-secondary: #B0BEC5;
 
-    /* Text colors - warm off-whites */
-    --text-primary: #fafaf9;    /* Warm white */
-    --text-secondary: #a8a29e;  /* Stone gray */
-    --text-muted: #78716c;      /* Muted stone */
+    /* Text colors - dark for readability */
+    --text-primary: #263238;    /* Near black */
+    --text-secondary: #546E7A;  /* Slate gray */
+    --text-muted: #78909C;      /* Light slate */
 
-    /* Accent colors - copper/amber */
-    --accent-primary: #d97706;  /* Copper/amber - primary actions */
-    --accent-secondary: #b45309; /* Deep copper */
-    --accent-hover: #f59e0b;    /* Bright amber - hover states */
-    --accent-muted: #92400e;    /* Dark copper */
+    /* Accent colors - Slate Blue */
+    --accent-primary: #455A64;  /* Slate blue - sidebar, buttons */
+    --accent-secondary: #37474F; /* Darker slate */
+    --accent-hover: #263238;    /* Darkest slate for hover */
+    --accent-muted: #546E7A;
 
     /* Semantic colors */
-    --success: #4ade80;         /* Green */
-    --error: #f87171;           /* Red */
-    --warning: #fbbf24;         /* Yellow */
-    --info: #d97706;            /* Copper (matches theme) */
+    --success: #43A047;         /* Green */
+    --error: #E53935;           /* Red */
+    --warning: #FB8C00;         /* Orange */
+    --info: #1E88E5;            /* Blue */
 }
 ```
 
 **Key Design Decisions:**
-- All "info" elements (alerts, badges, buttons) use copper (#d97706) instead of blue
-- Bootstrap overrides for `.btn-info`, `.alert-info`, `.badge.bg-info`, `.bg-info`, `.text-info`
-- Nav tabs use copper accent for active state
-- Form focus states use copper glow: `box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15)`
+- Light theme with white content areas on light gray background
+- Slate blue sidebar (#455A64) with white text
+- Standard Bootstrap semantic colors (blue for info, not copper)
+- Form focus uses slate blue glow: `box-shadow: 0 0 0 3px rgba(69, 90, 100, 0.15)`
 
-**Files Updated (Theme):**
-- Portal: `portal/css/style.css`, `portal/templates/*.html`
-- Inventory: `inventory/src/restaurant_inventory/templates/base.html`
-- Individual templates with inline styles: `setup_password.html`, `pos_item_mapping.html`, `waste.html`, `storage_areas.html`
-
-**Previous Theme (if reverting):**
-- Blue accent: `#58a6ff` or `#60a5fa`
-- Info color: `#60a5fa`
-- Alternative CSS file exists: `portal/css/style-slate-blue.css`
+**Files:**
+- Inventory base template: `inventory/src/restaurant_inventory/templates/base.html`
+- Page-specific styles use CSS variables from base.html
 
 **Sidebar:**
-- SW Hospitality Group logo only (no system name)
-- Navigation links: font-size 14px
-- Background: var(--bg-secondary)
+- SW Hospitality Group logo (white on slate blue)
+- Navigation links: font-size 14px, white text
+- Background: #455A64 (slate blue)
+- Active/hover: white left border, rgba(255,255,255,0.15) background
 
 **Top Navbar:**
 - System name with Bootstrap icon
-- User name on right
-- Background: var(--bg-secondary)
+- User dropdown on right
+- Background: var(--bg-secondary) (white)
 
 **Dashboard Titles:**
 - `<h2 class="mb-0">` with icon

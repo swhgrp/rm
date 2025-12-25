@@ -518,9 +518,6 @@
             let lastPrice = '-';
             if (item.last_price_paid) {
                 lastPrice = '$' + parseFloat(item.last_price_paid).toFixed(2);
-                if (item.last_price_unit) {
-                    lastPrice += ' / ' + item.last_price_unit;
-                }
             }
 
             // Check if this item is in our selected set
@@ -832,11 +829,13 @@
         // Initialize modal
         itemModal = new bootstrap.Modal(document.getElementById('itemModal'));
 
-        // Load data
-        await loadCategories();
-        await loadVendors();
-        await loadUnitsOfMeasure();
-        await loadItems();
+        // Load all data in PARALLEL for faster page load
+        await Promise.all([
+            loadCategories(),
+            loadVendors(),
+            loadUnitsOfMeasure(),
+            loadItems()
+        ]);
 
         // Setup search listener
         document.getElementById('itemSearch')?.addEventListener('input', filterItems);

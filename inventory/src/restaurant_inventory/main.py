@@ -34,16 +34,15 @@ from restaurant_inventory.api.api_v1.endpoints import roles
 from restaurant_inventory.api.api_v1.endpoints import categories
 from restaurant_inventory.api.api_v1.endpoints import reports
 from restaurant_inventory.api.api_v1.endpoints import vendors
-from restaurant_inventory.api.api_v1.endpoints import invoices
 from restaurant_inventory.api.api_v1.endpoints import waste
 from restaurant_inventory.api.api_v1.endpoints import recipes
 from restaurant_inventory.api.api_v1.endpoints import pos
 from restaurant_inventory.api.api_v1.endpoints import units
 from restaurant_inventory.api.api_v1.endpoints import dashboard
-from restaurant_inventory.api.api_v1.endpoints import vendor_items
 from restaurant_inventory.api.api_v1.endpoints import cache_management
 from restaurant_inventory.api.api_v1.endpoints import hub_invoices
 from restaurant_inventory.api.api_v1.endpoints import hub_vendor_items
+# REMOVED (Dec 25, 2025): invoices, vendor_items - Hub is source of truth
 from restaurant_inventory.services.scheduler import start_scheduler, stop_scheduler
 
 logger = logging.getLogger(__name__)
@@ -145,16 +144,16 @@ app.include_router(count_sessions.router, prefix="/api/count-sessions", tags=["c
 app.include_router(categories.router, prefix="/api/categories", tags=["categories"])
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(vendors.router, prefix="/api/vendors", tags=["vendors"])
-app.include_router(invoices.router, prefix="/api/invoices", tags=["invoices"])
 app.include_router(waste.router, prefix="/api/waste", tags=["waste"])
 app.include_router(recipes.router, prefix="/api/recipes", tags=["recipes"])
 app.include_router(pos.router, prefix="/api/pos", tags=["pos"])
 app.include_router(units.router, prefix="/api/units", tags=["units"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
-app.include_router(vendor_items.router, prefix="/api/vendor-items", tags=["vendor-items"])
 app.include_router(cache_management.router, prefix="/api/cache", tags=["cache"])
+# Hub integration - source of truth for invoices and vendor items
 app.include_router(hub_invoices.router, prefix="/api/hub-invoices", tags=["hub-invoices"])
 app.include_router(hub_vendor_items.router, prefix="/api/hub-vendor-items", tags=["hub-vendor-items"])
+# REMOVED (Dec 25, 2025): /api/invoices, /api/vendor-items - Hub is source of truth
 
 
 # Health check endpoint

@@ -35,9 +35,6 @@
             <select class="form-select" id="vendorItemFilterVendor" style="width: 200px;" onchange="loadVendorItems()">
                 <option value="">All Vendors</option>
             </select>
-            <select class="form-select" id="vendorItemFilterMaster" style="width: 200px;" onchange="loadVendorItems()">
-                <option value="">All Master Items</option>
-            </select>
             <select class="form-select" id="vendorItemFilterLinked" style="width: 150px;" onchange="loadVendorItems()">
                 <option value="">All Items</option>
                 <option value="true">Linked</option>
@@ -329,10 +326,19 @@
     let confirmCallback = null;
     let unitsOfMeasure = [];
 
+    // Cached dropdown data for modal (preloaded for instant modal opening)
+    let cachedVendors = null;
+    let cachedMasterItems = null;
+    let cachedUnits = null;
+
     // Initialize page
     document.addEventListener('DOMContentLoaded', async function() {
-        await loadFilterDropdowns();
-        await loadVendorItems();
+        // Load filter dropdowns, vendor items, AND modal dropdown data in PARALLEL
+        await Promise.all([
+            loadFilterDropdowns(),
+            loadVendorItems(),
+            preloadModalDropdowns()
+        ]);
 
         // Check for highlight parameter to auto-open edit modal
         const urlParams = new URLSearchParams(window.location.search);
@@ -362,20 +368,27 @@
                 });
             }
 
-            // Load master items for filter (with high limit to get all items)
-            const itemsResp = await apiRequest('api/items/?limit=10000');
-            const itemFilter = document.getElementById('vendorItemFilterMaster');
-
-            if (itemFilter && Array.isArray(itemsResp)) {
-                itemFilter.innerHTML = '<option value="">All Master Items</option>';
-                itemsResp.sort((a, b) => a.name.localeCompare(b.name));
-                itemsResp.forEach(item => {
-                    itemFilter.innerHTML += `<option value="${item.id}">${item.name}</option>`;
-                });
-            }
+            // Master items filter removed - too slow with 500+ items
+            // Use search box instead for filtering by master item name
         } catch (error) {
             console.error('Error loading filter dropdowns:', error);
-            // Don't show alert - filters are optional
+        }
+    }
+
+    // Preload modal dropdown data in background for instant modal opening
+    async function preloadModalDropdowns() {
+        try {
+            const [vendors, items, units] = await Promise.all([
+                apiRequest('api/vendors/'),
+                apiRequest('api/items/?limit=1000'),
+                apiRequest('api/units/')
+            ]);
+            cachedVendors = Array.isArray(vendors) ? vendors.sort((a, b) => a.name.localeCompare(b.name)) : [];
+            const itemsArr = Array.isArray(items) ? items : (items.items || []);
+            cachedMasterItems = itemsArr.sort((a, b) => a.name.localeCompare(b.name));
+            cachedUnits = Array.isArray(units) ? units.sort((a, b) => a.name.localeCompare(b.name)) : [];
+        } catch (error) {
+            console.error('Error preloading modal dropdowns:', error);
         }
     }
 
@@ -429,42 +442,42 @@
     // ========== VENDOR ITEMS ==========
     // Now fetches from Hub (source of truth)
     async function loadVendorItems() {
+        const tbody = document.getElementById('vendorItemsTableBody');
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div> Loading vendor items...</td></tr>';
+
         try {
             const vendorFilter = document.getElementById('vendorItemFilterVendor').value;
-            const masterFilter = document.getElementById('vendorItemFilterMaster').value;
             const linkedFilter = document.getElementById('vendorItemFilterLinked').value;
 
-            // Fetch all pages from Hub API
-            let allItems = [];
-            let page = 1;
-            const pageSize = 500;  // Max allowed by Hub API
-            let hasMore = true;
+            // Fetch all pages from Hub API in parallel for speed
+            const params = new URLSearchParams();
+            params.append('page', '1');
+            params.append('page_size', '500');
+            if (vendorFilter) params.append('vendor_id', vendorFilter);
 
-            while (hasMore) {
-                const params = new URLSearchParams();
-                params.append('page', page.toString());
-                params.append('page_size', pageSize.toString());
-                if (vendorFilter) params.append('vendor_id', vendorFilter);
-                if (masterFilter) params.append('master_item_id', masterFilter);
+            // First request to get total count
+            const firstResponse = await apiRequest(`api/hub-vendor-items/?${params.toString()}`);
+            let allItems = firstResponse.items || [];
+            const total = firstResponse.total || 0;
 
-                const url = `api/hub-vendor-items/?${params.toString()}`;
-                const response = await apiRequest(url);
-
-                const items = response.items || [];
-                allItems = allItems.concat(items);
-
-                // Check if there are more pages
-                const total = response.total || 0;
-                hasMore = (page * pageSize) < total;
-                page++;
-
-                // Safety limit to prevent infinite loops
-                if (page > 20) break;
+            // If more pages needed, fetch them in parallel
+            if (total > 500) {
+                const totalPages = Math.ceil(total / 500);
+                const pagePromises = [];
+                for (let p = 2; p <= Math.min(totalPages, 10); p++) {
+                    const pageParams = new URLSearchParams(params);
+                    pageParams.set('page', p.toString());
+                    pagePromises.push(apiRequest(`api/hub-vendor-items/?${pageParams.toString()}`));
+                }
+                const responses = await Promise.all(pagePromises);
+                responses.forEach(resp => {
+                    allItems = allItems.concat(resp.items || []);
+                });
             }
 
             let items = allItems;
 
-            // Apply linked filter client-side if needed
+            // Apply linked filter client-side
             if (linkedFilter === 'true') {
                 items = items.filter(vi => vi.inventory_master_item_id);
             } else if (linkedFilter === 'false') {
@@ -622,66 +635,35 @@
     }
 
     async function loadVendorItemDropdowns() {
-        // Save current filter values before repopulating
-        const vendorFilter = document.getElementById('vendorItemFilterVendor');
-        const itemFilter = document.getElementById('vendorItemFilterMaster');
-        const savedVendorFilter = vendorFilter.value;
-        const savedItemFilter = itemFilter.value;
+        // Use cached data if available (preloaded on page load)
+        // Otherwise fetch fresh data
+        if (!cachedVendors || !cachedMasterItems || !cachedUnits) {
+            await preloadModalDropdowns();
+        }
 
-        // Load vendors
-        const vendorsResp = await apiRequest('api/vendors/');
+        // Populate vendors dropdown
         const vendorSelect = document.getElementById('viVendorId');
-
         vendorSelect.innerHTML = '<option value="">Select vendor...</option>';
-        vendorFilter.innerHTML = '<option value="">All Vendors</option>';
-
-        if (Array.isArray(vendorsResp)) {
-            // Sort vendors alphabetically by name
-            vendorsResp.sort((a, b) => a.name.localeCompare(b.name));
-            vendorsResp.forEach(v => {
+        if (cachedVendors) {
+            cachedVendors.forEach(v => {
                 vendorSelect.innerHTML += `<option value="${v.id}">${v.name}</option>`;
-                vendorFilter.innerHTML += `<option value="${v.id}">${v.name}</option>`;
             });
         }
 
-        // Restore vendor filter selection
-        if (savedVendorFilter) {
-            vendorFilter.value = savedVendorFilter;
-        }
-
-        // Load master items (with high limit to get all items for dropdown)
-        const itemsResp = await apiRequest('api/items/?limit=10000');
+        // Populate master items dropdown
         const itemSelect = document.getElementById('viMasterItemId');
-
         itemSelect.innerHTML = '<option value="">Select master item...</option>';
-        itemFilter.innerHTML = '<option value="">All Master Items</option>';
-
-        // Handle both array response and {success, items} object response
-        const items = Array.isArray(itemsResp) ? itemsResp : (itemsResp.items || []);
-
-        if (items.length > 0) {
-            // Sort master items alphabetically by name
-            items.sort((a, b) => a.name.localeCompare(b.name));
-            items.forEach(item => {
+        if (cachedMasterItems) {
+            cachedMasterItems.forEach(item => {
                 itemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
-                itemFilter.innerHTML += `<option value="${item.id}">${item.name}</option>`;
             });
         }
 
-        // Restore item filter selection
-        if (savedItemFilter) {
-            itemFilter.value = savedItemFilter;
-        }
-
-        // Load units
-        const unitsResp = await apiRequest('api/units/');
+        // Populate units dropdown
         const unitSelect = document.getElementById('viPurchaseUnitId');
         unitSelect.innerHTML = '<option value="">Select unit...</option>';
-
-        if (Array.isArray(unitsResp)) {
-            // Sort units alphabetically by name
-            unitsResp.sort((a, b) => a.name.localeCompare(b.name));
-            unitsResp.forEach(u => {
+        if (cachedUnits) {
+            cachedUnits.forEach(u => {
                 unitSelect.innerHTML += `<option value="${u.id}">${u.name} (${u.abbreviation})</option>`;
             });
         }

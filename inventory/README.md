@@ -357,7 +357,7 @@ A comprehensive web-based inventory management system built for restaurant opera
 - `categories` - Item categories
 - `vendors` - Vendor/supplier database
 - `master_items` - Central item catalog
-- `vendor_items` - Vendor-specific item data
+- `vendor_items` - **DEPRECATED** (moved to Integration Hub)
 
 **Inventory Tables:**
 - `inventory` - Current inventory quantities
@@ -377,9 +377,7 @@ A comprehensive web-based inventory management system built for restaurant opera
 **Waste Tables:**
 - `waste_records` - Waste logging and tracking
 
-**Invoice Tables:**
-- `invoices` - Invoice headers
-- `invoice_items` - Invoice line items
+**Note:** Invoice and vendor item tables have been moved to Integration Hub (source of truth).
 
 **Recipe Tables:**
 - `recipes` - Recipe headers

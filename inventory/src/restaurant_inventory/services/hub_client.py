@@ -333,3 +333,145 @@ def get_hub_client() -> HubClient:
     if _hub_client is None:
         _hub_client = HubClient()
     return _hub_client
+
+
+def get_vendor_item_price_for_master_item_sync(master_item_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Synchronous method to get the preferred vendor item price for a master item.
+    Used for cost calculation in sync endpoints.
+
+    Returns:
+        Dict with 'unit_price', 'conversion_factor', 'vendor_name' or None if not found
+    """
+    import httpx
+
+    hub_url = os.getenv("HUB_API_URL", "http://integration-hub:8000").rstrip('/')
+
+    try:
+        # Get vendor items for this master item, preferring active and preferred
+        with httpx.Client(timeout=10.0) as client:
+            response = client.get(
+                f"{hub_url}/api/v1/vendor-items/",
+                params={
+                    "inventory_master_item_id": master_item_id,
+                    "is_active": True,
+                    "page_size": 10
+                }
+            )
+
+            if response.status_code != 200:
+                return None
+
+            data = response.json()
+            items = data.get('items', [])
+
+            if not items:
+                return None
+
+            # Find preferred item first, then any item with price
+            preferred_item = None
+            any_priced_item = None
+
+            for item in items:
+                if item.get('unit_price') and item.get('conversion_factor'):
+                    if item.get('is_preferred'):
+                        preferred_item = item
+                        break
+                    elif not any_priced_item:
+                        any_priced_item = item
+
+            best_item = preferred_item or any_priced_item
+
+            if best_item:
+                return {
+                    'unit_price': best_item.get('unit_price'),
+                    'conversion_factor': best_item.get('conversion_factor'),
+                    'vendor_name': best_item.get('vendor_name'),
+                    'vendor_product_name': best_item.get('vendor_product_name')
+                }
+
+            return None
+
+    except Exception as e:
+        logger.warning(f"Error fetching vendor item price from Hub for master_item_id={master_item_id}: {str(e)}")
+        return None
+
+
+def get_all_vendor_item_prices_sync() -> Dict[int, Dict[str, Any]]:
+    """
+    Batch fetch all vendor item prices from Hub in a single request.
+    Returns a dict mapping master_item_id -> price info.
+
+    This is much more efficient than N+1 calls for large item lists.
+
+    Returns:
+        Dict[master_item_id, {unit_price, conversion_factor, vendor_name, vendor_product_name}]
+    """
+    import httpx
+
+    hub_url = os.getenv("HUB_API_URL", "http://integration-hub:8000").rstrip('/')
+    prices_by_master_id: Dict[int, Dict[str, Any]] = {}
+
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            # Fetch all active vendor items with prices in batches
+            page = 1
+            page_size = 500  # Larger batch for efficiency
+
+            while True:
+                response = client.get(
+                    f"{hub_url}/api/v1/vendor-items/",
+                    params={
+                        "page": page,
+                        "page_size": page_size,
+                        "is_active": True
+                    }
+                )
+
+                if response.status_code != 200:
+                    logger.warning(f"Failed to fetch vendor items page {page}: status {response.status_code}")
+                    break
+
+                data = response.json()
+                items = data.get('items', [])
+
+                if not items:
+                    break
+
+                # Process items - build price lookup by master_item_id
+                for item in items:
+                    master_id = item.get('inventory_master_item_id')
+                    if not master_id:
+                        continue
+
+                    unit_price = item.get('unit_price')
+                    conversion_factor = item.get('conversion_factor')
+
+                    if not unit_price or not conversion_factor:
+                        continue
+
+                    is_preferred = item.get('is_preferred', False)
+
+                    # Store if we don't have this master_id yet, or if this one is preferred
+                    if master_id not in prices_by_master_id or is_preferred:
+                        prices_by_master_id[master_id] = {
+                            'unit_price': unit_price,
+                            'conversion_factor': conversion_factor,
+                            'vendor_name': item.get('vendor_name'),
+                            'vendor_product_name': item.get('vendor_product_name'),
+                            'is_preferred': is_preferred
+                        }
+
+                # Check if more pages
+                total = data.get('total', 0)
+                if page * page_size >= total:
+                    break
+
+                page += 1
+
+        logger.info(f"Fetched prices for {len(prices_by_master_id)} master items from Hub")
+        return prices_by_master_id
+
+    except Exception as e:
+        logger.warning(f"Error batch fetching vendor item prices from Hub: {str(e)}")
+        return {}

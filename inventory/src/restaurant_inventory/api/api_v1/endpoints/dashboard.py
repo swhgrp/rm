@@ -14,9 +14,11 @@ from restaurant_inventory.core.cache import cache, CacheKeys
 from restaurant_inventory.models.user import User
 from restaurant_inventory.models.pos_sale import POSSale, POSSaleItem
 from restaurant_inventory.models.inventory import Inventory
-from restaurant_inventory.models.invoice import Invoice
 from restaurant_inventory.models.transfer import Transfer
 from restaurant_inventory.models.waste import WasteRecord
+
+# REMOVED (Dec 25, 2025): Invoice - Hub is source of truth for invoices
+# COGS calculation and recent invoices now fetched from Hub
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -135,14 +137,10 @@ async def get_dashboard_analytics(
         # Previous week had zero sales but current week has sales
         wow_change = 100.0  # 100% increase from zero
 
-    # COGS (Previous 7 Complete Days) - Sum of approved invoices
-    cogs_query = db.query(func.sum(Invoice.total)).filter(
-        Invoice.invoice_date >= start_date,
-        Invoice.invoice_date < end_date,  # Exclude today
-        Invoice.status == 'APPROVED'
-    )
-    cogs_query = apply_location_filter(cogs_query, Invoice)
-    total_cogs = float(cogs_query.scalar() or 0.0)
+    # COGS (Previous 7 Complete Days) - Now fetched from Hub
+    # TODO: Integrate with Hub API for COGS calculation
+    # For now, return 0.0 - Hub dashboard should be used for COGS metrics
+    total_cogs = 0.0
 
     # Gross Margin %
     gross_margin = ((total_sales - total_cogs) / total_sales * 100) if total_sales > 0 else 0.0
@@ -171,18 +169,10 @@ async def get_dashboard_analytics(
     sales_by_date_query = apply_location_filter(sales_by_date_query, POSSale)
     sales_dict = {row.date: float(row.sales) for row in sales_by_date_query.all()}
 
-    # COGS aggregated by date (single query for all 7 days)
-    cogs_by_date_query = db.query(
-        cast(Invoice.invoice_date, Date).label('date'),
-        func.sum(Invoice.total).label('cogs')
-    ).filter(
-        Invoice.invoice_date >= start_date,
-        Invoice.invoice_date < end_date,
-        Invoice.status == 'APPROVED'
-    ).group_by(cast(Invoice.invoice_date, Date))
-
-    cogs_by_date_query = apply_location_filter(cogs_by_date_query, Invoice)
-    cogs_dict = {row.date: float(row.cogs) for row in cogs_by_date_query.all()}
+    # COGS aggregated by date - Now fetched from Hub
+    # TODO: Integrate with Hub API for daily COGS data
+    # For now, return empty dict - Hub dashboard should be used for COGS trends
+    cogs_dict = {}
 
     # Build daily data array from dictionaries
     daily_data = []
@@ -228,26 +218,10 @@ async def get_dashboard_analytics(
         for item in top_items_query.all()
     ]
 
-    # Recent Invoices (last 5)
-    recent_invoices_query = db.query(Invoice).options(
-        joinedload(Invoice.location)
-    )
-    recent_invoices_query = apply_location_filter(recent_invoices_query, Invoice)
-    recent_invoices = recent_invoices_query.order_by(
-        Invoice.uploaded_at.desc()
-    ).limit(5).all()
-
-    invoices_data = [
-        {
-            'id': inv.id,
-            'invoice_number': inv.invoice_number,
-            'location_name': inv.location.name if inv.location else 'Unknown',
-            'total': float(inv.total) if inv.total else 0.0,
-            'status': inv.status.value,
-            'uploaded_at': inv.uploaded_at.isoformat() if inv.uploaded_at else None
-        }
-        for inv in recent_invoices
-    ]
+    # Recent Invoices - Now fetched from Hub
+    # TODO: Integrate with Hub API for recent invoices
+    # For now, return empty list - Hub dashboard shows recent invoices
+    invoices_data = []
 
     # Recent Transfers (last 5)
     recent_transfers_query = db.query(Transfer).options(

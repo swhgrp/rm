@@ -11,11 +11,11 @@ import os
 
 from restaurant_inventory.core.deps import get_db, get_current_user, require_manager_or_admin
 from restaurant_inventory.models.item import MasterItem
-from restaurant_inventory.models.vendor_item import VendorItem
 from restaurant_inventory.models.unit_of_measure import UnitOfMeasure
 from restaurant_inventory.models.user import User
 from restaurant_inventory.schemas.item import MasterItemCreate, MasterItemUpdate, MasterItemResponse
 from restaurant_inventory.core.audit import log_audit_event, create_change_dict
+from restaurant_inventory.services.hub_client import get_vendor_item_price_for_master_item_sync, get_all_vendor_item_prices_sync
 
 router = APIRouter()
 
@@ -85,6 +85,10 @@ async def get_master_items(
 
     items = query.offset(skip).limit(limit).all()
 
+    # Batch fetch all vendor item prices from Hub in ONE call (not N+1 calls)
+    # This is much more efficient than calling Hub for each of 500+ items
+    prices_by_master_id = get_all_vendor_item_prices_sync()
+
     # Add unit names and pricing info to response
     result = []
     for item in items:
@@ -104,27 +108,11 @@ async def get_master_items(
         item_dict['count_unit_3_name'] = item.count_unit_3.name if item.count_unit_3 else None
         item_dict['count_unit_3_factor'] = float(item.count_unit_3.contains_quantity) if item.count_unit_3 and item.count_unit_3.contains_quantity else None
 
-        # Get last price paid from preferred vendor item, or most recent vendor item
-        preferred_vendor_item = db.query(VendorItem).filter(
-            VendorItem.master_item_id == item.id,
-            VendorItem.is_preferred == True,
-            VendorItem.is_active == True
-        ).first()
-
-        if not preferred_vendor_item:
-            # Get most recent vendor item with a price
-            preferred_vendor_item = db.query(VendorItem).filter(
-                VendorItem.master_item_id == item.id,
-                VendorItem.is_active == True,
-                VendorItem.unit_price.isnot(None)
-            ).order_by(desc(VendorItem.updated_at)).first()
-
-        if preferred_vendor_item and preferred_vendor_item.unit_price and preferred_vendor_item.conversion_factor:
-            # Calculate cost per master unit (unit_price / conversion_factor)
-            cost_per_master_unit = float(preferred_vendor_item.unit_price) / float(preferred_vendor_item.conversion_factor)
-            item_dict['last_price_paid'] = cost_per_master_unit
-            # Use the master item's unit of measure, not the vendor's purchase unit
-            item_dict['last_price_unit'] = unit_name
+        # Look up price from batch-fetched data
+        price_info = prices_by_master_id.get(item.id)
+        if price_info:
+            item_dict['last_price_paid'] = price_info.get('unit_price')
+            item_dict['last_price_unit'] = price_info.get('vendor_product_name') or price_info.get('vendor_name')
         else:
             item_dict['last_price_paid'] = None
             item_dict['last_price_unit'] = None
@@ -251,7 +239,6 @@ async def merge_master_items(
     from restaurant_inventory.models.recipe import RecipeIngredient
     from restaurant_inventory.models.waste import WasteRecord
     from restaurant_inventory.models.count_session import CountSessionItem
-    from restaurant_inventory.models.invoice import InvoiceItem
     from restaurant_inventory.models.inventory_transaction import InventoryTransaction
 
     # Validate source and target exist
@@ -266,34 +253,24 @@ async def merge_master_items(
         raise HTTPException(status_code=400, detail="Source and target cannot be the same item")
 
     merge_stats = {
-        "vendor_items": 0,
         "waste_records": 0,
-        "invoice_items": 0,
         "inventory_records": 0,
         "count_session_items": 0,
         "recipe_ingredients": 0,
         "pos_mappings": 0,
-        "inventory_transactions": 0
+        "inventory_transactions": 0,
+        "note": "Vendor items and invoice items are managed in Hub - merge them there"
     }
 
     try:
-        # Move vendor_items
-        vendor_items_moved = db.query(VendorItem).filter(
-            VendorItem.master_item_id == source_id
-        ).update({VendorItem.master_item_id: target_id})
-        merge_stats["vendor_items"] = vendor_items_moved
+        # NOTE: vendor_items and invoice_items are now in Hub (source of truth)
+        # They should be merged in Hub, not here
 
         # Move waste_records
         waste_moved = db.query(WasteRecord).filter(
             WasteRecord.master_item_id == source_id
         ).update({WasteRecord.master_item_id: target_id})
         merge_stats["waste_records"] = waste_moved
-
-        # Move invoice_items
-        invoice_moved = db.query(InvoiceItem).filter(
-            InvoiceItem.master_item_id == source_id
-        ).update({InvoiceItem.master_item_id: target_id})
-        merge_stats["invoice_items"] = invoice_moved
 
         # Move inventory records
         inventory_moved = db.query(Inventory).filter(
@@ -403,71 +380,18 @@ async def get_item_location_costs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get cost comparison by location for a master item"""
-    from sqlalchemy import func, desc
-    from restaurant_inventory.models.invoice import Invoice, InvoiceItem
-    from restaurant_inventory.models.location import Location
+    """
+    Get cost comparison by location for a master item.
 
-    # Query invoice items for this master item, grouped by location
-    location_stats = db.query(
-        Location.id.label('location_id'),
-        Location.name.label('location_name'),
-        func.count(InvoiceItem.id).label('invoice_count'),
-        func.avg(InvoiceItem.unit_price).label('avg_price'),
-        func.max(Invoice.invoice_date).label('last_invoice_date')
-    ).join(
-        Invoice, Invoice.id == InvoiceItem.invoice_id
-    ).join(
-        Location, Location.id == Invoice.location_id
-    ).filter(
-        InvoiceItem.master_item_id == item_id
-    ).group_by(
-        Location.id, Location.name
-    ).all()
-
-    if not location_stats:
-        return []
-
-    # Get the last price for each location (most recent invoice)
-    results = []
-    overall_avg = 0
-    total_count = 0
-
-    for stat in location_stats:
-        # Get the most recent price for this location
-        last_item = db.query(InvoiceItem.unit_price).join(
-            Invoice, Invoice.id == InvoiceItem.invoice_id
-        ).filter(
-            InvoiceItem.master_item_id == item_id,
-            Invoice.location_id == stat.location_id
-        ).order_by(desc(Invoice.invoice_date)).first()
-
-        last_price = last_item[0] if last_item else None
-        avg_price = float(stat.avg_price) if stat.avg_price else None
-
-        results.append({
-            'location_id': stat.location_id,
-            'location_name': stat.location_name,
-            'invoice_count': stat.invoice_count,
-            'last_price': last_price,
-            'avg_price': avg_price,
-            'last_invoice_date': stat.last_invoice_date.isoformat() if stat.last_invoice_date else None
-        })
-
-        if avg_price:
-            overall_avg += avg_price * stat.invoice_count
-            total_count += stat.invoice_count
-
-    # Calculate overall average and variance for each location
-    if total_count > 0:
-        overall_avg = overall_avg / total_count
-        for result in results:
-            if result['avg_price'] and overall_avg > 0:
-                result['variance_pct'] = ((result['avg_price'] - overall_avg) / overall_avg) * 100
-            else:
-                result['variance_pct'] = None
-
-    return results
+    DEPRECATED: Invoice data is now in Integration Hub.
+    This endpoint returns a redirect message.
+    """
+    return {
+        "message": "Invoice-based cost data has been moved to Integration Hub",
+        "redirect": "/hub/dashboard",
+        "reason": "Invoice data is now managed in the Integration Hub (source of truth)",
+        "results": []
+    }
 
 @router.post("/", response_model=MasterItemResponse)
 async def create_master_item(
@@ -604,7 +528,6 @@ async def delete_master_item(
     from restaurant_inventory.models.recipe import RecipeIngredient
     from restaurant_inventory.models.waste import WasteRecord
     from restaurant_inventory.models.count_session import CountSessionItem
-    from restaurant_inventory.models.invoice import InvoiceItem
     from restaurant_inventory.models.inventory_transaction import InventoryTransaction
 
     blocking_items = []
@@ -634,10 +557,8 @@ async def delete_master_item(
     if count_count > 0:
         blocking_items.append(f"{count_count} count session item(s)")
 
-    # Check invoice items
-    invoice_count = db.query(InvoiceItem).filter(InvoiceItem.master_item_id == item_id).count()
-    if invoice_count > 0:
-        blocking_items.append(f"{invoice_count} invoice item(s)")
+    # NOTE: Invoice items are now in Hub (source of truth)
+    # Deletion blocking for invoice items should be checked via Hub API if needed
 
     # Check inventory transactions
     transaction_count = db.query(InventoryTransaction).filter(InventoryTransaction.master_item_id == item_id).count()
@@ -677,61 +598,15 @@ async def parse_vendor_upload(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_manager_or_admin)
 ):
-    """Parse an uploaded vendor item list (CSV or Excel)"""
-    from restaurant_inventory.core.vendor_item_parser import VendorItemParser
+    """
+    Parse an uploaded vendor item list (CSV or Excel).
 
-    # Validate file type
-    allowed_extensions = {'.csv', '.xlsx', '.xls'}
-    file_ext = os.path.splitext(file.filename)[1].lower()
-
-    if file_ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File type not supported. Allowed types: {', '.join(allowed_extensions)}"
-        )
-
-    # Save uploaded file to temporary location
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
-            content = await file.read()
-            temp_file.write(content)
-            temp_path = temp_file.name
-
-        # Parse the file to get columns and sample data
-        parser = VendorItemParser()
-        result = parser.parse_file(temp_path, file_ext[1:])  # Remove the dot from extension
-
-        # Clean up temp file
-        os.unlink(temp_path)
-
-        if not result.get("success"):
-            raise HTTPException(
-                status_code=500,
-                detail=result.get("error", "Failed to parse vendor file")
-            )
-
-        # Get suggested column mapping
-        columns = result.get("data", {}).get("columns", [])
-        suggested_mapping = parser.get_suggested_mapping(columns)
-
-        # Return columns, sample data, and suggested mapping
-        return {
-            "columns": columns,
-            "sample_rows": result.get("data", {}).get("sample_rows", []),
-            "total_rows": result.get("data", {}).get("total_rows", 0),
-            "suggested_mapping": suggested_mapping
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        # Clean up temp file if it exists
-        if 'temp_path' in locals() and os.path.exists(temp_path):
-            os.unlink(temp_path)
-        import traceback
-        error_detail = f"{str(e)}\n{traceback.format_exc()}"
-        print(f"ERROR in parse_vendor_upload: {error_detail}")
-        raise HTTPException(status_code=500, detail=str(e))
+    DEPRECATED: Vendor items are now managed in Integration Hub.
+    """
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Vendor items are now managed in Integration Hub. Please use the Hub interface."
+    )
 
 
 @router.post("/preview-vendor-items")
@@ -741,160 +616,15 @@ async def preview_vendor_items(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_manager_or_admin)
 ):
-    """Preview all items from vendor file with column mapping"""
-    from restaurant_inventory.core.vendor_item_parser import VendorItemParser
-    from restaurant_inventory.models.unit_of_measure import UnitOfMeasure
-    import json
+    """
+    Preview all items from vendor file with column mapping.
 
-    # Validate file type
-    allowed_extensions = {'.csv', '.xlsx', '.xls'}
-    file_ext = os.path.splitext(file.filename)[1].lower()
-
-    if file_ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File type not supported. Allowed types: {', '.join(allowed_extensions)}"
-        )
-
-    if not column_mapping:
-        raise HTTPException(
-            status_code=400,
-            detail="Column mapping is required"
-        )
-
-    # Parse column_mapping from JSON string
-    try:
-        column_mapping_dict = json.loads(column_mapping)
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid column mapping format"
-        )
-
-    try:
-        # Save uploaded file to temporary location
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
-            content = await file.read()
-            temp_file.write(content)
-            temp_path = temp_file.name
-
-        # First, read the file to get raw data and find combined unit size field
-        parser = VendorItemParser()
-        import pandas as pd
-        if file_ext == '.csv':
-            df = pd.read_csv(temp_path)
-        else:
-            df = pd.read_excel(temp_path)
-
-        raw_result = parser.parse_file(temp_path, file_ext[1:], None)
-
-        # Parse the file with mapping to get ALL items
-        result = parser.parse_file(temp_path, file_ext[1:], column_mapping_dict)
-
-        # Clean up temp file
-        os.unlink(temp_path)
-
-        if not result.get("success"):
-            raise HTTPException(
-                status_code=500,
-                detail=result.get("error", "Failed to parse vendor file")
-            )
-
-        items_data = result.get("data", {}).get("items", [])
-
-        # Post-process: Extract units from combined "Unit size" field
-        # The vendor has "Unit size" (e.g., "5.0 LB") separate from "Pack size" (e.g., 6)
-        if raw_result.get("success") and items_data:
-            raw_data = raw_result.get("data", {})
-            raw_sample_rows = raw_data.get("sample_rows", [])
-            raw_columns = raw_data.get("columns", [])
-
-            # Find the vendor column that contains combined unit info
-            unit_size_column = None
-            for col in raw_columns:
-                col_lower = col.lower().strip()
-                # Look for "unit size" or similar
-                if ("unit" in col_lower and "size" in col_lower) or col_lower == "unit size":
-                    if raw_sample_rows and len(raw_sample_rows) > 0:
-                        sample_value = str(raw_sample_rows[0].get(col, ""))
-                        # Check if it contains combined format (number + space + letters)
-                        if " " in sample_value and any(c.isalpha() for c in sample_value):
-                            unit_size_column = col
-                            break
-
-            # If we found the unit size column, parse it for ALL rows
-            if unit_size_column:
-                # Extract both size and unit for each item from the DataFrame
-                for i, item_data in enumerate(items_data):
-                    if i < len(df):
-                        raw_unit_value = df.iloc[i][unit_size_column]
-                        size, unit = parser.parse_unit_size(str(raw_unit_value))
-                        if unit:
-                            item_data['unit'] = unit
-                        if size:
-                            # This is the weight/volume of each individual unit in the pack
-                            # e.g., "5.0 LB" means each bag is 5 pounds
-                            item_data['unit_size'] = size
-
-        # Get all available units from the system
-        units = db.query(UnitOfMeasure).filter(UnitOfMeasure.is_active == True).all()
-        unit_options = [{"id": u.id, "name": u.name, "abbreviation": u.abbreviation} for u in units]
-
-        # For each item, try to auto-match the unit and clean up currency
-        # Common vendor abbreviation mappings
-        vendor_unit_mappings = {
-            'co': 'ea',      # Count → Each
-            'count': 'ea',   # Count → Each
-            'foz': 'fl oz',  # Fluid Ounce
-            'floz': 'fl oz', # Fluid Ounce
-            'ct': 'ea',      # Count → Each
-        }
-
-        for item in items_data:
-            item_unit = item.get("unit", "").strip().lower()
-            matched_unit = None
-
-            # Apply vendor mapping if needed
-            mapped_unit = vendor_unit_mappings.get(item_unit, item_unit)
-
-            # Try to match by name or abbreviation
-            for unit in units:
-                if (unit.name and unit.name.lower() == mapped_unit) or \
-                   (unit.abbreviation and unit.abbreviation.lower() == mapped_unit):
-                    matched_unit = unit.id
-                    break
-
-            item["matched_unit_id"] = matched_unit
-            item["original_unit"] = item.get("unit", "")
-
-            # Clean up unit_cost if it's a string with currency formatting
-            if "unit_cost" in item:
-                unit_cost_value = item.get("unit_cost")
-                if isinstance(unit_cost_value, str):
-                    # Remove $ sign, commas, and whitespace
-                    cleaned_value = unit_cost_value.replace("$", "").replace(",", "").strip()
-                    try:
-                        item["unit_cost"] = float(cleaned_value)
-                    except (ValueError, AttributeError):
-                        item["unit_cost"] = None
-
-        return {
-            "success": True,
-            "items": items_data,
-            "total": len(items_data),
-            "unit_options": unit_options
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        # Clean up temp file if it exists
-        if 'temp_path' in locals() and os.path.exists(temp_path):
-            os.unlink(temp_path)
-        import traceback
-        error_detail = f"{str(e)}\n{traceback.format_exc()}"
-        print(f"ERROR in preview_vendor_items: {error_detail}")
-        raise HTTPException(status_code=500, detail=str(e))
+    DEPRECATED: Vendor items are now managed in Integration Hub.
+    """
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Vendor items are now managed in Integration Hub. Please use the Hub interface."
+    )
 
 
 @router.post("/import-vendor-items")
@@ -908,276 +638,16 @@ async def import_vendor_items(
     current_user: User = Depends(require_manager_or_admin),
     request: Request = None
 ):
-    """Import vendor items using specified column and unit mappings"""
-    from restaurant_inventory.core.vendor_item_parser import VendorItemParser
-    from restaurant_inventory.models.vendor import Vendor
-    import json
+    """
+    Import vendor items using specified column and unit mappings.
 
-    # Validate vendor_id
-    try:
-        vendor_id_int = int(vendor_id)
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid vendor ID"
-        )
-
-    # Verify vendor exists
-    vendor = db.query(Vendor).filter(Vendor.id == vendor_id_int).first()
-    if not vendor:
-        raise HTTPException(
-            status_code=404,
-            detail="Vendor not found"
-        )
-
-    # Validate file type
-    allowed_extensions = {'.csv', '.xlsx', '.xls'}
-    file_ext = os.path.splitext(file.filename)[1].lower()
-
-    if file_ext not in allowed_extensions:
-        raise HTTPException(
-            status_code=400,
-            detail=f"File type not supported. Allowed types: {', '.join(allowed_extensions)}"
-        )
-
-    if not column_mapping:
-        raise HTTPException(
-            status_code=400,
-            detail="Column mapping is required"
-        )
-
-    # Parse column_mapping from JSON string
-    try:
-        column_mapping_dict = json.loads(column_mapping)
-    except json.JSONDecodeError:
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid column mapping format"
-        )
-
-    # Parse unit_mappings from JSON string (maps vendor_item_code -> unit_id)
-    unit_mappings_dict = {}
-    if unit_mappings:
-        try:
-            unit_mappings_dict = json.loads(unit_mappings)
-        except json.JSONDecodeError:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid unit mappings format"
-            )
-
-    # Parse update_existing
-    update_existing_bool = update_existing.lower() == "true"
-
-    try:
-        # Save uploaded file to temporary location
-        with tempfile.NamedTemporaryFile(delete=False, suffix=file_ext) as temp_file:
-            content = await file.read()
-            temp_file.write(content)
-            temp_path = temp_file.name
-
-        # First, read the file to get raw data and find combined unit size field
-        parser = VendorItemParser()
-        import pandas as pd
-        if file_ext == '.csv':
-            df = pd.read_csv(temp_path)
-        else:
-            df = pd.read_excel(temp_path)
-
-        raw_result = parser.parse_file(temp_path, file_ext[1:], None)
-
-        # Parse the file with mapping
-        result = parser.parse_file(temp_path, file_ext[1:], column_mapping_dict)
-
-        # Clean up temp file
-        os.unlink(temp_path)
-
-        if not result.get("success"):
-            raise HTTPException(
-                status_code=500,
-                detail=result.get("error", "Failed to parse vendor file")
-            )
-
-        items_data = result.get("data", {}).get("items", [])
-
-        # Post-process: Extract units from combined "Unit size" field
-        if raw_result.get("success") and items_data:
-            raw_data = raw_result.get("data", {})
-            raw_sample_rows = raw_data.get("sample_rows", [])
-            raw_columns = raw_data.get("columns", [])
-
-            # Find the vendor column that contains combined unit info
-            unit_size_column = None
-            for col in raw_columns:
-                col_lower = col.lower().strip()
-                if ("unit" in col_lower and "size" in col_lower) or col_lower == "unit size":
-                    if raw_sample_rows and len(raw_sample_rows) > 0:
-                        sample_value = str(raw_sample_rows[0].get(col, ""))
-                        if " " in sample_value and any(c.isalpha() for c in sample_value):
-                            unit_size_column = col
-                            break
-
-            # If we found the unit size column, parse it for ALL rows
-            if unit_size_column:
-                for i, item_data in enumerate(items_data):
-                    if i < len(df):
-                        raw_unit_value = df.iloc[i][unit_size_column]
-                        size, unit = parser.parse_unit_size(str(raw_unit_value))
-                        if unit:
-                            item_data['unit'] = unit
-                        if size:
-                            item_data['unit_size'] = size
-
-        created_count = 0
-        updated_count = 0
-        skipped_count = 0
-
-        for item_data in items_data:
-            vendor_sku = item_data.get("vendor_item_code")
-            vendor_product_name = item_data.get("name")
-
-            # Convert vendor_sku to string (in case it's a number from Excel)
-            if vendor_sku is not None:
-                vendor_sku = str(vendor_sku)
-
-            # Clean up unit_cost if it's a string with currency formatting
-            if "unit_cost" in item_data and item_data.get("unit_cost"):
-                unit_cost_value = item_data.get("unit_cost")
-                if isinstance(unit_cost_value, str):
-                    # Remove $ sign, commas, and whitespace
-                    cleaned_value = unit_cost_value.replace("$", "").replace(",", "").strip()
-                    try:
-                        item_data["unit_cost"] = float(cleaned_value)
-                    except (ValueError, AttributeError):
-                        item_data["unit_cost"] = None
-
-            # Skip if no name
-            if not vendor_product_name:
-                skipped_count += 1
-                continue
-
-            # Get the mapped unit_id for this item (if provided)
-            purchase_unit_id = unit_mappings_dict.get(vendor_sku) if vendor_sku else None
-
-            if not purchase_unit_id:
-                # If no unit mapping provided, skip this item
-                skipped_count += 1
-                continue
-
-            # Try to find existing Master Item by name (exact match)
-            # Do NOT auto-create master items - import vendor items as "Not Linked"
-            master_item = db.query(MasterItem).filter(
-                MasterItem.name.ilike(vendor_product_name.strip())
-            ).first()
-
-            # master_item can be None - vendor item will be imported as "Not Linked"
-            master_item_id = master_item.id if master_item else None
-
-            # Try to find existing Vendor Item
-            existing_vendor_item = None
-            if master_item_id:
-                # Check by vendor and master item combination
-                existing_vendor_item = db.query(VendorItem).filter(
-                    VendorItem.vendor_id == vendor_id_int,
-                    VendorItem.master_item_id == master_item_id
-                ).first()
-
-            # Also check if there's one with matching vendor_sku
-            if not existing_vendor_item and vendor_sku:
-                existing_vendor_item = db.query(VendorItem).filter(
-                    VendorItem.vendor_id == vendor_id_int,
-                    VendorItem.vendor_sku == vendor_sku
-                ).first()
-
-            # Calculate conversion factor if we have both pack_size and unit_size
-            # conversion_factor = how many master item units are in one purchase unit (case)
-            # Example: 6 bags × 5.0 LB per bag = 30 LB per case
-            conversion_factor = 1.0  # Default
-            if item_data.get("pack_size") and item_data.get("unit_size"):
-                try:
-                    pack_count = float(item_data.get("pack_size"))
-                    size_per_unit = float(item_data.get("unit_size"))
-                    conversion_factor = pack_count * size_per_unit
-                except (ValueError, TypeError):
-                    conversion_factor = 1.0
-
-            if existing_vendor_item and update_existing_bool:
-                # Update existing vendor item
-                existing_vendor_item.vendor_product_name = vendor_product_name
-                existing_vendor_item.vendor_sku = vendor_sku
-                existing_vendor_item.purchase_unit_id = purchase_unit_id
-                existing_vendor_item.pack_size = str(item_data.get("pack_size")) if item_data.get("pack_size") else None
-                existing_vendor_item.conversion_factor = conversion_factor
-
-                # Update price if provided
-                if item_data.get("unit_cost"):
-                    try:
-                        new_price = float(item_data.get("unit_cost"))
-                        existing_vendor_item.unit_price = new_price
-                    except (ValueError, TypeError):
-                        pass
-
-                updated_count += 1
-
-            elif not existing_vendor_item:
-                # Create new Vendor Item
-                unit_price = None
-                if item_data.get("unit_cost"):
-                    try:
-                        unit_price = float(item_data.get("unit_cost"))
-                    except (ValueError, TypeError):
-                        pass
-
-                new_vendor_item = VendorItem(
-                    vendor_id=vendor_id_int,
-                    master_item_id=master_item_id,  # Can be None - "Not Linked"
-                    vendor_sku=vendor_sku,
-                    vendor_product_name=vendor_product_name,
-                    purchase_unit_id=purchase_unit_id,
-                    pack_size=str(item_data.get("pack_size")) if item_data.get("pack_size") else None,
-                    conversion_factor=conversion_factor,
-                    unit_price=unit_price,
-                    is_active=True
-                )
-                db.add(new_vendor_item)
-                created_count += 1
-            else:
-                # Existing item but update_existing is False
-                skipped_count += 1
-
-        db.commit()
-
-        # Log the import
-        log_audit_event(
-            db=db,
-            user=current_user,
-            action="import_vendor_items",
-            entity_type="vendor_item",
-            entity_id=vendor_id_int,
-            changes={
-                "vendor_id": vendor_id_int,
-                "vendor_name": vendor.name,
-                "filename": file.filename,
-                "created": created_count,
-                "updated": updated_count,
-                "skipped": skipped_count
-            }
-        )
-
-        return {
-            "success": True,
-            "created": created_count,
-            "updated": updated_count,
-            "skipped": skipped_count,
-            "total": len(items_data)
-        }
-
-    except Exception as e:
-        # Clean up temp file if it exists
-        if 'temp_path' in locals() and os.path.exists(temp_path):
-            os.unlink(temp_path)
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+    DEPRECATED: Vendor items are now managed in Integration Hub.
+    This endpoint is no longer functional.
+    """
+    raise HTTPException(
+        status_code=status.HTTP_410_GONE,
+        detail="Vendor items are now managed in Integration Hub. Please use the Hub interface to import vendor items."
+    )
 
 
 @router.post("/parse-master-upload")
