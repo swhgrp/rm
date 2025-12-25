@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** December 8, 2025
+**Last Updated:** December 25, 2025
 **Status:** ~90% Complete - Core Systems Production Ready ✅
-**Latest:** Website Manager mobile responsive + activity logging enhancements (Dec 8, 2025) ✅
+**Latest:** Hub source of truth consolidation + vendor items UI improvements (Dec 25, 2025) ✅
 
 ---
 
@@ -330,15 +330,11 @@ restaurant-system/
 - ✅ Portal SSO integration with JWT
 - ✅ Units of measure library with conversion factors
 
-**🌟 AI-Powered Invoice Processing (PRODUCTION READY):**
-- ✅ OpenAI GPT-4 integration for OCR and data extraction
-- ✅ Automatic line item parsing from PDF/image invoices
-- ✅ Vendor identification and invoice metadata extraction
-- ✅ Confidence scoring and anomaly detection
-- ✅ Manual review interface for AI-extracted data
-- ✅ Status workflow: UPLOADED → PARSING → PARSED → REVIEWED → APPROVED
-- ✅ Invoice item mapping to inventory items
-- ✅ Full-featured 69KB invoice management UI
+**🌟 Invoice Processing (via Integration Hub):**
+- ✅ **Note:** Invoice processing has moved to Integration Hub (source of truth)
+- ✅ Inventory receives processed invoice data via Hub API
+- ✅ Master items linked to vendor items in Hub
+- ✅ Price lookups via Hub's vendor item catalog
 
 **🌟 POS Integration (PRODUCTION READY):**
 - ✅ Clover, Square, and Toast POS support
@@ -622,13 +618,11 @@ restaurant-system/
 
 **Core Invoice Processing Features:**
 - ✅ Receives vendor invoices (email, manual upload, or API)
-- ✅ Maps invoice line items to inventory items (with bulk mapping)
+- ✅ Maps invoice line items to inventory master items (with bulk mapping)
 - ✅ Maps items to GL accounts (Asset, COGS, Waste, Revenue)
-- ✅ **Smart routing** - Sends to Inventory (inventory items) and/or Accounting (all items)
-- ✅ Sends mapped invoices to Inventory system via REST API
+- ✅ **Smart routing** - Creates journal entries in Accounting system
 - ✅ Creates and sends journal entries to Accounting system via REST API
-- ✅ Manages vendor master data across systems
-- ✅ Vendor sync from Inventory and Accounting systems
+- ✅ **Vendor items managed in Hub** - Inventory queries Hub for pricing/catalog
 - ✅ Invoice status tracking (pending → mapping → ready → sent/statement)
 - ✅ **Support for non-inventory items** - Propane, linen, janitorial, etc.
 
@@ -645,14 +639,14 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 ```
 
 **Integration Points:**
-- → **Inventory:** Sends processed invoices with item mappings
 - → **Accounting:** Creates balanced journal entries (Dr = Cr)
-- ← **Both Systems:** Syncs vendor master data
+- ← **Inventory:** Queries for master items, categories, units (via dblink)
 - ← **Email (IMAP):** Monitors for invoice PDFs
+- **Note:** Hub is source of truth for invoices, vendor items, and vendors
 
 **Note:** Integration Hub is an **internal invoice processing hub**, not a vendor API integration platform. It processes invoices from any vendor (email/upload) and routes data to internal systems.
 
-**[→ View Integration Hub Documentation](./integration-hub/README.md)** *(Updated 2025-11-08)*
+**[→ View Integration Hub Documentation](./integration-hub/README.md)** *(Updated 2025-12-25)*
 
 ---
 
@@ -1052,16 +1046,16 @@ docker compose exec inventory-db psql -U inventory_user -d inventory_db -c "\l+"
 - **Manages:** System permissions
 - **Sync:** Real-time via shared database
 
-### Integration Hub → Inventory
-- **Syncs:** Vendor product catalogs
-- **Updates:** Pricing information
-- **Tracks:** Stock availability from vendors
-- **Frequency:** Configurable (hourly, daily, weekly)
+### Integration Hub ↔ Inventory
+- **Hub provides:** Vendor items, pricing, invoice data (source of truth)
+- **Inventory provides:** Master items, categories, units (via dblink)
+- **Integration:** Hub queries Inventory DB directly for reference data
+- **Note:** No sync needed - Hub is authoritative for vendor data
 
-### Integration Hub → Accounting (Future)
-- **Syncs:** Vendor invoice data
-- **Tracks:** Payment confirmations
-- **Status:** Planned integration
+### Integration Hub → Accounting
+- **Creates:** Journal entries from processed invoices
+- **Tracks:** AP bills with GL account mappings
+- **Status:** Production (creates balanced Dr/Cr entries)
 
 ### POS Systems → Inventory
 - **Syncs:** Daily sales data
@@ -1290,8 +1284,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 3.1
-**Last Updated:** December 8, 2025
+**Version:** 3.2
+**Last Updated:** December 25, 2025
 **Maintained By:** SW Hospitality Group Development Team
 
 **For complete system details, see [SYSTEM_DOCUMENTATION.md](./SYSTEM_DOCUMENTATION.md)**
@@ -1299,6 +1293,34 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 ## 📝 Recent Updates
+
+### December 25, 2025 - Hub Source of Truth + Vendor Items UI 🎯
+
+**Integration Hub - Source of Truth Architecture**
+- ✅ **Hub owns:** Invoices, Vendor Items, Vendors (with alias normalization), GL Mappings
+- ✅ **Inventory owns:** Master Items, Categories, Units of Measure, Storage Areas
+- ✅ **dblink integration:** Hub queries Inventory DB for categories (hierarchical) and units
+
+**Hub Vendor Items - UI Improvements**
+- ✅ **Field Label Clarity:**
+  - "Purchase Unit" → "Base Unit" (what you count inventory in)
+  - "Conversion Factor" → "Quantity Per Case" (how many base units per case)
+  - "Unit Price" → "Case Price" / "Last Case Price"
+- ✅ **Removed Pack Size Field** - Redundant with Base Unit + Qty Per Case
+- ✅ **Hierarchical Categories** - Shows "Beer - Bottled" instead of just "Bottled"
+- ✅ **All 37 Units Available** - Fetched from Inventory via dblink
+
+**Inventory System - Hub Integration**
+- ✅ **Deprecated:** invoices.py, vendor_items.py, invoice_parser.py (moved to _deprecated/)
+- ✅ **Hub Proxy:** hub_vendor_items.py proxies to Hub for vendor item data
+- ✅ **Price Lookups:** Master items fetch last price from Hub vendor items
+
+**Files Modified:**
+- `integration-hub/src/integration_hub/main.py` (dblink queries)
+- `integration-hub/src/integration_hub/templates/hub_vendor_items.html` (UI)
+- `inventory/src/restaurant_inventory/` (cleanup, hub_client.py updates)
+
+---
 
 ### December 8, 2025 - Website Manager Mobile Responsive + Activity Logging 📱
 
