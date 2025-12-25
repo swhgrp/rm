@@ -6,9 +6,14 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h3>Invoices</h3>
-        <button class="btn btn-primary" onclick="showUploadModal()">
-            <i class="bi bi-upload"></i> Upload Invoice
-        </button>
+        <div>
+            <a href="/inventory/hub-invoices" class="btn btn-outline-primary me-2">
+                <i class="bi bi-cloud-arrow-down"></i> View Hub Invoices
+            </a>
+            <button class="btn btn-primary" onclick="showUploadModal()">
+                <i class="bi bi-upload"></i> Upload Invoice
+            </button>
+        </div>
     </div>
 
     <!-- Filters -->
@@ -720,8 +725,8 @@ function displayInvoiceDetail(invoice) {
                         <th>#</th>
                         <th>Description</th>
                         <th>SKU</th>
-                        <th>Pack Size</th>
-                        <th>UOM</th>
+                        <th>Purchase Unit</th>
+                        <th>Base Unit</th>
                         <th>Qty</th>
                         <th>Price</th>
                         <th>Total</th>
@@ -738,19 +743,35 @@ function displayInvoiceDetail(invoice) {
             const isUnmapped = !item.vendor_item_id || !item.unit_of_measure_id;
             const uomMissing = !item.unit_of_measure_id;
             const rowClass = isUnmapped ? 'table-danger' : (item.is_anomaly ? 'table-warning' : '');
+            // Get purchase unit info from vendor_item
+            const vi = item.vendor_item;
+            const convFactor = vi && vi.conversion_factor ? Math.round(vi.conversion_factor) : null;
+            const purchaseUnitAbbr = vi && vi.purchase_unit ? vi.purchase_unit.abbreviation : null;
+            const baseUnitName = vi && vi.purchase_unit ? vi.purchase_unit.name : null;
+
+            // Format Purchase Unit: "12 CS" or "1 EA"
+            let purchaseUnitDisplay = '-';
+            if (convFactor !== null && purchaseUnitAbbr) {
+                purchaseUnitDisplay = convFactor > 1 ? `${convFactor} <small class="text-muted">CS</small>` : `1 <small class="text-muted">EA</small>`;
+            } else if (item.pack_size) {
+                purchaseUnitDisplay = item.pack_size;
+            }
+
+            // Format Base Unit: "Bottle 750ml" or "Each"
+            let baseUnitDisplay = '-';
+            if (baseUnitName) {
+                baseUnitDisplay = baseUnitName;
+            } else if (item.unit_of_measure) {
+                baseUnitDisplay = item.unit_of_measure.name || item.unit_of_measure.abbreviation;
+            }
+
             html += `
                 <tr class="${rowClass}" data-item-id="${item.id}">
                     <td>${item.line_number || '-'}</td>
                     <td>${item.description}</td>
                     <td>${item.vendor_sku || '-'}</td>
-                    <td>${item.pack_size || '-'}</td>
-                    <td id="uomStatus-${item.id}">
-                        ${item.unit_of_measure_id && item.unit_of_measure ?
-                        `<span class="badge bg-success" title="Matched to: ${item.unit_of_measure.name}">${item.unit_of_measure.abbreviation}</span>` :
-                        item.unit_of_measure_id ?
-                        `<span class="badge bg-success" title="UOM ID: ${item.unit_of_measure_id}">ID: ${item.unit_of_measure_id}</span>` :
-                        `<span class="badge bg-danger" title="UOM Not Matched">Unmapped</span>`}
-                    </td>
+                    <td>${purchaseUnitDisplay}</td>
+                    <td>${baseUnitDisplay}</td>
                     <td>${item.quantity}</td>
                     <td>$${item.unit_price.toFixed(2)}</td>
                     <td>$${item.line_total.toFixed(2)}</td>
@@ -781,7 +802,7 @@ function displayInvoiceDetail(invoice) {
             `;
         });
     } else {
-        html += '<tr><td colspan="10" class="text-muted">No line items</td></tr>';
+        html += '<tr><td colspan="11" class="text-muted">No line items</td></tr>';
     }
 
     html += '</tbody></table></div>';

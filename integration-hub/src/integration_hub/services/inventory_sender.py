@@ -174,6 +174,7 @@ class InventorySenderService:
                 "description": item.item_description,
                 "quantity": float(item.quantity),
                 "unit_of_measure": item.unit_of_measure,
+                "pack_size": item.pack_size,  # Units per case (e.g., 12 for a 12-pack)
                 "unit_price": float(item.unit_price),
                 "line_total": float(item.line_total),
                 "category": item.inventory_category

@@ -27,14 +27,16 @@ def get_vendor_items_for_hub(
     db: Session = Depends(get_db)
 ):
     """
-    Get all vendor items for Integration Hub sync
+    Get all vendor items for Integration Hub sync/migration
     No authentication required - this is an internal API call from the hub
     IMPORTANT: This route must be defined BEFORE /{vendor_item_id} route
     Path starts with _ to avoid being matched by /{vendor_item_id} pattern
     """
     query = db.query(VendorItem).options(
         joinedload(VendorItem.vendor),
-        joinedload(VendorItem.master_item)
+        joinedload(VendorItem.master_item),
+        joinedload(VendorItem.purchase_unit),
+        joinedload(VendorItem.conversion_unit)
     )
 
     if vendor_id:
@@ -45,7 +47,7 @@ def get_vendor_items_for_hub(
 
     vendor_items = query.limit(limit).all()
 
-    # Return simple dict format for hub
+    # Return full dict format for hub migration
     item_list = []
     for vi in vendor_items:
         item_list.append({
@@ -57,9 +59,15 @@ def get_vendor_items_for_hub(
             "vendor_description": vi.vendor_description,
             "master_item_id": vi.master_item_id,
             "master_item_name": vi.master_item.name if vi.master_item else None,
-            "master_item_category": vi.master_item.category if vi.master_item else None,
+            "category": vi.master_item.category if vi.master_item else None,
+            "purchase_unit_id": vi.purchase_unit_id,
+            "purchase_unit_name": vi.purchase_unit.name if vi.purchase_unit else None,
+            "purchase_unit_abbr": vi.purchase_unit.abbreviation if vi.purchase_unit else None,
             "pack_size": vi.pack_size,
+            "conversion_factor": float(vi.conversion_factor) if vi.conversion_factor else 1.0,
+            "conversion_unit_id": vi.conversion_unit_id,
             "unit_price": float(vi.unit_price) if vi.unit_price else None,
+            "last_price": float(vi.last_price) if vi.last_price else None,
             "is_active": vi.is_active,
             "is_preferred": vi.is_preferred
         })

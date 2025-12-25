@@ -105,7 +105,7 @@ def get_invoice(
         joinedload(Invoice.reviewed_by),
         joinedload(Invoice.approved_by),
         joinedload(Invoice.items).joinedload(InvoiceItem.master_item),
-        joinedload(Invoice.items).joinedload(InvoiceItem.vendor_item),
+        joinedload(Invoice.items).joinedload(InvoiceItem.vendor_item).joinedload(VendorItem.purchase_unit),
         joinedload(Invoice.items).joinedload(InvoiceItem.unit_of_measure)
     ).filter(Invoice.id == invoice_id)
 

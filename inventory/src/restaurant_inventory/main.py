@@ -42,6 +42,8 @@ from restaurant_inventory.api.api_v1.endpoints import units
 from restaurant_inventory.api.api_v1.endpoints import dashboard
 from restaurant_inventory.api.api_v1.endpoints import vendor_items
 from restaurant_inventory.api.api_v1.endpoints import cache_management
+from restaurant_inventory.api.api_v1.endpoints import hub_invoices
+from restaurant_inventory.api.api_v1.endpoints import hub_vendor_items
 from restaurant_inventory.services.scheduler import start_scheduler, stop_scheduler
 
 logger = logging.getLogger(__name__)
@@ -151,6 +153,8 @@ app.include_router(units.router, prefix="/api/units", tags=["units"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"])
 app.include_router(vendor_items.router, prefix="/api/vendor-items", tags=["vendor-items"])
 app.include_router(cache_management.router, prefix="/api/cache", tags=["cache"])
+app.include_router(hub_invoices.router, prefix="/api/hub-invoices", tags=["hub-invoices"])
+app.include_router(hub_vendor_items.router, prefix="/api/hub-vendor-items", tags=["hub-vendor-items"])
 
 
 # Health check endpoint
@@ -297,6 +301,11 @@ async def transfers_page(request: Request):
 async def invoices_page(request: Request):
     """Invoices management page"""
     return templates.TemplateResponse("invoices.html", {"request": request})
+
+@app.get("/hub-invoices", response_class=HTMLResponse)
+async def hub_invoices_page(request: Request):
+    """Hub Invoices page - view invoices from Integration Hub"""
+    return templates.TemplateResponse("hub_invoices.html", {"request": request})
 
 @app.get("/storage-areas", response_class=HTMLResponse)
 async def storage_areas_page(request: Request):

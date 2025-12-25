@@ -237,17 +237,22 @@
 
     <!-- Invoice Items -->
     <div class="card mt-4">
-        <div class="card-header">
-            <i class="bi bi-list-ul"></i> Line Items ({{ items|length }})
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list-ul"></i> Line Items ({{ items|length }})</span>
+            <button class="btn btn-sm btn-outline-primary" onclick="toggleEditMode()">
+                <i class="bi bi-pencil"></i> <span id="editModeBtn">Edit Items</span>
+            </button>
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-sm table-hover">
+                <table class="table table-sm table-hover" id="lineItemsTable">
                     <thead>
                         <tr>
                             <th>#</th>
                             <th>Item Code</th>
                             <th>Description</th>
+                            <th>Purchase Unit</th>
+                            <th>Base Unit</th>
                             <th>Qty</th>
                             <th>Unit Price</th>
                             <th>Total</th>
@@ -259,7 +264,7 @@
                     </thead>
                     <tbody>
                         {% for item in items %}
-                        <tr>
+                        <tr data-item-id="{{ item.id }}">
                             <td>{{ item.line_number }}</td>
                             <td>
                                 {% if item.item_code %}
@@ -269,8 +274,41 @@
                                 {% endif %}
                             </td>
                             <td>{{ item.item_description }}</td>
-                            <td>{{ item.quantity }} {{ item.unit_of_measure or '' }}</td>
-                            <td>${{ "{:,.2f}".format(item.unit_price) }}</td>
+                            {% set vi_info = vendor_item_info.get(item.inventory_item_id, {}) %}
+                            {% set has_vendor_info = vi_info.get('conversion_factor') is not none %}
+                            <td>
+                                {% if has_vendor_info %}
+                                    {% set cf = vi_info.conversion_factor|int %}
+                                    {% if cf > 1 %}
+                                        {{ cf }} <small class="text-muted">CS</small>
+                                    {% else %}
+                                        1 <small class="text-muted">EA</small>
+                                    {% endif %}
+                                {% elif item.pack_size %}
+                                    {{ item.pack_size }} <small class="text-muted">{{ item.unit_of_measure or '?' }}</small>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if vi_info.get('purchase_unit') %}
+                                    {{ vi_info.purchase_unit }}
+                                {% elif item.unit_of_measure and not has_vendor_info %}
+                                    {{ item.unit_of_measure }}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="editable-cell" data-field="quantity">
+                                <span class="display-value">{% if item.quantity == item.quantity|int %}{{ item.quantity|int }}{% else %}{{ item.quantity }}{% endif %}</span>
+                                <input type="number" class="form-control form-control-sm edit-input"
+                                       value="{{ item.quantity }}" style="display: none; width: 70px;" step="0.001" min="0">
+                            </td>
+                            <td class="editable-cell" data-field="unit_price">
+                                <span class="display-value">${{ "{:,.2f}".format(item.unit_price) }}</span>
+                                <input type="number" class="form-control form-control-sm edit-input"
+                                       value="{{ "{:.2f}".format(item.unit_price) }}" style="display: none; width: 80px;" step="0.01" min="0">
+                            </td>
                             <td><strong>${{ "{:,.2f}".format(item.line_total) }}</strong></td>
                             <td>
                                 {% if item.inventory_category and item.inventory_category != 'Uncategorized' %}
@@ -308,16 +346,27 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if item.is_mapped %}
+                                {% if item.is_mapped and has_vendor_info %}
                                 <span class="text-success"><i class="bi bi-check-circle"></i> Mapped</span>
+                                {% elif item.is_mapped and not has_vendor_info %}
+                                <span class="text-warning" data-bs-toggle="tooltip" title="Vendor item needs purchase unit configuration in Inventory"><i class="bi bi-exclamation-triangle"></i> Incomplete</span>
                                 {% else %}
-                                <span class="text-warning"><i class="bi bi-exclamation-circle"></i> Unmapped</span>
+                                <span class="text-danger"><i class="bi bi-exclamation-circle"></i> Unmapped</span>
                                 {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+            <!-- Save button appears when in edit mode -->
+            <div id="editModeActions" style="display: none;" class="mt-3">
+                <button class="btn btn-success" onclick="saveAllItems()">
+                    <i class="bi bi-check-lg"></i> Save All Changes
+                </button>
+                <button class="btn btn-secondary" onclick="cancelEditMode()">
+                    <i class="bi bi-x-lg"></i> Cancel
+                </button>
             </div>
         </div>
     </div>
@@ -612,5 +661,87 @@ async function retryInvoice(system) {
 }
 
 // showAlert and showConfirm are defined in base.html
+
+// Inline editing functions
+let editMode = false;
+
+function toggleEditMode() {
+    editMode = !editMode;
+    const table = document.getElementById('lineItemsTable');
+    const displayValues = table.querySelectorAll('.display-value');
+    const editInputs = table.querySelectorAll('.edit-input');
+    const editModeActions = document.getElementById('editModeActions');
+    const editModeBtn = document.getElementById('editModeBtn');
+
+    if (editMode) {
+        displayValues.forEach(el => el.style.display = 'none');
+        editInputs.forEach(el => el.style.display = 'block');
+        editModeActions.style.display = 'block';
+        editModeBtn.textContent = 'Cancel Edit';
+    } else {
+        displayValues.forEach(el => el.style.display = '');
+        editInputs.forEach(el => el.style.display = 'none');
+        editModeActions.style.display = 'none';
+        editModeBtn.textContent = 'Edit Items';
+    }
+}
+
+function cancelEditMode() {
+    // Reset to display mode and reload to restore original values
+    editMode = false;
+    location.reload();
+}
+
+async function saveAllItems() {
+    const table = document.getElementById('lineItemsTable');
+    const rows = table.querySelectorAll('tbody tr[data-item-id]');
+    const updates = [];
+
+    rows.forEach(row => {
+        const itemId = row.dataset.itemId;
+        const cells = row.querySelectorAll('.editable-cell');
+        const itemData = { id: parseInt(itemId) };
+
+        cells.forEach(cell => {
+            const field = cell.dataset.field;
+            const input = cell.querySelector('.edit-input');
+            let value = input.value;
+
+            // Convert types appropriately
+            if (field === 'quantity' || field === 'unit_price') {
+                value = parseFloat(value) || 0;
+            } else if (field === 'pack_size') {
+                value = value ? parseInt(value) : null;
+            } else if (value === '') {
+                value = null;
+            }
+
+            itemData[field] = value;
+        });
+
+        updates.push(itemData);
+    });
+
+    try {
+        const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/items/bulk-update`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ items: updates })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            showToast('All items saved successfully!', 'Success', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showToast(`Error saving items: ${result.detail || 'Unknown error'}`, 'Error', 'error');
+        }
+    } catch (error) {
+        showToast(`Error saving items: ${error.message}`, 'Error', 'error');
+    }
+}
 </script>
 {% endblock %}

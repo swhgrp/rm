@@ -256,20 +256,92 @@
                     <div id="inventoryItemFields">
                         <h6 class="mb-3">Inventory Item Mapping</h6>
 
+                        <!-- Toggle between existing and new -->
                         <div class="mb-3">
-                            <label class="form-label">Vendor Item (Product) <span class="text-danger">*</span></label>
-                            <div class="searchable-select-wrapper">
-                                <input type="text" class="form-control search-input" id="searchInventoryItem" placeholder="Search by name, SKU, or vendor...">
-                                <select class="form-select" id="inventoryItemId" name="inventory_item_id" size="8">
-                                    <option value="">-- Select vendor item --</option>
-                                    {% for item in inventory_items %}
-                                    <option value="{{ item.id }}" data-category="{{ item.master_item_category or '' }}">
-                                        {{ item.vendor_name }}: {{ item.vendor_product_name }}{% if item.vendor_sku %} [{{ item.vendor_sku }}]{% endif %}{% if item.pack_size %} - {{ item.pack_size }}{% endif %}{% if item.master_item_category %} ({{ item.master_item_category }}){% endif %}
-                                    </option>
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="vendorItemMode" id="modeExisting" value="existing" checked>
+                                <label class="btn btn-outline-primary" for="modeExisting">
+                                    <i class="bi bi-search"></i> Select Existing
+                                </label>
+                                <input type="radio" class="btn-check" name="vendorItemMode" id="modeNew" value="new">
+                                <label class="btn btn-outline-success" for="modeNew">
+                                    <i class="bi bi-plus-circle"></i> Create New
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Existing vendor item selection -->
+                        <div id="existingVendorItemFields">
+                            <div class="mb-3">
+                                <label class="form-label">Vendor Item (Product) <span class="text-danger">*</span></label>
+                                <div class="searchable-select-wrapper">
+                                    <input type="text" class="form-control search-input" id="searchInventoryItem" placeholder="Search by name, SKU, or vendor...">
+                                    <select class="form-select" id="inventoryItemId" name="inventory_item_id" size="8">
+                                        <option value="">-- Select vendor item --</option>
+                                        {% for item in inventory_items %}
+                                        <option value="{{ item.id }}" data-category="{{ item.master_item_category or '' }}">
+                                            {{ item.vendor_name }}: {{ item.vendor_product_name }}{% if item.vendor_sku %} [{{ item.vendor_sku }}]{% endif %}{% if item.pack_size %} - {{ item.pack_size }}{% endif %}{% if item.master_item_category %} ({{ item.master_item_category }}){% endif %}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <small class="text-muted">Select the vendor product from inventory. Category and GL accounts are determined automatically.</small>
+                            </div>
+                        </div>
+
+                        <!-- New vendor item creation -->
+                        <div id="newVendorItemFields" style="display: none;">
+                            <div class="alert alert-success mb-3">
+                                <i class="bi bi-info-circle"></i> Create a new vendor item in Hub. It will be synced to Inventory automatically.
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Vendor <span class="text-danger">*</span></label>
+                                <select class="form-select" id="newVendorId" name="new_vendor_id">
+                                    <option value="">-- Select vendor --</option>
+                                    {% for vendor in vendors %}
+                                    <option value="{{ vendor.id }}">{{ vendor.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
-                            <small class="text-muted">Select the vendor product from inventory. Category and GL accounts are determined automatically.</small>
+
+                            <div class="mb-3">
+                                <label class="form-label">Product Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" id="newProductName" placeholder="e.g., Tomatoes Roma 25lb Case">
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Vendor SKU</label>
+                                    <input type="text" class="form-control" id="newVendorSku" placeholder="e.g., 123456">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Category <span class="text-danger">*</span></label>
+                                    <select class="form-select" id="newCategory" name="new_category">
+                                        <option value="">-- Select category --</option>
+                                        {% for mapping in category_mappings %}
+                                        <option value="{{ mapping.inventory_category }}">{{ mapping.inventory_category }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Purchase Unit</label>
+                                    <select class="form-select" id="newPurchaseUnit">
+                                        <option value="1">Each</option>
+                                        <option value="2">Case</option>
+                                        <option value="3">Pound</option>
+                                        <option value="4">Gallon</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Conversion Factor</label>
+                                    <input type="number" class="form-control" id="newConversionFactor" value="1" step="0.01" min="0.01">
+                                    <small class="text-muted">Units per purchase unit</small>
+                                </div>
+                            </div>
                         </div>
 
                         <div id="selectedItemInfo" class="alert alert-light" style="display: none;">
@@ -804,6 +876,27 @@ function setupItemTypeListeners() {
     expenseRadio.addEventListener('change', toggleFields);
     depositRadio.addEventListener('change', toggleFields);
 
+    // Set up vendor item mode toggle (existing vs new)
+    const modeExisting = document.getElementById('modeExisting');
+    const modeNew = document.getElementById('modeNew');
+    const existingFields = document.getElementById('existingVendorItemFields');
+    const newFields = document.getElementById('newVendorItemFields');
+
+    function toggleVendorItemMode() {
+        if (modeExisting.checked) {
+            existingFields.style.display = 'block';
+            newFields.style.display = 'none';
+        } else {
+            existingFields.style.display = 'none';
+            newFields.style.display = 'block';
+        }
+    }
+
+    if (modeExisting && modeNew) {
+        modeExisting.addEventListener('change', toggleVendorItemMode);
+        modeNew.addEventListener('change', toggleVendorItemMode);
+    }
+
     // Set up vendor item selection to show category
     const inventoryItemSelect = document.getElementById('inventoryItemId');
     if (inventoryItemSelect) {
@@ -814,6 +907,23 @@ function setupItemTypeListeners() {
             const categorySpan = document.getElementById('selectedCategory');
 
             if (category && this.value) {
+                categorySpan.textContent = category;
+                infoDiv.style.display = 'block';
+            } else {
+                infoDiv.style.display = 'none';
+            }
+        });
+    }
+
+    // Set up new category selection to show category info
+    const newCategorySelect = document.getElementById('newCategory');
+    if (newCategorySelect) {
+        newCategorySelect.addEventListener('change', function() {
+            const category = this.value;
+            const infoDiv = document.getElementById('selectedItemInfo');
+            const categorySpan = document.getElementById('selectedCategory');
+
+            if (category) {
                 categorySpan.textContent = category;
                 infoDiv.style.display = 'block';
             } else {
@@ -935,35 +1045,107 @@ async function saveMapping() {
     let inventoryItemId, category, assetAccount, cogsAccount, wasteAccount;
 
     if (itemType === 'inventory') {
-        // Inventory item validation
-        const inventorySelect = document.getElementById('inventoryItemId');
-        inventoryItemId = inventorySelect.value;
+        // Check if we're in "Create New" mode or "Select Existing" mode
+        const vendorItemMode = document.querySelector('input[name="vendorItemMode"]:checked');
+        const isCreateNewMode = vendorItemMode && vendorItemMode.value === 'new';
 
-        if (!inventoryItemId) {
-            await showAlert('Please select a vendor item from inventory', 'Validation Error');
-            return;
+        if (isCreateNewMode) {
+            // Create new vendor item mode
+            const newVendorId = document.getElementById('newVendorId').value;
+            const newProductName = document.getElementById('newProductName').value.trim();
+            const newVendorSku = document.getElementById('newVendorSku').value.trim();
+            const newCategory = document.getElementById('newCategory').value;
+            const newPurchaseUnit = document.getElementById('newPurchaseUnit').value;
+            const newConversionFactor = document.getElementById('newConversionFactor').value || 1;
+
+            if (!newVendorId) {
+                await showAlert('Please select a vendor', 'Validation Error');
+                return;
+            }
+            if (!newProductName) {
+                await showAlert('Please enter a product name', 'Validation Error');
+                return;
+            }
+            if (!newCategory) {
+                await showAlert('Please select a category', 'Validation Error');
+                return;
+            }
+
+            // Fetch GL accounts from category mapping
+            const categoryGLs = await fetchCategoryGLAccounts(newCategory);
+            if (!categoryGLs) {
+                await showAlert(`No GL account mapping found for category: ${newCategory}`, 'Error');
+                return;
+            }
+
+            // Create the new vendor item via API
+            try {
+                const createResponse = await fetch('/hub/api/v1/vendor-items/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        vendor_id: parseInt(newVendorId),
+                        vendor_product_name: newProductName,
+                        vendor_sku: newVendorSku || null,
+                        category: newCategory,
+                        purchase_unit_id: parseInt(newPurchaseUnit),
+                        conversion_factor: parseFloat(newConversionFactor),
+                        is_active: true
+                    })
+                });
+
+                if (!createResponse.ok) {
+                    const error = await createResponse.json();
+                    await showAlert(`Failed to create vendor item: ${error.detail || 'Unknown error'}`, 'Error');
+                    return;
+                }
+
+                const newItem = await createResponse.json();
+                inventoryItemId = newItem.id;
+                category = newCategory;
+                console.log('Created new vendor item:', newItem);
+            } catch (error) {
+                console.error('Error creating vendor item:', error);
+                await showAlert(`Error creating vendor item: ${error.message}`, 'Error');
+                return;
+            }
+
+            // Set GL accounts from category mapping
+            assetAccount = categoryGLs.gl_asset_account;
+            cogsAccount = categoryGLs.gl_cogs_account;
+            wasteAccount = categoryGLs.gl_waste_account;
+
+        } else {
+            // Select existing vendor item mode
+            const inventorySelect = document.getElementById('inventoryItemId');
+            inventoryItemId = inventorySelect.value;
+
+            if (!inventoryItemId) {
+                await showAlert('Please select a vendor item from inventory', 'Validation Error');
+                return;
+            }
+
+            // Get category from selected option's data attribute
+            const selectedOption = inventorySelect.options[inventorySelect.selectedIndex];
+            category = selectedOption.getAttribute('data-category');
+
+            if (!category) {
+                await showAlert('Selected vendor item has no category assigned. Please select a different item or contact admin.', 'Error');
+                return;
+            }
+
+            // Fetch GL accounts from category mapping
+            const categoryGLs = await fetchCategoryGLAccounts(category);
+            if (!categoryGLs) {
+                await showAlert(`No GL account mapping found for category: ${category}`, 'Error');
+                return;
+            }
+
+            // Set GL accounts from category mapping
+            assetAccount = categoryGLs.gl_asset_account;
+            cogsAccount = categoryGLs.gl_cogs_account;
+            wasteAccount = categoryGLs.gl_waste_account;
         }
-
-        // Get category from selected option's data attribute
-        const selectedOption = inventorySelect.options[inventorySelect.selectedIndex];
-        category = selectedOption.getAttribute('data-category');
-
-        if (!category) {
-            await showAlert('Selected vendor item has no category assigned. Please select a different item or contact admin.', 'Error');
-            return;
-        }
-
-        // Fetch GL accounts from category mapping
-        const categoryGLs = await fetchCategoryGLAccounts(category);
-        if (!categoryGLs) {
-            await showAlert(`No GL account mapping found for category: ${category}`, 'Error');
-            return;
-        }
-
-        // Set GL accounts from category mapping
-        assetAccount = categoryGLs.gl_asset_account;
-        cogsAccount = categoryGLs.gl_cogs_account;
-        wasteAccount = categoryGLs.gl_waste_account;
 
         // Update hidden fields
         document.getElementById('glAssetAccount').value = assetAccount;

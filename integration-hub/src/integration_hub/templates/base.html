@@ -417,7 +417,9 @@
             <li><a href="/hub/category-mappings" class="{% if '/category-mappings' in request.url.path %}active{% endif %}"><i class="bi bi-list-ul"></i> Category Mappings</a></li>
             <!-- Item Codes page still accessible at /hub/item-codes but removed from main nav -->
             <!-- Fix Code functionality now integrated into Unmapped Items page -->
-            <li><a href="/hub/vendors" class="{% if '/vendors' in request.url.path %}active{% endif %}"><i class="bi bi-building"></i> Vendors</a></li>
+            <li><a href="/hub/vendors" class="{% if request.url.path == '/hub/vendors' %}active{% endif %}"><i class="bi bi-building"></i> Vendors</a></li>
+            <li><a href="/hub/vendor-items" class="{% if '/vendor-items' in request.url.path %}active{% endif %}"><i class="bi bi-box-seam"></i> Vendor Items</a></li>
+            <li><a href="/hub/duplicates" class="{% if '/duplicates' in request.url.path %}active{% endif %}"><i class="bi bi-files"></i> Duplicates</a></li>
             <li><a href="/hub/settings" class="{% if '/settings' in request.url.path %}active{% endif %}"><i class="bi bi-gear"></i> Settings</a></li>
         </ul>
     </div>

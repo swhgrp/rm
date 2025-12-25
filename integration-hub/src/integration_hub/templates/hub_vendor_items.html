@@ -1,0 +1,688 @@
+{% extends "base.html" %}
+
+{% block title %}Vendor Items - Integration Hub{% endblock %}
+
+{% block page_title %}Vendor Items{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1><i class="bi bi-box-seam"></i> Vendor Items</h1>
+            <div>
+                <button class="btn btn-outline-secondary me-2" onclick="exportVendorItems()">
+                    <i class="bi bi-download"></i> Export
+                </button>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVendorItemModal">
+                    <i class="bi bi-plus-circle"></i> Add Vendor Item
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body py-3">
+                    <h3 class="mb-0" id="totalCount">{{ stats.total }}</h3>
+                    <small class="text-muted">Total Items</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body py-3">
+                    <h3 class="mb-0 text-success" id="activeCount">{{ stats.active }}</h3>
+                    <small class="text-muted">Active</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body py-3">
+                    <h3 class="mb-0 text-info" id="syncedCount">{{ stats.synced }}</h3>
+                    <small class="text-muted">Synced to Inventory</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body py-3">
+                    <h3 class="mb-0 text-warning" id="vendorCount">{{ stats.vendors }}</h3>
+                    <small class="text-muted">Vendors</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="row align-items-center">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search by name, SKU, or category..." onkeyup="filterItems()">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" id="vendorFilter" onchange="filterItems()">
+                        <option value="">All Vendors</option>
+                        {% for vendor in vendors %}
+                        <option value="{{ vendor.id }}">{{ vendor.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" id="categoryFilter" onchange="filterItems()">
+                        <option value="">All Categories</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" id="statusFilter" onchange="filterItems()">
+                        <option value="active">Active Only</option>
+                        <option value="inactive">Inactive Only</option>
+                        <option value="all">All</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select" id="syncFilter" onchange="filterItems()">
+                        <option value="">Sync Status</option>
+                        <option value="synced">Synced</option>
+                        <option value="not_synced">Not Synced</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Items Table -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list"></i> Vendor Items <span id="filteredCount" class="badge bg-secondary ms-2"></span></span>
+            <div>
+                <button class="btn btn-sm btn-outline-secondary" onclick="selectAll()" title="Select All">
+                    <i class="bi bi-check-square"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger ms-1" onclick="bulkDeactivate()" title="Deactivate Selected">
+                    <i class="bi bi-x-circle"></i>
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                <table class="table table-hover table-sm mb-0">
+                    <thead style="position: sticky; top: 0; background: var(--bg-tertiary); z-index: 1;">
+                        <tr>
+                            <th style="width: 30px;">
+                                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)">
+                            </th>
+                            <th>Vendor</th>
+                            <th>Product Name</th>
+                            <th>SKU</th>
+                            <th>Category</th>
+                            <th>Master Item</th>
+                            <th>Pack Size</th>
+                            <th>Unit Price</th>
+                            <th>Sync</th>
+                            <th>Status</th>
+                            <th style="width: 80px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTableBody">
+                        {% for item in vendor_items %}
+                        <tr data-id="{{ item.id }}"
+                            data-vendor-id="{{ item.vendor_id }}"
+                            data-category="{{ item.category or '' }}"
+                            data-active="{{ item.is_active }}"
+                            data-synced="{{ item.synced_to_inventory }}"
+                            class="{% if not item.is_active %}table-secondary{% endif %}">
+                            <td>
+                                <input type="checkbox" class="item-checkbox" value="{{ item.id }}">
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ item.vendor.name if item.vendor else 'Unknown' }}</small>
+                            </td>
+                            <td>
+                                <strong>{{ item.vendor_product_name }}</strong>
+                                {% if item.vendor_description %}
+                                <br><small class="text-muted">{{ item.vendor_description[:50] }}{% if item.vendor_description|length > 50 %}...{% endif %}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.vendor_sku %}
+                                <code>{{ item.vendor_sku }}</code>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.category %}
+                                <span class="badge bg-info">{{ item.category }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.inventory_master_item_name %}
+                                <small>{{ item.inventory_master_item_name }}</small>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ item.pack_size or '-' }}</td>
+                            <td>
+                                {% if item.unit_price %}
+                                ${{ "%.2f"|format(item.unit_price) }}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.synced_to_inventory %}
+                                <span class="badge bg-success" title="Synced to Inventory"><i class="bi bi-check-circle"></i></span>
+                                {% else %}
+                                <span class="badge bg-secondary" title="Not Synced"><i class="bi bi-dash-circle"></i></span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.is_active %}
+                                <span class="badge bg-success">Active</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="editItem({{ item.id }})" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                {% if item.is_active %}
+                                <button class="btn btn-sm btn-outline-danger" onclick="deactivateItem({{ item.id }})" title="Deactivate">
+                                    <i class="bi bi-x-circle"></i>
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm btn-outline-success" onclick="activateItem({{ item.id }})" title="Activate">
+                                    <i class="bi bi-check-circle"></i>
+                                </button>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Vendor Item Modal -->
+<div class="modal fade" id="addVendorItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-plus-circle"></i> Add Vendor Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="addVendorItemForm" onsubmit="submitAddForm(event)">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Vendor <span class="text-danger">*</span></label>
+                            <select class="form-select" id="addVendorId" required>
+                                <option value="">Select Vendor</option>
+                                {% for vendor in vendors %}
+                                <option value="{{ vendor.id }}">{{ vendor.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Vendor SKU</label>
+                            <input type="text" class="form-control" id="addVendorSku" placeholder="e.g., 123456">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Product Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="addProductName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="addDescription" rows="2"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Category</label>
+                            <select class="form-select" id="addCategory">
+                                <option value="">Select Category</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat }}">{{ cat }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Purchase Unit <span class="text-danger">*</span></label>
+                            <select class="form-select" id="addPurchaseUnit" required>
+                                {% for unit in units %}
+                                <option value="{{ unit.id }}">{{ unit.name }} ({{ unit.abbreviation }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Conversion Factor</label>
+                            <input type="number" class="form-control" id="addConversionFactor" value="1" min="0.001" step="0.001">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Pack Size</label>
+                            <input type="text" class="form-control" id="addPackSize" placeholder="e.g., Case - 6">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Unit Price</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="addUnitPrice" min="0" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Add Item
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Vendor Item Modal -->
+<div class="modal fade" id="editVendorItemModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Vendor Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editVendorItemForm" onsubmit="submitEditForm(event)">
+                <input type="hidden" id="editItemId">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Vendor <span class="text-danger">*</span></label>
+                            <select class="form-select" id="editVendorId" required>
+                                {% for vendor in vendors %}
+                                <option value="{{ vendor.id }}">{{ vendor.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Vendor SKU</label>
+                            <input type="text" class="form-control" id="editVendorSku">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Product Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="editProductName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" id="editDescription" rows="2"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Category</label>
+                            <select class="form-select" id="editCategory">
+                                <option value="">Select Category</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat }}">{{ cat }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Purchase Unit <span class="text-danger">*</span></label>
+                            <select class="form-select" id="editPurchaseUnit" required>
+                                {% for unit in units %}
+                                <option value="{{ unit.id }}">{{ unit.name }} ({{ unit.abbreviation }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Conversion Factor</label>
+                            <input type="number" class="form-control" id="editConversionFactor" min="0.001" step="0.001">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Pack Size</label>
+                            <input type="text" class="form-control" id="editPackSize">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Unit Price</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                <input type="number" class="form-control" id="editUnitPrice" min="0" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Master Item</label>
+                            <input type="text" class="form-control" id="editMasterItemName" readonly>
+                            <small class="text-muted">Set via invoice mapping workflow</small>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" id="editNotes" rows="2"></textarea>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Filter items based on search and dropdowns
+function filterItems() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const vendorId = document.getElementById('vendorFilter').value;
+    const category = document.getElementById('categoryFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    const syncStatus = document.getElementById('syncFilter').value;
+
+    const rows = document.querySelectorAll('#itemsTableBody tr');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const text = row.textContent.toLowerCase();
+        const rowVendorId = row.dataset.vendorId;
+        const rowCategory = row.dataset.category;
+        const rowActive = row.dataset.active === 'True';
+        const rowSynced = row.dataset.synced === 'True';
+
+        let show = true;
+
+        // Search filter
+        if (search && !text.includes(search)) {
+            show = false;
+        }
+
+        // Vendor filter
+        if (vendorId && rowVendorId !== vendorId) {
+            show = false;
+        }
+
+        // Category filter
+        if (category && rowCategory !== category) {
+            show = false;
+        }
+
+        // Status filter
+        if (status === 'active' && !rowActive) {
+            show = false;
+        } else if (status === 'inactive' && rowActive) {
+            show = false;
+        }
+
+        // Sync filter
+        if (syncStatus === 'synced' && !rowSynced) {
+            show = false;
+        } else if (syncStatus === 'not_synced' && rowSynced) {
+            show = false;
+        }
+
+        row.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
+    });
+
+    document.getElementById('filteredCount').textContent = `${visibleCount} shown`;
+}
+
+// Toggle select all checkbox
+function toggleSelectAll(checkbox) {
+    const checkboxes = document.querySelectorAll('#itemsTableBody tr:not([style*="display: none"]) .item-checkbox');
+    checkboxes.forEach(cb => cb.checked = checkbox.checked);
+}
+
+// Select all visible items
+function selectAll() {
+    const checkboxes = document.querySelectorAll('#itemsTableBody tr:not([style*="display: none"]) .item-checkbox');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => cb.checked = !allChecked);
+    document.getElementById('selectAllCheckbox').checked = !allChecked;
+}
+
+// Bulk deactivate selected items
+async function bulkDeactivate() {
+    const checkboxes = document.querySelectorAll('.item-checkbox:checked');
+    if (checkboxes.length === 0) {
+        alert('Please select items to deactivate');
+        return;
+    }
+
+    if (!await showConfirm(`Deactivate ${checkboxes.length} selected items?`)) {
+        return;
+    }
+
+    const ids = Array.from(checkboxes).map(cb => cb.value);
+    let successCount = 0;
+
+    for (const id of ids) {
+        try {
+            const response = await fetch(`/hub/api/v1/vendor-items/${id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ is_active: false })
+            });
+            if (response.ok) successCount++;
+        } catch (e) {
+            console.error(`Error deactivating item ${id}:`, e);
+        }
+    }
+
+    alert(`Deactivated ${successCount} of ${ids.length} items`);
+    location.reload();
+}
+
+// Edit item
+async function editItem(id) {
+    try {
+        const response = await fetch(`/hub/api/v1/vendor-items/${id}`);
+        if (!response.ok) throw new Error('Failed to fetch item');
+
+        const item = await response.json();
+
+        document.getElementById('editItemId').value = item.id;
+        document.getElementById('editVendorId').value = item.vendor_id;
+        document.getElementById('editVendorSku').value = item.vendor_sku || '';
+        document.getElementById('editProductName').value = item.vendor_product_name;
+        document.getElementById('editDescription').value = item.vendor_description || '';
+        document.getElementById('editCategory').value = item.category || '';
+        document.getElementById('editPurchaseUnit').value = item.purchase_unit_id;
+        document.getElementById('editConversionFactor').value = item.conversion_factor || 1;
+        document.getElementById('editPackSize').value = item.pack_size || '';
+        document.getElementById('editUnitPrice').value = item.unit_price || '';
+        document.getElementById('editMasterItemName').value = item.inventory_master_item_name || 'Not linked';
+        document.getElementById('editNotes').value = item.notes || '';
+
+        const modal = new bootstrap.Modal(document.getElementById('editVendorItemModal'));
+        modal.show();
+    } catch (error) {
+        alert(`Error loading item: ${error.message}`);
+    }
+}
+
+// Submit edit form
+async function submitEditForm(event) {
+    event.preventDefault();
+
+    const id = document.getElementById('editItemId').value;
+    const data = {
+        vendor_id: parseInt(document.getElementById('editVendorId').value),
+        vendor_sku: document.getElementById('editVendorSku').value || null,
+        vendor_product_name: document.getElementById('editProductName').value,
+        vendor_description: document.getElementById('editDescription').value || null,
+        category: document.getElementById('editCategory').value || null,
+        purchase_unit_id: parseInt(document.getElementById('editPurchaseUnit').value),
+        conversion_factor: parseFloat(document.getElementById('editConversionFactor').value) || 1,
+        pack_size: document.getElementById('editPackSize').value || null,
+        unit_price: parseFloat(document.getElementById('editUnitPrice').value) || null,
+        notes: document.getElementById('editNotes').value || null
+    };
+
+    try {
+        const response = await fetch(`/hub/api/v1/vendor-items/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('editVendorItemModal')).hide();
+            showToast('Success', 'Vendor item updated successfully', 'success');
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert(`Error: ${error.detail || 'Failed to update item'}`);
+        }
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// Submit add form
+async function submitAddForm(event) {
+    event.preventDefault();
+
+    const data = {
+        vendor_id: parseInt(document.getElementById('addVendorId').value),
+        vendor_sku: document.getElementById('addVendorSku').value || null,
+        vendor_product_name: document.getElementById('addProductName').value,
+        vendor_description: document.getElementById('addDescription').value || null,
+        category: document.getElementById('addCategory').value || null,
+        purchase_unit_id: parseInt(document.getElementById('addPurchaseUnit').value),
+        conversion_factor: parseFloat(document.getElementById('addConversionFactor').value) || 1,
+        pack_size: document.getElementById('addPackSize').value || null,
+        unit_price: parseFloat(document.getElementById('addUnitPrice').value) || null,
+        is_active: true
+    };
+
+    try {
+        const response = await fetch('/hub/api/v1/vendor-items/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('addVendorItemModal')).hide();
+            showToast('Success', 'Vendor item created successfully', 'success');
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert(`Error: ${error.detail || 'Failed to create item'}`);
+        }
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// Deactivate single item
+async function deactivateItem(id) {
+    if (!await showConfirm('Deactivate this vendor item?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hub/api/v1/vendor-items/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_active: false })
+        });
+
+        if (response.ok) {
+            showToast('Success', 'Item deactivated', 'success');
+            location.reload();
+        } else {
+            alert('Failed to deactivate item');
+        }
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// Activate single item
+async function activateItem(id) {
+    try {
+        const response = await fetch(`/hub/api/v1/vendor-items/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_active: true })
+        });
+
+        if (response.ok) {
+            showToast('Success', 'Item activated', 'success');
+            location.reload();
+        } else {
+            alert('Failed to activate item');
+        }
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// Export vendor items to CSV
+async function exportVendorItems() {
+    try {
+        const response = await fetch('/hub/api/v1/vendor-items/?page=1&page_size=5000');
+        const items = await response.json();
+
+        // Build CSV
+        const headers = ['Vendor', 'Product Name', 'SKU', 'Category', 'Master Item', 'Pack Size', 'Unit Price', 'Status'];
+        const rows = items.items.map(item => [
+            item.vendor_name || '',
+            item.vendor_product_name || '',
+            item.vendor_sku || '',
+            item.category || '',
+            item.inventory_master_item_name || '',
+            item.pack_size || '',
+            item.unit_price || '',
+            item.is_active ? 'Active' : 'Inactive'
+        ]);
+
+        const csvContent = [headers, ...rows].map(row =>
+            row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+        ).join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `vendor_items_${new Date().toISOString().split('T')[0]}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (error) {
+        alert(`Error exporting: ${error.message}`);
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    filterItems();
+});
+</script>
+{% endblock %}

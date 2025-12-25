@@ -1,0 +1,448 @@
+{% extends "base.html" %}
+
+{% block title %}Hub Invoices - SW Hospitality Group{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3>Hub Invoices</h3>
+            <small class="text-muted">Viewing invoices from Integration Hub (source of truth)</small>
+        </div>
+        <div>
+            <span id="hubStatus" class="badge bg-secondary">Checking Hub...</span>
+            <a href="/inventory/invoices" class="btn btn-outline-secondary ms-2">
+                <i class="bi bi-arrow-left"></i> Local Invoices
+            </a>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size: 13px;">Location</label>
+                    <select class="form-select form-select-sm" id="filterLocation">
+                        <option value="">All Locations</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label" style="font-size: 13px;">Vendor</label>
+                    <input type="text" class="form-control form-control-sm" id="filterVendor" placeholder="Vendor name">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" style="font-size: 13px;">Status</label>
+                    <select class="form-select form-select-sm" id="filterStatus">
+                        <option value="">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="parsing">Parsing</option>
+                        <option value="mapping">Needs Mapping</option>
+                        <option value="ready">Ready</option>
+                        <option value="sent">Sent</option>
+                        <option value="error">Error</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" style="font-size: 13px;">Sent to Inventory</label>
+                    <select class="form-select form-select-sm" id="filterSent">
+                        <option value="">All</option>
+                        <option value="true">Yes</option>
+                        <option value="false">No</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label" style="font-size: 13px;">&nbsp;</label>
+                    <div>
+                        <button class="btn btn-primary btn-sm" onclick="loadInvoices()">Apply</button>
+                        <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Clear</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Invoice List -->
+    <div class="card">
+        <div class="card-body">
+            <div id="invoiceList">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Loading invoices from Hub...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <nav id="pagination" class="mt-3" style="display: none;">
+        <ul class="pagination justify-content-center">
+        </ul>
+    </nav>
+</div>
+
+<!-- Invoice Detail Modal -->
+<div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="detailModalTitle">Invoice Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="invoiceDetail"></div>
+            </div>
+            <div class="modal-footer">
+                <a id="hubInvoiceLink" href="#" target="_blank" class="btn btn-outline-primary">
+                    <i class="bi bi-box-arrow-up-right"></i> Open in Hub
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentPage = 1;
+let pageSize = 50;
+let totalPages = 1;
+let locations = [];
+
+function getToken() {
+    return localStorage.getItem('access_token');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    checkHubStatus();
+    loadLocations();
+    loadInvoices();
+});
+
+async function checkHubStatus() {
+    try {
+        const response = await fetch('api/hub-invoices/health', {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        const data = await response.json();
+
+        const statusBadge = document.getElementById('hubStatus');
+        if (data.hub_reachable) {
+            statusBadge.className = 'badge bg-success';
+            statusBadge.textContent = 'Hub Connected';
+        } else {
+            statusBadge.className = 'badge bg-danger';
+            statusBadge.textContent = 'Hub Unreachable';
+        }
+    } catch (error) {
+        const statusBadge = document.getElementById('hubStatus');
+        statusBadge.className = 'badge bg-danger';
+        statusBadge.textContent = 'Hub Error';
+    }
+}
+
+async function loadLocations() {
+    try {
+        const response = await fetch('api/locations', {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        const data = await response.json();
+        locations = Array.isArray(data) ? data : (data.locations || []);
+
+        const select = document.getElementById('filterLocation');
+        locations.forEach(loc => {
+            select.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+        });
+    } catch (error) {
+        console.error('Error loading locations:', error);
+    }
+}
+
+async function loadInvoices() {
+    const locationId = document.getElementById('filterLocation').value;
+    const vendorName = document.getElementById('filterVendor').value;
+    const status = document.getElementById('filterStatus').value;
+    const sentToInventory = document.getElementById('filterSent').value;
+
+    let url = `api/hub-invoices/?page=${currentPage}&page_size=${pageSize}`;
+    if (locationId) url += `&location_id=${locationId}`;
+    if (vendorName) url += `&vendor_name=${encodeURIComponent(vendorName)}`;
+    if (status) url += `&status=${status}`;
+    if (sentToInventory) url += `&sent_to_inventory=${sentToInventory}`;
+
+    try {
+        document.getElementById('invoiceList').innerHTML = `
+            <div class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2">Loading...</p>
+            </div>
+        `;
+
+        const response = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        totalPages = data.pages || 1;
+        displayInvoices(data.invoices || []);
+        updatePagination();
+    } catch (error) {
+        console.error('Error loading invoices:', error);
+        document.getElementById('invoiceList').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> Failed to load invoices from Hub: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function displayInvoices(invoices) {
+    const container = document.getElementById('invoiceList');
+
+    if (invoices.length === 0) {
+        container.innerHTML = '<p class="text-muted">No invoices found</p>';
+        return;
+    }
+
+    let html = `
+        <div class="table-responsive">
+            <table class="table table-hover" style="font-size: 13px;">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Invoice #</th>
+                        <th>Vendor</th>
+                        <th>Location</th>
+                        <th>Date</th>
+                        <th>Total</th>
+                        <th>Items</th>
+                        <th>Status</th>
+                        <th>Sent</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    invoices.forEach(invoice => {
+        const date = invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString() : '-';
+        const total = invoice.total_amount ? '$' + invoice.total_amount.toFixed(2) : '-';
+        const statusBadge = getStatusBadge(invoice.status);
+        const sentBadge = invoice.sent_to_inventory
+            ? '<span class="badge bg-success"><i class="bi bi-check"></i></span>'
+            : '<span class="badge bg-secondary"><i class="bi bi-x"></i></span>';
+        const mappedInfo = `${invoice.mapped_item_count || 0}/${invoice.item_count || 0}`;
+
+        html += `
+            <tr style="cursor: pointer;" onclick="viewInvoice(${invoice.id})">
+                <td>${invoice.invoice_number || '-'}</td>
+                <td>${invoice.vendor_name || '-'}</td>
+                <td>${invoice.location_name || '-'}</td>
+                <td>${date}</td>
+                <td>${total}</td>
+                <td><small class="text-muted">${mappedInfo} mapped</small></td>
+                <td>${statusBadge}</td>
+                <td>${sentBadge}</td>
+                <td onclick="event.stopPropagation();">
+                    <button class="btn btn-sm btn-outline-primary" onclick="viewInvoice(${invoice.id})">
+                        <i class="bi bi-eye"></i>
+                    </button>
+                    <a href="/hub/invoices/${invoice.id}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-box-arrow-up-right"></i>
+                    </a>
+                </td>
+            </tr>
+        `;
+    });
+
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+function getStatusBadge(status) {
+    const badges = {
+        'pending': '<span class="badge bg-secondary">Pending</span>',
+        'parsing': '<span class="badge bg-info">Parsing</span>',
+        'parse_failed': '<span class="badge bg-danger">Parse Failed</span>',
+        'mapping': '<span class="badge bg-warning text-dark">Mapping</span>',
+        'ready': '<span class="badge bg-primary">Ready</span>',
+        'sent': '<span class="badge bg-success">Sent</span>',
+        'error': '<span class="badge bg-danger">Error</span>',
+        'partial': '<span class="badge bg-warning text-dark">Partial</span>',
+        'statement': '<span class="badge bg-secondary">Statement</span>'
+    };
+    return badges[status] || `<span class="badge bg-secondary">${status}</span>`;
+}
+
+async function viewInvoice(invoiceId) {
+    try {
+        const response = await fetch(`api/hub-invoices/${invoiceId}`, {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const invoice = await response.json();
+        displayInvoiceDetail(invoice);
+
+        document.getElementById('hubInvoiceLink').href = `/hub/invoices/${invoiceId}`;
+
+        const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+        modal.show();
+    } catch (error) {
+        console.error('Error loading invoice:', error);
+        alert('Failed to load invoice details: ' + error.message);
+    }
+}
+
+function displayInvoiceDetail(invoice) {
+    document.getElementById('detailModalTitle').textContent = `Invoice: ${invoice.invoice_number || invoice.id}`;
+
+    const date = invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString() : '-';
+    const dueDate = invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-';
+
+    let html = `
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <p><strong>Vendor:</strong> ${invoice.vendor_name || '-'}</p>
+                <p><strong>Invoice #:</strong> ${invoice.invoice_number || '-'}</p>
+                <p><strong>Location:</strong> ${invoice.location_name || '-'}</p>
+                <p><strong>Status:</strong> ${getStatusBadge(invoice.status)}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>Date:</strong> ${date}</p>
+                <p><strong>Due Date:</strong> ${dueDate}</p>
+                <p><strong>Total:</strong> ${invoice.total_amount ? '$' + invoice.total_amount.toFixed(2) : '-'}</p>
+                <p><strong>Tax:</strong> ${invoice.tax_amount ? '$' + invoice.tax_amount.toFixed(2) : '-'}</p>
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <span class="badge ${invoice.sent_to_inventory ? 'bg-success' : 'bg-secondary'} me-2">
+                <i class="bi bi-${invoice.sent_to_inventory ? 'check' : 'x'}"></i> Inventory
+            </span>
+            <span class="badge ${invoice.sent_to_accounting ? 'bg-success' : 'bg-secondary'}">
+                <i class="bi bi-${invoice.sent_to_accounting ? 'check' : 'x'}"></i> Accounting
+            </span>
+            ${invoice.inventory_invoice_id ? `<small class="text-muted ms-2">Inventory ID: ${invoice.inventory_invoice_id}</small>` : ''}
+        </div>
+
+        <h5>Line Items (${invoice.items ? invoice.items.length : 0})</h5>
+        <div class="table-responsive">
+            <table class="table table-sm" style="font-size: 12px;">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Description</th>
+                        <th>Code</th>
+                        <th>Qty</th>
+                        <th>UOM</th>
+                        <th>Price</th>
+                        <th>Total</th>
+                        <th>Mapped</th>
+                        <th>Category</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    if (invoice.items && invoice.items.length > 0) {
+        invoice.items.forEach(item => {
+            const mappedBadge = item.is_mapped
+                ? '<span class="badge bg-success">Yes</span>'
+                : '<span class="badge bg-danger">No</span>';
+
+            html += `
+                <tr class="${!item.is_mapped ? 'table-warning' : ''}">
+                    <td>${item.line_number || '-'}</td>
+                    <td>${item.item_description || '-'}</td>
+                    <td><small>${item.item_code || '-'}</small></td>
+                    <td>${item.quantity}</td>
+                    <td>${item.unit_of_measure || '-'}</td>
+                    <td>$${item.unit_price.toFixed(2)}</td>
+                    <td>$${item.line_total.toFixed(2)}</td>
+                    <td>${mappedBadge}</td>
+                    <td><small>${item.inventory_category || '-'}</small></td>
+                </tr>
+            `;
+        });
+    } else {
+        html += '<tr><td colspan="9" class="text-muted">No line items</td></tr>';
+    }
+
+    html += '</tbody></table></div>';
+
+    if (invoice.inventory_error) {
+        html += `<div class="alert alert-danger mt-3"><strong>Inventory Error:</strong> ${invoice.inventory_error}</div>`;
+    }
+    if (invoice.accounting_error) {
+        html += `<div class="alert alert-danger mt-3"><strong>Accounting Error:</strong> ${invoice.accounting_error}</div>`;
+    }
+
+    document.getElementById('invoiceDetail').innerHTML = html;
+}
+
+function updatePagination() {
+    const nav = document.getElementById('pagination');
+    const ul = nav.querySelector('ul');
+
+    if (totalPages <= 1) {
+        nav.style.display = 'none';
+        return;
+    }
+
+    nav.style.display = 'block';
+    let html = '';
+
+    // Previous button
+    html += `
+        <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">Previous</a>
+        </li>
+    `;
+
+    // Page numbers
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+            html += `
+                <li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>
+                </li>
+            `;
+        } else if (i === currentPage - 3 || i === currentPage + 3) {
+            html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+    }
+
+    // Next button
+    html += `
+        <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">Next</a>
+        </li>
+    `;
+
+    ul.innerHTML = html;
+}
+
+function goToPage(page) {
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+    loadInvoices();
+}
+
+function clearFilters() {
+    document.getElementById('filterLocation').value = '';
+    document.getElementById('filterVendor').value = '';
+    document.getElementById('filterStatus').value = '';
+    document.getElementById('filterSent').value = '';
+    currentPage = 1;
+    loadInvoices();
+}
+</script>
+{% endblock %}

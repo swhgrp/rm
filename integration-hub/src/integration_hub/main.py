@@ -12,13 +12,19 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import Optional, List
 import os
+import logging
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 from integration_hub.db.database import get_db, engine, Base
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.models.item_gl_mapping import ItemGLMapping, CategoryGLMapping
 from integration_hub.models.vendor import Vendor
+from integration_hub.models.hub_vendor_item import HubVendorItem
+from integration_hub.models.price_history import PriceHistory
+from integration_hub.models.vendor_alias import VendorAlias
 from integration_hub.schemas.vendor import VendorCreate, VendorResponse, VendorSyncStatus
 from integration_hub.services.inventory_sender import get_inventory_sender
 from integration_hub.services.accounting_sender import get_accounting_sender
@@ -27,6 +33,12 @@ from integration_hub.services.vendor_sync import get_vendor_sync_service
 from integration_hub.services.email_scheduler import get_email_scheduler
 from integration_hub.api import auth as auth_router
 from integration_hub.api import settings as settings_router
+from integration_hub.api import invoices as invoices_router
+from integration_hub.api import vendor_items as vendor_items_router
+from integration_hub.api import batch_operations as batch_operations_router
+from integration_hub.api import reporting as reporting_router
+from integration_hub.api import vendors as vendors_router
+from integration_hub.api import duplicates as duplicates_router
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -58,6 +70,12 @@ app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 # Include routers
 app.include_router(auth_router.router)
 app.include_router(settings_router.router, prefix="/api/settings", tags=["settings"])
+app.include_router(invoices_router.router)  # External API for Inventory/Accounting systems
+app.include_router(vendor_items_router.router)  # Vendor items API (proxies to Inventory for now)
+app.include_router(batch_operations_router.router)  # Batch operations for invoices
+app.include_router(reporting_router.router)  # Reporting and analytics
+app.include_router(vendors_router.router)  # Vendor management and aliases
+app.include_router(duplicates_router.router)  # Duplicate invoice detection
 
 
 # ============================================================================
@@ -262,13 +280,44 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
         logger = logging.getLogger(__name__)
         logger.error(f"Error fetching GL names: {str(e)}")
 
+    # Fetch vendor item pack_size and purchase_unit from Inventory for mapped items
+    vendor_item_info = {}
+    try:
+        # Get all inventory_item_ids (which are vendor_item_ids) for mapped items
+        vendor_item_ids = [item.inventory_item_id for item in items if item.inventory_item_id]
+        if vendor_item_ids:
+            engine = create_engine(inventory_db_url)
+            with engine.connect() as conn:
+                # Query vendor_items with units_of_measure join
+                results = conn.execute(
+                    text("""
+                        SELECT vi.id, vi.pack_size, vi.conversion_factor, uom.name as purchase_unit, uom.abbreviation as purchase_unit_abbr
+                        FROM vendor_items vi
+                        LEFT JOIN units_of_measure uom ON vi.purchase_unit_id = uom.id
+                        WHERE vi.id = ANY(:ids)
+                    """),
+                    {"ids": vendor_item_ids}
+                ).fetchall()
+                for row in results:
+                    vendor_item_info[row[0]] = {
+                        "pack_size": row[1],  # This is the pack_size string like "6x750ml"
+                        "conversion_factor": float(row[2]) if row[2] else None,  # Quantity per case
+                        "purchase_unit": row[3],  # Unit name like "Bottle 750ml"
+                        "purchase_unit_abbr": row[4]  # Abbreviation like "btl750ml"
+                    }
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error fetching vendor item info: {str(e)}")
+
     return templates.TemplateResponse("invoice_detail.html", {
         "request": request,
         "invoice": invoice,
         "items": items,
         "locations": locations,
         "vendors": vendors,
-        "gl_names": gl_names
+        "gl_names": gl_names,
+        "vendor_item_info": vendor_item_info
     })
 
 
@@ -619,6 +668,80 @@ async def delete_invoice(
         raise HTTPException(status_code=500, detail=f"Error deleting invoice: {str(e)}")
 
 
+@app.patch("/api/invoices/{invoice_id}/items/bulk-update")
+async def bulk_update_invoice_items(
+    invoice_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Bulk update invoice line items.
+    Used for inline editing of item_code, description, pack_size, unit_of_measure, quantity, unit_price.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Get the request body
+    body = await request.json()
+    items_data = body.get('items', [])
+
+    if not items_data:
+        raise HTTPException(status_code=400, detail="No items provided")
+
+    # Get invoice
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    try:
+        updated_count = 0
+        for item_data in items_data:
+            item_id = item_data.get('id')
+            if not item_id:
+                continue
+
+            item = db.query(HubInvoiceItem).filter(
+                HubInvoiceItem.id == item_id,
+                HubInvoiceItem.invoice_id == invoice_id
+            ).first()
+
+            if not item:
+                logger.warning(f"Item {item_id} not found for invoice {invoice_id}")
+                continue
+
+            # Update allowed fields
+            if 'item_code' in item_data:
+                item.item_code = item_data['item_code']
+            if 'item_description' in item_data:
+                item.item_description = item_data['item_description']
+            if 'pack_size' in item_data:
+                item.pack_size = item_data['pack_size']
+            if 'unit_of_measure' in item_data:
+                item.unit_of_measure = item_data['unit_of_measure']
+            if 'quantity' in item_data:
+                item.quantity = item_data['quantity']
+            if 'unit_price' in item_data:
+                item.unit_price = item_data['unit_price']
+                # Recalculate total
+                item.total_amount = float(item.quantity) * float(item.unit_price)
+
+            updated_count += 1
+
+        db.commit()
+        logger.info(f"Updated {updated_count} items for invoice {invoice_id}")
+
+        return {
+            "success": True,
+            "message": f"Updated {updated_count} items",
+            "updated_count": updated_count
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating items for invoice {invoice_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error updating items: {str(e)}")
+
+
 @app.post("/api/invoices/{invoice_id}/mark-statement")
 async def mark_invoice_as_statement(
     invoice_id: int,
@@ -799,18 +922,38 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Failed to fetch GL accounts from Accounting API: {str(e)}")
 
-    # Fetch vendor items from Inventory API (not master items - those are just for counts)
+    # Fetch vendor items from Hub's local table (Hub is source of truth)
     inventory_items = []
     try:
-        async with httpx.AsyncClient() as client:
-            # Use special /_hub/sync endpoint that doesn't require authentication
-            response = await client.get(f"{INVENTORY_API_URL}/vendor-items/_hub/sync", params={"is_active": True, "limit": 5000})
-            if response.status_code == 200:
-                inventory_items = response.json()
-            else:
-                logger.warning(f"Failed to fetch vendor items: status {response.status_code}")
+        from integration_hub.models.hub_vendor_item import HubVendorItem
+        from integration_hub.models.vendor import Vendor as HubVendor
+        from sqlalchemy.orm import joinedload
+
+        hub_vendor_items = db.query(HubVendorItem).options(
+            joinedload(HubVendorItem.vendor)
+        ).filter(HubVendorItem.is_active == True).order_by(
+            HubVendorItem.vendor_product_name
+        ).all()
+
+        for vi in hub_vendor_items:
+            inventory_items.append({
+                'id': vi.id,  # Hub vendor item ID
+                'vendor_id': vi.vendor_id,
+                'vendor_name': vi.vendor.name if vi.vendor else 'Unknown Vendor',
+                'vendor_product_name': vi.vendor_product_name,
+                'vendor_sku': vi.vendor_sku,
+                'pack_size': vi.pack_size,
+                'master_item_id': vi.inventory_master_item_id,
+                'master_item_name': vi.inventory_master_item_name,
+                'master_item_category': vi.category,
+                'purchase_unit_id': vi.purchase_unit_id,
+                'purchase_unit_name': vi.purchase_unit_name,
+                'conversion_factor': float(vi.conversion_factor) if vi.conversion_factor else 1.0
+            })
+
+        logger.info(f"Loaded {len(inventory_items)} vendor items from Hub database")
     except Exception as e:
-        logger.error(f"Failed to fetch vendor items from Inventory API: {str(e)}")
+        logger.error(f"Failed to fetch vendor items from Hub: {str(e)}")
 
     # Also fetch verified item codes from item_code_mapping that don't have vendor items yet
     # This allows mapping by item code even when vendor item isn't in inventory system
@@ -854,12 +997,16 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
         CategoryGLMapping.is_active == True
     ).order_by(CategoryGLMapping.inventory_category).all()
 
+    # Get vendors for the "Create New" vendor item form
+    vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
+
     response = templates.TemplateResponse("unmapped_items.html", {
         "request": request,
         "unique_items": unique_items,
         "gl_accounts": gl_accounts,
         "inventory_items": inventory_items,
-        "category_mappings": category_mappings
+        "category_mappings": category_mappings,
+        "vendors": vendors
     })
     # Prevent browser caching
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
@@ -918,21 +1065,41 @@ async def mapped_items(request: Request, db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Failed to fetch GL accounts from Accounting API: {str(e)}")
 
-    # Fetch vendor items from Inventory API
+    # Fetch vendor items from Hub's local table (Hub is source of truth)
     inventory_items = []
     inventory_items_map = {}
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{INVENTORY_API_URL}/vendor-items/_hub/sync", params={"is_active": True, "limit": 5000})
-            if response.status_code == 200:
-                inventory_items = response.json()
-                # Create a map of vendor item ID to item details for quick lookup
-                for item in inventory_items:
-                    inventory_items_map[item['id']] = item
-            else:
-                logger.warning(f"Failed to fetch vendor items: status {response.status_code}")
+        from integration_hub.models.hub_vendor_item import HubVendorItem
+        from integration_hub.models.vendor import Vendor as HubVendor
+        from sqlalchemy.orm import joinedload
+
+        hub_vendor_items = db.query(HubVendorItem).options(
+            joinedload(HubVendorItem.vendor)
+        ).filter(HubVendorItem.is_active == True).order_by(
+            HubVendorItem.vendor_product_name
+        ).all()
+
+        for vi in hub_vendor_items:
+            item_data = {
+                'id': vi.id,  # Hub vendor item ID
+                'vendor_id': vi.vendor_id,
+                'vendor_name': vi.vendor.name if vi.vendor else 'Unknown Vendor',
+                'vendor_product_name': vi.vendor_product_name,
+                'vendor_sku': vi.vendor_sku,
+                'pack_size': vi.pack_size,
+                'master_item_id': vi.inventory_master_item_id,
+                'master_item_name': vi.inventory_master_item_name,
+                'master_item_category': vi.category,
+                'purchase_unit_id': vi.purchase_unit_id,
+                'purchase_unit_name': vi.purchase_unit_name,
+                'conversion_factor': float(vi.conversion_factor) if vi.conversion_factor else 1.0
+            }
+            inventory_items.append(item_data)
+            inventory_items_map[vi.id] = item_data
+
+        logger.info(f"Loaded {len(inventory_items)} vendor items from Hub database for mapped items page")
     except Exception as e:
-        logger.error(f"Failed to fetch vendor items from Inventory API: {str(e)}")
+        logger.error(f"Failed to fetch vendor items from Hub: {str(e)}")
 
     # Format results for template with vendor item details
     unique_items = []
@@ -1662,12 +1829,78 @@ async def sync_vendors(db: Session = Depends(get_db)):
 
 @app.get("/vendors", response_class=HTMLResponse)
 async def vendors_page(request: Request, db: Session = Depends(get_db)):
-    """Vendor management page"""
-    vendors = db.query(Vendor).order_by(Vendor.name).all()
+    """Vendor management page - only show active vendors"""
+    vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
 
     return templates.TemplateResponse("vendors.html", {
         "request": request,
         "vendors": vendors
+    })
+
+
+@app.get("/duplicates", response_class=HTMLResponse)
+async def duplicates_page(request: Request):
+    """Duplicate invoice detection page"""
+    return templates.TemplateResponse("duplicates.html", {
+        "request": request
+    })
+
+
+@app.get("/vendor-items", response_class=HTMLResponse)
+async def vendor_items_page(request: Request, db: Session = Depends(get_db)):
+    """Hub Vendor Items management page - Hub is source of truth"""
+    from sqlalchemy.orm import joinedload
+
+    # Fetch all vendor items with vendor relationship
+    vendor_items = db.query(HubVendorItem).options(
+        joinedload(HubVendorItem.vendor)
+    ).order_by(
+        HubVendorItem.vendor_product_name
+    ).all()
+
+    # Get active vendors for filters and forms
+    vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
+
+    # Get distinct categories
+    categories_query = db.query(HubVendorItem.category).filter(
+        HubVendorItem.category.isnot(None),
+        HubVendorItem.category != ''
+    ).distinct().order_by(HubVendorItem.category).all()
+    categories = [c[0] for c in categories_query]
+
+    # Fetch units of measure from Inventory
+    units = []
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get("http://inventory-app:5000/api/units-of-measure/")
+            if response.status_code == 200:
+                units = response.json()
+    except Exception as e:
+        logger.warning(f"Could not fetch units of measure: {e}")
+        # Fallback to common units
+        units = [
+            {"id": 1, "name": "Each", "abbreviation": "EA"},
+            {"id": 2, "name": "Case", "abbreviation": "CS"},
+            {"id": 3, "name": "Pound", "abbreviation": "LB"},
+            {"id": 4, "name": "Gallon", "abbreviation": "GAL"},
+        ]
+
+    # Stats
+    stats = {
+        "total": len(vendor_items),
+        "active": sum(1 for vi in vendor_items if vi.is_active),
+        "synced": sum(1 for vi in vendor_items if vi.synced_to_inventory),
+        "vendors": len(vendors)
+    }
+
+    return templates.TemplateResponse("hub_vendor_items.html", {
+        "request": request,
+        "vendor_items": vendor_items,
+        "vendors": vendors,
+        "categories": categories,
+        "units": units,
+        "stats": stats
     })
 
 

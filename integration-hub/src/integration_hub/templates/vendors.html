@@ -8,6 +8,9 @@
         <div class="d-flex justify-content-between align-items-center">
             <h1><i class="bi bi-building"></i> Vendor Management</h1>
             <div>
+                <button class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#aliasesModal">
+                    <i class="bi bi-tags"></i> Manage Aliases
+                </button>
                 <button class="btn btn-success" onclick="syncVendors(event)">
                     <i class="bi bi-arrow-repeat"></i> Sync from Systems
                 </button>
@@ -18,31 +21,73 @@
         </div>
     </div>
 
+    <!-- Vendor Summary Cards -->
+    <div class="row mb-4" id="vendorSummaryCards">
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h3 class="mb-0" id="totalVendors">-</h3>
+                    <small class="text-muted">Total Vendors</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h3 class="mb-0" id="totalAliases">-</h3>
+                    <small class="text-muted">Aliases Defined</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h3 class="mb-0" id="linkedInvoices">-</h3>
+                    <small class="text-muted">Linked Invoices</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h3 class="mb-0 text-success" id="unlinkedInvoices">-</h3>
+                    <small class="text-muted">Unlinked Invoices</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card">
-        <div class="card-header">
-            <i class="bi bi-list"></i> All Vendors
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-list"></i> All Vendors</span>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="showAliasesToggle" checked>
+                <label class="form-check-label" for="showAliasesToggle">Show Aliases</label>
+            </div>
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover" id="vendorsTable">
                     <thead>
                         <tr>
                             <th>Name</th>
+                            <th>Aliases</th>
+                            <th>Invoices</th>
                             <th>Contact</th>
-                            <th>Phone</th>
-                            <th>Email</th>
                             <th>Payment Terms</th>
                             <th>Sync Status</th>
-                            <th>Status</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for vendor in vendors %}
-                        <tr>
+                        <tr data-vendor-id="{{ vendor.id }}">
                             <td><strong>{{ vendor.name }}</strong></td>
+                            <td class="aliases-cell">
+                                <span class="text-muted">Loading...</span>
+                            </td>
+                            <td class="invoice-count-cell">-</td>
                             <td>{{ vendor.contact_name or '-' }}</td>
-                            <td>{{ vendor.phone or '-' }}</td>
-                            <td>{{ vendor.email or '-' }}</td>
                             <td>{{ vendor.payment_terms or '-' }}</td>
                             <td>
                                 {% if vendor.inventory_vendor_id %}
@@ -66,11 +111,12 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if vendor.is_active %}
-                                <span class="badge bg-success">Active</span>
-                                {% else %}
-                                <span class="badge bg-secondary">Inactive</span>
-                                {% endif %}
+                                <button class="btn btn-sm btn-outline-primary" onclick="showAddAliasModal({{ vendor.id }}, '{{ vendor.name }}')" title="Add Alias">
+                                    <i class="bi bi-plus"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="editVendor({{ vendor.id }})" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
                             </td>
                         </tr>
                         {% endfor %}
@@ -184,10 +230,404 @@
     </div>
 </div>
 
+<!-- Add Alias Modal -->
+<div class="modal fade" id="addAliasModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Vendor Alias</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="aliasForm">
+                <div class="modal-body">
+                    <p class="text-muted">
+                        Add an alias to map invoice vendor names to: <strong id="aliasTargetVendor"></strong>
+                    </p>
+                    <input type="hidden" id="aliasVendorId">
+                    <div class="mb-3">
+                        <label class="form-label">Alias Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="aliasName" required
+                               placeholder="e.g., Gordon Food Service Inc.">
+                        <small class="text-muted">Enter the vendor name as it appears on invoices</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Add Alias
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Manage Aliases Modal -->
+<div class="modal fade" id="aliasesModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-tags"></i> Vendor Aliases</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <div class="btn-group">
+                        <button class="btn btn-outline-success btn-sm" onclick="autoCreateAliases()">
+                            <i class="bi bi-magic"></i> Auto-Create from Linked Invoices
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm" onclick="linkByAlias()">
+                            <i class="bi bi-link"></i> Link Unlinked Invoices
+                        </button>
+                        <button class="btn btn-outline-warning btn-sm" onclick="normalizeVendors()">
+                            <i class="bi bi-text-paragraph"></i> Normalize Names
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm" id="aliasesTable">
+                        <thead>
+                            <tr>
+                                <th>Alias (Invoice Name)</th>
+                                <th>Maps To (Canonical)</th>
+                                <th>Source</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <hr>
+
+                <h6>Unlinked Invoice Vendor Names</h6>
+                <div id="unlinkedVendorsList" class="mb-3">
+                    <span class="text-muted">Loading...</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
+let vendorSummaryData = [];
+
+// Load vendor summary on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadVendorSummary();
+});
+
+async function loadVendorSummary() {
+    try {
+        const response = await fetch('/hub/api/v1/vendors/summary');
+        vendorSummaryData = await response.json();
+
+        // Update summary cards
+        const linked = vendorSummaryData.filter(v => v.vendor_id);
+        const unlinked = vendorSummaryData.filter(v => !v.vendor_id);
+        const totalAliases = linked.reduce((sum, v) => sum + (v.alias_count || 0), 0);
+        const totalInvoices = vendorSummaryData.reduce((sum, v) => sum + v.invoice_count, 0);
+        const unlinkedInvoices = unlinked.reduce((sum, v) => sum + v.invoice_count, 0);
+
+        document.getElementById('totalVendors').textContent = linked.length;
+        document.getElementById('totalAliases').textContent = totalAliases;
+        document.getElementById('linkedInvoices').textContent = totalInvoices - unlinkedInvoices;
+        document.getElementById('unlinkedInvoices').textContent = unlinkedInvoices;
+
+        // Update table cells with aliases and invoice counts
+        document.querySelectorAll('#vendorsTable tbody tr').forEach(row => {
+            const vendorId = parseInt(row.dataset.vendorId);
+            const vendorData = vendorSummaryData.find(v => v.vendor_id === vendorId);
+
+            if (vendorData) {
+                // Aliases
+                const aliasCell = row.querySelector('.aliases-cell');
+                if (vendorData.aliases && vendorData.aliases.length > 0) {
+                    aliasCell.innerHTML = vendorData.aliases.map(a =>
+                        `<span class="badge bg-info text-dark me-1">${escapeHtml(a)}</span>`
+                    ).join('');
+                } else {
+                    aliasCell.innerHTML = '<span class="text-muted">-</span>';
+                }
+
+                // Invoice count
+                row.querySelector('.invoice-count-cell').textContent = vendorData.invoice_count;
+            } else {
+                row.querySelector('.aliases-cell').innerHTML = '<span class="text-muted">-</span>';
+                row.querySelector('.invoice-count-cell').textContent = '0';
+            }
+        });
+
+    } catch (error) {
+        console.error('Error loading vendor summary:', error);
+    }
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Show add alias modal
+function showAddAliasModal(vendorId, vendorName) {
+    document.getElementById('aliasVendorId').value = vendorId;
+    document.getElementById('aliasTargetVendor').textContent = vendorName;
+    document.getElementById('aliasName').value = '';
+    new bootstrap.Modal(document.getElementById('addAliasModal')).show();
+}
+
+// Add alias form submit
+document.getElementById('aliasForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const vendorId = document.getElementById('aliasVendorId').value;
+    const aliasName = document.getElementById('aliasName').value;
+
+    try {
+        const response = await fetch('/hub/api/v1/vendors/aliases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alias_name: aliasName, vendor_id: parseInt(vendorId) })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            alert(`Alias "${aliasName}" added successfully!`);
+            bootstrap.Modal.getInstance(document.getElementById('addAliasModal')).hide();
+            loadVendorSummary();
+        } else {
+            alert(`Error: ${result.detail || result.error}`);
+        }
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+});
+
+// Load aliases into modal
+document.getElementById('aliasesModal').addEventListener('show.bs.modal', async function() {
+    // Load aliases
+    try {
+        const response = await fetch('/hub/api/v1/vendors/aliases/all');
+        const aliases = await response.json();
+
+        const tbody = document.querySelector('#aliasesTable tbody');
+        tbody.innerHTML = aliases.map(a => `
+            <tr>
+                <td>${escapeHtml(a.alias_name)}</td>
+                <td><strong>${escapeHtml(a.vendor_name)}</strong></td>
+                <td><span class="badge bg-secondary">${a.source || 'manual'}</span></td>
+                <td>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteAlias(${a.alias_id})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('') || '<tr><td colspan="4" class="text-muted text-center">No aliases defined</td></tr>';
+
+    } catch (error) {
+        console.error('Error loading aliases:', error);
+    }
+
+    // Load unlinked vendors
+    try {
+        const response = await fetch('/hub/api/v1/vendors/normalization/unlinked');
+        const unlinked = await response.json();
+
+        const container = document.getElementById('unlinkedVendorsList');
+        if (unlinked.length === 0) {
+            container.innerHTML = '<span class="text-success"><i class="bi bi-check-circle"></i> All invoice vendors are linked!</span>';
+        } else {
+            container.innerHTML = unlinked.map(u => `
+                <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
+                    <span>
+                        <strong>${escapeHtml(u.vendor_name)}</strong>
+                        <span class="badge bg-secondary ms-2">${u.invoice_count} invoices</span>
+                    </span>
+                    <button class="btn btn-sm btn-outline-primary" onclick="showLinkUnlinkedModal('${escapeHtml(u.vendor_name).replace(/'/g, "\\'")}')">
+                        <i class="bi bi-link"></i> Link
+                    </button>
+                </div>
+            `).join('');
+        }
+    } catch (error) {
+        console.error('Error loading unlinked vendors:', error);
+    }
+});
+
+async function deleteAlias(aliasId) {
+    if (!confirm('Delete this alias?')) return;
+
+    try {
+        const response = await fetch(`/hub/api/v1/vendors/aliases/${aliasId}`, {
+            method: 'DELETE'
+        });
+
+        if (response.ok) {
+            // Reload modal content
+            document.getElementById('aliasesModal').dispatchEvent(new Event('show.bs.modal'));
+            loadVendorSummary();
+        } else {
+            alert('Error deleting alias');
+        }
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function autoCreateAliases() {
+    if (!confirm('Auto-create aliases from already-linked invoices?\n\nThis will create aliases for vendor name variants that are already linked to vendors.')) return;
+
+    try {
+        const response = await fetch('/hub/api/v1/vendors/normalization/auto-create-aliases', {
+            method: 'POST'
+        });
+        const result = await response.json();
+
+        alert(`Created ${result.created_count} aliases\nSkipped ${result.skipped_count}`);
+        document.getElementById('aliasesModal').dispatchEvent(new Event('show.bs.modal'));
+        loadVendorSummary();
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function linkByAlias() {
+    try {
+        const response = await fetch('/hub/api/v1/vendors/normalization/link-by-alias', {
+            method: 'POST'
+        });
+        const result = await response.json();
+
+        alert(`Linked ${result.linked} invoices\n${result.still_unlinked} still unlinked`);
+        document.getElementById('aliasesModal').dispatchEvent(new Event('show.bs.modal'));
+        loadVendorSummary();
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function normalizeVendors() {
+    // First preview
+    try {
+        const previewResp = await fetch('/hub/api/v1/vendors/normalization/preview');
+        const preview = await previewResp.json();
+
+        if (preview.total_changes === 0) {
+            alert('No vendor names need normalization - all names match their canonical vendors.');
+            return;
+        }
+
+        const changes = preview.changes.map(c => `${c.original} -> ${c.normalized} (${c.invoice_count} invoices)`).join('\n');
+
+        if (!confirm(`Normalize ${preview.total_invoices_affected} invoices?\n\nChanges:\n${changes}`)) {
+            return;
+        }
+
+        const response = await fetch('/hub/api/v1/vendors/normalization/apply', {
+            method: 'POST'
+        });
+        const result = await response.json();
+
+        alert(`Normalized ${result.total_invoices_affected} invoices`);
+        loadVendorSummary();
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+function showLinkUnlinkedModal(vendorName) {
+    // Get list of vendors for dropdown
+    const vendors = vendorSummaryData.filter(v => v.vendor_id);
+
+    const html = `
+        <div class="mb-3">
+            <label class="form-label">Link "${vendorName}" to:</label>
+            <select class="form-select" id="linkTargetVendor">
+                <option value="">-- Select Vendor --</option>
+                ${vendors.map(v => `<option value="${v.vendor_id}">${escapeHtml(v.vendor_name)}</option>`).join('')}
+            </select>
+        </div>
+    `;
+
+    // Create a simple modal dynamically
+    const modal = document.createElement('div');
+    modal.innerHTML = `
+        <div class="modal fade" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Link Vendor Name</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">${html}</div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" onclick="doLinkVendor('${vendorName.replace(/'/g, "\\'")}')">Link & Create Alias</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    const bsModal = new bootstrap.Modal(modal.querySelector('.modal'));
+    bsModal.show();
+
+    modal.querySelector('.modal').addEventListener('hidden.bs.modal', () => {
+        modal.remove();
+    });
+}
+
+async function doLinkVendor(aliasName) {
+    const vendorId = document.getElementById('linkTargetVendor').value;
+    if (!vendorId) {
+        alert('Please select a vendor');
+        return;
+    }
+
+    try {
+        // Create alias
+        const response = await fetch('/hub/api/v1/vendors/aliases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alias_name: aliasName, vendor_id: parseInt(vendorId) })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            alert(`Error: ${err.detail || err.error}`);
+            return;
+        }
+
+        // Now link invoices
+        await fetch('/hub/api/v1/vendors/normalization/link-by-alias', { method: 'POST' });
+
+        alert('Vendor linked successfully!');
+
+        // Close modal and refresh
+        document.querySelectorAll('.modal').forEach(m => {
+            const instance = bootstrap.Modal.getInstance(m);
+            if (instance) instance.hide();
+        });
+
+        loadVendorSummary();
+
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
 // Sync vendors from other systems
 async function syncVendors(event) {
     if (!await showConfirm('Sync vendors from Inventory and Accounting systems?')) {
@@ -208,20 +648,20 @@ async function syncVendors(event) {
 
         if (response.ok) {
             let message = 'Vendor Sync Complete!\n\n';
-            message += `✓ Created: ${result.created}\n`;
-            message += `✓ Updated: ${result.updated}\n`;
-            message += `✓ Inventory vendors fetched: ${result.inventory_vendors_fetched}\n`;
-            message += `✓ Accounting vendors fetched: ${result.accounting_vendors_fetched}\n`;
+            message += `Created: ${result.created}\n`;
+            message += `Updated: ${result.updated}\n`;
+            message += `Inventory vendors fetched: ${result.inventory_vendors_fetched}\n`;
+            message += `Accounting vendors fetched: ${result.accounting_vendors_fetched}\n`;
 
             if (result.pushed_to_inventory > 0) {
-                message += `✓ Pushed to Inventory: ${result.pushed_to_inventory}\n`;
+                message += `Pushed to Inventory: ${result.pushed_to_inventory}\n`;
             }
             if (result.pushed_to_accounting > 0) {
-                message += `✓ Pushed to Accounting: ${result.pushed_to_accounting}\n`;
+                message += `Pushed to Accounting: ${result.pushed_to_accounting}\n`;
             }
 
             if (result.errors && result.errors.length > 0) {
-                message += `\n⚠ Errors: ${result.errors.length}\n${result.errors.join('\n')}`;
+                message += `\nErrors: ${result.errors.length}\n${result.errors.join('\n')}`;
             }
 
             alert(message);
@@ -273,11 +713,11 @@ document.getElementById('vendorForm').addEventListener('submit', async (e) => {
         });
 
         if (response.ok) {
-            alert('✓ Vendor added successfully!\n\nThe vendor has been created in the Integration Hub and synced to the selected systems.');
+            alert('Vendor added successfully!\n\nThe vendor has been created in the Integration Hub and synced to the selected systems.');
             location.reload();
         } else {
             const error = await response.json();
-            alert(`⚠ Error adding vendor\n\n${error.detail || 'Failed to add vendor'}`);
+            alert(`Error adding vendor\n\n${error.detail || 'Failed to add vendor'}`);
         }
     } catch (error) {
         alert(`Error: ${error.message}`);
@@ -285,6 +725,153 @@ document.getElementById('vendorForm').addEventListener('submit', async (e) => {
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalHTML;
     }
+});
+
+async function editVendor(vendorId) {
+    try {
+        const response = await fetch(`/hub/api/v1/vendors/${vendorId}`);
+        if (!response.ok) {
+            alert('Error loading vendor');
+            return;
+        }
+        const vendor = await response.json();
+
+        // Create edit modal dynamically
+        const modal = document.createElement('div');
+        modal.innerHTML = `
+            <div class="modal fade" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Edit Vendor: ${escapeHtml(vendor.name)}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+                        <form id="editVendorForm">
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Vendor Name</label>
+                                        <input type="text" class="form-control" id="editVendorName" value="${escapeHtml(vendor.name)}" required>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Contact Name</label>
+                                        <input type="text" class="form-control" id="editContactName" value="${escapeHtml(vendor.contact_name || '')}">
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Email</label>
+                                        <input type="email" class="form-control" id="editEmail" value="${escapeHtml(vendor.email || '')}">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Phone</label>
+                                        <input type="tel" class="form-control" id="editPhone" value="${escapeHtml(vendor.phone || '')}">
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Address</label>
+                                    <input type="text" class="form-control" id="editAddress" value="${escapeHtml(vendor.address || '')}">
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Payment Terms</label>
+                                        <select class="form-select" id="editPaymentTerms">
+                                            <option value="Net 30" ${vendor.payment_terms === 'Net 30' ? 'selected' : ''}>Net 30</option>
+                                            <option value="Net 15" ${vendor.payment_terms === 'Net 15' ? 'selected' : ''}>Net 15</option>
+                                            <option value="Net 10" ${vendor.payment_terms === 'Net 10' ? 'selected' : ''}>Net 10</option>
+                                            <option value="Due on Receipt" ${vendor.payment_terms === 'Due on Receipt' ? 'selected' : ''}>Due on Receipt</option>
+                                            <option value="COD" ${vendor.payment_terms === 'COD' ? 'selected' : ''}>COD</option>
+                                            <option value="Net 60" ${vendor.payment_terms === 'Net 60' ? 'selected' : ''}>Net 60</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Status</label>
+                                        <select class="form-select" id="editIsActive">
+                                            <option value="true" ${vendor.is_active ? 'selected' : ''}>Active</option>
+                                            <option value="false" ${!vendor.is_active ? 'selected' : ''}>Inactive</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Notes</label>
+                                    <textarea class="form-control" id="editNotes" rows="2">${escapeHtml(vendor.notes || '')}</textarea>
+                                </div>
+                                <hr>
+                                <h6>Aliases</h6>
+                                <div class="mb-2">
+                                    ${vendor.aliases && vendor.aliases.length > 0
+                                        ? vendor.aliases.map(a => `<span class="badge bg-info text-dark me-1">${escapeHtml(a.alias_name)}</span>`).join('')
+                                        : '<span class="text-muted">No aliases defined</span>'}
+                                </div>
+                                <div class="text-muted small">
+                                    Inventory ID: ${vendor.inventory_vendor_id || 'Not linked'} |
+                                    Accounting ID: ${vendor.accounting_vendor_id || 'Not linked'}
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" class="btn btn-primary">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        const bsModal = new bootstrap.Modal(modal.querySelector('.modal'));
+        bsModal.show();
+
+        // Handle form submit
+        modal.querySelector('#editVendorForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const updates = {
+                name: document.getElementById('editVendorName').value,
+                contact_name: document.getElementById('editContactName').value || null,
+                email: document.getElementById('editEmail').value || null,
+                phone: document.getElementById('editPhone').value || null,
+                address: document.getElementById('editAddress').value || null,
+                payment_terms: document.getElementById('editPaymentTerms').value,
+                notes: document.getElementById('editNotes').value || null,
+                is_active: document.getElementById('editIsActive').value === 'true'
+            };
+
+            try {
+                const updateResp = await fetch(`/hub/api/v1/vendors/${vendorId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(updates)
+                });
+
+                if (updateResp.ok) {
+                    alert('Vendor updated successfully!');
+                    bsModal.hide();
+                    location.reload();
+                } else {
+                    const err = await updateResp.json();
+                    alert(`Error: ${err.detail || 'Failed to update vendor'}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        });
+
+        modal.querySelector('.modal').addEventListener('hidden.bs.modal', () => {
+            modal.remove();
+        });
+
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// Toggle aliases column visibility
+document.getElementById('showAliasesToggle').addEventListener('change', function() {
+    const aliasesCells = document.querySelectorAll('.aliases-cell, th:nth-child(2)');
+    aliasesCells.forEach(cell => {
+        cell.style.display = this.checked ? '' : 'none';
+    });
 });
 </script>
 {% endblock %}

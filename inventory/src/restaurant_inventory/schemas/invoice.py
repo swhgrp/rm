@@ -62,6 +62,9 @@ class VendorItemSummary(BaseModel):
     id: int
     vendor_product_name: str
     vendor_sku: Optional[str] = None
+    pack_size: Optional[str] = None
+    conversion_factor: Optional[float] = None
+    purchase_unit: Optional[UOMSummary] = None
 
     class Config:
         from_attributes = True

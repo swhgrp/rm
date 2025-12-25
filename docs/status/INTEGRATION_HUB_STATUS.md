@@ -1,7 +1,7 @@
 # Integration Hub - Implementation Status
 
-**Last Updated:** 2025-11-04
-**Version:** 1.3.0 (Vendor Bills Integration Complete)
+**Last Updated:** 2025-12-25
+**Version:** 1.5.0 (Vendor Normalization, Batch Operations, Duplicate Detection)
 
 ---
 
@@ -168,21 +168,85 @@ The Integration Hub is a centralized microservice that receives invoices and rou
 
 ---
 
-### 🔄 Pending (5%)
+#### **Vendor Normalization - Hub as Source of Truth** ✅ **COMPLETE** (Dec 2025)
+- [x] `vendor_aliases` table - Maps OCR name variants to canonical vendors
+- [x] **VendorNormalizerService** - Resolve vendors, create aliases, link invoices
+- [x] **API Endpoints** `/api/v1/vendors/`
+  - [x] CRUD for vendors and aliases
+  - [x] `GET /summary` - Vendor/alias statistics
+  - [x] `POST /normalization/auto-create-aliases` - Create from linked invoices
+  - [x] `POST /normalization/normalize-invoices` - Normalize vendor names
+  - [x] `POST /normalization/link-unlinked` - Link via aliases
+- [x] **Vendors Page** (`/hub/vendors`)
+  - [x] Show Aliases toggle
+  - [x] Aliases column per vendor
+  - [x] Add alias button (+)
+  - [x] Edit vendor modal
+  - [x] Filter inactive (merged) vendors
+- **Files:** `models/vendor_alias.py`, `services/vendor_normalizer.py`, `api/vendors.py`
 
-#### **Fuzzy Matching Service**
-- [ ] Implement fuzzy string matching algorithm
-- [ ] Query inventory system for item list
-- [ ] Calculate similarity scores
-- [ ] Return top 5 suggestions with confidence scores
-- [ ] Auto-map items with >90% confidence
+#### **Invoice Batch Operations** ✅ **COMPLETE** (Dec 2025)
+- [x] **API Endpoints** `/api/v1/batch/`
+  - [x] `POST /approve` - Batch approve
+  - [x] `POST /auto-map` - Batch auto-map
+  - [x] `POST /status` - Batch status update
+  - [x] `POST /mark-sent` - Mark as sent
+  - [x] `POST /reset-sync` - Reset sync for re-processing
+  - [x] `POST /delete` - Batch delete
+  - [x] `POST /summary` - Summary for selected
+- **Files:** `services/batch_operations.py`, `api/batch_operations.py`
+
+#### **Reporting Dashboard** ✅ **COMPLETE** (Dec 2025)
+- [x] **API Endpoints** `/api/v1/reports/`
+  - [x] `GET /summary` - Overall stats
+  - [x] `GET /vendor-spend` - By vendor with period filters
+  - [x] `GET /mapping-stats` - Item mapping statistics
+  - [x] `GET /sync-status` - Sync health metrics
+  - [x] `GET /daily-volume` - Volume over time
+  - [x] `GET /category-breakdown` - By category
+- **Files:** `services/reporting.py`, `api/reporting.py`
+
+#### **Duplicate Invoice Detection** ✅ **COMPLETE** (Dec 2025)
+- [x] **Detection Strategies:**
+  - [x] Exact invoice number match (95% confidence)
+  - [x] Vendor + date + amount match (70-80% confidence)
+- [x] **API Endpoints** `/api/v1/duplicates/`
+  - [x] `GET /stats` - Statistics
+  - [x] `GET /scan` - Scan with configurable thresholds
+  - [x] `GET /invoice/{id}` - Find duplicates for invoice
+  - [x] `POST /mark` - Mark as duplicate
+  - [x] `POST /mark/bulk` - Bulk mark
+- [x] **Duplicates Page** (`/hub/duplicates`)
+  - [x] Stats cards
+  - [x] Configurable filters
+  - [x] Visual duplicate groups with confidence
+  - [x] "Keep First" / "Keep Newest" actions
+  - [x] Bulk delete
+- **Files:** `services/duplicate_detection.py`, `api/duplicates.py`, `templates/duplicates.html`
+
+#### **Fuzzy Matching** ✅ **COMPLETE** (Dec 2025)
+- [x] Implement fuzzy string matching algorithm (rapidfuzz)
+- [x] Query inventory system for item list
+- [x] Calculate similarity scores
+- [x] Return top suggestions with confidence scores
+- [x] Auto-map items with high confidence
+- **File:** `services/fuzzy_matcher.py`
+
+#### **Price History Tracking** ✅ **COMPLETE** (Dec 2025)
+- [x] Track price changes over time per vendor item
+- [x] Alert on significant price changes
+- **File:** `services/price_tracker.py`
+
+---
+
+### 🔄 Pending (2%)
 
 #### **Email Invoice Reception**
 - [ ] Configure email forwarding (ap@swhgrp.com)
-- [ ] Integrate with email service (SendGrid/Mailgun/etc.)
-- [ ] Parse invoice PDF attachments
-- [ ] Extract vendor, invoice number, date, amount
-- [ ] Create invoice record automatically
+- [x] Integrate with email service (IMAP monitoring) ✅ COMPLETE
+- [x] Parse invoice PDF attachments (Claude Vision) ✅ COMPLETE
+- [x] Extract vendor, invoice number, date, amount ✅ COMPLETE
+- [x] Create invoice record automatically ✅ COMPLETE
 
 #### **Invoice Detail Enhancements**
 - [ ] In-page item mapping interface (currently requires unmapped items page)
@@ -201,13 +265,11 @@ integration-hub/
 │   ├── env.py
 │   ├── script.py.mako
 │   └── versions/
-│       ├── 20251019_1400_001_initial_schema.py
-│       └── 20251019_1430_002_seed_category_mappings.py
 ├── src/
 │   └── integration_hub/
 │       ├── __init__.py
 │       ├── __main__.py
-│       ├── main.py                      # FastAPI app
+│       ├── main.py                        # FastAPI app
 │       ├── db/
 │       │   ├── __init__.py
 │       │   └── database.py
@@ -215,20 +277,47 @@ integration-hub/
 │       │   ├── __init__.py
 │       │   ├── hub_invoice.py
 │       │   ├── hub_invoice_item.py
-│       │   └── item_gl_mapping.py
-│       ├── services/                     # ✅ NEW
+│       │   ├── hub_vendor_item.py         # Hub vendor items (source of truth)
+│       │   ├── vendor.py                   # Hub vendors
+│       │   ├── vendor_alias.py             # Vendor name aliases
+│       │   ├── item_gl_mapping.py
+│       │   └── price_history.py            # Price tracking
+│       ├── api/                            # API routers
+│       │   ├── auth.py
+│       │   ├── batch_operations.py         # Batch invoice operations
+│       │   ├── duplicates.py               # Duplicate detection
+│       │   ├── invoices.py
+│       │   ├── reporting.py                # Analytics/reports
+│       │   ├── settings.py
+│       │   ├── vendor_items.py
+│       │   └── vendors.py                  # Vendor management
+│       ├── services/
 │       │   ├── __init__.py
-│       │   ├── inventory_sender.py       # Send to inventory
-│       │   ├── accounting_sender.py      # Send to accounting
-│       │   └── auto_send.py              # Orchestrator
+│       │   ├── inventory_sender.py         # Send to inventory
+│       │   ├── accounting_sender.py        # Send to accounting
+│       │   ├── auto_send.py                # Orchestrator
+│       │   ├── batch_operations.py         # Batch operations
+│       │   ├── duplicate_detection.py      # Find duplicates
+│       │   ├── email_monitor.py            # IMAP email monitoring
+│       │   ├── fuzzy_matcher.py            # Fuzzy item matching
+│       │   ├── invoice_parser.py           # Claude Vision OCR
+│       │   ├── price_tracker.py            # Price history
+│       │   ├── reporting.py                # Reports/analytics
+│       │   ├── vendor_normalizer.py        # Vendor alias resolution
+│       │   └── vendor_sync.py              # Vendor sync
 │       └── templates/
 │           ├── base.html
 │           ├── dashboard.html
 │           ├── invoices.html
-│           ├── invoice_detail.html       # ✅ COMPLETE
+│           ├── invoice_detail.html
 │           ├── unmapped_items.html
-│           └── category_mappings.html
-└── uploads/                              # PDF storage
+│           ├── mapped_items.html
+│           ├── category_mappings.html
+│           ├── vendors.html                # Vendor management
+│           ├── hub_vendor_items.html       # Vendor items
+│           ├── duplicates.html             # Duplicate detection UI
+│           └── settings.html
+└── uploads/                                # PDF storage
 ```
 
 ---

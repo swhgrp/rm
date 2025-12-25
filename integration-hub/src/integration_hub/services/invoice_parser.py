@@ -1427,6 +1427,17 @@ class InvoiceParser:
                 raw_description = item_data.get('description') or 'Unknown'
                 normalized_description = to_title_case(raw_description)
 
+                # Parse pack_size - could be string like "6x5 LB", "Case - 12", "12/1 LT" or just a number
+                pack_size_raw = item_data.get('pack_size')
+                pack_size_int = None
+                if pack_size_raw:
+                    # Try to extract numeric pack size
+                    import re
+                    # Match patterns like: "12", "6x5", "Case - 12", "12/1", "6-pack"
+                    match = re.search(r'(\d+)(?:\s*[-x/]\s*\d+)?', str(pack_size_raw))
+                    if match:
+                        pack_size_int = int(match.group(1))
+
                 invoice_item = HubInvoiceItem(
                     invoice_id=invoice_id,
                     line_number=item_data.get('line_number'),
@@ -1434,6 +1445,7 @@ class InvoiceParser:
                     item_code=item_data.get('item_code'),
                     quantity=quantity,
                     unit_of_measure=item_data.get('unit'),
+                    pack_size=pack_size_int,
                     unit_price=unit_price,
                     total_amount=line_total,
                     is_mapped=False  # Will need manual mapping

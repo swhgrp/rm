@@ -1,0 +1,504 @@
+{% extends "base.html" %}
+
+{% block title %}Duplicate Detection - Integration Hub{% endblock %}
+
+{% block page_title %}Duplicate Detection{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .duplicate-group {
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        margin-bottom: 15px;
+        background: var(--bg-secondary);
+    }
+    .duplicate-group-header {
+        background: var(--bg-tertiary);
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-primary);
+        border-radius: 8px 8px 0 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    .duplicate-invoice {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        align-items: center;
+        gap: 15px;
+    }
+    .duplicate-invoice:last-child {
+        border-bottom: none;
+    }
+    .duplicate-invoice.selected-original {
+        background: rgba(67, 160, 71, 0.1);
+        border-left: 3px solid #43A047;
+    }
+    .duplicate-invoice.selected-duplicate {
+        background: rgba(229, 57, 53, 0.1);
+        border-left: 3px solid #E53935;
+    }
+    .confidence-badge {
+        font-size: 11px;
+        padding: 3px 8px;
+    }
+    .confidence-high { background: #43A047; color: white; }
+    .confidence-medium { background: #FB8C00; color: white; }
+    .confidence-low { background: #78909C; color: white; }
+    .stats-card {
+        text-align: center;
+        padding: 20px;
+    }
+    .stats-number {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--accent-primary);
+    }
+    .stats-label {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+    .invoice-details {
+        flex: 1;
+    }
+    .invoice-meta {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+    .filter-section {
+        background: var(--bg-secondary);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border: 1px solid var(--border-primary);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="stats-number" id="totalGroups">-</div>
+                <div class="stats-label">Duplicate Groups</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="stats-number" id="totalDuplicates">-</div>
+                <div class="stats-label">Potential Duplicates</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="stats-number" id="highConfidence">-</div>
+                <div class="stats-label">High Confidence</div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card stats-card">
+                <div class="stats-number" id="scannedInvoices">-</div>
+                <div class="stats-label">Invoices Scanned</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filter-section">
+        <div class="row align-items-end">
+            <div class="col-md-3">
+                <label class="form-label">Minimum Confidence</label>
+                <select class="form-select" id="minConfidence">
+                    <option value="0.9">High (90%+)</option>
+                    <option value="0.7" selected>Medium (70%+)</option>
+                    <option value="0.5">Low (50%+)</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Match Type</label>
+                <select class="form-select" id="matchType">
+                    <option value="all">All Types</option>
+                    <option value="invoice_number">Invoice Number Match</option>
+                    <option value="vendor_date_amount">Vendor/Date/Amount Match</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Date Window (days)</label>
+                <input type="number" class="form-control" id="dateWindow" value="7" min="1" max="30">
+            </div>
+            <div class="col-md-3">
+                <button class="btn btn-primary w-100" onclick="scanDuplicates()">
+                    <i class="bi bi-search"></i> Scan for Duplicates
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="d-flex justify-content-between mb-3">
+        <div>
+            <span class="text-muted" id="selectionInfo">Select invoices to mark as duplicates</span>
+        </div>
+        <div>
+            <button class="btn btn-outline-danger" id="deleteSelectedBtn" onclick="deleteSelected()" disabled>
+                <i class="bi bi-trash"></i> Delete Selected Duplicates
+            </button>
+        </div>
+    </div>
+
+    <!-- Duplicate Groups -->
+    <div id="duplicateGroups">
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-search" style="font-size: 3rem;"></i>
+            <p class="mt-3">Click "Scan for Duplicates" to find potential duplicate invoices</p>
+        </div>
+    </div>
+</div>
+
+<!-- View Invoice Modal -->
+<div class="modal fade" id="viewInvoiceModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Invoice Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="invoiceDetails">
+                Loading...
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let duplicateData = null;
+let selectedDuplicates = new Set();
+
+async function loadStats() {
+    try {
+        const response = await fetch('/hub/api/v1/duplicates/stats');
+        const stats = await response.json();
+
+        document.getElementById('totalGroups').textContent = stats.total_duplicate_groups;
+        document.getElementById('totalDuplicates').textContent = stats.total_potential_duplicates;
+        document.getElementById('highConfidence').textContent = stats.high_confidence_groups;
+        document.getElementById('scannedInvoices').textContent = stats.scanned_invoices;
+    } catch (error) {
+        console.error('Error loading stats:', error);
+    }
+}
+
+async function scanDuplicates() {
+    const minConfidence = document.getElementById('minConfidence').value;
+    const dateWindow = document.getElementById('dateWindow').value;
+    const matchType = document.getElementById('matchType').value;
+
+    document.getElementById('duplicateGroups').innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-3">Scanning for duplicates...</p>
+        </div>
+    `;
+
+    try {
+        const response = await fetch(`/hub/api/v1/duplicates/scan?min_confidence=${minConfidence}&date_window=${dateWindow}`);
+        duplicateData = await response.json();
+
+        // Update stats
+        document.getElementById('totalGroups').textContent = duplicateData.total_groups;
+        document.getElementById('totalDuplicates').textContent = duplicateData.total_potential_duplicates;
+        document.getElementById('scannedInvoices').textContent = duplicateData.scanned_invoices;
+
+        // Filter by match type if needed
+        let groups = duplicateData.duplicate_groups;
+        if (matchType !== 'all') {
+            groups = groups.filter(g => g.match_type === matchType);
+        }
+
+        renderGroups(groups);
+    } catch (error) {
+        document.getElementById('duplicateGroups').innerHTML = `
+            <div class="alert alert-danger">Error scanning for duplicates: ${error.message}</div>
+        `;
+    }
+}
+
+function renderGroups(groups) {
+    if (groups.length === 0) {
+        document.getElementById('duplicateGroups').innerHTML = `
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-check-circle" style="font-size: 3rem; color: #43A047;"></i>
+                <p class="mt-3">No duplicates found with current filters</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    groups.forEach((group, groupIndex) => {
+        const confidenceClass = group.confidence >= 0.9 ? 'confidence-high' :
+                               group.confidence >= 0.7 ? 'confidence-medium' : 'confidence-low';
+        const matchTypeLabel = group.match_type === 'invoice_number' ? 'Invoice # Match' : 'Vendor/Date/Amount Match';
+
+        html += `
+            <div class="duplicate-group" data-group-index="${groupIndex}">
+                <div class="duplicate-group-header">
+                    <div>
+                        <strong>${group.invoices[0].vendor_name}</strong>
+                        <span class="badge ${confidenceClass} confidence-badge ms-2">${Math.round(group.confidence * 100)}% confidence</span>
+                        <span class="badge bg-secondary confidence-badge">${matchTypeLabel}</span>
+                    </div>
+                    <div>
+                        <button class="btn btn-sm btn-outline-success" onclick="keepFirst(${groupIndex})" title="Keep first, mark rest as duplicates">
+                            <i class="bi bi-check"></i> Keep First
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="keepNewest(${groupIndex})" title="Keep newest, mark rest as duplicates">
+                            <i class="bi bi-clock"></i> Keep Newest
+                        </button>
+                    </div>
+                </div>
+        `;
+
+        group.invoices.forEach((inv, invIndex) => {
+            const isSelected = selectedDuplicates.has(inv.id);
+            const selectedClass = isSelected ? 'selected-duplicate' : '';
+
+            html += `
+                <div class="duplicate-invoice ${selectedClass}" data-invoice-id="${inv.id}">
+                    <div class="form-check">
+                        <input class="form-check-input duplicate-checkbox" type="checkbox"
+                               id="dup_${inv.id}" data-invoice-id="${inv.id}"
+                               ${isSelected ? 'checked' : ''}
+                               onchange="toggleDuplicate(${inv.id}, this.checked)">
+                    </div>
+                    <div class="invoice-details">
+                        <div>
+                            <strong>Invoice #${inv.invoice_number}</strong>
+                            <span class="badge bg-${getStatusColor(inv.status)} ms-2">${inv.status}</span>
+                        </div>
+                        <div class="invoice-meta">
+                            $${inv.total_amount?.toFixed(2) || '0.00'} |
+                            Date: ${inv.invoice_date || 'N/A'} |
+                            Created: ${formatDate(inv.created_at)}
+                        </div>
+                    </div>
+                    <div class="action-buttons">
+                        <button class="btn btn-sm btn-outline-secondary" onclick="viewInvoice(${inv.id})" title="View Details">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <a href="/hub/invoices/${inv.id}" class="btn btn-sm btn-outline-primary" title="Open Invoice">
+                            <i class="bi bi-box-arrow-up-right"></i>
+                        </a>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+    });
+
+    document.getElementById('duplicateGroups').innerHTML = html;
+    updateSelectionInfo();
+}
+
+function toggleDuplicate(invoiceId, checked) {
+    if (checked) {
+        selectedDuplicates.add(invoiceId);
+    } else {
+        selectedDuplicates.delete(invoiceId);
+    }
+
+    // Update visual state
+    const row = document.querySelector(`[data-invoice-id="${invoiceId}"]`);
+    if (row) {
+        row.classList.toggle('selected-duplicate', checked);
+    }
+
+    updateSelectionInfo();
+}
+
+function updateSelectionInfo() {
+    const count = selectedDuplicates.size;
+    document.getElementById('selectionInfo').textContent =
+        count > 0 ? `${count} invoice(s) selected for deletion` : 'Select invoices to mark as duplicates';
+    document.getElementById('deleteSelectedBtn').disabled = count === 0;
+}
+
+function keepFirst(groupIndex) {
+    const group = duplicateData.duplicate_groups[groupIndex];
+    // Uncheck first, check rest
+    group.invoices.forEach((inv, idx) => {
+        if (idx === 0) {
+            selectedDuplicates.delete(inv.id);
+        } else {
+            selectedDuplicates.add(inv.id);
+        }
+    });
+    renderGroups(duplicateData.duplicate_groups);
+}
+
+function keepNewest(groupIndex) {
+    const group = duplicateData.duplicate_groups[groupIndex];
+    // Find newest by created_at
+    let newestIdx = 0;
+    let newestDate = new Date(group.invoices[0].created_at);
+
+    group.invoices.forEach((inv, idx) => {
+        const date = new Date(inv.created_at);
+        if (date > newestDate) {
+            newestDate = date;
+            newestIdx = idx;
+        }
+    });
+
+    // Keep newest, select rest for deletion
+    group.invoices.forEach((inv, idx) => {
+        if (idx === newestIdx) {
+            selectedDuplicates.delete(inv.id);
+        } else {
+            selectedDuplicates.add(inv.id);
+        }
+    });
+    renderGroups(duplicateData.duplicate_groups);
+}
+
+async function deleteSelected() {
+    if (selectedDuplicates.size === 0) return;
+
+    const confirmed = await showConfirm(
+        `Are you sure you want to delete ${selectedDuplicates.size} duplicate invoice(s)? This cannot be undone.`,
+        'Confirm Deletion'
+    );
+
+    if (!confirmed) return;
+
+    try {
+        // We need an original_id for each duplicate - use the first non-selected invoice in each group
+        const requests = [];
+
+        for (const dupId of selectedDuplicates) {
+            // Find the group this belongs to
+            for (const group of duplicateData.duplicate_groups) {
+                const invInGroup = group.invoices.find(i => i.id === dupId);
+                if (invInGroup) {
+                    // Find an invoice in this group that's not selected
+                    const original = group.invoices.find(i => !selectedDuplicates.has(i.id));
+                    if (original) {
+                        requests.push({
+                            duplicate_id: dupId,
+                            original_id: original.id,
+                            action: 'delete'
+                        });
+                    }
+                    break;
+                }
+            }
+        }
+
+        const response = await fetch('/hub/api/v1/duplicates/mark/bulk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ duplicates: requests })
+        });
+
+        const result = await response.json();
+
+        if (result.success_count > 0) {
+            showToast(`Deleted ${result.success_count} duplicate(s)`, 'Success', 'success');
+            selectedDuplicates.clear();
+            scanDuplicates(); // Refresh
+        }
+
+        if (result.error_count > 0) {
+            showToast(`${result.error_count} deletion(s) failed`, 'Warning', 'warning');
+        }
+
+    } catch (error) {
+        showToast(`Error: ${error.message}`, 'Error', 'error');
+    }
+}
+
+async function viewInvoice(invoiceId) {
+    const modal = new bootstrap.Modal(document.getElementById('viewInvoiceModal'));
+    document.getElementById('invoiceDetails').innerHTML = '<div class="text-center"><div class="spinner-border"></div></div>';
+    modal.show();
+
+    try {
+        const response = await fetch(`/hub/api/invoices/${invoiceId}`);
+        const invoice = await response.json();
+
+        document.getElementById('invoiceDetails').innerHTML = `
+            <div class="row">
+                <div class="col-md-6">
+                    <p><strong>Invoice #:</strong> ${invoice.invoice_number}</p>
+                    <p><strong>Vendor:</strong> ${invoice.vendor_name}</p>
+                    <p><strong>Date:</strong> ${invoice.invoice_date}</p>
+                    <p><strong>Total:</strong> $${invoice.total_amount?.toFixed(2)}</p>
+                </div>
+                <div class="col-md-6">
+                    <p><strong>Status:</strong> <span class="badge bg-${getStatusColor(invoice.status)}">${invoice.status}</span></p>
+                    <p><strong>Source:</strong> ${invoice.source}</p>
+                    <p><strong>Created:</strong> ${formatDate(invoice.created_at)}</p>
+                    ${invoice.pdf_path ? `<p><a href="/hub/api/invoices/${invoiceId}/pdf" target="_blank" class="btn btn-sm btn-outline-primary"><i class="bi bi-file-pdf"></i> View PDF</a></p>` : ''}
+                </div>
+            </div>
+            ${invoice.items && invoice.items.length > 0 ? `
+            <hr>
+            <h6>Line Items (${invoice.items.length})</h6>
+            <table class="table table-sm">
+                <thead>
+                    <tr><th>Description</th><th>Qty</th><th>Price</th><th>Total</th></tr>
+                </thead>
+                <tbody>
+                    ${invoice.items.slice(0, 10).map(item => `
+                        <tr>
+                            <td>${item.description || item.vendor_product_name || '-'}</td>
+                            <td>${item.quantity || '-'}</td>
+                            <td>$${item.unit_price?.toFixed(2) || '-'}</td>
+                            <td>$${item.total_price?.toFixed(2) || '-'}</td>
+                        </tr>
+                    `).join('')}
+                    ${invoice.items.length > 10 ? `<tr><td colspan="4" class="text-muted">...and ${invoice.items.length - 10} more items</td></tr>` : ''}
+                </tbody>
+            </table>
+            ` : ''}
+        `;
+    } catch (error) {
+        document.getElementById('invoiceDetails').innerHTML = `<div class="alert alert-danger">Error loading invoice: ${error.message}</div>`;
+    }
+}
+
+function getStatusColor(status) {
+    const colors = {
+        'pending': 'warning',
+        'mapping': 'warning',
+        'ready': 'success',
+        'sent': 'secondary',
+        'error': 'danger',
+        'partial': 'warning',
+        'duplicate': 'danger'
+    };
+    return colors[status] || 'secondary';
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return 'N/A';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+}
+
+// Load stats on page load
+document.addEventListener('DOMContentLoaded', () => {
+    loadStats();
+});
+</script>
+{% endblock %}

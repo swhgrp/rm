@@ -19,7 +19,8 @@ class HubInvoiceItem(Base):
     item_description = Column(String(500), nullable=False)
     item_code = Column(String(100), nullable=True)  # Vendor's item code
     quantity = Column(Numeric(10, 3), nullable=False)
-    unit_of_measure = Column(String(50), nullable=True)
+    unit_of_measure = Column(String(50), nullable=True)  # CS, EA, LB, GAL, etc.
+    pack_size = Column(Integer, nullable=True)  # Units per case (e.g., 12 for a 12-pack)
     unit_price = Column(Numeric(10, 4), nullable=False)
     total_amount = Column(Numeric(12, 4), nullable=False)
 

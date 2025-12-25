@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** December 24, 2025
+**Last Updated:** December 25, 2025
 **System Status:** Production (95% Complete - Core systems operational)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -9,7 +9,106 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Dec 24, 2025)
+### Most Recent Work (Current Session - Dec 25, 2025)
+
+**INTEGRATION HUB: VENDOR NORMALIZATION, BATCH OPERATIONS, REPORTING & DUPLICATE DETECTION** ✅ **COMPLETE**
+
+#### 1. **Invoice Batch Operations** 📦 **NEW API**
+- Created batch operations service and API endpoints
+- **Endpoints:** `/api/v1/batch/`
+  - `POST /approve` - Batch approve invoices
+  - `POST /auto-map` - Batch auto-map unmapped items
+  - `POST /status` - Batch status update
+  - `POST /mark-sent` - Mark invoices as sent to systems
+  - `POST /reset-sync` - Reset sync status for re-processing
+  - `POST /delete` - Batch delete invoices
+  - `POST /summary` - Get summary for selected invoices
+- **Files Created:**
+  - `integration-hub/src/integration_hub/services/batch_operations.py`
+  - `integration-hub/src/integration_hub/api/batch_operations.py`
+
+#### 2. **Reporting Dashboard** 📊 **NEW API**
+- Created reporting service with analytics endpoints
+- **Endpoints:** `/api/v1/reports/`
+  - `GET /summary` - Overall system summary stats
+  - `GET /vendor-spend` - Spending by vendor with period filtering
+  - `GET /mapping-stats` - Item mapping statistics
+  - `GET /sync-status` - System sync health metrics
+  - `GET /daily-volume` - Invoice volume over time
+  - `GET /category-breakdown` - Spending by category
+- **Files Created:**
+  - `integration-hub/src/integration_hub/services/reporting.py`
+  - `integration-hub/src/integration_hub/api/reporting.py`
+
+#### 3. **Vendor Name Normalization - Hub as Source of Truth** 🏢 **MAJOR FEATURE**
+- **Decision:** Moved vendors to Hub as source of truth (like vendor items)
+- **VendorAlias Model:** Maps OCR/invoice name variants to canonical vendors
+  - `alias_name` - Original name from invoice (e.g., "Gordon Food Service Inc.")
+  - `alias_name_normalized` - Lowercase stripped version for matching
+  - `vendor_id` - Links to canonical Hub vendor
+  - `source` - 'manual', 'auto', 'migrated', 'ocr'
+- **VendorNormalizerService:** Resolves vendor names, creates aliases, links invoices
+- **API Endpoints:** `/api/v1/vendors/`
+  - CRUD for vendors and aliases
+  - `GET /summary` - Vendor/alias statistics
+  - `POST /normalization/auto-create-aliases` - Create aliases from linked invoices
+  - `POST /normalization/normalize-invoices` - Normalize vendor names on invoices
+  - `POST /normalization/link-unlinked` - Link invoices via aliases
+- **Results:**
+  - Auto-created 8 aliases from linked invoices
+  - Normalized 275 invoices to canonical vendor names
+  - Linked 19 previously unlinked invoices
+  - Deactivated 5 duplicate vendors (merged as aliases)
+- **UI Updates:** `/hub/vendors` page
+  - Added "Show Aliases" toggle
+  - Aliases column shows linked variants
+  - "+" button to add aliases per vendor
+  - "Manage Aliases" modal with auto-create, link, normalize actions
+  - Edit vendor functionality
+  - Filters out inactive (merged) vendors
+- **Files Created:**
+  - `integration-hub/src/integration_hub/models/vendor_alias.py`
+  - `integration-hub/src/integration_hub/services/vendor_normalizer.py`
+  - `integration-hub/src/integration_hub/api/vendors.py`
+- **Files Modified:**
+  - `integration-hub/src/integration_hub/templates/vendors.html`
+  - `integration-hub/src/integration_hub/main.py` (vendor page route filters inactive)
+
+#### 4. **Duplicate Invoice Detection** 🔍 **NEW FEATURE**
+- **Detection Strategies:**
+  - Exact invoice number match (same vendor + normalized invoice#) - 95% confidence
+  - Vendor + date + amount match (within configurable window) - 70-80% confidence
+- **API Endpoints:** `/api/v1/duplicates/`
+  - `GET /stats` - Duplicate statistics
+  - `GET /scan` - Scan all invoices with configurable thresholds
+  - `GET /invoice/{id}` - Find duplicates for specific invoice
+  - `POST /mark` - Mark invoice as duplicate (flag or delete)
+  - `POST /mark/bulk` - Bulk mark duplicates
+- **UI Page:** `/hub/duplicates`
+  - Stats cards (groups, potential duplicates, high confidence, scanned)
+  - Configurable filters (min confidence, match type, date window)
+  - Visual duplicate groups with confidence badges
+  - Quick actions: "Keep First" or "Keep Newest"
+  - Checkbox selection for bulk deletion
+  - View invoice details modal
+- **Results Found:**
+  - 53 high-confidence duplicate groups (128 total)
+  - 257 potential duplicate invoices
+  - Primary vendors: Gold Coast Linen (59), Gordon Food Service (51)
+- **Files Created:**
+  - `integration-hub/src/integration_hub/services/duplicate_detection.py`
+  - `integration-hub/src/integration_hub/api/duplicates.py`
+  - `integration-hub/src/integration_hub/templates/duplicates.html`
+- **Files Modified:**
+  - `integration-hub/src/integration_hub/templates/base.html` (nav link)
+  - `integration-hub/src/integration_hub/main.py` (page route, router registration)
+
+#### 5. **Navigation Update**
+- Added "Duplicates" link to sidebar navigation (between Vendor Items and Settings)
+
+---
+
+### Previous Session Work (Dec 24, 2025)
 
 **UI CONSISTENCY: SIDEBAR HIGHLIGHTING & SUBMENU BEHAVIOR FIXES** ✅ **COMPLETE**
 
