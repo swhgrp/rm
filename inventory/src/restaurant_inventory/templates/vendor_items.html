@@ -210,84 +210,105 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="vendorItemModalTitle">Add Vendor Item</h5>
+                <h5 class="modal-title" id="vendorItemModalTitle">Edit Vendor Item</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <form id="vendorItemForm">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="viVendorId" class="form-label">Vendor *</label>
-                            <select class="form-select" id="viVendorId" required>
-                                <option value="">Select vendor...</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="viMasterItemId" class="form-label">Master Item <span class="text-muted">(optional - can link later)</span></label>
-                            <div class="searchable-select-wrapper">
-                                <input type="text" class="form-control search-input" id="searchMasterItem" placeholder="Search master items...">
-                                <select class="form-select" id="viMasterItemId" size="6">
-                                    <option value="">Select master item...</option>
+                    <!-- Status Badge (auto-calculated, read-only) -->
+                    <div class="mb-3 d-flex align-items-center" id="viStatusSection" style="display: none !important;">
+                        <span class="me-2">Status:</span>
+                        <span id="viStatusBadge" class="badge bg-secondary">-</span>
+                        <small class="text-muted ms-2" id="viStatusReason"></small>
+                    </div>
+
+                    <!-- Section 1: Identity -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3"><i class="bi bi-tag"></i> Identity</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="viVendorId" class="form-label">Vendor *</label>
+                                <select class="form-select" id="viVendorId" required>
+                                    <option value="">Select vendor...</option>
                                 </select>
                             </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="viVendorSku" class="form-label">Vendor Item Code / SKU</label>
+                                <input type="text" class="form-control" id="viVendorSku" placeholder="Code as it appears on invoices">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="viVendorProductName" class="form-label">Invoice Display Name *</label>
+                            <input type="text" class="form-control" id="viVendorProductName" required placeholder="Raw text as it appears on invoices">
+                            <small class="form-text text-muted">Match invoice lines by vendor + SKU/name signature</small>
                         </div>
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="viVendorSku" class="form-label">Vendor SKU</label>
-                            <input type="text" class="form-control" id="viVendorSku">
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="viVendorProductName" class="form-label">Vendor Product Name *</label>
-                            <input type="text" class="form-control" id="viVendorProductName" required>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label for="viPurchaseUnitId" class="form-label">Base Unit *</label>
-                            <select class="form-select" id="viPurchaseUnitId" required>
-                                <option value="">Select unit...</option>
-                            </select>
-                            <small class="form-text text-muted">What you count inventory in (Each, Pound, Gallon, etc.)</small>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label for="viConversionFactor" class="form-label">Quantity Per Case</label>
-                            <input type="number" step="0.01" class="form-control" id="viConversionFactor" placeholder="1.0">
-                            <small class="form-text text-muted">How many base units per case (e.g., 25 for 25lb case, 60 for case of 60)</small>
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label for="viUnitPrice" class="form-label">Last Case Price</label>
-                            <input type="number" step="0.01" class="form-control bg-secondary" id="viUnitPrice" readonly>
-                            <small class="form-text text-muted">Auto-updated from invoices</small>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-md-4 mb-3">
-                            <label for="viMinOrderQty" class="form-label">Min Order Qty</label>
-                            <input type="number" step="0.001" class="form-control" id="viMinOrderQty">
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <label for="viLeadTimeDays" class="form-label">Lead Time (days)</label>
-                            <input type="number" class="form-control" id="viLeadTimeDays">
-                        </div>
-                        <div class="col-md-4 mb-3">
-                            <div class="form-check mt-4">
-                                <input type="checkbox" class="form-check-input" id="viIsPreferred">
-                                <label class="form-check-label" for="viIsPreferred">Preferred Vendor</label>
+                    <!-- Section 2: Purchasing Definition -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3"><i class="bi bi-box-seam"></i> Purchasing Definition</h6>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label for="viPurchaseUnitId" class="form-label">Purchase UOM *</label>
+                                <select class="form-select" id="viPurchaseUnitId" required>
+                                    <option value="">Select unit...</option>
+                                </select>
+                                <small class="form-text text-muted">e.g., Case, Each, Keg</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="viConversionFactor" class="form-label">Primary Units per Purchase *</label>
+                                <input type="number" step="0.001" class="form-control" id="viConversionFactor" value="1" oninput="updateCostCalculation()">
+                                <small class="form-text text-muted">e.g., 12 bottles per case</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label for="viUnitPrice" class="form-label">Last Purchase Price</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" class="form-control" id="viUnitPrice" oninput="updateCostCalculation()">
+                                </div>
+                                <small class="form-text text-muted">Per purchase unit</small>
                             </div>
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="viNotes" class="form-label">Notes</label>
-                        <textarea class="form-control" id="viNotes" rows="2"></textarea>
+                    <!-- Section 3: Prices by Location (Read-only, from invoices) -->
+                    <div class="mb-4" id="viLocationPricesSection" style="display: none;">
+                        <h6 class="text-muted mb-3"><i class="bi bi-geo-alt"></i> Prices by Location <small class="text-muted">(from invoices)</small></h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Location</th>
+                                        <th>Last Price</th>
+                                        <th>Cost/Unit</th>
+                                        <th>Last Invoice</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="viLocationPricesBody">
+                                    <tr><td colspan="4" class="text-muted text-center">No price history</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
-                    <div class="alert alert-info" id="viCostCalculation" style="display: none;">
-                        <strong>Cost per Master Unit:</strong> <span id="viCostPerMaster">$0.00</span>
+                    <!-- Section 4: Mapping -->
+                    <div class="mb-3">
+                        <h6 class="text-muted mb-3"><i class="bi bi-link-45deg"></i> Mapping</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="viMasterItemId" class="form-label">Master Item <span class="text-muted">(optional - can link later)</span></label>
+                                <div class="searchable-select-wrapper">
+                                    <input type="text" class="form-control search-input" id="searchMasterItem" placeholder="Search master items...">
+                                    <select class="form-select" id="viMasterItemId" size="6">
+                                        <option value="">Select master item...</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="viCategory" class="form-label">Category <small class="text-muted">(display only)</small></label>
+                                <input type="text" class="form-control" id="viCategory" readonly placeholder="From master item">
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -439,6 +460,14 @@
         }
     }
 
+    // Calculate and display derived cost
+    function updateCostCalculation() {
+        const price = parseFloat(document.getElementById('viUnitPrice').value) || 0;
+        const factor = parseFloat(document.getElementById('viConversionFactor').value) || 1;
+        const derivedCost = factor > 0 ? (price / factor).toFixed(4) : '-';
+        document.getElementById('viCostPerMaster').value = derivedCost;
+    }
+
     // ========== VENDOR ITEMS ==========
     // Now fetches from Hub (source of truth)
     async function loadVendorItems() {
@@ -491,15 +520,20 @@
                 vendor_id: vi.inventory_vendor_id || vi.vendor_id,
                 hub_vendor_id: vi.vendor_id,  // Keep Hub's vendor ID for reference
                 vendor_name: vi.vendor_name,
+                location_id: vi.location_id,
+                location_name: vi.location_name,
                 master_item_id: vi.inventory_master_item_id,
                 master_item_name: vi.inventory_master_item_name,
                 vendor_sku: vi.vendor_sku,
                 vendor_product_name: vi.vendor_product_name,
                 purchase_unit_id: vi.purchase_unit_id,
                 purchase_unit_name: vi.purchase_unit_name,
-                conversion_factor: vi.conversion_factor,
+                pack_to_primary_factor: vi.pack_to_primary_factor,
+                conversion_factor: vi.conversion_factor,  // Keep old field for compatibility
                 unit_price: vi.unit_price,
+                last_purchase_price: vi.last_purchase_price,
                 last_price: vi.last_price,
+                status: vi.status,
                 is_active: vi.is_active,
                 is_preferred: vi.is_preferred,
                 category: vi.category,
@@ -596,6 +630,75 @@
         displayVendorItems();
     }
 
+    // Calculate auto-status based on completeness
+    function calculateVendorItemStatus(vendorItem) {
+        const missing = [];
+        if (!vendorItem.master_item_id) missing.push('Master Item');
+        if (!vendorItem.purchase_unit_id) missing.push('Purchase UOM');
+        const packFactor = vendorItem.pack_to_primary_factor || vendorItem.conversion_factor || 0;
+        if (!packFactor || packFactor <= 0) missing.push('Pack Factor');
+
+        if (missing.length > 0) {
+            return { status: 'needs_review', reason: `Missing: ${missing.join(', ')}`, badge: 'bg-warning text-dark' };
+        }
+        return { status: 'active', reason: 'Complete', badge: 'bg-success' };
+    }
+
+    // Update status badge display
+    function updateVendorItemStatusBadge(vendorItem) {
+        const { status, reason, badge } = calculateVendorItemStatus(vendorItem);
+        const section = document.getElementById('viStatusSection');
+        const badgeEl = document.getElementById('viStatusBadge');
+        const reasonEl = document.getElementById('viStatusReason');
+
+        if (section) {
+            section.style.display = 'flex';
+            section.style.setProperty('display', 'flex', 'important');
+        }
+        if (badgeEl) {
+            badgeEl.textContent = status === 'active' ? 'Active' : 'Needs Review';
+            badgeEl.className = `badge ${badge}`;
+        }
+        if (reasonEl) {
+            reasonEl.textContent = status === 'needs_review' ? reason : '';
+        }
+    }
+
+    // Load location prices for edit modal
+    async function loadVendorItemLocationPrices(vendorItemId) {
+        const section = document.getElementById('viLocationPricesSection');
+        const tbody = document.getElementById('viLocationPricesBody');
+
+        if (!section || !tbody) return;
+
+        try {
+            // Fetch location prices from Hub API via Inventory proxy
+            const response = await apiRequest(`api/hub-vendor-items/${vendorItemId}/location-prices`);
+
+            if (!response || response.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            tbody.innerHTML = response.map(p => {
+                const costPerUnit = p.pack_factor > 0 ? (p.last_price / p.pack_factor).toFixed(4) : '-';
+                const lastDate = p.last_invoice_date ? new Date(p.last_invoice_date).toLocaleDateString() : '-';
+                return `
+                    <tr>
+                        <td>${p.location_name || 'Unknown'}</td>
+                        <td>$${parseFloat(p.last_price).toFixed(2)}</td>
+                        <td>$${costPerUnit}</td>
+                        <td>${lastDate}</td>
+                    </tr>
+                `;
+            }).join('');
+        } catch (error) {
+            console.error('Error loading location prices:', error);
+            section.style.display = 'none';
+        }
+    }
+
     async function showVendorItemModal(vendorItemId = null) {
         currentEditVendorItemId = vendorItemId;
 
@@ -605,27 +708,43 @@
             loadUnitsOfMeasure()
         ]);
 
+        // Hide location prices section for new items
+        const pricesSection = document.getElementById('viLocationPricesSection');
+        if (pricesSection) pricesSection.style.display = 'none';
+
+        // Hide status section for new items
+        const statusSection = document.getElementById('viStatusSection');
+        if (statusSection) statusSection.style.display = 'none';
+
         if (vendorItemId) {
             document.getElementById('vendorItemModalTitle').textContent = 'Edit Vendor Item';
             const vendorItem = vendorItems.find(vi => vi.id === vendorItemId);
             if (vendorItem) {
+                // Identity
                 document.getElementById('viVendorId').value = vendorItem.vendor_id;
-                document.getElementById('viMasterItemId').value = vendorItem.master_item_id || '';  // Handle null
                 document.getElementById('viVendorSku').value = vendorItem.vendor_sku || '';
                 document.getElementById('viVendorProductName').value = vendorItem.vendor_product_name;
+
+                // Status badge (auto-calculated)
+                updateVendorItemStatusBadge(vendorItem);
+
+                // Purchasing
                 document.getElementById('viPurchaseUnitId').value = vendorItem.purchase_unit_id;
-                // Format conversion factor to 2 decimal places
-                const conversionFactor = vendorItem.conversion_factor ? parseFloat(vendorItem.conversion_factor).toFixed(2) : '1.00';
-                document.getElementById('viConversionFactor').value = conversionFactor;
-                document.getElementById('viUnitPrice').value = vendorItem.unit_price || '';
-                document.getElementById('viMinOrderQty').value = vendorItem.minimum_order_quantity || '';
-                document.getElementById('viLeadTimeDays').value = vendorItem.lead_time_days || '';
-                document.getElementById('viIsPreferred').checked = vendorItem.is_preferred;
-                document.getElementById('viNotes').value = vendorItem.notes || '';
+                const conversionFactor = vendorItem.pack_to_primary_factor || vendorItem.conversion_factor || 1;
+                document.getElementById('viConversionFactor').value = parseFloat(conversionFactor).toFixed(2);
+                document.getElementById('viUnitPrice').value = vendorItem.last_purchase_price || vendorItem.unit_price || '';
+
+                // Mapping
+                document.getElementById('viMasterItemId').value = vendorItem.master_item_id || '';
+                document.getElementById('viCategory').value = vendorItem.category || '';
+
+                // Load location prices (async)
+                loadVendorItemLocationPrices(vendorItemId);
             }
         } else {
             document.getElementById('vendorItemModalTitle').textContent = 'Add Vendor Item';
             document.getElementById('vendorItemForm').reset();
+            document.getElementById('viConversionFactor').value = '1';
         }
 
         if (!vendorItemModal) {
@@ -681,27 +800,29 @@
         console.log(`[${saveTimestamp}] ===== SAVE VENDOR ITEM TO HUB =====`);
         console.log(`[${saveTimestamp}] Form Values:`, { vendorId, masterItemId, vendorProductName, purchaseUnitId, currentEditVendorItemId });
 
-        // Master Item is now optional - can be linked later
+        // Validate required fields
         if (!vendorId || !vendorProductName || !purchaseUnitId) {
-            showAlert('Please fill in all required fields (Vendor, Product Name, Purchase Unit)', 'warning');
+            showAlert('Please fill in all required fields (Vendor, Invoice Display Name, Purchase UOM)', 'warning');
             return;
         }
 
         const conversionFactorValue = document.getElementById('viConversionFactor').value;
-        const conversionFactor = conversionFactorValue ? parseFloat(conversionFactorValue) : 1.0;
+        const packFactor = conversionFactorValue ? parseFloat(conversionFactorValue) : 1.0;
+
+        // Auto-calculate status based on completeness
+        const hasAllFields = masterItemId && purchaseUnitId && packFactor > 0;
+        const autoStatus = hasAllFields ? 'active' : 'needs_review';
 
         const data = {
             vendor_id: parseInt(vendorId),
-            master_item_id: masterItemId ? parseInt(masterItemId) : null,  // Allow null for "Not Linked"
+            inventory_master_item_id: masterItemId ? parseInt(masterItemId) : null,
             vendor_sku: document.getElementById('viVendorSku').value || null,
             vendor_product_name: vendorProductName,
             purchase_unit_id: parseInt(purchaseUnitId),
-            conversion_factor: conversionFactor,  // Editable conversion factor
-            minimum_order_quantity: document.getElementById('viMinOrderQty').value ? parseFloat(document.getElementById('viMinOrderQty').value) : null,
-            lead_time_days: document.getElementById('viLeadTimeDays').value ? parseInt(document.getElementById('viLeadTimeDays').value) : null,
-            is_preferred: document.getElementById('viIsPreferred').checked,
-            notes: document.getElementById('viNotes').value || null,
-            is_active: true
+            pack_to_primary_factor: packFactor,
+            last_purchase_price: document.getElementById('viUnitPrice').value ? parseFloat(document.getElementById('viUnitPrice').value) : null,
+            status: autoStatus,  // Auto-calculated, not user-selected
+            category: document.getElementById('viCategory').value || null
         };
 
         console.log(`[${saveTimestamp}] Sending data to Hub:`, JSON.stringify(data, null, 2));

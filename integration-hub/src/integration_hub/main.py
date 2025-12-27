@@ -1850,6 +1850,7 @@ async def duplicates_page(request: Request):
 async def vendor_items_page(request: Request, db: Session = Depends(get_db)):
     """Hub Vendor Items management page - Hub is source of truth"""
     from sqlalchemy.orm import joinedload
+    from integration_hub.models.hub_vendor_item import VendorItemStatus
 
     # Fetch all vendor items with vendor relationship
     vendor_items = db.query(HubVendorItem).options(
@@ -1861,59 +1862,20 @@ async def vendor_items_page(request: Request, db: Session = Depends(get_db)):
     # Get active vendors for filters and forms
     vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
 
-    # Get hierarchical categories from Inventory system
-    categories = []
-    try:
-        from sqlalchemy import text as sql_text
-        inv_result = db.execute(sql_text("""
-            SELECT name, parent_name
-            FROM dblink(
-                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
-                'SELECT c.name, p.name as parent_name
-                 FROM categories c
-                 LEFT JOIN categories p ON c.parent_id = p.id
-                 WHERE c.is_active = true OR c.is_active IS NULL
-                 ORDER BY COALESCE(p.name, c.name), c.name'
-            ) AS t(name VARCHAR, parent_name VARCHAR)
-        """)).fetchall()
+    # Get distinct categories
+    categories_query = db.query(HubVendorItem.category).filter(
+        HubVendorItem.category.isnot(None),
+        HubVendorItem.category != ''
+    ).distinct().order_by(HubVendorItem.category).all()
+    categories = [c[0] for c in categories_query]
 
-        for cat in inv_result:
-            cat_name = cat[0]
-            parent_name = cat[1]
-            if parent_name:
-                categories.append(f"{parent_name} - {cat_name}")
-            else:
-                # Only add top-level categories if they have no subcategories
-                # Check if any subcategory references this as parent
-                has_children = any(c[1] == cat_name for c in inv_result)
-                if not has_children:
-                    categories.append(cat_name)
-    except Exception as e:
-        logger.warning(f"Could not fetch categories from Inventory: {e}")
-        # Fallback to existing distinct categories from vendor items
-        categories_query = db.query(HubVendorItem.category).filter(
-            HubVendorItem.category.isnot(None),
-            HubVendorItem.category != ''
-        ).distinct().order_by(HubVendorItem.category).all()
-        categories = [c[0] for c in categories_query]
+    # Fetch units of measure from Hub database
+    from integration_hub.models.unit_of_measure import UnitOfMeasure
+    units_query = db.query(UnitOfMeasure).filter(UnitOfMeasure.is_active == True).order_by(UnitOfMeasure.name).all()
+    units = [{"id": u.id, "name": u.name, "abbreviation": u.abbreviation or ""} for u in units_query]
 
-    # Fetch units of measure from Inventory via dblink
-    units = []
-    try:
-        from sqlalchemy import text as sql_text
-        units_result = db.execute(sql_text("""
-            SELECT id, name, abbreviation
-            FROM dblink(
-                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
-                'SELECT id, name, abbreviation FROM units_of_measure WHERE is_active = true ORDER BY name'
-            ) AS t(id INTEGER, name VARCHAR, abbreviation VARCHAR)
-        """)).fetchall()
-
-        for u in units_result:
-            units.append({"id": u[0], "name": u[1], "abbreviation": u[2]})
-    except Exception as e:
-        logger.warning(f"Could not fetch units of measure from Inventory: {e}")
-        # Fallback to common units
+    # Fallback if no units
+    if not units:
         units = [
             {"id": 1, "name": "Each", "abbreviation": "EA"},
             {"id": 2, "name": "Case", "abbreviation": "CS"},
@@ -1921,10 +1883,35 @@ async def vendor_items_page(request: Request, db: Session = Depends(get_db)):
             {"id": 4, "name": "Gallon", "abbreviation": "GAL"},
         ]
 
-    # Stats
+    # Fetch locations and master items from Inventory database directly (no auth needed)
+    from sqlalchemy import create_engine, text as sql_text
+    inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
+                                 'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+    locations = []
+    master_items = []
+    try:
+        inv_engine = create_engine(inventory_db_url)
+        with inv_engine.connect() as conn:
+            # Fetch locations
+            results = conn.execute(
+                sql_text("SELECT id, name FROM locations WHERE is_active = true ORDER BY name")
+            ).fetchall()
+            locations = [{"id": row[0], "name": row[1]} for row in results]
+
+            # Fetch master items (limit 2000 for dropdown)
+            items_results = conn.execute(
+                sql_text("SELECT id, name, category FROM master_items WHERE is_active = true ORDER BY name LIMIT 2000")
+            ).fetchall()
+            master_items = [{"id": row[0], "name": row[1], "category": row[2]} for row in items_results]
+    except Exception as e:
+        logger.warning(f"Could not fetch data from Inventory database: {e}")
+
+    # Stats with status counts
     stats = {
         "total": len(vendor_items),
-        "active": sum(1 for vi in vendor_items if vi.is_active),
+        "active": sum(1 for vi in vendor_items if vi.status == VendorItemStatus.active),
+        "needs_review": sum(1 for vi in vendor_items if vi.status == VendorItemStatus.needs_review),
+        "inactive": sum(1 for vi in vendor_items if vi.status == VendorItemStatus.inactive),
         "synced": sum(1 for vi in vendor_items if vi.synced_to_inventory),
         "vendors": len(vendors)
     }
@@ -1933,8 +1920,10 @@ async def vendor_items_page(request: Request, db: Session = Depends(get_db)):
         "request": request,
         "vendor_items": vendor_items,
         "vendors": vendors,
+        "locations": locations,
         "categories": categories,
         "units": units,
+        "master_items": master_items,
         "stats": stats
     })
 

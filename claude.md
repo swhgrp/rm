@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** December 25, 2025
-**System Status:** Production (95% Complete - Core systems operational)
+**Last Updated:** December 27, 2025
+**System Status:** Production (95% Complete - Major Architecture Refactor in Progress)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -9,7 +9,65 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Dec 25, 2025)
+### Most Recent Work (Current Session - Dec 27, 2025)
+
+**LOCATION-AWARE COSTING ARCHITECTURE** 🔄 **IN PROGRESS (40%)**
+
+Major refactor implementing MarginEdge/R365 hybrid architecture for location-specific weighted average costing.
+
+#### System Boundaries (New Architecture)
+- **Hub owns:** UOM (global), Categories (global), Vendor Items (per location)
+- **Inventory owns:** Master Items, Count Units, Location Costs
+
+#### 1. **Hub Schema Updates** ✅ **COMPLETE**
+- **UnitOfMeasure Model** (`integration-hub/src/integration_hub/models/unit_of_measure.py`)
+  - Added `MeasureType` enum (each, weight, volume) - simplified from old 4-dimension system
+  - Added `measure_type` field with `effective_measure_type` property for backward compatibility
+  - Deprecated `dimension` field (kept for migration)
+- **HubVendorItem Model** (`integration-hub/src/integration_hub/models/hub_vendor_item.py`)
+  - Added `VendorItemStatus` enum (active, needs_review, inactive)
+  - Added `location_id` - each vendor item now tied to a specific location
+  - Added `status` field for review workflow
+  - Added `pack_to_primary_factor` - converts purchase units to primary count units
+  - Added `last_purchase_price`, `previous_purchase_price`
+  - Added `cost_per_primary_unit` property
+  - Deprecated old fields: `conversion_factor`, `unit_price`, `is_active`
+
+#### 2. **Inventory Schema Updates** ✅ **COMPLETE**
+- **NEW: MasterItemCountUnit** (`inventory/src/restaurant_inventory/models/master_item_count_unit.py`)
+  - Defines multiple count units per master item
+  - `is_primary` flag for primary count unit
+  - `conversion_to_primary` factor
+  - Helper methods: `convert_to_primary()`, `convert_from_primary()`
+- **NEW: MasterItemLocationCost** (`inventory/src/restaurant_inventory/models/master_item_location_cost.py`)
+  - Weighted average cost per location
+  - `current_weighted_avg_cost`, `total_qty_on_hand`
+  - `apply_purchase()` and `apply_usage()` methods for cost updates
+  - `MasterItemLocationCostHistory` for audit trail
+- **MasterItem Model** (`inventory/src/restaurant_inventory/models/item.py`)
+  - Added `category_id`, `primary_uom_id`, `primary_uom_name`, `primary_uom_abbr`, `shelf_life_days`
+  - Added relationships to `count_units` and `location_costs`
+  - Added `get_cost_at_location()` and `get_primary_count_unit()` methods
+  - Deprecated cost fields: `current_cost`, `average_cost`
+
+#### 3. **Migration Script** ✅ **COMPLETE**
+- **File:** `scripts/migrate_location_aware_costing.py`
+- **Phases:**
+  - Phase 1a: Hub UOM measure_type migration (dimension → measure_type)
+  - Phase 1b: Hub Vendor Items schema updates (add location_id, status, pack_to_primary_factor)
+  - Phase 2: Inventory table creation (count_units, location_costs, cost_history)
+  - Phase 3: Data migration (copy existing costs to all locations)
+- **Usage:** `python3 scripts/migrate_location_aware_costing.py [--dry-run]`
+
+#### 4. **Remaining Work**
+- [ ] Run migration script on staging/production
+- [ ] Update invoice processing for location detection
+- [ ] Build costing engine with weighted average calculations
+- [ ] Update UIs for location filters and cost displays
+
+---
+
+### Previous Session Work (Dec 25, 2025)
 
 **HUB VENDOR ITEMS: UI IMPROVEMENTS & SOURCE OF TRUTH CONSOLIDATION** ✅ **COMPLETE**
 

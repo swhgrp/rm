@@ -22,7 +22,7 @@
 
     <!-- Stats Cards -->
     <div class="row mb-4">
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card text-center">
                 <div class="card-body py-3">
                     <h3 class="mb-0" id="totalCount">{{ stats.total }}</h3>
@@ -30,7 +30,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card text-center">
                 <div class="card-body py-3">
                     <h3 class="mb-0 text-success" id="activeCount">{{ stats.active }}</h3>
@@ -38,18 +38,34 @@
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card text-center">
                 <div class="card-body py-3">
-                    <h3 class="mb-0 text-info" id="syncedCount">{{ stats.synced }}</h3>
-                    <small class="text-muted">Synced to Inventory</small>
+                    <h3 class="mb-0 text-warning" id="needsReviewCount">{{ stats.needs_review }}</h3>
+                    <small class="text-muted">Needs Review</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-2">
             <div class="card text-center">
                 <div class="card-body py-3">
-                    <h3 class="mb-0 text-warning" id="vendorCount">{{ stats.vendors }}</h3>
+                    <h3 class="mb-0 text-secondary" id="inactiveCount">{{ stats.inactive }}</h3>
+                    <small class="text-muted">Inactive</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body py-3">
+                    <h3 class="mb-0 text-info" id="syncedCount">{{ stats.synced }}</h3>
+                    <small class="text-muted">Synced</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card text-center">
+                <div class="card-body py-3">
+                    <h3 class="mb-0 text-primary" id="vendorCount">{{ stats.vendors }}</h3>
                     <small class="text-muted">Vendors</small>
                 </div>
             </div>
@@ -59,11 +75,11 @@
     <!-- Filters -->
     <div class="card mb-3">
         <div class="card-body py-2">
-            <div class="row align-items-center">
+            <div class="row align-items-center g-2">
                 <div class="col-md-4">
                     <div class="input-group">
                         <span class="input-group-text"><i class="bi bi-search"></i></span>
-                        <input type="text" class="form-control" id="searchInput" placeholder="Search by name, SKU, or category..." onkeyup="filterItems()">
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search name, SKU..." onkeyup="filterItems()">
                     </div>
                 </div>
                 <div class="col-md-2">
@@ -84,17 +100,16 @@
                 </div>
                 <div class="col-md-2">
                     <select class="form-select" id="statusFilter" onchange="filterItems()">
-                        <option value="active">Active Only</option>
-                        <option value="inactive">Inactive Only</option>
-                        <option value="all">All</option>
+                        <option value="" selected>All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="needs_review">Needs Review</option>
+                        <option value="inactive">Inactive</option>
                     </select>
                 </div>
                 <div class="col-md-2">
-                    <select class="form-select" id="syncFilter" onchange="filterItems()">
-                        <option value="">Sync Status</option>
-                        <option value="synced">Synced</option>
-                        <option value="not_synced">Not Synced</option>
-                    </select>
+                    <button class="btn btn-outline-secondary w-100" onclick="clearFilters()" title="Clear filters">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </button>
                 </div>
             </div>
         </div>
@@ -107,6 +122,9 @@
             <div>
                 <button class="btn btn-sm btn-outline-secondary" onclick="selectAll()" title="Select All">
                     <i class="bi bi-check-square"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-success ms-1" onclick="bulkApprove()" title="Approve Selected">
+                    <i class="bi bi-check-lg"></i> Approve
                 </button>
                 <button class="btn btn-sm btn-outline-danger ms-1" onclick="bulkDeactivate()" title="Deactivate Selected">
                     <i class="bi bi-x-circle"></i>
@@ -126,11 +144,9 @@
                             <th>SKU</th>
                             <th>Category</th>
                             <th>Master Item</th>
-                            <th>Pack Size</th>
-                            <th>Unit Price</th>
-                            <th>Sync</th>
+                            <th>Pack Factor</th>
                             <th>Status</th>
-                            <th style="width: 80px;">Actions</th>
+                            <th style="width: 100px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="itemsTableBody">
@@ -138,20 +154,16 @@
                         <tr data-id="{{ item.id }}"
                             data-vendor-id="{{ item.vendor_id }}"
                             data-category="{{ item.category or '' }}"
-                            data-active="{{ item.is_active }}"
-                            data-synced="{{ item.synced_to_inventory }}"
-                            class="{% if not item.is_active %}table-secondary{% endif %}">
+                            data-status="{{ item.status.value if item.status else 'active' }}"
+                            class="{% if item.status and item.status.value == 'inactive' %}table-secondary{% elif item.status and item.status.value == 'needs_review' %}table-warning{% endif %}">
                             <td>
                                 <input type="checkbox" class="item-checkbox" value="{{ item.id }}">
                             </td>
                             <td>
-                                <small class="text-muted">{{ item.vendor.name if item.vendor else 'Unknown' }}</small>
+                                <small>{{ item.vendor.name if item.vendor else 'Unknown' }}</small>
                             </td>
                             <td>
-                                <strong>{{ item.vendor_product_name }}</strong>
-                                {% if item.vendor_description %}
-                                <br><small class="text-muted">{{ item.vendor_description[:50] }}{% if item.vendor_description|length > 50 %}...{% endif %}</small>
-                                {% endif %}
+                                <strong>{{ item.vendor_product_name[:40] }}{% if item.vendor_product_name|length > 40 %}...{% endif %}</strong>
                             </td>
                             <td>
                                 {% if item.vendor_sku %}
@@ -162,36 +174,30 @@
                             </td>
                             <td>
                                 {% if item.category %}
-                                <span class="badge bg-info">{{ item.category }}</span>
+                                <small>{{ item.category }}</small>
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td>
                                 {% if item.inventory_master_item_name %}
-                                <small>{{ item.inventory_master_item_name }}</small>
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>{{ item.pack_size or '-' }}</td>
-                            <td>
-                                {% if item.unit_price %}
-                                ${{ "%.2f"|format(item.unit_price) }}
+                                <small>{{ item.inventory_master_item_name[:25] }}{% if item.inventory_master_item_name|length > 25 %}...{% endif %}</small>
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
                             <td>
-                                {% if item.synced_to_inventory %}
-                                <span class="badge bg-success" title="Synced to Inventory"><i class="bi bi-check-circle"></i></span>
+                                {% if item.pack_to_primary_factor %}
+                                {{ "%.2f"|format(item.pack_to_primary_factor) }}
                                 {% else %}
-                                <span class="badge bg-secondary" title="Not Synced"><i class="bi bi-dash-circle"></i></span>
+                                1.00
                                 {% endif %}
                             </td>
                             <td>
-                                {% if item.is_active %}
+                                {% if item.status and item.status.value == 'active' %}
                                 <span class="badge bg-success">Active</span>
+                                {% elif item.status and item.status.value == 'needs_review' %}
+                                <span class="badge bg-warning text-dark">Review</span>
                                 {% else %}
                                 <span class="badge bg-secondary">Inactive</span>
                                 {% endif %}
@@ -200,13 +206,13 @@
                                 <button class="btn btn-sm btn-outline-primary" onclick="editItem({{ item.id }})" title="Edit">
                                     <i class="bi bi-pencil"></i>
                                 </button>
-                                {% if item.is_active %}
-                                <button class="btn btn-sm btn-outline-danger" onclick="deactivateItem({{ item.id }})" title="Deactivate">
-                                    <i class="bi bi-x-circle"></i>
-                                </button>
-                                {% else %}
+                                {% if item.status and item.status.value == 'inactive' %}
                                 <button class="btn btn-sm btn-outline-success" onclick="activateItem({{ item.id }})" title="Activate">
                                     <i class="bi bi-check-circle"></i>
+                                </button>
+                                {% else %}
+                                <button class="btn btn-sm btn-outline-danger" onclick="deactivateItem({{ item.id }})" title="Deactivate">
+                                    <i class="bi bi-x-circle"></i>
                                 </button>
                                 {% endif %}
                             </td>
@@ -229,60 +235,95 @@
             </div>
             <form id="addVendorItemForm" onsubmit="submitAddForm(event)">
                 <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Vendor <span class="text-danger">*</span></label>
-                            <select class="form-select" id="addVendorId" required>
-                                <option value="">Select Vendor</option>
-                                {% for vendor in vendors %}
-                                <option value="{{ vendor.id }}">{{ vendor.name }}</option>
-                                {% endfor %}
-                            </select>
+                    <!-- Section 1: Identity (Invoice Matching) -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3"><i class="bi bi-tag"></i> Identity</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Vendor <span class="text-danger">*</span></label>
+                                <select class="form-select" id="addVendorId" required>
+                                    <option value="">Select Vendor</option>
+                                    {% for vendor in vendors %}
+                                    <option value="{{ vendor.id }}">{{ vendor.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Vendor Item Code / SKU</label>
+                                <input type="text" class="form-control" id="addVendorSku" placeholder="Code as it appears on invoices">
+                            </div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Vendor SKU</label>
-                            <input type="text" class="form-control" id="addVendorSku" placeholder="e.g., 123456">
+                        <div class="mb-3">
+                            <label class="form-label">Invoice Display Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="addProductName" required placeholder="Raw text as it appears on invoices">
+                            <small class="text-muted">Match invoice lines by vendor + SKU/name signature</small>
                         </div>
                     </div>
+
+                    <!-- Section 2: Purchasing Definition -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3"><i class="bi bi-box-seam"></i> Purchasing Definition</h6>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Purchase UOM <span class="text-danger">*</span></label>
+                                <select class="form-select" id="addPurchaseUnit" required>
+                                    {% for unit in units %}
+                                    <option value="{{ unit.id }}">{{ unit.name }} ({{ unit.abbreviation }})</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">e.g., Case, Each, Keg</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Primary Units per Purchase <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="addPackFactor" value="1" min="0.001" step="0.001" oninput="updateAddDerivedCost()">
+                                <small class="text-muted">e.g., 12 bottles per case</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Last Purchase Price</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="addLastPrice" min="0" step="0.01" oninput="updateAddDerivedCost()">
+                                </div>
+                                <small class="text-muted">Per purchase unit</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 3: Derived (Read-only) -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3"><i class="bi bi-calculator"></i> Derived <small class="text-muted">(auto-calculated)</small></h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label class="form-label">Cost per Primary Unit</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="text" class="form-control" id="addDerivedCost" readonly value="-" style="background-color: var(--bg-tertiary);">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Section 4: Mapping -->
                     <div class="mb-3">
-                        <label class="form-label">Product Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="addProductName" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea class="form-control" id="addDescription" rows="2"></textarea>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Category</label>
-                            <select class="form-select" id="addCategory">
-                                <option value="">Select Category</option>
-                                {% for cat in categories %}
-                                <option value="{{ cat }}">{{ cat }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Base Unit <span class="text-danger">*</span></label>
-                            <select class="form-select" id="addPurchaseUnit" required>
-                                {% for unit in units %}
-                                <option value="{{ unit.id }}">{{ unit.name }} ({{ unit.abbreviation }})</option>
-                                {% endfor %}
-                            </select>
-                            <small class="text-muted">What you count inventory in (Each, Pound, Gallon, etc.)</small>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Quantity Per Case</label>
-                            <input type="number" class="form-control" id="addConversionFactor" value="1" min="0.001" step="0.001">
-                            <small class="text-muted">How many base units per case (e.g., 25 for 25lb case, 60 for case of 60)</small>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Case Price</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="addUnitPrice" min="0" step="0.01">
+                        <h6 class="text-muted mb-3"><i class="bi bi-link-45deg"></i> Mapping</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Master Item <small class="text-muted">(optional - can link later)</small></label>
+                                <select class="form-select" id="addMasterItem">
+                                    <option value="">Not mapped</option>
+                                    {% for item in master_items %}
+                                    <option value="{{ item.id }}">{{ item.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Category <small class="text-muted">(display only)</small></label>
+                                <select class="form-select" id="addCategory">
+                                    <option value="">Select Category</option>
+                                    {% for cat in categories %}
+                                    <option value="{{ cat }}">{{ cat }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -309,72 +350,108 @@
             <form id="editVendorItemForm" onsubmit="submitEditForm(event)">
                 <input type="hidden" id="editItemId">
                 <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Vendor <span class="text-danger">*</span></label>
-                            <select class="form-select" id="editVendorId" required>
-                                {% for vendor in vendors %}
-                                <option value="{{ vendor.id }}">{{ vendor.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Vendor SKU</label>
-                            <input type="text" class="form-control" id="editVendorSku">
-                        </div>
+                    <!-- Status Badge (auto-calculated, read-only) -->
+                    <div class="mb-3 d-flex align-items-center">
+                        <span class="me-2">Status:</span>
+                        <span id="editStatusBadge" class="badge bg-secondary">-</span>
+                        <small class="text-muted ms-2" id="editStatusReason"></small>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Product Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" id="editProductName" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <textarea class="form-control" id="editDescription" rows="2"></textarea>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Category</label>
-                            <select class="form-select" id="editCategory">
-                                <option value="">Select Category</option>
-                                {% for cat in categories %}
-                                <option value="{{ cat }}">{{ cat }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Base Unit <span class="text-danger">*</span></label>
-                            <select class="form-select" id="editPurchaseUnit" required>
-                                {% for unit in units %}
-                                <option value="{{ unit.id }}">{{ unit.name }} ({{ unit.abbreviation }})</option>
-                                {% endfor %}
-                            </select>
-                            <small class="text-muted">What you count inventory in (Each, Pound, Gallon, etc.)</small>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Quantity Per Case</label>
-                            <input type="number" class="form-control" id="editConversionFactor" min="0.001" step="0.001" placeholder="1.00">
-                            <small class="text-muted">How many base units per case (e.g., 25 for 25lb case, 60 for case of 60)</small>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Last Case Price</label>
-                            <div class="input-group">
-                                <span class="input-group-text">$</span>
-                                <input type="number" class="form-control" id="editUnitPrice" min="0" step="0.01">
+
+                    <!-- Section 1: Identity -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3"><i class="bi bi-tag"></i> Identity</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Vendor <span class="text-danger">*</span></label>
+                                <select class="form-select" id="editVendorId" required>
+                                    {% for vendor in vendors %}
+                                    <option value="{{ vendor.id }}">{{ vendor.name }}</option>
+                                    {% endfor %}
+                                </select>
                             </div>
-                            <small class="text-muted">Auto-updated from invoices</small>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Vendor Item Code / SKU</label>
+                                <input type="text" class="form-control" id="editVendorSku" placeholder="Code as it appears on invoices">
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Invoice Display Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="editProductName" required placeholder="Raw text as it appears on invoices">
+                            <small class="text-muted">Match invoice lines by vendor + SKU/name signature</small>
                         </div>
                     </div>
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Master Item</label>
-                            <input type="text" class="form-control" id="editMasterItemName" readonly>
-                            <small class="text-muted">Set via invoice mapping workflow</small>
+
+                    <!-- Section 2: Purchasing Definition -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3"><i class="bi bi-box-seam"></i> Purchasing Definition</h6>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Purchase UOM <span class="text-danger">*</span></label>
+                                <select class="form-select" id="editPurchaseUnit" required>
+                                    {% for unit in units %}
+                                    <option value="{{ unit.id }}">{{ unit.name }} ({{ unit.abbreviation }})</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">e.g., Case, Each, Keg</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Primary Units per Purchase <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="editPackFactor" min="0.001" step="0.001" oninput="updateEditDerivedCost()">
+                                <small class="text-muted">e.g., 12 bottles per case</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Last Purchase Price</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" class="form-control" id="editLastPrice" min="0" step="0.01" oninput="updateEditDerivedCost()">
+                                </div>
+                                <small class="text-muted" id="editPriceNote">Per purchase unit</small>
+                            </div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Notes</label>
-                            <textarea class="form-control" id="editNotes" rows="2"></textarea>
+                    </div>
+
+                    <!-- Section 3: Prices by Location (Read-only, from invoices) -->
+                    <div class="mb-4">
+                        <h6 class="text-muted mb-3"><i class="bi bi-geo-alt"></i> Prices by Location <small class="text-muted">(from invoices)</small></h6>
+                        <div id="editLocationPrices" class="table-responsive">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Location</th>
+                                        <th>Last Price</th>
+                                        <th>Cost/Unit</th>
+                                        <th>Last Invoice</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="editLocationPricesBody">
+                                    <tr><td colspan="4" class="text-muted text-center">No price history</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Section 4: Mapping -->
+                    <div class="mb-3">
+                        <h6 class="text-muted mb-3"><i class="bi bi-link-45deg"></i> Mapping</h6>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Master Item <small class="text-muted">(optional - can link later)</small></label>
+                                <select class="form-select" id="editMasterItem">
+                                    <option value="">Not mapped</option>
+                                    {% for item in master_items %}
+                                    <option value="{{ item.id }}">{{ item.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Category <small class="text-muted">(display only)</small></label>
+                                <select class="form-select" id="editCategory">
+                                    <option value="">Select Category</option>
+                                    {% for cat in categories %}
+                                    <option value="{{ cat }}">{{ cat }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -393,13 +470,27 @@
 
 {% block extra_scripts %}
 <script>
+// Calculate derived cost
+function updateAddDerivedCost() {
+    const price = parseFloat(document.getElementById('addLastPrice').value) || 0;
+    const factor = parseFloat(document.getElementById('addPackFactor').value) || 1;
+    const derivedCost = factor > 0 ? (price / factor).toFixed(4) : '-';
+    document.getElementById('addDerivedCost').value = derivedCost !== '-' ? derivedCost : '-';
+}
+
+function updateEditDerivedCost() {
+    const price = parseFloat(document.getElementById('editLastPrice').value) || 0;
+    const factor = parseFloat(document.getElementById('editPackFactor').value) || 1;
+    const derivedCost = factor > 0 ? (price / factor).toFixed(4) : '-';
+    document.getElementById('editDerivedCost').value = derivedCost !== '-' ? derivedCost : '-';
+}
+
 // Filter items based on search and dropdowns
 function filterItems() {
     const search = document.getElementById('searchInput').value.toLowerCase();
     const vendorId = document.getElementById('vendorFilter').value;
     const category = document.getElementById('categoryFilter').value;
     const status = document.getElementById('statusFilter').value;
-    const syncStatus = document.getElementById('syncFilter').value;
 
     const rows = document.querySelectorAll('#itemsTableBody tr');
     let visibleCount = 0;
@@ -408,8 +499,7 @@ function filterItems() {
         const text = row.textContent.toLowerCase();
         const rowVendorId = row.dataset.vendorId;
         const rowCategory = row.dataset.category;
-        const rowActive = row.dataset.active === 'True';
-        const rowSynced = row.dataset.synced === 'True';
+        const rowStatus = row.dataset.status;
 
         let show = true;
 
@@ -428,17 +518,8 @@ function filterItems() {
             show = false;
         }
 
-        // Status filter
-        if (status === 'active' && !rowActive) {
-            show = false;
-        } else if (status === 'inactive' && rowActive) {
-            show = false;
-        }
-
-        // Sync filter
-        if (syncStatus === 'synced' && !rowSynced) {
-            show = false;
-        } else if (syncStatus === 'not_synced' && rowSynced) {
+        // Status filter (review workflow)
+        if (status && rowStatus !== status) {
             show = false;
         }
 
@@ -447,6 +528,15 @@ function filterItems() {
     });
 
     document.getElementById('filteredCount').textContent = `${visibleCount} shown`;
+}
+
+// Clear all filters
+function clearFilters() {
+    document.getElementById('searchInput').value = '';
+    document.getElementById('vendorFilter').value = '';
+    document.getElementById('categoryFilter').value = '';
+    document.getElementById('statusFilter').value = '';
+    filterItems();
 }
 
 // Toggle select all checkbox
@@ -483,7 +573,7 @@ async function bulkDeactivate() {
             const response = await fetch(`/hub/api/v1/vendor-items/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ is_active: false })
+                body: JSON.stringify({ status: 'inactive' })
             });
             if (response.ok) successCount++;
         } catch (e) {
@@ -495,7 +585,66 @@ async function bulkDeactivate() {
     location.reload();
 }
 
-// Edit item
+// Calculate auto-status based on completeness
+function calculateStatus(item) {
+    const missing = [];
+    if (!item.inventory_master_item_id) missing.push('Master Item');
+    if (!item.purchase_unit_id) missing.push('Purchase UOM');
+    if (!item.pack_to_primary_factor || item.pack_to_primary_factor <= 0) missing.push('Pack Factor');
+
+    if (missing.length > 0) {
+        return { status: 'needs_review', reason: `Missing: ${missing.join(', ')}`, badge: 'bg-warning text-dark' };
+    }
+    return { status: 'active', reason: 'Complete', badge: 'bg-success' };
+}
+
+// Update status badge display
+function updateStatusBadge(item) {
+    const { status, reason, badge } = calculateStatus(item);
+    const badgeEl = document.getElementById('editStatusBadge');
+    const reasonEl = document.getElementById('editStatusReason');
+
+    badgeEl.textContent = status === 'active' ? 'Active' : 'Needs Review';
+    badgeEl.className = `badge ${badge}`;
+    reasonEl.textContent = status === 'needs_review' ? reason : '';
+}
+
+// Load location prices for edit modal
+async function loadLocationPrices(vendorItemId) {
+    const tbody = document.getElementById('editLocationPricesBody');
+    try {
+        // Fetch location prices from API
+        const response = await fetch(`/hub/api/v1/vendor-items/${vendorItemId}/location-prices`);
+        if (!response.ok) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-muted text-center">No price history</td></tr>';
+            return;
+        }
+
+        const prices = await response.json();
+        if (!prices || prices.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-muted text-center">No price history</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = prices.map(p => {
+            const costPerUnit = p.pack_factor > 0 ? (p.last_price / p.pack_factor).toFixed(4) : '-';
+            const lastDate = p.last_invoice_date ? new Date(p.last_invoice_date).toLocaleDateString() : '-';
+            return `
+                <tr>
+                    <td>${p.location_name || 'Unknown'}</td>
+                    <td>$${parseFloat(p.last_price).toFixed(2)}</td>
+                    <td>$${costPerUnit}</td>
+                    <td>${lastDate}</td>
+                </tr>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Error loading location prices:', error);
+        tbody.innerHTML = '<tr><td colspan="4" class="text-muted text-center">Error loading prices</td></tr>';
+    }
+}
+
+// Edit item - load data into modal
 async function editItem(id) {
     try {
         const response = await fetch(`/hub/api/v1/vendor-items/${id}`);
@@ -503,17 +652,25 @@ async function editItem(id) {
 
         const item = await response.json();
 
+        // Identity
         document.getElementById('editItemId').value = item.id;
         document.getElementById('editVendorId').value = item.vendor_id;
         document.getElementById('editVendorSku').value = item.vendor_sku || '';
         document.getElementById('editProductName').value = item.vendor_product_name;
-        document.getElementById('editDescription').value = item.vendor_description || '';
+
+        // Status badge (auto-calculated)
+        updateStatusBadge(item);
+
+        // Purchasing
+        document.getElementById('editPurchaseUnit').value = item.purchase_unit_id || '';
+        document.getElementById('editPackFactor').value = item.pack_to_primary_factor || 1;
+
+        // Mapping
+        document.getElementById('editMasterItem').value = item.inventory_master_item_id || '';
         document.getElementById('editCategory').value = item.category || '';
-        document.getElementById('editPurchaseUnit').value = item.purchase_unit_id;
-        document.getElementById('editConversionFactor').value = item.conversion_factor || 1;
-        document.getElementById('editUnitPrice').value = item.unit_price || '';
-        document.getElementById('editMasterItemName').value = item.inventory_master_item_name || 'Not linked';
-        document.getElementById('editNotes').value = item.notes || '';
+
+        // Load location prices (async)
+        loadLocationPrices(id);
 
         const modal = new bootstrap.Modal(document.getElementById('editVendorItemModal'));
         modal.show();
@@ -527,16 +684,23 @@ async function submitEditForm(event) {
     event.preventDefault();
 
     const id = document.getElementById('editItemId').value;
+    const masterItemId = document.getElementById('editMasterItem').value;
+    const purchaseUnitId = document.getElementById('editPurchaseUnit').value;
+    const packFactor = parseFloat(document.getElementById('editPackFactor').value) || 1;
+
+    // Auto-calculate status based on completeness
+    const hasAllFields = masterItemId && purchaseUnitId && packFactor > 0;
+    const autoStatus = hasAllFields ? 'active' : 'needs_review';
+
     const data = {
         vendor_id: parseInt(document.getElementById('editVendorId').value),
         vendor_sku: document.getElementById('editVendorSku').value || null,
+        status: autoStatus,  // Auto-calculated, not user-selected
         vendor_product_name: document.getElementById('editProductName').value,
-        vendor_description: document.getElementById('editDescription').value || null,
-        category: document.getElementById('editCategory').value || null,
-        purchase_unit_id: parseInt(document.getElementById('editPurchaseUnit').value),
-        conversion_factor: parseFloat(document.getElementById('editConversionFactor').value) || 1,
-        unit_price: parseFloat(document.getElementById('editUnitPrice').value) || null,
-        notes: document.getElementById('editNotes').value || null
+        purchase_unit_id: purchaseUnitId ? parseInt(purchaseUnitId) : null,
+        pack_to_primary_factor: packFactor,
+        inventory_master_item_id: masterItemId ? parseInt(masterItemId) : null,
+        category: document.getElementById('editCategory').value || null
     };
 
     try {
@@ -563,16 +727,24 @@ async function submitEditForm(event) {
 async function submitAddForm(event) {
     event.preventDefault();
 
+    const masterItemId = document.getElementById('addMasterItem').value;
+    const purchaseUnitId = document.getElementById('addPurchaseUnit').value;
+    const packFactor = parseFloat(document.getElementById('addPackFactor').value) || 1;
+
+    // Auto-calculate status based on completeness
+    const hasAllFields = masterItemId && purchaseUnitId && packFactor > 0;
+    const autoStatus = hasAllFields ? 'active' : 'needs_review';
+
     const data = {
         vendor_id: parseInt(document.getElementById('addVendorId').value),
         vendor_sku: document.getElementById('addVendorSku').value || null,
+        status: autoStatus,  // Auto-calculated, not user-selected
         vendor_product_name: document.getElementById('addProductName').value,
-        vendor_description: document.getElementById('addDescription').value || null,
-        category: document.getElementById('addCategory').value || null,
-        purchase_unit_id: parseInt(document.getElementById('addPurchaseUnit').value),
-        conversion_factor: parseFloat(document.getElementById('addConversionFactor').value) || 1,
-        unit_price: parseFloat(document.getElementById('addUnitPrice').value) || null,
-        is_active: true
+        purchase_unit_id: purchaseUnitId ? parseInt(purchaseUnitId) : null,
+        pack_to_primary_factor: packFactor,
+        last_purchase_price: parseFloat(document.getElementById('addLastPrice').value) || null,
+        inventory_master_item_id: masterItemId ? parseInt(masterItemId) : null,
+        category: document.getElementById('addCategory').value || null
     };
 
     try {
@@ -633,6 +805,75 @@ async function activateItem(id) {
             location.reload();
         } else {
             alert('Failed to activate item');
+        }
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// Approve vendor item (review workflow)
+async function approveItem(id) {
+    try {
+        const response = await fetch(`/hub/api/v1/vendor-items/review/${id}/approve`, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            showToast('Success', 'Item approved', 'success');
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert(`Failed to approve: ${error.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// Reject vendor item (review workflow)
+async function rejectItem(id) {
+    const reason = prompt('Rejection reason (optional):');
+    try {
+        const url = `/hub/api/v1/vendor-items/review/${id}/reject` + (reason ? `?reason=${encodeURIComponent(reason)}` : '');
+        const response = await fetch(url, {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            showToast('Success', 'Item rejected', 'success');
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert(`Failed to reject: ${error.detail || 'Unknown error'}`);
+        }
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+// Bulk approve selected items
+async function bulkApprove() {
+    const checkboxes = document.querySelectorAll('.item-checkbox:checked');
+    if (checkboxes.length === 0) {
+        alert('Please select items to approve');
+        return;
+    }
+
+    const ids = Array.from(checkboxes).map(cb => parseInt(cb.value));
+
+    try {
+        const response = await fetch('/hub/api/v1/vendor-items/review/bulk-approve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item_ids: ids })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            showToast('Success', `Approved ${result.approved} items`, 'success');
+            location.reload();
+        } else {
+            alert('Failed to bulk approve');
         }
     } catch (error) {
         alert(`Error: ${error.message}`);

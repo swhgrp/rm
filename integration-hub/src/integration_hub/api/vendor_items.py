@@ -3,6 +3,11 @@ Vendor Items API endpoints
 
 CRUD operations for Hub's vendor items table.
 Hub is the source of truth for vendor items.
+
+Location-Aware Costing:
+- Vendor items are per-location (location_id)
+- Status workflow: needs_review → active/inactive
+- Review workflow for approving/rejecting new items
 """
 
 import os
@@ -16,8 +21,9 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from integration_hub.db.database import get_db
-from integration_hub.models.hub_vendor_item import HubVendorItem
+from integration_hub.models.hub_vendor_item import HubVendorItem, VendorItemStatus
 from integration_hub.models.vendor import Vendor
+from integration_hub.services.vendor_item_review import VendorItemReviewService
 
 logger = logging.getLogger(__name__)
 
@@ -212,20 +218,32 @@ async def list_vendor_items(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
     vendor_id: Optional[int] = Query(None, description="Filter by vendor"),
+    location_id: Optional[int] = Query(None, description="Filter by location"),
     master_item_id: Optional[int] = Query(None, description="Filter by master item"),
     search: Optional[str] = Query(None, description="Search by SKU or name"),
-    is_active: Optional[bool] = Query(None, description="Filter by active status"),
+    status: Optional[str] = Query(None, description="Filter by status (active, needs_review, inactive)"),
+    is_active: Optional[bool] = Query(None, description="Filter by active status (deprecated, use status)"),
     category: Optional[str] = Query(None, description="Filter by category"),
     db: Session = Depends(get_db)
 ):
     """
     Get paginated list of vendor items from Hub database.
+
+    Supports filtering by:
+    - vendor_id: Hub vendor ID
+    - location_id: Location ID (for location-aware queries)
+    - status: Review status (active, needs_review, inactive)
+    - category: Product category
+    - search: SKU or product name
     """
     query = db.query(HubVendorItem).options(joinedload(HubVendorItem.vendor))
 
     # Apply filters
     if vendor_id:
         query = query.filter(HubVendorItem.vendor_id == vendor_id)
+
+    if location_id:
+        query = query.filter(HubVendorItem.location_id == location_id)
 
     if master_item_id:
         query = query.filter(HubVendorItem.inventory_master_item_id == master_item_id)
@@ -239,6 +257,15 @@ async def list_vendor_items(
             )
         )
 
+    # Status filter (new)
+    if status:
+        try:
+            status_enum = VendorItemStatus(status)
+            query = query.filter(HubVendorItem.status == status_enum)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid status: {status}")
+
+    # Legacy is_active filter (deprecated)
     if is_active is not None:
         query = query.filter(HubVendorItem.is_active == is_active)
 
@@ -718,4 +745,323 @@ async def get_significant_price_changes(
         "min_change_pct": min_change_pct,
         "days": days,
         "changes": changes
+    }
+
+
+# ============================================================================
+# REVIEW WORKFLOW ENDPOINTS
+# ============================================================================
+
+@router.get("/review/stats")
+async def get_review_stats(db: Session = Depends(get_db)):
+    """
+    Get statistics about items in review workflow.
+
+    Returns counts by status, location, and vendor.
+    """
+    service = VendorItemReviewService(db)
+    return service.get_review_stats()
+
+
+@router.get("/review/needs-review")
+async def get_items_needing_review(
+    vendor_id: Optional[int] = Query(None, description="Filter by vendor"),
+    location_id: Optional[int] = Query(None, description="Filter by location"),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_db)
+):
+    """
+    Get all vendor items that need review.
+
+    Returns items with status='needs_review' for approval/rejection.
+    """
+    service = VendorItemReviewService(db)
+    items = service.get_items_needing_review(
+        vendor_id=vendor_id,
+        location_id=location_id,
+        limit=limit
+    )
+    return {"items": items, "count": len(items)}
+
+
+@router.post("/review/{item_id}/approve")
+async def approve_vendor_item(
+    item_id: int,
+    approved_by: Optional[str] = Query(None, description="Username of approver"),
+    db: Session = Depends(get_db)
+):
+    """
+    Approve a vendor item for use in costing.
+
+    Changes status from needs_review to active.
+    """
+    service = VendorItemReviewService(db)
+    result = service.approve_item(item_id, approved_by)
+    if result.get('error'):
+        raise HTTPException(status_code=400, detail=result['error'])
+    return result
+
+
+@router.post("/review/{item_id}/reject")
+async def reject_vendor_item(
+    item_id: int,
+    reason: Optional[str] = Query(None, description="Rejection reason"),
+    rejected_by: Optional[str] = Query(None, description="Username of rejecter"),
+    db: Session = Depends(get_db)
+):
+    """
+    Reject a vendor item, marking it inactive.
+    """
+    service = VendorItemReviewService(db)
+    result = service.reject_item(item_id, reason, rejected_by)
+    if result.get('error'):
+        raise HTTPException(status_code=400, detail=result['error'])
+    return result
+
+
+class BulkApproveRequest(BaseModel):
+    """Bulk approve request"""
+    item_ids: List[int]
+    approved_by: Optional[str] = None
+
+
+@router.post("/review/bulk-approve")
+async def bulk_approve_vendor_items(
+    request: BulkApproveRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Approve multiple vendor items at once.
+    """
+    service = VendorItemReviewService(db)
+    return service.bulk_approve(request.item_ids, request.approved_by)
+
+
+class CloneToLocationRequest(BaseModel):
+    """Clone to location request"""
+    target_location_id: int
+    price: Optional[float] = None
+
+
+@router.post("/{item_id}/clone-to-location")
+async def clone_vendor_item_to_location(
+    item_id: int,
+    request: CloneToLocationRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Clone a vendor item to a new location.
+
+    Used when an item is discovered via cross-location matching.
+    Creates a new vendor item at the target location with needs_review status.
+    """
+    service = VendorItemReviewService(db)
+    result = service.clone_to_location(
+        source_item_id=item_id,
+        target_location_id=request.target_location_id,
+        price=request.price
+    )
+    if result.get('error'):
+        if result.get('existing_item_id'):
+            return result  # Not a hard error, just already exists
+        raise HTTPException(status_code=400, detail=result['error'])
+    return result
+
+
+class CreateFromInvoiceRequest(BaseModel):
+    """Create from invoice request"""
+    vendor_id: int
+    location_id: int
+    item_code: str
+    item_description: str
+    unit_price: Optional[float] = None
+
+
+@router.post("/create-from-invoice")
+async def create_vendor_item_from_invoice(
+    request: CreateFromInvoiceRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new vendor item from an unmapped invoice item.
+
+    Creates with needs_review status for later approval.
+    """
+    service = VendorItemReviewService(db)
+    return service.create_from_invoice_item(
+        vendor_id=request.vendor_id,
+        location_id=request.location_id,
+        item_code=request.item_code,
+        item_description=request.item_description,
+        unit_price=request.unit_price
+    )
+
+
+# ============================================================================
+# LOCATION PRICES ENDPOINTS (from invoices)
+# ============================================================================
+
+@router.get("/{vendor_item_id}/location-prices")
+async def get_vendor_item_location_prices(
+    vendor_item_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get prices by location for a vendor item.
+
+    Aggregates invoice data to show the last price and date per location
+    where this vendor item has been purchased.
+
+    Matches invoice items by vendor + item_code OR vendor + item_description.
+    Fetches location names from Inventory API.
+    """
+    from sqlalchemy import text
+
+    # Get vendor item
+    item = db.query(HubVendorItem).filter(HubVendorItem.id == vendor_item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Vendor item not found")
+
+    pack_factor = float(item.pack_to_primary_factor or item.conversion_factor or 1.0)
+
+    # Query hub_invoice_items joined with hub_invoices to get prices by location
+    # Match by vendor + item_code OR vendor + item_description
+    query = text("""
+        SELECT
+            i.location_id,
+            MAX(ii.unit_price) as last_price,
+            MAX(i.invoice_date) as last_invoice_date
+        FROM hub_invoice_items ii
+        JOIN hub_invoices i ON ii.invoice_id = i.id
+        WHERE i.vendor_id = :vendor_id
+          AND (
+            (ii.item_code IS NOT NULL AND ii.item_code = :vendor_sku)
+            OR (ii.item_description = :vendor_product_name)
+          )
+          AND i.location_id IS NOT NULL
+        GROUP BY i.location_id
+        ORDER BY last_invoice_date DESC
+    """)
+
+    try:
+        results = db.execute(query, {
+            "vendor_id": item.vendor_id,
+            "vendor_sku": item.vendor_sku,
+            "vendor_product_name": item.vendor_product_name
+        }).fetchall()
+
+        if not results:
+            return []
+
+        # Fetch location names from Inventory database directly
+        # (API requires auth, so we use DB connection)
+        location_names = {}
+        try:
+            from sqlalchemy import create_engine
+            import os
+            inventory_db_url = os.getenv(
+                'INVENTORY_DATABASE_URL',
+                'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
+            )
+            inv_engine = create_engine(inventory_db_url)
+            with inv_engine.connect() as conn:
+                loc_results = conn.execute(
+                    text("SELECT id, name FROM locations WHERE is_active = true ORDER BY name")
+                ).fetchall()
+                for row in loc_results:
+                    location_names[row[0]] = row[1]
+        except Exception as e:
+            logger.warning(f"Could not fetch location names from Inventory DB: {e}")
+
+        prices = []
+        for row in results:
+            location_id = row[0]
+            # location_id in Hub invoices is often a string name like "Tiki Terrace"
+            # Try to match against Inventory locations by ID or by name
+            location_name = location_names.get(location_id, None)
+            if not location_name:
+                # If location_id is actually a name string, use it directly
+                location_name = str(location_id) if location_id else "Unknown"
+
+            prices.append({
+                "location_id": location_id,
+                "location_name": location_name,
+                "last_price": float(row[1]) if row[1] else 0,
+                "pack_factor": pack_factor,
+                "last_invoice_date": row[2].isoformat() if row[2] else None
+            })
+
+        return prices
+
+    except Exception as e:
+        logger.error(f"Error fetching location prices for vendor item {vendor_item_id}: {str(e)}")
+        # Return empty list on error
+        return []
+
+
+# ============================================================================
+# LOCATION COST ENDPOINTS
+# ============================================================================
+
+@router.get("/{vendor_item_id}/location-cost")
+async def get_vendor_item_location_cost(
+    vendor_item_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get the current location cost for a vendor item's master item.
+
+    Returns the weighted average cost from Inventory's MasterItemLocationCost table.
+    """
+    from integration_hub.services.location_cost_updater import LocationCostUpdaterService
+
+    # Get vendor item to find master_item_id and location_id
+    item = db.query(HubVendorItem).filter(HubVendorItem.id == vendor_item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Vendor item not found")
+
+    if not item.inventory_master_item_id:
+        return {"error": "Vendor item not linked to master item", "master_item_id": None}
+
+    if not item.location_id:
+        return {"error": "Vendor item has no location", "location_id": None}
+
+    service = LocationCostUpdaterService(db)
+    cost = service.get_location_cost(item.inventory_master_item_id, item.location_id)
+
+    return {
+        "vendor_item_id": vendor_item_id,
+        "master_item_id": item.inventory_master_item_id,
+        "location_id": item.location_id,
+        "location_cost": cost
+    }
+
+
+@router.get("/{vendor_item_id}/cost-history")
+async def get_vendor_item_cost_history(
+    vendor_item_id: int,
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db)
+):
+    """
+    Get cost change history for a vendor item's master item at its location.
+    """
+    from integration_hub.services.location_cost_updater import LocationCostUpdaterService
+
+    # Get vendor item to find master_item_id and location_id
+    item = db.query(HubVendorItem).filter(HubVendorItem.id == vendor_item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Vendor item not found")
+
+    if not item.inventory_master_item_id or not item.location_id:
+        return {"history": [], "message": "Vendor item not linked to master item or has no location"}
+
+    service = LocationCostUpdaterService(db)
+    history = service.get_cost_history(item.inventory_master_item_id, item.location_id, limit)
+
+    return {
+        "vendor_item_id": vendor_item_id,
+        "master_item_id": item.inventory_master_item_id,
+        "location_id": item.location_id,
+        "history": history
     }

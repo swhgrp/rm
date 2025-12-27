@@ -10,10 +10,16 @@
         <div>
             <h2 class="mb-0"><i class="bi bi-geo-alt"></i> Locations / Entities</h2>
             <p class="text-muted mb-0">Manage your business locations and organizational entities</p>
+            <small class="text-muted"><i class="bi bi-info-circle"></i> Source of truth: Inventory System</small>
         </div>
-        <button class="btn btn-success" onclick="showCreateModal()">
-            <i class="bi bi-plus-circle"></i> Add Location
-        </button>
+        <div>
+            <button class="btn btn-outline-primary me-2" onclick="syncFromInventory()" id="syncBtn">
+                <i class="bi bi-arrow-repeat"></i> Sync from Inventory
+            </button>
+            <button class="btn btn-success" onclick="showCreateModal()">
+                <i class="bi bi-plus-circle"></i> Add Location
+            </button>
+        </div>
     </div>
 
     <!-- Locations Table -->
@@ -579,6 +585,42 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+async function syncFromInventory() {
+    const btn = document.getElementById('syncBtn');
+    const originalText = btn.innerHTML;
+
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Syncing...';
+
+        const response = await fetch('/accounting/api/areas/sync-from-inventory', {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Sync failed');
+        }
+
+        const result = await response.json();
+
+        let message = `Sync completed: ${result.created} created, ${result.updated} updated`;
+        if (result.errors && result.errors.length > 0) {
+            message += `\n\nWarnings:\n${result.errors.join('\n')}`;
+        }
+
+        showNotification(message, 'success');
+        await loadLocations();
+
+    } catch (error) {
+        console.error('Sync error:', error);
+        showNotification(error.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
 }
 </script>
 {% endblock %}

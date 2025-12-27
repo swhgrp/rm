@@ -1,6 +1,12 @@
 """
 Area management API endpoints
+
+Areas/Locations are synced from Inventory system.
+Inventory is the source of truth for locations.
 """
+import os
+import httpx
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
@@ -11,6 +17,11 @@ from accounting.models.area import Area
 from accounting.models.role import role_areas
 from accounting.schemas.area import AreaCreate, AreaUpdate, AreaResponse
 from accounting.api.auth import require_admin, require_auth
+
+logger = logging.getLogger(__name__)
+
+# Inventory API URL for syncing locations
+INVENTORY_API_URL = os.getenv("INVENTORY_API_URL", "http://inventory-app:8000/api")
 
 router = APIRouter(prefix="/api/areas", tags=["areas"])
 
@@ -225,3 +236,105 @@ def delete_area(
     db.commit()
 
     return {"message": "Area deleted successfully"}
+
+
+# ============================================================================
+# SYNC ENDPOINTS - Sync locations from Inventory (source of truth)
+# ============================================================================
+
+@router.post("/sync-from-inventory")
+async def sync_areas_from_inventory(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """
+    Sync areas/locations from Inventory system.
+
+    Inventory is the source of truth for locations.
+    This endpoint pulls locations from Inventory and updates local areas.
+
+    - Creates new areas for locations that don't exist
+    - Updates existing areas to match Inventory data
+    - Does NOT delete areas (manual cleanup required)
+    """
+    try:
+        # Fetch locations from Inventory
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(f"{INVENTORY_API_URL}/locations/_sync?include_inactive=true")
+
+            if response.status_code != 200:
+                logger.error(f"Failed to fetch locations from Inventory: {response.status_code}")
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Failed to fetch locations from Inventory: {response.status_code}"
+                )
+
+            inventory_locations = response.json()
+
+        logger.info(f"Fetched {len(inventory_locations)} locations from Inventory")
+
+        created = 0
+        updated = 0
+        errors = []
+
+        for inv_loc in inventory_locations:
+            try:
+                code = inv_loc.get("code")
+                if not code:
+                    errors.append(f"Location ID {inv_loc.get('id')} has no code, skipping")
+                    continue
+
+                # Try to find existing area by code
+                existing = db.query(Area).filter(Area.code == code).first()
+
+                if existing:
+                    # Update existing area
+                    existing.name = inv_loc.get("name", existing.name)
+                    existing.legal_name = inv_loc.get("legal_name")
+                    existing.ein = inv_loc.get("ein")
+                    existing.city = inv_loc.get("city")
+                    existing.state = inv_loc.get("state")
+                    existing.zip_code = inv_loc.get("zip_code")
+                    existing.address_line1 = inv_loc.get("address")
+                    existing.phone = inv_loc.get("phone")
+                    existing.is_active = inv_loc.get("is_active", True)
+                    updated += 1
+                    logger.info(f"Updated area {code}: {existing.name}")
+                else:
+                    # Create new area
+                    new_area = Area(
+                        code=code,
+                        name=inv_loc.get("name"),
+                        legal_name=inv_loc.get("legal_name"),
+                        ein=inv_loc.get("ein"),
+                        city=inv_loc.get("city"),
+                        state=inv_loc.get("state"),
+                        zip_code=inv_loc.get("zip_code"),
+                        address_line1=inv_loc.get("address"),
+                        phone=inv_loc.get("phone"),
+                        is_active=inv_loc.get("is_active", True)
+                    )
+                    db.add(new_area)
+                    created += 1
+                    logger.info(f"Created area {code}: {new_area.name}")
+
+            except Exception as e:
+                errors.append(f"Error processing location {inv_loc.get('id')}: {str(e)}")
+                logger.error(f"Error processing location: {e}")
+
+        db.commit()
+
+        return {
+            "success": True,
+            "message": "Sync completed",
+            "inventory_locations": len(inventory_locations),
+            "created": created,
+            "updated": updated,
+            "errors": errors[:10] if errors else []
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Sync error: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))

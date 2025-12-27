@@ -3,6 +3,10 @@ Auto-Send Orchestrator Service
 
 Orchestrates sending invoices to both Inventory and Accounting systems.
 Handles parallel sending, error handling, and status updates.
+
+Location-Aware Costing:
+After sending to Inventory, also updates MasterItemLocationCost table
+with weighted average costs for each item at the invoice's location.
 """
 
 import asyncio
@@ -14,6 +18,7 @@ from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.services.inventory_sender import InventorySenderService
 from integration_hub.services.accounting_sender import AccountingSenderService
+from integration_hub.services.location_cost_updater import LocationCostUpdaterService
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +200,10 @@ class AutoSendService:
 
     async def _send_to_inventory(self, invoice: HubInvoice, items: list, db: Session) -> Dict:
         """
-        Send to inventory system
+        Send to inventory system and update location costs.
+
+        After successfully sending to Inventory, updates the MasterItemLocationCost
+        table with weighted average costs for each item at the invoice's location.
 
         Args:
             invoice: HubInvoice instance
@@ -203,13 +211,29 @@ class AutoSendService:
             db: Database session
 
         Returns:
-            Result dict from inventory sender
+            Result dict from inventory sender with cost update stats
 
         Raises:
             Exception: If sending fails
         """
         try:
-            return await self.inventory_sender.send_invoice(invoice, items, db)
+            result = await self.inventory_sender.send_invoice(invoice, items, db)
+
+            # After successful send, update location costs
+            if result.get('success') and invoice.location_id:
+                try:
+                    cost_updater = LocationCostUpdaterService(db)
+                    cost_result = cost_updater.update_costs_from_invoice(invoice.id)
+                    result['cost_update'] = cost_result
+                    logger.info(f"Location costs updated for invoice {invoice.invoice_number}: "
+                              f"{cost_result.get('costs_updated', 0)} updated, "
+                              f"{cost_result.get('costs_created', 0)} created")
+                except Exception as cost_error:
+                    # Log but don't fail the whole operation
+                    logger.warning(f"Failed to update location costs for invoice {invoice.invoice_number}: {str(cost_error)}")
+                    result['cost_update_error'] = str(cost_error)
+
+            return result
         except Exception as e:
             logger.error(f"Failed to send invoice {invoice.invoice_number} to inventory: {str(e)}")
             raise

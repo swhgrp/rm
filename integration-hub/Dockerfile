@@ -13,12 +13,15 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application
-COPY src/ /app/
+COPY src/ /app/src/
 COPY alembic/ /app/alembic/
 COPY alembic.ini /app/
 
 # Expose port
 EXPOSE 8000
+
+# Set PYTHONPATH to include src directory
+ENV PYTHONPATH=/app/src
 
 # Run application
 CMD ["uvicorn", "integration_hub.main:app", "--host", "0.0.0.0", "--port", "8000"]

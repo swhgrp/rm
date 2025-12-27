@@ -88,11 +88,11 @@
     <!-- Locations Tab -->
     <div class="tab-pane fade" id="locations" role="tabpanel">
         <div class="alert alert-info mb-3">
-            <i class="bi bi-info-circle"></i> <strong>Locations</strong> – Define and track your physical restaurant or store locations.
+            <i class="bi bi-info-circle"></i> <strong>Locations</strong> – Define and track your physical restaurant or store locations. <span class="text-primary fw-bold">Inventory is the source of truth for locations.</span>
         </div>
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div class="input-group" style="max-width: 400px;">
-                <input type="text" class="form-control" id="locationSearch" placeholder="Search locations">
+                <input type="text" class="form-control" id="locationSearch" placeholder="Search locations" oninput="filterLocations()">
                 <button class="btn btn-outline-secondary" onclick="clearLocationSearch()">Clear</button>
             </div>
             <button class="btn btn-primary" onclick="showCreateLocationModal()">
@@ -105,16 +105,18 @@
                 <table class="table table-hover mb-0">
                     <thead class="table-dark">
                         <tr>
+                            <th>Code</th>
                             <th>Name</th>
-                            <th>Address</th>
-                            <th>Type</th>
+                            <th>Legal Name</th>
+                            <th>City, State</th>
+                            <th>EIN</th>
                             <th>Status</th>
-                            <th style="width: 100px;">Actions</th>
+                            <th style="width: 120px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="locationsTableBody">
                         <tr>
-                            <td colspan="5" class="text-center">
+                            <td colspan="7" class="text-center">
                                 <div class="spinner-border spinner-border-sm" role="status">
                                     <span class="visually-hidden">Loading...</span>
                                 </div>
@@ -707,24 +709,60 @@
 
 <!-- Location Modal -->
 <div class="modal fade" id="locationModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="locationModalTitle">Add Location</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
                 <form id="locationForm">
-                    <div class="mb-3">
-                        <label for="locationName" class="form-label">Name *</label>
-                        <input type="text" class="form-control" id="locationName" required>
+                    <!-- Basic Information -->
+                    <h6 class="mb-3"><i class="bi bi-info-circle"></i> Basic Information</h6>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label for="locationCode" class="form-label">Location Code <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="locationCode" required
+                                   placeholder="e.g., 200, 300" maxlength="20" style="text-transform: uppercase;">
+                            <small class="text-muted">Short code (2-20 characters)</small>
+                        </div>
+                        <div class="col-md-8 mb-3">
+                            <label for="locationName" class="form-label">DBA / Operating Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="locationName" required
+                                   placeholder="e.g., Seaside Grill">
+                            <small class="text-muted">Doing Business As name</small>
+                        </div>
                     </div>
+
+                    <hr class="my-3">
+
+                    <!-- Legal Entity Information -->
+                    <h6 class="mb-3"><i class="bi bi-briefcase"></i> Legal Entity Information</h6>
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label for="locationLegalName" class="form-label">Legal Business Name</label>
+                            <input type="text" class="form-control" id="locationLegalName"
+                                   placeholder="e.g., SW Hospitality Group, LLC">
+                            <small class="text-muted">Full legal name for reports and tax documents</small>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label for="locationEin" class="form-label">EIN (Tax ID)</label>
+                            <input type="text" class="form-control" id="locationEin"
+                                   placeholder="XX-XXXXXXX" maxlength="20">
+                            <small class="text-muted">Employer ID Number</small>
+                        </div>
+                    </div>
+
+                    <hr class="my-3">
+
+                    <!-- Address -->
+                    <h6 class="mb-3"><i class="bi bi-map"></i> Address</h6>
                     <div class="mb-3">
                         <label for="locationAddress" class="form-label">Street Address</label>
                         <input type="text" class="form-control" id="locationAddress" placeholder="123 Main St">
                     </div>
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-md-5 mb-3">
                             <label for="locationCity" class="form-label">City</label>
                             <input type="text" class="form-control" id="locationCity">
                         </div>
@@ -732,24 +770,44 @@
                             <label for="locationState" class="form-label">State</label>
                             <input type="text" class="form-control" id="locationState" maxlength="2" placeholder="FL">
                         </div>
-                        <div class="col-md-3 mb-3">
-                            <label for="locationZip" class="form-label">ZIP</label>
+                        <div class="col-md-4 mb-3">
+                            <label for="locationZip" class="form-label">ZIP Code</label>
                             <input type="text" class="form-control" id="locationZip" maxlength="10" placeholder="12345">
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="locationPhone" class="form-label">Phone</label>
-                        <input type="tel" class="form-control" id="locationPhone" placeholder="(555) 123-4567">
+
+                    <hr class="my-3">
+
+                    <!-- Contact Information -->
+                    <h6 class="mb-3"><i class="bi bi-telephone"></i> Contact Information</h6>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="locationPhone" class="form-label">Phone</label>
+                            <input type="tel" class="form-control" id="locationPhone" placeholder="(555) 123-4567">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="locationManager" class="form-label">Manager Name</label>
+                            <input type="text" class="form-control" id="locationManager">
+                        </div>
                     </div>
+
+                    <hr class="my-3">
+
+                    <!-- Status -->
                     <div class="mb-3">
-                        <label for="locationManager" class="form-label">Manager Name</label>
-                        <input type="text" class="form-control" id="locationManager">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="locationActive" checked>
+                            <label class="form-check-label" for="locationActive"><strong>Active</strong></label>
+                        </div>
+                        <small class="text-muted">Inactive locations won't appear in dropdown selections</small>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveLocation()">Save Location</button>
+                <button type="button" class="btn btn-primary" onclick="saveLocation()">
+                    <i class="bi bi-save"></i> Save Location
+                </button>
             </div>
         </div>
     </div>
@@ -1641,7 +1699,7 @@
         const displayList = filteredLocations || locations;
 
         if (displayList.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center">No locations found</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No locations found</td></tr>';
             return;
         }
 
@@ -1649,18 +1707,21 @@
             const statusBadge = location.is_active
                 ? '<span class="badge bg-success">Active</span>'
                 : '<span class="badge bg-secondary">Inactive</span>';
+            const cityState = [location.city, location.state].filter(Boolean).join(', ') || '-';
 
             return `
                 <tr>
+                    <td><strong>${location.code || '-'}</strong></td>
                     <td>${location.name}</td>
-                    <td>${location.address || '-'}</td>
-                    <td>${location.location_type || '-'}</td>
+                    <td>${location.legal_name || '<span class="text-muted">-</span>'}</td>
+                    <td>${cityState}</td>
+                    <td>${location.ein || '<span class="text-muted">-</span>'}</td>
                     <td>${statusBadge}</td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-link p-0 me-2" onclick="editLocation(${location.id})" title="Edit">
+                        <button class="btn btn-sm btn-primary" onclick="editLocation(${location.id})" title="Edit">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn btn-sm btn-link p-0 text-danger" onclick="deleteLocation(${location.id})" title="Delete">
+                        <button class="btn btn-sm btn-danger" onclick="deleteLocation(${location.id})" title="Delete">
                             <i class="bi bi-trash"></i>
                         </button>
                     </td>
@@ -1673,7 +1734,10 @@
         const search = document.getElementById('locationSearch').value.toLowerCase();
         const filtered = locations.filter(l =>
             l.name.toLowerCase().includes(search) ||
-            (l.address && l.address.toLowerCase().includes(search))
+            (l.code && l.code.toLowerCase().includes(search)) ||
+            (l.legal_name && l.legal_name.toLowerCase().includes(search)) ||
+            (l.address && l.address.toLowerCase().includes(search)) ||
+            (l.city && l.city.toLowerCase().includes(search))
         );
         displayLocations(filtered);
     }
@@ -1687,6 +1751,7 @@
         currentEditLocationId = null;
         document.getElementById('locationModalTitle').textContent = 'Add Location';
         document.getElementById('locationForm').reset();
+        document.getElementById('locationActive').checked = true;
         locationModal.show();
     }
 
@@ -1696,38 +1761,64 @@
 
         currentEditLocationId = locationId;
         document.getElementById('locationModalTitle').textContent = 'Edit Location';
+        // Basic info
+        document.getElementById('locationCode').value = location.code || '';
         document.getElementById('locationName').value = location.name;
+        // Legal entity info
+        document.getElementById('locationLegalName').value = location.legal_name || '';
+        document.getElementById('locationEin').value = location.ein || '';
+        // Address
         document.getElementById('locationAddress').value = location.address || '';
         document.getElementById('locationCity').value = location.city || '';
         document.getElementById('locationState').value = location.state || '';
         document.getElementById('locationZip').value = location.zip_code || '';
+        // Contact
         document.getElementById('locationPhone').value = location.phone || '';
         document.getElementById('locationManager').value = location.manager_name || '';
+        // Status
+        document.getElementById('locationActive').checked = location.is_active !== false;
         locationModal.show();
     }
 
     async function saveLocation() {
-        const name = document.getElementById('locationName').value;
-        const address = document.getElementById('locationAddress').value;
-        const city = document.getElementById('locationCity').value;
-        const state = document.getElementById('locationState').value;
-        const zip_code = document.getElementById('locationZip').value;
-        const phone = document.getElementById('locationPhone').value;
-        const manager_name = document.getElementById('locationManager').value;
+        const code = document.getElementById('locationCode').value.trim().toUpperCase();
+        const name = document.getElementById('locationName').value.trim();
+        const legal_name = document.getElementById('locationLegalName').value.trim();
+        const ein = document.getElementById('locationEin').value.trim();
+        const address = document.getElementById('locationAddress').value.trim();
+        const city = document.getElementById('locationCity').value.trim();
+        const state = document.getElementById('locationState').value.trim();
+        const zip_code = document.getElementById('locationZip').value.trim();
+        const phone = document.getElementById('locationPhone').value.trim();
+        const manager_name = document.getElementById('locationManager').value.trim();
+        const is_active = document.getElementById('locationActive').checked;
 
+        // Validation
+        if (!code) {
+            showAlert('Please enter a location code', 'warning');
+            return;
+        }
+        if (code.length < 2 || code.length > 20) {
+            showAlert('Location code must be 2-20 characters', 'warning');
+            return;
+        }
         if (!name) {
             showAlert('Please enter a location name', 'warning');
             return;
         }
 
         const locationData = {
+            code,
             name,
+            legal_name: legal_name || null,
+            ein: ein || null,
             address,
             city,
             state,
             zip_code,
             phone,
-            manager_name
+            manager_name,
+            is_active
         };
 
         try {

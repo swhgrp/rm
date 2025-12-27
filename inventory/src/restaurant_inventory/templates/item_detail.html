@@ -118,32 +118,40 @@
         </div>
     </div>
 
-    <!-- Row 2: Price History (full width) -->
+    <!-- Row 2: Cost Change History (full width) -->
     <div class="row">
         <div class="col-12">
             <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> Price History</h5>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-graph-up"></i> Cost Change History</h5>
+                    <select class="form-select form-select-sm" id="costHistoryLocationFilter" style="width: auto;" onchange="loadCostHistory()">
+                        <option value="">All Locations</option>
+                    </select>
                 </div>
                 <div class="card-body">
-                    <div id="priceHistoryContent">
-                        <p class="text-muted mb-0">Price history is tracked when invoices are processed. Recent price changes will appear here.</p>
+                    <div id="costHistoryContent">
+                        <p class="text-muted mb-0">Loading cost history...</p>
                     </div>
-                    <div id="priceHistoryTable" style="display: none;">
+                    <div id="costHistoryTable" style="display: none;">
                         <table class="table table-sm table-hover mb-0">
                             <thead>
                                 <tr>
                                     <th>Date</th>
-                                    <th>Vendor</th>
-                                    <th>Invoice</th>
-                                    <th>Old Price</th>
-                                    <th>New Price</th>
-                                    <th>Change</th>
+                                    <th>Location</th>
+                                    <th>Event</th>
+                                    <th class="text-end">Qty</th>
+                                    <th class="text-end">Old Cost</th>
+                                    <th class="text-end">New Cost</th>
+                                    <th class="text-end">Change</th>
+                                    <th>Notes</th>
                                 </tr>
                             </thead>
-                            <tbody id="priceHistoryTableBody">
+                            <tbody id="costHistoryTableBody">
                             </tbody>
                         </table>
+                    </div>
+                    <div id="noCostHistoryMessage" class="alert alert-info mb-0" style="display: none;">
+                        <i class="bi bi-info-circle"></i> No cost history available yet. History will be recorded when invoices are processed through the Hub.
                     </div>
                 </div>
             </div>
@@ -154,8 +162,9 @@
     <div class="row">
         <div class="col-12">
             <div class="card mb-4">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="bi bi-geo-alt"></i> Cost by Location</h5>
+                    <small class="text-muted">Weighted average costs per primary count unit</small>
                 </div>
                 <div class="card-body">
                     <div id="locationCostContent">
@@ -166,11 +175,12 @@
                             <thead>
                                 <tr>
                                     <th>Location</th>
-                                    <th>Last Price</th>
-                                    <th>Avg Price</th>
-                                    <th>Invoice Count</th>
-                                    <th>Last Invoice</th>
-                                    <th>Variance</th>
+                                    <th class="text-end">Last Cost</th>
+                                    <th class="text-end">Weighted Avg</th>
+                                    <th class="text-end">Qty on Hand</th>
+                                    <th class="text-center">Invoices</th>
+                                    <th>Last Purchase</th>
+                                    <th class="text-end">vs. Avg</th>
                                 </tr>
                             </thead>
                             <tbody id="locationCostTableBody">
@@ -178,7 +188,7 @@
                         </table>
                     </div>
                     <div id="noLocationCostMessage" class="alert alert-info mb-0" style="display: none;">
-                        <i class="bi bi-info-circle"></i> No invoice data available yet. Costs by location will appear here once invoices are processed.
+                        <i class="bi bi-info-circle"></i> No cost data available yet. Location costs will appear here once invoices are processed through the Hub.
                     </div>
                 </div>
             </div>
@@ -837,6 +847,8 @@
         noData.style.display = 'none';
         table.style.display = 'block';
 
+        const unitName = itemData?.unit_of_measure || 'unit';
+
         tbody.innerHTML = locationCosts.map(loc => {
             const lastPrice = loc.last_price ? `$${parseFloat(loc.last_price).toFixed(2)}` : '-';
             const avgPrice = loc.avg_price ? `$${parseFloat(loc.avg_price).toFixed(2)}` : '-';
@@ -844,16 +856,24 @@
                 ? new Date(loc.last_invoice_date).toLocaleDateString()
                 : '-';
 
+            // Format quantity on hand
+            let qtyOnHand = '-';
+            if (loc.qty_on_hand !== null && loc.qty_on_hand !== undefined) {
+                qtyOnHand = `${parseFloat(loc.qty_on_hand).toFixed(2)}`;
+            }
+
             // Format variance with color coding
+            // Positive variance = this location is more expensive (red)
+            // Negative variance = this location is cheaper (green)
             let varianceHtml = '-';
             if (loc.variance_pct !== null && loc.variance_pct !== undefined) {
                 const variance = parseFloat(loc.variance_pct);
                 if (Math.abs(variance) < 0.01) {
                     varianceHtml = '<span class="text-muted">-</span>';
                 } else if (variance > 5) {
-                    varianceHtml = `<span class="text-danger">+${variance.toFixed(1)}%</span>`;
+                    varianceHtml = `<span class="text-danger"><i class="bi bi-arrow-up-short"></i>+${variance.toFixed(1)}%</span>`;
                 } else if (variance < -5) {
-                    varianceHtml = `<span class="text-success">${variance.toFixed(1)}%</span>`;
+                    varianceHtml = `<span class="text-success"><i class="bi bi-arrow-down-short"></i>${variance.toFixed(1)}%</span>`;
                 } else {
                     varianceHtml = `<span class="text-muted">${variance >= 0 ? '+' : ''}${variance.toFixed(1)}%</span>`;
                 }
@@ -861,15 +881,129 @@
 
             return `
                 <tr>
-                    <td>${loc.location_name}</td>
-                    <td>${lastPrice}</td>
-                    <td>${avgPrice}</td>
-                    <td>${loc.invoice_count}</td>
+                    <td><strong>${loc.location_name}</strong></td>
+                    <td class="text-end">${lastPrice}</td>
+                    <td class="text-end"><strong>${avgPrice}</strong></td>
+                    <td class="text-end">${qtyOnHand}</td>
+                    <td class="text-center">${loc.invoice_count}</td>
                     <td>${lastDate}</td>
-                    <td>${varianceHtml}</td>
+                    <td class="text-end">${varianceHtml}</td>
                 </tr>
             `;
         }).join('');
+    }
+
+    // ============================================================================
+    // Cost Change History
+    // ============================================================================
+
+    let locations = [];
+
+    // Load cost history for this master item
+    async function loadCostHistory() {
+        const locationFilter = document.getElementById('costHistoryLocationFilter');
+        const locationId = locationFilter ? locationFilter.value : '';
+
+        try {
+            let url = `api/items/${itemId}/cost-history?limit=50`;
+            if (locationId) {
+                url += `&location_id=${locationId}`;
+            }
+            const history = await apiRequest(url);
+            displayCostHistory(history);
+        } catch (error) {
+            console.error('Error loading cost history:', error);
+            document.getElementById('costHistoryContent').innerHTML =
+                `<p class="text-danger">Error loading cost history: ${error.message}</p>`;
+        }
+    }
+
+    // Display cost history
+    function displayCostHistory(history) {
+        const content = document.getElementById('costHistoryContent');
+        const table = document.getElementById('costHistoryTable');
+        const noData = document.getElementById('noCostHistoryMessage');
+        const tbody = document.getElementById('costHistoryTableBody');
+
+        content.style.display = 'none';
+
+        if (!history || history.length === 0) {
+            table.style.display = 'none';
+            noData.style.display = 'block';
+            return;
+        }
+
+        noData.style.display = 'none';
+        table.style.display = 'block';
+
+        tbody.innerHTML = history.map(record => {
+            const date = record.created_at
+                ? new Date(record.created_at).toLocaleDateString()
+                : '-';
+
+            const eventBadge = getEventBadge(record.event_type);
+            const oldCost = record.old_cost !== null ? `$${record.old_cost.toFixed(4)}` : '-';
+            const newCost = record.new_cost !== null ? `$${record.new_cost.toFixed(4)}` : '-';
+            const qty = record.change_qty !== null ? record.change_qty.toFixed(2) : '-';
+
+            // Calculate percentage change
+            let changeHtml = '-';
+            if (record.old_cost !== null && record.new_cost !== null && record.old_cost > 0) {
+                const changePct = ((record.new_cost - record.old_cost) / record.old_cost) * 100;
+                if (changePct > 0) {
+                    changeHtml = `<span class="text-danger">+${changePct.toFixed(1)}%</span>`;
+                } else if (changePct < 0) {
+                    changeHtml = `<span class="text-success">${changePct.toFixed(1)}%</span>`;
+                } else {
+                    changeHtml = '<span class="text-muted">0%</span>';
+                }
+            }
+
+            return `
+                <tr>
+                    <td>${date}</td>
+                    <td>${record.location_name}</td>
+                    <td>${eventBadge}</td>
+                    <td class="text-end">${qty}</td>
+                    <td class="text-end">${oldCost}</td>
+                    <td class="text-end">${newCost}</td>
+                    <td class="text-end">${changeHtml}</td>
+                    <td><small class="text-muted">${record.notes || ''}</small></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // Get event type badge
+    function getEventBadge(eventType) {
+        const badges = {
+            'purchase': '<span class="badge bg-primary">Purchase</span>',
+            'adjustment': '<span class="badge bg-warning text-dark">Adjustment</span>',
+            'transfer_in': '<span class="badge bg-info">Transfer In</span>',
+            'transfer_out': '<span class="badge bg-secondary">Transfer Out</span>',
+            'initial': '<span class="badge bg-success">Initial</span>',
+            'waste': '<span class="badge bg-danger">Waste</span>'
+        };
+        return badges[eventType] || `<span class="badge bg-secondary">${eventType}</span>`;
+    }
+
+    // Populate location filter dropdown
+    async function loadLocations() {
+        try {
+            const response = await apiRequest('api/locations/');
+            locations = response || [];
+            const select = document.getElementById('costHistoryLocationFilter');
+            if (select && locations.length > 0) {
+                locations.forEach(loc => {
+                    const option = document.createElement('option');
+                    option.value = loc.id;
+                    option.textContent = loc.name;
+                    select.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
     }
 
     // ============================================================================
@@ -1357,9 +1491,11 @@
 
         // Load data
         await loadReferenceData();
+        await loadLocations();  // For cost history filter
         await loadItemDetails();
         await loadVendorItems();
         await loadLocationCosts();
+        await loadCostHistory();
         await loadUnitConversions();
     });
 </script>

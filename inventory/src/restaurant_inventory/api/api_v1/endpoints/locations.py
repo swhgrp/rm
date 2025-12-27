@@ -1,10 +1,13 @@
 """
 Location CRUD endpoints
+
+Inventory is the source of truth for locations.
+Accounting syncs from here via the /_sync endpoint.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 
 from restaurant_inventory.core.deps import get_db, get_current_user, require_manager_or_admin, filter_by_user_locations
 from restaurant_inventory.models.location import Location
@@ -13,6 +16,30 @@ from restaurant_inventory.schemas.location import LocationCreate, LocationUpdate
 from restaurant_inventory.core.audit import log_audit_event, create_change_dict
 
 router = APIRouter()
+
+
+# ============================================================================
+# SYNC ENDPOINT - For Accounting to fetch locations
+# ============================================================================
+
+@router.get("/_sync", response_model=List[LocationResponse])
+async def sync_locations_for_accounting(
+    include_inactive: bool = False,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all locations for syncing to Accounting.
+
+    This is an internal endpoint for Accounting system to sync locations.
+    No authentication required - assumes internal network access.
+
+    Inventory is the source of truth for locations.
+    """
+    query = db.query(Location)
+    if not include_inactive:
+        query = query.filter(Location.is_active == True)
+    locations = query.order_by(Location.code).all()
+    return locations
 
 @router.get("/", response_model=List[LocationResponse])
 async def get_locations(

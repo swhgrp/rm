@@ -39,7 +39,11 @@
       "Bash(unset:*)",
       "Bash(docker volume ls:*)",
       "Bash(docker images:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

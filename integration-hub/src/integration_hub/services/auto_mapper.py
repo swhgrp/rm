@@ -4,11 +4,18 @@ Auto-Mapper Service (Hub-Based)
 Automatically maps invoice line items to Hub's vendor items table.
 Hub is now the source of truth for vendor items.
 
-Mapping Logic:
-1. Match by SKU: item_code → hub_vendor_items.vendor_sku
-2. Match by fuzzy product name (same vendor, high similarity)
-3. Match by expense mapping: item_description → expense_mappings table
-4. No match: Item goes to unmapped queue
+Mapping Logic (Location-Aware):
+1. Match by SKU + location: item_code → hub_vendor_items.vendor_sku (same vendor + location)
+2. Match by SKU globally: item_code → hub_vendor_items.vendor_sku (same vendor, any location)
+3. Match by fuzzy product name (same vendor, high similarity)
+4. Match by expense mapping: item_description → expense_mappings table
+5. No match: Item goes to unmapped queue
+
+New items are automatically marked as `needs_review` in the vendor items table.
+
+Architecture (Location-Aware Costing):
+- Hub owns: UOM (global), Categories (global), Vendor Items (per location)
+- Inventory owns: Master Items, Count Units, Location Costs
 """
 
 import logging
@@ -19,7 +26,7 @@ from sqlalchemy import text as sql_text
 
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.models.hub_invoice import HubInvoice
-from integration_hub.models.hub_vendor_item import HubVendorItem
+from integration_hub.models.hub_vendor_item import HubVendorItem, VendorItemStatus
 
 logger = logging.getLogger(__name__)
 
@@ -94,25 +101,33 @@ class AutoMapperService:
         self.db = db
         self._vendor_items_cache = None
 
-    def fetch_vendor_items(self) -> List[Dict]:
+    def fetch_vendor_items(self, include_inactive: bool = False) -> List[Dict]:
         """
-        Fetch all active vendor items from Hub's local table.
-        Returns list of vendor items with SKU, name, category, etc.
+        Fetch vendor items from Hub's local table.
+        Returns list of vendor items with SKU, name, category, location, status, etc.
+
+        Args:
+            include_inactive: If True, include inactive items (for admin views)
         """
         if self._vendor_items_cache is not None:
             return self._vendor_items_cache
 
         try:
             # Query Hub's local vendor items table
-            items = self.db.query(HubVendorItem).filter(
-                HubVendorItem.is_active == True
-            ).all()
+            # Filter by status (active or needs_review) unless include_inactive
+            query = self.db.query(HubVendorItem)
+            if not include_inactive:
+                query = query.filter(
+                    HubVendorItem.status.in_([VendorItemStatus.active, VendorItemStatus.needs_review])
+                )
+            items = query.all()
 
             self._vendor_items_cache = []
             for vi in items:
                 self._vendor_items_cache.append({
                     'id': vi.id,
                     'vendor_id': vi.vendor_id,
+                    'location_id': vi.location_id,  # Location-aware
                     'vendor_sku': vi.vendor_sku,
                     'vendor_product_name': vi.vendor_product_name,
                     'inventory_master_item_id': vi.inventory_master_item_id,
@@ -122,11 +137,13 @@ class AutoMapperService:
                     'purchase_unit_name': vi.purchase_unit_name,
                     'purchase_unit_abbr': vi.purchase_unit_abbr,
                     'pack_size': vi.pack_size,
-                    'conversion_factor': float(vi.conversion_factor) if vi.conversion_factor else 1.0,
+                    'pack_to_primary_factor': float(vi.pack_to_primary_factor) if vi.pack_to_primary_factor else 1.0,
+                    'status': vi.status.value if vi.status else 'active',
                     'gl_asset_account': vi.gl_asset_account,
                     'gl_cogs_account': vi.gl_cogs_account,
                     'gl_waste_account': vi.gl_waste_account,
-                    'inventory_vendor_item_id': vi.inventory_vendor_item_id
+                    'inventory_vendor_item_id': vi.inventory_vendor_item_id,
+                    'last_purchase_price': float(vi.last_purchase_price) if vi.last_purchase_price else None
                 })
 
             logger.info(f"Loaded {len(self._vendor_items_cache)} vendor items from Hub database")
@@ -136,16 +153,26 @@ class AutoMapperService:
             logger.error(f"Error loading vendor items from Hub: {str(e)}")
             return []
 
-    def match_by_sku(self, item_code: str, vendor_id: int = None) -> Optional[Dict]:
+    def match_by_sku(
+        self,
+        item_code: str,
+        vendor_id: int = None,
+        location_id: int = None
+    ) -> Optional[Dict]:
         """
         Match item code against Hub vendor_items.vendor_sku
         Returns vendor item dict if found, None otherwise
+
+        Location-aware matching strategy:
+        1. First try exact match with vendor + location + SKU
+        2. If not found, try vendor + SKU (any location) - allows cross-location matching
 
         Handles leading zeros: invoice may have '390982' while inventory has '000390982'
 
         Args:
             item_code: The item code/SKU to match
             vendor_id: Optional vendor ID to scope the search (Hub vendor ID)
+            location_id: Optional location ID for location-specific matching
         """
         if not item_code:
             return None
@@ -156,6 +183,33 @@ class AutoMapperService:
 
         vendor_items = self.fetch_vendor_items()
 
+        # Pass 1: Location-specific match (if location provided)
+        if location_id:
+            for vi in vendor_items:
+                # Match by vendor + location
+                if vendor_id and vi.get('vendor_id') != vendor_id:
+                    continue
+                if vi.get('location_id') != location_id:
+                    continue
+
+                vendor_sku = vi.get('vendor_sku')
+                if not vendor_sku:
+                    continue
+
+                vendor_sku_clean = str(vendor_sku).strip()
+                vendor_sku_normalized = vendor_sku_clean.lstrip('0') or '0'
+
+                # Try exact match first
+                if vendor_sku_clean == item_code_clean:
+                    logger.debug(f"SKU match (location-specific): {item_code} → vendor item {vi['id']} at location {location_id}")
+                    return vi
+
+                # Try normalized match (handles leading zeros difference)
+                if vendor_sku_normalized == item_code_normalized:
+                    logger.debug(f"SKU match (location-specific, normalized): {item_code} → vendor item {vi['id']} at location {location_id}")
+                    return vi
+
+        # Pass 2: Vendor-only match (any location) - for cross-location item discovery
         for vi in vendor_items:
             # If vendor_id specified, only match within that vendor
             if vendor_id and vi.get('vendor_id') != vendor_id:
@@ -170,10 +224,12 @@ class AutoMapperService:
 
             # Try exact match first
             if vendor_sku_clean == item_code_clean:
+                logger.debug(f"SKU match (cross-location): {item_code} → vendor item {vi['id']} from location {vi.get('location_id')}")
                 return vi
 
             # Try normalized match (handles leading zeros difference)
             if vendor_sku_normalized == item_code_normalized:
+                logger.debug(f"SKU match (cross-location, normalized): {item_code} → vendor item {vi['id']} from location {vi.get('location_id')}")
                 return vi
 
         return None
@@ -182,15 +238,21 @@ class AutoMapperService:
         self,
         item_description: str,
         vendor_id: int,
+        location_id: int = None,
         min_similarity: float = 0.7
     ) -> Optional[Tuple[Dict, float]]:
         """
         Match item description against vendor items using fuzzy matching.
-        Only searches within the specified vendor's items.
+        Searches within the specified vendor's items, preferring location-specific matches.
+
+        Location-aware matching strategy:
+        1. First search for matches at the specific location
+        2. If no good match, search across all locations for that vendor
 
         Args:
             item_description: The invoice item description
             vendor_id: Hub vendor ID to scope the search
+            location_id: Optional location ID for location-specific matching
             min_similarity: Minimum similarity threshold (0.0-1.0)
 
         Returns:
@@ -201,6 +263,33 @@ class AutoMapperService:
 
         vendor_items = self.fetch_vendor_items()
 
+        # Pass 1: Location-specific match (if location provided)
+        if location_id:
+            best_match = None
+            best_score = 0.0
+
+            for vi in vendor_items:
+                # Only match within the same vendor AND location
+                if vi.get('vendor_id') != vendor_id:
+                    continue
+                if vi.get('location_id') != location_id:
+                    continue
+
+                vendor_product_name = vi.get('vendor_product_name')
+                if not vendor_product_name:
+                    continue
+
+                score = calculate_similarity(item_description, vendor_product_name)
+
+                if score > best_score and score >= min_similarity:
+                    best_score = score
+                    best_match = vi
+
+            if best_match:
+                logger.debug(f"Fuzzy match (location-specific): '{item_description[:30]}' → vendor item {best_match['id']} (score: {best_score:.2f})")
+                return (best_match, best_score)
+
+        # Pass 2: Vendor-only match (any location)
         best_match = None
         best_score = 0.0
 
@@ -213,7 +302,6 @@ class AutoMapperService:
             if not vendor_product_name:
                 continue
 
-            # Calculate similarity
             score = calculate_similarity(item_description, vendor_product_name)
 
             if score > best_score and score >= min_similarity:
@@ -221,6 +309,7 @@ class AutoMapperService:
                 best_match = vi
 
         if best_match:
+            logger.debug(f"Fuzzy match (cross-location): '{item_description[:30]}' → vendor item {best_match['id']} (score: {best_score:.2f})")
             return (best_match, best_score)
 
         return None
@@ -318,29 +407,43 @@ class AutoMapperService:
             'reason': None if has_required_gl else 'no_category_gl_mapping'
         }
 
-    def map_item(self, item: HubInvoiceItem, vendor_id: int = None) -> Dict:
+    def map_item(self, item: HubInvoiceItem, vendor_id: int = None, location_id: int = None) -> Dict:
         """
         Attempt to automatically map a single item
+
+        Location-aware matching strategy:
+        1. First try SKU match with vendor + location
+        2. Then try SKU match with vendor only (cross-location)
+        3. Then try fuzzy name match (location-aware)
+        4. Finally try expense mapping
 
         Args:
             item: The invoice item to map
             vendor_id: Hub vendor ID for the invoice (for vendor-scoped matching)
+            location_id: Location ID from invoice (for location-specific matching)
 
         Returns:
-            Dict with mapping result
+            Dict with mapping result including location info
         """
-        # 1. Try SKU match against Hub vendor items (vendor-scoped if vendor_id provided)
+        # 1. Try SKU match against Hub vendor items (location-aware)
         if item.item_code:
-            vendor_item = self.match_by_sku(item.item_code, vendor_id)
+            vendor_item = self.match_by_sku(item.item_code, vendor_id, location_id)
             if vendor_item:
-                return self._build_mapping_result(vendor_item, 'sku_match', confidence=1.0)
+                result = self._build_mapping_result(vendor_item, 'sku_match', confidence=1.0)
+                # Track if this was a cross-location match
+                result['matched_location_id'] = vendor_item.get('location_id')
+                result['is_cross_location'] = (location_id and vendor_item.get('location_id') != location_id)
+                return result
 
-        # 2. Try fuzzy name match (only if we have vendor_id to scope the search)
+        # 2. Try fuzzy name match (location-aware)
         if vendor_id and item.item_description:
-            fuzzy_result = self.match_by_fuzzy_name(item.item_description, vendor_id, min_similarity=0.65)
+            fuzzy_result = self.match_by_fuzzy_name(item.item_description, vendor_id, location_id, min_similarity=0.65)
             if fuzzy_result:
                 vendor_item, score = fuzzy_result
-                return self._build_mapping_result(vendor_item, 'fuzzy_name_match', confidence=score)
+                result = self._build_mapping_result(vendor_item, 'fuzzy_name_match', confidence=score)
+                result['matched_location_id'] = vendor_item.get('location_id')
+                result['is_cross_location'] = (location_id and vendor_item.get('location_id') != location_id)
+                return result
 
         # 3. Try expense mapping
         expense = self.match_by_expense_mapping(item.item_description)
@@ -358,13 +461,17 @@ class AutoMapperService:
                 'gl_asset_account': None,
                 'gl_cogs_account': expense['gl_expense_account'],
                 'gl_waste_account': None,
-                'is_expense': True
+                'is_expense': True,
+                'matched_location_id': None,
+                'is_cross_location': False
             }
 
         # 4. No match found
         return {
             'mapped': False,
-            'reason': 'no_match'
+            'reason': 'no_match',
+            'matched_location_id': None,
+            'is_cross_location': False
         }
 
     def apply_mapping(self, item: HubInvoiceItem, mapping_result: Dict) -> bool:
@@ -407,18 +514,26 @@ class AutoMapperService:
 
     def map_invoice_items(self, invoice_id: int) -> Dict:
         """
-        Auto-map all unmapped items for an invoice
+        Auto-map all unmapped items for an invoice using location-aware matching.
+
+        Location-aware matching:
+        1. Uses invoice.location_id for location-specific vendor item lookup
+        2. Falls back to cross-location matching if no local match found
+        3. Tracks cross-location matches for potential vendor item creation
 
         Returns:
-            Dict with statistics
+            Dict with statistics including cross-location matches
         """
         # Get invoice
         invoice = self.db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
         if not invoice:
             return {'error': 'Invoice not found'}
 
-        # Get the vendor_id for vendor-scoped matching
+        # Get vendor_id and location_id for location-aware matching
         vendor_id = invoice.vendor_id
+        location_id = invoice.location_id
+
+        logger.info(f"Auto-mapping invoice {invoice_id}: vendor={vendor_id}, location={location_id}")
 
         # Get all unmapped items
         items = self.db.query(HubInvoiceItem).filter(
@@ -430,17 +545,30 @@ class AutoMapperService:
             'total_items': len(items),
             'mapped_count': 0,
             'unmapped_count': 0,
-            'methods': {}
+            'cross_location_count': 0,  # Items matched from different location
+            'methods': {},
+            'cross_location_items': []  # Track for potential vendor item creation
         }
 
         for item in items:
-            # Pass vendor_id for vendor-scoped matching
-            mapping_result = self.map_item(item, vendor_id=vendor_id)
+            # Pass vendor_id AND location_id for location-aware matching
+            mapping_result = self.map_item(item, vendor_id=vendor_id, location_id=location_id)
 
             if self.apply_mapping(item, mapping_result):
                 stats['mapped_count'] += 1
                 method = mapping_result.get('method', 'unknown')
                 stats['methods'][method] = stats['methods'].get(method, 0) + 1
+
+                # Track cross-location matches (for potential vendor item creation at this location)
+                if mapping_result.get('is_cross_location'):
+                    stats['cross_location_count'] += 1
+                    stats['cross_location_items'].append({
+                        'item_description': item.item_description,
+                        'item_code': item.item_code,
+                        'vendor_item_id': mapping_result.get('vendor_item_id'),
+                        'matched_location_id': mapping_result.get('matched_location_id'),
+                        'invoice_location_id': location_id
+                    })
             else:
                 stats['unmapped_count'] += 1
 
@@ -452,9 +580,9 @@ class AutoMapperService:
             from integration_hub.services.invoice_status import update_invoice_status
             new_status = update_invoice_status(invoice, self.db)
             self.db.commit()
-            logger.info(f"Auto-mapping complete for invoice {invoice_id}: {stats}, status: {new_status}")
+            logger.info(f"Auto-mapping complete for invoice {invoice_id}: {stats['mapped_count']} mapped, {stats['unmapped_count']} unmapped, {stats['cross_location_count']} cross-location, status: {new_status}")
         except ImportError:
-            logger.info(f"Auto-mapping complete for invoice {invoice_id}: {stats}")
+            logger.info(f"Auto-mapping complete for invoice {invoice_id}: {stats['mapped_count']} mapped, {stats['unmapped_count']} unmapped, {stats['cross_location_count']} cross-location")
 
         return stats
 
