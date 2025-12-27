@@ -11,7 +11,7 @@ import os
 
 from restaurant_inventory.core.deps import get_db, get_current_user, require_manager_or_admin
 from restaurant_inventory.models.item import MasterItem
-from restaurant_inventory.models.vendor_item import VendorItem
+from restaurant_inventory.models._deprecated.vendor_item import VendorItem
 from restaurant_inventory.models.unit_of_measure import UnitOfMeasure
 from restaurant_inventory.models.user import User
 from restaurant_inventory.schemas.item import MasterItemCreate, MasterItemUpdate, MasterItemResponse
@@ -251,7 +251,7 @@ async def merge_master_items(
     from restaurant_inventory.models.recipe import RecipeIngredient
     from restaurant_inventory.models.waste import WasteRecord
     from restaurant_inventory.models.count_session import CountSessionItem
-    from restaurant_inventory.models.invoice import InvoiceItem
+    from restaurant_inventory.models._deprecated.invoice import InvoiceItem
     from restaurant_inventory.models.inventory_transaction import InventoryTransaction
 
     # Validate source and target exist
@@ -410,7 +410,7 @@ async def get_item_location_costs(
     with fallback to invoice data for legacy items.
     """
     from sqlalchemy import func, desc
-    from restaurant_inventory.models.invoice import Invoice, InvoiceItem
+    from restaurant_inventory.models._deprecated.invoice import Invoice, InvoiceItem
     from restaurant_inventory.models.location import Location
     from restaurant_inventory.models.master_item_location_cost import MasterItemLocationCost, MasterItemLocationCostHistory
 
@@ -711,7 +711,7 @@ async def delete_master_item(
     from restaurant_inventory.models.recipe import RecipeIngredient
     from restaurant_inventory.models.waste import WasteRecord
     from restaurant_inventory.models.count_session import CountSessionItem
-    from restaurant_inventory.models.invoice import InvoiceItem
+    from restaurant_inventory.models._deprecated.invoice import InvoiceItem
     from restaurant_inventory.models.inventory_transaction import InventoryTransaction
 
     blocking_items = []
