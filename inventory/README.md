@@ -1,10 +1,38 @@
 # Restaurant Inventory Management System
 
-A comprehensive web-based inventory management system built for restaurant operations, featuring multi-location tracking, AI-powered invoice processing, POS integration, recipe management, and advanced analytics.
+A comprehensive web-based inventory management system built for restaurant operations, featuring multi-location tracking, location-aware costing, POS integration, recipe management, and advanced analytics.
 
-**Last Updated:** November 30, 2025
+**Last Updated:** December 27, 2025
 
 ## Recent Updates
+
+### December 27, 2025 - Location-Aware Costing Architecture 🏗️
+
+**Major Architecture Refactor - Source of Truth:**
+- ✅ **Inventory owns Locations** - All location data (code, legal_name, ein, address) managed here
+- ✅ **Accounting syncs from Inventory** - `/_sync` endpoint for Accounting to fetch locations
+- ✅ **Location model enhanced** - Added `code`, `legal_name`, `ein` fields
+
+**New Location-Aware Costing Models:**
+- ✅ **MasterItemCountUnit** - Multiple count units per item with conversion factors
+  - `master_item_id` + `uom_id` + `is_primary` flag
+  - `conversion_to_primary` factor for unit conversions
+  - `convert_to_primary()` and `convert_from_primary()` methods
+- ✅ **MasterItemLocationCost** - Weighted average cost per item per location
+  - `master_item_id` + `location_id` (unique together)
+  - `current_weighted_avg_cost`, `total_qty_on_hand`
+  - `apply_purchase()` and `apply_usage()` methods
+- ✅ **MasterItemLocationCostHistory** - Full audit trail for cost changes
+
+**Deprecated Models (moved to _deprecated/):**
+- Invoice, InvoiceItem, InvoiceStatus → Use Integration Hub
+- VendorItem, VendorAlias → Use Integration Hub
+
+**Migration Stats:**
+- 409 count units created
+- 372 location cost records (62 items × 6 locations)
+
+---
 
 ### November 28-29, 2025 - Key Items, Unit Conversions & Count Fixes 🔧
 
@@ -347,17 +375,22 @@ A comprehensive web-based inventory management system built for restaurant opera
 
 ## 🗄️ Database Schema
 
-### 32 Database Tables
+### 37 Database Tables
 
 **Core Tables:**
 - `users` - User accounts and authentication
 - `roles` - User roles (Admin, User)
-- `locations` - Restaurant locations
+- `locations` - Restaurant locations (SOURCE OF TRUTH - synced to Accounting)
 - `storage_areas` - Storage zones within locations
-- `categories` - Item categories
+- `categories` - Item categories (references Hub)
 - `vendors` - Vendor/supplier database
 - `master_items` - Central item catalog
-- `vendor_items` - **DEPRECATED** (moved to Integration Hub)
+
+**Location-Aware Costing Tables (NEW Dec 27, 2025):**
+- `master_item_count_units` - Multiple count units per item with conversion factors
+- `master_item_location_costs` - Weighted average cost per item per location
+- `master_item_location_cost_history` - Audit trail for cost changes
+- `item_unit_conversions` - Per-item unit conversions (e.g., 1 case = 40 lbs)
 
 **Inventory Tables:**
 - `inventory` - Current inventory quantities
@@ -377,8 +410,6 @@ A comprehensive web-based inventory management system built for restaurant opera
 **Waste Tables:**
 - `waste_records` - Waste logging and tracking
 
-**Note:** Invoice and vendor item tables have been moved to Integration Hub (source of truth).
-
 **Recipe Tables:**
 - `recipes` - Recipe headers
 - `recipe_ingredients` - Recipe ingredient lists
@@ -390,12 +421,16 @@ A comprehensive web-based inventory management system built for restaurant opera
 - `pos_item_mappings` - POS item to inventory item mappings
 
 **System Tables:**
-- `units_of_measure` - UOM library
+- `units_of_measure` - UOM library (local cache, Hub is source of truth)
 - `unit_categories` - UOM category groupings
 - `user_locations` - User-location assignments
 - `audit_log` - System activity audit trail
 - `password_reset_tokens` - Password reset functionality
 - `alembic_version` - Database migration tracking
+
+**Deprecated Tables (moved to _deprecated/ models):**
+- `invoices`, `invoice_items` - Use Integration Hub
+- `vendor_items`, `vendor_aliases` - Use Integration Hub
 
 ---
 
@@ -979,6 +1014,6 @@ All rights reserved. Unauthorized use, distribution, or modification is prohibit
 
 ---
 
-**Last Updated:** December 8, 2025
-**Document Version:** 2.1
-**System Version:** v2.0.0 Production
+**Last Updated:** December 27, 2025
+**Document Version:** 2.2
+**System Version:** v2.1.0 Production (Location-Aware Costing)

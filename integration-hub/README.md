@@ -2,25 +2,58 @@
 
 ## Overview
 
-The Integration Hub is an **invoice processing and general ledger (GL) mapping system** that receives vendor invoices, maps line items to inventory items and GL accounts, and routes the processed invoices to both the Inventory and Accounting systems.
+The Integration Hub is an **invoice processing and general ledger (GL) mapping system** that receives vendor invoices, maps line items to inventory items and GL accounts, and routes the processed invoices to both the Inventory and Accounting systems. It also serves as the **source of truth** for vendor items, UOM, and categories.
 
-## Status: Production Ready (Core Features + Advanced Workflow) ✅
+## Status: Production Ready (Location-Aware Costing) ✅
 
-**Last Updated:** December 25, 2025
+**Last Updated:** December 27, 2025
 
 **Note:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
-### Source of Truth Architecture
+### Source of Truth Architecture (Dec 27, 2025)
 
 The Integration Hub is the **source of truth** for:
 - **Invoices** - All invoice data, processing, and routing
-- **Vendor Items** - Vendor-specific product catalog with pricing
+- **Vendor Items** - Vendor-specific product catalog with location-aware pricing
 - **Vendors** - Canonical vendor records with alias normalization
 - **GL Mappings** - Item and category GL account mappings
+- **UOM (Units of Measure)** - Global units with MeasureType (each, weight, volume)
+- **Categories** - Hierarchical product categories
 
-The Inventory system queries Hub for vendor item data via proxy endpoints.
+The Inventory system owns:
+- **Master Items** - Central item catalog
+- **Count Units** - Per-item counting units with conversion factors
+- **Location Costs** - Weighted average cost per item per location
+- **Locations** - Restaurant locations (source of truth for all systems)
 
 ## Recent Updates
+
+### December 27, 2025 - Location-Aware Costing Architecture 🏗️
+
+**Major Architecture Refactor:**
+- ✅ **Inventory owns Locations** - All location data managed in Inventory
+- ✅ **Accounting syncs from Inventory** - New sync endpoint for locations
+- ✅ **Hub vendor items location-aware** - VendorItemStatus enum (active, needs_review, inactive)
+- ✅ **Invoice-derived pricing** - Prices per location from invoice history
+
+**New Hub Models:**
+- ✅ **MeasureType enum** - each, weight, volume for UOM categorization
+- ✅ **VendorItemStatus enum** - active, needs_review, inactive
+- ✅ **Location-aware fields** - `location_id`, `last_purchase_price`, `previous_purchase_price`
+- ✅ **Pack conversion** - `pack_to_primary_factor` for unit conversions
+
+**New Inventory Models (updated by Hub):**
+- ✅ **MasterItemCountUnit** - Multiple count units per item
+- ✅ **MasterItemLocationCost** - Weighted average cost per location
+- ✅ **MasterItemLocationCostHistory** - Cost change audit trail
+
+**Migration Stats:**
+- Hub: 23 UOMs with measure_type (10 each, 9 volume, 4 weight)
+- Hub: 908 vendor items with location_id and status
+- Inventory: 409 count units created
+- Inventory: 372 location cost records (62 items × 6 locations)
+
+---
 
 ### November 30, 2025 - Tax Double-Counting Fix 🔥
 

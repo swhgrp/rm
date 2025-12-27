@@ -1,15 +1,15 @@
 # SW Hospitality Group - Restaurant Management System
 
 [![Status](https://img.shields.io/badge/status-production-yellow)]()
-[![Completion](https://img.shields.io/badge/completion-90%25-green)]()
+[![Completion](https://img.shields.io/badge/completion-92%25-green)]()
 [![Documentation](https://img.shields.io/badge/docs-updated-blue)]()
 
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** December 25, 2025
-**Status:** ~90% Complete - Core Systems Production Ready ✅
-**Latest:** Hub source of truth consolidation + vendor items UI improvements (Dec 25, 2025) ✅
+**Last Updated:** December 27, 2025
+**Status:** ~92% Complete - Core Systems Production Ready ✅
+**Latest:** Location-aware costing architecture + Inventory as location source of truth (Dec 27, 2025) ✅
 
 ---
 
@@ -31,14 +31,27 @@
 
 The SW Hospitality Group Restaurant Management System is a comprehensive microservices platform handling all aspects of restaurant operations including inventory management, human resources, accounting, event planning, and third-party integrations.
 
-### Key Statistics (Verified Dec 8, 2025)
+### Key Statistics (Verified Dec 27, 2025)
 - **8 microservices** running in production (including Websites CMS)
-- **437 Python files** across all systems
-- **136 HTML templates** for user interfaces
-- **130+ database models** with full relationships
-- **700+ API endpoints** for system integration
+- **450+ Python files** across all systems
+- **140+ HTML templates** for user interfaces
+- **140+ database models** with full relationships
+- **750+ API endpoints** for system integration
 - **20 Docker containers** orchestrated via Docker Compose
-- **~90% completion** - core systems production ready
+- **~92% completion** - core systems production ready
+
+### Source of Truth Architecture (Dec 27, 2025)
+| Data Domain | Owner System | Consumer Systems |
+|-------------|--------------|------------------|
+| **Locations** | Inventory | Accounting, Hub |
+| **Master Items** | Inventory | Hub |
+| **Count Units** | Inventory | - |
+| **Location Costs** | Inventory | - |
+| **Vendors** | Hub | Inventory, Accounting |
+| **Vendor Items** | Hub | Inventory |
+| **Invoices/GL** | Hub | Accounting |
+| **Categories** | Hub (global) | Inventory |
+| **UOM** | Hub (global) | Inventory |
 
 ---
 
@@ -307,18 +320,24 @@ restaurant-system/
 ---
 
 ### 2. Inventory System ✅ **Production Ready (100%+ Complete)** 🌟
-**Enterprise-grade inventory management with AI-powered invoice processing, POS integration, recipe costing, and advanced analytics**
+**Enterprise-grade inventory management with location-aware costing, POS integration, recipe costing, and advanced analytics**
 
 - **URL:** https://rm.swhgrp.com/inventory/
-- **Database:** inventory_db (PostgreSQL 15) - **32 tables, 25+ models**
-- **Technology:** FastAPI, SQLAlchemy, OpenAI GPT-4, Redis, APScheduler, ReportLab
-- **Files:** 104 Python files, **30 templates**, 190+ API routes across 21 modules
+- **Database:** inventory_db (PostgreSQL 15) - **37 tables, 37+ models**
+- **Technology:** FastAPI, SQLAlchemy, Redis, APScheduler, ReportLab
+- **Files:** 104 Python files, **30 templates**, 177+ API routes across 21 modules
+
+**Source of Truth (Dec 27, 2025):**
+- ✅ **Locations** - Inventory owns all location data (code, legal_name, ein, address)
+- ✅ **Master Items** - Central item catalog with category/UOM references to Hub
+- ✅ **Count Units** - Per-item counting units with conversion factors
+- ✅ **Location Costs** - Weighted average cost per item per location
 
 **Core Inventory Features:**
 - ✅ Master item catalog with SKUs and categorization
 - ✅ Multi-location inventory tracking with storage areas
-- ✅ Vendor management with multi-vendor item support
-- ✅ Vendor-specific item codes, pricing, and UOMs
+- ✅ **Location-aware costing** - Per-location weighted average costs (NEW)
+- ✅ **Multiple count units** - Primary + 2 additional count units per item (NEW)
 - ✅ Live count sessions with auto-save (mobile-responsive)
 - ✅ Count templates for recurring counts
 - ✅ Waste tracking and reporting (**PRODUCTION READY**)
@@ -330,11 +349,11 @@ restaurant-system/
 - ✅ Portal SSO integration with JWT
 - ✅ Units of measure library with conversion factors
 
-**🌟 Invoice Processing (via Integration Hub):**
-- ✅ **Note:** Invoice processing has moved to Integration Hub (source of truth)
-- ✅ Inventory receives processed invoice data via Hub API
-- ✅ Master items linked to vendor items in Hub
-- ✅ Price lookups via Hub's vendor item catalog
+**🌟 Integration Hub Connection:**
+- ✅ **Note:** Invoice processing is in Integration Hub (source of truth)
+- ✅ Inventory provides `/_sync` endpoint for Accounting to fetch locations
+- ✅ Master items reference Hub categories and UOMs
+- ✅ Location costs updated by Hub when invoices are processed
 
 **🌟 POS Integration (PRODUCTION READY):**
 - ✅ Clover, Square, and Toast POS support
@@ -578,20 +597,21 @@ restaurant-system/
 
 ---
 
-### 6. Integration Hub ✅ **Production Ready with Advanced Workflow** 🌟
-**Automated invoice processing with email monitoring, AI parsing, bulk mapping, and smart routing**
+### 6. Integration Hub ✅ **Production Ready with Location-Aware Costing** 🌟
+**Automated invoice processing with email monitoring, AI parsing, location-aware pricing, and smart routing**
 
 - **URL:** https://rm.swhgrp.com/hub/
-- **Database:** hub_db (PostgreSQL 15) - 7+ models
+- **Database:** hub_db (PostgreSQL 15) - **15+ tables, 20+ models**
 - **Technology:** **FastAPI**, SQLAlchemy, OpenAI GPT-4o Vision, APScheduler, PyPDF2, pdf2image
-- **Files:** 39 Python files, 10 templates
+- **Files:** 50+ Python files, 12 templates
 
 **Critical Correction:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
-**Source of Truth Architecture (Dec 2025):**
-- **Integration Hub owns:** Invoices, Vendor Items, Vendors (with alias normalization), GL Mappings
-- **Inventory owns:** Master Items, Categories, Units of Measure, Storage Areas, Counts
-- Hub fetches category/unit data from Inventory via PostgreSQL dblink
+**Source of Truth Architecture (Dec 27, 2025):**
+- **Hub owns:** Invoices, Vendor Items (location-aware), Vendors, GL Mappings, UOM, Categories
+- **Inventory owns:** Master Items, Count Units, Location Costs, Locations
+- **Location-aware pricing:** Vendor items track prices per location from invoices
+- **Weighted average costing:** Hub updates Inventory's `MasterItemLocationCost` on invoice processing
 
 **🚀 NEW: Major Workflow Improvements (Nov 8, 2025):**
 - ✅ **Bulk mapping by description** - Map once, apply to ALL occurrences (10x faster)
@@ -1047,10 +1067,11 @@ docker compose exec inventory-db psql -U inventory_user -d inventory_db -c "\l+"
 - **Sync:** Real-time via shared database
 
 ### Integration Hub ↔ Inventory
-- **Hub provides:** Vendor items, pricing, invoice data (source of truth)
-- **Inventory provides:** Master items, categories, units (via dblink)
-- **Integration:** Hub queries Inventory DB directly for reference data
-- **Note:** No sync needed - Hub is authoritative for vendor data
+- **Hub provides:** Vendor items, pricing, invoices, GL mappings, UOM, Categories (source of truth)
+- **Inventory provides:** Master items, count units, location costs, locations
+- **Location-aware costing:** Hub updates `MasterItemLocationCost` when invoices are processed
+- **Location sync:** Accounting fetches locations from Inventory via `/_sync` endpoint
+- **Note:** Hub is authoritative for vendor/pricing data; Inventory owns item costs and locations
 
 ### Integration Hub → Accounting
 - **Creates:** Journal entries from processed invoices
@@ -1293,6 +1314,40 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 ## 📝 Recent Updates
+
+### December 27, 2025 - Location-Aware Costing Architecture 🏗️
+
+**Major Architecture Refactor - Location as Source of Truth**
+- ✅ **Inventory owns Locations** - All location data (code, legal_name, ein, address) managed in Inventory
+- ✅ **Accounting syncs from Inventory** - New `/api/areas/sync-from-inventory` endpoint + "Sync from Inventory" button
+- ✅ **Location model enhanced** - Added `code`, `legal_name`, `ein` fields to Inventory's Location model
+
+**New Inventory Models (Location-Aware Costing)**
+- ✅ **MasterItemCountUnit** - Multiple count units per item with conversion factors
+  - `master_item_id` + `uom_id` + `is_primary` flag
+  - `conversion_to_primary` factor for unit conversions
+- ✅ **MasterItemLocationCost** - Weighted average cost per item per location
+  - `current_weighted_avg_cost`, `total_qty_on_hand`
+  - `apply_purchase()` and `apply_usage()` methods
+- ✅ **MasterItemLocationCostHistory** - Full audit trail for cost changes
+
+**Hub Vendor Items - Location-Aware**
+- ✅ **VendorItemStatus enum** - active, needs_review, inactive
+- ✅ **Location-aware pricing** - `location_id`, `last_purchase_price`, `previous_purchase_price`
+- ✅ **Pack conversion** - `pack_to_primary_factor` for purchase unit to primary unit
+- ✅ **Review workflow** - Approve/reject/bulk approve for new vendor items
+
+**Migration Completed**
+- ✅ Hub: 23 UOMs with measure_type (10 each, 9 volume, 4 weight)
+- ✅ Hub: 908 vendor items with location_id and status
+- ✅ Inventory: 409 count units created
+- ✅ Inventory: 372 location cost records (62 items × 6 locations)
+
+**Deprecated Models (moved to _deprecated/)**
+- Invoice, InvoiceItem, InvoiceStatus → Use Hub for invoices
+- VendorItem, VendorAlias → Use Hub for vendor items
+
+---
 
 ### December 25, 2025 - Hub Source of Truth + Vendor Items UI 🎯
 
@@ -1758,8 +1813,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 3.1 - Website Manager Mobile Responsive
-**Last Updated:** December 8, 2025
-**Documentation Health:** 95/100 - Excellent ✅
+**Version:** 3.2 - Location-Aware Costing Architecture
+**Last Updated:** December 27, 2025
+**Documentation Health:** 96/100 - Excellent ✅
 
-*Websites system: Mobile-responsive admin interface, enhanced activity logging with pagination and change details, social media and action links on website preview.*
+*Location-aware costing: Inventory as location source of truth, per-location weighted average costs, Hub vendor item pricing by location.*
