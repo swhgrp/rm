@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 
-from restaurant_inventory.core.deps import get_db, get_current_user
+from restaurant_inventory.core.deps import get_db, get_current_user, verify_hub_api_key
 from restaurant_inventory.models import VendorItem, MasterItem, Vendor, UnitOfMeasure, User
 from restaurant_inventory.schemas.vendor_item import (
     VendorItemCreate,
@@ -24,11 +24,12 @@ def get_vendor_items_for_hub(
     vendor_id: Optional[int] = None,
     is_active: bool = True,
     limit: int = 5000,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_hub_api_key)
 ):
     """
     Get all vendor items for Integration Hub sync/migration
-    No authentication required - this is an internal API call from the hub
+    Requires X-Hub-API-Key header for authentication
     IMPORTANT: This route must be defined BEFORE /{vendor_item_id} route
     Path starts with _ to avoid being matched by /{vendor_item_id} pattern
     """

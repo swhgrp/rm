@@ -32,6 +32,13 @@ router = APIRouter(prefix="/api/v1/vendor-items", tags=["vendor-items-api"])
 # Inventory API URL for fetching master items and UOM
 INVENTORY_API_URL = os.getenv("INVENTORY_API_URL", "http://inventory-app:8000/api")
 
+# Internal API key for Hub-to-system communication - MUST be set via environment
+HUB_INTERNAL_API_KEY = os.getenv("HUB_INTERNAL_API_KEY")
+if not HUB_INTERNAL_API_KEY:
+    raise ValueError("HUB_INTERNAL_API_KEY environment variable must be set")
+
+HUB_API_HEADERS = {"X-Hub-API-Key": HUB_INTERNAL_API_KEY}
+
 
 async def sync_vendor_item_to_inventory(item: "HubVendorItem", vendor: "Vendor", action: str = "sync"):
     """
@@ -723,7 +730,8 @@ async def import_vendor_items_from_inventory(
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.get(
                 f"{INVENTORY_API_URL}/vendor-items/_hub/sync",
-                params={"limit": 5000, "is_active": "true"}
+                params={"limit": 5000, "is_active": "true"},
+                headers=HUB_API_HEADERS
             )
 
             if response.status_code != 200:

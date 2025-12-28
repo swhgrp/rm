@@ -131,16 +131,20 @@ class InventoryDeductionService:
         """
         Deduct a master item from inventory.
         Returns list of transactions created.
+
+        Uses pessimistic locking (SELECT FOR UPDATE) to prevent race conditions
+        when multiple concurrent requests try to deduct from the same inventory.
         """
         transactions = []
 
         # Get or create inventory record for this item at this location
+        # Use FOR UPDATE to lock the row and prevent concurrent modifications
         inventory = self.db.query(Inventory).filter(
             and_(
                 Inventory.master_item_id == master_item_id,
                 Inventory.location_id == location_id
             )
-        ).first()
+        ).with_for_update().first()
 
         if not inventory:
             # Create inventory record if it doesn't exist (starting at 0)

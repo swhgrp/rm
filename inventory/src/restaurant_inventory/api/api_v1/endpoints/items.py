@@ -9,7 +9,7 @@ from typing import List, Optional, Dict
 import tempfile
 import os
 
-from restaurant_inventory.core.deps import get_db, get_current_user, require_manager_or_admin
+from restaurant_inventory.core.deps import get_db, get_current_user, require_manager_or_admin, verify_hub_api_key
 from restaurant_inventory.models.item import MasterItem
 from restaurant_inventory.models._deprecated.vendor_item import VendorItem
 from restaurant_inventory.models.unit_of_measure import UnitOfMeasure
@@ -24,11 +24,12 @@ def get_items_for_hub(
     skip: int = 0,
     limit: int = 5000,
     active_only: bool = Query(True, description="Show only active items"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_hub_api_key)
 ):
     """
     Get all items for Integration Hub sync
-    No authentication required - this is an internal API call from the hub
+    Requires X-Hub-API-Key header for authentication
     IMPORTANT: This route must be defined BEFORE /{item_id} route
     Path starts with _ to avoid being matched by /{item_id} pattern
     """

@@ -1,7 +1,8 @@
 """
 Authentication API endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+import os
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request, Header
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -13,6 +14,24 @@ from accounting.core.security import verify_password, generate_session_token
 from accounting.core.portal_sso import validate_portal_token
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+# Internal API key for Hub-to-system communication - MUST be set via environment
+HUB_INTERNAL_API_KEY = os.getenv("HUB_INTERNAL_API_KEY")
+if not HUB_INTERNAL_API_KEY:
+    raise ValueError("HUB_INTERNAL_API_KEY environment variable must be set")
+
+
+def verify_hub_api_key(x_hub_api_key: str = Header(..., alias="X-Hub-API-Key")):
+    """
+    Verify the internal API key for Hub-to-system communication.
+    This is used for internal endpoints like /_hub/sync and /_hub/receive.
+    """
+    if x_hub_api_key != HUB_INTERNAL_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Hub API key"
+        )
+    return True
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optional[User]:

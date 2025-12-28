@@ -13,6 +13,11 @@ from integration_hub.models.vendor import Vendor
 
 logger = logging.getLogger(__name__)
 
+# Internal API key for Hub-to-system communication - MUST be set via environment
+HUB_INTERNAL_API_KEY = os.getenv("HUB_INTERNAL_API_KEY")
+if not HUB_INTERNAL_API_KEY:
+    raise ValueError("HUB_INTERNAL_API_KEY environment variable must be set")
+
 
 class VendorSyncService:
     """Service for syncing vendors across systems"""
@@ -20,12 +25,16 @@ class VendorSyncService:
     def __init__(self):
         self.inventory_api_url = os.getenv("INVENTORY_API_URL", "http://inventory-app:8000/api")
         self.accounting_api_url = os.getenv("ACCOUNTING_API_URL", "http://accounting-app:8000/api")
+        self.hub_api_headers = {"X-Hub-API-Key": HUB_INTERNAL_API_KEY}
         self.client = httpx.AsyncClient(timeout=30.0)
 
     async def fetch_inventory_vendors(self) -> List[Dict]:
         """Fetch all vendors from Inventory system"""
         try:
-            response = await self.client.get(f"{self.inventory_api_url}/vendors/_hub/sync")
+            response = await self.client.get(
+                f"{self.inventory_api_url}/vendors/_hub/sync",
+                headers=self.hub_api_headers
+            )
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -35,7 +44,10 @@ class VendorSyncService:
     async def fetch_accounting_vendors(self) -> List[Dict]:
         """Fetch all vendors from Accounting system"""
         try:
-            response = await self.client.get(f"{self.accounting_api_url}/vendors/_hub/sync")
+            response = await self.client.get(
+                f"{self.accounting_api_url}/vendors/_hub/sync",
+                headers=self.hub_api_headers
+            )
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -243,7 +255,8 @@ class VendorSyncService:
 
             response = await self.client.post(
                 f"{self.inventory_api_url}/vendors/_hub/receive",
-                json=payload
+                json=payload,
+                headers=self.hub_api_headers
             )
             response.raise_for_status()
             result = response.json()
@@ -278,7 +291,8 @@ class VendorSyncService:
 
             response = await self.client.post(
                 f"{self.accounting_api_url}/vendors/_hub/receive",
-                json=payload
+                json=payload,
+                headers=self.hub_api_headers
             )
             response.raise_for_status()
             result = response.json()

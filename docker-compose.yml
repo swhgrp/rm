@@ -52,8 +52,9 @@ services:
     - DATABASE_URL=postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db
     - REDIS_URL=redis://inventory-redis:6379
     - DEBUG=true
-    - SECRET_KEY=your-super-secret-key-change-in-production-galveston34
-    - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    - SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
+    - PORTAL_SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
+    - HUB_INTERNAL_API_KEY=fqyUzahSx18ivWkajrVcVcFEi3Edwmy7dC22WMlXHH0=
     depends_on:
       inventory-db:
         condition: service_healthy
@@ -95,7 +96,8 @@ services:
     - TZ=America/New_York
     - DATABASE_URL=postgresql://accounting_user:Acc0unt1ng_Pr0d_2024!@accounting-db:5432/accounting_db
     - INVENTORY_API_URL=http://inventory-app:8000/api
-    - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    - PORTAL_SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
+    - HUB_INTERNAL_API_KEY=fqyUzahSx18ivWkajrVcVcFEi3Edwmy7dC22WMlXHH0=
     depends_on:
       accounting-db:
         condition: service_healthy
@@ -138,7 +140,8 @@ services:
     - DATABASE_URL=postgresql://hub_user:hub_password@hub-db:5432/integration_hub_db
     - INVENTORY_API_URL=http://inventory-app:8000/api
     - ACCOUNTING_API_URL=http://accounting-app:8000/api
-    - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    - PORTAL_SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
+    - HUB_INTERNAL_API_KEY=fqyUzahSx18ivWkajrVcVcFEi3Edwmy7dC22WMlXHH0=
     depends_on:
       hub-db:
         condition: service_healthy
@@ -185,7 +188,7 @@ services:
     - INVENTORY_API_URL=http://inventory-app:8000/api
     - ACCOUNTING_API_URL=http://accounting-app:8000/api
     - ENCRYPTION_KEY=yX_axNoTYxskNPgHeaoSSi2gM1jXhXvsdwf9acQqKpM=
-    - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    - PORTAL_SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
     depends_on:
       hr-db:
         condition: service_healthy
@@ -245,7 +248,7 @@ services:
     - TZ=America/New_York
     - DATABASE_URL=postgresql://events_user:events_pass@events-db:5432/events_db
     - REDIS_URL=redis://events-redis:6379/0
-    - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    - PORTAL_SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
     depends_on:
       events-db:
         condition: service_healthy
@@ -279,7 +282,7 @@ services:
     environment:
     - TZ=America/New_York
     - HR_DATABASE_URL=postgresql://hr_user:HR_Pr0d_2024!@hr-db:5432/hr_db
-    - SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    - SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
     - INVENTORY_API_URL=http://inventory-app:8000
     - ACCOUNTING_API_URL=http://accounting-app:8000
     - HR_API_URL=http://hr-app:8000
@@ -310,7 +313,7 @@ services:
     - restaurant-network
     environment:
     - TZ=America/New_York
-    - PORTAL_SECRET_KEY=your-super-secret-key-change-in-production-galveston34
+    - PORTAL_SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
   onlyoffice:
     image: onlyoffice/documentserver:latest
     container_name: onlyoffice-documentserver
@@ -355,8 +358,8 @@ services:
     environment:
     - TZ=America/New_York
     - DATABASE_URL=postgresql://websites_user:W3bs1t3s_Pr0d_2024!@websites-db:5432/websites_db
-    - SECRET_KEY=your-super-secret-key-change-in-production-galveston34
-    - PORTAL_SSO_SECRET=your-super-secret-key-change-in-production-galveston34
+    - SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
+    - PORTAL_SSO_SECRET=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
     depends_on:
       websites-db:
         condition: service_healthy

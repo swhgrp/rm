@@ -92,8 +92,11 @@ class PaymentService:
             )
             self.db.add(app)
 
-            # Update bill paid amount
-            bill = self.db.query(VendorBill).filter(VendorBill.id == app_data.vendor_bill_id).first()
+            # Update bill paid amount with pessimistic locking to prevent race conditions
+            # when multiple concurrent payments are applied to the same bill
+            bill = self.db.query(VendorBill).filter(
+                VendorBill.id == app_data.vendor_bill_id
+            ).with_for_update().first()
             if bill:
                 bill.paid_amount = (bill.paid_amount or Decimal('0')) + app_data.amount_applied
                 if bill.paid_amount >= bill.total_amount:
@@ -397,9 +400,11 @@ class PaymentService:
         if payment.status == PaymentStatus.VOIDED:
             raise ValueError("Payment is already voided")
 
-        # Reverse bill payments
+        # Reverse bill payments with pessimistic locking to prevent race conditions
         for app in payment.applications:
-            bill = self.db.query(VendorBill).filter(VendorBill.id == app.vendor_bill_id).first()
+            bill = self.db.query(VendorBill).filter(
+                VendorBill.id == app.vendor_bill_id
+            ).with_for_update().first()
             if bill:
                 bill.paid_amount = (bill.paid_amount or Decimal('0')) - app.amount_applied
                 if bill.paid_amount == 0:

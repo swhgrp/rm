@@ -7,8 +7,10 @@ from jose import JWTError, jwt
 from typing import Optional, Dict
 import os
 
-# Portal secret key - should match Portal configuration
-PORTAL_SECRET_KEY = os.getenv("PORTAL_SECRET_KEY", "your-super-secret-key-change-in-production-galveston34")
+# Portal secret key - MUST be set via environment variable
+PORTAL_SECRET_KEY = os.getenv("PORTAL_SECRET_KEY")
+if not PORTAL_SECRET_KEY:
+    raise ValueError("PORTAL_SECRET_KEY environment variable must be set")
 PORTAL_ALGORITHM = "HS256"
 
 

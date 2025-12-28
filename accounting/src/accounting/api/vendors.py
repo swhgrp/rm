@@ -10,21 +10,24 @@ from accounting.models.user import User
 from accounting.models.vendor import Vendor
 from accounting.models.vendor_alias import VendorAlias
 from accounting.schemas.vendor import VendorCreate, VendorUpdate, VendorResponse
-from accounting.api.auth import require_auth
+from accounting.api.auth import require_auth, verify_hub_api_key
 from accounting.services.vendor_service import VendorService
 
 router = APIRouter(prefix="/api/vendors", tags=["vendors"])
 
 
 # ============================================================================
-# UNAUTHENTICATED ENDPOINTS FOR INTEGRATION HUB - MUST BE FIRST!
+# AUTHENTICATED ENDPOINTS FOR INTEGRATION HUB - MUST BE FIRST!
 # ============================================================================
 
 @router.get("/_hub/sync")
-def get_vendors_for_hub(db: Session = Depends(get_db)):
+def get_vendors_for_hub(
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_hub_api_key)
+):
     """
     Get all vendors for Integration Hub sync
-    No authentication required - this is an internal API call from the hub
+    Requires X-Hub-API-Key header for authentication
     Returns vendor data in a format compatible with the hub (using 'name' instead of 'vendor_name')
     IMPORTANT: This route must be defined BEFORE /{vendor_id} route
     """
@@ -52,10 +55,14 @@ def get_vendors_for_hub(db: Session = Depends(get_db)):
 
 
 @router.post("/_hub/receive")
-def receive_vendor_from_hub(vendor_data: dict, db: Session = Depends(get_db)):
+def receive_vendor_from_hub(
+    vendor_data: dict,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_hub_api_key)
+):
     """
     Receive vendor from Integration Hub
-    No authentication required - this is an internal API call from the hub
+    Requires X-Hub-API-Key header for authentication
     """
     # Check if vendor already exists by name (using vendor_name field)
     vendor_name = vendor_data.get("name")

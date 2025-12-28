@@ -2,8 +2,9 @@
 Dependency functions for authentication and authorization
 """
 
+import os
 from typing import Generator, Optional
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, HTTPException, status, Request, Header
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
@@ -13,6 +14,24 @@ from restaurant_inventory.models.user import User
 
 # Security scheme
 security = HTTPBearer(auto_error=False)
+
+# Internal API key for Hub-to-system communication - MUST be set via environment
+HUB_INTERNAL_API_KEY = os.getenv("HUB_INTERNAL_API_KEY")
+if not HUB_INTERNAL_API_KEY:
+    raise ValueError("HUB_INTERNAL_API_KEY environment variable must be set")
+
+
+def verify_hub_api_key(x_hub_api_key: str = Header(..., alias="X-Hub-API-Key")):
+    """
+    Verify the internal API key for Hub-to-system communication.
+    This is used for internal endpoints like /_hub/sync and /_hub/receive.
+    """
+    if x_hub_api_key != HUB_INTERNAL_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Hub API key"
+        )
+    return True
 
 def get_db() -> Generator:
     """Database session dependency"""

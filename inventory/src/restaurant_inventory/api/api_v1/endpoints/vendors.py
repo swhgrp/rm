@@ -8,7 +8,7 @@ from pydantic import BaseModel, EmailStr
 
 from sqlalchemy import func
 
-from restaurant_inventory.core.deps import get_db, get_current_user
+from restaurant_inventory.core.deps import get_db, get_current_user, verify_hub_api_key
 from restaurant_inventory.models.vendor import Vendor
 from restaurant_inventory.models.user import User
 from restaurant_inventory.core.audit import log_audit_event, create_change_dict
@@ -20,14 +20,17 @@ router = APIRouter()
 
 
 # ============================================================================
-# UNAUTHENTICATED ENDPOINTS FOR INTEGRATION HUB - MUST BE FIRST!
+# AUTHENTICATED ENDPOINTS FOR INTEGRATION HUB - MUST BE FIRST!
 # ============================================================================
 
 @router.get("/_hub/sync")
-def get_vendors_for_hub(db: Session = Depends(get_db)):
+def get_vendors_for_hub(
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_hub_api_key)
+):
     """
     Get all vendors for Integration Hub sync
-    No authentication required - this is an internal API call from the hub
+    Requires X-Hub-API-Key header for authentication
     IMPORTANT: This route must be defined BEFORE /{vendor_id} route
     Path starts with _ to avoid being matched by /{vendor_id} pattern
     """
@@ -47,10 +50,14 @@ def get_vendors_for_hub(db: Session = Depends(get_db)):
 
 
 @router.post("/_hub/receive")
-def receive_vendor_from_hub(vendor_data: dict, db: Session = Depends(get_db)):
+def receive_vendor_from_hub(
+    vendor_data: dict,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_hub_api_key)
+):
     """
     Receive vendor from Integration Hub
-    No authentication required - this is an internal API call from the hub
+    Requires X-Hub-API-Key header for authentication
     """
     # Check if vendor already exists by name
     existing_vendor = db.query(Vendor).filter(Vendor.name == vendor_data.get("name")).first()
