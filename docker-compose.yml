@@ -105,7 +105,7 @@ services:
     networks:
     - restaurant-network
   hub-db:
-    image: postgres:15
+    image: pgvector/pgvector:pg15
     container_name: hub-db
     environment:
       POSTGRES_USER: hub_user
