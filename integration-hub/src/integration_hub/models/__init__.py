@@ -27,6 +27,8 @@ from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.models.item_gl_mapping import ItemGLMapping
 from integration_hub.models.price_history import PriceHistory
 from integration_hub.models.system_setting import SystemSetting
+from integration_hub.models.size_unit import SizeUnit
+from integration_hub.models.container import Container
 
 __all__ = [
     # UOM
@@ -50,4 +52,7 @@ __all__ = [
     # Other
     'PriceHistory',
     'SystemSetting',
+    # Backbar-style sizing
+    'SizeUnit',
+    'Container',
 ]

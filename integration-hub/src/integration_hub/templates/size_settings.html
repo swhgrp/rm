@@ -1,0 +1,474 @@
+{% extends "base.html" %}
+
+{% block title %}Size & Container Settings - Integration Hub{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="d-flex align-items-center mb-4">
+        <a href="settings" class="btn btn-outline-secondary btn-sm me-3">
+            <i class="bi bi-arrow-left"></i> Back to Settings
+        </a>
+        <div>
+            <h1 class="mb-0"><i class="bi bi-rulers"></i> Size & Container Settings</h1>
+            <p class="text-muted mb-0">Manage size units and container types for Backbar-style vendor item sizing</p>
+        </div>
+    </div>
+
+    <!-- Alert Container -->
+    <div id="alertContainer"></div>
+
+    <div class="row">
+        <!-- Size Units Card -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0"><i class="bi bi-rulers"></i> Size Units</h5>
+                        <small class="text-muted">Volume, weight, and count units (L, ml, lb, oz, etc.)</small>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="showAddSizeUnitModal()">
+                        <i class="bi bi-plus-lg"></i> Add Unit
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead style="position: sticky; top: 0; background: var(--bg-secondary);">
+                                <tr>
+                                    <th style="padding-left: 15px;">Symbol</th>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Conversion</th>
+                                    <th>Active</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="sizeUnitsTableBody">
+                                <tr><td colspan="6" class="text-center text-muted py-3">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Containers Card -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0"><i class="bi bi-box"></i> Container Types</h5>
+                        <small class="text-muted">Physical packaging types (bottle, can, bag, etc.)</small>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="showAddContainerModal()">
+                        <i class="bi bi-plus-lg"></i> Add Container
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead style="position: sticky; top: 0; background: var(--bg-secondary);">
+                                <tr>
+                                    <th style="padding-left: 15px;">Name</th>
+                                    <th>Sort Order</th>
+                                    <th>Active</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="containersTableBody">
+                                <tr><td colspan="4" class="text-center text-muted py-3">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Usage Info -->
+    <div class="card">
+        <div class="card-body">
+            <h6 class="text-muted mb-3"><i class="bi bi-info-circle"></i> How Size & Containers Work</h6>
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="small mb-2"><strong>Size Format:</strong> <code>[Quantity] [Unit] [Container]</code></p>
+                    <ul class="small text-muted mb-0">
+                        <li><code>1 L bottle</code> - 1 liter bottle</li>
+                        <li><code>750 ml bottle</code> - 750 milliliter bottle</li>
+                        <li><code>25 lb bag</code> - 25 pound bag</li>
+                        <li><code>12 oz can</code> - 12 ounce can</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <p class="small mb-2"><strong>Conversion Factors:</strong></p>
+                    <ul class="small text-muted mb-0">
+                        <li>Size units have conversion factors to a base unit (ml for volume, g for weight)</li>
+                        <li>This enables price comparison across different sizes</li>
+                        <li>Example: 1 L = 1000 ml, 1 lb = 453.592 g</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Size Unit Modal -->
+<div class="modal fade" id="sizeUnitModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sizeUnitModalTitle"><i class="bi bi-rulers"></i> Add Size Unit</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="sizeUnitForm" onsubmit="saveSizeUnit(event)">
+                <div class="modal-body">
+                    <input type="hidden" id="sizeUnitId">
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Symbol <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="sizeUnitSymbol" required placeholder="e.g., L, ml, lb, oz">
+                            <small class="text-muted">Short symbol for display</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="sizeUnitName" required placeholder="e.g., Liter, Milliliter">
+                            <small class="text-muted">Full name</small>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Measure Type <span class="text-danger">*</span></label>
+                            <select class="form-select" id="sizeUnitMeasureType" required>
+                                <option value="volume">Volume</option>
+                                <option value="weight">Weight</option>
+                                <option value="count">Count</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Base Unit Symbol <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="sizeUnitBaseSymbol" required placeholder="e.g., ml, g, each">
+                            <small class="text-muted">Base unit for conversion</small>
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Conversion to Base <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="sizeUnitConversion" required min="0.000001" step="any" value="1">
+                            <small class="text-muted">e.g., 1000 for L->ml</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Sort Order</label>
+                            <input type="number" class="form-control" id="sizeUnitSortOrder" value="0">
+                            <small class="text-muted">Display order in dropdowns</small>
+                        </div>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="sizeUnitIsActive" checked>
+                        <label class="form-check-label" for="sizeUnitIsActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Container Modal -->
+<div class="modal fade" id="containerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="containerModalTitle"><i class="bi bi-box"></i> Add Container</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="containerForm" onsubmit="saveContainer(event)">
+                <div class="modal-body">
+                    <input type="hidden" id="containerId">
+
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="containerName" required placeholder="e.g., bottle, can, bag">
+                        <small class="text-muted">Container type name (lowercase)</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Sort Order</label>
+                        <input type="number" class="form-control" id="containerSortOrder" value="0">
+                        <small class="text-muted">Display order in dropdowns</small>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="containerIsActive" checked>
+                        <label class="form-check-label" for="containerIsActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Load data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadSizeUnits();
+    loadContainers();
+});
+
+// ============================================================================
+// SIZE UNITS
+// ============================================================================
+
+async function loadSizeUnits() {
+    const tbody = document.getElementById('sizeUnitsTableBody');
+    try {
+        const response = await fetch('/hub/api/v1/size-settings/size-units');
+        if (!response.ok) throw new Error('Failed to load');
+
+        const units = await response.json();
+
+        if (units.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No size units defined</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = units.map(unit => `
+            <tr class="${!unit.is_active ? 'text-muted' : ''}">
+                <td style="padding-left: 15px;"><code>${unit.symbol}</code></td>
+                <td>${unit.name}</td>
+                <td><span class="badge bg-secondary">${unit.measure_type}</span></td>
+                <td><small>${unit.conversion_to_base} ${unit.base_unit_symbol}</small></td>
+                <td>
+                    ${unit.is_active
+                        ? '<span class="badge bg-success">Yes</span>'
+                        : '<span class="badge bg-secondary">No</span>'}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="editSizeUnit(${unit.id})" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Error loading: ${error.message}</td></tr>`;
+    }
+}
+
+function showAddSizeUnitModal() {
+    document.getElementById('sizeUnitModalTitle').textContent = 'Add Size Unit';
+    document.getElementById('sizeUnitId').value = '';
+    document.getElementById('sizeUnitSymbol').value = '';
+    document.getElementById('sizeUnitName').value = '';
+    document.getElementById('sizeUnitMeasureType').value = 'volume';
+    document.getElementById('sizeUnitBaseSymbol').value = 'ml';
+    document.getElementById('sizeUnitConversion').value = '1';
+    document.getElementById('sizeUnitSortOrder').value = '0';
+    document.getElementById('sizeUnitIsActive').checked = true;
+
+    new bootstrap.Modal(document.getElementById('sizeUnitModal')).show();
+}
+
+async function editSizeUnit(id) {
+    try {
+        const response = await fetch(`/hub/api/v1/size-settings/size-units/${id}`);
+        if (!response.ok) throw new Error('Failed to load');
+
+        const unit = await response.json();
+
+        document.getElementById('sizeUnitModalTitle').textContent = 'Edit Size Unit';
+        document.getElementById('sizeUnitId').value = unit.id;
+        document.getElementById('sizeUnitSymbol').value = unit.symbol;
+        document.getElementById('sizeUnitName').value = unit.name;
+        document.getElementById('sizeUnitMeasureType').value = unit.measure_type;
+        document.getElementById('sizeUnitBaseSymbol').value = unit.base_unit_symbol;
+        document.getElementById('sizeUnitConversion').value = unit.conversion_to_base;
+        document.getElementById('sizeUnitSortOrder').value = unit.sort_order || 0;
+        document.getElementById('sizeUnitIsActive').checked = unit.is_active;
+
+        new bootstrap.Modal(document.getElementById('sizeUnitModal')).show();
+    } catch (error) {
+        showAlert('Error loading size unit: ' + error.message, 'error');
+    }
+}
+
+async function saveSizeUnit(event) {
+    event.preventDefault();
+
+    const id = document.getElementById('sizeUnitId').value;
+    const data = {
+        symbol: document.getElementById('sizeUnitSymbol').value,
+        name: document.getElementById('sizeUnitName').value,
+        measure_type: document.getElementById('sizeUnitMeasureType').value,
+        base_unit_symbol: document.getElementById('sizeUnitBaseSymbol').value,
+        conversion_to_base: parseFloat(document.getElementById('sizeUnitConversion').value),
+        sort_order: parseInt(document.getElementById('sizeUnitSortOrder').value) || 0,
+        is_active: document.getElementById('sizeUnitIsActive').checked
+    };
+
+    try {
+        const url = id
+            ? `/hub/api/v1/size-settings/size-units/${id}`
+            : '/hub/api/v1/size-settings/size-units';
+        const method = id ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save');
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('sizeUnitModal')).hide();
+        showAlert('Size unit saved successfully', 'success');
+        loadSizeUnits();
+    } catch (error) {
+        showAlert('Error saving: ' + error.message, 'error');
+    }
+}
+
+// ============================================================================
+// CONTAINERS
+// ============================================================================
+
+async function loadContainers() {
+    const tbody = document.getElementById('containersTableBody');
+    try {
+        const response = await fetch('/hub/api/v1/size-settings/containers');
+        if (!response.ok) throw new Error('Failed to load');
+
+        const containers = await response.json();
+
+        if (containers.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted py-3">No containers defined</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = containers.map(container => `
+            <tr class="${!container.is_active ? 'text-muted' : ''}">
+                <td style="padding-left: 15px;">${container.name}</td>
+                <td>${container.sort_order || 0}</td>
+                <td>
+                    ${container.is_active
+                        ? '<span class="badge bg-success">Yes</span>'
+                        : '<span class="badge bg-secondary">No</span>'}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="editContainer(${container.id})" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        tbody.innerHTML = `<tr><td colspan="4" class="text-center text-danger py-3">Error loading: ${error.message}</td></tr>`;
+    }
+}
+
+function showAddContainerModal() {
+    document.getElementById('containerModalTitle').textContent = 'Add Container';
+    document.getElementById('containerId').value = '';
+    document.getElementById('containerName').value = '';
+    document.getElementById('containerSortOrder').value = '0';
+    document.getElementById('containerIsActive').checked = true;
+
+    new bootstrap.Modal(document.getElementById('containerModal')).show();
+}
+
+async function editContainer(id) {
+    try {
+        const response = await fetch(`/hub/api/v1/size-settings/containers/${id}`);
+        if (!response.ok) throw new Error('Failed to load');
+
+        const container = await response.json();
+
+        document.getElementById('containerModalTitle').textContent = 'Edit Container';
+        document.getElementById('containerId').value = container.id;
+        document.getElementById('containerName').value = container.name;
+        document.getElementById('containerSortOrder').value = container.sort_order || 0;
+        document.getElementById('containerIsActive').checked = container.is_active;
+
+        new bootstrap.Modal(document.getElementById('containerModal')).show();
+    } catch (error) {
+        showAlert('Error loading container: ' + error.message, 'error');
+    }
+}
+
+async function saveContainer(event) {
+    event.preventDefault();
+
+    const id = document.getElementById('containerId').value;
+    const data = {
+        name: document.getElementById('containerName').value.toLowerCase(),
+        sort_order: parseInt(document.getElementById('containerSortOrder').value) || 0,
+        is_active: document.getElementById('containerIsActive').checked
+    };
+
+    try {
+        const url = id
+            ? `/hub/api/v1/size-settings/containers/${id}`
+            : '/hub/api/v1/size-settings/containers';
+        const method = id ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save');
+        }
+
+        bootstrap.Modal.getInstance(document.getElementById('containerModal')).hide();
+        showAlert('Container saved successfully', 'success');
+        loadContainers();
+    } catch (error) {
+        showAlert('Error saving: ' + error.message, 'error');
+    }
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+function showAlert(message, type) {
+    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
+    const icon = type === 'success' ? 'check-circle' : 'exclamation-triangle';
+
+    document.getElementById('alertContainer').innerHTML = `
+        <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
+            <i class="bi bi-${icon}-fill"></i> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+
+    setTimeout(() => {
+        const alert = document.querySelector('#alertContainer .alert');
+        if (alert) alert.remove();
+    }, 5000);
+}
+</script>
+{% endblock %}

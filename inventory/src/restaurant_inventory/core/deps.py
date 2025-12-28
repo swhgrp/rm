@@ -102,22 +102,33 @@ def require_manager_or_admin(current_user: User = Depends(get_current_user)) -> 
     return current_user
 
 
-def get_user_location_ids(user: User) -> Optional[list]:
+def get_user_location_ids(user: User, db: Session = None) -> list:
     """
     Get list of location IDs the user has access to.
 
+    Args:
+        user: Current user object
+        db: Database session (optional, needed for admins to get all location IDs)
+
     Returns:
-        - None if user has no restrictions (access to all locations)
-        - List of location IDs if user has specific location assignments
+        - List of all location IDs if user is admin (requires db session)
+        - List of assigned location IDs if user has specific location assignments
         - Empty list if user has no access to any locations
 
-    Admin users always have access to all locations (returns None).
+    Admin users always have access to all locations.
     Non-admin users with assigned locations only see those locations.
     Non-admin users without assigned locations have NO access (empty list).
     """
     # Admins have access to everything
     if user.role == "Admin":
-        return None
+        # If db session provided, get all location IDs
+        if db:
+            from restaurant_inventory.models.location import Location
+            all_locations = db.query(Location.id).filter(Location.is_active == True).all()
+            return [loc.id for loc in all_locations]
+        else:
+            # Legacy behavior - return None to indicate all access
+            return None
 
     # If user has assigned locations, return those IDs
     if user.assigned_locations:

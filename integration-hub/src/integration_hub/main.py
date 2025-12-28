@@ -39,6 +39,8 @@ from integration_hub.api import batch_operations as batch_operations_router
 from integration_hub.api import reporting as reporting_router
 from integration_hub.api import vendors as vendors_router
 from integration_hub.api import duplicates as duplicates_router
+from integration_hub.api import similarity as similarity_router
+from integration_hub.api import size_settings as size_settings_router
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -76,6 +78,8 @@ app.include_router(batch_operations_router.router)  # Batch operations for invoi
 app.include_router(reporting_router.router)  # Reporting and analytics
 app.include_router(vendors_router.router)  # Vendor management and aliases
 app.include_router(duplicates_router.router)  # Duplicate invoice detection
+app.include_router(similarity_router.router)  # AI-powered similarity search
+app.include_router(size_settings_router.router)  # Size units and containers management
 
 
 # ============================================================================
@@ -1847,17 +1851,26 @@ async def duplicates_page(request: Request):
 
 
 @app.get("/vendor-items", response_class=HTMLResponse)
-async def vendor_items_page(request: Request, db: Session = Depends(get_db)):
+async def vendor_items_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    master_item: Optional[int] = Query(None, description="Filter by master item ID")
+):
     """Hub Vendor Items management page - Hub is source of truth"""
     from sqlalchemy.orm import joinedload
     from integration_hub.models.hub_vendor_item import VendorItemStatus
 
-    # Fetch all vendor items with vendor relationship
-    vendor_items = db.query(HubVendorItem).options(
-        joinedload(HubVendorItem.vendor)
-    ).order_by(
-        HubVendorItem.vendor_product_name
-    ).all()
+    # Build query with optional master item filter
+    query = db.query(HubVendorItem).options(
+        joinedload(HubVendorItem.vendor),
+        joinedload(HubVendorItem.size_unit),
+        joinedload(HubVendorItem.container)
+    )
+
+    if master_item:
+        query = query.filter(HubVendorItem.inventory_master_item_id == master_item)
+
+    vendor_items = query.order_by(HubVendorItem.vendor_product_name).all()
 
     # Get active vendors for filters and forms
     vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
@@ -1916,6 +1929,14 @@ async def vendor_items_page(request: Request, db: Session = Depends(get_db)):
         "vendors": len(vendors)
     }
 
+    # Get filtered master item name if filtering
+    filter_master_item_name = None
+    if master_item:
+        for mi in master_items:
+            if mi["id"] == master_item:
+                filter_master_item_name = mi["name"]
+                break
+
     return templates.TemplateResponse("hub_vendor_items.html", {
         "request": request,
         "vendor_items": vendor_items,
@@ -1924,7 +1945,90 @@ async def vendor_items_page(request: Request, db: Session = Depends(get_db)):
         "categories": categories,
         "units": units,
         "master_items": master_items,
-        "stats": stats
+        "stats": stats,
+        "filter_master_item_id": master_item,
+        "filter_master_item_name": filter_master_item_name
+    })
+
+
+@app.get("/vendor-item-detail", response_class=HTMLResponse)
+async def vendor_item_detail_page(request: Request, id: int = Query(..., description="Vendor Item ID"), db: Session = Depends(get_db)):
+    """
+    Vendor Item detail page - comprehensive view of a single vendor item.
+
+    Shows:
+    - Product details (vendor, SKU, name, description)
+    - Pricing information (last price, cost per unit)
+    - Master item mapping
+    - Price history from invoices
+    - AI similar items
+    - Review status and sync info
+    """
+    # Get vendors for edit modal
+    vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
+
+    # Get distinct categories
+    categories_query = db.query(HubVendorItem.category).filter(
+        HubVendorItem.category.isnot(None),
+        HubVendorItem.category != ''
+    ).distinct().order_by(HubVendorItem.category).all()
+    categories = [c[0] for c in categories_query]
+
+    # Get units of measure (legacy, for compatibility)
+    from integration_hub.models.unit_of_measure import UnitOfMeasure
+    units_query = db.query(UnitOfMeasure).filter(UnitOfMeasure.is_active == True).order_by(UnitOfMeasure.name).all()
+    units = [{"id": u.id, "name": u.name, "abbreviation": u.abbreviation or ""} for u in units_query]
+
+    # Fallback if no units
+    if not units:
+        units = [
+            {"id": 1, "name": "Each", "abbreviation": "EA"},
+            {"id": 2, "name": "Case", "abbreviation": "CS"},
+            {"id": 3, "name": "Pound", "abbreviation": "LB"},
+            {"id": 4, "name": "Gallon", "abbreviation": "GAL"},
+        ]
+
+    # Get Backbar-style size units
+    from integration_hub.models.size_unit import SizeUnit
+    size_units_query = db.query(SizeUnit).filter(SizeUnit.is_active == True).order_by(SizeUnit.measure_type, SizeUnit.sort_order).all()
+    size_units = [{"id": u.id, "name": u.name, "symbol": u.symbol, "measure_type": u.measure_type} for u in size_units_query]
+
+    # Get containers
+    from integration_hub.models.container import Container
+    containers_query = db.query(Container).filter(Container.is_active == True).order_by(Container.sort_order).all()
+    containers = [{"id": c.id, "name": c.name} for c in containers_query]
+
+    # Fetch locations and master items from Inventory database
+    from sqlalchemy import create_engine, text as sql_text
+    inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
+                                 'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+    locations = []
+    master_items = []
+    try:
+        inv_engine = create_engine(inventory_db_url)
+        with inv_engine.connect() as conn:
+            results = conn.execute(
+                sql_text("SELECT id, name FROM locations WHERE is_active = true ORDER BY name")
+            ).fetchall()
+            locations = [{"id": row[0], "name": row[1]} for row in results]
+
+            items_results = conn.execute(
+                sql_text("SELECT id, name, category FROM master_items WHERE is_active = true ORDER BY name LIMIT 2000")
+            ).fetchall()
+            master_items = [{"id": row[0], "name": row[1], "category": row[2]} for row in items_results]
+    except Exception as e:
+        logger.warning(f"Could not fetch data from Inventory database: {e}")
+
+    return templates.TemplateResponse("vendor_item_detail.html", {
+        "request": request,
+        "item_id": id,
+        "vendors": vendors,
+        "categories": categories,
+        "units": units,
+        "size_units": size_units,
+        "containers": containers,
+        "locations": locations,
+        "master_items": master_items
     })
 
 
@@ -1941,6 +2045,14 @@ def settings_page(request: Request):
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
     return response
+
+
+@app.get("/settings/size", response_class=HTMLResponse)
+def size_settings_page(request: Request):
+    """Size units and containers settings page (Backbar-style sizing)"""
+    return templates.TemplateResponse("size_settings.html", {
+        "request": request
+    })
 
 
 # ============================================================================

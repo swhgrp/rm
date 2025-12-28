@@ -121,6 +121,11 @@
             <i class="bi bi-arrow-left-right"></i> Transfers
         </button>
     </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="cross-location-tab" data-bs-toggle="tab" data-bs-target="#crossLocationReport" type="button" role="tab">
+            <i class="bi bi-geo-alt"></i> Cross-Location
+        </button>
+    </li>
 </ul>
 
 <!-- Filters -->
@@ -343,11 +348,183 @@
         </div>
     </div>
 
+    <!-- Cross-Location Reports Tab -->
+    <div class="tab-pane fade" id="crossLocationReport" role="tabpanel">
+        <!-- Sub-tabs for cross-location reports -->
+        <ul class="nav nav-pills mb-3" id="crossLocationSubTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="top-variance-subtab" data-bs-toggle="pill" data-bs-target="#topVariance" type="button" role="tab">
+                    <i class="bi bi-graph-up-arrow"></i> Top Variance
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="best-price-subtab" data-bs-toggle="pill" data-bs-target="#bestPrice" type="button" role="tab">
+                    <i class="bi bi-currency-dollar"></i> Best Price
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="cost-trend-subtab" data-bs-toggle="pill" data-bs-target="#costTrend" type="button" role="tab">
+                    <i class="bi bi-graph-up"></i> Cost Trend
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="location-summary-subtab" data-bs-toggle="pill" data-bs-target="#locationSummary" type="button" role="tab">
+                    <i class="bi bi-building"></i> Location Summary
+                </button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="crossLocationSubContent">
+            <!-- Top Variance Items -->
+            <div class="tab-pane fade show active" id="topVariance" role="tabpanel">
+                <div class="card">
+                    <div class="card-header" style="background-color: #2c3e50; color: white;">
+                        <h5 class="mb-0">Top Variance Items</h5>
+                        <small style="color: #ecf0f1;">Items with highest price differences across locations</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <label class="form-label">Min Variance %</label>
+                                <input type="number" class="form-control form-control-sm" id="tvMinVariance" value="10" min="0" max="100">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Category</label>
+                                <select class="form-select form-select-sm" id="tvCategory">
+                                    <option value="">All Categories</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Limit</label>
+                                <input type="number" class="form-control form-control-sm" id="tvLimit" value="20" min="1" max="100">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">&nbsp;</label>
+                                <button class="btn btn-primary btn-sm w-100" onclick="loadTopVariance()">
+                                    <i class="bi bi-search"></i> Load Report
+                                </button>
+                            </div>
+                        </div>
+                        <div id="topVarianceContent">
+                            <p class="text-muted">Click Load Report to view items with price variance</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Best Price by Location -->
+            <div class="tab-pane fade" id="bestPrice" role="tabpanel">
+                <div class="card">
+                    <div class="card-header" style="background-color: #2c3e50; color: white;">
+                        <h5 class="mb-0">Best Price by Location</h5>
+                        <small style="color: #ecf0f1;">Which location gets the best price for each item</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Category</label>
+                                <select class="form-select form-select-sm" id="bpCategory">
+                                    <option value="">All Categories</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Limit</label>
+                                <input type="number" class="form-control form-control-sm" id="bpLimit" value="50" min="1" max="200">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">&nbsp;</label>
+                                <button class="btn btn-primary btn-sm w-100" onclick="loadBestPrice()">
+                                    <i class="bi bi-search"></i> Load Report
+                                </button>
+                            </div>
+                        </div>
+                        <div id="bestPriceContent">
+                            <p class="text-muted">Click Load Report to view best price by location</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cost Trend -->
+            <div class="tab-pane fade" id="costTrend" role="tabpanel">
+                <div class="card">
+                    <div class="card-header" style="background-color: #2c3e50; color: white;">
+                        <h5 class="mb-0">Cost Trend Comparison</h5>
+                        <small style="color: #ecf0f1;">Historical cost data with Chart.js visualization</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Select Item</label>
+                                <select class="form-select form-select-sm" id="ctItemSelect">
+                                    <option value="">-- Search items below --</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Days of History</label>
+                                <input type="number" class="form-control form-control-sm" id="ctDays" value="90" min="7" max="365">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Search Items</label>
+                                <input type="text" class="form-control form-control-sm" id="ctItemSearch" placeholder="Type to search...">
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label">&nbsp;</label>
+                                <button class="btn btn-primary btn-sm w-100" onclick="loadCostTrend()">
+                                    <i class="bi bi-graph-up"></i> Load
+                                </button>
+                            </div>
+                        </div>
+                        <div id="costTrendContent">
+                            <p class="text-muted">Select an item to view cost trend across locations</p>
+                        </div>
+                        <div class="mt-3">
+                            <canvas id="costTrendChart" style="display: none; max-height: 350px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Location Cost Summary -->
+            <div class="tab-pane fade" id="locationSummary" role="tabpanel">
+                <div class="card">
+                    <div class="card-header" style="background-color: #2c3e50; color: white;">
+                        <h5 class="mb-0">Location Cost Summary</h5>
+                        <small style="color: #ecf0f1;">Overall cost positioning per location</small>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Category</label>
+                                <select class="form-select form-select-sm" id="lsCategory">
+                                    <option value="">All Categories</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">&nbsp;</label>
+                                <button class="btn btn-primary btn-sm" onclick="loadLocationSummary()">
+                                    <i class="bi bi-search"></i> Load Report
+                                </button>
+                            </div>
+                        </div>
+                        <div id="locationSummaryContent">
+                            <p class="text-muted">Click Load Report to view location cost summary</p>
+                        </div>
+                        <div class="mt-3">
+                            <canvas id="locationSummaryChart" style="display: none; max-height: 300px;"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
 let locations = [];
 let storageAreas = [];
@@ -355,6 +532,9 @@ let countSessions = [];
 let currentReportData = null;
 let usageReportData = null;
 let costReportData = null;
+let costTrendChart = null;
+let locationSummaryChart = null;
+let masterItems = [];
 
 async function init() {
     try {
@@ -1311,5 +1491,466 @@ function populateTransferLocationFilters() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// ========================================
+// Cross-Location Reports
+// ========================================
+
+async function loadCrossLocationData() {
+    // Load categories for filter dropdowns
+    try {
+        const categories = await apiRequest('api/categories/');
+        if (categories) {
+            const selects = ['tvCategory', 'bpCategory', 'lsCategory'];
+            selects.forEach(id => {
+                const select = document.getElementById(id);
+                if (select) {
+                    categories.forEach(cat => {
+                        select.innerHTML += `<option value="${cat.name}">${cat.name}</option>`;
+                    });
+                }
+            });
+        }
+
+        // Load master items for cost trend search
+        masterItems = await apiRequest('api/master-items/?limit=1000') || [];
+
+        // Setup item search
+        const searchInput = document.getElementById('ctItemSearch');
+        const itemSelect = document.getElementById('ctItemSelect');
+
+        if (searchInput && itemSelect) {
+            searchInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase();
+                itemSelect.innerHTML = '<option value="">-- Select an item --</option>';
+
+                if (query.length >= 2) {
+                    const filtered = masterItems.filter(item =>
+                        item.name.toLowerCase().includes(query)
+                    ).slice(0, 50);
+
+                    filtered.forEach(item => {
+                        itemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+                    });
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error loading cross-location data:', error);
+    }
+}
+
+// Top Variance Report
+async function loadTopVariance() {
+    const minVariance = document.getElementById('tvMinVariance').value || 10;
+    const category = document.getElementById('tvCategory').value;
+    const limit = document.getElementById('tvLimit').value || 20;
+
+    let url = `api/reports/top-variance?min_variance=${minVariance}&limit=${limit}`;
+    if (category) url += `&category=${encodeURIComponent(category)}`;
+
+    const container = document.getElementById('topVarianceContent');
+    container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+
+    try {
+        const data = await apiRequest(url);
+
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p class="text-muted">No items found with price variance above the threshold</p>';
+            return;
+        }
+
+        let html = `
+            <div class="alert alert-info mb-3">
+                <strong>${data.length}</strong> items with variance ≥ ${minVariance}%
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm table-hover" style="font-size: 12px;">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Item</th>
+                            <th>Category</th>
+                            <th>Unit</th>
+                            <th>Min Cost</th>
+                            <th>Min Location</th>
+                            <th>Max Cost</th>
+                            <th>Max Location</th>
+                            <th>Avg Cost</th>
+                            <th>Variance %</th>
+                            <th>Locations</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        data.forEach(item => {
+            const varianceClass = item.variance_pct > 25 ? 'text-danger fw-bold' : item.variance_pct > 15 ? 'text-warning' : '';
+            html += `
+                <tr>
+                    <td><strong>${item.item_name}</strong></td>
+                    <td>${item.category || '-'}</td>
+                    <td>${item.unit}</td>
+                    <td class="text-success">$${item.min_cost.toFixed(2)}</td>
+                    <td>${item.min_cost_location}</td>
+                    <td class="text-danger">$${item.max_cost.toFixed(2)}</td>
+                    <td>${item.max_cost_location}</td>
+                    <td>$${item.avg_cost.toFixed(2)}</td>
+                    <td class="${varianceClass}">${item.variance_pct.toFixed(1)}%</td>
+                    <td>${item.location_count}</td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading top variance:', error);
+        container.innerHTML = '<div class="alert alert-danger">Failed to load top variance report</div>';
+    }
+}
+
+// Best Price by Location Report
+async function loadBestPrice() {
+    const category = document.getElementById('bpCategory').value;
+    const limit = document.getElementById('bpLimit').value || 50;
+
+    let url = `api/reports/best-price-by-location?limit=${limit}`;
+    if (category) url += `&category=${encodeURIComponent(category)}`;
+
+    const container = document.getElementById('bestPriceContent');
+    container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+
+    try {
+        const data = await apiRequest(url);
+
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p class="text-muted">No best price data found</p>';
+            return;
+        }
+
+        // Group by best location to show count
+        const locationWins = {};
+        data.forEach(item => {
+            const loc = item.best_location_name;
+            locationWins[loc] = (locationWins[loc] || 0) + 1;
+        });
+
+        let summaryHtml = '<div class="row mb-3">';
+        Object.entries(locationWins).sort((a, b) => b[1] - a[1]).forEach(([loc, count]) => {
+            summaryHtml += `
+                <div class="col-md-2 mb-2">
+                    <div class="card bg-light">
+                        <div class="card-body py-2 text-center">
+                            <h5 class="mb-0">${count}</h5>
+                            <small>${loc}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        summaryHtml += '</div>';
+
+        let html = summaryHtml + `
+            <div class="table-responsive">
+                <table class="table table-sm table-hover" style="font-size: 12px;">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Item</th>
+                            <th>Category</th>
+                            <th>Unit</th>
+                            <th>Best Price</th>
+                            <th>Best Location</th>
+                            <th>Worst Price</th>
+                            <th>Worst Location</th>
+                            <th>Potential Savings</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        data.forEach(item => {
+            const savings = item.worst_cost - item.best_cost;
+            html += `
+                <tr>
+                    <td><strong>${item.item_name}</strong></td>
+                    <td>${item.category || '-'}</td>
+                    <td>${item.unit}</td>
+                    <td class="text-success fw-bold">$${item.best_cost.toFixed(2)}</td>
+                    <td>${item.best_location_name}</td>
+                    <td class="text-danger">$${item.worst_cost.toFixed(2)}</td>
+                    <td>${item.worst_location_name}</td>
+                    <td class="text-info">$${savings.toFixed(2)}/unit</td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading best price:', error);
+        container.innerHTML = '<div class="alert alert-danger">Failed to load best price report</div>';
+    }
+}
+
+// Cost Trend Report with Chart.js
+async function loadCostTrend() {
+    const itemId = document.getElementById('ctItemSelect').value;
+    const days = document.getElementById('ctDays').value || 90;
+
+    if (!itemId) {
+        showAlert('Please select an item first', 'warning');
+        return;
+    }
+
+    const container = document.getElementById('costTrendContent');
+    const chartCanvas = document.getElementById('costTrendChart');
+    container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+
+    try {
+        const data = await apiRequest(`api/reports/cost-trend/${itemId}?days=${days}`);
+
+        if (!data || !data.locations || data.locations.length === 0) {
+            container.innerHTML = '<p class="text-muted">No cost trend data found for this item</p>';
+            chartCanvas.style.display = 'none';
+            return;
+        }
+
+        // Display item info
+        container.innerHTML = `
+            <div class="alert alert-info mb-3">
+                <strong>${data.item_name}</strong>
+                <span class="ms-3">Unit: ${data.unit}</span>
+                <span class="ms-3">Category: ${data.category || '-'}</span>
+                <span class="ms-3">Period: ${days} days</span>
+            </div>
+        `;
+
+        // Prepare chart data
+        const chartData = prepareChartData(data.locations);
+
+        // Destroy existing chart
+        if (costTrendChart) {
+            costTrendChart.destroy();
+        }
+
+        chartCanvas.style.display = 'block';
+        const ctx = chartCanvas.getContext('2d');
+
+        costTrendChart = new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `Cost Trend: ${data.item_name}`
+                    },
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Date'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Cost ($)'
+                        },
+                        beginAtZero: false
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error loading cost trend:', error);
+        container.innerHTML = '<div class="alert alert-danger">Failed to load cost trend report</div>';
+        chartCanvas.style.display = 'none';
+    }
+}
+
+function prepareChartData(locations) {
+    const colors = [
+        'rgb(75, 192, 192)',
+        'rgb(255, 99, 132)',
+        'rgb(54, 162, 235)',
+        'rgb(255, 205, 86)',
+        'rgb(153, 102, 255)',
+        'rgb(255, 159, 64)',
+        'rgb(201, 203, 207)'
+    ];
+
+    // Collect all unique dates
+    const allDates = new Set();
+    locations.forEach(loc => {
+        loc.cost_history.forEach(point => {
+            allDates.add(point.date);
+        });
+    });
+
+    const sortedDates = Array.from(allDates).sort();
+
+    const datasets = locations.map((loc, idx) => {
+        const dateToValue = {};
+        loc.cost_history.forEach(point => {
+            dateToValue[point.date] = point.cost;
+        });
+
+        return {
+            label: loc.location_name,
+            data: sortedDates.map(date => dateToValue[date] || null),
+            borderColor: colors[idx % colors.length],
+            backgroundColor: colors[idx % colors.length],
+            tension: 0.1,
+            fill: false,
+            spanGaps: true
+        };
+    });
+
+    return {
+        labels: sortedDates.map(d => {
+            const date = new Date(d);
+            return `${date.getMonth() + 1}/${date.getDate()}`;
+        }),
+        datasets: datasets
+    };
+}
+
+// Location Cost Summary Report
+async function loadLocationSummary() {
+    const category = document.getElementById('lsCategory').value;
+
+    let url = 'api/reports/location-cost-summary';
+    if (category) url += `?category=${encodeURIComponent(category)}`;
+
+    const container = document.getElementById('locationSummaryContent');
+    const chartCanvas = document.getElementById('locationSummaryChart');
+    container.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+
+    try {
+        const data = await apiRequest(url);
+
+        if (!data || data.length === 0) {
+            container.innerHTML = '<p class="text-muted">No location summary data found</p>';
+            chartCanvas.style.display = 'none';
+            return;
+        }
+
+        let html = `
+            <div class="table-responsive">
+                <table class="table table-sm table-hover" style="font-size: 12px;">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Location</th>
+                            <th>Items Tracked</th>
+                            <th>Avg Cost</th>
+                            <th>vs Overall Avg</th>
+                            <th>Best Price Count</th>
+                            <th>Worst Price Count</th>
+                            <th>Cost Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        `;
+
+        // Calculate overall avg
+        const overallAvg = data.reduce((sum, l) => sum + l.avg_cost, 0) / data.length;
+
+        data.forEach(loc => {
+            const diff = loc.avg_cost - overallAvg;
+            const diffPct = (diff / overallAvg * 100).toFixed(1);
+            const diffClass = diff < 0 ? 'text-success' : diff > 0 ? 'text-danger' : '';
+            const scoreClass = loc.cost_score >= 70 ? 'text-success' : loc.cost_score >= 50 ? 'text-warning' : 'text-danger';
+
+            html += `
+                <tr>
+                    <td><strong>${loc.location_name}</strong></td>
+                    <td>${loc.item_count}</td>
+                    <td>$${loc.avg_cost.toFixed(2)}</td>
+                    <td class="${diffClass}">${diff >= 0 ? '+' : ''}${diffPct}%</td>
+                    <td class="text-success">${loc.best_price_count}</td>
+                    <td class="text-danger">${loc.worst_price_count}</td>
+                    <td class="${scoreClass} fw-bold">${loc.cost_score.toFixed(0)}</td>
+                </tr>
+            `;
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+
+        // Render bar chart
+        if (locationSummaryChart) {
+            locationSummaryChart.destroy();
+        }
+
+        chartCanvas.style.display = 'block';
+        const ctx = chartCanvas.getContext('2d');
+
+        locationSummaryChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.map(l => l.location_name),
+                datasets: [
+                    {
+                        label: 'Best Price Count',
+                        data: data.map(l => l.best_price_count),
+                        backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                        borderColor: 'rgb(75, 192, 192)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Worst Price Count',
+                        data: data.map(l => l.worst_price_count),
+                        backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                        borderColor: 'rgb(255, 99, 132)',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Best vs Worst Prices by Location'
+                    },
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Item Count'
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error loading location summary:', error);
+        container.innerHTML = '<div class="alert alert-danger">Failed to load location summary report</div>';
+        chartCanvas.style.display = 'none';
+    }
+}
+
+// Initialize cross-location data when tab is shown
+document.addEventListener('DOMContentLoaded', function() {
+    const crossLocationTab = document.getElementById('cross-location-tab');
+    if (crossLocationTab) {
+        crossLocationTab.addEventListener('shown.bs.tab', function() {
+            loadCrossLocationData();
+        });
+    }
+});
 </script>
 {% endblock %}

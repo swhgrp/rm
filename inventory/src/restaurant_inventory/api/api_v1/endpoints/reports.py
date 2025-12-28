@@ -1,7 +1,7 @@
 """
 Reports API endpoints
 """
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, desc
 from typing import List, Optional
@@ -9,7 +9,7 @@ from datetime import datetime, date
 from pydantic import BaseModel
 from decimal import Decimal
 
-from restaurant_inventory.core.deps import get_db, get_current_user, filter_by_user_locations
+from restaurant_inventory.core.deps import get_db, get_current_user, filter_by_user_locations, get_user_location_ids
 from restaurant_inventory.models.user import User
 from restaurant_inventory.models.count_session import CountSession, CountSessionItem, CountStatus
 from restaurant_inventory.models.inventory import Inventory
@@ -17,9 +17,12 @@ from restaurant_inventory.models.vendor import Vendor
 from restaurant_inventory.models.transfer import Transfer
 from restaurant_inventory.models.item import MasterItem
 from restaurant_inventory.models.location import Location
+from restaurant_inventory.models.master_item_location_cost import MasterItemLocationCost, MasterItemLocationCostHistory
 
 # NOTE (Dec 25, 2025): Invoice and InvoiceItem removed - Hub is source of truth
 # Invoice-based reports now disabled - use Hub for invoice reports
+
+# NOTE (Dec 27, 2025): New cross-location cost reports added using MasterItemLocationCost
 
 router = APIRouter()
 
@@ -1061,3 +1064,460 @@ async def get_slow_moving_inventory(
     slow_items.sort(key=lambda x: x.days_since_last_movement, reverse=True)
 
     return slow_items
+
+
+# ==================== CROSS-LOCATION COST REPORTS (Dec 27, 2025) ====================
+
+class TopVarianceItem(BaseModel):
+    """Item with highest price variance across locations"""
+    item_id: int
+    item_name: str
+    category: Optional[str]
+    unit: str
+    min_cost: float
+    min_cost_location: str
+    min_cost_location_id: int
+    max_cost: float
+    max_cost_location: str
+    max_cost_location_id: int
+    avg_cost: float
+    variance_pct: float  # (max - min) / avg * 100
+    location_count: int
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/top-variance", response_model=List[TopVarianceItem])
+async def get_top_variance_report(
+    limit: int = Query(20, description="Number of items to return"),
+    min_variance: float = Query(10.0, description="Minimum variance % to include"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Top Variance Items Report (Cross-Location)
+
+    Shows items with the largest price spread across locations the user has access to.
+    Helps identify where some locations are paying significantly more than others.
+
+    NOTE: Results filtered to user's assigned locations only.
+    """
+    from sqlalchemy import case
+
+    # Get user's accessible location IDs
+    user_location_ids = get_user_location_ids(current_user, db)
+    if not user_location_ids:
+        return []
+
+    # Query for items with costs at multiple locations
+    # Group by master_item_id and calculate min, max, avg
+    subquery = db.query(
+        MasterItemLocationCost.master_item_id,
+        func.min(MasterItemLocationCost.current_weighted_avg_cost).label('min_cost'),
+        func.max(MasterItemLocationCost.current_weighted_avg_cost).label('max_cost'),
+        func.avg(MasterItemLocationCost.current_weighted_avg_cost).label('avg_cost'),
+        func.count(MasterItemLocationCost.id).label('location_count')
+    ).filter(
+        MasterItemLocationCost.location_id.in_(user_location_ids),
+        MasterItemLocationCost.current_weighted_avg_cost.isnot(None),
+        MasterItemLocationCost.current_weighted_avg_cost > 0
+    ).group_by(MasterItemLocationCost.master_item_id).having(
+        func.count(MasterItemLocationCost.id) >= 2  # At least 2 locations
+    ).subquery()
+
+    # Join with master items and calculate variance
+    results = db.query(
+        MasterItem.id.label('item_id'),
+        MasterItem.name.label('item_name'),
+        MasterItem.category,
+        MasterItem.unit_of_measure.label('unit'),
+        subquery.c.min_cost,
+        subquery.c.max_cost,
+        subquery.c.avg_cost,
+        subquery.c.location_count
+    ).join(
+        subquery, MasterItem.id == subquery.c.master_item_id
+    ).filter(
+        MasterItem.is_active == True
+    )
+
+    if category:
+        results = results.filter(MasterItem.category == category)
+
+    results = results.all()
+
+    # Build response with location names
+    variance_items = []
+    for r in results:
+        min_cost = float(r.min_cost or 0)
+        max_cost = float(r.max_cost or 0)
+        avg_cost = float(r.avg_cost or 0)
+
+        if avg_cost > 0:
+            variance_pct = ((max_cost - min_cost) / avg_cost) * 100
+        else:
+            variance_pct = 0
+
+        # Skip items below minimum variance threshold
+        if variance_pct < min_variance:
+            continue
+
+        # Find which locations have min and max costs
+        min_loc = db.query(
+            MasterItemLocationCost.location_id,
+            Location.name.label('location_name')
+        ).join(
+            Location, MasterItemLocationCost.location_id == Location.id
+        ).filter(
+            MasterItemLocationCost.master_item_id == r.item_id,
+            MasterItemLocationCost.current_weighted_avg_cost == r.min_cost,
+            MasterItemLocationCost.location_id.in_(user_location_ids)
+        ).first()
+
+        max_loc = db.query(
+            MasterItemLocationCost.location_id,
+            Location.name.label('location_name')
+        ).join(
+            Location, MasterItemLocationCost.location_id == Location.id
+        ).filter(
+            MasterItemLocationCost.master_item_id == r.item_id,
+            MasterItemLocationCost.current_weighted_avg_cost == r.max_cost,
+            MasterItemLocationCost.location_id.in_(user_location_ids)
+        ).first()
+
+        variance_items.append(TopVarianceItem(
+            item_id=r.item_id,
+            item_name=r.item_name,
+            category=r.category,
+            unit=r.unit or '',
+            min_cost=round(min_cost, 4),
+            min_cost_location=min_loc.location_name if min_loc else 'Unknown',
+            min_cost_location_id=min_loc.location_id if min_loc else 0,
+            max_cost=round(max_cost, 4),
+            max_cost_location=max_loc.location_name if max_loc else 'Unknown',
+            max_cost_location_id=max_loc.location_id if max_loc else 0,
+            avg_cost=round(avg_cost, 4),
+            variance_pct=round(variance_pct, 1),
+            location_count=r.location_count
+        ))
+
+    # Sort by variance (highest first) and limit
+    variance_items.sort(key=lambda x: x.variance_pct, reverse=True)
+    return variance_items[:limit]
+
+
+class BestPriceItem(BaseModel):
+    """Item with best price location identified"""
+    item_id: int
+    item_name: str
+    category: Optional[str]
+    unit: str
+    best_price: float
+    best_location: str
+    best_location_id: int
+    avg_price: float
+    savings_vs_avg: float  # How much cheaper than average (%)
+    location_prices: List[dict]  # [{location: str, location_id: int, price: float}]
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/best-price-by-location", response_model=List[BestPriceItem])
+async def get_best_price_by_location(
+    category: Optional[str] = Query(None, description="Filter by category"),
+    min_savings: float = Query(0.0, description="Minimum savings % vs avg to include"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Best Price by Location Report
+
+    For each item, shows which location is getting the best price.
+    Helps identify successful vendor negotiations that could be replicated.
+
+    NOTE: Results filtered to user's assigned locations only.
+    """
+    # Get user's accessible location IDs
+    user_location_ids = get_user_location_ids(current_user, db)
+    if not user_location_ids:
+        return []
+
+    # Get all items with costs at user's locations
+    items_query = db.query(MasterItem).filter(
+        MasterItem.is_active == True
+    )
+
+    if category:
+        items_query = items_query.filter(MasterItem.category == category)
+
+    items = items_query.all()
+
+    best_price_items = []
+
+    for item in items:
+        # Get all location costs for this item
+        costs = db.query(
+            MasterItemLocationCost.location_id,
+            MasterItemLocationCost.current_weighted_avg_cost,
+            Location.name.label('location_name')
+        ).join(
+            Location, MasterItemLocationCost.location_id == Location.id
+        ).filter(
+            MasterItemLocationCost.master_item_id == item.id,
+            MasterItemLocationCost.location_id.in_(user_location_ids),
+            MasterItemLocationCost.current_weighted_avg_cost.isnot(None),
+            MasterItemLocationCost.current_weighted_avg_cost > 0
+        ).all()
+
+        if len(costs) < 1:
+            continue
+
+        # Calculate avg and find best
+        prices = [float(c.current_weighted_avg_cost) for c in costs]
+        avg_price = sum(prices) / len(prices)
+        best_cost = min(costs, key=lambda x: float(x.current_weighted_avg_cost))
+        best_price = float(best_cost.current_weighted_avg_cost)
+
+        # Calculate savings
+        if avg_price > 0:
+            savings_pct = ((avg_price - best_price) / avg_price) * 100
+        else:
+            savings_pct = 0
+
+        # Skip if below minimum savings
+        if savings_pct < min_savings:
+            continue
+
+        # Build location prices list
+        location_prices = [
+            {
+                'location': c.location_name,
+                'location_id': c.location_id,
+                'price': round(float(c.current_weighted_avg_cost), 4)
+            }
+            for c in sorted(costs, key=lambda x: float(x.current_weighted_avg_cost))
+        ]
+
+        best_price_items.append(BestPriceItem(
+            item_id=item.id,
+            item_name=item.name,
+            category=item.category,
+            unit=item.unit_of_measure or '',
+            best_price=round(best_price, 4),
+            best_location=best_cost.location_name,
+            best_location_id=best_cost.location_id,
+            avg_price=round(avg_price, 4),
+            savings_vs_avg=round(savings_pct, 1),
+            location_prices=location_prices
+        ))
+
+    # Sort by savings (highest first)
+    best_price_items.sort(key=lambda x: x.savings_vs_avg, reverse=True)
+    return best_price_items
+
+
+class CostTrendPoint(BaseModel):
+    """Single point in cost trend"""
+    date: datetime
+    cost: float
+    event_type: str
+    vendor_id: Optional[int]
+    invoice_id: Optional[int]
+
+    class Config:
+        from_attributes = True
+
+
+class CostTrendItem(BaseModel):
+    """Cost trend for an item at a location"""
+    location_id: int
+    location_name: str
+    current_cost: float
+    trend_data: List[CostTrendPoint]
+
+    class Config:
+        from_attributes = True
+
+
+class CostTrendReport(BaseModel):
+    """Full cost trend report for an item"""
+    item_id: int
+    item_name: str
+    category: Optional[str]
+    unit: str
+    locations: List[CostTrendItem]
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/cost-trend/{item_id}", response_model=CostTrendReport)
+async def get_cost_trend(
+    item_id: int,
+    days: int = Query(90, description="Number of days of history"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Cost Trend Comparison Report
+
+    Line chart data showing cost over time for a selected item across all locations
+    the user has access to. Visualizes price divergence and convergence patterns.
+
+    NOTE: Results filtered to user's assigned locations only.
+    """
+    from datetime import timedelta
+
+    # Get user's accessible location IDs
+    user_location_ids = get_user_location_ids(current_user, db)
+    if not user_location_ids:
+        raise HTTPException(status_code=403, detail="No location access")
+
+    # Get the item
+    item = db.query(MasterItem).filter(MasterItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    # Calculate date cutoff
+    cutoff_date = datetime.utcnow() - timedelta(days=days)
+
+    # Get cost data for each location
+    location_trends = []
+
+    for loc_id in user_location_ids:
+        # Get location name and current cost
+        location = db.query(Location).filter(Location.id == loc_id).first()
+        if not location:
+            continue
+
+        current_cost_record = db.query(MasterItemLocationCost).filter(
+            MasterItemLocationCost.master_item_id == item_id,
+            MasterItemLocationCost.location_id == loc_id
+        ).first()
+
+        current_cost = float(current_cost_record.current_weighted_avg_cost or 0) if current_cost_record else 0
+
+        # Get historical data
+        history = db.query(MasterItemLocationCostHistory).filter(
+            MasterItemLocationCostHistory.master_item_id == item_id,
+            MasterItemLocationCostHistory.location_id == loc_id,
+            MasterItemLocationCostHistory.created_at >= cutoff_date
+        ).order_by(MasterItemLocationCostHistory.created_at).all()
+
+        trend_data = [
+            CostTrendPoint(
+                date=h.created_at,
+                cost=float(h.new_cost or 0),
+                event_type=h.event_type,
+                vendor_id=h.vendor_id,
+                invoice_id=h.invoice_id
+            )
+            for h in history
+        ]
+
+        location_trends.append(CostTrendItem(
+            location_id=loc_id,
+            location_name=location.name,
+            current_cost=current_cost,
+            trend_data=trend_data
+        ))
+
+    return CostTrendReport(
+        item_id=item.id,
+        item_name=item.name,
+        category=item.category,
+        unit=item.unit_of_measure or '',
+        locations=location_trends
+    )
+
+
+class LocationCostSummary(BaseModel):
+    """Summary of costs for a single location"""
+    location_id: int
+    location_name: str
+    total_items: int
+    total_value: float  # Sum of (qty * cost) for all items
+    avg_cost_vs_overall: float  # % above/below overall average
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/location-cost-summary", response_model=List[LocationCostSummary])
+async def get_location_cost_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Location Cost Summary Report
+
+    Shows total inventory value and average cost positioning for each location.
+    Helps identify which locations have higher overall costs.
+
+    NOTE: Results filtered to user's assigned locations only.
+    """
+    # Get user's accessible location IDs
+    user_location_ids = get_user_location_ids(current_user, db)
+    if not user_location_ids:
+        return []
+
+    # Calculate overall average cost per item
+    overall_avg = db.query(
+        MasterItemLocationCost.master_item_id,
+        func.avg(MasterItemLocationCost.current_weighted_avg_cost).label('avg_cost')
+    ).filter(
+        MasterItemLocationCost.current_weighted_avg_cost.isnot(None),
+        MasterItemLocationCost.current_weighted_avg_cost > 0
+    ).group_by(MasterItemLocationCost.master_item_id).subquery()
+
+    summaries = []
+
+    for loc_id in user_location_ids:
+        location = db.query(Location).filter(Location.id == loc_id).first()
+        if not location:
+            continue
+
+        # Get location costs
+        loc_costs = db.query(MasterItemLocationCost).filter(
+            MasterItemLocationCost.location_id == loc_id,
+            MasterItemLocationCost.current_weighted_avg_cost.isnot(None),
+            MasterItemLocationCost.current_weighted_avg_cost > 0
+        ).all()
+
+        if not loc_costs:
+            continue
+
+        total_items = len(loc_costs)
+        total_value = sum(
+            float(c.current_weighted_avg_cost or 0) * float(c.total_qty_on_hand or 0)
+            for c in loc_costs
+        )
+
+        # Calculate how this location compares to overall average
+        cost_ratios = []
+        for c in loc_costs:
+            # Get overall avg for this item
+            overall = db.query(overall_avg.c.avg_cost).filter(
+                overall_avg.c.master_item_id == c.master_item_id
+            ).scalar()
+
+            if overall and overall > 0:
+                ratio = (float(c.current_weighted_avg_cost) / float(overall)) - 1
+                cost_ratios.append(ratio * 100)  # As percentage
+
+        avg_vs_overall = sum(cost_ratios) / len(cost_ratios) if cost_ratios else 0
+
+        summaries.append(LocationCostSummary(
+            location_id=loc_id,
+            location_name=location.name,
+            total_items=total_items,
+            total_value=round(total_value, 2),
+            avg_cost_vs_overall=round(avg_vs_overall, 1)
+        ))
+
+    # Sort by avg_cost_vs_overall (lowest first = best)
+    summaries.sort(key=lambda x: x.avg_cost_vs_overall)
+    return summaries

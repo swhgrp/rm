@@ -6,7 +6,7 @@ The Integration Hub is an **invoice processing and general ledger (GL) mapping s
 
 ## Status: Production Ready (Location-Aware Costing) ✅
 
-**Last Updated:** December 27, 2025
+**Last Updated:** December 28, 2025
 
 **Note:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
@@ -27,6 +27,69 @@ The Inventory system owns:
 - **Locations** - Restaurant locations (source of truth for all systems)
 
 ## Recent Updates
+
+### December 28, 2025 - AI Semantic Search & Backbar-Style Sizing 🤖📦
+
+**NEW: AI-Powered Semantic Search for Vendor Items**
+- ✅ **OpenAI Embeddings** - Uses text-embedding-3-small model (1536 dimensions)
+- ✅ **Semantic similarity search** - Find similar items across vendors using natural language
+- ✅ **pgvector integration** - HNSW index for fast similarity lookups
+- ✅ **Confidence levels** - High (85%+), Medium (70%+), Low (55%+) matches
+- ✅ **Batch embedding generation** - Efficient bulk processing for existing items
+- ✅ **AI Search UI** - Search bar on vendor items page with real-time results
+- ✅ **Similar items finder** - Find duplicates or related items from any vendor item
+
+**API Endpoints (`/api/v1/similarity/`):**
+- `GET /stats` - Embedding coverage statistics
+- `POST /search` - Search by text description
+- `GET /item/{id}` - Find items similar to existing vendor item
+- `POST /generate` - Batch generate embeddings for items
+- `POST /item/{id}/generate` - Generate embedding for single item
+
+**NEW: Backbar-Style Sizing System**
+- ✅ **Size Units table** (`hub_size_units`) - L, ml, lb, oz, g, kg, etc. with conversion factors
+- ✅ **Containers table** (`hub_containers`) - bottle, can, bag, box, keg, etc.
+- ✅ **Structured sizing** - Size = [Quantity] [Unit] [Container] (e.g., "750 ml bottle", "25 lb bag")
+- ✅ **Units per case** - How many individual units in a purchasing case
+- ✅ **Case cost tracking** - Price per case from invoices
+- ✅ **Auto-calculated unit cost** - `case_cost / units_per_case`
+
+**Size Settings Management UI (`/settings/size`):**
+- ✅ **Size Units CRUD** - Manage measurement units with conversion factors
+- ✅ **Containers CRUD** - Manage container types
+- ✅ **Measure type grouping** - Volume, Weight, Count categories
+- ✅ **Sort order management** - Control dropdown display order
+
+**Vendor Item Detail Page (`/vendor-item-detail?id=X`):**
+- ✅ **Comprehensive view** - All product details, pricing, location costs
+- ✅ **Edit modal** - Update sizing, pricing, and mappings
+- ✅ **Price history** - Track cost changes over time (30/60/90/180/365 days)
+- ✅ **AI mapping suggestions** - Semantic search for master item matches
+- ✅ **Review workflow** - Approve/reject items needing review
+
+**Database Migrations (Dec 27):**
+- `20251227_0001_add_embedding_columns.py` - pgvector embedding support
+- `20251227_0002_add_unit_uom_columns.py` - Unit UOM fields
+- `20251227_0003_add_backbar_size_fields.py` - Size system tables and fields
+
+**New Models:**
+- `SizeUnit` - Size measurement units (ml, L, oz, lb, g, kg, each, pack, case, etc.)
+- `Container` - Container types (bottle, can, bag, box, keg, jug, pack, etc.)
+
+**HubVendorItem New Fields:**
+- `size_quantity` - Numeric size value (e.g., 750, 1, 25)
+- `size_unit_id` - FK to hub_size_units
+- `container_id` - FK to hub_containers
+- `units_per_case` - Units per purchasing case
+- `case_cost` - Cost per case
+- `embedding` - Vector(1536) for semantic search
+- `embedding_generated_at` - Embedding timestamp
+
+**Configuration Required:**
+- `OPENAI_API_KEY` - Required for embedding generation (optional - feature disabled without it)
+- PostgreSQL with pgvector extension - Required for similarity search
+
+---
 
 ### December 27, 2025 - Location-Aware Costing Architecture 🏗️
 
@@ -156,8 +219,11 @@ The Inventory system owns:
 ## Technology Stack
 
 - **Framework:** FastAPI (Python async)
-- **Database:** PostgreSQL 15
-- **AI/ML:** OpenAI GPT-4o Vision (invoice parsing) 🤖
+- **Database:** PostgreSQL 15 with pgvector extension
+- **AI/ML:**
+  - OpenAI GPT-4o Vision (invoice parsing) 🤖
+  - OpenAI text-embedding-3-small (semantic search) 🔍
+- **Vector Search:** pgvector with HNSW index (similarity search) 🎯
 - **PDF Processing:** PyPDF2, pdf2image 📄
 - **Background Jobs:** APScheduler (email monitoring) ⏰
 - **HTTP Client:** httpx (async)
@@ -235,6 +301,26 @@ The Inventory system owns:
 - ✅ Vendor management UI
 - ✅ Bootstrap 5 responsive design
 - ✅ Dark GitHub theme styling
+
+**AI-Powered Features (Dec 28, 2025):** 🤖
+- ✅ **Semantic search** - Find vendor items using natural language descriptions
+- ✅ **Similar item detection** - Find duplicates/related items across vendors
+- ✅ **AI mapping suggestions** - Semantic search for master item matching
+- ✅ **Embedding coverage stats** - Track which items have embeddings
+- ✅ **Batch embedding generation** - Efficiently process existing items
+- ✅ **Confidence scoring** - High/Medium/Low match indicators
+
+**Vendor Item Management (Dec 28, 2025):** 📦
+- ✅ **Vendor item detail page** - Comprehensive view with pricing, history, mappings
+- ✅ **Backbar-style sizing** - [Quantity] [Unit] [Container] format
+- ✅ **Size units management** - Volume, weight, count units with conversions
+- ✅ **Container types** - Bottle, can, bag, box, keg, etc.
+- ✅ **Units per case** - Track case quantities
+- ✅ **Case cost tracking** - Invoice-derived pricing
+- ✅ **Auto unit cost** - Calculated from case cost / units per case
+- ✅ **Price history** - Track cost changes over time (30/60/90/180/365 days)
+- ✅ **Review workflow** - Approve/reject items needing review
+- ✅ **Size settings UI** - Manage units and containers at `/settings/size`
 
 **Security & Authentication:**
 - ✅ Portal SSO integration
@@ -392,6 +478,15 @@ class Vendor:
 **GET /vendors**
 - Vendor management page
 
+**GET /vendor-items** 🆕
+- Vendor items list with AI search bar
+
+**GET /vendor-item-detail?id=X** 🆕
+- Comprehensive vendor item detail page
+
+**GET /settings/size** 🆕
+- Size units and containers management
+
 ### API Endpoints (JSON)
 
 **POST /api/items/{item_id}/map**
@@ -447,13 +542,93 @@ class Vendor:
 **GET /health**
 - Health check endpoint
 
+### AI Similarity Search API (Dec 28, 2025) 🤖
+
+**GET /api/v1/similarity/stats**
+- Get embedding coverage statistics
+- Returns: `{"total_items": 908, "with_embedding": 450, "coverage_percent": 49.6, "pgvector_available": true, "openai_configured": true}`
+
+**POST /api/v1/similarity/search**
+- Search vendor items by text description
+- Body: `{"text": "red wine", "limit": 15, "min_similarity": 0.35}`
+- Returns: `{"query": "red wine", "results": [{...similarity_results...}]}`
+
+**GET /api/v1/similarity/search?text=X&limit=15&min_similarity=0.35**
+- GET version of similarity search
+
+**GET /api/v1/similarity/item/{vendor_item_id}**
+- Find items similar to an existing vendor item
+- Query params: `?limit=10&min_similarity=0.4`
+- Returns: Similar items with confidence levels (high/medium/low)
+
+**POST /api/v1/similarity/generate**
+- Batch generate embeddings for items without them
+- Body: `{"batch_size": 100}`
+- Returns: `{"generated": 100, "failed": 0, "remaining": 358}`
+
+**POST /api/v1/similarity/item/{vendor_item_id}/generate**
+- Generate/regenerate embedding for single item
+- Returns: Updated vendor item with new embedding
+
+### Size Settings API (Dec 28, 2025) 📦
+
+**GET /api/v1/size-settings/units**
+- List all size units with measure type grouping
+
+**POST /api/v1/size-settings/units**
+- Create new size unit
+- Body: `{"name": "gallon", "symbol": "gal", "measure_type": "volume", "conversion_to_base": 3785.41}`
+
+**PATCH /api/v1/size-settings/units/{id}**
+- Update size unit
+
+**GET /api/v1/size-settings/containers**
+- List all container types
+
+**POST /api/v1/size-settings/containers**
+- Create new container type
+- Body: `{"name": "keg", "is_active": true, "sort_order": 10}`
+
+**PATCH /api/v1/size-settings/containers/{id}**
+- Update container type
+
+### Vendor Items API (Dec 28, 2025) 📦
+
+**GET /api/v1/vendor-items/**
+- List vendor items with pagination and filters
+
+**GET /api/v1/vendor-items/{id}**
+- Get vendor item details
+
+**PATCH /api/v1/vendor-items/{id}**
+- Update vendor item (sizing, pricing, mappings)
+- Supports new Backbar-style fields: `size_quantity`, `size_unit_id`, `container_id`, `units_per_case`, `case_cost`
+
+**GET /api/v1/vendor-items/lookup/size-units**
+- Get size units for dropdowns
+
+**GET /api/v1/vendor-items/lookup/containers**
+- Get containers for dropdowns
+
+**POST /api/v1/vendor-items/review/{id}/approve**
+- Approve vendor item (changes status to active)
+
+**POST /api/v1/vendor-items/review/{id}/reject**
+- Reject vendor item
+- Query params: `?reason=duplicate`
+
+**POST /api/v1/vendor-items/review/bulk-approve**
+- Bulk approve multiple items
+- Body: `{"item_ids": [1, 2, 3]}`
+
 ## Configuration
 
 ### Environment Variables (.env)
 
 ```bash
-# Database
+# Database (with pgvector extension for AI search)
 DATABASE_URL=postgresql://integration_user:password@integration-db:5432/integration_db
+INVENTORY_DATABASE_URL=postgresql://inventory_user:password@inventory-db:5432/inventory_db
 
 # Portal Integration
 PORTAL_URL=https://rm.swhgrp.com/portal
@@ -465,6 +640,20 @@ ACCOUNTING_URL=http://accounting-app:8001
 
 # Internal Service Authentication
 X_PORTAL_AUTH=your-internal-service-secret
+
+# AI Features (Dec 28, 2025)
+OPENAI_API_KEY=sk-...  # Required for AI semantic search (optional - feature disabled without it)
+```
+
+### Database Requirements
+
+The Integration Hub requires PostgreSQL with the **pgvector** extension for AI semantic search:
+
+```sql
+-- Enable pgvector extension (run as superuser)
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- The migration will create the embedding column and HNSW index automatically
 ```
 
 ## Installation & Setup
@@ -637,30 +826,51 @@ Hub creates journal entries for Accounting via POST request:
 integration-hub/
 ├── src/
 │   └── integration_hub/
-│       ├── models/              # SQLAlchemy models (4 files)
+│       ├── api/                 # API routers (NEW Dec 28)
+│       │   ├── similarity.py        # AI semantic search endpoints
+│       │   ├── size_settings.py     # Size units & containers CRUD
+│       │   ├── vendor_items.py      # Vendor item management
+│       │   └── reporting.py         # Report endpoints
+│       ├── models/              # SQLAlchemy models (8 files)
 │       │   ├── hub_invoice.py
 │       │   ├── hub_invoice_item.py
-│       │   ├── item_gl_mapping.py  (includes CategoryGLMapping)
-│       │   └── vendor.py
-│       ├── services/            # Business logic (5 files)
-│       │   ├── inventory_sender.py    (180 lines)
-│       │   ├── accounting_sender.py   (223 lines)
-│       │   ├── auto_send.py           (290 lines)
-│       │   ├── vendor_sync.py         (310 lines)
+│       │   ├── hub_vendor_item.py   # Vendor items with sizing & embeddings
+│       │   ├── item_gl_mapping.py   # (includes CategoryGLMapping)
+│       │   ├── vendor.py
+│       │   ├── size_unit.py         # Size units (NEW)
+│       │   ├── container.py         # Container types (NEW)
 │       │   └── __init__.py
-│       ├── templates/           # Jinja2 HTML templates (7 files)
+│       ├── services/            # Business logic (7 files)
+│       │   ├── inventory_sender.py
+│       │   ├── accounting_sender.py
+│       │   ├── auto_send.py
+│       │   ├── vendor_sync.py
+│       │   ├── embedding_service.py # OpenAI embeddings (NEW)
+│       │   ├── reporting.py
+│       │   └── __init__.py
+│       ├── templates/           # Jinja2 HTML templates (12 files)
 │       │   ├── base.html
 │       │   ├── dashboard.html
 │       │   ├── invoices.html
 │       │   ├── invoice_detail.html
 │       │   ├── unmapped_items.html
+│       │   ├── mapped_items.html
 │       │   ├── category_mappings.html
-│       │   └── vendors.html
+│       │   ├── vendors.html
+│       │   ├── hub_vendor_items.html    # Vendor items list with AI search
+│       │   ├── vendor_item_detail.html  # Vendor item detail page (NEW)
+│       │   ├── size_settings.html       # Size units & containers (NEW)
+│       │   └── settings.html
 │       ├── static/              # CSS, JS, images
-│       ├── database.py          # Database connection
-│       ├── main.py              # FastAPI application (511 lines)
+│       ├── db/
+│       │   └── database.py      # Database connection
+│       ├── main.py              # FastAPI application
 │       └── __init__.py
-├── migrations/                  # Alembic migrations
+├── alembic/                     # Alembic migrations
+│   └── versions/
+│       ├── 20251227_0001_add_embedding_columns.py     # pgvector
+│       ├── 20251227_0002_add_unit_uom_columns.py      # Unit UOM
+│       └── 20251227_0003_add_backbar_size_fields.py   # Sizing system
 ├── Dockerfile
 ├── requirements.txt
 ├── .env

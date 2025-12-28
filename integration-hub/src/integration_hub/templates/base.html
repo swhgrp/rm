@@ -413,13 +413,8 @@
             <li><a href="/hub/" class="{% if request.url.path == '/hub/' %}active{% endif %}"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
             <li><a href="/hub/invoices" class="{% if '/invoices' in request.url.path %}active{% endif %}"><i class="bi bi-file-earmark-text"></i> Invoices</a></li>
             <li><a href="/hub/unmapped-items" class="{% if '/unmapped-items' in request.url.path %}active{% endif %}"><i class="bi bi-question-circle"></i> Unmapped Items</a></li>
-            <li><a href="/hub/mapped-items" class="{% if '/mapped-items' in request.url.path %}active{% endif %}"><i class="bi bi-check-circle"></i> Mapped Items</a></li>
-            <li><a href="/hub/category-mappings" class="{% if '/category-mappings' in request.url.path %}active{% endif %}"><i class="bi bi-list-ul"></i> Category Mappings</a></li>
-            <!-- Item Codes page still accessible at /hub/item-codes but removed from main nav -->
-            <!-- Fix Code functionality now integrated into Unmapped Items page -->
-            <li><a href="/hub/vendors" class="{% if request.url.path == '/hub/vendors' %}active{% endif %}"><i class="bi bi-building"></i> Vendors</a></li>
-            <li><a href="/hub/vendor-items" class="{% if '/vendor-items' in request.url.path %}active{% endif %}"><i class="bi bi-box-seam"></i> Vendor Items</a></li>
-            <li><a href="/hub/duplicates" class="{% if '/duplicates' in request.url.path %}active{% endif %}"><i class="bi bi-files"></i> Duplicates</a></li>
+            <li><a href="/hub/vendor-items" class="{% if '/vendor-item' in request.url.path %}active{% endif %}"><i class="bi bi-box-seam"></i> Vendor Items</a></li>
+            <li><a href="/hub/vendors" class="{% if request.url.path == '/hub/vendors' %}active{% endif %}"><i class="bi bi-truck"></i> Vendors</a></li>
             <li><a href="/hub/settings" class="{% if '/settings' in request.url.path %}active{% endif %}"><i class="bi bi-gear"></i> Settings</a></li>
         </ul>
     </div>

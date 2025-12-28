@@ -133,22 +133,44 @@ class VendorItemCreate(BaseModel):
 
 class VendorItemUpdate(BaseModel):
     """Update vendor item request"""
-    inventory_master_item_id: Optional[int] = None
-    inventory_master_item_name: Optional[str] = None
+    # Identity
+    vendor_id: Optional[int] = None
     vendor_sku: Optional[str] = None
     vendor_product_name: Optional[str] = None
     vendor_description: Optional[str] = None
+
+    # Backbar-style Size Fields (NEW)
+    size_quantity: Optional[float] = None  # e.g., 1, 750, 25
+    size_unit_id: Optional[int] = None  # FK to hub_size_units
+    container_id: Optional[int] = None  # FK to hub_containers
+    units_per_case: Optional[int] = None  # How many units in a case
+    case_cost: Optional[float] = None  # Cost per case from invoice
+
+    # Purchasing Definition (DEPRECATED - kept for migration)
     purchase_unit_id: Optional[int] = None
     purchase_unit_name: Optional[str] = None
     purchase_unit_abbr: Optional[str] = None
     pack_size: Optional[str] = None
-    conversion_factor: Optional[float] = None
-    conversion_unit_id: Optional[int] = None
-    unit_price: Optional[float] = None
+    unit_uom_id: Optional[int] = None  # DEPRECATED: Use size_unit_id + container_id
+    unit_uom_name: Optional[str] = None  # DEPRECATED
+    pack_to_primary_factor: Optional[float] = None  # DEPRECATED: Use units_per_case
+    conversion_factor: Optional[float] = None  # DEPRECATED
+    conversion_unit_id: Optional[int] = None  # DEPRECATED
+
+    # Pricing
+    last_purchase_price: Optional[float] = None  # New: current price
+    unit_price: Optional[float] = None  # Deprecated alias
+    minimum_order_quantity: Optional[float] = None
+
+    # Mapping & Classification
+    inventory_master_item_id: Optional[int] = None
+    inventory_master_item_name: Optional[str] = None
     category: Optional[str] = None
     gl_asset_account: Optional[int] = None
     gl_cogs_account: Optional[int] = None
     gl_waste_account: Optional[int] = None
+
+    # Status
     is_active: Optional[bool] = None
     is_preferred: Optional[bool] = None
     notes: Optional[str] = None
@@ -168,17 +190,34 @@ class VendorItemResponse(BaseModel):
     vendor_product_name: str
     vendor_description: Optional[str] = None
 
-    # Purchase unit and conversion
-    purchase_unit_id: int
+    # Backbar-style Size Fields (NEW)
+    size_quantity: Optional[float] = None  # e.g., 1, 750, 25
+    size_unit_id: Optional[int] = None  # FK to hub_size_units
+    size_unit_symbol: Optional[str] = None  # e.g., "L", "ml", "lb"
+    container_id: Optional[int] = None  # FK to hub_containers
+    container_name: Optional[str] = None  # e.g., "bottle", "can", "bag"
+    size_display: Optional[str] = None  # Formatted: "1 L bottle"
+    units_per_case: Optional[int] = None  # How many units in a case
+    case_cost: Optional[float] = None  # Cost per case from invoice
+    unit_cost: Optional[float] = None  # Calculated: case_cost / units_per_case
+
+    # Purchase unit and conversion (DEPRECATED - kept for migration)
+    purchase_unit_id: Optional[int] = None
     purchase_unit_name: Optional[str] = None
     purchase_unit_abbr: Optional[str] = None
     pack_size: Optional[str] = None
-    conversion_factor: float
-    conversion_unit_id: Optional[int] = None
+    unit_uom_id: Optional[int] = None  # DEPRECATED: Use size_unit_id + container_id
+    unit_uom_name: Optional[str] = None  # DEPRECATED
+    pack_to_primary_factor: Optional[float] = None  # DEPRECATED: Use units_per_case
+    conversion_factor: Optional[float] = None  # DEPRECATED
+    conversion_unit_id: Optional[int] = None  # DEPRECATED
 
     # Pricing
-    unit_price: Optional[float] = None
-    last_price: Optional[float] = None
+    last_purchase_price: Optional[float] = None  # Current price per purchase unit
+    previous_purchase_price: Optional[float] = None  # Previous price
+    unit_price: Optional[float] = None  # Deprecated alias
+    last_price: Optional[float] = None  # Deprecated alias
+    minimum_order_quantity: Optional[float] = None
 
     # Category and GL
     category: Optional[str] = None
@@ -189,6 +228,7 @@ class VendorItemResponse(BaseModel):
     # Status
     is_active: bool = True
     is_preferred: bool = False
+    notes: Optional[str] = None
 
     # Sync info
     inventory_vendor_item_id: Optional[int] = None
@@ -403,6 +443,32 @@ async def create_vendor_item(
     )
 
 
+@router.get("/master-items")
+async def get_master_items_from_inventory():
+    """
+    Fetch master items from Inventory database for mapping dropdown.
+
+    Direct database connection to Inventory for reliability.
+    Must be defined before /{vendor_item_id} to avoid route conflict.
+    """
+    from sqlalchemy import create_engine, text as sql_text
+
+    inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
+                                 'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+
+    try:
+        engine = create_engine(inventory_db_url)
+        with engine.connect() as conn:
+            results = conn.execute(
+                sql_text("SELECT id, name, category FROM master_items WHERE is_active = true ORDER BY name LIMIT 2000")
+            ).fetchall()
+            return [{"id": row[0], "name": row[1], "category": row[2]} for row in results]
+
+    except Exception as e:
+        logger.error(f"Error fetching master items from Inventory DB: {str(e)}")
+        return []
+
+
 @router.get("/{vendor_item_id}", response_model=VendorItemResponse)
 async def get_vendor_item(
     vendor_item_id: int,
@@ -412,7 +478,9 @@ async def get_vendor_item(
     Get a specific vendor item by ID.
     """
     item = db.query(HubVendorItem).options(
-        joinedload(HubVendorItem.vendor)
+        joinedload(HubVendorItem.vendor),
+        joinedload(HubVendorItem.size_unit),
+        joinedload(HubVendorItem.container)
     ).filter(HubVendorItem.id == vendor_item_id).first()
 
     if not item:
@@ -428,20 +496,38 @@ async def get_vendor_item(
         vendor_sku=item.vendor_sku,
         vendor_product_name=item.vendor_product_name,
         vendor_description=item.vendor_description,
+        # Backbar-style size fields
+        size_quantity=float(item.size_quantity) if item.size_quantity else None,
+        size_unit_id=item.size_unit_id,
+        size_unit_symbol=item.size_unit.symbol if item.size_unit else None,
+        container_id=item.container_id,
+        container_name=item.container.name if item.container else None,
+        size_display=item.size_display,
+        units_per_case=item.units_per_case,
+        case_cost=float(item.case_cost) if item.case_cost else None,
+        unit_cost=item.unit_cost,
+        # Deprecated fields (kept for migration)
         purchase_unit_id=item.purchase_unit_id,
         purchase_unit_name=item.purchase_unit_name,
         purchase_unit_abbr=item.purchase_unit_abbr,
         pack_size=item.pack_size,
+        unit_uom_id=item.unit_uom_id,
+        unit_uom_name=item.unit_uom_name,
+        pack_to_primary_factor=float(item.pack_to_primary_factor) if item.pack_to_primary_factor else 1.0,
         conversion_factor=float(item.conversion_factor) if item.conversion_factor else 1.0,
         conversion_unit_id=item.conversion_unit_id,
+        last_purchase_price=float(item.last_purchase_price) if item.last_purchase_price else None,
+        previous_purchase_price=float(item.previous_purchase_price) if item.previous_purchase_price else None,
         unit_price=float(item.unit_price) if item.unit_price else None,
         last_price=float(item.last_price) if item.last_price else None,
+        minimum_order_quantity=float(item.minimum_order_quantity) if item.minimum_order_quantity else None,
         category=item.category,
         gl_asset_account=item.gl_asset_account,
         gl_cogs_account=item.gl_cogs_account,
         gl_waste_account=item.gl_waste_account,
         is_active=item.is_active,
         is_preferred=item.is_preferred,
+        notes=item.notes,
         inventory_vendor_item_id=item.inventory_vendor_item_id,
         synced_to_inventory=item.synced_to_inventory,
         created_at=item.created_at,
@@ -460,7 +546,9 @@ async def update_vendor_item(
     Update a vendor item.
     """
     item = db.query(HubVendorItem).options(
-        joinedload(HubVendorItem.vendor)
+        joinedload(HubVendorItem.vendor),
+        joinedload(HubVendorItem.size_unit),
+        joinedload(HubVendorItem.container)
     ).filter(HubVendorItem.id == vendor_item_id).first()
 
     if not item:
@@ -469,8 +557,12 @@ async def update_vendor_item(
     # Update fields
     update_data = item_data.dict(exclude_unset=True)
 
-    # Track price changes
-    if "unit_price" in update_data and update_data["unit_price"] is not None:
+    # Track price changes (support both old and new field names)
+    if "last_purchase_price" in update_data and update_data["last_purchase_price"] is not None:
+        if item.last_purchase_price is not None:
+            item.previous_purchase_price = item.last_purchase_price
+        item.price_updated_at = datetime.utcnow()
+    elif "unit_price" in update_data and update_data["unit_price"] is not None:
         if item.unit_price is not None:
             item.last_price = item.unit_price
         item.price_updated_at = datetime.utcnow()
@@ -480,6 +572,15 @@ async def update_vendor_item(
 
     db.commit()
     db.refresh(item)
+
+    # Reload relationships after update
+    db.refresh(item)
+    if item.size_unit_id:
+        from integration_hub.models.size_unit import SizeUnit
+        item.size_unit = db.query(SizeUnit).filter(SizeUnit.id == item.size_unit_id).first()
+    if item.container_id:
+        from integration_hub.models.container import Container
+        item.container = db.query(Container).filter(Container.id == item.container_id).first()
 
     logger.info(f"Updated vendor item {item.id}")
 
@@ -503,20 +604,38 @@ async def update_vendor_item(
         vendor_sku=item.vendor_sku,
         vendor_product_name=item.vendor_product_name,
         vendor_description=item.vendor_description,
+        # Backbar-style size fields
+        size_quantity=float(item.size_quantity) if item.size_quantity else None,
+        size_unit_id=item.size_unit_id,
+        size_unit_symbol=item.size_unit.symbol if item.size_unit else None,
+        container_id=item.container_id,
+        container_name=item.container.name if item.container else None,
+        size_display=item.size_display,
+        units_per_case=item.units_per_case,
+        case_cost=float(item.case_cost) if item.case_cost else None,
+        unit_cost=item.unit_cost,
+        # Deprecated fields (kept for migration)
         purchase_unit_id=item.purchase_unit_id,
         purchase_unit_name=item.purchase_unit_name,
         purchase_unit_abbr=item.purchase_unit_abbr,
         pack_size=item.pack_size,
+        unit_uom_id=item.unit_uom_id,
+        unit_uom_name=item.unit_uom_name,
+        pack_to_primary_factor=float(item.pack_to_primary_factor) if item.pack_to_primary_factor else 1.0,
         conversion_factor=float(item.conversion_factor) if item.conversion_factor else 1.0,
         conversion_unit_id=item.conversion_unit_id,
+        last_purchase_price=float(item.last_purchase_price) if item.last_purchase_price else None,
+        previous_purchase_price=float(item.previous_purchase_price) if item.previous_purchase_price else None,
         unit_price=float(item.unit_price) if item.unit_price else None,
         last_price=float(item.last_price) if item.last_price else None,
+        minimum_order_quantity=float(item.minimum_order_quantity) if item.minimum_order_quantity else None,
         category=item.category,
         gl_asset_account=item.gl_asset_account,
         gl_cogs_account=item.gl_cogs_account,
         gl_waste_account=item.gl_waste_account,
         is_active=item.is_active,
         is_preferred=item.is_preferred,
+        notes=item.notes,
         inventory_vendor_item_id=item.inventory_vendor_item_id,
         synced_to_inventory=item.synced_to_inventory,
         created_at=item.created_at,
@@ -1065,3 +1184,51 @@ async def get_vendor_item_cost_history(
         "location_id": item.location_id,
         "history": history
     }
+
+
+# ============================================================================
+# LOOKUP ENDPOINTS FOR BACKBAR-STYLE SIZE FIELDS
+# ============================================================================
+
+@router.get("/lookup/size-units")
+async def get_size_units(db: Session = Depends(get_db)):
+    """
+    Get all active size units for dropdown.
+    Returns units grouped by measure type (volume, weight, count).
+    """
+    from integration_hub.models.size_unit import SizeUnit
+
+    units = db.query(SizeUnit).filter(
+        SizeUnit.is_active == True
+    ).order_by(SizeUnit.measure_type, SizeUnit.sort_order).all()
+
+    return [
+        {
+            "id": u.id,
+            "name": u.name,
+            "symbol": u.symbol,
+            "measure_type": u.measure_type,
+            "display_name": u.display_name
+        }
+        for u in units
+    ]
+
+
+@router.get("/lookup/containers")
+async def get_containers(db: Session = Depends(get_db)):
+    """
+    Get all active containers for dropdown.
+    """
+    from integration_hub.models.container import Container
+
+    containers = db.query(Container).filter(
+        Container.is_active == True
+    ).order_by(Container.sort_order).all()
+
+    return [
+        {
+            "id": c.id,
+            "name": c.name
+        }
+        for c in containers
+    ]

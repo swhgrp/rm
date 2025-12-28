@@ -22,6 +22,15 @@ from sqlalchemy.sql import func
 from integration_hub.db.database import Base
 import enum
 
+# pgvector support for AI embeddings
+try:
+    from pgvector.sqlalchemy import Vector
+    PGVECTOR_AVAILABLE = True
+except ImportError:
+    # Fallback if pgvector not installed
+    Vector = None
+    PGVECTOR_AVAILABLE = False
+
 
 class VendorItemStatus(enum.Enum):
     """
@@ -77,6 +86,26 @@ class HubVendorItem(Base):
     # Pack size info (display only)
     pack_size = Column(String(100), nullable=True)  # e.g., "Case - 6", "Box - 24", "12 x 750ml"
 
+    # Unit UOM - Individual unit size within pack (for price comparison)
+    # DEPRECATED: Use Backbar-style size fields instead (size_quantity, size_unit_id, container_id)
+    unit_uom_id = Column(Integer, ForeignKey("units_of_measure.id"), nullable=True)
+    unit_uom_name = Column(String(50), nullable=True)  # Cached: e.g., "750ml", "1L", "25lb"
+
+    # =========================================================================
+    # BACKBAR-STYLE SIZE FIELDS (NEW)
+    # Size = [Quantity] [Unit] [Container], e.g., "1 L bottle", "25 lb bag"
+    # =========================================================================
+    # Size quantity - the numeric value (e.g., 1, 750, 25, 1.75)
+    size_quantity = Column(Numeric(10, 4), nullable=True)
+    # Size unit - references hub_size_units (e.g., L, ml, lb, oz)
+    size_unit_id = Column(Integer, ForeignKey("hub_size_units.id"), nullable=True)
+    # Container type - references hub_containers (e.g., bottle, can, bag)
+    container_id = Column(Integer, ForeignKey("hub_containers.id"), nullable=True)
+    # Units per case - how many individual units in a case (e.g., 12, 6, 24)
+    units_per_case = Column(Integer, nullable=True)
+    # Case cost - price paid per case (from invoice)
+    case_cost = Column(Numeric(10, 4), nullable=True)
+
     # NEW: Pack to Primary Factor
     # Converts purchase units to the master item's primary count unit
     # Example: If purchase unit is "Case" containing 6 bottles, and primary count unit is "Each":
@@ -124,6 +153,12 @@ class HubVendorItem(Base):
     synced_to_inventory = Column(Boolean, default=False)
     synced_to_inventory_at = Column(DateTime(timezone=True), nullable=True)
 
+    # AI Embedding for semantic matching (1536 dimensions for text-embedding-3-small)
+    # Stores vector representation of: vendor_product_name + vendor_description + category
+    # Used for finding similar items across vendors and matching to master items
+    embedding = Column(Vector(1536), nullable=True) if PGVECTOR_AVAILABLE else None
+    embedding_generated_at = Column(DateTime(timezone=True), nullable=True)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -131,6 +166,9 @@ class HubVendorItem(Base):
     # Relationships
     vendor = relationship("Vendor", backref="vendor_items")
     purchase_unit = relationship("UnitOfMeasure", foreign_keys=[purchase_unit_id])
+    unit_uom = relationship("UnitOfMeasure", foreign_keys=[unit_uom_id])
+    size_unit = relationship("SizeUnit", foreign_keys=[size_unit_id])
+    container = relationship("Container", foreign_keys=[container_id])
 
     def __repr__(self):
         name_preview = self.vendor_product_name[:30] if self.vendor_product_name else None
@@ -152,3 +190,65 @@ class HubVendorItem(Base):
         if float(self.pack_to_primary_factor) == 0:
             return None
         return float(self.last_purchase_price) / float(self.pack_to_primary_factor)
+
+    @property
+    def unit_cost(self) -> float | None:
+        """
+        Calculate unit cost from case cost and units per case.
+        Returns None if data is incomplete.
+
+        Example:
+          - case_cost = $45.00
+          - units_per_case = 6
+          - unit_cost = $45.00 / 6 = $7.50
+        """
+        if not self.case_cost or not self.units_per_case:
+            return None
+        if self.units_per_case == 0:
+            return None
+        return float(self.case_cost) / float(self.units_per_case)
+
+    @property
+    def size_display(self) -> str | None:
+        """
+        Format the Backbar-style size for display.
+        Returns formatted string like "1 L bottle" or "25 lb bag".
+        Returns None if size fields are not set.
+        """
+        if not self.size_quantity:
+            return None
+
+        parts = []
+        # Format quantity (remove trailing zeros)
+        qty = float(self.size_quantity)
+        if qty == int(qty):
+            parts.append(str(int(qty)))
+        else:
+            parts.append(str(qty))
+
+        # Add unit symbol
+        if self.size_unit:
+            parts.append(self.size_unit.symbol)
+
+        # Add container name
+        if self.container:
+            parts.append(self.container.name)
+
+        return " ".join(parts) if parts else None
+
+    @property
+    def embedding_text(self) -> str:
+        """
+        Generate text for embedding generation.
+        Combines product name, description, and category for semantic search.
+        """
+        parts = []
+        if self.vendor_product_name:
+            parts.append(self.vendor_product_name)
+        if self.vendor_description:
+            parts.append(self.vendor_description)
+        if self.category:
+            parts.append(f"Category: {self.category}")
+        if self.pack_size:
+            parts.append(f"Pack: {self.pack_size}")
+        return " | ".join(parts) if parts else ""

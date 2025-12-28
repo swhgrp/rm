@@ -118,3 +118,62 @@ async def get_full_summary(
         'mapping': service.get_mapping_report(),
         'sync_status': service.get_sync_status_report()
     }
+
+
+@router.get("/vendor-spend-by-location")
+async def get_vendor_spend_by_location(
+    start_date: Optional[date] = Query(None, description="Start date for period"),
+    end_date: Optional[date] = Query(None, description="End date for period"),
+    vendor_name: Optional[str] = Query(None, description="Filter by specific vendor name"),
+    location_id: Optional[int] = Query(None, description="Filter by specific location ID"),
+    limit: int = Query(50, ge=1, le=200, description="Max results to return"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get vendor spend breakdown by location.
+
+    Shows how much each location is spending with each vendor,
+    enabling cross-location cost comparisons and negotiation insights.
+    """
+    service = ReportingService(db)
+    return service.get_vendor_spend_by_location(
+        start_date=start_date,
+        end_date=end_date,
+        vendor_name=vendor_name,
+        location_id=location_id,
+        limit=limit
+    )
+
+
+@router.get("/location-spend-summary")
+async def get_location_spend_summary(
+    start_date: Optional[date] = Query(None, description="Start date for period"),
+    end_date: Optional[date] = Query(None, description="End date for period"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get overall spend summary per location.
+
+    Shows total spend, invoice counts, and vendor counts per location
+    for high-level cross-location comparison.
+    """
+    service = ReportingService(db)
+    return service.get_location_spend_summary(start_date, end_date)
+
+
+@router.get("/vendor-location-matrix")
+async def get_vendor_location_matrix(
+    start_date: Optional[date] = Query(None, description="Start date for period"),
+    end_date: Optional[date] = Query(None, description="End date for period"),
+    top_vendors: int = Query(10, ge=1, le=50, description="Number of top vendors to include"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get vendor-location spend matrix.
+
+    Returns a matrix of vendors vs locations with spend amounts,
+    useful for heat map visualizations and identifying location-specific
+    vendor relationships.
+    """
+    service = ReportingService(db)
+    return service.get_vendor_location_matrix(start_date, end_date, top_vendors)

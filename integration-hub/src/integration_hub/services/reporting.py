@@ -509,6 +509,310 @@ class ReportingService:
             }
         }
 
+    def get_vendor_spend_by_location(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        vendor_name: Optional[str] = None,
+        location_id: Optional[int] = None,
+        limit: int = 50
+    ) -> Dict:
+        """
+        Get vendor spend breakdown by location.
+
+        Args:
+            start_date: Start of period (defaults to 30 days ago)
+            end_date: End of period (defaults to today)
+            vendor_name: Filter by specific vendor
+            location_id: Filter by specific location
+            limit: Max results to return
+
+        Returns:
+            Dict with vendor-location spend data
+        """
+        if not start_date:
+            start_date = date.today() - timedelta(days=30)
+        if not end_date:
+            end_date = date.today()
+
+        # Base query conditions
+        conditions = [
+            HubInvoice.invoice_date >= start_date,
+            HubInvoice.invoice_date <= end_date,
+            or_(HubInvoice.is_statement == False, HubInvoice.is_statement == None),
+            HubInvoice.location_id != None  # Only invoices with assigned location
+        ]
+
+        if vendor_name:
+            conditions.append(HubInvoice.vendor_name.ilike(f"%{vendor_name}%"))
+        if location_id:
+            conditions.append(HubInvoice.location_id == location_id)
+
+        # Query spend by vendor and location
+        vendor_location_spend = self.db.query(
+            HubInvoice.vendor_name,
+            HubInvoice.location_id,
+            HubInvoice.location_name,
+            func.count(HubInvoice.id).label('invoice_count'),
+            func.sum(HubInvoice.total_amount).label('total_spend'),
+            func.avg(HubInvoice.total_amount).label('avg_invoice'),
+            func.min(HubInvoice.invoice_date).label('first_invoice'),
+            func.max(HubInvoice.invoice_date).label('last_invoice')
+        ).filter(
+            and_(*conditions)
+        ).group_by(
+            HubInvoice.vendor_name,
+            HubInvoice.location_id,
+            HubInvoice.location_name
+        ).order_by(
+            func.sum(HubInvoice.total_amount).desc()
+        ).limit(limit).all()
+
+        # Calculate totals
+        total_spend = sum(float(v.total_spend or 0) for v in vendor_location_spend)
+
+        results = []
+        for v in vendor_location_spend:
+            spend = float(v.total_spend or 0)
+            pct = (spend / total_spend * 100) if total_spend > 0 else 0
+            results.append({
+                'vendor_name': v.vendor_name,
+                'location_id': v.location_id,
+                'location_name': v.location_name or f"Location {v.location_id}",
+                'invoice_count': v.invoice_count,
+                'total_spend': spend,
+                'avg_invoice': round(float(v.avg_invoice or 0), 2),
+                'percentage': round(pct, 1),
+                'first_invoice': v.first_invoice.isoformat() if v.first_invoice else None,
+                'last_invoice': v.last_invoice.isoformat() if v.last_invoice else None
+            })
+
+        # Group by vendor for cross-location comparison
+        vendor_totals = {}
+        for r in results:
+            vn = r['vendor_name']
+            if vn not in vendor_totals:
+                vendor_totals[vn] = {
+                    'total_spend': 0,
+                    'locations': [],
+                    'location_count': 0
+                }
+            vendor_totals[vn]['total_spend'] += r['total_spend']
+            vendor_totals[vn]['locations'].append({
+                'location_id': r['location_id'],
+                'location_name': r['location_name'],
+                'spend': r['total_spend']
+            })
+            vendor_totals[vn]['location_count'] += 1
+
+        return {
+            'period': {
+                'start': start_date.isoformat(),
+                'end': end_date.isoformat()
+            },
+            'filters': {
+                'vendor_name': vendor_name,
+                'location_id': location_id
+            },
+            'total_spend': total_spend,
+            'result_count': len(results),
+            'data': results,
+            'vendor_summary': [
+                {
+                    'vendor_name': k,
+                    'total_spend': v['total_spend'],
+                    'location_count': v['location_count'],
+                    'locations': v['locations']
+                }
+                for k, v in sorted(vendor_totals.items(), key=lambda x: -x[1]['total_spend'])
+            ]
+        }
+
+    def get_location_spend_summary(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None
+    ) -> Dict:
+        """
+        Get overall spend summary per location.
+
+        Args:
+            start_date: Start of period (defaults to 30 days ago)
+            end_date: End of period (defaults to today)
+
+        Returns:
+            Dict with location spend summaries
+        """
+        if not start_date:
+            start_date = date.today() - timedelta(days=30)
+        if not end_date:
+            end_date = date.today()
+
+        # Query spend by location
+        location_spend = self.db.query(
+            HubInvoice.location_id,
+            HubInvoice.location_name,
+            func.count(HubInvoice.id).label('invoice_count'),
+            func.sum(HubInvoice.total_amount).label('total_spend'),
+            func.avg(HubInvoice.total_amount).label('avg_invoice'),
+            func.count(func.distinct(HubInvoice.vendor_name)).label('vendor_count')
+        ).filter(
+            and_(
+                HubInvoice.invoice_date >= start_date,
+                HubInvoice.invoice_date <= end_date,
+                or_(HubInvoice.is_statement == False, HubInvoice.is_statement == None),
+                HubInvoice.location_id != None
+            )
+        ).group_by(
+            HubInvoice.location_id,
+            HubInvoice.location_name
+        ).order_by(
+            func.sum(HubInvoice.total_amount).desc()
+        ).all()
+
+        total_spend = sum(float(l.total_spend or 0) for l in location_spend)
+
+        locations = []
+        for l in location_spend:
+            spend = float(l.total_spend or 0)
+            pct = (spend / total_spend * 100) if total_spend > 0 else 0
+            locations.append({
+                'location_id': l.location_id,
+                'location_name': l.location_name or f"Location {l.location_id}",
+                'invoice_count': l.invoice_count,
+                'total_spend': spend,
+                'avg_invoice': round(float(l.avg_invoice or 0), 2),
+                'vendor_count': l.vendor_count,
+                'percentage': round(pct, 1)
+            })
+
+        return {
+            'period': {
+                'start': start_date.isoformat(),
+                'end': end_date.isoformat()
+            },
+            'total_spend': total_spend,
+            'location_count': len(locations),
+            'locations': locations
+        }
+
+    def get_vendor_location_matrix(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        top_vendors: int = 10
+    ) -> Dict:
+        """
+        Get vendor-location spend matrix.
+
+        Args:
+            start_date: Start of period (defaults to 30 days ago)
+            end_date: End of period (defaults to today)
+            top_vendors: Number of top vendors to include
+
+        Returns:
+            Dict with matrix data for visualization
+        """
+        if not start_date:
+            start_date = date.today() - timedelta(days=30)
+        if not end_date:
+            end_date = date.today()
+
+        # Get top vendors by total spend
+        top_vendor_names = self.db.query(
+            HubInvoice.vendor_name,
+            func.sum(HubInvoice.total_amount).label('total')
+        ).filter(
+            and_(
+                HubInvoice.invoice_date >= start_date,
+                HubInvoice.invoice_date <= end_date,
+                or_(HubInvoice.is_statement == False, HubInvoice.is_statement == None)
+            )
+        ).group_by(
+            HubInvoice.vendor_name
+        ).order_by(
+            func.sum(HubInvoice.total_amount).desc()
+        ).limit(top_vendors).all()
+
+        vendor_names = [v.vendor_name for v in top_vendor_names]
+
+        # Get all locations with invoices
+        locations = self.db.query(
+            HubInvoice.location_id,
+            HubInvoice.location_name
+        ).filter(
+            and_(
+                HubInvoice.invoice_date >= start_date,
+                HubInvoice.invoice_date <= end_date,
+                or_(HubInvoice.is_statement == False, HubInvoice.is_statement == None),
+                HubInvoice.location_id != None
+            )
+        ).distinct().all()
+
+        location_map = {l.location_id: l.location_name or f"Location {l.location_id}" for l in locations}
+
+        # Get spend matrix data
+        matrix_data = self.db.query(
+            HubInvoice.vendor_name,
+            HubInvoice.location_id,
+            func.sum(HubInvoice.total_amount).label('spend')
+        ).filter(
+            and_(
+                HubInvoice.invoice_date >= start_date,
+                HubInvoice.invoice_date <= end_date,
+                or_(HubInvoice.is_statement == False, HubInvoice.is_statement == None),
+                HubInvoice.vendor_name.in_(vendor_names),
+                HubInvoice.location_id != None
+            )
+        ).group_by(
+            HubInvoice.vendor_name,
+            HubInvoice.location_id
+        ).all()
+
+        # Build matrix
+        matrix = {}
+        for row in matrix_data:
+            if row.vendor_name not in matrix:
+                matrix[row.vendor_name] = {}
+            matrix[row.vendor_name][row.location_id] = float(row.spend or 0)
+
+        # Format for output
+        rows = []
+        for vendor_name in vendor_names:
+            row = {
+                'vendor_name': vendor_name,
+                'locations': {}
+            }
+            vendor_total = 0
+            for loc_id in location_map.keys():
+                spend = matrix.get(vendor_name, {}).get(loc_id, 0)
+                row['locations'][loc_id] = spend
+                vendor_total += spend
+            row['total'] = vendor_total
+            rows.append(row)
+
+        # Calculate location totals
+        location_totals = {}
+        for loc_id in location_map.keys():
+            location_totals[loc_id] = sum(
+                matrix.get(vn, {}).get(loc_id, 0) for vn in vendor_names
+            )
+
+        return {
+            'period': {
+                'start': start_date.isoformat(),
+                'end': end_date.isoformat()
+            },
+            'locations': [
+                {'id': loc_id, 'name': loc_name}
+                for loc_id, loc_name in location_map.items()
+            ],
+            'vendors': vendor_names,
+            'matrix': rows,
+            'location_totals': location_totals,
+            'grand_total': sum(location_totals.values())
+        }
+
 
 def get_reporting_service(db: Session) -> ReportingService:
     """Get reporting service instance"""

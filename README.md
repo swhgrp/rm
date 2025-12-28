@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** December 27, 2025
+**Last Updated:** December 28, 2025
 **Status:** ~92% Complete - Core Systems Production Ready ✅
-**Latest:** Location-aware costing architecture + Inventory as location source of truth (Dec 27, 2025) ✅
+**Latest:** AI semantic search + Backbar-style sizing for vendor items (Dec 28, 2025) ✅
 
 ---
 
@@ -597,13 +597,13 @@ restaurant-system/
 
 ---
 
-### 6. Integration Hub ✅ **Production Ready with Location-Aware Costing** 🌟
-**Automated invoice processing with email monitoring, AI parsing, location-aware pricing, and smart routing**
+### 6. Integration Hub ✅ **Production Ready with AI Search & Sizing** 🌟
+**Automated invoice processing with email monitoring, AI parsing, semantic search, Backbar-style sizing, and smart routing**
 
 - **URL:** https://rm.swhgrp.com/hub/
-- **Database:** hub_db (PostgreSQL 15) - **15+ tables, 20+ models**
-- **Technology:** **FastAPI**, SQLAlchemy, OpenAI GPT-4o Vision, APScheduler, PyPDF2, pdf2image
-- **Files:** 50+ Python files, 12 templates
+- **Database:** hub_db (PostgreSQL 15 + pgvector) - **18+ tables, 25+ models**
+- **Technology:** **FastAPI**, SQLAlchemy, OpenAI GPT-4o Vision, OpenAI Embeddings, pgvector, APScheduler, PyPDF2, pdf2image
+- **Files:** 55+ Python files, 14 templates
 
 **Critical Correction:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
@@ -613,7 +613,16 @@ restaurant-system/
 - **Location-aware pricing:** Vendor items track prices per location from invoices
 - **Weighted average costing:** Hub updates Inventory's `MasterItemLocationCost` on invoice processing
 
-**🚀 NEW: Major Workflow Improvements (Nov 8, 2025):**
+**🤖 NEW: AI Semantic Search & Backbar-Style Sizing (Dec 28, 2025):**
+- ✅ **AI-powered semantic search** - Find vendor items using natural language
+- ✅ **pgvector integration** - HNSW index for fast similarity lookups
+- ✅ **Similar item detection** - Find duplicates across vendors
+- ✅ **Backbar-style sizing** - [Quantity] [Unit] [Container] format (e.g., "750 ml bottle")
+- ✅ **Size units & containers** - Configurable units (L, ml, lb, oz) and containers (bottle, can, bag)
+- ✅ **Vendor item detail page** - Comprehensive view with pricing history and AI suggestions
+- ✅ **Auto unit cost calculation** - `case_cost / units_per_case`
+
+**🚀 Major Workflow Improvements (Nov 8, 2025):**
 - ✅ **Bulk mapping by description** - Map once, apply to ALL occurrences (10x faster)
 - ✅ **Unique item grouping** - Unmapped items page shows frequency & affected invoices
 - ✅ **Mapped items review page** - View/edit all mapped items with vendor details
@@ -1315,6 +1324,49 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ## 📝 Recent Updates
 
+### December 28, 2025 - AI Semantic Search & Backbar-Style Sizing 🤖📦
+
+**NEW: AI-Powered Semantic Search for Vendor Items**
+- ✅ **OpenAI Embeddings** - Uses text-embedding-3-small model (1536 dimensions)
+- ✅ **Semantic similarity search** - Find similar items using natural language descriptions
+- ✅ **pgvector integration** - HNSW index for fast vector similarity lookups
+- ✅ **Confidence levels** - High (85%+), Medium (70%+), Low (55%+) match indicators
+- ✅ **Similar items finder** - Detect duplicates and related items across vendors
+- ✅ **AI Search UI** - Search bar on vendor items page with real-time results
+- ✅ **Batch embedding generation** - Efficient bulk processing for existing items
+
+**NEW: Backbar-Style Sizing System**
+- ✅ **Size Units table** - Volume (L, ml, oz), Weight (lb, oz, g, kg), Count (each, pack, case)
+- ✅ **Containers table** - Bottle, can, bag, box, keg, jug, pack, etc.
+- ✅ **Structured sizing** - Format: [Quantity] [Unit] [Container] (e.g., "750 ml bottle", "25 lb bag")
+- ✅ **Units per case** - Track how many units in a purchasing case
+- ✅ **Case cost tracking** - Price per case from invoices
+- ✅ **Auto unit cost** - Calculated as `case_cost / units_per_case`
+- ✅ **Size settings UI** - Manage units and containers at `/hub/settings/size`
+
+**NEW: Vendor Item Detail Page**
+- ✅ **Comprehensive view** - All product details, pricing, location costs in one place
+- ✅ **Price history** - Track cost changes over time (30/60/90/180/365 days)
+- ✅ **Edit modal** - Update sizing, pricing, and master item mappings
+- ✅ **AI mapping suggestions** - Semantic search for master item matches
+- ✅ **Review workflow** - Approve/reject items needing review
+
+**New API Endpoints:**
+- `/api/v1/similarity/` - AI semantic search (stats, search, similar items, generate embeddings)
+- `/api/v1/size-settings/` - Size units and containers CRUD
+- `/api/v1/vendor-items/` - Enhanced with Backbar-style fields and review workflow
+
+**Database Migrations:**
+- `20251227_0001_add_embedding_columns.py` - pgvector embedding support
+- `20251227_0002_add_unit_uom_columns.py` - Unit UOM fields
+- `20251227_0003_add_backbar_size_fields.py` - Size system tables (hub_size_units, hub_containers)
+
+**Configuration:**
+- `OPENAI_API_KEY` - Required for embedding generation (optional - feature disabled without it)
+- PostgreSQL with pgvector extension required for similarity search
+
+---
+
 ### December 27, 2025 - Location-Aware Costing Architecture 🏗️
 
 **Major Architecture Refactor - Location as Source of Truth**
@@ -1813,8 +1865,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 3.2 - Location-Aware Costing Architecture
-**Last Updated:** December 27, 2025
+**Version:** 3.3 - AI Semantic Search & Backbar-Style Sizing
+**Last Updated:** December 28, 2025
 **Documentation Health:** 96/100 - Excellent ✅
 
-*Location-aware costing: Inventory as location source of truth, per-location weighted average costs, Hub vendor item pricing by location.*
+*AI-powered vendor item search + Backbar-style sizing system. Location-aware costing with Inventory as location source of truth.*
