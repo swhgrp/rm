@@ -1570,9 +1570,9 @@ async def get_category_mapping(category: str, db: Session = Depends(get_db)):
         "gl_asset_account": mapping.gl_asset_account,
         "gl_cogs_account": mapping.gl_cogs_account,
         "gl_waste_account": mapping.gl_waste_account,
-        "asset_account_name": account_lookup.get(str(mapping.gl_asset_account), mapping.asset_account_name),
-        "cogs_account_name": account_lookup.get(str(mapping.gl_cogs_account), mapping.cogs_account_name),
-        "waste_account_name": account_lookup.get(str(mapping.gl_waste_account), mapping.waste_account_name) if mapping.gl_waste_account else None
+        "asset_account_name": account_lookup.get(str(mapping.gl_asset_account)),
+        "cogs_account_name": account_lookup.get(str(mapping.gl_cogs_account)),
+        "waste_account_name": account_lookup.get(str(mapping.gl_waste_account)) if mapping.gl_waste_account else None
     }
 
 
