@@ -1560,7 +1560,8 @@ async def get_category_mapping(category: str, db: Session = Depends(get_db)):
         "gl_cogs_account": mapping.gl_cogs_account,
         "gl_waste_account": mapping.gl_waste_account,
         "asset_account_name": mapping.asset_account_name,
-        "cogs_account_name": mapping.cogs_account_name
+        "cogs_account_name": mapping.cogs_account_name,
+        "waste_account_name": mapping.waste_account_name
     }
 
 
@@ -1568,6 +1569,8 @@ async def get_category_mapping(category: str, db: Session = Depends(get_db)):
 async def create_category_mapping(
     inventory_category: str = Form(...),
     asset_account_name: Optional[str] = Form(None),
+    cogs_account_name: Optional[str] = Form(None),
+    waste_account_name: Optional[str] = Form(None),
     gl_asset_account: int = Form(...),
     gl_cogs_account: int = Form(...),
     gl_waste_account: Optional[int] = Form(None),
@@ -1583,6 +1586,8 @@ async def create_category_mapping(
     if mapping:
         # Update existing
         mapping.asset_account_name = asset_account_name
+        mapping.cogs_account_name = cogs_account_name
+        mapping.waste_account_name = waste_account_name
         mapping.gl_asset_account = gl_asset_account
         mapping.gl_cogs_account = gl_cogs_account
         mapping.gl_waste_account = gl_waste_account
@@ -1592,6 +1597,8 @@ async def create_category_mapping(
         mapping = CategoryGLMapping(
             inventory_category=inventory_category,
             asset_account_name=asset_account_name,
+            cogs_account_name=cogs_account_name,
+            waste_account_name=waste_account_name,
             gl_asset_account=gl_asset_account,
             gl_cogs_account=gl_cogs_account,
             gl_waste_account=gl_waste_account,

@@ -74,6 +74,7 @@ class CategoryGLMapping(Base):
     # Account names
     asset_account_name = Column(String(200), nullable=True)
     cogs_account_name = Column(String(200), nullable=True)
+    waste_account_name = Column(String(200), nullable=True)
 
     # Metadata
     is_active = Column(Boolean, default=True)

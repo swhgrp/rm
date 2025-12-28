@@ -169,6 +169,8 @@
             </div>
             <form action="/hub/api/category-mappings" method="post">
                 <input type="hidden" id="categoryHidden" name="inventory_category">
+                <input type="hidden" id="cogsAccountName" name="cogs_account_name">
+                <input type="hidden" id="wasteAccountName" name="waste_account_name">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Category Code <span class="text-danger">*</span></label>
@@ -480,11 +482,34 @@ async function syncFromInventory() {
     }
 }
 
+// Helper to get account name from selected option
+function getSelectedAccountName(selectId) {
+    const select = document.getElementById(selectId);
+    if (select.selectedIndex > 0) {
+        const text = select.options[select.selectedIndex].text;
+        // Format is "1234 - Account Name", extract the name part
+        const parts = text.split(' - ');
+        return parts.length > 1 ? parts.slice(1).join(' - ') : '';
+    }
+    return '';
+}
+
+// Update hidden account name fields when selection changes
+function setupAccountNameSync(selectId, hiddenId) {
+    document.getElementById(selectId).addEventListener('change', function() {
+        document.getElementById(hiddenId).value = getSelectedAccountName(selectId);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Setup searchable dropdowns
     setupSearchableSelect('searchAssetAccount', 'assetAccount');
     setupSearchableSelect('searchCogsAccount', 'cogsAccount');
     setupSearchableSelect('searchWasteAccount', 'wasteAccount');
+
+    // Sync account name hidden fields when accounts are selected
+    setupAccountNameSync('cogsAccount', 'cogsAccountName');
+    setupAccountNameSync('wasteAccount', 'wasteAccountName');
 
     // Sync category select with hidden field for new mappings
     document.getElementById('categorySelect').addEventListener('change', function() {
@@ -498,6 +523,8 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('mappingModalTitle').textContent = 'Add Category Mapping';
         document.getElementById('categorySelect').disabled = false;
         document.getElementById('categoryHidden').value = '';
+        document.getElementById('cogsAccountName').value = '';
+        document.getElementById('wasteAccountName').value = '';
 
         // Reset all searchable selects to show all options
         resetSearchableSelect('searchAssetAccount', 'assetAccount');
