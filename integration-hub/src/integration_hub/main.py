@@ -1544,7 +1544,7 @@ async def list_category_mappings(request: Request, db: Session = Depends(get_db)
 
 @app.get("/api/category-mappings/{category:path}")
 async def get_category_mapping(category: str, db: Session = Depends(get_db)):
-    """Get GL account mapping for a specific category"""
+    """Get GL account mapping for a specific category with live account names from Accounting"""
 
     mapping = db.query(CategoryGLMapping).filter(
         CategoryGLMapping.inventory_category == category,
@@ -1554,14 +1554,25 @@ async def get_category_mapping(category: str, db: Session = Depends(get_db)):
     if not mapping:
         raise HTTPException(status_code=404, detail=f"No mapping found for category: {category}")
 
+    # Fetch live GL account names from Accounting API
+    account_lookup = {}
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000})
+            if response.status_code == 200:
+                gl_accounts = response.json()
+                account_lookup = {str(acc['account_number']): acc['account_name'] for acc in gl_accounts}
+    except Exception as e:
+        logger.warning(f"Could not fetch GL accounts from Accounting: {e}")
+
     return {
         "inventory_category": mapping.inventory_category,
         "gl_asset_account": mapping.gl_asset_account,
         "gl_cogs_account": mapping.gl_cogs_account,
         "gl_waste_account": mapping.gl_waste_account,
-        "asset_account_name": mapping.asset_account_name,
-        "cogs_account_name": mapping.cogs_account_name,
-        "waste_account_name": mapping.waste_account_name
+        "asset_account_name": account_lookup.get(str(mapping.gl_asset_account), mapping.asset_account_name),
+        "cogs_account_name": account_lookup.get(str(mapping.gl_cogs_account), mapping.cogs_account_name),
+        "waste_account_name": account_lookup.get(str(mapping.gl_waste_account), mapping.waste_account_name) if mapping.gl_waste_account else None
     }
 
 
