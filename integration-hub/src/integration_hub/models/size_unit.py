@@ -38,6 +38,11 @@ class SizeUnit(Base):
     base_unit_symbol = Column(String(20), nullable=False)  # "ml", "g", "each"
     conversion_to_base = Column(Numeric(15, 6), nullable=False, default=1.0)  # e.g., 1000 for L->ml
 
+    # Conversion to inventory tracking unit (fl oz for volume, oz for weight)
+    # This enables automatic conversion when creating master items
+    # e.g., 750 ml vendor item → 25.36 fl oz in inventory
+    conversion_to_inventory_unit = Column(Numeric(15, 6), nullable=True)  # ml->fl oz: 0.033814
+
     # Status
     is_active = Column(Boolean, default=True, nullable=False)
     sort_order = Column(Integer, default=0)  # For dropdown ordering

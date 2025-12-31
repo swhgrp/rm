@@ -1,15 +1,89 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** December 30, 2025
-**System Status:** Production (95% Complete - Hub UoM Architecture Complete)
+**Last Updated:** December 31, 2025
+**System Status:** Production (95% Complete - Unit Conversions & Pricing Complete)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
 ---
 
+## 🛠️ CODING PRINCIPLES & GUIDELINES
+
+### Always Use Long-Term Fixes
+When fixing issues, **always implement the permanent/architectural solution**, not quick hacks:
+
+1. **Data Sync Issues** → Add API endpoints for automatic syncing, not manual database updates
+2. **Cached Data Stale** → Add triggers/hooks to update cache when source changes
+3. **Pricing Calculations** → Fix the core formula/query, not just display
+4. **Name Mismatches** → Sync mechanisms that auto-update when source changes
+
+### Source of Truth Architecture
+- **Hub owns:** UoM, Categories, Vendors, Vendor Items, Invoices
+- **Inventory owns:** Master Items, Count Units, Location Costs
+- **Accounting owns:** GL Accounts, Journal Entries, Chart of Accounts
+- When data is cached across systems, implement sync mechanisms
+
+### Code Quality
+- **Delete unused code** - Don't comment out, delete it
+- **No backwards-compatibility hacks** - If unused, remove completely
+- **Fix root cause** - Don't patch symptoms
+- **Test after changes** - Restart containers and verify
+
+### Commit Messages
+- Use conventional commits: `feat:`, `fix:`, `chore:`, `docs:`
+- Include what was changed and why
+- End with Claude Code signature
+
+---
+
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Dec 30, 2025)
+### Most Recent Work (Current Session - Dec 31, 2025)
+
+**UNIT CONVERSIONS & PRICING FIXES** ✅ **COMPLETE**
+
+#### 1. **Beer Items - Ounce to Can Conversions** ✅ **COMPLETE**
+- Added unit conversions for 10 beer items (16oz cans): oz → Can with factor=16
+- Updated all beer items to have "Can" as primary count unit
+- Fixed vendor item `size_quantity` consistency (all 16oz beers now have size_quantity=16)
+- Pricing calculation: `case_cost / (units_per_case * size_quantity) * conversion_factor`
+- Example: Coors Light $31.55/case ÷ 24 ÷ 16oz = $0.082/oz × 16 = $1.31/can
+
+#### 2. **Wine Items - Bottle Count Units** ✅ **COMPLETE**
+- Updated all 29 wine items to have "Bottle" as primary count unit
+- Wine items do NOT need unit conversions (volume items priced per bottle directly)
+- Pricing calculation for volume: `case_cost / units_per_case` (size_quantity is just description)
+- Example: Cabernet $189/case ÷ 12 = $15.75/bottle
+
+#### 3. **Master Items List Pricing Fix** ✅ **COMPLETE**
+- Added unit conversion lookup to items API endpoint
+- Applies conversion factor when displaying `last_price_paid`
+- Only applies to weight/count items, not volume items
+- Files modified:
+  - `inventory/src/restaurant_inventory/api/api_v1/endpoints/items.py` - Unit conversion in pricing
+
+#### 4. **Item Detail Pricing Display Fix** ✅ **COMPLETE**
+- Fixed pricing stats calculation in item_detail.html
+- Loads unit conversions BEFORE vendor items
+- Applies conversion factor correctly based on from_unit/to_unit matching
+
+#### 5. **Count Units Dropdown Fix** ✅ **COMPLETE**
+- Inventory count modal now only shows explicitly defined count units
+- Removed fallback to "compatible units" that was adding unwanted options
+- Files modified:
+  - `inventory/src/restaurant_inventory/templates/count_session_new.html`
+
+#### 6. **Pricing Logic Summary**
+| Item Type | measure_type | size_quantity division | Unit Conversion |
+|-----------|--------------|------------------------|-----------------|
+| Weight (flour, meat) | weight | Yes (÷ size_qty) | Yes (oz→lb etc) |
+| Count (patties, eggs) | count | Yes (÷ size_qty) | Yes (each→case) |
+| Volume (wine, spirits) | volume | No (size is description) | No (per bottle) |
+| Beer (special case) | weight (oz) | Yes (÷ 16oz) | Yes (oz→can ×16) |
+
+---
+
+### Previous Session Work (Dec 30, 2025)
 
 **HUB UOM ARCHITECTURE & VENDOR ITEMS PERFORMANCE** ✅ **COMPLETE**
 
@@ -31,12 +105,6 @@
 - Debounced search (300ms delay before server request)
 - Server-side filtering for search, vendor, category, status
 - Pagination UI with Previous/Next and "Showing 1-50 of 694" info
-
-#### 4. **Files Modified**
-- `integration-hub/src/integration_hub/api/uom.py` - New UoM API endpoint
-- `integration-hub/src/integration_hub/templates/hub_vendor_items.html` - Server-side pagination
-- `inventory/src/restaurant_inventory/api/api_v1/endpoints/units.py` - Hub UoM proxy
-- `inventory/src/restaurant_inventory/models/item_unit_conversion.py` - Hub UoM references
 
 ---
 

@@ -207,7 +207,7 @@
                 </div>
                 <div class="card-body">
                     <p class="text-muted small mb-3">
-                        Define how to convert between units for this item (e.g., 1 LB = 8 patties for 2oz patties)
+                        Define how to convert between units for this item (e.g., 1 Bottle = 750 mL, 1 Box = 32 oz)
                     </p>
                     <div id="conversionsContent">
                         <p class="text-muted">Loading conversions...</p>
@@ -216,9 +216,8 @@
                         <table class="table table-sm table-hover mb-0">
                             <thead>
                                 <tr>
-                                    <th>From Unit</th>
-                                    <th>To Unit</th>
-                                    <th>Factor</th>
+                                    <th>Container</th>
+                                    <th>Contains</th>
                                     <th>Individual Size</th>
                                     <th>Notes</th>
                                     <th style="width: 80px;">Actions</th>
@@ -289,31 +288,37 @@
             </div>
             <div class="modal-body">
                 <p class="text-muted small">
-                    Define how to convert between units for this item.<br>
-                    Example: For 2oz patties, 1 LB = 8 patties (16oz / 2oz = 8)
+                    Define a container/count unit for this item.<br>
+                    Example: 1 Bottle = 750 mL, or 1 Box = 32 oz
                 </p>
                 <form id="addConversionForm">
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="convFromUnit" class="form-label">From Unit *</label>
-                            <select class="form-select" id="convFromUnit" required>
-                                <option value="">Select unit...</option>
-                            </select>
-                            <small class="form-text text-muted">Purchase/weight unit</small>
+                    <!-- Hidden field to store the primary unit (from_unit) -->
+                    <input type="hidden" id="convFromUnit">
+
+                    <div class="row align-items-center mb-3">
+                        <div class="col-auto">
+                            <span class="fs-5">1</span>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="convToUnit" class="form-label">To Unit *</label>
+                        <div class="col">
+                            <label for="convToUnit" class="form-label visually-hidden">Container Unit *</label>
                             <select class="form-select" id="convToUnit" required>
-                                <option value="">Select unit...</option>
+                                <option value="">Select container...</option>
                             </select>
-                            <small class="form-text text-muted">Count unit</small>
+                        </div>
+                        <div class="col-auto">
+                            <span class="fs-5">=</span>
+                        </div>
+                        <div class="col">
+                            <label for="convFactor" class="form-label visually-hidden">Amount *</label>
+                            <input type="number" step="0.0001" class="form-control" id="convFactor" required placeholder="e.g., 750">
+                        </div>
+                        <div class="col-auto">
+                            <span class="fs-5" id="primaryUnitLabel">-</span>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="convFactor" class="form-label">Conversion Factor *</label>
-                        <input type="number" step="0.0001" class="form-control" id="convFactor" required placeholder="e.g., 8">
-                        <small class="form-text text-muted">How many "To Units" in one "From Unit" (e.g., 8 patties per pound)</small>
-                    </div>
+                    <small class="form-text text-muted d-block mb-3">
+                        Example: "1 Bottle = 750 Milliliter" or "1 Box = 32 Ounce"
+                    </small>
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label for="convIndividualWeight" class="form-label">Individual Weight (oz)</label>
@@ -372,14 +377,14 @@
                     <div class="row">
                         <div class="col-md-5 mb-3">
                             <label for="editItemCountUnit2Id" class="form-label">Count Unit 2 (Optional)</label>
-                            <select class="form-select" id="editItemCountUnit2Id" onchange="updateConversionPreview(2)">
+                            <select class="form-select" id="editItemCountUnit2Id" onchange="onCountUnitSelect(2)">
                                 <option value="">None</option>
                             </select>
                         </div>
                         <div class="col-md-3 mb-3">
                             <label for="editItemCountUnit2Factor" class="form-label">= Primary Units</label>
                             <input type="number" step="0.01" min="0.01" class="form-control" id="editItemCountUnit2Factor"
-                                   placeholder="e.g., 24" oninput="updateConversionPreview(2)">
+                                   placeholder="e.g., 5" oninput="updateCountUnitPreview(2)">
                         </div>
                         <div class="col-md-4 mb-3 d-flex align-items-end">
                             <small id="conversionPreview2" class="text-muted"></small>
@@ -388,14 +393,14 @@
                     <div class="row">
                         <div class="col-md-5 mb-3">
                             <label for="editItemCountUnit3Id" class="form-label">Count Unit 3 (Optional)</label>
-                            <select class="form-select" id="editItemCountUnit3Id" onchange="updateConversionPreview(3)">
+                            <select class="form-select" id="editItemCountUnit3Id" onchange="onCountUnitSelect(3)">
                                 <option value="">None</option>
                             </select>
                         </div>
                         <div class="col-md-3 mb-3">
                             <label for="editItemCountUnit3Factor" class="form-label">= Primary Units</label>
                             <input type="number" step="0.01" min="0.01" class="form-control" id="editItemCountUnit3Factor"
-                                   placeholder="e.g., 12" oninput="updateConversionPreview(3)">
+                                   placeholder="e.g., 12" oninput="updateCountUnitPreview(3)">
                         </div>
                         <div class="col-md-4 mb-3 d-flex align-items-end">
                             <small id="conversionPreview3" class="text-muted"></small>
@@ -581,11 +586,14 @@
 
         // Details
         document.getElementById('itemCategoryDetail').textContent = itemData.category || '-';
-        document.getElementById('itemCountUnit').textContent = itemData.unit_of_measure || itemData.unit_name || '-';
+        // Display the PRIMARY COUNT UNIT (from master_item_count_units), NOT the primary UoM for costing
+        const primaryCountUnit = itemData.count_units?.find(cu => cu.is_primary);
+        const countUnitDisplay = primaryCountUnit?.uom_name || itemData.primary_count_unit_name || '-';
+        document.getElementById('itemCountUnit').textContent = countUnitDisplay;
         document.getElementById('itemParLevel').textContent = itemData.par_level ? parseFloat(itemData.par_level).toFixed(2) : '-';
 
         // Additional count units with conversion factors
-        const primaryUnit = itemData.unit_of_measure || itemData.unit_name || 'unit';
+        const primaryUnit = countUnitDisplay || 'unit';
         if (itemData.count_unit_2_name) {
             document.getElementById('countUnit2Row').style.display = '';
             let cu2Display = itemData.count_unit_2_name;
@@ -642,24 +650,79 @@
         const maxPriceEl = document.getElementById('itemMaxPrice');
         const pricingNoteEl = document.getElementById('pricingNote');
 
-        const unitName = itemData?.unit_of_measure || 'unit';
+        // Use PRIMARY COUNT UNIT for display (e.g., "Can"), not cost tracking unit (e.g., "Ounce")
+        const primaryCountUnit = itemData?.count_units?.find(cu => cu.is_primary);
+        const unitName = primaryCountUnit?.uom_name || itemData?.primary_count_unit_name || itemData?.unit_of_measure || 'unit';
+        const primaryCountUnitId = primaryCountUnit?.uom_id || itemData?.primary_count_unit_id;
+
+        // Check if there's a unit conversion involving the primary count unit
+        // Conversion stored as: from_unit → to_unit, conversion_factor = "how many to_units in 1 from_unit"
+        // Example: from=Ounce, to=Can, factor=16 means "16 Cans per 1 Ounce" (wrong way around)
+        //          Actually means "1 Can contains 16 Ounces" for our purposes
+        //
+        // If primary count unit is "Can" (uom_id=8) and conversion shows:
+        //   - to_unit_id = 8 (Can): multiply cost by conversion_factor (e.g., $0.08 × 16 = $1.28/can)
+        //   - from_unit_id = 8 (Can): divide cost by conversion_factor
+        let countUnitConversionFactor = 1;
+        if (unitConversions && unitConversions.length > 0 && primaryCountUnitId) {
+            // Find conversion involving the primary count unit
+            const conversion = unitConversions.find(c => {
+                const fromId = c.from_unit_id || (c.from_unit && c.from_unit.id);
+                const toId = c.to_unit_id || (c.to_unit && c.to_unit.id);
+                return fromId === primaryCountUnitId || toId === primaryCountUnitId;
+            });
+            if (conversion && conversion.conversion_factor) {
+                const factor = parseFloat(conversion.conversion_factor);
+                const toUnitId = conversion.to_unit_id || (conversion.to_unit && conversion.to_unit.id);
+
+                // If to_unit is the primary count unit, multiply (e.g., to=Can, factor=16: cost × 16)
+                // If from_unit is the primary count unit, divide (e.g., from=Can, factor=0.0625: cost / 0.0625)
+                if (toUnitId === primaryCountUnitId) {
+                    countUnitConversionFactor = factor;
+                } else {
+                    countUnitConversionFactor = 1 / factor;
+                }
+            }
+        }
 
         // Calculate pricing from vendor items
         // Priority: case_cost/units_per_case (new Backbar-style), fallback to unit_price/conversion_factor (deprecated)
+        // For weight items (lb, oz, kg, g), divide by size_quantity to get cost per unit weight
         const validPrices = vendorItems
             .filter(vi => vi.is_active && (
                 (vi.case_cost && vi.units_per_case && vi.units_per_case > 0) ||
                 (vi.unit_price && vi.conversion_factor && vi.conversion_factor > 0)
             ))
             .map(vi => {
-                let costPerUnit;
+                let costPerBaseUnit;
                 if (vi.case_cost && vi.units_per_case && vi.units_per_case > 0) {
-                    // New Backbar-style pricing
-                    costPerUnit = parseFloat(vi.case_cost) / parseFloat(vi.units_per_case);
+                    // New Backbar-style pricing: case_cost / units_per_case / size_quantity
+                    // e.g., Flour: $21.96 / 2 bags / 10 lb = $1.10/lb
+                    // e.g., Buns: $53.54 / 8 bags / 10 count = $0.67/bun
+                    // BUT NOT for volume: $171 / 6 bottles = $28.50/bottle (750ml is just the size, not inner count)
+                    const unitsPerCase = parseFloat(vi.units_per_case);
+                    const sizeQty = parseFloat(vi.size_quantity) || 1;
+                    const measureType = vi.size_unit_measure_type || '';
+
+                    // Only divide by size_quantity for weight and count types (not volume)
+                    // Weight: 25 lb bag = 25 units of weight
+                    // Count: 10 count bag = 10 individual items
+                    // Volume: 750 ml bottle = 1 bottle (750ml is just the size description)
+                    if ((measureType === 'weight' || measureType === 'count') && sizeQty > 1) {
+                        costPerBaseUnit = parseFloat(vi.case_cost) / (unitsPerCase * sizeQty);
+                    } else {
+                        // Volume items, or items without size_quantity
+                        costPerBaseUnit = parseFloat(vi.case_cost) / unitsPerCase;
+                    }
                 } else {
                     // Deprecated pricing (fallback)
-                    costPerUnit = parseFloat(vi.unit_price) / parseFloat(vi.conversion_factor);
+                    costPerBaseUnit = parseFloat(vi.unit_price) / parseFloat(vi.conversion_factor);
                 }
+
+                // Apply unit conversion factor to get cost per count unit
+                // e.g., if count unit is "Can" and 1 Can = 16 oz, multiply cost-per-oz by 16
+                const costPerUnit = costPerBaseUnit * countUnitConversionFactor;
+
                 return {
                     vendor: vi.vendor_name,
                     costPerUnit: costPerUnit,
@@ -824,9 +887,24 @@
 
         const unitName = itemData?.unit_of_measure || 'unit';
 
+        // Get size_quantity from vendor items to adjust location costs
+        // Location costs store per-unit prices (per bag), we need per-each prices
+        // Only for weight/count items (not volume - 750ml bottle is still 1 bottle)
+        let sizeQtyDivisor = 1;
+        if (vendorItems && vendorItems.length > 0) {
+            const vi = vendorItems[0]; // Use primary vendor item
+            const sizeQty = parseFloat(vi.size_quantity) || 1;
+            const measureType = vi.size_unit_measure_type || '';
+            // Only divide for weight/count types, not volume
+            if ((measureType === 'weight' || measureType === 'count') && sizeQty > 1) {
+                sizeQtyDivisor = sizeQty;
+            }
+        }
+
         tbody.innerHTML = locationCosts.map(loc => {
-            const lastPrice = loc.last_price ? `$${parseFloat(loc.last_price).toFixed(2)}` : '-';
-            const avgPrice = loc.avg_price ? `$${parseFloat(loc.avg_price).toFixed(2)}` : '-';
+            // Adjust prices by size_quantity to show per-each cost
+            const lastPrice = loc.last_price ? `$${(parseFloat(loc.last_price) / sizeQtyDivisor).toFixed(2)}` : '-';
+            const avgPrice = loc.avg_price ? `$${(parseFloat(loc.avg_price) / sizeQtyDivisor).toFixed(2)}` : '-';
             const lastDate = loc.last_invoice_date
                 ? new Date(loc.last_invoice_date).toLocaleDateString()
                 : '-';
@@ -854,9 +932,14 @@
                 }
             }
 
+            // Show indicator if using default cost (no location-specific invoice data)
+            const defaultBadge = loc.is_default_cost
+                ? '<span class="badge bg-secondary ms-1" title="Using default cost - no invoices for this location">Default</span>'
+                : '';
+
             return `
                 <tr>
-                    <td><strong>${loc.location_name}</strong></td>
+                    <td><strong>${loc.location_name}</strong>${defaultBadge}</td>
                     <td class="text-end">${lastPrice}</td>
                     <td class="text-end"><strong>${avgPrice}</strong></td>
                     <td class="text-end">${qtyOnHand}</td>
@@ -1022,7 +1105,21 @@
         tbody.innerHTML = conversions.map(conv => {
             const fromUnit = conv.from_unit ? `${conv.from_unit.name} (${conv.from_unit.abbreviation})` : '-';
             const toUnit = conv.to_unit ? `${conv.to_unit.name} (${conv.to_unit.abbreviation})` : '-';
-            const factor = parseFloat(conv.conversion_factor).toFixed(4).replace(/\.?0+$/, '');
+            const factor = parseFloat(conv.conversion_factor);
+
+            // Display in intuitive format: "1 Container = X Primary Units"
+            // Database stores: conversion_factor = "how many to_units per 1 from_unit"
+            // Example: from=mL, to=Bottle, factor=750 means "1 mL = 750 Bottles" (nonsensical)
+            //
+            // For intuitive display "1 Bottle = 750 mL":
+            // - If factor > 1: likely entered backwards, so factor IS the amount (1 Bottle = factor mL)
+            // - If factor < 1: correctly stored, so 1/factor is the amount
+            //
+            // Going forward, new UI will store factor < 1 (e.g., 0.00133 for 750mL bottle)
+            // For now, display factor directly if > 1 (legacy), or 1/factor if < 1 (new)
+            const containsAmount = factor >= 1
+                ? factor.toFixed(4).replace(/\.?0+$/, '')
+                : (1 / factor).toFixed(4).replace(/\.?0+$/, '');
 
             let sizeInfo = '-';
             if (conv.individual_weight_oz) {
@@ -1033,9 +1130,8 @@
 
             return `
                 <tr>
-                    <td>1 ${fromUnit}</td>
-                    <td>${factor} ${toUnit}</td>
-                    <td>${factor}</td>
+                    <td><strong>1 ${toUnit}</strong></td>
+                    <td>${containsAmount} ${fromUnit}</td>
                     <td>${sizeInfo}</td>
                     <td>${conv.notes || '-'}</td>
                     <td>
@@ -1059,62 +1155,66 @@
         const baseUomId = itemData?.primary_uom_id || itemData?.unit_of_measure_id;
         const baseUom = unitsOfMeasure.find(u => u.id == baseUomId);
 
-        // Populate unit dropdowns
-        const fromSelect = document.getElementById('convFromUnit');
+        // Store from unit in hidden field
+        const fromInput = document.getElementById('convFromUnit');
+        fromInput.value = baseUomId || '';
+
+        // Show primary unit name in the label
+        const primaryLabel = document.getElementById('primaryUnitLabel');
+        primaryLabel.textContent = baseUom ? baseUom.name : '-';
+
+        // To Unit (Container): Show all OTHER units (excluding the base UoM)
+        // Prioritize "count" dimension units (Box, Bottle, Case, Each, etc.)
         const toSelect = document.getElementById('convToUnit');
-
-        // From Unit: ONLY show the base UoM (pre-selected and locked)
-        fromSelect.innerHTML = '';
-        if (baseUom) {
-            fromSelect.innerHTML = `<option value="${baseUom.id}" selected>${baseUom.name} (${baseUom.abbreviation})</option>`;
-            fromSelect.disabled = true;  // Lock it - can only convert FROM the base unit
-        } else {
-            fromSelect.innerHTML = '<option value="">No base unit set</option>';
-            fromSelect.disabled = true;
-        }
-
-        // To Unit: Show all OTHER units (excluding the base UoM)
-        toSelect.innerHTML = '<option value="">Select unit...</option>';
+        toSelect.innerHTML = '<option value="">Select container...</option>';
         toSelect.disabled = false;
-        unitsOfMeasure
-            .filter(unit => unit.id != baseUomId)  // Exclude the base UoM
-            .forEach(unit => {
-                const dimLabel = unit.dimension ? ` [${unit.dimension}]` : '';
-                toSelect.innerHTML += `<option value="${unit.id}">${unit.name} (${unit.abbreviation})${dimLabel}</option>`;
+
+        // Sort: count units first, then others
+        const sortedUnits = unitsOfMeasure
+            .filter(unit => unit.id != baseUomId)
+            .sort((a, b) => {
+                const aIsCount = a.dimension === 'count';
+                const bIsCount = b.dimension === 'count';
+                if (aIsCount && !bIsCount) return -1;
+                if (!aIsCount && bIsCount) return 1;
+                return a.name.localeCompare(b.name);
             });
+
+        sortedUnits.forEach(unit => {
+            const dimLabel = unit.dimension ? ` [${unit.dimension}]` : '';
+            toSelect.innerHTML += `<option value="${unit.id}">${unit.name} (${unit.abbreviation})${dimLabel}</option>`;
+        });
 
         // Clear form
         document.getElementById('addConversionForm').reset();
         document.getElementById('conversionPreview').style.display = 'none';
 
-        // Re-set the from unit after reset (reset clears selections)
-        if (baseUom) {
-            fromSelect.value = baseUom.id;
-        }
+        // Restore hidden field after reset
+        fromInput.value = baseUomId || '';
 
         // Add change handlers for preview
-        document.getElementById('convFromUnit').onchange = updateConversionPreview;
-        document.getElementById('convToUnit').onchange = updateConversionPreview;
-        document.getElementById('convFactor').oninput = updateConversionPreview;
+        document.getElementById('convToUnit').onchange = updateConversionModalPreview;
+        document.getElementById('convFactor').oninput = updateConversionModalPreview;
 
         conversionModal.show();
     }
 
-    // Update conversion preview
-    function updateConversionPreview() {
+    // Update conversion modal preview (for Add Conversion modal)
+    function updateConversionModalPreview() {
         const fromUnitId = document.getElementById('convFromUnit').value;
         const toUnitId = document.getElementById('convToUnit').value;
-        const factor = parseFloat(document.getElementById('convFactor').value);
+        const amount = parseFloat(document.getElementById('convFactor').value);
 
         const preview = document.getElementById('conversionPreview');
         const previewText = document.getElementById('conversionPreviewText');
 
-        if (fromUnitId && toUnitId && factor > 0) {
+        if (fromUnitId && toUnitId && amount > 0) {
             const fromUnit = unitsOfMeasure.find(u => u.id == fromUnitId);
             const toUnit = unitsOfMeasure.find(u => u.id == toUnitId);
 
             if (fromUnit && toUnit) {
-                previewText.textContent = `1 ${fromUnit.name} = ${factor} ${toUnit.name}`;
+                // Show in intuitive format: "1 Bottle = 750 Milliliter"
+                previewText.textContent = `1 ${toUnit.name} = ${amount} ${fromUnit.name}`;
                 preview.style.display = 'block';
             }
         } else {
@@ -1277,8 +1377,11 @@
         // Fill form with current values
         document.getElementById('editItemName').value = itemData.name || '';
         document.getElementById('editItemDescription').value = itemData.description || '';
-        // Use Hub UoM (primary_uom_id) if available, otherwise fall back to deprecated unit_of_measure_id
-        document.getElementById('editItemUnitId').value = itemData.primary_uom_id || itemData.unit_of_measure_id || '';
+        // Use primary_count_unit_id (from master_item_count_units) - what you physically count (e.g., Bottle)
+        // Falls back to hub_uom_id from count_units array, or deprecated primary_uom_id
+        const primaryCountUnitForEdit = itemData.count_units?.find(cu => cu.is_primary);
+        const countUnitIdToSelect = primaryCountUnitForEdit?.uom_id || itemData.primary_count_unit_id || '';
+        document.getElementById('editItemUnitId').value = String(countUnitIdToSelect);
         document.getElementById('editItemCountUnit2Id').value = itemData.count_unit_2_id || '';
         document.getElementById('editItemCountUnit3Id').value = itemData.count_unit_3_id || '';
         document.getElementById('editItemCountUnit2Factor').value = itemData.count_unit_2_factor || '';
@@ -1288,27 +1391,26 @@
         document.getElementById('editItemIsKeyItem').checked = itemData.is_key_item === true;
 
         // Update conversion previews
-        updateConversionPreview(2);
-        updateConversionPreview(3);
+        updateCountUnitPreview(2);
+        updateCountUnitPreview(3);
 
         editItemModal.show();
     }
 
     // Save item changes
     async function saveItem() {
+        const primaryCountUnitId = parseInt(document.getElementById('editItemUnitId').value);
         const countUnit2Val = document.getElementById('editItemCountUnit2Id').value;
         const countUnit3Val = document.getElementById('editItemCountUnit3Id').value;
         const countUnit2Factor = document.getElementById('editItemCountUnit2Factor').value;
         const countUnit3Factor = document.getElementById('editItemCountUnit3Factor').value;
         const nameField = document.getElementById('editItemName');
-        const primaryUomId = parseInt(document.getElementById('editItemUnitId').value);
 
         // Build data object - category is managed by Hub, not editable here
-        // Use primary_uom_id (Hub UoM) instead of deprecated unit_of_measure_id
+        // Note: primary_uom_id is for COST tracking (fl oz), primary COUNT unit is separate
         const data = {
             name: nameField.value,
             description: document.getElementById('editItemDescription').value || null,
-            primary_uom_id: primaryUomId,  // Hub UoM ID (source of truth)
             par_level: document.getElementById('editItemParLevel').value
                 ? parseFloat(document.getElementById('editItemParLevel').value)
                 : null,
@@ -1321,7 +1423,7 @@
             showAlert('Please fill in the name field', 'warning');
             return;
         }
-        if (!data.primary_uom_id) {
+        if (!primaryCountUnitId) {
             showAlert('Please select a count unit', 'warning');
             return;
         }
@@ -1346,6 +1448,8 @@
             // Update count units separately (with Hub UOM IDs and conversion factors)
             // Build query params for count units endpoint
             const countUnitParams = new URLSearchParams();
+            // Include primary count unit (what you physically count - e.g., Bottle)
+            countUnitParams.append('primary_count_unit_id', primaryCountUnitId.toString());
             if (countUnit2Val) {
                 countUnitParams.append('count_unit_2_id', countUnit2Val);
                 countUnitParams.append('count_unit_2_factor', countUnit2Factor || '1');
@@ -1417,6 +1521,9 @@
             .filter(c => c.to_unit && c.to_unit.id)
             .map(c => c.to_unit.id);
 
+        // Get current item's primary count unit ID to ensure it's always included
+        const currentCountUnitId = itemData?.count_units?.find(cu => cu.is_primary)?.uom_id;
+
         // Filter and sort units
         let filteredUnits = [...unitsOfMeasure];
 
@@ -1428,6 +1535,8 @@
                 if (compatibleDimensions.includes(unit.dimension)) return true;
                 // Include if this unit has a conversion defined (can count in this unit)
                 if (conversionToUnitIds.includes(unit.id)) return true;
+                // Always include the current item's count unit (so it shows as selected)
+                if (currentCountUnitId && unit.id === currentCountUnitId) return true;
                 return false;
             });
         }
@@ -1448,8 +1557,43 @@
             });
     }
 
-    // Update conversion preview text (e.g., "1 Case = 24 Bottle")
-    function updateConversionPreview(unitNum) {
+    // Handle count unit selection - auto-populate factor from conversions if available
+    function onCountUnitSelect(unitNum) {
+        const unitSelect = document.getElementById(`editItemCountUnit${unitNum}Id`);
+        const factorInput = document.getElementById(`editItemCountUnit${unitNum}Factor`);
+        const primaryUnitId = document.getElementById('editItemUnitId').value;
+        const selectedUnitId = unitSelect.value;
+
+        if (!selectedUnitId) {
+            factorInput.value = '';
+            updateCountUnitPreview(unitNum);
+            return;
+        }
+
+        // Look for a conversion from primary unit to this unit
+        const conversion = unitConversions.find(c =>
+            c.from_unit && c.to_unit &&
+            c.from_unit.id == primaryUnitId &&
+            c.to_unit.id == selectedUnitId
+        );
+
+        if (conversion && conversion.conversion_factor) {
+            const storedFactor = parseFloat(conversion.conversion_factor);
+            // Factor interpretation:
+            // - If factor >= 1: stored as "1 container = factor primary units" (new format)
+            // - If factor < 1: stored as "1 primary = factor containers" (old format), need inverse
+            const countUnitFactor = storedFactor >= 1 ? storedFactor : (1 / storedFactor);
+            factorInput.value = countUnitFactor.toFixed(4).replace(/\.?0+$/, '');
+        } else {
+            // No conversion found - clear the factor
+            factorInput.value = '';
+        }
+
+        updateCountUnitPreview(unitNum);
+    }
+
+    // Update count unit preview text (e.g., "1 Box = 5 Pound")
+    function updateCountUnitPreview(unitNum) {
         const previewEl = document.getElementById(`conversionPreview${unitNum}`);
         const unitSelect = document.getElementById(`editItemCountUnit${unitNum}Id`);
         const factorInput = document.getElementById(`editItemCountUnit${unitNum}Factor`);
@@ -1511,10 +1655,10 @@
         await loadReferenceData();
         await loadLocations();  // For cost history filter
         await loadItemDetails();
+        await loadUnitConversions();  // Load conversions BEFORE vendor items so pricing can apply them
         await loadVendorItems();
         await loadLocationCosts();
         await loadCostHistory();
-        await loadUnitConversions();
     });
 </script>
 {% endblock %}

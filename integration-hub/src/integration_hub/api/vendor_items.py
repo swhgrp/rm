@@ -909,6 +909,39 @@ async def sync_master_item_category(
         raise HTTPException(status_code=500, detail=f"Error syncing category: {str(e)}")
 
 
+@router.post("/sync-master-item-name/{master_item_id}")
+async def sync_master_item_name(
+    master_item_id: int,
+    name: str = Query(..., description="New name for the master item"),
+    db: Session = Depends(get_db)
+):
+    """
+    Sync a master item's name to all related vendor items in Hub.
+
+    This endpoint updates the cached `inventory_master_item_name` field
+    on all vendor items mapped to this master item.
+
+    Called by Inventory when a master item is renamed.
+    """
+    # Update all vendor items with this master item ID
+    updated = db.query(HubVendorItem).filter(
+        HubVendorItem.inventory_master_item_id == master_item_id
+    ).update({
+        HubVendorItem.inventory_master_item_name: name
+    })
+
+    db.commit()
+
+    logger.info(f"Updated cached name for master item {master_item_id} to '{name}' on {updated} vendor items")
+
+    return {
+        "success": True,
+        "master_item_id": master_item_id,
+        "new_name": name,
+        "vendor_items_updated": updated
+    }
+
+
 @router.get("/{vendor_item_id}", response_model=VendorItemResponse)
 async def get_vendor_item(
     vendor_item_id: int,
@@ -965,11 +998,12 @@ async def get_vendor_item(
         gl_asset_account=item.gl_asset_account,
         gl_cogs_account=item.gl_cogs_account,
         gl_waste_account=item.gl_waste_account,
+        status=item.status.value if hasattr(item.status, 'value') else (item.status or 'active'),
         is_active=item.is_active,
         is_preferred=item.is_preferred,
         notes=item.notes,
         inventory_vendor_item_id=item.inventory_vendor_item_id,
-        synced_to_inventory=item.synced_to_inventory,
+        synced_to_inventory=item.synced_to_inventory if item.synced_to_inventory is not None else False,
         created_at=item.created_at,
         updated_at=item.updated_at
     )
@@ -1024,6 +1058,50 @@ async def update_vendor_item(
 
     logger.info(f"Updated vendor item {item.id}")
 
+    # Sync size_unit (primary UoM) to master item if updated and item is mapped
+    # For VOLUME items: use Fluid Ounce (id=15) as primary for POS liquor tracking
+    # For other items: use the vendor item's size unit
+    if "size_unit_id" in update_data and item.inventory_master_item_id and item.size_unit_id:
+        try:
+            from sqlalchemy import text, create_engine
+            from integration_hub.models.size_unit import SizeUnit
+
+            # Get size unit details
+            size_unit = db.query(SizeUnit).filter(SizeUnit.id == item.size_unit_id).first()
+            if size_unit:
+                inventory_db_url = os.getenv(
+                    "INVENTORY_DATABASE_URL",
+                    "postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db"
+                )
+                inv_engine = create_engine(inventory_db_url)
+
+                # For volume items, set primary UoM to Fluid Ounce for POS tracking
+                if size_unit.measure_type == "volume" and size_unit.conversion_to_inventory_unit:
+                    uom_id, uom_name, uom_abbr = 15, "Fluid Ounce", "fl oz"
+                    logger.info(f"Volume item detected - using Fluid Ounce as primary UoM instead of {size_unit.symbol}")
+                else:
+                    uom_id, uom_name, uom_abbr = size_unit.id, size_unit.name, size_unit.symbol
+
+                with inv_engine.connect() as conn:
+                    conn.execute(
+                        text("""UPDATE master_items
+                                SET primary_uom_id = :uom_id,
+                                    primary_uom_name = :uom_name,
+                                    primary_uom_abbr = :uom_abbr,
+                                    updated_at = NOW()
+                                WHERE id = :id"""),
+                        {
+                            "id": item.inventory_master_item_id,
+                            "uom_id": uom_id,
+                            "uom_name": uom_name,
+                            "uom_abbr": uom_abbr
+                        }
+                    )
+                    conn.commit()
+                    logger.info(f"Synced primary UoM '{uom_abbr}' to master item {item.inventory_master_item_id}")
+        except Exception as e:
+            logger.error(f"Error syncing primary UoM to master item: {str(e)}")
+
     # Sync category to master item if category was updated and item is mapped
     if "category" in update_data and item.inventory_master_item_id and item.category:
         try:
@@ -1042,6 +1120,70 @@ async def update_vendor_item(
                 logger.info(f"Synced category '{item.category}' to master item {item.inventory_master_item_id}")
         except Exception as e:
             logger.error(f"Error syncing category to master item: {str(e)}")
+
+    # Auto-create bottle conversion and set primary UoM when vendor item with volume is mapped to master item
+    if "inventory_master_item_id" in update_data and item.inventory_master_item_id and item.size_quantity and item.size_unit_id:
+        try:
+            from sqlalchemy import text, create_engine
+            from integration_hub.models.size_unit import SizeUnit
+
+            # Get size unit to check if it has conversion factor for inventory unit
+            size_unit = db.query(SizeUnit).filter(SizeUnit.id == item.size_unit_id).first()
+            if size_unit and size_unit.conversion_to_inventory_unit and size_unit.measure_type == "volume":
+                # Calculate fl oz from vendor item size
+                fl_oz_amount = float(item.size_quantity) * float(size_unit.conversion_to_inventory_unit)
+
+                inventory_db_url = os.getenv(
+                    "INVENTORY_DATABASE_URL",
+                    "postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db"
+                )
+                inv_engine = create_engine(inventory_db_url)
+                with inv_engine.connect() as conn:
+                    # Set primary UoM to Fluid Ounce for volume items
+                    conn.execute(
+                        text("""UPDATE master_items
+                                SET primary_uom_id = 15,
+                                    primary_uom_name = 'Fluid Ounce',
+                                    primary_uom_abbr = 'fl oz',
+                                    updated_at = NOW()
+                                WHERE id = :id"""),
+                        {"id": item.inventory_master_item_id}
+                    )
+                    logger.info(f"Set primary UoM to Fluid Ounce for master item {item.inventory_master_item_id}")
+
+                    # Check if conversion already exists for this item (fl oz -> Bottle)
+                    existing = conn.execute(
+                        text("""SELECT id FROM item_unit_conversions
+                                WHERE master_item_id = :master_item_id
+                                AND from_unit_id = 15 AND to_unit_id = 7"""),
+                        {"master_item_id": item.inventory_master_item_id}
+                    ).fetchone()
+
+                    if not existing:
+                        # Insert new bottle conversion: 1 Bottle = X fl oz
+                        # from_unit = Fluid Ounce (15), to_unit = Bottle (7)
+                        conn.execute(
+                            text("""INSERT INTO item_unit_conversions
+                                    (master_item_id, from_unit_id, from_unit_name, from_unit_abbr,
+                                     to_unit_id, to_unit_name, to_unit_abbr, conversion_factor,
+                                     is_active, created_at, notes)
+                                    VALUES (:master_item_id, 15, 'Fluid Ounce', 'fl oz',
+                                            7, 'Bottle', 'btl', :factor,
+                                            true, NOW(), :notes)"""),
+                            {
+                                "master_item_id": item.inventory_master_item_id,
+                                "factor": round(fl_oz_amount, 4),
+                                "notes": f"Auto-created from vendor item size: {item.size_quantity} {size_unit.symbol}"
+                            }
+                        )
+                        logger.info(f"Auto-created bottle conversion for master item {item.inventory_master_item_id}: "
+                                   f"1 Bottle = {round(fl_oz_amount, 4)} fl oz (from {item.size_quantity} {size_unit.symbol})")
+                    else:
+                        logger.info(f"Bottle conversion already exists for master item {item.inventory_master_item_id}")
+
+                    conn.commit()
+        except Exception as e:
+            logger.error(f"Error auto-creating bottle conversion: {str(e)}")
 
     # Sync to Inventory
     if item.vendor:
@@ -1105,10 +1247,16 @@ async def update_vendor_item(
 @router.delete("/{vendor_item_id}")
 async def delete_vendor_item(
     vendor_item_id: int,
+    permanent: bool = Query(False, description="If true, permanently delete (only if no invoices)"),
     db: Session = Depends(get_db)
 ):
     """
-    Delete a vendor item (soft delete - sets is_active=False).
+    Delete a vendor item.
+
+    By default, performs a soft delete (sets is_active=False).
+
+    With permanent=true, performs a hard delete but ONLY if the item has no
+    associated invoice line items (no location prices recorded).
     """
     item = db.query(HubVendorItem).options(
         joinedload(HubVendorItem.vendor)
@@ -1117,17 +1265,53 @@ async def delete_vendor_item(
     if not item:
         raise HTTPException(status_code=404, detail="Vendor item not found")
 
-    # Soft delete
-    item.is_active = False
-    db.commit()
+    if permanent:
+        # Check if item has invoice records (indicates invoices exist)
+        from sqlalchemy import text
+        invoice_check = text("""
+            SELECT COUNT(*) FROM hub_invoice_items ii
+            JOIN hub_invoices i ON ii.invoice_id = i.id
+            WHERE i.vendor_id = :vendor_id
+              AND (
+                (ii.item_code IS NOT NULL AND ii.item_code = :vendor_sku)
+                OR (ii.item_description = :vendor_product_name)
+              )
+        """)
+        result = db.execute(invoice_check, {
+            "vendor_id": item.vendor_id,
+            "vendor_sku": item.vendor_sku,
+            "vendor_product_name": item.vendor_product_name
+        }).scalar()
+        price_count = result or 0
 
-    logger.info(f"Soft-deleted vendor item {vendor_item_id}")
+        if price_count > 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot permanently delete: item has {price_count} location price record(s) from invoices. Use deactivate instead."
+            )
 
-    # Sync deletion to Inventory
-    if item.vendor:
-        await sync_vendor_item_to_inventory(item, item.vendor, action="delete")
+        # Also sync deletion to Inventory first
+        if item.vendor:
+            await sync_vendor_item_to_inventory(item, item.vendor, action="delete")
 
-    return {"message": "Vendor item deactivated", "id": vendor_item_id}
+        # Hard delete
+        db.delete(item)
+        db.commit()
+        logger.info(f"Permanently deleted vendor item {vendor_item_id}")
+        return {"message": "Vendor item permanently deleted", "id": vendor_item_id}
+
+    else:
+        # Soft delete
+        item.is_active = False
+        db.commit()
+
+        logger.info(f"Soft-deleted vendor item {vendor_item_id}")
+
+        # Sync deletion to Inventory
+        if item.vendor:
+            await sync_vendor_item_to_inventory(item, item.vendor, action="delete")
+
+        return {"message": "Vendor item deactivated", "id": vendor_item_id}
 
 
 @router.get("/by-sku/{vendor_sku}")

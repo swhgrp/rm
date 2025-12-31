@@ -82,3 +82,9 @@ PRIORITY*_*.md
 *_IMPLEMENTATION.md
 RECOMMENDATIONS.md
 mail/
+
+# Temp/working files
+cookies.txt
+
+# HR document uploads (employee documents)
+hr/documents/

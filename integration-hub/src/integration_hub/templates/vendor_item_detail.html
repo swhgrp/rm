@@ -64,6 +64,9 @@
                     </div>
                 </div>
                 <div>
+                    <button class="btn btn-outline-danger me-2" id="deleteBtn" style="display: none;" onclick="deleteItem()" title="Delete this vendor item (only available if no invoices)">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
                     <button class="btn btn-outline-warning me-2" onclick="convertToExpense()" title="Map to expense GL account">
                         <i class="bi bi-receipt"></i> Map to Expense
                     </button>
@@ -123,19 +126,25 @@
                     <h5 class="mb-0"><i class="bi bi-currency-dollar"></i> Purchasing & Pricing</h5>
                 </div>
                 <div class="card-body">
+                    <!-- Case breakdown -->
+                    <div id="caseBreakdownRow" class="mb-3 p-2 bg-light rounded" style="display: none;">
+                        <small class="text-muted">Case Contents:</small>
+                        <div id="caseBreakdownDetail" class="fw-medium">-</div>
+                    </div>
+
                     <table class="table table-sm mb-0">
                         <tbody>
                             <tr>
-                                <td class="text-muted" style="width: 40%;">Units per Case</td>
-                                <td id="unitsPerCaseDetail">-</td>
-                            </tr>
-                            <tr>
-                                <td class="text-muted">Case Cost</td>
+                                <td class="text-muted" style="width: 40%;">Case Cost</td>
                                 <td id="caseCostDetail" class="fw-bold">-</td>
                             </tr>
-                            <tr>
-                                <td class="text-muted">Unit Cost</td>
-                                <td id="unitCostDetail" class="text-success fw-bold">-</td>
+                            <tr id="perContainerRow" style="display: none;">
+                                <td class="text-muted" id="perContainerLabel">Per Unit</td>
+                                <td id="perContainerCost" class="fw-bold">-</td>
+                            </tr>
+                            <tr id="perEachRow">
+                                <td class="text-muted" id="perEachLabel">Per Each</td>
+                                <td id="perEachCost" class="text-success fw-bold fs-5">-</td>
                             </tr>
                             <tr>
                                 <td class="text-muted">Previous Price</td>
@@ -599,6 +608,31 @@
         </div>
     </div>
 </div>
+
+<!-- Reject Item Modal -->
+<div class="modal fade" id="rejectItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="bi bi-x-circle"></i> Reject Item</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to reject this item?</p>
+                <div class="mb-3">
+                    <label class="form-label">Rejection Reason (optional)</label>
+                    <textarea class="form-control" id="rejectReasonInput" rows="3" placeholder="Enter reason for rejection..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" onclick="confirmRejectItem()">
+                    <i class="bi bi-x-circle"></i> Reject
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -723,10 +757,70 @@ function displayItemDetails(item) {
     // Size Display (Backbar-style)
     document.getElementById('sizeDisplayDetail').textContent = item.size_display || '-';
 
-    // Purchasing & Pricing (Backbar-style)
-    document.getElementById('unitsPerCaseDetail').textContent = item.units_per_case || '-';
+    // Purchasing & Pricing (Backbar-style) with clear breakdown
     document.getElementById('caseCostDetail').textContent = item.case_cost ? `$${parseFloat(item.case_cost).toFixed(2)}` : '-';
-    document.getElementById('unitCostDetail').textContent = item.unit_cost ? `$${parseFloat(item.unit_cost).toFixed(2)}` : '-';
+
+    // Build case breakdown and pricing display
+    const unitsPerCase = parseFloat(item.units_per_case) || 0;
+    const sizeQty = parseFloat(item.size_quantity) || 0;
+    const caseCost = parseFloat(item.case_cost) || 0;
+    const containerName = item.container_name || 'unit';
+    const sizeUnitSymbol = item.size_unit_symbol || '';
+    const measureType = item.size_unit_measure_type || '';
+
+    // Only show breakdown for weight/count items (not volume)
+    // Weight: 25 lb bag = cost per lb (show breakdown)
+    // Count: 10 count bag = cost per each (show breakdown)
+    // Volume: 750 ml bottle = cost per bottle (don't break down - 750ml is just size description)
+    const shouldShowBreakdown = (measureType === 'weight' || measureType === 'count') && sizeQty > 1;
+
+    if (unitsPerCase > 0 && shouldShowBreakdown) {
+        // Has size quantity for weight/count (e.g., 8 bags × 10 count = 80 count)
+        const totalUnits = unitsPerCase * sizeQty;
+        const perContainer = caseCost / unitsPerCase;
+        const perEach = caseCost / totalUnits;
+
+        // Show case breakdown: "8 × 10 count bag = 80 count"
+        document.getElementById('caseBreakdownRow').style.display = 'block';
+        document.getElementById('caseBreakdownDetail').textContent =
+            `${unitsPerCase} × ${sizeQty} ${sizeUnitSymbol} ${containerName} = ${totalUnits} ${sizeUnitSymbol}`;
+
+        // Show per-container price (e.g., "Per Bag (10 count)")
+        document.getElementById('perContainerRow').style.display = '';
+        document.getElementById('perContainerLabel').textContent =
+            `Per ${containerName.charAt(0).toUpperCase() + containerName.slice(1)} (${sizeQty} ${sizeUnitSymbol})`;
+        document.getElementById('perContainerCost').textContent = `$${perContainer.toFixed(2)}`;
+
+        // Show per-each price with unit label
+        document.getElementById('perEachLabel').textContent = `Per ${sizeUnitSymbol.charAt(0).toUpperCase() + sizeUnitSymbol.slice(1)}`;
+        document.getElementById('perEachCost').textContent = `$${perEach.toFixed(2)}`;
+
+    } else if (unitsPerCase > 0) {
+        // Simple case (no size quantity or size=1)
+        const perUnit = caseCost / unitsPerCase;
+
+        // Show case breakdown: "8 bottles"
+        if (item.container_name) {
+            document.getElementById('caseBreakdownRow').style.display = 'block';
+            document.getElementById('caseBreakdownDetail').textContent =
+                `${unitsPerCase} ${containerName}${unitsPerCase > 1 ? 's' : ''}`;
+        }
+
+        // Hide per-container row (no intermediate level)
+        document.getElementById('perContainerRow').style.display = 'none';
+
+        // Show per-unit price
+        const unitLabel = item.container_name || sizeUnitSymbol || 'Unit';
+        document.getElementById('perEachLabel').textContent =
+            `Per ${unitLabel.charAt(0).toUpperCase() + unitLabel.slice(1)}`;
+        document.getElementById('perEachCost').textContent = `$${perUnit.toFixed(2)}`;
+    } else {
+        // No pricing data
+        document.getElementById('caseBreakdownRow').style.display = 'none';
+        document.getElementById('perContainerRow').style.display = 'none';
+        document.getElementById('perEachLabel').textContent = 'Unit Cost';
+        document.getElementById('perEachCost').textContent = item.unit_cost ? `$${parseFloat(item.unit_cost).toFixed(2)}` : '-';
+    }
 
     const prevPrice = item.previous_purchase_price || item.last_price;
     document.getElementById('prevPriceDetail').textContent = prevPrice ? `$${parseFloat(prevPrice).toFixed(2)}` : '-';
@@ -854,11 +948,14 @@ async function loadLocationPrices() {
     const content = document.getElementById('locationPricesContent');
     const table = document.getElementById('locationPricesTable');
     const tbody = document.getElementById('locationPricesTableBody');
+    const deleteBtn = document.getElementById('deleteBtn');
 
     try {
         const response = await fetch(`/hub/api/v1/vendor-items/${itemId}/location-prices`);
         if (!response.ok) {
             content.innerHTML = '<p class="text-muted mb-0">No location-specific pricing available</p>';
+            // No pricing = can delete
+            deleteBtn.style.display = '';
             return;
         }
 
@@ -867,8 +964,13 @@ async function loadLocationPrices() {
 
         if (prices.length === 0) {
             content.innerHTML = '<p class="text-muted mb-0">No location-specific pricing available</p>';
+            // No pricing = can delete
+            deleteBtn.style.display = '';
             return;
         }
+
+        // Has pricing = cannot delete
+        deleteBtn.style.display = 'none';
 
         content.style.display = 'none';
         table.style.display = 'block';
@@ -884,6 +986,8 @@ async function loadLocationPrices() {
         `).join('');
     } catch (error) {
         content.innerHTML = '<p class="text-muted mb-0">No location-specific pricing available</p>';
+        // Error loading = assume can delete
+        deleteBtn.style.display = '';
     }
 }
 
@@ -1037,7 +1141,7 @@ async function saveMasterItemMapping() {
         // Reload page
         setTimeout(() => location.reload(), 500);
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showAlert(error.message, 'Error');
     }
 }
 
@@ -1083,6 +1187,37 @@ function editItem() {
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('editVendorItemModal'));
     modal.show();
+}
+
+// Delete vendor item (only allowed when no invoices/pricing)
+async function deleteItem() {
+    if (!currentItem) return;
+
+    const confirmed = await showConfirm(
+        `Are you sure you want to permanently delete "${currentItem.vendor_product_name}"? This action cannot be undone.`,
+        'Delete Vendor Item'
+    );
+
+    if (!confirmed) return;
+
+    try {
+        // Use permanent=true for hard delete
+        const response = await fetch(`/hub/api/v1/vendor-items/${itemId}?permanent=true`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete vendor item');
+        }
+
+        showToast('Vendor item deleted successfully', 'Success', 'success');
+        // Redirect back to vendor items list
+        setTimeout(() => { window.location.href = 'vendor-items'; }, 500);
+
+    } catch (error) {
+        showAlert('Error deleting vendor item: ' + error.message, 'Error');
+    }
 }
 
 // Convert vendor item to expense item - show confirmation modal
@@ -1266,7 +1401,7 @@ async function submitEditForm(event) {
         showToast('Success', 'Vendor item updated', 'success');
         setTimeout(() => location.reload(), 500);
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showAlert(error.message, 'Error');
     }
 }
 
@@ -1282,13 +1417,29 @@ async function approveItem() {
         showToast('Success', 'Item approved', 'success');
         setTimeout(() => location.reload(), 500);
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showAlert(error.message, 'Error');
     }
 }
 
-// Reject item
-async function rejectItem() {
-    const reason = prompt('Rejection reason (optional):');
+// Reject item - show modal
+function rejectItem() {
+    // Clear previous reason
+    document.getElementById('rejectReasonInput').value = '';
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('rejectItemModal'));
+    modal.show();
+}
+
+// Confirm rejection from modal
+async function confirmRejectItem() {
+    const reason = document.getElementById('rejectReasonInput').value.trim();
+
+    // Hide modal
+    const modalEl = document.getElementById('rejectItemModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    modal.hide();
+
     try {
         const url = `/hub/api/v1/vendor-items/review/${itemId}/reject${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`;
         const response = await fetch(url, { method: 'POST' });
@@ -1298,7 +1449,7 @@ async function rejectItem() {
         showToast('Success', 'Item rejected', 'success');
         setTimeout(() => location.reload(), 500);
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showAlert(error.message, 'Error');
     }
 }
 </script>

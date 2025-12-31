@@ -51,7 +51,18 @@
       "Bash(docker restart:*)",
       "Bash(docker logs:*)",
       "Bash(openssl rand:*)",
-      "Bash(docker cp:*)"
+      "Bash(docker cp:*)",
+      "Bash(systemctl status:*)",
+      "Bash(sudo systemctl stop:*)",
+      "Bash(sudo systemctl:*)",
+      "Bash(docker start:*)",
+      "Bash(time curl:*)",
+      "Bash(done)",
+      "Bash(echo \"=== CHECKING IF DEPRECATED FILES ARE STILL IMPORTED ===\" echo \"--- invoice.py \\(models\\) ---\" grep -r \"from.*_deprecated.*invoice\" /opt/restaurant-system/inventory/src --include=\"*.py\")",
+      "Bash(echo \"=== FILES WITH LOTS OF COMMENTS ===\" find /opt/restaurant-system/inventory/src -name \"*.py\" ! -path \"*__pycache__*\" -exec sh -c 'count=$\\(grep -c \"\"^[[:space:]]*#\"\" \"\"$1\"\" 2>/dev/null\\); if [ \"\"$count\"\" -gt 30 ]; then echo \"\"$1: $count\"\"; fi' _ {} ;)",
+      "Bash(sort:*)",
+      "Bash(echo \"=== CONSOLE.LOG STATEMENTS IN HTML ===\" grep -rn \"console\\\\.log\" /opt/restaurant-system/*/src/*/templates/*.html)",
+      "Bash(echo \"=== CONSOLE.LOG STATEMENTS IN HTML ===\" find /opt/restaurant-system -path \"*/templates/*.html\" -exec grep -l \"console.log\" {} ;)"
     ],
     "deny": [],
     "ask": []

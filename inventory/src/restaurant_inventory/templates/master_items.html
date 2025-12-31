@@ -341,7 +341,7 @@
 
 <!-- Manual Merge Selection Modal -->
 <div class="modal fade" id="manualMergeModal" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header bg-warning">
                 <h5 class="modal-title"><i class="bi bi-arrow-left-right"></i> Merge Selected Items</h5>
@@ -529,6 +529,10 @@
                         <input type="checkbox" class="form-check-input item-select-checkbox"
                                data-item-id="${item.id}"
                                data-item-name="${escapeHtml(item.name)}"
+                               data-item-category="${escapeHtml(item.category || '')}"
+                               data-item-unit="${escapeHtml(item.unit_of_measure || '')}"
+                               data-item-price="${item.last_price_paid || ''}"
+                               data-item-status="${item.is_active ? 'Active' : 'Inactive'}"
                                onchange="updateMergeSelection(this)" ${isChecked}>
                     </td>
                     <td><a href="item-detail?id=${item.id}" class="text-decoration-none text-primary" onclick="event.stopPropagation();">${item.name}</a></td>
@@ -1431,9 +1435,20 @@
     function updateMergeSelection(checkbox) {
         const itemId = parseInt(checkbox.dataset.itemId);
         const itemName = checkbox.dataset.itemName;
+        const itemCategory = checkbox.dataset.itemCategory || '';
+        const itemUnit = checkbox.dataset.itemUnit || '';
+        const itemPrice = checkbox.dataset.itemPrice || '';
+        const itemStatus = checkbox.dataset.itemStatus || '';
 
         if (checkbox.checked) {
-            selectedForMerge.set(itemId, { id: itemId, name: itemName });
+            selectedForMerge.set(itemId, {
+                id: itemId,
+                name: itemName,
+                category: itemCategory,
+                unit: itemUnit,
+                price: itemPrice,
+                status: itemStatus
+            });
         } else {
             selectedForMerge.delete(itemId);
         }
@@ -1496,14 +1511,27 @@
         const itemsArray = Array.from(selectedForMerge.values());
 
         itemsArray.forEach((item, index) => {
+            const priceDisplay = item.price ? '$' + parseFloat(item.price).toFixed(2) : 'No price';
             const div = document.createElement('div');
             div.className = 'form-check border rounded p-2 mb-2';
             div.innerHTML = `
                 <input class="form-check-input" type="radio" name="manual_merge_target"
                        id="manual_target_${item.id}" value="${item.id}" ${index === 0 ? 'checked' : ''}>
                 <label class="form-check-label w-100" for="manual_target_${item.id}">
-                    <strong>${item.name}</strong>
-                    <br><small class="text-muted">ID: ${item.id}</small>
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>${item.name}</strong>
+                            <div class="small text-muted mt-1">
+                                <span class="me-3"><i class="bi bi-tag"></i> ${item.category || 'No category'}</span>
+                                <span class="me-3"><i class="bi bi-rulers"></i> ${item.unit || 'No unit'}</span>
+                                <span><i class="bi bi-currency-dollar"></i> ${priceDisplay}</span>
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span class="badge ${item.status === 'Active' ? 'bg-success' : 'bg-secondary'}">${item.status}</span>
+                            <div class="small text-muted mt-1">ID: ${item.id}</div>
+                        </div>
+                    </div>
                 </label>
             `;
             container.appendChild(div);

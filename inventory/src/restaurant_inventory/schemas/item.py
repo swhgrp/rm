@@ -3,9 +3,20 @@ Master Item schemas for request/response models
 """
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Any
 from datetime import datetime
 from decimal import Decimal
+
+
+class CountUnitSchema(BaseModel):
+    """Schema for count unit data from master_item_count_units table"""
+    id: int
+    uom_id: int
+    uom_name: Optional[str] = None
+    uom_abbreviation: Optional[str] = None
+    is_primary: bool = False
+    conversion_to_primary: float = 1.0
+    display_order: int = 0
 
 class MasterItemBase(BaseModel):
     name: str
@@ -82,6 +93,30 @@ class MasterItemResponse(MasterItemBase):
     # Last price paid from vendor items
     last_price_paid: Optional[float] = None
     last_price_unit: Optional[str] = None
+    # Primary count unit from master_item_count_units (Hub UoM architecture)
+    primary_count_unit_id: Optional[int] = None
+    primary_count_unit_name: Optional[str] = None
+    primary_count_unit_abbr: Optional[str] = None
+    # All count units for advanced UI (populated manually, excluded from ORM)
+    count_units: Optional[List[Any]] = None
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True,
+        # Exclude count_units from ORM conversion since it's a relationship
+        # that needs manual serialization
+    }
+
+    @classmethod
+    def from_orm(cls, obj):
+        """Override to handle count_units manually"""
+        # Get all fields except count_units
+        data = {}
+        for field_name in cls.model_fields:
+            if field_name == 'count_units':
+                data['count_units'] = None  # Will be populated manually if needed
+            else:
+                try:
+                    data[field_name] = getattr(obj, field_name, None)
+                except Exception:
+                    data[field_name] = None
+        return cls(**data)

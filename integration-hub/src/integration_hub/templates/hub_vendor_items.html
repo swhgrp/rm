@@ -408,8 +408,7 @@ async function loadVendorItems() {
         // Build API URL with pagination and filters
         const params = new URLSearchParams({
             page: currentPage,
-            page_size: PAGE_SIZE,
-            mapped_only: 'true'
+            page_size: PAGE_SIZE
         });
 
         // Add filters

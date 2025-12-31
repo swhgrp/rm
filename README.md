@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** December 30, 2025
+**Last Updated:** December 31, 2025
 **Status:** ~92% Complete - Core Systems Production Ready ✅
-**Latest:** Hub UoM architecture, vendor items pagination, unit conversions (Dec 30, 2025) ✅
+**Latest:** Unit conversions & pricing fixes for beer/wine items (Dec 31, 2025) ✅
 
 ---
 
@@ -1332,6 +1332,34 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ## 📝 Recent Updates
 
+### December 31, 2025 - Unit Conversions & Pricing Fixes 🍺🍷
+
+**Beer Items - Ounce to Can Conversions**
+- ✅ **Unit conversions** - Added oz → Can conversions (factor=16) for 10 beer items
+- ✅ **Count unit standardization** - All beers now use "Can" as primary count unit
+- ✅ **Vendor item consistency** - Fixed `size_quantity=16` for all 16oz beer vendor items
+- ✅ **Pricing display** - $0.08/oz × 16 = $1.31/can shown correctly
+
+**Wine Items - Bottle Count Units**
+- ✅ **Count unit standardization** - All 29 wines now use "Bottle" as primary count unit
+- ✅ **No conversion needed** - Volume items priced per bottle directly (no mL conversion)
+- ✅ **Pricing display** - $189/case ÷ 12 = $15.75/bottle shown correctly
+
+**Master Items List Pricing**
+- ✅ **API enhancement** - Unit conversion factor applied to `last_price_paid`
+- ✅ **Correct display** - Shows per-count-unit price ($/can, $/bottle, $/lb)
+
+**Item Detail Pricing Fix**
+- ✅ **Load order fix** - Unit conversions loaded BEFORE vendor items
+- ✅ **Correct calculation** - Conversion factor applied based on from/to unit matching
+
+**Files Modified:**
+- `inventory/src/restaurant_inventory/api/api_v1/endpoints/items.py` - Unit conversion in pricing
+- `inventory/src/restaurant_inventory/templates/item_detail.html` - Pricing stats fix
+- `inventory/src/restaurant_inventory/templates/count_session_new.html` - Count units dropdown
+
+---
+
 ### December 30, 2025 - Hub UoM Architecture & Vendor Items Pagination ⚡
 
 **Hub as UoM Source of Truth**
@@ -1940,8 +1968,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 3.4 - Hub UoM Architecture & Vendor Items Performance
-**Last Updated:** December 30, 2025
+**Version:** 3.5 - Unit Conversions & Pricing Fixes
+**Last Updated:** December 31, 2025
 **Documentation Health:** 96/100 - Excellent ✅
 
-*Hub as UoM source of truth. Server-side pagination for vendor items. Item-specific unit conversions.*
+*Beer/wine unit conversions. Correct pricing per count unit ($/can, $/bottle). Volume vs weight pricing logic.*

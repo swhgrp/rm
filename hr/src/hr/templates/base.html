@@ -3,6 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Debug Mode Configuration -->
+    <script>
+        // Global debug configuration
+        // Set to false in production to disable console.log and console.warn
+        window.DEBUG_MODE = false;
+
+        // Override console methods to respect DEBUG_MODE
+        (function() {
+            const originalLog = console.log;
+            const originalWarn = console.warn;
+            const originalInfo = console.info;
+            const originalDebug = console.debug;
+
+            console.log = function(...args) {
+                if (window.DEBUG_MODE) originalLog.apply(console, args);
+            };
+            console.warn = function(...args) {
+                if (window.DEBUG_MODE) originalWarn.apply(console, args);
+            };
+            console.info = function(...args) {
+                if (window.DEBUG_MODE) originalInfo.apply(console, args);
+            };
+            console.debug = function(...args) {
+                if (window.DEBUG_MODE) originalDebug.apply(console, args);
+            };
+            // Keep console.error always enabled
+        })();
+    </script>
+
     <title>{% block title %}HR Management{% endblock %}</title>
 
     <!-- Favicon -->

@@ -194,10 +194,17 @@ class HubVendorItem(Base):
     @property
     def unit_cost(self) -> float | None:
         """
-        Calculate unit cost from case cost and units per case.
+        Calculate unit cost from case cost, units per case, and size quantity.
         Returns None if data is incomplete.
 
-        Example:
+        For count/weight items with size_quantity, divides by total units:
+          - Burger buns: $53.54 / (8 bags × 10 count) = $0.67/bun
+          - Flour 25lb bags: $45.00 / (2 bags × 25 lb) = $0.90/lb
+
+        For volume items (ml, L, fl oz), size_quantity is just the size description:
+          - Wine bottle: $171 / 6 bottles = $28.50/bottle (750ml is the size, not inner count)
+
+        For items without size_quantity (or size_quantity=1):
           - case_cost = $45.00
           - units_per_case = 6
           - unit_cost = $45.00 / 6 = $7.50
@@ -206,7 +213,18 @@ class HubVendorItem(Base):
             return None
         if self.units_per_case == 0:
             return None
-        return float(self.case_cost) / float(self.units_per_case)
+
+        units = float(self.units_per_case)
+
+        # Only factor in size_quantity for weight/count items, NOT volume
+        # Volume items (ml, L, fl oz) - the size_quantity is just the size description
+        if self.size_quantity and float(self.size_quantity) > 1:
+            # Check measure_type from size_unit relationship
+            measure_type = self.size_unit.measure_type if self.size_unit else None
+            if measure_type in ('weight', 'count'):
+                units *= float(self.size_quantity)
+
+        return float(self.case_cost) / units
 
     @property
     def size_display(self) -> str | None:

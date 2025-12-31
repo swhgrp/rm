@@ -816,11 +816,12 @@ function openCountModal(itemId) {
         ${expectedHtml}
     `;
 
-    // Populate unit selector with compatible units
+    // Populate unit selector with ONLY the count units defined for this item
+    // If only 1 count unit is defined, only 1 option should be shown
     const unitSelect = document.getElementById('unitSelect');
-    let compatibleUnits = [itemUnit]; // Always include primary unit
+    let compatibleUnits = [itemUnit]; // Always include primary count unit
 
-    // Add additional count units if defined (count_unit_2 and count_unit_3)
+    // Add additional count units if explicitly defined (count_unit_2 and count_unit_3)
     if (item.count_unit_2_name) {
         compatibleUnits.push(item.count_unit_2_name);
     }
@@ -828,22 +829,35 @@ function openCountModal(itemId) {
         compatibleUnits.push(item.count_unit_3_name);
     }
 
-    // Fall back to secondary_unit for older items or standard conversions
-    if (compatibleUnits.length === 1) {
-        if (item.secondary_unit && item.units_per_secondary) {
-            compatibleUnits.push(item.secondary_unit);
-        } else {
-            // Fall back to standard conversions if no custom conversion defined
-            const standardUnits = getCompatibleUnits(itemUnit);
-            compatibleUnits = [...new Set([...compatibleUnits, ...standardUnits])]; // Remove duplicates
-        }
+    // Legacy support: only use secondary_unit if explicitly defined for this item
+    if (item.secondary_unit && item.units_per_secondary && !compatibleUnits.includes(item.secondary_unit)) {
+        compatibleUnits.push(item.secondary_unit);
     }
+
+    // Remove duplicates (case-insensitive)
+    const seen = new Set();
+    compatibleUnits = compatibleUnits.filter(unit => {
+        if (!unit) return false;
+        const lower = unit.toLowerCase();
+        if (seen.has(lower)) return false;
+        seen.add(lower);
+        return true;
+    });
 
     console.log('Item unit:', item.unit_of_measure, 'Compatible units:', compatibleUnits, 'count_unit_2:', item.count_unit_2_name, 'count_unit_3:', item.count_unit_3_name);
 
     unitSelect.innerHTML = compatibleUnits.map(unit =>
         `<option value="${unit}" ${unit && itemUnit && unit.toLowerCase() === itemUnit.toLowerCase() ? 'selected' : ''}>${unit ? unit.toUpperCase() : 'EACH'}</option>`
     ).join('');
+
+    // If only 1 unit option, disable dropdown and show as simple text
+    if (compatibleUnits.length === 1) {
+        unitSelect.disabled = true;
+        unitSelect.classList.add('bg-light');
+    } else {
+        unitSelect.disabled = false;
+        unitSelect.classList.remove('bg-light');
+    }
 
     document.getElementById('qtyInput').value = existing?.counted_quantity !== null && existing?.counted_quantity !== undefined ? existing.counted_quantity : '';
     document.getElementById('itemNotesInput').value = existing ? (existing.notes || '') : '';

@@ -99,6 +99,7 @@ async def get_master_items(
     # Fetch pricing data from Hub (source of truth for vendor items)
     # Get cost per unit for each master item from Hub's vendor items
     # Uses Backbar-style fields (case_cost / units_per_case) with fallback to deprecated fields
+    # For weight items (lb, oz, kg, g), divides by size_quantity to get true per-unit cost
     hub_pricing = {}
     try:
         from sqlalchemy import create_engine
@@ -106,32 +107,43 @@ async def get_master_items(
         with hub_engine.connect() as conn:
             # Get preferred vendor item price OR most recent price
             # Priority: case_cost/units_per_case (new), fallback to unit_price/conversion_factor (deprecated)
+            # For weight items, also divide by size_quantity to get cost per unit weight (e.g., $/lb)
             pricing_query = text("""
                 WITH vendor_item_prices AS (
                     SELECT
-                        inventory_master_item_id,
-                        is_preferred,
-                        updated_at,
+                        vi.inventory_master_item_id,
+                        vi.is_preferred,
+                        vi.updated_at,
                         -- New Backbar-style pricing (preferred)
-                        case_cost,
-                        units_per_case,
+                        vi.case_cost,
+                        vi.units_per_case,
+                        vi.size_quantity,
+                        su.measure_type as size_unit_measure_type,
                         -- Deprecated pricing (fallback)
-                        unit_price,
-                        conversion_factor,
-                        -- Calculate unit cost: prefer new fields, fallback to deprecated
+                        vi.unit_price,
+                        vi.conversion_factor,
+                        -- Calculate unit cost: divide by size_quantity for weight/count types only
+                        -- Weight: 25 lb bag = cost per lb (divide by 25)
+                        -- Count: 10 count bag = cost per each (divide by 10)
+                        -- Volume: 750 ml bottle = cost per bottle (don't divide - 750ml is just size description)
                         CASE
-                            WHEN case_cost IS NOT NULL AND units_per_case IS NOT NULL AND units_per_case > 0
-                                THEN case_cost / units_per_case
-                            WHEN unit_price IS NOT NULL AND unit_price > 0 AND conversion_factor IS NOT NULL AND conversion_factor > 0
-                                THEN unit_price / conversion_factor
+                            WHEN vi.case_cost IS NOT NULL AND vi.units_per_case IS NOT NULL AND vi.units_per_case > 0
+                                THEN CASE
+                                    WHEN su.measure_type IN ('weight', 'count') AND vi.size_quantity IS NOT NULL AND vi.size_quantity > 1
+                                        THEN vi.case_cost / (vi.units_per_case * vi.size_quantity)
+                                    ELSE vi.case_cost / vi.units_per_case
+                                END
+                            WHEN vi.unit_price IS NOT NULL AND vi.unit_price > 0 AND vi.conversion_factor IS NOT NULL AND vi.conversion_factor > 0
+                                THEN vi.unit_price / vi.conversion_factor
                             ELSE NULL
                         END as cost_per_unit
-                    FROM hub_vendor_items
-                    WHERE inventory_master_item_id IS NOT NULL
-                      AND is_active = true
+                    FROM hub_vendor_items vi
+                    LEFT JOIN hub_size_units su ON vi.size_unit_id = su.id
+                    WHERE vi.inventory_master_item_id IS NOT NULL
+                      AND vi.is_active = true
                       AND (
-                          (case_cost IS NOT NULL AND units_per_case IS NOT NULL AND units_per_case > 0)
-                          OR (unit_price IS NOT NULL AND unit_price > 0)
+                          (vi.case_cost IS NOT NULL AND vi.units_per_case IS NOT NULL AND vi.units_per_case > 0)
+                          OR (vi.unit_price IS NOT NULL AND vi.unit_price > 0)
                       )
                 ),
                 preferred_prices AS (
@@ -153,14 +165,42 @@ async def get_master_items(
     except Exception as e:
         logger.warning(f"Could not fetch pricing from Hub: {e}")
 
+    # Fetch unit conversions for items that have them
+    # This allows converting base unit cost (e.g., $/oz) to count unit cost (e.g., $/can)
+    from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
+    item_conversions = {}
+    try:
+        item_ids = [item.id for item in items]
+        if item_ids:
+            conversions = db.query(ItemUnitConversion).filter(
+                ItemUnitConversion.master_item_id.in_(item_ids),
+                ItemUnitConversion.is_active == True
+            ).all()
+            for conv in conversions:
+                item_conversions[conv.master_item_id] = {
+                    'from_unit_id': conv.from_unit_id,
+                    'to_unit_id': conv.to_unit_id,
+                    'factor': float(conv.conversion_factor)
+                }
+    except Exception as e:
+        logger.warning(f"Could not fetch unit conversions: {e}")
+
     # Add unit names and pricing info to response
     result = []
     for item in items:
-        item_dict = MasterItemResponse.from_orm(item).dict()
+        item_dict = MasterItemResponse.from_orm(item).model_dump()
 
-        # Prioritize Hub UoM fields (primary_uom_*) over deprecated Inventory UoM fields
-        # If primary_uom_id is set, use Hub UoM; otherwise fallback to deprecated fields
-        if item.primary_uom_id:
+        # Get count units from MasterItemCountUnit table (new architecture)
+        count_units = sorted(item.count_units, key=lambda cu: (not cu.is_primary, cu.display_order or 0))
+        primary_count_unit = next((cu for cu in count_units if cu.is_primary), None)
+        secondary_units = [cu for cu in count_units if not cu.is_primary]
+
+        # Use PRIMARY COUNT UNIT for display (what you physically count, e.g., "Bottle")
+        # NOT the cost tracking unit (primary_uom_name, e.g., "Fluid Ounce")
+        if primary_count_unit:
+            unit_name = primary_count_unit.uom_name
+        elif item.primary_uom_id:
+            # Fallback to Hub UoM (cost tracking unit)
             unit_name = item.primary_uom_name or item.primary_uom_abbr
         else:
             # Fallback to deprecated Inventory UoM
@@ -171,10 +211,11 @@ async def get_master_items(
         item_dict['secondary_unit_name'] = item.secondary_unit_rel.name if item.secondary_unit_rel else item.secondary_unit
         item_dict['secondary_unit'] = item.secondary_unit_rel.name if item.secondary_unit_rel else item.secondary_unit
 
-        # Additional count units for flexible inventory counting
-        # Priority: Use MasterItemCountUnit table (new), fallback to deprecated count_unit_2/3 relationships
-        count_units = sorted(item.count_units, key=lambda cu: (not cu.is_primary, cu.display_order or 0))
-        secondary_units = [cu for cu in count_units if not cu.is_primary]
+        # Also populate primary_count_unit fields for the API response
+        if primary_count_unit:
+            item_dict['primary_count_unit_id'] = primary_count_unit.uom_id
+            item_dict['primary_count_unit_name'] = primary_count_unit.uom_name
+            item_dict['primary_count_unit_abbr'] = primary_count_unit.uom_abbreviation
 
         # Count Unit 2 (first secondary)
         if len(secondary_units) >= 1:
@@ -202,8 +243,24 @@ async def get_master_items(
 
         # Get pricing from Hub vendor items (source of truth)
         # This is the cost per master item's count unit (e.g., $/lb, $/ea)
-        item_dict['last_price_paid'] = hub_pricing.get(item.id)
-        item_dict['last_price_unit'] = unit_name if hub_pricing.get(item.id) else None
+        base_price = hub_pricing.get(item.id)
+
+        # Apply unit conversion if the item has one
+        # E.g., if base price is $/oz and count unit is Can, multiply by conversion factor
+        if base_price is not None and item.id in item_conversions:
+            conv = item_conversions[item.id]
+            primary_count_unit_id = primary_count_unit.uom_id if primary_count_unit else None
+
+            # If to_unit matches primary count unit, multiply by factor
+            # E.g., conversion from oz→can with factor=16: $0.08/oz * 16 = $1.28/can
+            if conv['to_unit_id'] == primary_count_unit_id:
+                base_price = base_price * conv['factor']
+            # If from_unit matches primary count unit, divide by factor
+            elif conv['from_unit_id'] == primary_count_unit_id:
+                base_price = base_price / conv['factor']
+
+        item_dict['last_price_paid'] = base_price
+        item_dict['last_price_unit'] = unit_name if base_price else None
 
         result.append(item_dict)
 
@@ -329,6 +386,7 @@ async def merge_master_items(
     from restaurant_inventory.models.count_session import CountSessionItem
     from restaurant_inventory.models._deprecated.invoice import InvoiceItem
     from restaurant_inventory.models.inventory_transaction import InventoryTransaction
+    from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
 
     # Validate source and target exist
     source_item = db.query(MasterItem).filter(MasterItem.id == source_id).first()
@@ -349,7 +407,8 @@ async def merge_master_items(
         "count_session_items": 0,
         "recipe_ingredients": 0,
         "pos_mappings": 0,
-        "inventory_transactions": 0
+        "inventory_transactions": 0,
+        "unit_conversions": 0
     }
 
     try:
@@ -400,6 +459,12 @@ async def merge_master_items(
             InventoryTransaction.master_item_id == source_id
         ).update({InventoryTransaction.master_item_id: target_id})
         merge_stats["inventory_transactions"] = trans_moved
+
+        # Delete unit_conversions for source item (don't move - they're item-specific)
+        conversions_deleted = db.query(ItemUnitConversion).filter(
+            ItemUnitConversion.master_item_id == source_id
+        ).delete()
+        merge_stats["unit_conversions"] = conversions_deleted
 
         # Log audit event before deletion
         log_audit_event(
@@ -467,7 +532,7 @@ async def get_master_item(
         )
 
     # Build response with unit names
-    item_dict = MasterItemResponse.from_orm(item).dict()
+    item_dict = MasterItemResponse.from_orm(item).model_dump()
 
     # Prioritize Hub UoM fields (primary_uom_*) over deprecated Inventory UoM fields
     # If primary_uom_id is set, use Hub UoM; otherwise fallback to deprecated fields
@@ -552,6 +617,11 @@ async def get_item_location_costs(
 
     results = []
 
+    # Get the master item's default cost (fallback when no location-specific data)
+    from restaurant_inventory.models.item import MasterItem
+    master_item = db.query(MasterItem).filter(MasterItem.id == item_id).first()
+    default_cost = float(master_item.average_cost) if master_item and master_item.average_cost else None
+
     # First, get data from new MasterItemLocationCost table
     location_costs = db.query(
         MasterItemLocationCost,
@@ -575,17 +645,35 @@ async def get_item_location_costs(
     invoice_count_map = {loc_id: count for loc_id, count in invoice_counts}
 
     if location_costs:
-        # Use data from MasterItemLocationCost
+        # Use data from MasterItemLocationCost - show ALL locations
         for cost_record, location_name in location_costs:
+            inv_count = invoice_count_map.get(cost_record.location_id, 0)
+
+            # Determine if this location has actual invoice-based cost data
+            has_location_specific_data = (
+                cost_record.last_purchase_cost is not None or
+                cost_record.last_purchase_date is not None or
+                inv_count > 0
+            )
+
+            # Use location-specific cost if available, otherwise use default
+            if has_location_specific_data and cost_record.current_weighted_avg_cost:
+                avg_price = float(cost_record.current_weighted_avg_cost)
+                is_default_cost = False
+            else:
+                avg_price = default_cost
+                is_default_cost = True
+
             results.append({
                 'location_id': cost_record.location_id,
                 'location_name': location_name,
-                'invoice_count': invoice_count_map.get(cost_record.location_id, 0),
+                'invoice_count': inv_count,
                 'last_price': float(cost_record.last_purchase_cost) if cost_record.last_purchase_cost else None,
-                'avg_price': float(cost_record.current_weighted_avg_cost) if cost_record.current_weighted_avg_cost else None,
+                'avg_price': avg_price,
                 'last_invoice_date': cost_record.last_purchase_date.isoformat() if cost_record.last_purchase_date else None,
                 'qty_on_hand': float(cost_record.total_qty_on_hand) if cost_record.total_qty_on_hand else 0,
-                'last_updated': cost_record.last_updated.isoformat() if cost_record.last_updated else None
+                'last_updated': cost_record.last_updated.isoformat() if cost_record.last_updated else None,
+                'is_default_cost': is_default_cost
             })
     else:
         # Fallback: query invoice items for legacy data
@@ -625,7 +713,8 @@ async def get_item_location_costs(
                 'avg_price': avg_price,
                 'last_invoice_date': stat.last_invoice_date.isoformat() if stat.last_invoice_date else None,
                 'qty_on_hand': None,
-                'last_updated': None
+                'last_updated': None,
+                'is_default_cost': False  # Legacy path only returns locations with invoice data
             })
 
     if not results:
@@ -764,7 +853,8 @@ async def create_master_item(
         request=request
     )
 
-    return item
+    # Explicitly convert to response schema to avoid ORM serialization issues
+    return MasterItemResponse.from_orm(item)
 
 @router.put("/{item_id}", response_model=MasterItemResponse)
 async def update_master_item(
@@ -843,7 +933,26 @@ async def update_master_item(
             request=request
         )
 
-    return item
+    # If name changed, sync to Hub's cached vendor item names
+    if old_data["name"] != new_data["name"]:
+        try:
+            import httpx
+            hub_api_url = os.getenv("HUB_API_URL", "http://integration-hub:8000")
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.post(
+                    f"{hub_api_url}/api/v1/vendor-items/sync-master-item-name/{item_id}",
+                    params={"name": new_data["name"]}
+                )
+                if response.status_code == 200:
+                    result = response.json()
+                    logger.info(f"Synced master item name to Hub: {result.get('vendor_items_updated', 0)} vendor items updated")
+                else:
+                    logger.warning(f"Failed to sync master item name to Hub: {response.status_code}")
+        except Exception as e:
+            logger.warning(f"Could not sync master item name to Hub: {e}")
+
+    # Explicitly convert to response schema to avoid ORM serialization issues
+    return MasterItemResponse.from_orm(item)
 
 @router.delete("/{item_id}")
 async def delete_master_item(
@@ -2167,6 +2276,7 @@ async def get_item_count_units(
 async def update_item_count_units(
     item_id: int,
     request: Request,
+    primary_count_unit_id: Optional[int] = None,
     count_unit_2_id: Optional[int] = None,
     count_unit_2_factor: Optional[float] = None,
     count_unit_3_id: Optional[int] = None,
@@ -2177,19 +2287,18 @@ async def update_item_count_units(
     """
     Update count units for a master item.
 
-    This manages the secondary count units (count_unit_2 and count_unit_3).
-    The primary count unit is set when the item is created and shouldn't be changed here.
-
     Args:
         item_id: Master item ID
+        primary_count_unit_id: Hub UOM ID for the primary count unit (e.g., Bottle)
         count_unit_2_id: Hub UOM ID for the second count unit (e.g., Case)
         count_unit_2_factor: Conversion factor (e.g., 24 means 1 Case = 24 primary units)
         count_unit_3_id: Hub UOM ID for the third count unit
         count_unit_3_factor: Conversion factor for third unit
 
     Example: Setting up Coca Cola to count by Case
+        primary_count_unit_id: 7 (Bottle)
         count_unit_2_id: 9 (Case)
-        count_unit_2_factor: 24 (1 Case = 24 Each)
+        count_unit_2_factor: 24 (1 Case = 24 bottles)
     """
     from restaurant_inventory.models.master_item_count_unit import MasterItemCountUnit
     import httpx
@@ -2222,6 +2331,36 @@ async def update_item_count_units(
         return None
 
     changes_made = []
+
+    # Handle primary count unit update
+    if primary_count_unit_id is not None and primary_count_unit_id != 0:
+        # Fetch UOM info from Hub
+        uom_info = await get_hub_uom(primary_count_unit_id)
+        if not uom_info:
+            raise HTTPException(status_code=400, detail=f"UOM {primary_count_unit_id} not found in Hub")
+
+        if primary_unit:
+            # Update existing primary count unit
+            primary_unit.uom_id = primary_count_unit_id
+            primary_unit.hub_uom_id = primary_count_unit_id
+            primary_unit.uom_name = uom_info.get("name")
+            primary_unit.uom_abbreviation = uom_info.get("abbreviation")
+            primary_unit.uom_size = None  # Clear size info since it's now just "Bottle"
+            changes_made.append(f"Updated primary count unit: {uom_info.get('name')}")
+        else:
+            # Create new primary count unit
+            primary_unit = MasterItemCountUnit(
+                master_item_id=item_id,
+                uom_id=primary_count_unit_id,
+                hub_uom_id=primary_count_unit_id,
+                uom_name=uom_info.get("name"),
+                uom_abbreviation=uom_info.get("abbreviation"),
+                is_primary=True,
+                conversion_to_primary=1.0,
+                display_order=0
+            )
+            db.add(primary_unit)
+            changes_made.append(f"Added primary count unit: {uom_info.get('name')}")
 
     # Handle count_unit_2
     if count_unit_2_id is not None:
