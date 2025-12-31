@@ -916,7 +916,7 @@
             <ul id="purchasingSection" class="submenu">
                 <li><a href="invoices"><i class="bi bi-receipt"></i> Invoices</a></li>
                 <li><a href="vendors"><i class="bi bi-truck"></i> Vendors</a></li>
-                <li><a href="units-of-measure"><i class="bi bi-rulers"></i> Units of Measure</a></li>
+                <!-- Units of Measure removed - Hub is now source of truth for UoMs -->
             </ul>
 
             <li><a href="reports"><i class="bi bi-file-earmark-bar-graph"></i> Reports</a></li>
@@ -1102,8 +1102,7 @@
 
             // Check if current page is in Purchasing section
             if (currentPath.includes('/invoices') ||
-                currentPath.includes('/vendors') ||
-                currentPath.includes('/units-of-measure')) {
+                currentPath.includes('/vendors')) {
                 document.getElementById('purchasingSection').classList.add('open');
                 document.querySelector('[onclick*="purchasingSection"]').classList.add('open');
             }

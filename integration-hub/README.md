@@ -6,7 +6,7 @@ The Integration Hub is an **invoice processing and general ledger (GL) mapping s
 
 ## Status: Production Ready (Location-Aware Costing) ✅
 
-**Last Updated:** December 28, 2025
+**Last Updated:** December 28, 2025 (Expense Items Separation)
 
 **Note:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
@@ -27,6 +27,36 @@ The Inventory system owns:
 - **Locations** - Restaurant locations (source of truth for all systems)
 
 ## Recent Updates
+
+### December 28, 2025 - Expense Items vs Vendor Items Separation 📦💰
+
+**IMPORTANT: Clear distinction between Vendor Items and Expense Items:**
+
+**Vendor Items** (`hub_vendor_items` table):
+- Items linked to Inventory master items (`inventory_master_item_id IS NOT NULL`)
+- Tracked inventory items that get counted
+- Appear on Vendor Items page
+- Have pricing history, location costs, sizing
+
+**Expense Items** (`invoice_item_mapping_deprecated` table):
+- Items mapped only to expense GL accounts (no inventory tracking)
+- Supplies, services, non-inventory purchases (janitorial, linen, propane, office supplies)
+- Appear on Expense Items page ONLY
+- Map to COGS/Expense GL accounts
+
+**Key Behavior:**
+- When a vendor item is "converted to expense", it is **deleted** from `hub_vendor_items`
+- A new mapping is created in `invoice_item_mapping_deprecated` with the expense GL account
+- Items cannot appear in both lists - they are mutually exclusive
+- Vendor Items page filters: `WHERE inventory_master_item_id IS NOT NULL`
+
+**UI Changes:**
+- ✅ "Map to Expense" button on vendor item detail page
+- ✅ Searchable expense account dropdown (type-to-filter)
+- ✅ Expense Items page at `/expense-items`
+- ✅ Confirmation modal before conversion
+
+---
 
 ### December 28, 2025 - AI Semantic Search & Backbar-Style Sizing 🤖📦
 
@@ -480,9 +510,15 @@ class Vendor:
 
 **GET /vendor-items** 🆕
 - Vendor items list with AI search bar
+- Only shows items with inventory master item link
 
 **GET /vendor-item-detail?id=X** 🆕
 - Comprehensive vendor item detail page
+- "Map to Expense" button with searchable GL account dropdown
+
+**GET /expense-items** 🆕
+- Expense items list (items mapped to expense GL accounts only)
+- Shows items NOT tracked in inventory
 
 **GET /settings/size** 🆕
 - Size units and containers management
@@ -520,6 +556,11 @@ class Vendor:
 - Mark/unmark invoice as statement
 - Body: `{"is_statement": true}`
 - Returns: `{"success": true, "status": "statement"}`
+
+**POST /api/vendor-items/{id}/convert-to-expense** 🆕
+- Convert vendor item to expense (deletes from vendor items, creates expense mapping)
+- Body: `{"gl_cogs_account": 5200}`
+- Returns: `{"success": true, "message": "...", "mapping_id": 123}`
 
 **GET /api/invoices/{invoice_id}/pdf** 🆕
 - Download invoice PDF file

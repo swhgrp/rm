@@ -91,20 +91,13 @@ class InvoiceItem(Base):
     vendor_sku = Column(String(200), nullable=True)
     quantity = Column(Float, nullable=False)
     unit = Column(String(50), nullable=True)
-    pack_size = Column(String(100), nullable=True)  # e.g., "Case - 6", "Case - 24", "Each"
     unit_price = Column(Float, nullable=False)
     line_total = Column(Float, nullable=False)
 
-    # Mapping to vendor items (primary mapping method)
-    vendor_item_id = Column(Integer, ForeignKey("vendor_items.id"), nullable=True)
-
-    # Mapping to master items (legacy/deprecated - use vendor_item_id instead)
+    # Mapping to master items (deprecated - invoice processing moved to Integration Hub)
     master_item_id = Column(Integer, ForeignKey("master_items.id"), nullable=True)
     mapping_confidence = Column(Float, nullable=True)  # AI confidence in mapping (0-1)
     mapping_method = Column(String(50), nullable=True)  # 'auto', 'manual', 'confirmed'
-
-    # Mapping pack size to unit of measure
-    unit_of_measure_id = Column(Integer, ForeignKey("units_of_measure.id"), nullable=True)
 
     # Price comparison
     last_price = Column(Float, nullable=True)  # Previous price for this item
@@ -119,9 +112,7 @@ class InvoiceItem(Base):
 
     # Relationships
     invoice = relationship("Invoice", back_populates="items")
-    vendor_item = relationship("VendorItem", backref="invoice_items")
     master_item = relationship("MasterItem", backref="invoice_items")
-    unit_of_measure = relationship("UnitOfMeasure", backref="invoice_items")
     mapped_by = relationship("User", foreign_keys=[mapped_by_id])
 
     def __repr__(self):

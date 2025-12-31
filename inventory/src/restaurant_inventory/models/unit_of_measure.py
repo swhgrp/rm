@@ -33,6 +33,9 @@ class UnitOfMeasure(Base):
     name = Column(String(50), nullable=False)  # e.g., "Case - 6", "Each", "Dozen"
     abbreviation = Column(String(50), nullable=False)  # e.g., "cs", "ea", "dz"
 
+    # Dimension for unit type compatibility (count, volume, weight, length)
+    dimension = Column(String(20), nullable=True)
+
     # Reference-based conversion: this unit contains X quantity of the reference unit
     reference_unit_id = Column(Integer, ForeignKey("units_of_measure.id"), nullable=True)
     contains_quantity = Column(Numeric(20, 10), nullable=True)  # How many reference units this contains

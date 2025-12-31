@@ -201,6 +201,7 @@ class VendorItemResponse(BaseModel):
     size_quantity: Optional[float] = None  # e.g., 1, 750, 25
     size_unit_id: Optional[int] = None  # FK to hub_size_units
     size_unit_symbol: Optional[str] = None  # e.g., "L", "ml", "lb"
+    size_unit_measure_type: Optional[str] = None  # e.g., "weight", "volume", "count"
     container_id: Optional[int] = None  # FK to hub_containers
     container_name: Optional[str] = None  # e.g., "bottle", "can", "bag"
     size_display: Optional[str] = None  # Formatted: "1 L bottle"
@@ -233,6 +234,7 @@ class VendorItemResponse(BaseModel):
     gl_waste_account: Optional[int] = None
 
     # Status
+    status: Optional[str] = None  # 'active', 'needs_review', 'inactive'
     is_active: bool = True
     is_preferred: bool = False
     notes: Optional[str] = None
@@ -263,7 +265,7 @@ class VendorItemListResponse(BaseModel):
 @router.get("/", response_model=VendorItemListResponse)
 async def list_vendor_items(
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=500),
+    page_size: int = Query(50, ge=1, le=2000),
     vendor_id: Optional[int] = Query(None, description="Filter by vendor"),
     location_id: Optional[int] = Query(None, description="Filter by location"),
     master_item_id: Optional[int] = Query(None, description="Filter by master item"),
@@ -271,6 +273,8 @@ async def list_vendor_items(
     status: Optional[str] = Query(None, description="Filter by status (active, needs_review, inactive)"),
     is_active: Optional[bool] = Query(None, description="Filter by active status (deprecated, use status)"),
     category: Optional[str] = Query(None, description="Filter by category"),
+    exclude_expense_only: Optional[bool] = Query(None, description="Exclude items with no inventory link (expense-only items)"),
+    mapped_only: Optional[bool] = Query(None, description="Only show items mapped to master items"),
     db: Session = Depends(get_db)
 ):
     """
@@ -283,7 +287,11 @@ async def list_vendor_items(
     - category: Product category
     - search: SKU or product name
     """
-    query = db.query(HubVendorItem).options(joinedload(HubVendorItem.vendor))
+    query = db.query(HubVendorItem).options(
+        joinedload(HubVendorItem.vendor),
+        joinedload(HubVendorItem.size_unit),
+        joinedload(HubVendorItem.container)
+    )
 
     # Apply filters
     if vendor_id:
@@ -319,6 +327,14 @@ async def list_vendor_items(
     if category:
         query = query.filter(HubVendorItem.category.ilike(f"%{category}%"))
 
+    # Exclude expense-only items (items with no inventory link)
+    if exclude_expense_only:
+        query = query.filter(HubVendorItem.inventory_master_item_id.isnot(None))
+
+    # Only mapped items (same as exclude_expense_only but more explicit)
+    if mapped_only:
+        query = query.filter(HubVendorItem.inventory_master_item_id.isnot(None))
+
     # Get total count
     total = query.count()
 
@@ -339,20 +355,38 @@ async def list_vendor_items(
             vendor_sku=item.vendor_sku,
             vendor_product_name=item.vendor_product_name,
             vendor_description=item.vendor_description,
+            # Backbar-style size fields (NEW)
+            size_quantity=float(item.size_quantity) if item.size_quantity else None,
+            size_unit_id=item.size_unit_id,
+            size_unit_symbol=item.size_unit.symbol if item.size_unit else None,
+            size_unit_measure_type=item.size_unit.measure_type if item.size_unit else None,
+            container_id=item.container_id,
+            container_name=item.container.name if item.container else None,
+            size_display=item.size_display,
+            units_per_case=item.units_per_case,
+            case_cost=float(item.case_cost) if item.case_cost else None,
+            unit_cost=item.unit_cost,
+            # Deprecated fields (kept for migration)
             purchase_unit_id=item.purchase_unit_id,
             purchase_unit_name=item.purchase_unit_name,
             purchase_unit_abbr=item.purchase_unit_abbr,
             pack_size=item.pack_size,
+            pack_to_primary_factor=float(item.pack_to_primary_factor) if item.pack_to_primary_factor else 1.0,
             conversion_factor=float(item.conversion_factor) if item.conversion_factor else 1.0,
             conversion_unit_id=item.conversion_unit_id,
+            last_purchase_price=float(item.last_purchase_price) if item.last_purchase_price else None,
+            previous_purchase_price=float(item.previous_purchase_price) if item.previous_purchase_price else None,
             unit_price=float(item.unit_price) if item.unit_price else None,
             last_price=float(item.last_price) if item.last_price else None,
+            minimum_order_quantity=float(item.minimum_order_quantity) if item.minimum_order_quantity else None,
             category=item.category,
             gl_asset_account=item.gl_asset_account,
             gl_cogs_account=item.gl_cogs_account,
             gl_waste_account=item.gl_waste_account,
+            status=item.status.value if item.status else 'active',
             is_active=item.is_active,
             is_preferred=item.is_preferred,
+            notes=item.notes,
             inventory_vendor_item_id=item.inventory_vendor_item_id,
             synced_to_inventory=item.synced_to_inventory,
             created_at=item.created_at,
@@ -476,6 +510,405 @@ async def get_master_items_from_inventory():
         return []
 
 
+# ============================================================================
+# CATEGORY CONFLICT DETECTION ENDPOINTS
+# Must be defined before /{vendor_item_id} to avoid route conflict
+# ============================================================================
+
+class CategoryConflict(BaseModel):
+    """Category conflict information"""
+    master_item_id: int
+    master_item_name: str
+    master_item_category: Optional[str] = None
+    vendor_items: List[dict]
+    unique_categories: List[str]
+    conflict_count: int
+
+
+class CategoryConflictResponse(BaseModel):
+    """Response for category conflict check"""
+    conflicts: List[CategoryConflict]
+    total_conflicts: int
+    total_master_items_checked: int
+
+
+@router.get("/category-conflicts", response_model=CategoryConflictResponse)
+async def check_category_conflicts(
+    db: Session = Depends(get_db)
+):
+    """
+    Check for category conflicts across vendor items.
+
+    Returns master items that have vendor items with different categories.
+    This indicates a data inconsistency that needs manual resolution.
+
+    Hub is the source of truth for categories, so when a master item has
+    multiple vendor items with different categories, it's a conflict that
+    needs human review.
+    """
+    from sqlalchemy import text
+
+    # Find master items with multiple distinct categories across their vendor items
+    conflict_query = text("""
+        WITH vendor_item_categories AS (
+            SELECT
+                inventory_master_item_id,
+                inventory_master_item_name,
+                category,
+                id as vendor_item_id,
+                vendor_product_name,
+                vendor_id
+            FROM hub_vendor_items
+            WHERE inventory_master_item_id IS NOT NULL
+              AND is_active = true
+        ),
+        category_counts AS (
+            SELECT
+                inventory_master_item_id,
+                inventory_master_item_name,
+                COUNT(DISTINCT category) as unique_category_count,
+                STRING_AGG(DISTINCT category, ', ' ORDER BY category) as categories
+            FROM vendor_item_categories
+            GROUP BY inventory_master_item_id, inventory_master_item_name
+            HAVING COUNT(DISTINCT category) > 1
+        )
+        SELECT
+            cc.inventory_master_item_id,
+            cc.inventory_master_item_name,
+            cc.unique_category_count,
+            cc.categories
+        FROM category_counts cc
+        ORDER BY cc.unique_category_count DESC, cc.inventory_master_item_name
+    """)
+
+    try:
+        results = db.execute(conflict_query).fetchall()
+
+        conflicts = []
+        for row in results:
+            master_item_id = row[0]
+            master_item_name = row[1]
+            unique_count = row[2]
+            categories_str = row[3]
+
+            # Get the actual vendor items for this master item
+            vendor_items = db.query(HubVendorItem).filter(
+                HubVendorItem.inventory_master_item_id == master_item_id,
+                HubVendorItem.is_active == True
+            ).all()
+
+            vendor_item_details = [
+                {
+                    "id": vi.id,
+                    "vendor_id": vi.vendor_id,
+                    "vendor_name": vi.vendor.name if vi.vendor else None,
+                    "vendor_product_name": vi.vendor_product_name,
+                    "category": vi.category
+                }
+                for vi in vendor_items
+            ]
+
+            # Get unique categories as list
+            unique_categories = [c.strip() for c in categories_str.split(', ')] if categories_str else []
+
+            # Fetch master item's current category from Inventory
+            master_item_category = None
+            try:
+                from sqlalchemy import create_engine
+                inventory_db_url = os.getenv(
+                    'INVENTORY_DATABASE_URL',
+                    'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
+                )
+                inv_engine = create_engine(inventory_db_url)
+                with inv_engine.connect() as conn:
+                    mi_result = conn.execute(
+                        text("SELECT category FROM master_items WHERE id = :id"),
+                        {"id": master_item_id}
+                    ).fetchone()
+                    if mi_result:
+                        master_item_category = mi_result[0]
+            except Exception as e:
+                logger.warning(f"Could not fetch master item category: {e}")
+
+            conflicts.append(CategoryConflict(
+                master_item_id=master_item_id,
+                master_item_name=master_item_name or "Unknown",
+                master_item_category=master_item_category,
+                vendor_items=vendor_item_details,
+                unique_categories=unique_categories,
+                conflict_count=unique_count
+            ))
+
+        # Count total master items with vendor items
+        total_query = text("""
+            SELECT COUNT(DISTINCT inventory_master_item_id)
+            FROM hub_vendor_items
+            WHERE inventory_master_item_id IS NOT NULL
+              AND is_active = true
+        """)
+        total_checked = db.execute(total_query).scalar() or 0
+
+        return CategoryConflictResponse(
+            conflicts=conflicts,
+            total_conflicts=len(conflicts),
+            total_master_items_checked=total_checked
+        )
+
+    except Exception as e:
+        logger.error(f"Error checking category conflicts: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error checking category conflicts: {str(e)}")
+
+
+@router.get("/category-summary")
+async def get_category_summary(
+    db: Session = Depends(get_db)
+):
+    """
+    Get summary of categories across vendor items and master items.
+
+    Shows:
+    - Total vendor items by category
+    - Master items linked to vendor items by category
+    - Any mismatches between vendor item and master item categories
+    """
+    from sqlalchemy import text, create_engine
+
+    # Get vendor item category distribution
+    vi_query = text("""
+        SELECT
+            COALESCE(category, 'Uncategorized') as category,
+            COUNT(*) as vendor_item_count,
+            COUNT(DISTINCT inventory_master_item_id) as master_item_count
+        FROM hub_vendor_items
+        WHERE is_active = true
+        GROUP BY COALESCE(category, 'Uncategorized')
+        ORDER BY vendor_item_count DESC
+    """)
+
+    vi_results = db.execute(vi_query).fetchall()
+
+    vendor_item_categories = [
+        {
+            "category": row[0],
+            "vendor_item_count": row[1],
+            "linked_master_item_count": row[2]
+        }
+        for row in vi_results
+    ]
+
+    # Get master item category distribution from Inventory
+    master_item_categories = []
+    try:
+        inventory_db_url = os.getenv(
+            'INVENTORY_DATABASE_URL',
+            'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
+        )
+        inv_engine = create_engine(inventory_db_url)
+        with inv_engine.connect() as conn:
+            mi_results = conn.execute(text("""
+                SELECT
+                    COALESCE(category, 'Uncategorized') as category,
+                    COUNT(*) as count
+                FROM master_items
+                WHERE is_active = true
+                GROUP BY COALESCE(category, 'Uncategorized')
+                ORDER BY count DESC
+            """)).fetchall()
+
+            master_item_categories = [
+                {"category": row[0], "count": row[1]}
+                for row in mi_results
+            ]
+    except Exception as e:
+        logger.warning(f"Could not fetch master item categories: {e}")
+
+    return {
+        "vendor_item_categories": vendor_item_categories,
+        "master_item_categories": master_item_categories,
+        "total_vendor_items": sum(c["vendor_item_count"] for c in vendor_item_categories),
+        "total_master_items": sum(c["count"] for c in master_item_categories)
+    }
+
+
+@router.post("/sync-all-master-item-categories")
+async def sync_all_master_item_categories(
+    dry_run: bool = Query(True, description="If true, only report what would change without making changes"),
+    db: Session = Depends(get_db)
+):
+    """
+    Sync all master item categories from their vendor items.
+
+    For each master item that has vendor items (and no category conflicts),
+    updates the master item's category to match the vendor item's category.
+
+    Hub is the source of truth for categories.
+
+    Use dry_run=true (default) to see what would change without making changes.
+    Set dry_run=false to actually apply the changes.
+    """
+    from sqlalchemy import text, create_engine
+
+    # Get vendor item categories for each master item (only where there's no conflict)
+    category_query = text("""
+        WITH vendor_categories AS (
+            SELECT
+                inventory_master_item_id,
+                MAX(inventory_master_item_name) as master_item_name,
+                MAX(category) as category,
+                COUNT(DISTINCT category) as unique_categories
+            FROM hub_vendor_items
+            WHERE inventory_master_item_id IS NOT NULL
+              AND is_active = true
+              AND category IS NOT NULL
+            GROUP BY inventory_master_item_id
+            HAVING COUNT(DISTINCT category) = 1
+        )
+        SELECT
+            inventory_master_item_id,
+            master_item_name,
+            category
+        FROM vendor_categories
+        ORDER BY inventory_master_item_id
+    """)
+
+    try:
+        results = db.execute(category_query).fetchall()
+
+        # Get master item categories from Inventory for comparison
+        inventory_db_url = os.getenv(
+            'INVENTORY_DATABASE_URL',
+            'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
+        )
+        inv_engine = create_engine(inventory_db_url)
+
+        updates = []
+        already_correct = 0
+        updated = 0
+
+        with inv_engine.connect() as conn:
+            for row in results:
+                master_item_id = row[0]
+                master_item_name = row[1]
+                vendor_category = row[2]
+
+                # Get current master item category
+                mi_result = conn.execute(
+                    text("SELECT category FROM master_items WHERE id = :id"),
+                    {"id": master_item_id}
+                ).fetchone()
+
+                if not mi_result:
+                    continue
+
+                current_category = mi_result[0]
+
+                if current_category == vendor_category:
+                    already_correct += 1
+                    continue
+
+                updates.append({
+                    "master_item_id": master_item_id,
+                    "master_item_name": master_item_name,
+                    "old_category": current_category,
+                    "new_category": vendor_category
+                })
+
+                if not dry_run:
+                    conn.execute(
+                        text("UPDATE master_items SET category = :category, updated_at = NOW() WHERE id = :id"),
+                        {"id": master_item_id, "category": vendor_category}
+                    )
+                    updated += 1
+
+            if not dry_run:
+                conn.commit()
+
+        return {
+            "dry_run": dry_run,
+            "total_master_items_with_vendor_items": len(results),
+            "already_correct": already_correct,
+            "updates_needed": len(updates),
+            "updates_applied": updated if not dry_run else 0,
+            "updates": updates[:50]  # Limit response size
+        }
+
+    except Exception as e:
+        logger.error(f"Error syncing master item categories: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error syncing categories: {str(e)}")
+
+
+@router.post("/sync-master-item-category/{master_item_id}")
+async def sync_master_item_category(
+    master_item_id: int,
+    category: str = Query(..., description="Category to set on master item"),
+    db: Session = Depends(get_db)
+):
+    """
+    Sync a master item's category from its vendor items.
+
+    This endpoint updates the master item's category in Inventory to match
+    the specified category from its vendor items.
+
+    Use this after resolving category conflicts to set the correct category.
+    """
+    from sqlalchemy import text, create_engine
+
+    # Verify the master item has vendor items with this category
+    vendor_items = db.query(HubVendorItem).filter(
+        HubVendorItem.inventory_master_item_id == master_item_id,
+        HubVendorItem.category == category,
+        HubVendorItem.is_active == True
+    ).all()
+
+    if not vendor_items:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No active vendor items found for master item {master_item_id} with category '{category}'"
+        )
+
+    # Update master item in Inventory
+    try:
+        inventory_db_url = os.getenv(
+            'INVENTORY_DATABASE_URL',
+            'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
+        )
+        inv_engine = create_engine(inventory_db_url)
+        with inv_engine.connect() as conn:
+            # Get current category first
+            current = conn.execute(
+                text("SELECT category FROM master_items WHERE id = :id"),
+                {"id": master_item_id}
+            ).fetchone()
+
+            if not current:
+                raise HTTPException(status_code=404, detail=f"Master item {master_item_id} not found")
+
+            old_category = current[0]
+
+            # Update category
+            conn.execute(
+                text("UPDATE master_items SET category = :category, updated_at = NOW() WHERE id = :id"),
+                {"id": master_item_id, "category": category}
+            )
+            conn.commit()
+
+            logger.info(f"Updated master item {master_item_id} category from '{old_category}' to '{category}'")
+
+            return {
+                "success": True,
+                "master_item_id": master_item_id,
+                "old_category": old_category,
+                "new_category": category,
+                "vendor_items_count": len(vendor_items)
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error syncing master item category: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error syncing category: {str(e)}")
+
+
 @router.get("/{vendor_item_id}", response_model=VendorItemResponse)
 async def get_vendor_item(
     vendor_item_id: int,
@@ -590,6 +1023,25 @@ async def update_vendor_item(
         item.container = db.query(Container).filter(Container.id == item.container_id).first()
 
     logger.info(f"Updated vendor item {item.id}")
+
+    # Sync category to master item if category was updated and item is mapped
+    if "category" in update_data and item.inventory_master_item_id and item.category:
+        try:
+            from sqlalchemy import text, create_engine
+            inventory_db_url = os.getenv(
+                "INVENTORY_DATABASE_URL",
+                "postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db"
+            )
+            inv_engine = create_engine(inventory_db_url)
+            with inv_engine.connect() as conn:
+                conn.execute(
+                    text("UPDATE master_items SET category = :category, updated_at = NOW() WHERE id = :id"),
+                    {"id": item.inventory_master_item_id, "category": item.category}
+                )
+                conn.commit()
+                logger.info(f"Synced category '{item.category}' to master item {item.inventory_master_item_id}")
+        except Exception as e:
+            logger.error(f"Error syncing category to master item: {str(e)}")
 
     # Sync to Inventory
     if item.vendor:
@@ -1049,7 +1501,8 @@ async def get_vendor_item_location_prices(
     if not item:
         raise HTTPException(status_code=404, detail="Vendor item not found")
 
-    pack_factor = float(item.pack_to_primary_factor or item.conversion_factor or 1.0)
+    # Use units_per_case (Backbar-style) for cost calculation
+    units_per_case = float(item.units_per_case or item.pack_to_primary_factor or item.conversion_factor or 1.0)
 
     # Query hub_invoice_items joined with hub_invoices to get prices by location
     # Match by vendor + item_code OR vendor + item_description
@@ -1078,7 +1531,7 @@ async def get_vendor_item_location_prices(
         }).fetchall()
 
         if not results:
-            return []
+            return {"prices": []}
 
         # Fetch location names from Inventory database directly
         # (API requires auth, so we use DB connection)
@@ -1110,20 +1563,26 @@ async def get_vendor_item_location_prices(
                 # If location_id is actually a name string, use it directly
                 location_name = str(location_id) if location_id else "Unknown"
 
+            # Invoice unit_price is case cost, calculate unit cost
+            case_cost = float(row[1]) if row[1] else 0
+            unit_cost = case_cost / units_per_case if units_per_case > 0 else case_cost
+
             prices.append({
                 "location_id": location_id,
                 "location_name": location_name,
-                "last_price": float(row[1]) if row[1] else 0,
-                "pack_factor": pack_factor,
-                "last_invoice_date": row[2].isoformat() if row[2] else None
+                "case_cost": case_cost,
+                "unit_cost": unit_cost,
+                "last_purchase_price": case_cost,  # Alias for compatibility
+                "units_per_case": units_per_case,
+                "price_updated_at": row[2].isoformat() if row[2] else None
             })
 
-        return prices
+        return {"prices": prices}
 
     except Exception as e:
         logger.error(f"Error fetching location prices for vendor item {vendor_item_id}: {str(e)}")
-        # Return empty list on error
-        return []
+        # Return empty prices on error
+        return {"prices": []}
 
 
 # ============================================================================
@@ -1194,6 +1653,88 @@ async def get_vendor_item_cost_history(
     }
 
 
+@router.post("/seed-location-costs")
+async def seed_location_costs(
+    master_item_id: Optional[int] = Query(None, description="Seed for specific master item only"),
+    db: Session = Depends(get_db)
+):
+    """
+    Seed location costs from vendor item pricing.
+
+    For master items that don't have invoice-based location costs yet,
+    this creates MasterItemLocationCost records using the vendor item's
+    unit cost (case_cost / units_per_case) as the default price.
+
+    This ensures inventory counts have pricing data even before invoices
+    are processed through the Hub.
+    """
+    from integration_hub.services.location_cost_updater import LocationCostUpdaterService
+
+    service = LocationCostUpdaterService(db)
+    result = service.seed_location_costs_from_vendor_items(master_item_id)
+
+    return result
+
+
+@router.post("/fix-location-costs")
+async def fix_location_costs(
+    master_item_id: Optional[int] = Query(None, description="Fix for specific master item only"),
+    db: Session = Depends(get_db)
+):
+    """
+    Fix location costs that were seeded with incorrect values.
+
+    This updates seeded location costs (those without last_purchase_cost)
+    to use the correct unit cost (case_cost / units_per_case) instead of
+    the case cost that may have been incorrectly used before.
+    """
+    from integration_hub.services.location_cost_updater import LocationCostUpdaterService
+
+    service = LocationCostUpdaterService(db)
+    result = service.fix_seeded_location_costs(master_item_id)
+
+    return result
+
+
+@router.post("/reprocess-sent-invoices")
+async def reprocess_sent_invoices(db: Session = Depends(get_db)):
+    """
+    Re-process all sent invoices to update location costs.
+
+    This is useful after fixing bugs in the location cost calculation.
+    It will re-run the cost updater for all invoices that were already
+    sent to inventory, applying any fixes to the calculation logic.
+    """
+    from integration_hub.services.location_cost_updater import LocationCostUpdaterService
+    from integration_hub.models.hub_invoice import HubInvoice
+
+    # Get all sent invoices
+    sent_invoices = db.query(HubInvoice).filter(
+        HubInvoice.sent_to_inventory == True,
+        HubInvoice.location_id.isnot(None)
+    ).order_by(HubInvoice.invoice_date).all()
+
+    stats = {
+        'invoices_processed': 0,
+        'total_items_updated': 0,
+        'total_items_created': 0,
+        'errors': []
+    }
+
+    service = LocationCostUpdaterService(db)
+
+    for invoice in sent_invoices:
+        try:
+            result = service.update_costs_from_invoice(invoice.id)
+            stats['invoices_processed'] += 1
+            stats['total_items_updated'] += result.get('costs_updated', 0)
+            stats['total_items_created'] += result.get('costs_created', 0)
+        except Exception as e:
+            stats['errors'].append(f"Invoice {invoice.id}: {str(e)}")
+
+    return stats
+
+
 # ============================================================================
 # LOOKUP ENDPOINTS FOR BACKBAR-STYLE SIZE FIELDS
 # ============================================================================
@@ -1240,3 +1781,89 @@ async def get_containers(db: Session = Depends(get_db)):
         }
         for c in containers
     ]
+
+
+@router.get("/master-item/{master_item_id}/compatible-dimensions")
+async def get_compatible_dimensions(
+    master_item_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get compatible dimensions for a master item based on linked vendor items.
+
+    Returns the measure types (dimensions) that should be allowed for count units
+    based on the SIZE UNIT of how the item is purchased from vendors.
+
+    Logic:
+    - The base UoM comes from the vendor item's size_unit ONLY
+    - volume size_unit -> only volume UoMs allowed
+    - weight size_unit -> only weight UoMs allowed
+    - count size_unit -> only count UoMs allowed
+    - units_per_case is just packaging info, NOT a count dimension
+    - If no vendor items linked, all dimensions are allowed
+    - If you need to count in a different dimension, define a conversion on the master item
+
+    Response:
+    - compatible_dimensions: list of dimension strings (e.g., ["volume"] or ["weight"])
+    - vendor_item_dimensions: list of {vendor_name, product_name, measure_type} for each linked vendor item
+    """
+    from integration_hub.models.size_unit import SizeUnit
+
+    # Find vendor items linked to this master item
+    vendor_items = db.query(HubVendorItem).options(
+        joinedload(HubVendorItem.vendor),
+        joinedload(HubVendorItem.size_unit)
+    ).filter(
+        HubVendorItem.inventory_master_item_id == master_item_id,
+        HubVendorItem.status == VendorItemStatus.active
+    ).all()
+
+    # If no vendor items linked, allow all dimensions
+    if not vendor_items:
+        return {
+            "compatible_dimensions": ["volume", "weight", "count"],
+            "vendor_item_dimensions": [],
+            "has_vendor_items": False,
+            "message": "No active vendor items linked. All dimensions allowed."
+        }
+
+    # Collect unique measure types from vendor items
+    vendor_item_info = []
+    measure_types = set()
+
+    for vi in vendor_items:
+        measure_type = None
+        if vi.size_unit:
+            measure_type = vi.size_unit.measure_type
+            measure_types.add(measure_type)
+
+        vendor_item_info.append({
+            "vendor_name": vi.vendor.name if vi.vendor else "Unknown",
+            "product_name": vi.vendor_product_name,
+            "size_display": vi.size_display,
+            "measure_type": measure_type
+        })
+
+    # Determine compatible dimensions - ONLY the size_unit dimension
+    # The base UoM must match the vendor item's size_unit measure type
+    # units_per_case is packaging info, not a reason to add "count" dimension
+    compatible = set()
+
+    for mt in measure_types:
+        if mt == "volume":
+            compatible.add("volume")
+        elif mt == "weight":
+            compatible.add("weight")
+        elif mt == "count":
+            compatible.add("count")
+
+    # If no size units set, allow all
+    if not measure_types:
+        compatible = {"volume", "weight", "count"}
+
+    return {
+        "compatible_dimensions": sorted(list(compatible)),
+        "vendor_item_dimensions": vendor_item_info,
+        "has_vendor_items": True,
+        "message": f"Compatible dimensions based on {len(vendor_items)} active vendor item(s)."
+    }

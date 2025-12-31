@@ -403,14 +403,14 @@ document.getElementById('aliasForm').addEventListener('submit', async (e) => {
         const result = await response.json();
 
         if (response.ok) {
-            alert(`Alias "${aliasName}" added successfully!`);
+            showToast('Success', `Alias "${aliasName}" added successfully!`, 'success');
             bootstrap.Modal.getInstance(document.getElementById('addAliasModal')).hide();
             loadVendorSummary();
         } else {
-            alert(`Error: ${result.detail || result.error}`);
+            showToast('Error', result.detail || result.error, 'danger');
         }
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showToast('Error', error.message, 'danger');
     }
 });
 
@@ -466,7 +466,8 @@ document.getElementById('aliasesModal').addEventListener('show.bs.modal', async 
 });
 
 async function deleteAlias(aliasId) {
-    if (!confirm('Delete this alias?')) return;
+    const confirmed = await showConfirm('Delete this alias?', 'Delete Alias');
+    if (!confirmed) return;
 
     try {
         const response = await fetch(`/hub/api/v1/vendors/aliases/${aliasId}`, {
@@ -478,15 +479,16 @@ async function deleteAlias(aliasId) {
             document.getElementById('aliasesModal').dispatchEvent(new Event('show.bs.modal'));
             loadVendorSummary();
         } else {
-            alert('Error deleting alias');
+            showToast('Error', 'Error deleting alias', 'danger');
         }
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showToast('Error', error.message, 'danger');
     }
 }
 
 async function autoCreateAliases() {
-    if (!confirm('Auto-create aliases from already-linked invoices?\n\nThis will create aliases for vendor name variants that are already linked to vendors.')) return;
+    const confirmed = await showConfirm('Auto-create aliases from already-linked invoices? This will create aliases for vendor name variants that are already linked to vendors.', 'Auto-Create Aliases');
+    if (!confirmed) return;
 
     try {
         const response = await fetch('/hub/api/v1/vendors/normalization/auto-create-aliases', {
@@ -494,11 +496,11 @@ async function autoCreateAliases() {
         });
         const result = await response.json();
 
-        alert(`Created ${result.created_count} aliases\nSkipped ${result.skipped_count}`);
+        showToast('Success', `Created ${result.created_count} aliases, Skipped ${result.skipped_count}`, 'success');
         document.getElementById('aliasesModal').dispatchEvent(new Event('show.bs.modal'));
         loadVendorSummary();
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showToast('Error', error.message, 'danger');
     }
 }
 

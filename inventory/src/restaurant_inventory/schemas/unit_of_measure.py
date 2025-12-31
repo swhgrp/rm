@@ -59,6 +59,7 @@ class UnitOfMeasureResponse(UnitOfMeasureBase):
     updated_at: Optional[datetime] = None
     category_name: Optional[str] = None  # Populated from join
     reference_unit_name: Optional[str] = None  # Populated from join
+    dimension: Optional[str] = None  # count, volume, weight, length
 
     @field_serializer('contains_quantity')
     def serialize_contains_quantity(self, value: Optional[Decimal]) -> Optional[float]:

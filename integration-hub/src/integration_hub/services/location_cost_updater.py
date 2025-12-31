@@ -22,14 +22,55 @@ import os
 from decimal import Decimal
 from datetime import datetime
 from typing import Dict, List, Optional
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, or_
 from sqlalchemy.orm import Session
 
 from integration_hub.models.hub_vendor_item import HubVendorItem
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
+from integration_hub.models.size_unit import SizeUnit
 
 logger = logging.getLogger(__name__)
+
+
+def calculate_unit_cost_from_vendor_item(vi: HubVendorItem) -> Optional[float]:
+    """
+    Calculate unit cost from a vendor item's pricing fields.
+
+    For weight-based items (measure_type='weight'):
+        unit_cost = case_cost / (units_per_case × size_quantity)
+        Example: $138.13 case / (1 unit × 10 lb) = $13.81/lb
+
+    For count/volume items:
+        unit_cost = case_cost / units_per_case
+        Example: $36 case / 12 bottles = $3.00/bottle
+
+    Returns:
+        float unit cost or None if pricing is unavailable
+    """
+    if not vi.case_cost:
+        return float(vi.unit_cost) if vi.unit_cost else None
+
+    units_per_case = float(vi.units_per_case or 1)
+    if units_per_case == 0:
+        return None
+
+    # Check if this is a weight-based item
+    is_weight_item = False
+    if vi.size_unit and vi.size_unit.measure_type == 'weight':
+        is_weight_item = True
+
+    if is_weight_item and vi.size_quantity and float(vi.size_quantity) > 0:
+        # Weight items: divide by total weight (units × size)
+        # Example: Grouper 10lb case = $138.13 / (1 × 10) = $13.81/lb
+        total_weight = units_per_case * float(vi.size_quantity)
+        unit_cost = float(vi.case_cost) / total_weight
+    else:
+        # Count/volume items: divide by units per case
+        # Example: Wine 12-bottle case = $36 / 12 = $3.00/bottle
+        unit_cost = float(vi.case_cost) / units_per_case
+
+    return unit_cost
 
 
 class LocationCostUpdaterService:
@@ -139,18 +180,32 @@ class LocationCostUpdaterService:
         if not master_item_id:
             return {'skipped': True, 'reason': 'no_master_item_id'}
 
-        # Calculate cost per primary unit
-        pack_to_primary_factor = float(vendor_item.pack_to_primary_factor or 1.0)
-        unit_price = float(item.unit_price or 0)
+        # Calculate cost per primary unit (lb for weight, bottle/each for count/volume)
+        # Use units_per_case (Backbar-style) or fall back to deprecated pack_to_primary_factor
+        units_per_case = float(vendor_item.units_per_case or vendor_item.pack_to_primary_factor or 1.0)
+        unit_price = float(item.unit_price or 0)  # This is typically the CASE price from invoice
 
-        if pack_to_primary_factor == 0:
-            return {'skipped': True, 'reason': 'zero_pack_factor'}
+        if units_per_case == 0:
+            return {'skipped': True, 'reason': 'zero_units_per_case'}
 
-        cost_per_primary = unit_price / pack_to_primary_factor
+        # Check if this is a weight-based item
+        is_weight_item = (vendor_item.size_unit and
+                          vendor_item.size_unit.measure_type == 'weight' and
+                          vendor_item.size_quantity and
+                          float(vendor_item.size_quantity) > 0)
 
-        # Calculate quantity in primary units
-        quantity = float(item.quantity or 0)
-        qty_in_primary = quantity * pack_to_primary_factor
+        if is_weight_item:
+            # Weight items: divide by total weight (units × size)
+            # Example: Grouper 10lb case @ $138.13 = $138.13 / (1 × 10) = $13.81/lb
+            # Example: Cheese 4×5lb bags @ $47.54 = $47.54 / (4 × 5) = $2.38/lb
+            total_weight = units_per_case * float(vendor_item.size_quantity)
+            cost_per_primary = unit_price / total_weight
+            qty_in_primary = float(item.quantity or 0) * total_weight
+        else:
+            # Count/volume items: divide by units per case
+            # Example: Wine 12-bottle case @ $36 = $36 / 12 = $3.00/bottle
+            cost_per_primary = unit_price / units_per_case
+            qty_in_primary = float(item.quantity or 0) * units_per_case
 
         if qty_in_primary == 0:
             return {'skipped': True, 'reason': 'zero_quantity'}
@@ -365,6 +420,229 @@ class LocationCostUpdaterService:
                 }
                 for r in results
             ]
+
+
+    def seed_location_costs_from_vendor_items(self, master_item_id: Optional[int] = None) -> Dict:
+        """
+        Seed location costs from vendor item pricing for items that don't have invoice-based costs.
+
+        This populates MasterItemLocationCost records using the vendor item's unit_cost
+        (calculated from case_cost / units_per_case) as a default price for all locations.
+
+        Args:
+            master_item_id: Optional - seed for a specific master item only
+
+        Returns:
+            Dict with statistics about records created/updated
+        """
+        stats = {
+            'master_items_processed': 0,
+            'locations_seeded': 0,
+            'locations_skipped_existing': 0,
+            'errors': []
+        }
+
+        # Get all mapped vendor items with pricing
+        query = self.db.query(HubVendorItem).filter(
+            HubVendorItem.inventory_master_item_id.isnot(None),
+            HubVendorItem.is_active == True
+        )
+
+        if master_item_id:
+            query = query.filter(HubVendorItem.inventory_master_item_id == master_item_id)
+
+        # Group by master_item_id to get best price per master item
+        vendor_items = query.all()
+
+        # Build map of master_item_id -> best unit_cost
+        master_item_costs = {}
+        for vi in vendor_items:
+            # Calculate unit cost using helper that handles weight items correctly
+            unit_cost = calculate_unit_cost_from_vendor_item(vi)
+            if unit_cost is None:
+                continue
+
+            mid = vi.inventory_master_item_id
+            # Keep the lowest cost (or first if not set)
+            if mid not in master_item_costs or unit_cost < master_item_costs[mid]['cost']:
+                master_item_costs[mid] = {
+                    'cost': unit_cost,
+                    'vendor_id': vi.vendor_id,
+                    'vendor_item_id': vi.id
+                }
+
+        if not master_item_costs:
+            return stats
+
+        # Get all locations from Inventory
+        engine = self._get_inventory_engine()
+        with engine.connect() as conn:
+            locations = conn.execute(
+                text("SELECT id FROM locations WHERE is_active = true")
+            ).fetchall()
+            location_ids = [loc[0] for loc in locations]
+
+            for master_item_id, cost_info in master_item_costs.items():
+                stats['master_items_processed'] += 1
+                unit_cost = cost_info['cost']
+                vendor_id = cost_info['vendor_id']
+
+                for location_id in location_ids:
+                    try:
+                        # Check if location cost already exists
+                        existing = conn.execute(
+                            text("""
+                                SELECT id FROM master_item_location_costs
+                                WHERE master_item_id = :master_item_id AND location_id = :location_id
+                            """),
+                            {"master_item_id": master_item_id, "location_id": location_id}
+                        ).fetchone()
+
+                        if existing:
+                            stats['locations_skipped_existing'] += 1
+                            continue
+
+                        # Create new location cost record with vendor item pricing
+                        conn.execute(
+                            text("""
+                                INSERT INTO master_item_location_costs
+                                (master_item_id, location_id, current_weighted_avg_cost, total_qty_on_hand,
+                                 last_vendor_id, created_at, last_updated)
+                                VALUES (:master_item_id, :location_id, :cost, 0,
+                                        :vendor_id, NOW(), NOW())
+                            """),
+                            {
+                                "master_item_id": master_item_id,
+                                "location_id": location_id,
+                                "cost": unit_cost,
+                                "vendor_id": vendor_id
+                            }
+                        )
+                        stats['locations_seeded'] += 1
+
+                    except Exception as e:
+                        stats['errors'].append(f"Error seeding {master_item_id} at {location_id}: {str(e)}")
+
+            conn.commit()
+
+        logger.info(f"Seeded location costs: {stats['locations_seeded']} created, "
+                   f"{stats['locations_skipped_existing']} skipped (existing)")
+
+        return stats
+
+    def fix_seeded_location_costs(self, master_item_id: Optional[int] = None) -> Dict:
+        """
+        Fix location costs that were seeded with incorrect values (case prices instead of unit prices).
+        Only updates records that have no last_purchase_cost (meaning they were seeded, not from invoices).
+        """
+        stats = {
+            'master_items_checked': 0,
+            'locations_updated': 0,
+            'locations_already_correct': 0,
+            'items_fixed': [],
+            'errors': []
+        }
+
+        # Get vendor items with master item mapping and pricing
+        # Note: unit_cost is a property, so we filter on case_cost column only
+        query = self.db.query(HubVendorItem).filter(
+            HubVendorItem.inventory_master_item_id.isnot(None),
+            HubVendorItem.case_cost.isnot(None)
+        )
+
+        if master_item_id:
+            query = query.filter(HubVendorItem.inventory_master_item_id == master_item_id)
+
+        vendor_items = query.all()
+
+        # Build map of master_item_id -> correct unit_cost
+        master_item_costs = {}
+        for vi in vendor_items:
+            if vi.inventory_master_item_id not in master_item_costs:
+                # Calculate correct unit cost using helper that handles weight items
+                unit_cost = calculate_unit_cost_from_vendor_item(vi)
+                if unit_cost is None:
+                    continue
+
+                # For weight items, include size info in description
+                size_info = ""
+                if vi.size_unit and vi.size_unit.measure_type == 'weight' and vi.size_quantity:
+                    size_info = f" ({vi.size_quantity}{vi.size_unit.symbol})"
+
+                master_item_costs[vi.inventory_master_item_id] = {
+                    'cost': round(unit_cost, 4),
+                    'case_cost': float(vi.case_cost) if vi.case_cost else None,
+                    'units_per_case': float(vi.units_per_case) if vi.units_per_case else None,
+                    'size_quantity': float(vi.size_quantity) if vi.size_quantity else None,
+                    'is_weight_item': vi.size_unit and vi.size_unit.measure_type == 'weight',
+                    'description': (vi.vendor_product_name[:40] if vi.vendor_product_name else 'Unknown') + size_info
+                }
+
+        if not master_item_costs:
+            logger.warning("No vendor items found with valid pricing for fixing location costs")
+            return stats
+
+        logger.info(f"Fixing location costs for {len(master_item_costs)} master items")
+
+        # Connect to inventory database
+        inventory_db_url = os.getenv(
+            "INVENTORY_DATABASE_URL",
+            "postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db"
+        )
+        engine = create_engine(inventory_db_url)
+
+        with engine.connect() as conn:
+            for master_item_id, cost_info in master_item_costs.items():
+                stats['master_items_checked'] += 1
+                correct_cost = cost_info['cost']
+
+                try:
+                    # Update seeded location costs that have wrong values
+                    # Only update records without last_purchase_cost (not from invoices)
+                    result = conn.execute(
+                        text("""
+                            UPDATE master_item_location_costs
+                            SET current_weighted_avg_cost = :correct_cost,
+                                last_updated = NOW()
+                            WHERE master_item_id = :master_item_id
+                              AND last_purchase_cost IS NULL
+                              AND ABS(current_weighted_avg_cost - :correct_cost) > 0.01
+                        """),
+                        {"master_item_id": master_item_id, "correct_cost": correct_cost}
+                    )
+
+                    if result.rowcount > 0:
+                        stats['locations_updated'] += result.rowcount
+                        stats['items_fixed'].append({
+                            'master_item_id': master_item_id,
+                            'description': cost_info['description'],
+                            'case_cost': cost_info['case_cost'],
+                            'units_per_case': cost_info['units_per_case'],
+                            'correct_unit_cost': correct_cost,
+                            'locations_fixed': result.rowcount
+                        })
+                    else:
+                        # Check how many are already correct
+                        existing = conn.execute(
+                            text("""
+                                SELECT COUNT(*) FROM master_item_location_costs
+                                WHERE master_item_id = :master_item_id
+                                  AND last_purchase_cost IS NULL
+                            """),
+                            {"master_item_id": master_item_id}
+                        ).scalar()
+                        if existing:
+                            stats['locations_already_correct'] += existing
+
+                except Exception as e:
+                    stats['errors'].append(f"Error fixing {master_item_id}: {str(e)}")
+
+            conn.commit()
+
+        logger.info(f"Fixed location costs: {stats['locations_updated']} updated, "
+                   f"{stats['locations_already_correct']} already correct")
+
+        return stats
 
 
 def get_location_cost_updater(db: Session) -> LocationCostUpdaterService:

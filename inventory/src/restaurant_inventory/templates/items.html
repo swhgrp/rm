@@ -288,13 +288,22 @@ function isAuthenticated() {
 
 async function loadUnitsOfMeasure() {
     try {
-        const response = await apiRequest('api/units/');
+        // Fetch from Hub (source of truth for UoMs)
+        const response = await apiRequest('api/units/hub');
         unitsOfMeasure = response;
         // Don't populate dropdowns here - they don't exist yet
         // They will be populated when modal opens
     } catch (error) {
-        console.error('Error loading units of measure:', error);
-        showAlert('Error loading units of measure', 'danger');
+        console.error('Error loading Hub units:', error);
+        // Fallback to local units
+        try {
+            const localResponse = await apiRequest('api/units/');
+            unitsOfMeasure = localResponse;
+            console.warn('Using local UOMs as fallback');
+        } catch (fallbackError) {
+            console.error('Error loading local units:', fallbackError);
+            showAlert('Error loading units of measure', 'danger');
+        }
     }
 }
 
@@ -494,7 +503,8 @@ function editItem(itemId) {
 
     // Populate dropdowns first, then set values
     populateUnitDropdowns();
-    document.getElementById('itemUnitId').value = item.unit_of_measure_id || '';
+    // Use Hub UoM (primary_uom_id) if available, otherwise fall back to deprecated unit_of_measure_id
+    document.getElementById('itemUnitId').value = item.primary_uom_id || item.unit_of_measure_id || '';
     document.getElementById('itemSecondaryUnitId').value = item.secondary_unit_id || '';
 
     document.getElementById('itemCurrentCost').value = item.current_cost || '';
@@ -510,7 +520,7 @@ async function saveItem() {
         name: document.getElementById('itemName').value,
         description: document.getElementById('itemDescription').value || null,
         category: document.getElementById('itemCategory').value,
-        unit_of_measure_id: parseInt(document.getElementById('itemUnitId').value) || null,
+        primary_uom_id: parseInt(document.getElementById('itemUnitId').value) || null,  // Hub UoM ID
         secondary_unit_id: parseInt(document.getElementById('itemSecondaryUnitId').value) || null,
         current_cost: parseFloat(document.getElementById('itemCurrentCost').value) || null,
         sku: document.getElementById('itemSku').value || null,

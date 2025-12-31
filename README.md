@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** December 28, 2025
+**Last Updated:** December 30, 2025
 **Status:** ~92% Complete - Core Systems Production Ready ✅
-**Latest:** AI semantic search + Backbar-style sizing for vendor items (Dec 28, 2025) ✅
+**Latest:** Hub UoM architecture, vendor items pagination, unit conversions (Dec 30, 2025) ✅
 
 ---
 
@@ -613,7 +613,7 @@ restaurant-system/
 - **Location-aware pricing:** Vendor items track prices per location from invoices
 - **Weighted average costing:** Hub updates Inventory's `MasterItemLocationCost` on invoice processing
 
-**🤖 NEW: AI Semantic Search & Backbar-Style Sizing (Dec 28, 2025):**
+**🤖 AI Semantic Search & Backbar-Style Sizing (Dec 28, 2025):**
 - ✅ **AI-powered semantic search** - Find vendor items using natural language
 - ✅ **pgvector integration** - HNSW index for fast similarity lookups
 - ✅ **Similar item detection** - Find duplicates across vendors
@@ -621,6 +621,14 @@ restaurant-system/
 - ✅ **Size units & containers** - Configurable units (L, ml, lb, oz) and containers (bottle, can, bag)
 - ✅ **Vendor item detail page** - Comprehensive view with pricing history and AI suggestions
 - ✅ **Auto unit cost calculation** - `case_cost / units_per_case`
+
+**🆕 NEW: Expense Items vs Vendor Items (Dec 28, 2025):**
+- ✅ **Clear separation** - Vendor Items = inventory tracked, Expense Items = expense-only (not counted)
+- ✅ **Expense Items page** - View/manage items mapped to expense GL accounts
+- ✅ **"Map to Expense" action** - Convert vendor items to expense items (deletes from vendor items)
+- ✅ **Searchable GL dropdowns** - Type-to-filter expense account selection
+- ✅ **Convert to Inventory** - Move expense items back to vendor items with master item link
+- ✅ **Auto-cleanup** - Mapping to expense removes item from Vendor Items table
 
 **🚀 Major Workflow Improvements (Nov 8, 2025):**
 - ✅ **Bulk mapping by description** - Map once, apply to ALL occurrences (10x faster)
@@ -1324,6 +1332,73 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ## 📝 Recent Updates
 
+### December 30, 2025 - Hub UoM Architecture & Vendor Items Pagination ⚡
+
+**Hub as UoM Source of Truth**
+- ✅ **Hub owns UoM** - Hub's `units_of_measure` table is now the source of truth
+- ✅ **Inventory references Hub** - Primary UoM stored as `primary_uom_id` (Hub ID) with cached name/abbr
+- ✅ **Unit conversions** - Item-specific conversions (e.g., 1L = 1 Bottle for alcohol items)
+- ✅ **Bulk unit updates** - Added 58 Liter → Bottle conversions for alcohol items
+
+**Vendor Items Page Performance**
+- ✅ **Server-side pagination** - 50 items per page (was loading all 694+ items)
+- ✅ **AJAX loading** - Table loads via API for faster initial page load
+- ✅ **Debounced search** - 300ms delay before server request
+- ✅ **Server-side filtering** - All filters now query server with proper pagination
+
+**API Enhancements**
+- ✅ **New endpoint** - `GET /api/uom/` for Hub UoM list
+- ✅ **Inventory proxy** - `/api/units/hub` fetches UoMs from Hub API
+- ✅ **Pagination controls** - Previous/Next with "Showing 1-50 of 694" info
+
+**Files Modified:**
+- `integration-hub/src/integration_hub/api/uom.py` - New UoM API
+- `integration-hub/src/integration_hub/templates/hub_vendor_items.html` - Pagination UI
+- `inventory/src/restaurant_inventory/api/api_v1/endpoints/units.py` - Hub proxy
+- `inventory/src/restaurant_inventory/models/item_unit_conversion.py` - Hub UoM references
+
+---
+
+### December 28, 2025 - Expense Items vs Vendor Items Separation 💰📦
+
+**NEW: Clear Separation of Expense vs Inventory Items**
+- ✅ **Vendor Items** = Items linked to inventory master items (tracked, counted)
+- ✅ **Expense Items** = Items mapped to expense GL accounts only (not tracked in inventory)
+- ✅ **One-way conversion** - "Map to Expense" moves item from Vendor Items to Expense Items
+- ✅ **Data cleanup** - Converting to expense deletes vendor item record (expense mapping is sole record)
+
+**NEW: Expense Items Management Page**
+- ✅ **Dedicated page** - `/hub/expense-items` shows all expense-mapped items
+- ✅ **Edit GL accounts** - Change expense account for any mapped item
+- ✅ **Convert to Inventory** - Link expense item back to vendor item with master item
+- ✅ **Searchable GL dropdowns** - Type-to-filter with 8-row scrollable lists
+- ✅ **Occurrence tracking** - See how many times each expense item appears on invoices
+
+**NEW: Vendor Item Detail - Map to Expense**
+- ✅ **"Map to Expense" button** - On vendor item detail page header
+- ✅ **GL account selection modal** - Searchable expense/COGS account dropdown
+- ✅ **Instant conversion** - Creates expense mapping, deletes vendor item
+- ✅ **Redirect to Expense Items** - After conversion, redirects to expense items page
+
+**UI Improvements**
+- ✅ **Searchable select components** - Replaced native dropdowns with search+list UI
+- ✅ **Bootstrap modals** - Replaced browser `confirm()` dialogs with styled modals
+- ✅ **Toast notifications** - Replaced browser `alert()` with Bootstrap toasts
+- ✅ **GL account type fix** - Changed comparisons to uppercase ('ASSET', 'EXPENSE', 'COGS')
+
+**Database Changes**
+- ✅ **Vendor items filtered** - Page excludes items with `inventory_master_item_id = NULL`
+- ✅ **Data cleanup** - Deleted 213 orphaned vendor items with no inventory link
+
+**Files Modified:**
+- `integration-hub/src/integration_hub/main.py` - Convert-to-expense endpoint, page filters
+- `integration-hub/src/integration_hub/api/vendor_items.py` - `exclude_expense_only` filter
+- `integration-hub/src/integration_hub/templates/vendor_item_detail.html` - Map to Expense button/modal
+- `integration-hub/src/integration_hub/templates/expense_items.html` - Searchable GL dropdowns
+- Multiple templates - Replaced confirm/alert with Bootstrap modals/toasts
+
+---
+
 ### December 28, 2025 - AI Semantic Search & Backbar-Style Sizing 🤖📦
 
 **NEW: AI-Powered Semantic Search for Vendor Items**
@@ -1865,8 +1940,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 3.3 - AI Semantic Search & Backbar-Style Sizing
-**Last Updated:** December 28, 2025
+**Version:** 3.4 - Hub UoM Architecture & Vendor Items Performance
+**Last Updated:** December 30, 2025
 **Documentation Health:** 96/100 - Excellent ✅
 
-*AI-powered vendor item search + Backbar-style sizing system. Location-aware costing with Inventory as location source of truth.*
+*Hub as UoM source of truth. Server-side pagination for vendor items. Item-specific unit conversions.*

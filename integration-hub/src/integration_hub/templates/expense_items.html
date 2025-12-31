@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+
+{% block title %}Expense Items - Integration Hub{% endblock %}
+
+{% block page_title %}Expense Items{% endblock %}
+
+{% block head %}
+<style>
+    /* Searchable select styling */
+    .searchable-select-wrapper {
+        position: relative;
+    }
+    .searchable-select-wrapper .search-input {
+        width: 100%;
+        margin-bottom: 5px;
+    }
+    .searchable-select-wrapper select {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="page-header">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1><i class="bi bi-receipt"></i> Expense Items</h1>
+            <div>
+                <a href="/hub/mapped-items" class="btn btn-outline-secondary">
+                    <i class="bi bi-list-check"></i> View All Mapped Items
+                </a>
+            </div>
+        </div>
+        <p class="text-muted">Items mapped to expense accounts only (not tracked in inventory)</p>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body py-3">
+                    <h3 class="mb-0">{{ stats.total }}</h3>
+                    <small class="text-muted">Total Expense Items</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body py-3">
+                    <h3 class="mb-0 text-info">{{ stats.with_vendor }}</h3>
+                    <small class="text-muted">With Vendor</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body py-3">
+                    <h3 class="mb-0 text-secondary">{{ stats.without_vendor }}</h3>
+                    <small class="text-muted">No Vendor</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search -->
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="row align-items-center g-2">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search expense items..." onkeyup="filterItems()">
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                        <i class="bi bi-x-circle"></i> Clear
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Items Table -->
+    <div class="card">
+        <div class="card-header">
+            <i class="bi bi-list"></i> Expense Items <span id="filteredCount" class="badge bg-secondary ms-2">{{ expense_items|length }}</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="expenseItemsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Description</th>
+                            <th>Item Code</th>
+                            <th>Expense Account</th>
+                            <th>Vendor</th>
+                            <th>Occurrences</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in expense_items %}
+                        <tr data-description="{{ item.item_description|lower }}" data-id="{{ item.id }}">
+                            <td>
+                                <strong>{{ item.item_description }}</strong>
+                                {% if item.notes %}
+                                <br><small class="text-muted">{{ item.notes }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.item_code %}
+                                <span class="badge bg-secondary">{{ item.item_code }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.gl_cogs_account %}
+                                <span class="badge bg-warning text-dark">{{ item.gl_cogs_account }}</span>
+                                {% if item.gl_cogs_account_name %}
+                                <small class="text-muted ms-1">{{ item.gl_cogs_account_name[:30] }}</small>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.vendor_name %}
+                                <span class="badge bg-info">{{ item.vendor_name }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ item.occurrence_count }}</span>
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <button class="btn btn-outline-primary" onclick="openConvertModal('{{ item.item_description|replace("'", "\\'") }}', {{ item.id }}, {{ item.gl_cogs_account or 'null' }})" title="Convert to Inventory Item">
+                                        <i class="bi bi-box-arrow-in-right"></i>
+                                    </button>
+                                    <button class="btn btn-outline-warning" onclick="openEditModal('{{ item.item_description|replace("'", "\\'") }}', {{ item.id }}, {{ item.gl_asset_account or 'null' }}, {{ item.gl_cogs_account or 'null' }}, {{ item.gl_waste_account or 'null' }})" title="Edit GL Accounts">
+                                        <i class="bi bi-pencil"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Convert to Inventory Item Modal -->
+<div class="modal fade" id="convertModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-box-arrow-in-right"></i> Convert to Inventory Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> Converting "<span id="convertItemDescription"></span>" from expense to inventory item.
+                    This will link it to a vendor item and enable inventory tracking.
+                </div>
+                <form id="convertForm">
+                    <input type="hidden" id="convertMappingId" name="mapping_id">
+                    <input type="hidden" id="convertDescription" name="item_description">
+
+                    <div class="mb-3">
+                        <label class="form-label">Select Vendor Item <span class="text-danger">*</span></label>
+                        <div class="searchable-select-wrapper">
+                            <input type="text" class="form-control search-input" id="searchVendorItem" placeholder="Search vendor items...">
+                            <select class="form-select" id="vendorItemSelect" name="inventory_item_id" size="8" required>
+                                <option value="">-- Select vendor item --</option>
+                                {% for item in inventory_items %}
+                                <option value="{{ item.id }}" data-category="{{ item.master_item_category or '' }}">
+                                    {{ item.vendor_name }}: {{ item.vendor_product_name }} {% if item.vendor_sku %}[{{ item.vendor_sku }}]{% endif %} ({{ item.master_item_category or 'Uncategorized' }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <small class="text-muted">Select the vendor item to link this expense to</small>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Asset Account</label>
+                                <div class="searchable-select-wrapper">
+                                    <input type="text" class="form-control search-input" id="searchConvertAsset" placeholder="Search...">
+                                    <select class="form-select" id="convertAssetAccount" name="gl_asset_account" size="5">
+                                        <option value="">-- None --</option>
+                                        {% for account in gl_accounts %}
+                                        {% if account.account_type == 'ASSET' %}
+                                        <option value="{{ account.account_number }}">{{ account.account_number }} - {{ account.account_name }}</option>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">COGS Account <span class="text-danger">*</span></label>
+                                <div class="searchable-select-wrapper">
+                                    <input type="text" class="form-control search-input" id="searchConvertCogs" placeholder="Search...">
+                                    <select class="form-select" id="convertCogsAccount" name="gl_cogs_account" size="5" required>
+                                        <option value="">-- Select COGS account --</option>
+                                        {% for account in gl_accounts %}
+                                        {% if account.account_type == 'EXPENSE' or account.account_type == 'COGS' %}
+                                        <option value="{{ account.account_number }}">{{ account.account_number }} - {{ account.account_name }}</option>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label class="form-label">Waste Account</label>
+                                <div class="searchable-select-wrapper">
+                                    <input type="text" class="form-control search-input" id="searchConvertWaste" placeholder="Search...">
+                                    <select class="form-select" id="convertWasteAccount" name="gl_waste_account" size="5">
+                                        <option value="">-- None --</option>
+                                        {% for account in gl_accounts %}
+                                        {% if account.account_type == 'EXPENSE' %}
+                                        <option value="{{ account.account_number }}">{{ account.account_number }} - {{ account.account_name }}</option>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="convertToInventory()">
+                    <i class="bi bi-box-arrow-in-right"></i> Convert to Inventory Item
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit GL Accounts Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit Expense Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Editing: <strong id="editItemDescription"></strong></p>
+                <form id="editForm">
+                    <input type="hidden" id="editMappingId" name="mapping_id">
+                    <input type="hidden" id="editDescription" name="item_description">
+
+                    <div class="mb-3">
+                        <label class="form-label">Expense/COGS Account <span class="text-danger">*</span></label>
+                        <div class="searchable-select-wrapper">
+                            <input type="text" class="form-control search-input" id="searchEditCogs" placeholder="Search...">
+                            <select class="form-select" id="editCogsAccount" name="gl_cogs_account" size="6" required>
+                                {% for account in gl_accounts %}
+                                {% if account.account_type == 'EXPENSE' or account.account_type == 'COGS' %}
+                                <option value="{{ account.account_number }}">{{ account.account_number }} - {{ account.account_name }}</option>
+                                {% endif %}
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveExpenseEdit()">
+                    <i class="bi bi-check"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Category GL mappings from server
+const categoryMappings = {{ category_mappings|tojson|safe }};
+
+// Filter table
+function filterItems() {
+    const searchText = document.getElementById('searchInput').value.toLowerCase();
+    const rows = document.querySelectorAll('#expenseItemsTable tbody tr');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const description = row.dataset.description || '';
+        const matches = description.includes(searchText);
+        row.style.display = matches ? '' : 'none';
+        if (matches) visibleCount++;
+    });
+
+    document.getElementById('filteredCount').textContent = visibleCount;
+}
+
+function clearFilters() {
+    document.getElementById('searchInput').value = '';
+    filterItems();
+}
+
+// Convert to Inventory Item Modal
+function openConvertModal(description, mappingId, currentCogs) {
+    document.getElementById('convertItemDescription').textContent = description;
+    document.getElementById('convertDescription').value = description;
+    document.getElementById('convertMappingId').value = mappingId;
+
+    // Reset form
+    document.getElementById('vendorItemSelect').value = '';
+    document.getElementById('convertAssetAccount').value = '';
+    document.getElementById('convertCogsAccount').value = currentCogs || '';
+    document.getElementById('convertWasteAccount').value = '';
+
+    new bootstrap.Modal(document.getElementById('convertModal')).show();
+}
+
+async function convertToInventory() {
+    const form = document.getElementById('convertForm');
+    const vendorItemId = document.getElementById('vendorItemSelect').value;
+    const description = document.getElementById('convertDescription').value;
+
+    if (!vendorItemId) {
+        showToast('Warning', 'Please select a vendor item', 'warning');
+        return;
+    }
+
+    const cogsAccount = document.getElementById('convertCogsAccount').value;
+    if (!cogsAccount) {
+        showToast('Warning', 'Please select a COGS account', 'warning');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('item_description', description);
+    formData.append('inventory_item_id', vendorItemId);
+    formData.append('gl_cogs_account', cogsAccount);
+
+    const assetAccount = document.getElementById('convertAssetAccount').value;
+    if (assetAccount) formData.append('gl_asset_account', assetAccount);
+
+    const wasteAccount = document.getElementById('convertWasteAccount').value;
+    if (wasteAccount) formData.append('gl_waste_account', wasteAccount);
+
+    // Get category from selected vendor item
+    const vendorItemOption = document.querySelector(`#vendorItemSelect option[value="${vendorItemId}"]`);
+    if (vendorItemOption) {
+        const category = vendorItemOption.dataset.category;
+        if (category) formData.append('inventory_category', category);
+    }
+
+    try {
+        const response = await fetch('/hub/api/items/map-by-description', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            showToast('Success', 'Item converted to inventory', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('convertModal')).hide();
+            location.reload();
+        } else {
+            const error = await response.json();
+            showToast('Error', error.detail || 'Failed to convert item', 'danger');
+        }
+    } catch (e) {
+        showToast('Error', 'Error converting item: ' + e.message, 'danger');
+    }
+}
+
+// Edit Expense Item Modal
+function openEditModal(description, mappingId, assetAccount, cogsAccount, wasteAccount) {
+    document.getElementById('editItemDescription').textContent = description;
+    document.getElementById('editDescription').value = description;
+    document.getElementById('editMappingId').value = mappingId;
+    document.getElementById('editCogsAccount').value = cogsAccount || '';
+
+    new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+
+async function saveExpenseEdit() {
+    const description = document.getElementById('editDescription').value;
+    const cogsAccount = document.getElementById('editCogsAccount').value;
+
+    if (!cogsAccount) {
+        showToast('Warning', 'Please select an expense account', 'warning');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('item_description', description);
+    formData.append('gl_cogs_account', cogsAccount);
+    // No inventory_item_id means it stays as expense
+
+    try {
+        const response = await fetch('/hub/api/items/map-by-description', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (response.ok) {
+            showToast('Success', 'Expense item updated', 'success');
+            bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+            location.reload();
+        } else {
+            const error = await response.json();
+            showToast('Error', error.detail || 'Failed to update item', 'danger');
+        }
+    } catch (e) {
+        showToast('Error', 'Error updating item: ' + e.message, 'danger');
+    }
+}
+
+// Searchable select functionality
+function setupSearchableSelect(inputId, selectId) {
+    const input = document.getElementById(inputId);
+    const select = document.getElementById(selectId);
+
+    if (!input || !select) return;
+
+    input.addEventListener('input', function() {
+        const searchText = this.value.toLowerCase();
+        const options = select.options;
+
+        for (let i = 0; i < options.length; i++) {
+            const optionText = options[i].text.toLowerCase();
+            options[i].style.display = optionText.includes(searchText) ? '' : 'none';
+        }
+    });
+}
+
+// Auto-fill GL accounts when vendor item selected
+document.getElementById('vendorItemSelect')?.addEventListener('change', function() {
+    const option = this.selectedOptions[0];
+    if (option && option.dataset.category) {
+        const category = option.dataset.category;
+        if (categoryMappings[category]) {
+            const mapping = categoryMappings[category];
+            if (mapping.asset_account) {
+                document.getElementById('convertAssetAccount').value = mapping.asset_account;
+            }
+            if (mapping.cogs_account) {
+                document.getElementById('convertCogsAccount').value = mapping.cogs_account;
+            }
+            if (mapping.waste_account) {
+                document.getElementById('convertWasteAccount').value = mapping.waste_account;
+            }
+        }
+    }
+});
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Setup all searchable selects
+    setupSearchableSelect('searchVendorItem', 'vendorItemSelect');
+    setupSearchableSelect('searchConvertAsset', 'convertAssetAccount');
+    setupSearchableSelect('searchConvertCogs', 'convertCogsAccount');
+    setupSearchableSelect('searchConvertWaste', 'convertWasteAccount');
+    setupSearchableSelect('searchEditCogs', 'editCogsAccount');
+});
+</script>
+{% endblock %}

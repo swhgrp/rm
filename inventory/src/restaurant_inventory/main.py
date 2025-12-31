@@ -383,8 +383,9 @@ async def vendors_page(request: Request):
 
 @app.get("/units-of-measure", response_class=HTMLResponse)
 async def units_of_measure_page(request: Request):
-    """Units of Measure management page"""
-    return templates.TemplateResponse("units_of_measure.html", {"request": request})
+    """Units of Measure - DEPRECATED: Redirect to Hub (source of truth for UoMs)"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/hub/vendor-items", status_code=302)
 
 @app.get("/profile", response_class=HTMLResponse)
 async def profile_page(request: Request):

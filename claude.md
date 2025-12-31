@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** December 27, 2025
-**System Status:** Production (95% Complete - Major Architecture Refactor in Progress)
+**Last Updated:** December 30, 2025
+**System Status:** Production (95% Complete - Hub UoM Architecture Complete)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -9,9 +9,40 @@
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Dec 27, 2025)
+### Most Recent Work (Current Session - Dec 30, 2025)
 
-**LOCATION-AWARE COSTING ARCHITECTURE** 🔄 **IN PROGRESS (40%)**
+**HUB UOM ARCHITECTURE & VENDOR ITEMS PERFORMANCE** ✅ **COMPLETE**
+
+#### 1. **Hub as UoM Source of Truth** ✅ **COMPLETE**
+- Hub's `units_of_measure` table is the authoritative source for all UoM data
+- Inventory stores `primary_uom_id` (Hub ID) with cached `primary_uom_name` and `primary_uom_abbr`
+- New Hub API endpoint: `GET /api/uom/` returns all units with dimension/measure_type
+- Inventory proxy: `/api/units/hub` fetches UoMs from Hub for frontend use
+
+#### 2. **Item Unit Conversions** ✅ **COMPLETE**
+- Model: `ItemUnitConversion` with `from_unit_id`, `to_unit_id`, `conversion_factor`
+- Unit IDs reference Hub's UoM table (not Inventory's deprecated table)
+- Added 58 Liter → Bottle conversions for alcohol items (1:1 factor)
+- Updated 57 alcohol items to use Bottle as primary count unit
+
+#### 3. **Vendor Items Page Performance** ✅ **COMPLETE**
+- Server-side pagination: 50 items per page (was loading all 694+ items)
+- AJAX loading via `/hub/api/v1/vendor-items/` with pagination params
+- Debounced search (300ms delay before server request)
+- Server-side filtering for search, vendor, category, status
+- Pagination UI with Previous/Next and "Showing 1-50 of 694" info
+
+#### 4. **Files Modified**
+- `integration-hub/src/integration_hub/api/uom.py` - New UoM API endpoint
+- `integration-hub/src/integration_hub/templates/hub_vendor_items.html` - Server-side pagination
+- `inventory/src/restaurant_inventory/api/api_v1/endpoints/units.py` - Hub UoM proxy
+- `inventory/src/restaurant_inventory/models/item_unit_conversion.py` - Hub UoM references
+
+---
+
+### Previous Session Work (Dec 27-28, 2025)
+
+**LOCATION-AWARE COSTING ARCHITECTURE** ✅ **SCHEMA COMPLETE**
 
 Major refactor implementing MarginEdge/R365 hybrid architecture for location-specific weighted average costing.
 

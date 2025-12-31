@@ -573,10 +573,19 @@
 
     async function loadUnitsOfMeasure() {
         try {
-            const response = await apiRequest('api/units/');
+            // Fetch from Hub (source of truth for UoMs)
+            const response = await apiRequest('api/units/hub');
             unitsOfMeasure = response;
         } catch (error) {
-            console.error('Error loading units:', error);
+            console.error('Error loading Hub units:', error);
+            // Fallback to local units if Hub is unavailable
+            try {
+                const localResponse = await apiRequest('api/units/');
+                unitsOfMeasure = localResponse;
+                console.warn('Using local UOMs as fallback');
+            } catch (fallbackError) {
+                console.error('Error loading local units:', fallbackError);
+            }
         }
     }
 
@@ -655,7 +664,8 @@
         document.getElementById('itemName').value = item.name;
         document.getElementById('itemDescription').value = item.description || '';
         document.getElementById('itemCategory').value = item.category || '';
-        document.getElementById('itemUnitId').value = item.unit_of_measure_id || '';
+        // Use Hub UoM (primary_uom_id) if available, otherwise fall back to deprecated unit_of_measure_id
+        document.getElementById('itemUnitId').value = item.primary_uom_id || item.unit_of_measure_id || '';
         itemModal.show();
     }
 
@@ -663,9 +673,9 @@
         const name = document.getElementById('itemName').value;
         const description = document.getElementById('itemDescription').value;
         const category = document.getElementById('itemCategory').value;
-        const unit_of_measure_id = document.getElementById('itemUnitId').value;
+        const primary_uom_id = document.getElementById('itemUnitId').value;
 
-        if (!name || !category || !unit_of_measure_id) {
+        if (!name || !category || !primary_uom_id) {
             showAlert('Please fill in all required fields', 'warning');
             return;
         }
@@ -675,7 +685,7 @@
                 name,
                 description,
                 category,
-                unit_of_measure_id: parseInt(unit_of_measure_id)
+                primary_uom_id: parseInt(primary_uom_id)  // Use Hub UoM ID
             };
 
             if (currentEditItemId) {
@@ -734,19 +744,20 @@
         modal.show();
 
         try {
-            // Fetch vendor items for this master item
-            const response = await apiRequest(`api/vendor-items/?master_item_id=${masterItemId}`);
+            // Fetch vendor items from Hub (source of truth)
+            const response = await apiRequest(`api/hub-vendor-items/?master_item_id=${masterItemId}`);
+            const vendorItems = response.items || response || [];
 
             document.getElementById('vendorItemsLoading').style.display = 'none';
 
-            if (!response || response.length === 0) {
+            if (!vendorItems || vendorItems.length === 0) {
                 document.getElementById('vendorItemsEmpty').style.display = 'block';
                 return;
             }
 
             // Display vendor items
             const tbody = document.getElementById('vendorItemsTableBody');
-            tbody.innerHTML = response.map(vi => {
+            tbody.innerHTML = vendorItems.map(vi => {
                 const statusBadge = vi.is_active
                     ? '<span class="badge bg-success">Active</span>'
                     : '<span class="badge bg-secondary">Inactive</span>';

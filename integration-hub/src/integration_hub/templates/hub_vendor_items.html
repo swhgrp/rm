@@ -95,7 +95,7 @@
                 <div class="col-md-4">
                     <div class="input-group">
                         <span class="input-group-text"><i class="bi bi-search"></i></span>
-                        <input type="text" class="form-control" id="searchInput" placeholder="Search name, SKU..." onkeyup="filterItems()">
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search name, SKU..." onkeyup="debouncedSearch()">
                     </div>
                 </div>
                 <div class="col-md-2">
@@ -142,6 +142,9 @@
                 <button class="btn btn-sm btn-outline-success ms-1" onclick="bulkApprove()" title="Approve Selected">
                     <i class="bi bi-check-lg"></i> Approve
                 </button>
+                <button class="btn btn-sm btn-outline-warning ms-1" onclick="showMergeModal()" title="Merge Selected Duplicates">
+                    <i class="bi bi-diagram-3"></i> Merge
+                </button>
                 <button class="btn btn-sm btn-outline-danger ms-1" onclick="bulkDeactivate()" title="Deactivate Selected">
                     <i class="bi bi-x-circle"></i>
                 </button>
@@ -165,75 +168,71 @@
                         </tr>
                     </thead>
                     <tbody id="itemsTableBody">
-                        {% for item in vendor_items %}
-                        <tr data-id="{{ item.id }}"
-                            data-vendor-id="{{ item.vendor_id }}"
-                            data-category="{{ item.category or '' }}"
-                            data-status="{{ item.status.value if item.status else 'active' }}"
-                            class="{% if item.status and item.status.value == 'inactive' %}table-secondary{% elif item.status and item.status.value == 'needs_review' %}table-warning{% endif %}">
-                            <td style="padding-left: 1rem;">
-                                <input type="checkbox" class="item-checkbox" value="{{ item.id }}">
-                            </td>
-                            <td>
-                                <small>{{ item.vendor.name if item.vendor else 'Unknown' }}</small>
-                            </td>
-                            <td>
-                                <a href="vendor-item-detail?id={{ item.id }}" class="text-decoration-none">
-                                    <strong>{{ item.vendor_product_name[:40] }}{% if item.vendor_product_name|length > 40 %}...{% endif %}</strong>
-                                </a>
-                            </td>
-                            <td>
-                                {% if item.vendor_sku %}
-                                <code>{{ item.vendor_sku }}</code>
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if item.category %}
-                                <small>{{ item.category }}</small>
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if item.inventory_master_item_name %}
-                                <small>{{ item.inventory_master_item_name[:25] }}{% if item.inventory_master_item_name|length > 25 %}...{% endif %}</small>
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {# Purchasing U of M: Case - [units_per_case]/[size_unit] #}
-                                {% if item.units_per_case %}
-                                    {% set upc = item.units_per_case|float %}
-                                    {% set unit_name = item.size_unit.symbol|capitalize if item.size_unit else (item.container.name|capitalize if item.container else 'Each') %}
-                                    {% if upc == upc|int %}
-                                        <small>Case - {{ upc|int }}/{{ unit_name }}</small>
-                                    {% else %}
-                                        <small>Case - {{ upc }}/{{ unit_name }}</small>
-                                    {% endif %}
-                                {% elif item.pack_size %}
-                                    <small class="text-muted">{{ item.pack_size }}</small>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-end" style="padding-right: 1rem;">
-                                {# Unit Cost = case_cost / units_per_case, with container name #}
-                                {% if item.case_cost and item.units_per_case and item.units_per_case > 0 %}
-                                    {% set container_name = item.container.name if item.container else '' %}
-                                    <small>${{ "%.2f"|format(item.case_cost / item.units_per_case) }}{% if container_name %}/{{ container_name }}{% endif %}</small>
-                                {% elif item.unit_cost %}
-                                    <small>${{ "%.2f"|format(item.unit_cost) }}</small>
-                                {% else %}
-                                    <span class="text-muted">-</span>
-                                {% endif %}
+                        <!-- Loaded via AJAX for better performance -->
+                        <tr id="loadingRow">
+                            <td colspan="8" class="text-center py-4">
+                                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                Loading vendor items...
                             </td>
                         </tr>
-                        {% endfor %}
                     </tbody>
                 </table>
+            </div>
+            <!-- Pagination Controls -->
+            <div class="card-footer d-flex justify-content-between align-items-center py-2">
+                <div class="text-muted small">
+                    <span id="paginationInfo">Showing 0-0 of 0</span>
+                </div>
+                <nav aria-label="Vendor items pagination">
+                    <ul class="pagination pagination-sm mb-0">
+                        <li class="page-item" id="prevPageItem">
+                            <a class="page-link" href="javascript:void(0)" onclick="prevPage()" aria-label="Previous">
+                                <span aria-hidden="true">&laquo;</span> Previous
+                            </a>
+                        </li>
+                        <li class="page-item disabled">
+                            <span class="page-link" id="currentPageDisplay">Page 1</span>
+                        </li>
+                        <li class="page-item" id="nextPageItem">
+                            <a class="page-link" href="javascript:void(0)" onclick="nextPage()" aria-label="Next">
+                                Next <span aria-hidden="true">&raquo;</span>
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Merge Vendor Items Modal -->
+<div class="modal fade" id="mergeItemsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title"><i class="bi bi-diagram-3"></i> Merge Duplicate Vendor Items</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Select which item to keep as the primary. The other selected items will be deleted and their invoice references will be transferred to the primary item.</p>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Select Primary Item to Keep:</label>
+                    <div id="mergeItemsList" class="list-group">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This action cannot be undone. The non-primary items will be permanently deleted.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="executeMerge()">
+                    <i class="bi bi-diagram-3"></i> Merge Items
+                </button>
             </div>
         </div>
     </div>
@@ -372,6 +371,244 @@
 
 {% block extra_scripts %}
 <script>
+// Pagination state
+let currentPage = 1;
+const PAGE_SIZE = 50;
+let totalItems = 0;
+let totalPages = 1;
+let filterMasterItemId = {{ filter_master_item_id|tojson }};
+let searchDebounceTimer = null;
+let isLoading = false;
+
+// Debounced search - waits for user to stop typing, then reloads from page 1
+function debouncedSearch() {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+        currentPage = 1;
+        loadVendorItems();
+    }, 300);
+}
+
+// Load vendor items via AJAX with server-side pagination
+async function loadVendorItems() {
+    if (isLoading) return;
+    isLoading = true;
+
+    const tbody = document.getElementById('itemsTableBody');
+    tbody.innerHTML = `
+        <tr>
+            <td colspan="8" class="text-center py-4">
+                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                Loading...
+            </td>
+        </tr>
+    `;
+
+    try {
+        // Build API URL with pagination and filters
+        const params = new URLSearchParams({
+            page: currentPage,
+            page_size: PAGE_SIZE,
+            mapped_only: 'true'
+        });
+
+        // Add filters
+        if (filterMasterItemId) {
+            params.append('master_item_id', filterMasterItemId);
+        }
+
+        const search = document.getElementById('searchInput').value.trim();
+        if (search) {
+            params.append('search', search);
+        }
+
+        const vendorId = document.getElementById('vendorFilter').value;
+        if (vendorId) {
+            params.append('vendor_id', vendorId);
+        }
+
+        const category = document.getElementById('categoryFilter').value;
+        if (category) {
+            params.append('category', category);
+        }
+
+        const status = document.getElementById('statusFilter').value;
+        if (status) {
+            params.append('status', status);
+        }
+
+        const response = await fetch(`/hub/api/v1/vendor-items/?${params}`);
+        if (!response.ok) throw new Error('Failed to load vendor items');
+
+        const data = await response.json();
+        const items = data.items || [];
+        totalItems = data.total || 0;
+        totalPages = Math.ceil(totalItems / PAGE_SIZE) || 1;
+
+        renderVendorItems(items);
+        updatePagination();
+    } catch (error) {
+        console.error('Error loading vendor items:', error);
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4 text-danger">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    Failed to load vendor items. <a href="javascript:loadVendorItems()">Retry</a>
+                </td>
+            </tr>
+        `;
+    } finally {
+        isLoading = false;
+    }
+}
+
+// Update pagination controls
+function updatePagination() {
+    const start = totalItems === 0 ? 0 : ((currentPage - 1) * PAGE_SIZE) + 1;
+    const end = Math.min(currentPage * PAGE_SIZE, totalItems);
+
+    document.getElementById('paginationInfo').textContent = `Showing ${start}-${end} of ${totalItems}`;
+    document.getElementById('currentPageDisplay').textContent = `Page ${currentPage} of ${totalPages}`;
+    document.getElementById('filteredCount').textContent = `${totalItems} total`;
+
+    // Enable/disable prev/next buttons
+    const prevItem = document.getElementById('prevPageItem');
+    const nextItem = document.getElementById('nextPageItem');
+
+    if (currentPage <= 1) {
+        prevItem.classList.add('disabled');
+    } else {
+        prevItem.classList.remove('disabled');
+    }
+
+    if (currentPage >= totalPages) {
+        nextItem.classList.add('disabled');
+    } else {
+        nextItem.classList.remove('disabled');
+    }
+}
+
+// Pagination navigation
+function prevPage() {
+    if (currentPage > 1) {
+        currentPage--;
+        loadVendorItems();
+    }
+}
+
+function nextPage() {
+    if (currentPage < totalPages) {
+        currentPage++;
+        loadVendorItems();
+    }
+}
+
+function goToPage(page) {
+    if (page >= 1 && page <= totalPages) {
+        currentPage = page;
+        loadVendorItems();
+    }
+}
+
+// Generate HTML for a single row
+function generateRowHtml(item) {
+    const status = item.status || 'active';
+    const rowClass = status === 'inactive' ? 'table-secondary' : (status === 'needs_review' ? 'table-warning' : '');
+
+    // Format purchasing UoM
+    let purchasingUom = '-';
+    if (item.units_per_case) {
+        const upc = parseFloat(item.units_per_case);
+        const sizeQty = parseFloat(item.size_quantity) || 0;
+        const unitSymbol = item.size_unit_symbol || '';
+
+        if (sizeQty > 0 && unitSymbol) {
+            const sizeStr = sizeQty === Math.floor(sizeQty) ? Math.floor(sizeQty) : sizeQty;
+            const upcStr = upc === Math.floor(upc) ? Math.floor(upc) : upc;
+            purchasingUom = `Case - ${upcStr}/${sizeStr}${unitSymbol}`;
+        } else {
+            purchasingUom = `Case - ${upc === Math.floor(upc) ? Math.floor(upc) : upc}`;
+        }
+    } else if (item.pack_size) {
+        purchasingUom = item.pack_size;
+    }
+
+    // Format avg cost
+    let avgCost = '-';
+    if (item.case_cost && item.units_per_case && item.units_per_case > 0) {
+        const caseCost = parseFloat(item.case_cost);
+        const upc = parseFloat(item.units_per_case);
+        const sizeQty = parseFloat(item.size_quantity) || 1;
+        const measureType = item.size_unit_measure_type || 'count';
+
+        if (measureType === 'weight') {
+            const totalWeight = upc * sizeQty;
+            const symbol = item.size_unit_symbol || 'lb';
+            avgCost = `$${(caseCost / totalWeight).toFixed(2)}/${symbol}`;
+        } else {
+            const containerName = item.container_name || 'unit';
+            avgCost = `$${(caseCost / upc).toFixed(2)}/${containerName}`;
+        }
+    } else if (item.unit_cost) {
+        avgCost = `$${parseFloat(item.unit_cost).toFixed(2)}`;
+    }
+
+    // Truncate long text
+    const productName = item.vendor_product_name || '';
+    const displayName = productName.length > 40 ? productName.substring(0, 40) + '...' : productName;
+    const masterItemName = item.inventory_master_item_name || '';
+    const displayMasterItem = masterItemName.length > 25 ? masterItemName.substring(0, 25) + '...' : masterItemName;
+
+    return `
+        <tr data-id="${item.id}"
+            data-vendor-id="${item.vendor_id}"
+            data-category="${item.category || ''}"
+            data-status="${status}"
+            class="${rowClass}">
+            <td style="padding-left: 1rem;">
+                <input type="checkbox" class="item-checkbox" value="${item.id}">
+            </td>
+            <td><small>${item.vendor_name || 'Unknown'}</small></td>
+            <td>
+                <a href="vendor-item-detail?id=${item.id}" class="text-decoration-none">
+                    <strong>${escapeHtml(displayName)}</strong>
+                </a>
+            </td>
+            <td>${item.vendor_sku ? `<code>${escapeHtml(item.vendor_sku)}</code>` : '<span class="text-muted">-</span>'}</td>
+            <td>${item.category ? `<small>${escapeHtml(item.category)}</small>` : '<span class="text-muted">-</span>'}</td>
+            <td>${displayMasterItem ? `<small>${escapeHtml(displayMasterItem)}</small>` : '<span class="text-muted">-</span>'}</td>
+            <td><small>${purchasingUom}</small></td>
+            <td class="text-end" style="padding-right: 1rem;"><small>${avgCost}</small></td>
+        </tr>
+    `;
+}
+
+// Render vendor items to table
+function renderVendorItems(items) {
+    const tbody = document.getElementById('itemsTableBody');
+
+    if (items.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="text-center py-4 text-muted">
+                    <i class="bi bi-inbox me-2"></i>No vendor items found
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = items.map(generateRowHtml).join('');
+}
+
+// Escape HTML to prevent XSS
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Calculate derived cost
 function updateAddDerivedCost() {
     const price = parseFloat(document.getElementById('addLastPrice').value) || 0;
@@ -387,58 +624,20 @@ function updateEditDerivedCost() {
     document.getElementById('editDerivedCost').value = derivedCost !== '-' ? derivedCost : '-';
 }
 
-// Filter items based on search and dropdowns
+// Filter items - reloads from server with current filters
 function filterItems() {
-    const search = document.getElementById('searchInput').value.toLowerCase();
-    const vendorId = document.getElementById('vendorFilter').value;
-    const category = document.getElementById('categoryFilter').value;
-    const status = document.getElementById('statusFilter').value;
-
-    const rows = document.querySelectorAll('#itemsTableBody tr');
-    let visibleCount = 0;
-
-    rows.forEach(row => {
-        const text = row.textContent.toLowerCase();
-        const rowVendorId = row.dataset.vendorId;
-        const rowCategory = row.dataset.category;
-        const rowStatus = row.dataset.status;
-
-        let show = true;
-
-        // Search filter
-        if (search && !text.includes(search)) {
-            show = false;
-        }
-
-        // Vendor filter
-        if (vendorId && rowVendorId !== vendorId) {
-            show = false;
-        }
-
-        // Category filter
-        if (category && rowCategory !== category) {
-            show = false;
-        }
-
-        // Status filter (review workflow)
-        if (status && rowStatus !== status) {
-            show = false;
-        }
-
-        row.style.display = show ? '' : 'none';
-        if (show) visibleCount++;
-    });
-
-    document.getElementById('filteredCount').textContent = `${visibleCount} shown`;
+    currentPage = 1;
+    loadVendorItems();
 }
 
-// Clear all filters
+// Clear all filters and reload
 function clearFilters() {
     document.getElementById('searchInput').value = '';
     document.getElementById('vendorFilter').value = '';
     document.getElementById('categoryFilter').value = '';
     document.getElementById('statusFilter').value = '';
-    filterItems();
+    currentPage = 1;
+    loadVendorItems();
 }
 
 // Toggle select all checkbox
@@ -459,11 +658,11 @@ function selectAll() {
 async function bulkDeactivate() {
     const checkboxes = document.querySelectorAll('.item-checkbox:checked');
     if (checkboxes.length === 0) {
-        alert('Please select items to deactivate');
+        showToast('Warning', 'Please select items to deactivate', 'warning');
         return;
     }
 
-    if (!await showConfirm(`Deactivate ${checkboxes.length} selected items?`)) {
+    if (!await showConfirm(`Deactivate ${checkboxes.length} selected items?`, 'Bulk Deactivate')) {
         return;
     }
 
@@ -483,7 +682,7 @@ async function bulkDeactivate() {
         }
     }
 
-    alert(`Deactivated ${successCount} of ${ids.length} items`);
+    showToast('Success', `Deactivated ${successCount} of ${ids.length} items`, 'success');
     location.reload();
 }
 
@@ -571,16 +770,16 @@ async function submitAddForm(event) {
             location.reload();
         } else {
             const error = await response.json();
-            alert(`Error: ${error.detail || 'Failed to create item'}`);
+            showToast('Error', error.detail || 'Failed to create item', 'danger');
         }
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showToast('Error', error.message, 'danger');
     }
 }
 
 // Deactivate single item
 async function deactivateItem(id) {
-    if (!await showConfirm('Deactivate this vendor item?')) {
+    if (!await showConfirm('Deactivate this vendor item?', 'Deactivate Item')) {
         return;
     }
 
@@ -595,10 +794,10 @@ async function deactivateItem(id) {
             showToast('Success', 'Item deactivated', 'success');
             location.reload();
         } else {
-            alert('Failed to deactivate item');
+            showToast('Error', 'Failed to deactivate item', 'danger');
         }
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showToast('Error', error.message, 'danger');
     }
 }
 
@@ -615,10 +814,10 @@ async function activateItem(id) {
             showToast('Success', 'Item activated', 'success');
             location.reload();
         } else {
-            alert('Failed to activate item');
+            showToast('Error', 'Failed to activate item', 'danger');
         }
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showToast('Error', error.message, 'danger');
     }
 }
 
@@ -634,10 +833,10 @@ async function approveItem(id) {
             location.reload();
         } else {
             const error = await response.json();
-            alert(`Failed to approve: ${error.detail || 'Unknown error'}`);
+            showToast('Error', `Failed to approve: ${error.detail || 'Unknown error'}`, 'danger');
         }
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showToast('Error', error.message, 'danger');
     }
 }
 
@@ -655,10 +854,10 @@ async function rejectItem(id) {
             location.reload();
         } else {
             const error = await response.json();
-            alert(`Failed to reject: ${error.detail || 'Unknown error'}`);
+            showToast('Error', `Failed to reject: ${error.detail || 'Unknown error'}`, 'danger');
         }
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showToast('Error', error.message, 'danger');
     }
 }
 
@@ -666,7 +865,7 @@ async function rejectItem(id) {
 async function bulkApprove() {
     const checkboxes = document.querySelectorAll('.item-checkbox:checked');
     if (checkboxes.length === 0) {
-        alert('Please select items to approve');
+        showToast('Warning', 'Please select items to approve', 'warning');
         return;
     }
 
@@ -684,10 +883,10 @@ async function bulkApprove() {
             showToast('Success', `Approved ${result.approved} items`, 'success');
             location.reload();
         } else {
-            alert('Failed to bulk approve');
+            showToast('Error', 'Failed to bulk approve', 'danger');
         }
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showToast('Error', error.message, 'danger');
     }
 }
 
@@ -721,14 +920,121 @@ async function exportVendorItems() {
         a.download = `vendor_items_${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
         URL.revokeObjectURL(url);
+        showToast('Success', 'Export downloaded', 'success');
     } catch (error) {
-        alert(`Error exporting: ${error.message}`);
+        showToast('Error', `Error exporting: ${error.message}`, 'danger');
+    }
+}
+
+// Merge items functionality
+let mergeModal = null;
+let selectedItemsForMerge = [];
+
+function showMergeModal() {
+    const checkboxes = document.querySelectorAll('.item-checkbox:checked');
+    if (checkboxes.length < 2) {
+        showToast('Warning', 'Please select at least 2 items to merge', 'warning');
+        return;
+    }
+
+    // Get item details from the table rows
+    selectedItemsForMerge = Array.from(checkboxes).map(cb => {
+        const row = cb.closest('tr');
+        const id = parseInt(cb.value);
+        const vendorCell = row.cells[1];
+        const nameCell = row.cells[2];
+        const skuCell = row.cells[3];
+        const categoryCell = row.cells[4];
+        const masterItemCell = row.cells[5];
+        const uomCell = row.cells[6];
+        const costCell = row.cells[7];
+
+        return {
+            id: id,
+            vendor: vendorCell.textContent.trim(),
+            name: nameCell.textContent.trim(),
+            sku: skuCell.textContent.trim(),
+            category: categoryCell.textContent.trim(),
+            masterItem: masterItemCell.textContent.trim(),
+            uom: uomCell.textContent.trim(),
+            cost: costCell.textContent.trim()
+        };
+    });
+
+    // Populate the modal
+    const listEl = document.getElementById('mergeItemsList');
+    listEl.innerHTML = selectedItemsForMerge.map((item, idx) => `
+        <label class="list-group-item list-group-item-action">
+            <div class="d-flex align-items-center">
+                <input type="radio" name="primaryItem" value="${item.id}" class="form-check-input me-3" ${idx === 0 ? 'checked' : ''}>
+                <div class="flex-grow-1">
+                    <div class="d-flex justify-content-between">
+                        <strong>${item.name}</strong>
+                        <span class="badge bg-secondary">${item.vendor}</span>
+                    </div>
+                    <small class="text-muted">
+                        SKU: <code>${item.sku || '-'}</code> |
+                        ${item.uom || '-'} |
+                        ${item.cost || '-'}
+                    </small>
+                    <div><small>Master: ${item.masterItem || '-'}</small></div>
+                </div>
+            </div>
+        </label>
+    `).join('');
+
+    // Show modal
+    if (!mergeModal) {
+        mergeModal = new bootstrap.Modal(document.getElementById('mergeItemsModal'));
+    }
+    mergeModal.show();
+}
+
+async function executeMerge() {
+    const primaryRadio = document.querySelector('input[name="primaryItem"]:checked');
+    if (!primaryRadio) {
+        showToast('Error', 'Please select a primary item', 'danger');
+        return;
+    }
+
+    const primaryId = parseInt(primaryRadio.value);
+    const duplicateIds = selectedItemsForMerge
+        .filter(item => item.id !== primaryId)
+        .map(item => item.id);
+
+    if (duplicateIds.length === 0) {
+        showToast('Error', 'No duplicates to merge', 'danger');
+        return;
+    }
+
+    try {
+        const response = await fetch('/hub/api/vendor-items/merge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                primary_id: primaryId,
+                duplicate_ids: duplicateIds
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            mergeModal.hide();
+            showToast('Success', result.message || `Merged ${duplicateIds.length} items into primary`, 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showToast('Error', result.message || 'Failed to merge items', 'danger');
+        }
+    } catch (error) {
+        showToast('Error', error.message, 'danger');
     }
 }
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    filterItems();
+    // Load vendor items via AJAX for better performance
+    loadVendorItems();
 });
 </script>
 {% endblock %}

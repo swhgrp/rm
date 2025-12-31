@@ -2015,14 +2015,15 @@
             const vendorFilter = document.getElementById('vendorItemFilterVendor').value;
             const masterFilter = document.getElementById('vendorItemFilterMaster').value;
 
-            let url = 'api/vendor-items/';
+            // Fetch vendor items from Hub (source of truth)
+            let url = 'api/hub-vendor-items/';
             const params = new URLSearchParams();
             if (vendorFilter) params.append('vendor_id', vendorFilter);
             if (masterFilter) params.append('master_item_id', masterFilter);
             if (params.toString()) url += `?${params.toString()}`;
 
             const response = await apiRequest(url);
-            vendorItems = Array.isArray(response) ? response : [];
+            vendorItems = response.items || response || [];
             displayVendorItems();
         } catch (error) {
             console.error('Error loading vendor items:', error);
@@ -2177,10 +2178,10 @@
 
         try {
             if (currentEditVendorItemId) {
-                await apiRequest(`api/vendor-items/${currentEditVendorItemId}`, 'PUT', data);
+                await apiRequest(`api/hub-vendor-items/${currentEditVendorItemId}`, 'PUT', data);
                 showAlert('Vendor item updated successfully', 'success');
             } else {
-                await apiRequest('api/vendor-items/', 'POST', data);
+                await apiRequest('api/hub-vendor-items/', 'POST', data);
                 showAlert('Vendor item created successfully', 'success');
             }
 
@@ -2205,7 +2206,7 @@
             `Are you sure you want to delete vendor item "${vendorItem.vendor_product_name}"?`,
             async () => {
                 try {
-                    await apiRequest(`api/vendor-items/${vendorItemId}`, 'DELETE');
+                    await apiRequest(`api/hub-vendor-items/${vendorItemId}`, 'DELETE');
                     showAlert('Vendor item deleted successfully', 'success');
                     loadVendorItems();
                 } catch (error) {
@@ -2603,10 +2604,19 @@
 
     async function loadUnitsOfMeasure() {
         try {
-            const response = await apiRequest('api/units/');
+            // Fetch from Hub (source of truth for UoMs)
+            const response = await apiRequest('api/units/hub');
             unitsOfMeasure = response;
         } catch (error) {
-            console.error('Error loading units:', error);
+            console.error('Error loading Hub units:', error);
+            // Fallback to local units if Hub is unavailable
+            try {
+                const localResponse = await apiRequest('api/units/');
+                unitsOfMeasure = localResponse;
+                console.warn('Using local UOMs as fallback');
+            } catch (fallbackError) {
+                console.error('Error loading local units:', fallbackError);
+            }
         }
     }
 
@@ -2695,7 +2705,8 @@
         document.getElementById('itemDescription').value = item.description || '';
         document.getElementById('itemCategory').value = item.category || '';
         document.getElementById('itemVendor').value = item.vendor_id || '';
-        document.getElementById('itemUnitId').value = item.unit_of_measure_id || '';
+        // Use Hub UoM (primary_uom_id) if available, otherwise fall back to deprecated unit_of_measure_id
+        document.getElementById('itemUnitId').value = item.primary_uom_id || item.unit_of_measure_id || '';
         document.getElementById('itemSecondaryUnitId').value = item.secondary_unit_id || '';
         document.getElementById('itemSku').value = item.sku || '';
         document.getElementById('itemParLevel').value = item.par_level || '';
@@ -2707,14 +2718,14 @@
         const name = document.getElementById('itemName').value;
         const description = document.getElementById('itemDescription').value;
         const category = document.getElementById('itemCategory').value;
-        const unit_of_measure_id = document.getElementById('itemUnitId').value;
+        const primary_uom_id = document.getElementById('itemUnitId').value;
         const secondary_unit_id = document.getElementById('itemSecondaryUnitId').value;
         const sku = document.getElementById('itemSku').value;
         const vendor = document.getElementById('itemVendor').value;
         const par_level = document.getElementById('itemParLevel').value;
         const current_cost = document.getElementById('itemCost').value;
 
-        if (!name || !category || !unit_of_measure_id) {
+        if (!name || !category || !primary_uom_id) {
             showAlert('Please fill in all required fields', 'warning');
             return;
         }
@@ -2722,7 +2733,7 @@
         try {
             const itemData = {
                 name, description, category,
-                unit_of_measure_id: unit_of_measure_id ? parseInt(unit_of_measure_id) : null,
+                primary_uom_id: primary_uom_id ? parseInt(primary_uom_id) : null,  // Hub UoM ID
                 secondary_unit_id: secondary_unit_id ? parseInt(secondary_unit_id) : null,
                 sku,
                 vendor_id: vendor ? parseInt(vendor) : null,

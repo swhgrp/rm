@@ -3,9 +3,13 @@ Item Unit Conversion model for item-specific unit conversions
 
 Allows defining how to convert between units for a specific item.
 Example: Sausage patties - 1 LB = 8 patties (2oz each)
+
+Note: from_unit_id and to_unit_id reference Hub's units_of_measure table,
+not the local Inventory units_of_measure table. Cached names are stored
+for display purposes.
 """
 
-from sqlalchemy import Column, Integer, Numeric, Text, Boolean, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Numeric, Text, Boolean, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from restaurant_inventory.db.database import Base
@@ -25,17 +29,23 @@ class ItemUnitConversion(Base):
     - Purchasing in LB
     - Counting inventory in Each (patties)
     - Automatic conversion: 12 LB = 96 patties
+
+    Note: Unit IDs reference Hub's units_of_measure table (source of truth).
     """
     __tablename__ = "item_unit_conversions"
 
     id = Column(Integer, primary_key=True, index=True)
     master_item_id = Column(Integer, ForeignKey("master_items.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    # Source unit (e.g., Pound)
-    from_unit_id = Column(Integer, ForeignKey("units_of_measure.id"), nullable=False)
+    # Source unit - Hub UoM ID (no FK, references Hub DB)
+    from_unit_id = Column(Integer, nullable=False)
+    from_unit_name = Column(String(100), nullable=True)  # Cached: e.g., "Milliliter"
+    from_unit_abbr = Column(String(20), nullable=True)   # Cached: e.g., "mL"
 
-    # Target unit (e.g., Each)
-    to_unit_id = Column(Integer, ForeignKey("units_of_measure.id"), nullable=False)
+    # Target unit - Hub UoM ID (no FK, references Hub DB)
+    to_unit_id = Column(Integer, nullable=False)
+    to_unit_name = Column(String(100), nullable=True)    # Cached: e.g., "Bottle"
+    to_unit_abbr = Column(String(20), nullable=True)     # Cached: e.g., "btl"
 
     # How many "to_units" in one "from_unit"
     # Example: 1 LB = 8 patties -> conversion_factor = 8
@@ -55,8 +65,6 @@ class ItemUnitConversion(Base):
 
     # Relationships
     master_item = relationship("MasterItem", backref="unit_conversions")
-    from_unit = relationship("UnitOfMeasure", foreign_keys=[from_unit_id])
-    to_unit = relationship("UnitOfMeasure", foreign_keys=[to_unit_id])
 
     # Constraints
     __table_args__ = (

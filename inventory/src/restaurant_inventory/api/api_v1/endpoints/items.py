@@ -4,18 +4,27 @@ Master Items CRUD endpoints
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, UploadFile, File, Form
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import desc
+from sqlalchemy import desc, text
 from typing import List, Optional, Dict
 import tempfile
 import os
+import logging
 
 from restaurant_inventory.core.deps import get_db, get_current_user, require_manager_or_admin, verify_hub_api_key
 from restaurant_inventory.models.item import MasterItem
-from restaurant_inventory.models._deprecated.vendor_item import VendorItem
+from restaurant_inventory.models._deprecated.vendor_item import VendorItem  # For merge/import only
 from restaurant_inventory.models.unit_of_measure import UnitOfMeasure
 from restaurant_inventory.models.user import User
 from restaurant_inventory.schemas.item import MasterItemCreate, MasterItemUpdate, MasterItemResponse
 from restaurant_inventory.core.audit import log_audit_event, create_change_dict
+
+logger = logging.getLogger(__name__)
+
+# Hub database URL for fetching vendor items (source of truth)
+HUB_DATABASE_URL = os.getenv(
+    "HUB_DATABASE_URL",
+    "postgresql://hub_user:hub_password@hub-db:5432/integration_hub_db"
+)
 
 router = APIRouter()
 
@@ -69,7 +78,8 @@ async def get_master_items(
         joinedload(MasterItem.unit),
         joinedload(MasterItem.secondary_unit_rel),
         joinedload(MasterItem.count_unit_2),
-        joinedload(MasterItem.count_unit_3)
+        joinedload(MasterItem.count_unit_3),
+        joinedload(MasterItem.count_units)  # New: eagerly load MasterItemCountUnit records
     )
 
     if active_only:
@@ -86,49 +96,114 @@ async def get_master_items(
 
     items = query.offset(skip).limit(limit).all()
 
+    # Fetch pricing data from Hub (source of truth for vendor items)
+    # Get cost per unit for each master item from Hub's vendor items
+    # Uses Backbar-style fields (case_cost / units_per_case) with fallback to deprecated fields
+    hub_pricing = {}
+    try:
+        from sqlalchemy import create_engine
+        hub_engine = create_engine(HUB_DATABASE_URL)
+        with hub_engine.connect() as conn:
+            # Get preferred vendor item price OR most recent price
+            # Priority: case_cost/units_per_case (new), fallback to unit_price/conversion_factor (deprecated)
+            pricing_query = text("""
+                WITH vendor_item_prices AS (
+                    SELECT
+                        inventory_master_item_id,
+                        is_preferred,
+                        updated_at,
+                        -- New Backbar-style pricing (preferred)
+                        case_cost,
+                        units_per_case,
+                        -- Deprecated pricing (fallback)
+                        unit_price,
+                        conversion_factor,
+                        -- Calculate unit cost: prefer new fields, fallback to deprecated
+                        CASE
+                            WHEN case_cost IS NOT NULL AND units_per_case IS NOT NULL AND units_per_case > 0
+                                THEN case_cost / units_per_case
+                            WHEN unit_price IS NOT NULL AND unit_price > 0 AND conversion_factor IS NOT NULL AND conversion_factor > 0
+                                THEN unit_price / conversion_factor
+                            ELSE NULL
+                        END as cost_per_unit
+                    FROM hub_vendor_items
+                    WHERE inventory_master_item_id IS NOT NULL
+                      AND is_active = true
+                      AND (
+                          (case_cost IS NOT NULL AND units_per_case IS NOT NULL AND units_per_case > 0)
+                          OR (unit_price IS NOT NULL AND unit_price > 0)
+                      )
+                ),
+                preferred_prices AS (
+                    SELECT DISTINCT ON (inventory_master_item_id)
+                        inventory_master_item_id,
+                        cost_per_unit
+                    FROM vendor_item_prices
+                    WHERE cost_per_unit IS NOT NULL
+                    ORDER BY inventory_master_item_id, is_preferred DESC, updated_at DESC
+                )
+                SELECT
+                    inventory_master_item_id,
+                    cost_per_unit
+                FROM preferred_prices
+            """)
+            results = conn.execute(pricing_query).fetchall()
+            for row in results:
+                hub_pricing[row[0]] = float(row[1]) if row[1] else None
+    except Exception as e:
+        logger.warning(f"Could not fetch pricing from Hub: {e}")
+
     # Add unit names and pricing info to response
     result = []
     for item in items:
         item_dict = MasterItemResponse.from_orm(item).dict()
-        # Populate unit_of_measure with the actual unit name from the relationship
-        # This ensures backward compatibility with frontend that uses unit_of_measure field
-        unit_name = item.unit.name if item.unit else item.unit_of_measure
+
+        # Prioritize Hub UoM fields (primary_uom_*) over deprecated Inventory UoM fields
+        # If primary_uom_id is set, use Hub UoM; otherwise fallback to deprecated fields
+        if item.primary_uom_id:
+            unit_name = item.primary_uom_name or item.primary_uom_abbr
+        else:
+            # Fallback to deprecated Inventory UoM
+            unit_name = item.unit.name if item.unit else item.unit_of_measure
+
         item_dict['unit_of_measure'] = unit_name
         item_dict['unit_name'] = unit_name
         item_dict['secondary_unit_name'] = item.secondary_unit_rel.name if item.secondary_unit_rel else item.secondary_unit
         item_dict['secondary_unit'] = item.secondary_unit_rel.name if item.secondary_unit_rel else item.secondary_unit
 
         # Additional count units for flexible inventory counting
-        # Include conversion factors (contains_quantity) for unit conversion during counting
-        item_dict['count_unit_2_name'] = item.count_unit_2.name if item.count_unit_2 else None
-        item_dict['count_unit_2_factor'] = float(item.count_unit_2.contains_quantity) if item.count_unit_2 and item.count_unit_2.contains_quantity else None
-        item_dict['count_unit_3_name'] = item.count_unit_3.name if item.count_unit_3 else None
-        item_dict['count_unit_3_factor'] = float(item.count_unit_3.contains_quantity) if item.count_unit_3 and item.count_unit_3.contains_quantity else None
+        # Priority: Use MasterItemCountUnit table (new), fallback to deprecated count_unit_2/3 relationships
+        count_units = sorted(item.count_units, key=lambda cu: (not cu.is_primary, cu.display_order or 0))
+        secondary_units = [cu for cu in count_units if not cu.is_primary]
 
-        # Get last price paid from preferred vendor item, or most recent vendor item
-        preferred_vendor_item = db.query(VendorItem).filter(
-            VendorItem.master_item_id == item.id,
-            VendorItem.is_preferred == True,
-            VendorItem.is_active == True
-        ).first()
-
-        if not preferred_vendor_item:
-            # Get most recent vendor item with a price
-            preferred_vendor_item = db.query(VendorItem).filter(
-                VendorItem.master_item_id == item.id,
-                VendorItem.is_active == True,
-                VendorItem.unit_price.isnot(None)
-            ).order_by(desc(VendorItem.updated_at)).first()
-
-        if preferred_vendor_item and preferred_vendor_item.unit_price and preferred_vendor_item.conversion_factor:
-            # Calculate cost per master unit (unit_price / conversion_factor)
-            cost_per_master_unit = float(preferred_vendor_item.unit_price) / float(preferred_vendor_item.conversion_factor)
-            item_dict['last_price_paid'] = cost_per_master_unit
-            # Use the master item's unit of measure, not the vendor's purchase unit
-            item_dict['last_price_unit'] = unit_name
+        # Count Unit 2 (first secondary)
+        if len(secondary_units) >= 1:
+            cu2 = secondary_units[0]
+            item_dict['count_unit_2_id'] = cu2.uom_id
+            item_dict['count_unit_2_name'] = cu2.uom_name
+            item_dict['count_unit_2_factor'] = float(cu2.conversion_to_primary) if cu2.conversion_to_primary else None
         else:
-            item_dict['last_price_paid'] = None
-            item_dict['last_price_unit'] = None
+            # Fallback to deprecated relationship
+            item_dict['count_unit_2_id'] = item.count_unit_2_id
+            item_dict['count_unit_2_name'] = item.count_unit_2.name if item.count_unit_2 else None
+            item_dict['count_unit_2_factor'] = float(item.count_unit_2.contains_quantity) if item.count_unit_2 and item.count_unit_2.contains_quantity else None
+
+        # Count Unit 3 (second secondary)
+        if len(secondary_units) >= 2:
+            cu3 = secondary_units[1]
+            item_dict['count_unit_3_id'] = cu3.uom_id
+            item_dict['count_unit_3_name'] = cu3.uom_name
+            item_dict['count_unit_3_factor'] = float(cu3.conversion_to_primary) if cu3.conversion_to_primary else None
+        else:
+            # Fallback to deprecated relationship
+            item_dict['count_unit_3_id'] = item.count_unit_3_id
+            item_dict['count_unit_3_name'] = item.count_unit_3.name if item.count_unit_3 else None
+            item_dict['count_unit_3_factor'] = float(item.count_unit_3.contains_quantity) if item.count_unit_3 and item.count_unit_3.contains_quantity else None
+
+        # Get pricing from Hub vendor items (source of truth)
+        # This is the cost per master item's count unit (e.g., $/lb, $/ea)
+        item_dict['last_price_paid'] = hub_pricing.get(item.id)
+        item_dict['last_price_unit'] = unit_name if hub_pricing.get(item.id) else None
 
         result.append(item_dict)
 
@@ -375,11 +450,14 @@ async def get_master_item(
     current_user: User = Depends(get_current_user)
 ):
     """Get specific master item by ID"""
+    from restaurant_inventory.models.master_item_count_unit import MasterItemCountUnit
+
     item = db.query(MasterItem).options(
         joinedload(MasterItem.unit),
         joinedload(MasterItem.secondary_unit_rel),
         joinedload(MasterItem.count_unit_2),
-        joinedload(MasterItem.count_unit_3)
+        joinedload(MasterItem.count_unit_3),
+        joinedload(MasterItem.count_units)
     ).filter(MasterItem.id == item_id).first()
 
     if not item:
@@ -390,11 +468,68 @@ async def get_master_item(
 
     # Build response with unit names
     item_dict = MasterItemResponse.from_orm(item).dict()
-    item_dict['unit_of_measure'] = item.unit.name if item.unit else item.unit_of_measure
-    item_dict['unit_name'] = item.unit.name if item.unit else item.unit_of_measure
+
+    # Prioritize Hub UoM fields (primary_uom_*) over deprecated Inventory UoM fields
+    # If primary_uom_id is set, use Hub UoM; otherwise fallback to deprecated fields
+    if item.primary_uom_id:
+        item_dict['unit_of_measure'] = item.primary_uom_name or item.primary_uom_abbr
+        item_dict['unit_name'] = item.primary_uom_name or item.primary_uom_abbr
+    else:
+        # Fallback to deprecated Inventory UoM
+        item_dict['unit_of_measure'] = item.unit.name if item.unit else item.unit_of_measure
+        item_dict['unit_name'] = item.unit.name if item.unit else item.unit_of_measure
+
     item_dict['secondary_unit_name'] = item.secondary_unit_rel.name if item.secondary_unit_rel else item.secondary_unit
-    item_dict['count_unit_2_name'] = item.count_unit_2.name if item.count_unit_2 else None
-    item_dict['count_unit_3_name'] = item.count_unit_3.name if item.count_unit_3 else None
+
+    # Get count units from MasterItemCountUnit table (new architecture)
+    # Sort by display_order: primary first, then by display_order
+    count_units = sorted(item.count_units, key=lambda cu: (not cu.is_primary, cu.display_order or 0))
+
+    # Primary count unit (first one, should be is_primary=True)
+    primary_cu = next((cu for cu in count_units if cu.is_primary), None)
+    if primary_cu:
+        item_dict['primary_count_unit_id'] = primary_cu.uom_id
+        item_dict['primary_count_unit_name'] = primary_cu.uom_name
+        item_dict['primary_count_unit_abbr'] = primary_cu.uom_abbreviation
+
+    # Secondary count units (count_unit_2 and count_unit_3)
+    secondary_units = [cu for cu in count_units if not cu.is_primary]
+
+    # Count Unit 2
+    if len(secondary_units) >= 1:
+        cu2 = secondary_units[0]
+        item_dict['count_unit_2_id'] = cu2.uom_id
+        item_dict['count_unit_2_name'] = cu2.uom_name
+        item_dict['count_unit_2_factor'] = float(cu2.conversion_to_primary) if cu2.conversion_to_primary else None
+    else:
+        item_dict['count_unit_2_id'] = None
+        item_dict['count_unit_2_name'] = item.count_unit_2.name if item.count_unit_2 else None  # Fallback to deprecated
+        item_dict['count_unit_2_factor'] = None
+
+    # Count Unit 3
+    if len(secondary_units) >= 2:
+        cu3 = secondary_units[1]
+        item_dict['count_unit_3_id'] = cu3.uom_id
+        item_dict['count_unit_3_name'] = cu3.uom_name
+        item_dict['count_unit_3_factor'] = float(cu3.conversion_to_primary) if cu3.conversion_to_primary else None
+    else:
+        item_dict['count_unit_3_id'] = None
+        item_dict['count_unit_3_name'] = item.count_unit_3.name if item.count_unit_3 else None  # Fallback to deprecated
+        item_dict['count_unit_3_factor'] = None
+
+    # Include all count units for advanced UI
+    item_dict['count_units'] = [
+        {
+            'id': cu.id,
+            'uom_id': cu.uom_id,
+            'uom_name': cu.uom_name,
+            'uom_abbreviation': cu.uom_abbreviation,
+            'is_primary': cu.is_primary,
+            'conversion_to_primary': float(cu.conversion_to_primary) if cu.conversion_to_primary else 1.0,
+            'display_order': cu.display_order or 0
+        }
+        for cu in count_units
+    ]
 
     return item_dict
 
@@ -652,6 +787,7 @@ async def update_master_item(
     old_data = {
         "name": item.name,
         "category": item.category,
+        "primary_uom_id": item.primary_uom_id,
         "current_cost": float(item.current_cost) if item.current_cost else None
     }
 
@@ -660,6 +796,24 @@ async def update_master_item(
     if "current_cost" in update_data and update_data["current_cost"] is not None:
         from datetime import datetime
         update_data["last_cost_update"] = datetime.utcnow()
+
+    # If primary_uom_id is being set, fetch the UoM details from Hub to cache name/abbr
+    if "primary_uom_id" in update_data and update_data["primary_uom_id"] is not None:
+        hub_uom_id = update_data["primary_uom_id"]
+        try:
+            from sqlalchemy import create_engine, text
+            hub_engine = create_engine(HUB_DATABASE_URL)
+            with hub_engine.connect() as conn:
+                result = conn.execute(text("""
+                    SELECT id, name, abbreviation FROM units_of_measure WHERE id = :uom_id
+                """), {"uom_id": hub_uom_id}).fetchone()
+                if result:
+                    update_data["primary_uom_name"] = result[1]
+                    update_data["primary_uom_abbr"] = result[2]
+                else:
+                    logger.warning(f"Hub UoM {hub_uom_id} not found, using ID only")
+        except Exception as e:
+            logger.warning(f"Could not fetch Hub UoM details: {e}")
 
     # Update fields that were provided
     for field, value in update_data.items():
@@ -672,6 +826,7 @@ async def update_master_item(
     new_data = {
         "name": item.name,
         "category": item.category,
+        "primary_uom_id": item.primary_uom_id,
         "current_cost": float(item.current_cost) if item.current_cost else None
     }
 
@@ -773,6 +928,22 @@ async def delete_master_item(
         }},
         request=request
     )
+
+    # Explicitly delete location cost history and location costs first
+    # (SQLAlchemy ORM can interfere with database-level cascades)
+    from restaurant_inventory.models.master_item_location_cost import (
+        MasterItemLocationCost, MasterItemLocationCostHistory
+    )
+
+    # Delete history records first (child of location_cost)
+    db.query(MasterItemLocationCostHistory).filter(
+        MasterItemLocationCostHistory.master_item_id == item_id
+    ).delete(synchronize_session=False)
+
+    # Delete location cost records
+    db.query(MasterItemLocationCost).filter(
+        MasterItemLocationCost.master_item_id == item_id
+    ).delete(synchronize_session=False)
 
     db.delete(item)
     db.commit()
@@ -1655,7 +1826,6 @@ async def get_item_unit_conversions(
     ]
     """
     from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
-    from restaurant_inventory.models.unit_of_measure import UnitOfMeasure
 
     # Verify item exists
     item = db.query(MasterItem).filter(MasterItem.id == item_id).first()
@@ -1669,21 +1839,19 @@ async def get_item_unit_conversions(
 
     result = []
     for conv in conversions:
-        from_unit = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == conv.from_unit_id).first()
-        to_unit = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == conv.to_unit_id).first()
-
+        # Use cached Hub UoM names (stored on the conversion record)
         result.append({
             "id": conv.id,
             "from_unit": {
-                "id": from_unit.id,
-                "name": from_unit.name,
-                "abbreviation": from_unit.abbreviation
-            } if from_unit else None,
+                "id": conv.from_unit_id,
+                "name": conv.from_unit_name or f"UoM {conv.from_unit_id}",
+                "abbreviation": conv.from_unit_abbr or "?"
+            },
             "to_unit": {
-                "id": to_unit.id,
-                "name": to_unit.name,
-                "abbreviation": to_unit.abbreviation
-            } if to_unit else None,
+                "id": conv.to_unit_id,
+                "name": conv.to_unit_name or f"UoM {conv.to_unit_id}",
+                "abbreviation": conv.to_unit_abbr or "?"
+            },
             "conversion_factor": float(conv.conversion_factor),
             "individual_weight_oz": float(conv.individual_weight_oz) if conv.individual_weight_oz else None,
             "individual_volume_oz": float(conv.individual_volume_oz) if conv.individual_volume_oz else None,
@@ -1709,29 +1877,56 @@ async def create_item_unit_conversion(
     Create a new unit conversion for a master item.
 
     Example: For 2oz sausage patties:
-    - from_unit_id: Pound
-    - to_unit_id: Each
+    - from_unit_id: Hub UoM ID for Pound
+    - to_unit_id: Hub UoM ID for Each
     - conversion_factor: 8 (8 patties per pound)
     - individual_weight_oz: 2 (each patty is 2oz)
+
+    Note: Unit IDs are Hub UoM IDs (source of truth), not local Inventory UoM IDs.
     """
     from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
-    from restaurant_inventory.models.unit_of_measure import UnitOfMeasure
+    from sqlalchemy import text, create_engine
 
     # Verify item exists
     item = db.query(MasterItem).filter(MasterItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Master item not found")
 
-    # Verify units exist
-    from_unit = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == from_unit_id).first()
-    to_unit = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == to_unit_id).first()
+    # Fetch unit details from Hub (source of truth for UoMs)
+    from_unit_name = None
+    from_unit_abbr = None
+    to_unit_name = None
+    to_unit_abbr = None
 
-    if not from_unit:
-        raise HTTPException(status_code=400, detail="From unit not found")
-    if not to_unit:
-        raise HTTPException(status_code=400, detail="To unit not found")
+    try:
+        hub_engine = create_engine(HUB_DATABASE_URL)
+        with hub_engine.connect() as conn:
+            # Get from_unit details
+            from_result = conn.execute(text("""
+                SELECT id, name, abbreviation FROM units_of_measure WHERE id = :uom_id
+            """), {"uom_id": from_unit_id}).fetchone()
+            if from_result:
+                from_unit_name = from_result[1]
+                from_unit_abbr = from_result[2]
+            else:
+                raise HTTPException(status_code=400, detail=f"From unit {from_unit_id} not found in Hub")
 
-    # Check for existing conversion
+            # Get to_unit details
+            to_result = conn.execute(text("""
+                SELECT id, name, abbreviation FROM units_of_measure WHERE id = :uom_id
+            """), {"uom_id": to_unit_id}).fetchone()
+            if to_result:
+                to_unit_name = to_result[1]
+                to_unit_abbr = to_result[2]
+            else:
+                raise HTTPException(status_code=400, detail=f"To unit {to_unit_id} not found in Hub")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching Hub UoM details: {e}")
+        raise HTTPException(status_code=503, detail="Unable to fetch unit details from Hub")
+
+    # Check for existing conversion (including soft-deleted ones)
     existing = db.query(ItemUnitConversion).filter(
         ItemUnitConversion.master_item_id == item_id,
         ItemUnitConversion.from_unit_id == from_unit_id,
@@ -1739,12 +1934,39 @@ async def create_item_unit_conversion(
     ).first()
 
     if existing:
-        raise HTTPException(status_code=400, detail="Conversion already exists for this unit pair")
+        if existing.is_active:
+            raise HTTPException(status_code=400, detail="Conversion already exists for this unit pair")
+        # Reactivate soft-deleted conversion with new values
+        existing.conversion_factor = conversion_factor
+        existing.individual_weight_oz = individual_weight_oz
+        existing.individual_volume_oz = individual_volume_oz
+        existing.notes = notes
+        existing.is_active = True
+        existing.from_unit_name = from_unit_name
+        existing.from_unit_abbr = from_unit_abbr
+        existing.to_unit_name = to_unit_name
+        existing.to_unit_abbr = to_unit_abbr
+        db.commit()
+        db.refresh(existing)
+        return {
+            "id": existing.id,
+            "from_unit": {"id": from_unit_id, "name": from_unit_name, "abbreviation": from_unit_abbr},
+            "to_unit": {"id": to_unit_id, "name": to_unit_name, "abbreviation": to_unit_abbr},
+            "conversion_factor": float(existing.conversion_factor),
+            "individual_weight_oz": float(existing.individual_weight_oz) if existing.individual_weight_oz else None,
+            "individual_volume_oz": float(existing.individual_volume_oz) if existing.individual_volume_oz else None,
+            "notes": existing.notes,
+            "is_active": existing.is_active
+        }
 
     conversion = ItemUnitConversion(
         master_item_id=item_id,
         from_unit_id=from_unit_id,
+        from_unit_name=from_unit_name,
+        from_unit_abbr=from_unit_abbr,
         to_unit_id=to_unit_id,
+        to_unit_name=to_unit_name,
+        to_unit_abbr=to_unit_abbr,
         conversion_factor=conversion_factor,
         individual_weight_oz=individual_weight_oz,
         individual_volume_oz=individual_volume_oz,
@@ -1759,14 +1981,14 @@ async def create_item_unit_conversion(
     return {
         "id": conversion.id,
         "from_unit": {
-            "id": from_unit.id,
-            "name": from_unit.name,
-            "abbreviation": from_unit.abbreviation
+            "id": from_unit_id,
+            "name": from_unit_name,
+            "abbreviation": from_unit_abbr
         },
         "to_unit": {
-            "id": to_unit.id,
-            "name": to_unit.name,
-            "abbreviation": to_unit.abbreviation
+            "id": to_unit_id,
+            "name": to_unit_name,
+            "abbreviation": to_unit_abbr
         },
         "conversion_factor": float(conversion.conversion_factor),
         "individual_weight_oz": float(conversion.individual_weight_oz) if conversion.individual_weight_oz else None,
@@ -1890,3 +2112,204 @@ async def convert_units(
         "converted_unit_id": to_unit_id,
         "conversion_factor": float(conversion.conversion_factor)
     }
+
+
+# ============================================================================
+# Count Units API (Hub UOM Integration)
+# ============================================================================
+
+@router.get("/{item_id}/count-units")
+async def get_item_count_units(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get all count units for a master item.
+
+    Returns the list of units this item can be counted in,
+    with conversion factors to the primary unit.
+
+    Example for Coca Cola:
+    [
+        {"uom_id": 1, "uom_name": "Each", "is_primary": true, "conversion_to_primary": 1.0},
+        {"uom_id": 9, "uom_name": "Case", "is_primary": false, "conversion_to_primary": 24.0}
+    ]
+    """
+    from restaurant_inventory.models.master_item_count_unit import MasterItemCountUnit
+
+    item = db.query(MasterItem).filter(MasterItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Master item not found")
+
+    count_units = db.query(MasterItemCountUnit).filter(
+        MasterItemCountUnit.master_item_id == item_id
+    ).order_by(
+        MasterItemCountUnit.is_primary.desc(),
+        MasterItemCountUnit.display_order
+    ).all()
+
+    return [
+        {
+            "id": cu.id,
+            "uom_id": cu.uom_id,
+            "uom_name": cu.uom_name,
+            "uom_abbreviation": cu.uom_abbreviation,
+            "is_primary": cu.is_primary,
+            "conversion_to_primary": float(cu.conversion_to_primary) if cu.conversion_to_primary else 1.0,
+            "display_order": cu.display_order or 0
+        }
+        for cu in count_units
+    ]
+
+
+@router.put("/{item_id}/count-units")
+async def update_item_count_units(
+    item_id: int,
+    request: Request,
+    count_unit_2_id: Optional[int] = None,
+    count_unit_2_factor: Optional[float] = None,
+    count_unit_3_id: Optional[int] = None,
+    count_unit_3_factor: Optional[float] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager_or_admin)
+):
+    """
+    Update count units for a master item.
+
+    This manages the secondary count units (count_unit_2 and count_unit_3).
+    The primary count unit is set when the item is created and shouldn't be changed here.
+
+    Args:
+        item_id: Master item ID
+        count_unit_2_id: Hub UOM ID for the second count unit (e.g., Case)
+        count_unit_2_factor: Conversion factor (e.g., 24 means 1 Case = 24 primary units)
+        count_unit_3_id: Hub UOM ID for the third count unit
+        count_unit_3_factor: Conversion factor for third unit
+
+    Example: Setting up Coca Cola to count by Case
+        count_unit_2_id: 9 (Case)
+        count_unit_2_factor: 24 (1 Case = 24 Each)
+    """
+    from restaurant_inventory.models.master_item_count_unit import MasterItemCountUnit
+    import httpx
+    import os
+
+    item = db.query(MasterItem).filter(MasterItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Master item not found")
+
+    HUB_API_URL = os.getenv("HUB_API_URL", "http://integration-hub:8000")
+
+    # Get existing count units
+    existing_units = db.query(MasterItemCountUnit).filter(
+        MasterItemCountUnit.master_item_id == item_id
+    ).all()
+
+    # Separate primary from secondary
+    primary_unit = next((cu for cu in existing_units if cu.is_primary), None)
+    secondary_units = [cu for cu in existing_units if not cu.is_primary]
+
+    # Helper to fetch UOM info from Hub
+    async def get_hub_uom(uom_id: int) -> dict:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(f"{HUB_API_URL}/api/uom/{uom_id}")
+                if response.status_code == 200:
+                    return response.json()
+        except Exception as e:
+            logger.warning(f"Could not fetch UOM {uom_id} from Hub: {e}")
+        return None
+
+    changes_made = []
+
+    # Handle count_unit_2
+    if count_unit_2_id is not None:
+        # Find or create count_unit_2
+        cu2 = next((cu for cu in secondary_units if cu.display_order == 1), None)
+
+        if count_unit_2_id == 0:
+            # Remove count_unit_2
+            if cu2:
+                db.delete(cu2)
+                changes_made.append("Removed count unit 2")
+        else:
+            # Fetch UOM info from Hub
+            uom_info = await get_hub_uom(count_unit_2_id)
+            if not uom_info:
+                raise HTTPException(status_code=400, detail=f"UOM {count_unit_2_id} not found in Hub")
+
+            factor = count_unit_2_factor if count_unit_2_factor else 1.0
+
+            if cu2:
+                # Update existing
+                cu2.uom_id = count_unit_2_id
+                cu2.uom_name = uom_info.get("name")
+                cu2.uom_abbreviation = uom_info.get("abbreviation")
+                cu2.conversion_to_primary = factor
+                changes_made.append(f"Updated count unit 2: {uom_info.get('name')} ({factor}x)")
+            else:
+                # Create new
+                cu2 = MasterItemCountUnit(
+                    master_item_id=item_id,
+                    uom_id=count_unit_2_id,
+                    uom_name=uom_info.get("name"),
+                    uom_abbreviation=uom_info.get("abbreviation"),
+                    is_primary=False,
+                    conversion_to_primary=factor,
+                    display_order=1
+                )
+                db.add(cu2)
+                changes_made.append(f"Added count unit 2: {uom_info.get('name')} ({factor}x)")
+
+    # Handle count_unit_3
+    if count_unit_3_id is not None:
+        cu3 = next((cu for cu in secondary_units if cu.display_order == 2), None)
+
+        if count_unit_3_id == 0:
+            # Remove count_unit_3
+            if cu3:
+                db.delete(cu3)
+                changes_made.append("Removed count unit 3")
+        else:
+            uom_info = await get_hub_uom(count_unit_3_id)
+            if not uom_info:
+                raise HTTPException(status_code=400, detail=f"UOM {count_unit_3_id} not found in Hub")
+
+            factor = count_unit_3_factor if count_unit_3_factor else 1.0
+
+            if cu3:
+                cu3.uom_id = count_unit_3_id
+                cu3.uom_name = uom_info.get("name")
+                cu3.uom_abbreviation = uom_info.get("abbreviation")
+                cu3.conversion_to_primary = factor
+                changes_made.append(f"Updated count unit 3: {uom_info.get('name')} ({factor}x)")
+            else:
+                cu3 = MasterItemCountUnit(
+                    master_item_id=item_id,
+                    uom_id=count_unit_3_id,
+                    uom_name=uom_info.get("name"),
+                    uom_abbreviation=uom_info.get("abbreviation"),
+                    is_primary=False,
+                    conversion_to_primary=factor,
+                    display_order=2
+                )
+                db.add(cu3)
+                changes_made.append(f"Added count unit 3: {uom_info.get('name')} ({factor}x)")
+
+    db.commit()
+
+    # Log audit event
+    if changes_made:
+        log_audit_event(
+            db=db,
+            action="UPDATE_COUNT_UNITS",
+            entity_type="item",
+            entity_id=item_id,
+            user=current_user,
+            changes={"count_units": changes_made},
+            request=request
+        )
+
+    # Return updated count units
+    return await get_item_count_units(item_id, db, current_user)

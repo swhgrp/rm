@@ -41,6 +41,7 @@ from integration_hub.api import vendors as vendors_router
 from integration_hub.api import duplicates as duplicates_router
 from integration_hub.api import similarity as similarity_router
 from integration_hub.api import size_settings as size_settings_router
+from integration_hub.api import uom as uom_router
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -80,6 +81,7 @@ app.include_router(vendors_router.router)  # Vendor management and aliases
 app.include_router(duplicates_router.router)  # Duplicate invoice detection
 app.include_router(similarity_router.router)  # AI-powered similarity search
 app.include_router(size_settings_router.router)  # Size units and containers management
+app.include_router(uom_router.router)  # Units of Measure API (source of truth for all systems)
 
 
 # ============================================================================
@@ -1148,6 +1150,317 @@ async def mapped_items(request: Request, db: Session = Depends(get_db)):
     })
 
 
+@app.get("/expense-items", response_class=HTMLResponse)
+async def expense_items(request: Request, db: Session = Depends(get_db)):
+    """View and manage expense items (non-inventory mapped items)"""
+    from sqlalchemy import func, distinct, text as sql_text
+    import httpx
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    # Get expense items from invoice_item_mapping where inventory_item_id IS NULL
+    # These are items mapped to GL accounts only, not linked to inventory
+    expense_items_query = db.execute(
+        sql_text("""
+            SELECT
+                m.id,
+                m.item_description,
+                m.item_code,
+                m.inventory_category,
+                m.gl_asset_account,
+                m.gl_cogs_account,
+                m.gl_waste_account,
+                m.vendor_id,
+                m.is_active,
+                m.created_at,
+                m.updated_at,
+                m.notes,
+                v.name as vendor_name,
+                (SELECT COUNT(*) FROM hub_invoice_items i
+                 WHERE i.item_description = m.item_description AND i.is_mapped = true) as occurrence_count
+            FROM invoice_item_mapping m
+            LEFT JOIN vendors v ON m.vendor_id = v.id
+            WHERE m.inventory_item_id IS NULL
+              AND m.is_active = true
+            ORDER BY m.item_description
+        """)
+    ).fetchall()
+
+    # Fetch GL accounts from Accounting API
+    gl_accounts = []
+    gl_accounts_map = {}
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000})
+            if response.status_code == 200:
+                gl_accounts = response.json()
+                for account in gl_accounts:
+                    account_num = account['account_number']
+                    account_name = account['account_name']
+                    gl_accounts_map[account_num] = account_name
+                    gl_accounts_map[int(account_num)] = account_name
+    except Exception as e:
+        logger.error(f"Failed to fetch GL accounts: {str(e)}")
+
+    # Fetch vendor items for conversion to inventory item
+    inventory_items = []
+    try:
+        from integration_hub.models.hub_vendor_item import HubVendorItem
+        from sqlalchemy.orm import joinedload
+
+        hub_vendor_items = db.query(HubVendorItem).options(
+            joinedload(HubVendorItem.vendor)
+        ).filter(HubVendorItem.is_active == True).order_by(
+            HubVendorItem.vendor_product_name
+        ).all()
+
+        for vi in hub_vendor_items:
+            inventory_items.append({
+                'id': vi.id,
+                'vendor_id': vi.vendor_id,
+                'vendor_name': vi.vendor.name if vi.vendor else 'Unknown Vendor',
+                'vendor_product_name': vi.vendor_product_name,
+                'vendor_sku': vi.vendor_sku,
+                'master_item_category': vi.category
+            })
+    except Exception as e:
+        logger.error(f"Failed to fetch vendor items: {str(e)}")
+
+    # Get category GL mappings
+    category_mappings = {}
+    try:
+        mappings = db.query(CategoryGLMapping).filter(CategoryGLMapping.is_active == True).all()
+        for m in mappings:
+            category_mappings[m.inventory_category] = {
+                'asset_account': m.gl_asset_account,
+                'cogs_account': m.gl_cogs_account,
+                'waste_account': m.gl_waste_account
+            }
+    except Exception as e:
+        logger.error(f"Failed to fetch category mappings: {str(e)}")
+
+    # Process expense items with GL account names
+    processed_items = []
+    for item in expense_items_query:
+        processed_items.append({
+            'id': item.id,
+            'item_description': item.item_description,
+            'item_code': item.item_code,
+            'inventory_category': item.inventory_category,
+            'gl_asset_account': item.gl_asset_account,
+            'gl_asset_account_name': gl_accounts_map.get(item.gl_asset_account, ''),
+            'gl_cogs_account': item.gl_cogs_account,
+            'gl_cogs_account_name': gl_accounts_map.get(item.gl_cogs_account, ''),
+            'gl_waste_account': item.gl_waste_account,
+            'gl_waste_account_name': gl_accounts_map.get(item.gl_waste_account, ''),
+            'vendor_id': item.vendor_id,
+            'vendor_name': item.vendor_name,
+            'is_active': item.is_active,
+            'occurrence_count': item.occurrence_count,
+            'notes': item.notes
+        })
+
+    # Calculate stats
+    stats = {
+        'total': len(processed_items),
+        'with_vendor': len([i for i in processed_items if i['vendor_id']]),
+        'without_vendor': len([i for i in processed_items if not i['vendor_id']])
+    }
+
+    return templates.TemplateResponse("expense_items.html", {
+        "request": request,
+        "expense_items": processed_items,
+        "stats": stats,
+        "gl_accounts": gl_accounts,
+        "inventory_items": inventory_items,
+        "category_mappings": category_mappings
+    })
+
+
+@app.post("/api/vendor-items/merge")
+async def merge_vendor_items(request: Request, db: Session = Depends(get_db)):
+    """
+    Merge duplicate vendor items into a single primary item.
+
+    This:
+    1. Updates all hub_invoice_items that reference the duplicate items to point to the primary
+    2. Deletes the duplicate vendor items
+    3. Keeps the primary vendor item with its data
+
+    Request body:
+        primary_id: int - The vendor item ID to keep
+        duplicate_ids: list[int] - The vendor item IDs to merge into the primary
+    """
+    from integration_hub.models.hub_vendor_item import HubVendorItem
+    from sqlalchemy import text as sql_text
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        body = await request.json()
+        primary_id = body.get("primary_id")
+        duplicate_ids = body.get("duplicate_ids", [])
+
+        if not primary_id:
+            return {"success": False, "message": "Primary item ID is required"}
+
+        if not duplicate_ids or len(duplicate_ids) == 0:
+            return {"success": False, "message": "At least one duplicate ID is required"}
+
+        # Validate primary item exists
+        primary_item = db.query(HubVendorItem).filter(HubVendorItem.id == primary_id).first()
+        if not primary_item:
+            return {"success": False, "message": f"Primary item {primary_id} not found"}
+
+        # Validate all duplicate items exist
+        duplicate_items = db.query(HubVendorItem).filter(HubVendorItem.id.in_(duplicate_ids)).all()
+        if len(duplicate_items) != len(duplicate_ids):
+            found_ids = [item.id for item in duplicate_items]
+            missing = [id for id in duplicate_ids if id not in found_ids]
+            return {"success": False, "message": f"Duplicate items not found: {missing}"}
+
+        # Note: price_history table has ON DELETE CASCADE on vendor_item_id FK,
+        # so price history for deleted items is automatically removed.
+        # We just need to delete the duplicate vendor items.
+
+        # Delete the duplicate vendor items
+        deleted_names = []
+        for dup_item in duplicate_items:
+            deleted_names.append(f"{dup_item.vendor_product_name} (SKU: {dup_item.vendor_sku or 'N/A'})")
+            db.delete(dup_item)
+
+        db.commit()
+
+        logger.info(f"Merged {len(duplicate_ids)} vendor items into primary {primary_id}. Deleted: {deleted_names}")
+
+        return {
+            "success": True,
+            "message": f"Successfully merged {len(duplicate_ids)} items into '{primary_item.vendor_product_name}'",
+            "deleted_count": len(duplicate_ids)
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error merging vendor items: {str(e)}")
+        return {"success": False, "message": f"Error merging items: {str(e)}"}
+
+
+@app.post("/api/vendor-items/{vendor_item_id}/convert-to-expense")
+async def convert_vendor_item_to_expense(vendor_item_id: int, request: Request, db: Session = Depends(get_db)):
+    """
+    Convert a vendor item to an expense item.
+
+    This removes the inventory_master_item_id link, making the item an expense-only item
+    that won't be tracked in inventory but will still have GL account mappings.
+
+    Request body:
+        gl_cogs_account: int - Required expense/COGS GL account number
+    """
+    from integration_hub.models.hub_vendor_item import HubVendorItem
+    from sqlalchemy import text as sql_text
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        # Parse request body for GL account
+        body = await request.json()
+        gl_cogs_account = body.get("gl_cogs_account")
+
+        if not gl_cogs_account:
+            return {"success": False, "message": "Expense/COGS GL account is required"}
+
+        # Get the vendor item
+        vendor_item = db.query(HubVendorItem).filter(HubVendorItem.id == vendor_item_id).first()
+        if not vendor_item:
+            return {"success": False, "message": "Vendor item not found"}
+
+        # GL accounts - use provided COGS account, asset/waste can be null for expense items
+        gl_asset_account = None
+        gl_waste_account = None
+
+        # Track if this item had an inventory link (for logging)
+        had_inventory_link = vendor_item.inventory_master_item_id is not None
+
+        # Check if mapping already exists in invoice_item_mapping_deprecated table
+        # The table has a unique constraint on item_description
+        existing = db.execute(sql_text("""
+            SELECT id FROM invoice_item_mapping_deprecated
+            WHERE item_description = :description
+            LIMIT 1
+        """), {
+            "description": vendor_item.vendor_product_name
+        }).fetchone()
+
+        if existing:
+            # Update existing mapping to remove inventory link (make it expense-only)
+            db.execute(sql_text("""
+                UPDATE invoice_item_mapping_deprecated
+                SET inventory_item_id = NULL,
+                    gl_cogs_account = COALESCE(:cogs, gl_cogs_account),
+                    gl_asset_account = COALESCE(:asset, gl_asset_account),
+                    gl_waste_account = COALESCE(:waste, gl_waste_account),
+                    updated_at = NOW(),
+                    notes = COALESCE(notes || ' ', '') || :note
+                WHERE id = :id
+            """), {
+                "id": existing.id,
+                "cogs": gl_cogs_account,
+                "asset": gl_asset_account,
+                "waste": gl_waste_account,
+                "note": f"Converted to expense from vendor item #{vendor_item_id}"
+            })
+            mapping_id = existing.id
+            logger.info(f"Updated mapping {mapping_id} to expense item")
+        else:
+            # Create new mapping entry as expense item
+            result = db.execute(sql_text("""
+                INSERT INTO invoice_item_mapping_deprecated
+                (item_description, item_code, vendor_id, inventory_item_id, inventory_category,
+                 gl_asset_account, gl_cogs_account, gl_waste_account, is_active, notes, created_at)
+                VALUES (:description, :item_code, :vendor_id, NULL, :category,
+                        :asset, :cogs, :waste, true, :notes, NOW())
+                RETURNING id
+            """), {
+                "description": vendor_item.vendor_product_name,
+                "item_code": vendor_item.vendor_sku,
+                "vendor_id": vendor_item.vendor_id,
+                "category": vendor_item.category,
+                "asset": gl_asset_account,
+                "cogs": gl_cogs_account,
+                "waste": gl_waste_account,
+                "notes": f"Converted from vendor item #{vendor_item_id}"
+            })
+            mapping_id = result.fetchone()[0]
+            logger.info(f"Created new expense mapping {mapping_id} for vendor item {vendor_item_id}")
+
+        # Delete the vendor item - expense items don't belong in vendor items table
+        # The expense mapping in invoice_item_mapping_deprecated is the only record needed
+        product_name = vendor_item.vendor_product_name
+        old_master_item_id = vendor_item.inventory_master_item_id
+        db.delete(vendor_item)
+
+        db.commit()
+
+        if had_inventory_link:
+            logger.info(f"Converted vendor item {vendor_item_id} to expense and deleted from vendor items (was linked to master item {old_master_item_id})")
+        else:
+            logger.info(f"Mapped vendor item {vendor_item_id} to expense account {gl_cogs_account} and deleted from vendor items")
+
+        return {
+            "success": True,
+            "message": f"'{product_name}' moved to Expense Items",
+            "mapping_id": mapping_id
+        }
+
+    except Exception as e:
+        logger.error(f"Error converting vendor item {vendor_item_id} to expense: {str(e)}")
+        db.rollback()
+        return {"success": False, "message": str(e)}
+
+
 # ============================================================================
 # ITEM MAPPING APIs
 # ============================================================================
@@ -1872,26 +2185,49 @@ async def duplicates_page(request: Request):
 async def vendor_items_page(
     request: Request,
     db: Session = Depends(get_db),
-    master_item: Optional[int] = Query(None, description="Filter by master item ID")
+    master_item: Optional[str] = Query(None, description="Filter by master item ID")
 ):
-    """Hub Vendor Items management page - Hub is source of truth"""
-    from sqlalchemy.orm import joinedload
-    from integration_hub.models.hub_vendor_item import VendorItemStatus
+    """Hub Vendor Items management page - Hub is source of truth
 
-    # Build query with optional master item filter
-    query = db.query(HubVendorItem).options(
-        joinedload(HubVendorItem.vendor),
-        joinedload(HubVendorItem.size_unit),
-        joinedload(HubVendorItem.container)
-    )
+    Optimized for performance:
+    - Stats loaded via SQL COUNT queries (not Python iteration)
+    - Vendor items loaded via AJAX (not server-rendered)
+    - Only filter/form data loaded on initial page
+    """
+    from sqlalchemy import text as sql_text, func
 
-    if master_item:
-        query = query.filter(HubVendorItem.inventory_master_item_id == master_item)
+    # Convert master_item to int if provided (handle empty string as None)
+    master_item_id = None
+    if master_item and master_item.strip():
+        try:
+            master_item_id = int(master_item)
+        except ValueError:
+            pass  # Invalid value, treat as no filter
 
-    vendor_items = query.order_by(HubVendorItem.vendor_product_name).all()
+    # Get stats via efficient SQL COUNT queries (not Python iteration)
+    stats_query = sql_text("""
+        SELECT
+            COUNT(*) as total,
+            COUNT(*) FILTER (WHERE status = 'active' OR status IS NULL) as active,
+            COUNT(*) FILTER (WHERE status = 'needs_review') as needs_review,
+            COUNT(*) FILTER (WHERE status = 'inactive') as inactive,
+            COUNT(*) FILTER (WHERE synced_to_inventory = true) as synced
+        FROM hub_vendor_items
+        WHERE inventory_master_item_id IS NOT NULL
+    """)
+    stats_result = db.execute(stats_query).fetchone()
 
     # Get active vendors for filters and forms
     vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
+
+    stats = {
+        "total": stats_result[0] if stats_result else 0,
+        "active": stats_result[1] if stats_result else 0,
+        "needs_review": stats_result[2] if stats_result else 0,
+        "inactive": stats_result[3] if stats_result else 0,
+        "synced": stats_result[4] if stats_result else 0,
+        "vendors": len(vendors)
+    }
 
     # Get distinct categories
     categories_query = db.query(HubVendorItem.category).filter(
@@ -1914,12 +2250,19 @@ async def vendor_items_page(
             {"id": 4, "name": "Gallon", "abbreviation": "GAL"},
         ]
 
+    # Fetch size units and containers for Add modal
+    from integration_hub.models.size_unit import SizeUnit
+    from integration_hub.models.container import Container
+    size_units = db.query(SizeUnit).filter(SizeUnit.is_active == True).order_by(SizeUnit.sort_order).all()
+    containers = db.query(Container).filter(Container.is_active == True).order_by(Container.sort_order).all()
+
     # Fetch locations and master items from Inventory database directly (no auth needed)
-    from sqlalchemy import create_engine, text as sql_text
+    from sqlalchemy import create_engine
     inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
                                  'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
     locations = []
     master_items = []
+    filter_master_item_name = None
     try:
         inv_engine = create_engine(inventory_db_url)
         with inv_engine.connect() as conn:
@@ -1934,37 +2277,32 @@ async def vendor_items_page(
                 sql_text("SELECT id, name, category FROM master_items WHERE is_active = true ORDER BY name LIMIT 2000")
             ).fetchall()
             master_items = [{"id": row[0], "name": row[1], "category": row[2]} for row in items_results]
+
+            # Get filtered master item name if filtering
+            if master_item_id:
+                name_result = conn.execute(
+                    sql_text("SELECT name FROM master_items WHERE id = :id"),
+                    {"id": master_item_id}
+                ).fetchone()
+                if name_result:
+                    filter_master_item_name = name_result[0]
     except Exception as e:
         logger.warning(f"Could not fetch data from Inventory database: {e}")
 
-    # Stats with status counts
-    stats = {
-        "total": len(vendor_items),
-        "active": sum(1 for vi in vendor_items if vi.status == VendorItemStatus.active),
-        "needs_review": sum(1 for vi in vendor_items if vi.status == VendorItemStatus.needs_review),
-        "inactive": sum(1 for vi in vendor_items if vi.status == VendorItemStatus.inactive),
-        "synced": sum(1 for vi in vendor_items if vi.synced_to_inventory),
-        "vendors": len(vendors)
-    }
-
-    # Get filtered master item name if filtering
-    filter_master_item_name = None
-    if master_item:
-        for mi in master_items:
-            if mi["id"] == master_item:
-                filter_master_item_name = mi["name"]
-                break
-
+    # Don't load vendor_items here - they'll be loaded via AJAX
+    # This makes initial page load fast
     return templates.TemplateResponse("hub_vendor_items.html", {
         "request": request,
-        "vendor_items": vendor_items,
+        "vendor_items": [],  # Empty - loaded via AJAX
         "vendors": vendors,
         "locations": locations,
         "categories": categories,
         "units": units,
+        "size_units": size_units,
+        "containers": containers,
         "master_items": master_items,
         "stats": stats,
-        "filter_master_item_id": master_item,
+        "filter_master_item_id": master_item_id,
         "filter_master_item_name": filter_master_item_name
     })
 
@@ -2037,6 +2375,17 @@ async def vendor_item_detail_page(request: Request, id: int = Query(..., descrip
     except Exception as e:
         logger.warning(f"Could not fetch data from Inventory database: {e}")
 
+    # Fetch GL accounts from Accounting API for expense conversion modal
+    gl_accounts = []
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000})
+            if response.status_code == 200:
+                gl_accounts = response.json()
+    except Exception as e:
+        logger.warning(f"Could not fetch GL accounts: {e}")
+
     return templates.TemplateResponse("vendor_item_detail.html", {
         "request": request,
         "item_id": id,
@@ -2046,7 +2395,8 @@ async def vendor_item_detail_page(request: Request, id: int = Query(..., descrip
         "size_units": size_units,
         "containers": containers,
         "locations": locations,
-        "master_items": master_items
+        "master_items": master_items,
+        "gl_accounts": gl_accounts
     })
 
 

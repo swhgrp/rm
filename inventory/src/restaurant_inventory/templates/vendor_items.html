@@ -402,7 +402,7 @@
             const [vendors, items, units] = await Promise.all([
                 apiRequest('api/vendors/'),
                 apiRequest('api/items/?limit=1000'),
-                apiRequest('api/units/')
+                apiRequest('api/units/hub')  // Fetch from Hub (source of truth)
             ]);
             cachedVendors = Array.isArray(vendors) ? vendors.sort((a, b) => a.name.localeCompare(b.name)) : [];
             const itemsArr = Array.isArray(items) ? items : (items.items || []);
@@ -450,13 +450,20 @@
         }
     }
 
-    // Load units of measure
+    // Load units of measure from Hub (source of truth)
     async function loadUnitsOfMeasure() {
         try {
-            const response = await apiRequest('api/units/');
+            const response = await apiRequest('api/units/hub');
             unitsOfMeasure = response;
         } catch (error) {
-            console.error('Error loading units:', error);
+            console.error('Error loading Hub units:', error);
+            // Fallback to local units
+            try {
+                const localResponse = await apiRequest('api/units/');
+                unitsOfMeasure = localResponse;
+            } catch (e) {
+                console.error('Error loading local units:', e);
+            }
         }
     }
 

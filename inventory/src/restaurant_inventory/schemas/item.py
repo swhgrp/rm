@@ -11,9 +11,14 @@ class MasterItemBase(BaseModel):
     name: str
     description: Optional[str] = None
     category: str
-    unit_of_measure_id: Optional[int] = None
+    # Primary UoM from Hub (source of truth)
+    primary_uom_id: Optional[int] = None      # Hub UoM ID
+    primary_uom_name: Optional[str] = None    # Cached name for display
+    primary_uom_abbr: Optional[str] = None    # Cached abbreviation
+    # Legacy - DEPRECATED: Use primary_uom_id instead
+    unit_of_measure_id: Optional[int] = None  # Old Inventory UoM ID
     secondary_unit_id: Optional[int] = None
-    # Additional count units
+    # Additional count units (Hub UoM IDs)
     count_unit_2_id: Optional[int] = None
     count_unit_3_id: Optional[int] = None
     # Legacy fields for backward compatibility
@@ -36,7 +41,12 @@ class MasterItemUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
-    unit_of_measure_id: Optional[int] = None
+    # Primary UoM from Hub (source of truth)
+    primary_uom_id: Optional[int] = None      # Hub UoM ID
+    primary_uom_name: Optional[str] = None    # Cached name (auto-fetched from Hub)
+    primary_uom_abbr: Optional[str] = None    # Cached abbreviation (auto-fetched)
+    # Legacy - DEPRECATED: Use primary_uom_id instead
+    unit_of_measure_id: Optional[int] = None  # Old Inventory UoM ID
     secondary_unit_id: Optional[int] = None
     # Additional count units
     count_unit_2_id: Optional[int] = None

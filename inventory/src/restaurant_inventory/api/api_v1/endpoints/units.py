@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from decimal import Decimal
+import httpx
+import os
+import logging
 
 from restaurant_inventory.db.database import get_db
 from restaurant_inventory.models.unit_of_measure import UnitCategory, UnitOfMeasure
@@ -20,7 +23,11 @@ from restaurant_inventory.schemas.unit_of_measure import (
 from restaurant_inventory.core.deps import get_current_user, require_manager_or_admin
 from restaurant_inventory.core.audit import log_audit_event
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# Hub API URL for UOM source of truth
+HUB_API_URL = os.getenv("HUB_API_URL", "http://integration-hub:8000")
 
 
 # ==================== Unit Categories ====================
@@ -165,16 +172,117 @@ async def get_units(
 
     units = query.order_by(UnitOfMeasure.category_id, UnitOfMeasure.name).all()
 
-    # Add category name and reference unit name to each unit
+    # Add category name, reference unit name, and dimension to each unit
     result = []
     for unit in units:
         unit_dict = UnitOfMeasureResponse.model_validate(unit).model_dump()
         unit_dict['category_name'] = unit.category.name if unit.category else None
         unit_dict['reference_unit_name'] = unit.reference_unit.abbreviation if unit.reference_unit else None
+        unit_dict['dimension'] = unit.dimension
         result.append(UnitOfMeasureResponse(**unit_dict))
 
     return result
 
+
+# ==================== Hub UOM API (Source of Truth) ====================
+# NOTE: These routes MUST come before /{unit_id} to avoid route conflicts!
+
+@router.get("/hub")
+async def get_hub_units(
+    dimension: Optional[str] = Query(None, description="Filter by dimension: count, weight, volume"),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get units of measure from Hub (source of truth).
+
+    Hub is the authoritative source for UOM data. This endpoint fetches
+    UOM list from Hub API and returns it to the frontend.
+
+    Dimensions:
+    - count: Discrete items (each, case, bottle, dozen)
+    - weight: Mass measures (oz, lb, kg, g)
+    - volume: Liquid measures (fl oz, gallon, liter, ml)
+    """
+    logger.info(f"get_hub_units called by user {current_user.username if current_user else 'unknown'}")
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            params = {"active_only": "true"}
+            if dimension:
+                params["dimension"] = dimension
+
+            logger.info(f"Fetching from {HUB_API_URL}/api/uom/ with params {params}")
+            response = await client.get(f"{HUB_API_URL}/api/uom/", params=params)
+            response.raise_for_status()
+
+            hub_uoms = response.json()
+            logger.info(f"Got {len(hub_uoms)} UOMs from Hub")
+
+            # Transform to match frontend expectations
+            # Hub returns: id, name, abbreviation, dimension, to_base_factor, is_base_unit, category_id, category_name
+            result = []
+            for uom in hub_uoms:
+                result.append({
+                    "id": uom["id"],
+                    "hub_id": uom["id"],  # Explicit hub ID
+                    "name": uom["name"],
+                    "abbreviation": uom["abbreviation"],
+                    "dimension": uom["dimension"],
+                    "to_base_factor": uom.get("to_base_factor", 1.0),
+                    "is_base_unit": uom.get("is_base_unit", False),
+                    "category_name": uom.get("category_name"),
+                    "source": "hub"  # Indicate this came from Hub
+                })
+
+            return result
+
+    except httpx.RequestError as e:
+        logger.error(f"Error fetching UOMs from Hub: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Unable to reach Hub API for UOM data: {str(e)}"
+        )
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Hub API error: {e.response.status_code} - {e.response.text}")
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"Hub API error: {e.response.text}"
+        )
+    except Exception as e:
+        logger.exception(f"Unexpected error in get_hub_units: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {str(e)}"
+        )
+
+
+@router.get("/hub/{uom_id}")
+async def get_hub_unit(
+    uom_id: int,
+    current_user: User = Depends(get_current_user)
+):
+    """Get a single UOM from Hub by ID"""
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(f"{HUB_API_URL}/api/uom/{uom_id}")
+            response.raise_for_status()
+            return response.json()
+
+    except httpx.RequestError as e:
+        logger.error(f"Error fetching UOM {uom_id} from Hub: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Unable to reach Hub API: {str(e)}"
+        )
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            raise HTTPException(status_code=404, detail=f"UOM {uom_id} not found in Hub")
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=f"Hub API error: {e.response.text}"
+        )
+
+
+# ==================== Local Units of Measure (by ID) ====================
 
 @router.get("/{unit_id}", response_model=UnitOfMeasureResponse)
 async def get_unit(

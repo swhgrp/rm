@@ -304,15 +304,15 @@ async function retryParse(invoiceId) {
         const result = await response.json();
 
         if (result.success) {
-            alert(`Invoice parsed successfully! ${result.items_parsed || 0} items found.`);
+            showToast('Success', `Invoice parsed successfully! ${result.items_parsed || 0} items found.`, 'success');
             location.reload();
         } else {
-            alert(`Parse failed: ${result.error || result.message || 'Unknown error'}`);
+            showToast('Error', `Parse failed: ${result.error || result.message || 'Unknown error'}`, 'danger');
             btn.disabled = false;
             btn.innerHTML = originalHtml;
         }
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showToast('Error', error.message, 'danger');
         btn.disabled = false;
         btn.innerHTML = originalHtml;
     }
@@ -320,7 +320,8 @@ async function retryParse(invoiceId) {
 
 // Retry all failed parses
 async function retryAllFailed() {
-    if (!confirm('Reset all failed invoices and retry parsing?')) {
+    const confirmed = await showConfirm('Reset all failed invoices and retry parsing?', 'Retry Failed Invoices');
+    if (!confirmed) {
         return;
     }
 
@@ -331,10 +332,10 @@ async function retryAllFailed() {
         });
 
         const result = await response.json();
-        alert(`${result.reset_count} invoice(s) reset for re-parsing.`);
+        showToast('Success', `${result.reset_count} invoice(s) reset for re-parsing.`, 'success');
         location.reload();
     } catch (error) {
-        alert(`Error: ${error.message}`);
+        showToast('Error', error.message, 'danger');
     }
 }
 
