@@ -233,6 +233,28 @@ class AutoMapperService:
                 logger.debug(f"SKU match (cross-location, normalized): {item_code} → vendor item {vi['id']} from location {vi.get('location_id')}")
                 return vi
 
+        # Pass 3: Cross-vendor SKU match - handles vendor aliases/duplicates
+        # Only runs if vendor_id was specified but no match found within that vendor
+        # This catches cases where the same product exists under a different vendor alias
+        if vendor_id:
+            for vi in vendor_items:
+                vendor_sku = vi.get('vendor_sku')
+                if not vendor_sku:
+                    continue
+
+                vendor_sku_clean = str(vendor_sku).strip()
+                vendor_sku_normalized = vendor_sku_clean.lstrip('0') or '0'
+
+                # Try exact match
+                if vendor_sku_clean == item_code_clean:
+                    logger.debug(f"SKU match (cross-vendor): {item_code} → vendor item {vi['id']} (vendor {vi.get('vendor_id')} vs invoice vendor {vendor_id})")
+                    return vi
+
+                # Try normalized match
+                if vendor_sku_normalized == item_code_normalized:
+                    logger.debug(f"SKU match (cross-vendor, normalized): {item_code} → vendor item {vi['id']} (vendor {vi.get('vendor_id')} vs invoice vendor {vendor_id})")
+                    return vi
+
         return None
 
     def match_by_fuzzy_name(
