@@ -34,10 +34,15 @@ class HubClient:
         start_date: Optional[date] = None,
         end_date: Optional[date] = None,
         sent_to_inventory: Optional[bool] = None,
-        include_statements: bool = False
+        include_statements: bool = False,
+        has_inventory_items: Optional[bool] = None
     ) -> Dict[str, Any]:
         """
         Fetch invoices from Hub API.
+
+        Args:
+            has_inventory_items: If True, only return invoices with inventory items
+                                 (excludes expense-only invoices like Cozzini, utilities)
 
         Returns:
             Dict with 'invoices', 'total', 'page', 'page_size', 'pages' keys
@@ -60,6 +65,8 @@ class HubClient:
             params["end_date"] = end_date.isoformat()
         if sent_to_inventory is not None:
             params["sent_to_inventory"] = sent_to_inventory
+        if has_inventory_items is not None:
+            params["has_inventory_items"] = has_inventory_items
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
@@ -257,6 +264,41 @@ class HubClient:
                 return response.status_code == 200
         except Exception:
             return False
+
+    async def get_cogs_summary(
+        self,
+        start_date: Optional[date] = None,
+        end_date: Optional[date] = None,
+        location_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Get COGS summary from Hub invoices.
+
+        Returns total COGS for the given date range and optional daily breakdown.
+        """
+        params = {}
+        if start_date:
+            params["start_date"] = start_date.isoformat()
+        if end_date:
+            params["end_date"] = end_date.isoformat()
+        if location_id:
+            params["location_id"] = location_id
+
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(
+                    f"{self.base_url}/api/v1/invoices/cogs-summary",
+                    params=params
+                )
+                response.raise_for_status()
+                return response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HTTP error fetching COGS summary from Hub: {e.response.status_code}")
+            # Return empty summary on error so dashboard doesn't break
+            return {"total_cogs": 0.0, "daily_cogs": {}}
+        except httpx.RequestError as e:
+            logger.error(f"Request error fetching COGS summary from Hub: {str(e)}")
+            return {"total_cogs": 0.0, "daily_cogs": {}}
 
     async def create_vendor_item(self, item_data: Dict[str, Any]) -> Dict[str, Any]:
         """

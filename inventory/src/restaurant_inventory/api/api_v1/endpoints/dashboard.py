@@ -16,9 +16,7 @@ from restaurant_inventory.models.pos_sale import POSSale, POSSaleItem
 from restaurant_inventory.models.inventory import Inventory
 from restaurant_inventory.models.transfer import Transfer
 from restaurant_inventory.models.waste import WasteRecord
-
-# REMOVED (Dec 25, 2025): Invoice - Hub is source of truth for invoices
-# COGS calculation and recent invoices now fetched from Hub
+from restaurant_inventory.services.hub_client import get_hub_client
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -137,10 +135,24 @@ async def get_dashboard_analytics(
         # Previous week had zero sales but current week has sales
         wow_change = 100.0  # 100% increase from zero
 
-    # COGS (Previous 7 Complete Days) - Now fetched from Hub
-    # TODO: Integrate with Hub API for COGS calculation
-    # For now, return 0.0 - Hub dashboard should be used for COGS metrics
+    # COGS (Previous 7 Complete Days) - Fetched from Hub
     total_cogs = 0.0
+    daily_cogs_from_hub = {}
+    recent_invoices_from_hub = []
+
+    try:
+        hub_client = get_hub_client()
+        cogs_summary = await hub_client.get_cogs_summary(
+            start_date=start_date.date(),
+            end_date=(end_date - timedelta(days=1)).date(),  # end_date is exclusive
+            location_id=location_id
+        )
+        total_cogs = cogs_summary.get("total_cogs", 0.0)
+        daily_cogs_from_hub = cogs_summary.get("daily_cogs", {})
+        recent_invoices_from_hub = cogs_summary.get("recent_invoices", [])
+        logger.info(f"Fetched COGS from Hub: ${total_cogs:.2f}")
+    except Exception as e:
+        logger.warning(f"Error fetching COGS from Hub: {str(e)} - using 0.0")
 
     # Gross Margin %
     gross_margin = ((total_sales - total_cogs) / total_sales * 100) if total_sales > 0 else 0.0
@@ -169,10 +181,16 @@ async def get_dashboard_analytics(
     sales_by_date_query = apply_location_filter(sales_by_date_query, POSSale)
     sales_dict = {row.date: float(row.sales) for row in sales_by_date_query.all()}
 
-    # COGS aggregated by date - Now fetched from Hub
-    # TODO: Integrate with Hub API for daily COGS data
-    # For now, return empty dict - Hub dashboard should be used for COGS trends
+    # COGS aggregated by date - from Hub data
+    # Convert Hub daily_cogs (date strings) to date objects for lookup
+    from datetime import datetime as dt
     cogs_dict = {}
+    for date_str, amount in daily_cogs_from_hub.items():
+        try:
+            cogs_date = dt.fromisoformat(date_str).date()
+            cogs_dict[cogs_date] = amount
+        except (ValueError, TypeError):
+            pass
 
     # Build daily data array from dictionaries
     daily_data = []
@@ -218,10 +236,20 @@ async def get_dashboard_analytics(
         for item in top_items_query.all()
     ]
 
-    # Recent Invoices - Now fetched from Hub
-    # TODO: Integrate with Hub API for recent invoices
-    # For now, return empty list - Hub dashboard shows recent invoices
+    # Recent Invoices - from Hub data (already fetched with COGS summary)
     invoices_data = []
+    for inv in recent_invoices_from_hub:
+        invoices_data.append({
+            'id': inv.get('id'),
+            'invoice_number': inv.get('invoice_number'),
+            'vendor_name': inv.get('vendor_name'),
+            'location_name': inv.get('location_name'),
+            'total': inv.get('total_amount', 0),
+            'status': inv.get('status'),
+            'invoice_date': inv.get('invoice_date'),
+            'item_count': inv.get('item_count', 0),
+            'mapped_item_count': inv.get('mapped_item_count', 0)
+        })
 
     # Recent Transfers (last 5)
     recent_transfers_query = db.query(Transfer).options(

@@ -428,6 +428,81 @@ async def approve_count_session(
         "inventory_type": session.inventory_type.value if session.inventory_type else "PARTIAL"
     }
 
+
+@router.post("/{session_id}/reopen")
+async def reopen_count_session(
+    session_id: int,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager_or_admin)
+):
+    """
+    Reopen an approved count session for editing (Admin only).
+
+    This allows corrections to be made to a previously approved count.
+    Note: The inventory updates from the original approval are NOT reversed.
+    Any changes made after reopening will be applied on the next approval.
+    """
+
+    # Check if user is admin (not just manager)
+    if current_user.role.lower() != 'admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only administrators can reopen approved count sessions"
+        )
+
+    session = db.query(CountSession).filter(CountSession.id == session_id).first()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Count session not found"
+        )
+
+    if session.status != CountStatus.APPROVED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Can only reopen approved count sessions. Current status: {session.status.value}"
+        )
+
+    # Store previous approval info for audit
+    previous_approved_by = session.approved_by
+    previous_approved_at = session.approved_at
+
+    # Reopen the session
+    session.status = CountStatus.IN_PROGRESS
+    session.locked = False
+    session.approved_by = None
+    session.approved_at = None
+    # Keep completed_by and completed_at as historical record
+
+    db.commit()
+
+    # Log audit event
+    log_audit_event(
+        db=db,
+        action="REOPEN",
+        entity_type="count_session",
+        entity_id=session.id,
+        user=current_user,
+        changes={
+            "status": "IN_PROGRESS",
+            "previous_status": "APPROVED",
+            "locked": False,
+            "previous_approved_by": previous_approved_by,
+            "previous_approved_at": previous_approved_at.isoformat() if previous_approved_at else None,
+            "note": "Session reopened for corrections. Previous inventory updates not reversed."
+        },
+        request=request
+    )
+
+    return {
+        "message": "Count session reopened for editing",
+        "session_id": session.id,
+        "status": "IN_PROGRESS",
+        "note": "Previous inventory updates were not reversed. Make corrections and approve again to update inventory."
+    }
+
+
 @router.post("/{session_id}/unlock")
 async def unlock_count_session(
     session_id: int,

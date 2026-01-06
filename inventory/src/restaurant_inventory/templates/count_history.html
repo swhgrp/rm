@@ -82,6 +82,31 @@
     </div>
 </div>
 
+<!-- Reopen Confirmation Modal -->
+<div class="modal fade" id="reopenModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title"><i class="bi bi-unlock"></i> Reopen Count Session</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to reopen <strong id="reopenSessionName"></strong>?</p>
+                <div class="alert alert-info mb-0">
+                    <i class="bi bi-info-circle"></i> <strong>Note:</strong> The inventory updates from the original approval will NOT be reversed.
+                    This allows you to make corrections that will be applied when the count is approved again.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="confirmReopen()">
+                    <i class="bi bi-unlock"></i> Reopen
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -91,6 +116,8 @@ let locations = [];
 let currentUser = null;
 let deleteSessionId = null;
 let deleteModal = null;
+let reopenSessionId = null;
+let reopenModal = null;
 
 async function init() {
     try {
@@ -110,6 +137,7 @@ async function init() {
         });
 
         deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        reopenModal = new bootstrap.Modal(document.getElementById('reopenModal'));
 
         displayCounts();
     } catch (error) {
@@ -185,6 +213,7 @@ function displayCounts() {
 
                         const canDelete = isAdmin && (count.status === 'COMPLETED' || count.status === 'APPROVED' || count.status === 'CANCELLED');
                         const canResume = count.status === 'IN_PROGRESS';
+                        const canReopen = isAdmin && count.status === 'APPROVED';
 
                         return `
                             <tr>
@@ -207,6 +236,11 @@ function displayCounts() {
                                                 <i class="bi bi-eye"></i> View
                                             </a>
                                         `}
+                                        ${canReopen ? `
+                                            <button class="btn btn-outline-warning" onclick="showReopenModal(${count.id}, '${(count.name || 'Unnamed Count').replace(/'/g, "\\'")}')" title="Reopen for Editing">
+                                                <i class="bi bi-unlock"></i> Reopen
+                                            </button>
+                                        ` : ''}
                                         ${canDelete ? `
                                             <button class="btn btn-outline-danger" onclick="showDeleteModal(${count.id})" title="Delete">
                                                 <i class="bi bi-trash"></i>
@@ -244,6 +278,31 @@ async function confirmDelete() {
         displayCounts();
     } catch (error) {
         showAlert('Error deleting count session: ' + error.message, 'danger');
+    }
+}
+
+function showReopenModal(sessionId, sessionName) {
+    reopenSessionId = sessionId;
+    document.getElementById('reopenSessionName').textContent = sessionName;
+    reopenModal.show();
+}
+
+async function confirmReopen() {
+    if (!reopenSessionId) return;
+
+    try {
+        await apiRequest(`api/count-sessions/${reopenSessionId}/reopen`, {
+            method: 'POST'
+        });
+
+        showAlert('Count session reopened for editing', 'success');
+        reopenModal.hide();
+
+        // Reload counts
+        counts = await apiRequest('api/count-sessions/');
+        displayCounts();
+    } catch (error) {
+        showAlert('Error reopening count session: ' + error.message, 'danger');
     }
 }
 
