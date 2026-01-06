@@ -6,9 +6,29 @@ The Accounting System is a comprehensive double-entry accounting platform provid
 
 ## Status: 95% Production Ready ✅
 
-**Last Updated:** December 8, 2025
+**Last Updated:** January 5, 2026
 
 ## Recent Updates
+
+### January 5, 2026 - Plaid Integration & Scheduler Service 🏦
+
+**Plaid Bank Integration:**
+- ✅ **Plaid Link integration** - Connect bank accounts via Plaid UI
+- ✅ **Transaction sync** - Automated import of bank transactions
+- ✅ **Account mapping** - Map Plaid accounts to GL bank accounts
+- ✅ **Plaid service module** - `/src/accounting/services/plaid_service.py`
+- ✅ **Environment configuration** - `PLAID_CLIENT_ID`, `PLAID_SECRET`, `PLAID_ENVIRONMENT`
+
+**Background Scheduler:**
+- ✅ **APScheduler service** - Background job processing
+- ✅ **Scheduled bank sync** - Periodic transaction import
+- ✅ **Job monitoring** - Track scheduled task execution
+
+**Database:**
+- ✅ **23 Alembic migrations** - Full schema versioning tracked
+- ✅ **26+ tables** - Comprehensive accounting data model
+
+---
 
 ### November 30, 2025 - Journal Entry Corrections & Vendor Aliases 🔧
 

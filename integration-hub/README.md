@@ -4,9 +4,9 @@
 
 The Integration Hub is an **invoice processing and general ledger (GL) mapping system** that receives vendor invoices, maps line items to inventory items and GL accounts, and routes the processed invoices to both the Inventory and Accounting systems. It also serves as the **source of truth** for vendor items, UOM, and categories.
 
-## Status: Production Ready (Location-Aware Costing) ✅
+## Status: Production Ready (~98% Complete) ✅
 
-**Last Updated:** December 28, 2025 (Expense Items Separation)
+**Last Updated:** January 5, 2026
 
 **Note:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 

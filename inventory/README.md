@@ -2,9 +2,35 @@
 
 A comprehensive web-based inventory management system built for restaurant operations, featuring multi-location tracking, location-aware costing, POS integration, recipe management, and advanced analytics.
 
-**Last Updated:** December 27, 2025
+**Last Updated:** January 5, 2026
 
 ## Recent Updates
+
+### January 5, 2026 - Waste Log UoM & Transfer Enhancements 🔧
+
+**Waste Log UoM Dropdown:**
+- ✅ **UoM selection** - Select unit of measure when logging waste
+- ✅ **Dynamic dropdown** - Shows item's available count units
+- ✅ **Conversion support** - Records waste in selected unit
+- ✅ **Updated template** - `templates/waste.html` with UoM dropdown
+
+**Transfer Form Improvements:**
+- ✅ **Select2 item dropdown** - Searchable item selection with AJAX
+- ✅ **Date picker** - Calendar-based date selection for transfers
+- ✅ **UoM dropdown** - Select unit based on item's count units
+- ✅ **Improved UX** - Modern form controls replace basic inputs
+
+**Dashboard COGS Display:**
+- ✅ **Cost metrics** - Cost of goods sold shown on dashboard
+- ✅ **Location-aware** - COGS calculated per location
+
+**Files Modified:**
+- `templates/waste.html` - UoM dropdown for waste logging
+- `templates/transfers.html` - Select2, date picker, UoM selection
+- `api/api_v1/endpoints/waste.py` - UoM parameter handling
+- `schemas/waste.py` - WasteCreate schema with uom_id
+
+---
 
 ### December 27, 2025 - Location-Aware Costing Architecture 🏗️
 

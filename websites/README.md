@@ -4,7 +4,11 @@
 
 The Website Management System is a FastAPI-based application for managing restaurant website content. It provides a comprehensive admin interface for managing multiple restaurant websites, including menus, pages, hours, images, and form submissions.
 
-## Status: Production Ready ✅
+## Status: ~90% Production Ready ✅ (Updated Jan 5, 2026)
+
+### ⚠️ Known Issues (Jan 5, 2026)
+- Empty `alembic/versions/` directory - migrations not tracked
+- Several stub features not fully implemented
 
 ## Purpose
 

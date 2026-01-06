@@ -2,11 +2,31 @@
 
 ## Status: 99% Production Ready ✅
 
-**LAST UPDATED:** 2025-12-08
+**LAST UPDATED:** 2026-01-05
 
-A comprehensive event planning system with calendar, task management, document generation, email notifications, CalDAV sync, and role-based access control. The system is **production-ready** and actively used.
+A comprehensive event planning system with calendar, task management, document generation, email notifications, CalDAV sync, Quick Holds, and role-based access control. The system is **production-ready** and actively used.
 
 ## Recent Updates (Latest)
+
+### January 5, 2026 - Quick Holds Feature 📅
+
+**New Quick Holds System:**
+- ✅ **Quick hold creation** - Block dates without full event details
+- ✅ **Hold expiration** - Auto-expire holds after configurable period
+- ✅ **Convert to event** - One-click conversion from hold to full event
+- ✅ **Calendar integration** - Holds displayed on calendar with distinct styling
+- ✅ **Hold management UI** - View, edit, and delete holds
+
+**New Files:**
+- `events/src/events/api/quick_holds.py` - Quick holds API endpoints
+- `events/src/events/models/quick_hold.py` - QuickHold model
+- `events/src/events/schemas/quick_hold.py` - Pydantic schemas
+
+**CalDAV Sync Enhancements:**
+- ✅ **Enhanced sync service** - Improved reliability and error handling
+- ✅ **Per-venue calendars** - Separate calendar per venue in Radicale
+
+---
 
 ### November 25, 2025 - Email History UI Improvements 📧
 

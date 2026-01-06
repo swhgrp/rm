@@ -4,7 +4,7 @@
 
 The Portal is the central authentication and navigation hub for the SW Hospitality Group Restaurant Management System. It provides single sign-on (SSO) authentication and permission-based access control for all microservices.
 
-## Status: 99% Production Ready ✅ (Updated Dec 8, 2025)
+## Status: ~87% Production Ready ⚠️ (Updated Jan 5, 2026)
 
 ## Purpose
 
@@ -70,12 +70,19 @@ The Portal is the central authentication and navigation hub for the SW Hospitali
 - [x] Recent alerts and error logs
 - [x] Auto-refresh every 30 seconds
 
-### ❌ Missing (5%)
+### ⚠️ Critical Issues (Jan 5, 2026)
 
+- [ ] **Missing `profile.html` template** - `/profile` route returns 500 error
+- [ ] **`/debug` endpoint unprotected** - No authentication required (security risk)
+
+### ❌ Missing (~13%)
+
+- [ ] Profile page template (causes 500 error)
 - [ ] Password reset via email flow
 - [ ] User self-service registration
 - [ ] Two-factor authentication (2FA)
 - [ ] Failed login attempt tracking
+- [ ] Authentication on debug endpoint
 
 ## Architecture
 

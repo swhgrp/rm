@@ -4,9 +4,12 @@
 
 The HR System is an employee information management platform that serves as the central employee database for the entire restaurant management system. It provides employee profile management, organizational structure tracking, document storage, and user authentication data to the Portal.
 
-## Status: Production Ready (Core Features) ✅
+## Status: ~95% Production Ready ✅ (Updated Jan 5, 2026)
 
 **Note:** This is an employee information management system. It does NOT include scheduling, time tracking, or payroll features.
+
+### ⚠️ Known Issues (Jan 5, 2026)
+- Uses in-memory dict for sessions instead of Redis (should migrate for production scale)
 
 ## Purpose
 
