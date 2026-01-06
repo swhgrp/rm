@@ -90,8 +90,8 @@ class AutoSendService:
         logger.info(f"Auto-sending invoice {invoice.invoice_number} (ID: {invoice_id})")
 
         # Determine which systems need this invoice
-        # Send to inventory only if at least one item has an inventory category
-        has_inventory_items = any(item.inventory_category for item in items)
+        # Send to inventory only if at least one item has a real inventory category (not 'Uncategorized' which means expense-only)
+        has_inventory_items = any(item.inventory_category and item.inventory_category != 'Uncategorized' for item in items)
         # Always send to accounting (all items have GL accounts)
         needs_accounting = True
 
@@ -300,13 +300,13 @@ class AutoSendService:
             errors.append(f"{len(unmapped_items)} items are not mapped")
 
         # Check all items have GL accounts
-        # For expense-only items (no inventory_category), only gl_cogs_account is required
+        # For expense-only items (no inventory_category or 'Uncategorized'), only gl_cogs_account is required
         # For inventory items, both gl_asset_account and gl_cogs_account are required
         items_without_gl = [
             item for item in items
             if item.is_mapped and (
                 not item.gl_cogs_account or
-                (item.inventory_category and not item.gl_asset_account)
+                (item.inventory_category and item.inventory_category != 'Uncategorized' and not item.gl_asset_account)
             )
         ]
         if items_without_gl:

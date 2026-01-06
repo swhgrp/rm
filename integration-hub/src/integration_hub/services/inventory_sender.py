@@ -51,9 +51,9 @@ class InventorySenderService:
 
             logger.info(f"Sending invoice {invoice.invoice_number} to inventory system")
 
-            # POST to inventory API
+            # POST to inventory API - endpoint is at /hub-invoices/from-hub
             response = await self.client.post(
-                f"{self.inventory_api_url}/invoices/from-hub",
+                f"{self.inventory_api_url}/hub-invoices/from-hub",
                 json=payload,
                 headers={"Content-Type": "application/json"}
             )

@@ -286,31 +286,55 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
         logger = logging.getLogger(__name__)
         logger.error(f"Error fetching GL names: {str(e)}")
 
-    # Fetch vendor item pack_size and purchase_unit from Inventory for mapped items
+    # Also fetch GL account names from Accounting for any accounts not already in gl_names
+    # This handles expense items that have GL accounts set directly (not through category mappings)
+    try:
+        # Collect all GL accounts used on items
+        item_gl_accounts = set()
+        for item in items:
+            if item.gl_asset_account and str(item.gl_asset_account) not in gl_names:
+                item_gl_accounts.add(item.gl_asset_account)
+            if item.gl_cogs_account and str(item.gl_cogs_account) not in gl_names:
+                item_gl_accounts.add(item.gl_cogs_account)
+
+        if item_gl_accounts:
+            # Fetch account names from Accounting API
+            import httpx
+            accounting_api_url = os.environ.get("ACCOUNTING_API_URL", "http://accounting-app:8000/api")
+            with httpx.Client(timeout=5.0) as client:
+                for account_number in item_gl_accounts:
+                    try:
+                        url = f"{accounting_api_url}/accounts/"
+                        response = client.get(url, params={"search": str(account_number)})
+                        if response.status_code == 200:
+                            accounts = response.json()
+                            for acct in accounts:
+                                if str(acct.get("account_number")) == str(account_number):
+                                    gl_names[str(account_number)] = acct.get("account_name", "")
+                                    break
+                    except Exception:
+                        pass
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error fetching GL names from Accounting: {str(e)}")
+
+    # Fetch vendor item pack_size and purchase_unit from Hub's vendor items (source of truth)
     vendor_item_info = {}
     try:
-        # Get all inventory_item_ids (which are vendor_item_ids) for mapped items
+        # Get all inventory_item_ids (which are Hub vendor_item_ids) for mapped items
         vendor_item_ids = [item.inventory_item_id for item in items if item.inventory_item_id]
         if vendor_item_ids:
-            engine = create_engine(inventory_db_url)
-            with engine.connect() as conn:
-                # Query vendor_items with units_of_measure join
-                results = conn.execute(
-                    text("""
-                        SELECT vi.id, vi.pack_size, vi.conversion_factor, uom.name as purchase_unit, uom.abbreviation as purchase_unit_abbr
-                        FROM vendor_items vi
-                        LEFT JOIN units_of_measure uom ON vi.purchase_unit_id = uom.id
-                        WHERE vi.id = ANY(:ids)
-                    """),
-                    {"ids": vendor_item_ids}
-                ).fetchall()
-                for row in results:
-                    vendor_item_info[row[0]] = {
-                        "pack_size": row[1],  # This is the pack_size string like "6x750ml"
-                        "conversion_factor": float(row[2]) if row[2] else None,  # Quantity per case
-                        "purchase_unit": row[3],  # Unit name like "Bottle 750ml"
-                        "purchase_unit_abbr": row[4]  # Abbreviation like "btl750ml"
-                    }
+            # Query Hub's hub_vendor_items table
+            from integration_hub.models.hub_vendor_item import HubVendorItem
+            hub_items = db.query(HubVendorItem).filter(HubVendorItem.id.in_(vendor_item_ids)).all()
+            for vi in hub_items:
+                vendor_item_info[vi.id] = {
+                    "pack_size": vi.pack_size,
+                    "conversion_factor": float(vi.units_per_case) if vi.units_per_case else 1.0,
+                    "purchase_unit": vi.purchase_unit_name,
+                    "purchase_unit_abbr": vi.purchase_unit_abbr
+                }
     except Exception as e:
         import logging
         logger = logging.getLogger(__name__)
@@ -338,8 +362,8 @@ async def upload_invoice(
 ):
     """Upload an invoice PDF and create hub invoice record"""
 
-    # Save PDF file
-    pdf_dir = Path("/opt/restaurant-system/integration-hub/uploads")
+    # Save PDF file - use /app/uploads inside container (mounted from host)
+    pdf_dir = Path("/app/uploads")
     pdf_dir.mkdir(exist_ok=True)
 
     file_path = pdf_dir / f"{invoice_number}_{file.filename}"
@@ -362,7 +386,8 @@ async def upload_invoice(
     db.commit()
     db.refresh(invoice)
 
-    return RedirectResponse(url=f"/invoices/{invoice.id}", status_code=303)
+    # Redirect with /hub prefix since that's what the browser sees (nginx strips it internally)
+    return RedirectResponse(url=f"/hub/invoices/{invoice.id}", status_code=303)
 
 
 def _parse_invoice_background(invoice_id: int):

@@ -147,7 +147,7 @@
                 <div class="card-body">
                     <div class="mb-3">
                         <strong>Inventory System:</strong>
-                        {% set has_inventory_items = items|selectattr('inventory_category')|list|length > 0 %}
+                        {% set has_inventory_items = items|selectattr('inventory_category')|rejectattr('inventory_category', 'equalto', 'Uncategorized')|list|length > 0 %}
                         {% if invoice.sent_to_inventory and invoice.inventory_invoice_id %}
                         <span class="text-success">
                             <i class="bi bi-check-circle-fill"></i> Sent
@@ -315,6 +315,12 @@
                                 <span class="badge bg-info">{{ item.inventory_category }}</span>
                                 {% elif item.inventory_category == 'Uncategorized' or (not item.inventory_category and not item.inventory_item_id and item.gl_cogs_account) %}
                                 <span class="badge bg-secondary">Expense</span>
+                                {% if item.gl_cogs_account %}
+                                {% set gl_key = item.gl_cogs_account|string %}
+                                {% if gl_key in gl_names %}
+                                <small class="text-muted d-block" style="font-size: 10px; line-height: 1;">{{ gl_names[gl_key][:20] }}{% if gl_names[gl_key]|length > 20 %}...{% endif %}</small>
+                                {% endif %}
+                                {% endif %}
                                 {% else %}
                                 <span class="text-muted">-</span>
                                 {% endif %}
@@ -346,9 +352,10 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if item.is_mapped and has_vendor_info %}
+                                {% set is_expense_item = item.inventory_category == 'Uncategorized' or (not item.inventory_category and not item.inventory_item_id and item.gl_cogs_account) %}
+                                {% if item.is_mapped and (has_vendor_info or is_expense_item) %}
                                 <span class="text-success"><i class="bi bi-check-circle"></i> Mapped</span>
-                                {% elif item.is_mapped and not has_vendor_info %}
+                                {% elif item.is_mapped and not has_vendor_info and not is_expense_item %}
                                 <span class="text-warning" data-bs-toggle="tooltip" title="Vendor item needs purchase unit configuration in Inventory"><i class="bi bi-exclamation-triangle"></i> Incomplete</span>
                                 {% else %}
                                 <span class="text-danger"><i class="bi bi-exclamation-circle"></i> Unmapped</span>

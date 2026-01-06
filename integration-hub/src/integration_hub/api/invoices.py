@@ -142,6 +142,7 @@ async def list_invoices(
     end_date: Optional[date] = Query(None, description="Filter by invoice date end"),
     sent_to_inventory: Optional[bool] = Query(None, description="Filter by inventory sync status"),
     include_statements: bool = Query(False, description="Include statement invoices"),
+    has_inventory_items: Optional[bool] = Query(None, description="Filter to invoices with inventory items only (excludes expense-only)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -149,6 +150,8 @@ async def list_invoices(
 
     This endpoint is used by Inventory to fetch invoices for display.
     Returns invoice headers with item counts, not full line items.
+
+    Use has_inventory_items=true to exclude expense-only invoices (Cozzini, utilities, etc.)
     """
     # Base query with item counts
     query = db.query(
@@ -178,6 +181,28 @@ async def list_invoices(
 
     if sent_to_inventory is not None:
         query = query.filter(HubInvoice.sent_to_inventory == sent_to_inventory)
+
+    # Filter to only invoices with inventory items (not expense-only)
+    # An invoice has inventory items if at least one item has inventory_category set
+    # and it's not 'Uncategorized' (which means expense-only mapping)
+    if has_inventory_items is True:
+        # Subquery to find invoices that have at least one inventory item
+        from sqlalchemy import exists, and_
+        has_inv_items_subquery = db.query(HubInvoiceItem.invoice_id).filter(
+            HubInvoiceItem.inventory_category.isnot(None),
+            HubInvoiceItem.inventory_category != 'Uncategorized',
+            HubInvoiceItem.inventory_category != ''
+        ).distinct().subquery()
+        query = query.filter(HubInvoice.id.in_(db.query(has_inv_items_subquery)))
+    elif has_inventory_items is False:
+        # Show only expense-only invoices (no inventory items)
+        from sqlalchemy import exists, and_
+        has_inv_items_subquery = db.query(HubInvoiceItem.invoice_id).filter(
+            HubInvoiceItem.inventory_category.isnot(None),
+            HubInvoiceItem.inventory_category != 'Uncategorized',
+            HubInvoiceItem.inventory_category != ''
+        ).distinct().subquery()
+        query = query.filter(~HubInvoice.id.in_(db.query(has_inv_items_subquery)))
 
     # Get total count
     total = query.count()
@@ -218,6 +243,116 @@ async def list_invoices(
         page=page,
         page_size=page_size,
         pages=pages
+    )
+
+
+class COGSSummaryResponse(BaseModel):
+    """COGS summary response for dashboard"""
+    total_cogs: float
+    invoice_count: int
+    daily_cogs: dict  # date string -> amount
+    recent_invoices: List[InvoiceSummaryResponse]
+
+
+@router.get("/cogs-summary", response_model=COGSSummaryResponse)
+async def get_cogs_summary(
+    start_date: Optional[date] = Query(None, description="Start date for COGS calculation"),
+    end_date: Optional[date] = Query(None, description="End date for COGS calculation"),
+    location_id: Optional[int] = Query(None, description="Filter by location"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get COGS summary from approved invoices for dashboard display.
+
+    Returns total COGS, daily breakdown, and recent invoices for the date range.
+    Used by Inventory dashboard to display COGS data without requiring Hub access.
+    """
+    from datetime import timedelta
+    from sqlalchemy import Integer
+
+    # Default to last 7 days if no dates provided
+    if not end_date:
+        end_date = date.today()
+    if not start_date:
+        start_date = end_date - timedelta(days=7)
+
+    # Base query for approved/sent invoices (not statements)
+    query = db.query(HubInvoice).filter(
+        HubInvoice.invoice_date >= start_date,
+        HubInvoice.invoice_date <= end_date,
+        or_(HubInvoice.is_statement == False, HubInvoice.is_statement == None)
+    )
+
+    if location_id:
+        query = query.filter(HubInvoice.location_id == location_id)
+
+    invoices = query.order_by(desc(HubInvoice.invoice_date), desc(HubInvoice.id)).all()
+
+    # Calculate total COGS and daily breakdown
+    total_cogs = 0.0
+    daily_cogs = {}
+
+    for invoice in invoices:
+        amount = float(invoice.total_amount) if invoice.total_amount else 0.0
+        total_cogs += amount
+
+        # Add to daily breakdown
+        date_str = invoice.invoice_date.isoformat() if invoice.invoice_date else None
+        if date_str:
+            daily_cogs[date_str] = daily_cogs.get(date_str, 0.0) + amount
+
+    # Get recent invoices (last 5) with item counts
+    # Only include invoices with inventory items (not expense-only like Cozzini, utilities)
+    recent_query = db.query(
+        HubInvoice,
+        func.count(HubInvoiceItem.id).label('item_count'),
+        func.sum(func.cast(HubInvoiceItem.is_mapped, Integer)).label('mapped_count')
+    ).outerjoin(HubInvoiceItem).group_by(HubInvoice.id).filter(
+        or_(HubInvoice.is_statement == False, HubInvoice.is_statement == None)
+    )
+
+    if location_id:
+        recent_query = recent_query.filter(HubInvoice.location_id == location_id)
+
+    # Filter to only invoices with inventory items (exclude expense-only)
+    has_inv_items_subquery = db.query(HubInvoiceItem.invoice_id).filter(
+        HubInvoiceItem.inventory_category.isnot(None),
+        HubInvoiceItem.inventory_category != 'Uncategorized',
+        HubInvoiceItem.inventory_category != ''
+    ).distinct().subquery()
+    recent_query = recent_query.filter(HubInvoice.id.in_(db.query(has_inv_items_subquery)))
+
+    recent_results = recent_query.order_by(
+        desc(HubInvoice.invoice_date), desc(HubInvoice.id)
+    ).limit(5).all()
+
+    recent_invoices = []
+    for invoice, item_count, mapped_count in recent_results:
+        recent_invoices.append(InvoiceSummaryResponse(
+            id=invoice.id,
+            vendor_id=invoice.vendor_id,
+            vendor_name=invoice.vendor_name,
+            invoice_number=invoice.invoice_number,
+            invoice_date=invoice.invoice_date,
+            due_date=invoice.due_date,
+            total_amount=float(invoice.total_amount) if invoice.total_amount else 0,
+            tax_amount=float(invoice.tax_amount) if invoice.tax_amount else None,
+            location_id=invoice.location_id,
+            location_name=invoice.location_name,
+            status=invoice.status,
+            is_statement=invoice.is_statement or False,
+            sent_to_inventory=invoice.sent_to_inventory or False,
+            sent_to_accounting=invoice.sent_to_accounting or False,
+            item_count=item_count or 0,
+            mapped_item_count=mapped_count or 0,
+            created_at=invoice.created_at
+        ))
+
+    return COGSSummaryResponse(
+        total_cogs=total_cogs,
+        invoice_count=len(invoices),
+        daily_cogs=daily_cogs,
+        recent_invoices=recent_invoices
     )
 
 

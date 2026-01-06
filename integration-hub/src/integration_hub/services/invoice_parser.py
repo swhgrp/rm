@@ -528,16 +528,31 @@ class InvoiceParser:
         Match parsed vendor name to existing vendor in database
 
         Uses multiple strategies:
-        1. Exact match (case insensitive)
-        2. Partial match - vendor name contains parsed name
-        3. Partial match - parsed name contains vendor name
+        1. Check vendor aliases table first
+        2. Exact match (case insensitive)
+        3. Partial match - vendor name contains parsed name
+        4. Partial match - parsed name contains vendor name
         """
         if not vendor_name:
             return None
 
         vendor_name = vendor_name.strip()
 
-        # 1. Exact match (case insensitive)
+        # 1. Check vendor aliases first - this handles known variations
+        from integration_hub.models.vendor_alias import VendorAlias
+        normalized = vendor_name.lower().strip()
+        alias = db.query(VendorAlias).filter(
+            VendorAlias.alias_name_normalized == normalized,
+            VendorAlias.is_active == True
+        ).first()
+
+        if alias:
+            vendor = db.query(Vendor).filter(Vendor.id == alias.vendor_id).first()
+            if vendor:
+                logger.info(f"Vendor alias match: '{vendor_name}' -> '{vendor.name}' (ID: {vendor.id})")
+                return vendor
+
+        # 2. Exact match (case insensitive)
         vendor = db.query(Vendor).filter(
             Vendor.name.ilike(vendor_name)
         ).first()
@@ -546,7 +561,7 @@ class InvoiceParser:
             logger.info(f"Exact vendor match: '{vendor_name}' -> '{vendor.name}' (ID: {vendor.id})")
             return vendor
 
-        # 2. Partial match - vendor name contains the parsed name
+        # 3. Partial match - vendor name contains the parsed name
         vendor = db.query(Vendor).filter(
             Vendor.name.ilike(f"%{vendor_name}%")
         ).first()
@@ -555,7 +570,7 @@ class InvoiceParser:
             logger.info(f"Partial vendor match (contains): '{vendor_name}' -> '{vendor.name}' (ID: {vendor.id})")
             return vendor
 
-        # 3. Partial match - parsed name contains vendor name
+        # 4. Partial match - parsed name contains vendor name
         all_vendors = db.query(Vendor).filter(Vendor.is_active == True).all()
         for v in all_vendors:
             if v.name.lower() in vendor_name.lower():
