@@ -98,6 +98,9 @@ services:
     - INVENTORY_API_URL=http://inventory-app:8000/api
     - PORTAL_SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
     - HUB_INTERNAL_API_KEY=fqyUzahSx18ivWkajrVcVcFEi3Edwmy7dC22WMlXHH0=
+    - PLAID_CLIENT_ID=68f5d6dad4bf02002290032a
+    - PLAID_SECRET=00f91be32c85b9dba803c3cec36060
+    - PLAID_ENV=production
     depends_on:
       accounting-db:
         condition: service_healthy
