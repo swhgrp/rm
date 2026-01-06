@@ -7,56 +7,87 @@
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
 <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
 <style>
-    /* Select2 dark theme styling */
+    /* Select2 slate theme styling - matching app theme */
+    .select2-container .select2-selection,
     .select2-container--bootstrap-5 .select2-selection {
-        background-color: #0d1117 !important;
-        border-color: #30363d !important;
-        color: #c9d1d9 !important;
+        background-color: #ECEFF1 !important;
+        border-color: #CFD8DC !important;
+        color: #263238 !important;
     }
 
+    .select2-container .select2-selection__rendered,
     .select2-container--bootstrap-5 .select2-selection__rendered {
-        color: #c9d1d9 !important;
+        color: #263238 !important;
     }
 
+    .select2-container .select2-selection__placeholder,
     .select2-container--bootstrap-5 .select2-selection__placeholder {
-        color: #8b949e !important;
+        color: #78909C !important;
     }
 
+    .select2-dropdown,
     .select2-container--bootstrap-5 .select2-dropdown {
-        background-color: #161b22 !important;
-        border-color: #30363d !important;
+        background-color: #FFFFFF !important;
+        border-color: #CFD8DC !important;
     }
 
+    .select2-results__option,
     .select2-container--bootstrap-5 .select2-results__option {
-        color: #c9d1d9 !important;
-        background-color: #161b22 !important;
+        color: #263238 !important;
+        background-color: #FFFFFF !important;
     }
 
-    .select2-container--bootstrap-5 .select2-results__option--highlighted {
-        background-color: #21262d !important;
-        color: #d97706 !important;
+    .select2-results__option--highlighted,
+    .select2-container--bootstrap-5 .select2-results__option--highlighted,
+    .select2-results__option.select2-results__option--highlighted {
+        background-color: #ECEFF1 !important;
+        color: #455A64 !important;
     }
 
-    .select2-container--bootstrap-5 .select2-results__option--selected {
-        background-color: #0d1117 !important;
-        color: #d97706 !important;
+    .select2-results__option--selected,
+    .select2-container--bootstrap-5 .select2-results__option--selected,
+    .select2-results__option[aria-selected="true"] {
+        background-color: #CFD8DC !important;
+        color: #263238 !important;
     }
 
+    .select2-search__field,
     .select2-container--bootstrap-5 .select2-search__field {
-        background-color: #0d1117 !important;
-        border-color: #30363d !important;
-        color: #c9d1d9 !important;
+        background-color: #FFFFFF !important;
+        border-color: #CFD8DC !important;
+        color: #263238 !important;
     }
 
     /* Fix the single select display */
+    .select2-container--focus .select2-selection,
+    .select2-container--open .select2-selection,
     .select2-container--bootstrap-5.select2-container--focus .select2-selection,
     .select2-container--bootstrap-5.select2-container--open .select2-selection {
-        border-color: #d97706 !important;
+        border-color: #455A64 !important;
+        box-shadow: 0 0 0 3px rgba(69, 90, 100, 0.15) !important;
     }
 
+    .select2-selection--single .select2-selection__rendered,
     .select2-container--bootstrap-5 .select2-selection--single .select2-selection__rendered {
-        color: #c9d1d9 !important;
+        color: #263238 !important;
         line-height: 36px;
+    }
+
+    /* Search input focus styling */
+    .select2-search--dropdown .select2-search__field:focus,
+    .select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field:focus {
+        border-color: #455A64 !important;
+        outline: none !important;
+        box-shadow: 0 0 0 3px rgba(69, 90, 100, 0.15) !important;
+    }
+
+    /* Results container */
+    .select2-results {
+        background-color: #FFFFFF !important;
+    }
+
+    .select2-results__options {
+        background-color: #FFFFFF !important;
     }
 </style>
 {% endblock %}
@@ -200,10 +231,17 @@
                             <option value="">Select Item...</option>
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label for="wasteQuantity" class="form-label">Quantity <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control" id="wasteQuantity" step="0.001" min="0.001" required>
-                        <small class="text-muted">Unit: <span id="itemUnit">-</span></small>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="wasteQuantity" class="form-label">Quantity <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="wasteQuantity" step="0.001" min="0.001" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="wasteUom" class="form-label">Unit <span class="text-danger">*</span></label>
+                            <select class="form-select" id="wasteUom" required>
+                                <option value="">Select unit</option>
+                            </select>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="wasteReason" class="form-label">Reason <span class="text-danger">*</span></label>
@@ -340,8 +378,14 @@ async function loadLocations() {
 
 async function loadMasterItems() {
     try {
-        const response = await fetch('api/items', {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+        // Add cache-buster to ensure fresh data
+        // IMPORTANT: Use trailing slash to hit the full items endpoint with UOM data
+        const timestamp = Date.now();
+        const response = await fetch(`api/items/?limit=1000&_t=${timestamp}`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
+                'Cache-Control': 'no-cache'
+            }
         });
 
         if (!response.ok) {
@@ -349,13 +393,17 @@ async function loadMasterItems() {
         }
 
         const data = await response.json();
-        masterItems = data.items || [];
+        // API returns array directly or object with items property
+        masterItems = Array.isArray(data) ? data : (data.items || []);
 
         // Populate modal dropdown
         const itemSelect = document.getElementById('wasteItem');
         itemSelect.innerHTML = '<option value="">Select Item...</option>';
 
-        const activeItems = masterItems.filter(item => item.is_active);
+        // Filter active items and sort alphabetically by name
+        const activeItems = masterItems
+            .filter(item => item.is_active)
+            .sort((a, b) => a.name.localeCompare(b.name));
 
         activeItems.forEach(item => {
             const option = document.createElement('option');
@@ -383,18 +431,70 @@ async function loadMasterItems() {
 
 
         // Handle Select2 change event
-        $('#wasteItem').on('select2:select', function(e) {
-            const itemId = parseInt(e.params.data.id);
-            const item = masterItems.find(i => i.id === itemId);
-            if (item) {
-                document.getElementById('itemUnit').textContent = item.unit_of_measure || '-';
-            }
+        $('#wasteItem').on('select2:select select2:clear', function(e) {
+            updateUomSelect();
             updateEstimatedCost();
         });
 
     } catch (error) {
         console.error('Error loading items:', error);
         showToast('Error', 'Failed to load items', 'danger');
+    }
+}
+
+function updateUomSelect() {
+    const itemId = document.getElementById('wasteItem').value;
+    const uomSelect = document.getElementById('wasteUom');
+
+    // Reset the UOM dropdown
+    uomSelect.innerHTML = '<option value="">Select unit</option>';
+
+    if (!itemId) return;
+
+    const item = masterItems.find(i => i.id == itemId);
+    if (!item) return;
+
+    // Add primary count unit OR fall back to unit_of_measure/unit_name
+    if (item.primary_count_unit_name) {
+        const option = document.createElement('option');
+        option.value = item.primary_count_unit_name;
+        option.textContent = item.primary_count_unit_name;
+        option.dataset.factor = '1';
+        option.selected = true;
+        uomSelect.appendChild(option);
+    } else if (item.unit_of_measure) {
+        // Fallback to base unit
+        const option = document.createElement('option');
+        option.value = item.unit_of_measure;
+        option.textContent = item.unit_of_measure;
+        option.dataset.factor = '1';
+        option.selected = true;
+        uomSelect.appendChild(option);
+    } else if (item.unit_name) {
+        // Another fallback
+        const option = document.createElement('option');
+        option.value = item.unit_name;
+        option.textContent = item.unit_name;
+        option.dataset.factor = '1';
+        option.selected = true;
+        uomSelect.appendChild(option);
+    }
+
+    // Add secondary count units if available
+    if (item.count_unit_2_name) {
+        const option = document.createElement('option');
+        option.value = item.count_unit_2_name;
+        option.textContent = item.count_unit_2_name;
+        option.dataset.factor = item.count_unit_2_factor || '1';
+        uomSelect.appendChild(option);
+    }
+
+    if (item.count_unit_3_name) {
+        const option = document.createElement('option');
+        option.value = item.count_unit_3_name;
+        option.textContent = item.count_unit_3_name;
+        option.dataset.factor = item.count_unit_3_factor || '1';
+        uomSelect.appendChild(option);
     }
 }
 
@@ -509,11 +609,15 @@ function showLogWasteModal() {
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     document.getElementById('wasteDate').value = now.toISOString().slice(0, 16);
-    document.getElementById('itemUnit').textContent = '-';
     document.getElementById('estimatedCost').textContent = '0.00';
 
     // Reset Select2
-    $('#wasteItem').val(null).trigger('change');
+    if (typeof $ !== 'undefined' && $('#wasteItem').data('select2')) {
+        $('#wasteItem').val(null).trigger('change');
+    }
+
+    // Reset UOM dropdown
+    document.getElementById('wasteUom').innerHTML = '<option value="">Select unit</option>';
 
     logWasteModalInstance.show();
 }
@@ -538,10 +642,17 @@ async function submitWaste() {
         return;
     }
 
+    const uom = document.getElementById('wasteUom').value;
+    if (!uom) {
+        showToast('Error', 'Please select a unit of measure', 'danger');
+        return;
+    }
+
     const data = {
         location_id: parseInt(document.getElementById('wasteLocation').value),
         master_item_id: parseInt(document.getElementById('wasteItem').value),
         quantity_wasted: parseFloat(document.getElementById('wasteQuantity').value),
+        unit_of_measure: uom,
         reason_code: document.getElementById('wasteReason').value,
         waste_date: new Date(document.getElementById('wasteDate').value).toISOString(),
         description: document.getElementById('wasteDescription').value || null

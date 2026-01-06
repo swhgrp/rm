@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** December 31, 2025
-**System Status:** Production (95% Complete - Unit Conversions & Pricing Complete)
+**Last Updated:** January 5, 2026
+**System Status:** Production (96% Complete - Waste Log UoM & Transfer Enhancements)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -38,7 +38,41 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - Dec 31, 2025)
+### Most Recent Work (Current Session - January 5, 2026)
+
+**WASTE LOG & TRANSFER ENHANCEMENTS** ✅ **COMPLETE**
+
+#### 1. **Waste Log UoM Dropdown** ✅ **COMPLETE**
+- Added unit of measure dropdown to waste log form
+- UoM options populated from item's count units (primary + secondary)
+- Fixed API routing issue: `/api/items` (no slash) was hitting simplified endpoint returning null UoM
+- Changed `/api/items` endpoint to redirect (307) to `/api/items/` for consistency
+- Added `unit_of_measure` column to `waste_records` table (migration: `20260105_0001`)
+- Updated WasteRecord model, schemas, and API endpoints to store/display UoM
+
+#### 2. **Transfer Form Enhancements** ✅ **COMPLETE**
+- Added searchable Select2 dropdown for item selection
+- Added date/time field for transfer date
+- Added UoM dropdown populated from item's count units
+- Applied slate theme styling to Select2 dropdowns
+
+#### 3. **API Route Consistency Fix** ✅ **COMPLETE**
+- Discovered `/api/items` (no trailing slash) in main.py was returning incomplete data
+- Changed it to redirect to `/api/items/` which has full UoM processing
+- Prevents confusion where different endpoints return different data structures
+
+#### 4. **Files Modified**
+- `inventory/src/restaurant_inventory/templates/waste.html` - UoM dropdown, Select2, trailing slash fix
+- `inventory/src/restaurant_inventory/templates/transfers.html` - Date, UoM, Select2
+- `inventory/src/restaurant_inventory/models/waste.py` - Added `unit_of_measure` column
+- `inventory/src/restaurant_inventory/schemas/waste.py` - Added `unit_of_measure` field
+- `inventory/src/restaurant_inventory/api/api_v1/endpoints/waste.py` - Store/display UoM
+- `inventory/src/restaurant_inventory/main.py` - Redirect `/api/items` → `/api/items/`
+- `inventory/alembic/versions/20260105_0001_add_uom_to_waste_records.py` - Migration
+
+---
+
+### Previous Session Work (Dec 31, 2025)
 
 **UNIT CONVERSIONS & PRICING FIXES** ✅ **COMPLETE**
 

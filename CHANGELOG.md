@@ -1,5 +1,40 @@
 # Changelog
 
+## [2026-01-05] - Waste Log UoM & Transfer Enhancements
+
+### Summary
+Added unit of measure (UoM) support to the waste log and enhanced the transfer form with searchable dropdowns and date selection. Fixed API routing issue where `/api/items` (no trailing slash) was returning incomplete data.
+
+### Added - Inventory System
+- **Waste Log UoM Dropdown:**
+  - New dropdown to select unit of measure when logging waste
+  - Options populated from item's count units (primary + secondary)
+  - Selected UoM stored with waste record for accurate reporting
+  - Database migration: `20260105_0001_add_uom_to_waste_records.py`
+
+- **Transfer Form Enhancements:**
+  - Searchable Select2 dropdown for item selection (matches waste log)
+  - Date/time picker for transfer date
+  - UoM dropdown populated from item's count units
+  - Slate theme styling applied to all Select2 dropdowns
+
+### Fixed - Inventory System
+- **API Route Consistency:**
+  - `/api/items` (no trailing slash) was returning simplified data without UoM fields
+  - Changed to redirect (307) to `/api/items/` which has full UoM processing
+  - Prevents confusion where different endpoints return different data structures
+
+### Files Modified
+- `inventory/src/restaurant_inventory/templates/waste.html`
+- `inventory/src/restaurant_inventory/templates/transfers.html`
+- `inventory/src/restaurant_inventory/models/waste.py`
+- `inventory/src/restaurant_inventory/schemas/waste.py`
+- `inventory/src/restaurant_inventory/api/api_v1/endpoints/waste.py`
+- `inventory/src/restaurant_inventory/main.py`
+- `inventory/alembic/versions/20260105_0001_add_uom_to_waste_records.py`
+
+---
+
 ## [2025-12-24] - UI Consistency: Sidebar Highlighting & Submenu Behavior Fixes
 
 ### Summary

@@ -19,6 +19,7 @@ class WasteRecord(Base):
     
     # Waste details
     quantity_wasted = Column(Numeric(10, 3), nullable=False)
+    unit_of_measure = Column(String(50), nullable=True)  # UOM used for this waste entry
     unit_cost = Column(Numeric(10, 2), nullable=True)
     total_cost = Column(Numeric(12, 2), nullable=True)
     

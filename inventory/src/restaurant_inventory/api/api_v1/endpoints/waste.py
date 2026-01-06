@@ -56,6 +56,8 @@ def list_waste_records(
     # Format response
     result = []
     for record in waste_records:
+        # Use the stored unit_of_measure if available, otherwise fall back to master item's UOM
+        unit = record.unit_of_measure or (record.master_item.unit_of_measure if record.master_item else None)
         result.append(WasteRecordList(
             id=record.id,
             location_id=record.location_id,
@@ -63,7 +65,7 @@ def list_waste_records(
             master_item_id=record.master_item_id,
             item_name=record.master_item.name if record.master_item else None,
             quantity_wasted=float(record.quantity_wasted),
-            unit=record.master_item.unit_of_measure if record.master_item else None,
+            unit=unit,
             total_cost=record.total_cost,
             reason_code=record.reason_code,
             waste_date=record.waste_date,
@@ -133,6 +135,7 @@ def create_waste_record(
         master_item_id=waste.master_item_id,
         inventory_id=inventory_record.id if inventory_record else None,
         quantity_wasted=waste.quantity_wasted,
+        unit_of_measure=waste.unit_of_measure,
         unit_cost=unit_cost,
         total_cost=total_cost,
         reason_code=waste.reason_code,

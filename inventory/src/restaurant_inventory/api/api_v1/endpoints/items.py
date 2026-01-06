@@ -63,7 +63,7 @@ def get_items_for_hub(
     return item_list
 
 
-@router.get("/", response_model=List[MasterItemResponse])
+@router.get("/")
 async def get_master_items(
     skip: int = 0,
     limit: int = 100,
@@ -191,7 +191,11 @@ async def get_master_items(
         item_dict = MasterItemResponse.from_orm(item).model_dump()
 
         # Get count units from MasterItemCountUnit table (new architecture)
-        count_units = sorted(item.count_units, key=lambda cu: (not cu.is_primary, cu.display_order or 0))
+        try:
+            count_units = sorted(item.count_units, key=lambda cu: (not cu.is_primary, cu.display_order or 0))
+        except Exception as e:
+            logger.warning(f"Error sorting count_units for item {item.id}: {e}")
+            count_units = []
         primary_count_unit = next((cu for cu in count_units if cu.is_primary), None)
         secondary_units = [cu for cu in count_units if not cu.is_primary]
 
@@ -209,6 +213,7 @@ async def get_master_items(
         item_dict['unit_of_measure'] = unit_name
         item_dict['unit_name'] = unit_name
         item_dict['secondary_unit_name'] = item.secondary_unit_rel.name if item.secondary_unit_rel else item.secondary_unit
+
         item_dict['secondary_unit'] = item.secondary_unit_rel.name if item.secondary_unit_rel else item.secondary_unit
 
         # Also populate primary_count_unit fields for the API response
@@ -265,6 +270,7 @@ async def get_master_items(
         result.append(item_dict)
 
     return result
+
 
 @router.get("/categories")
 async def get_categories(

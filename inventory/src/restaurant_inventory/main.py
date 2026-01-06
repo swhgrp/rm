@@ -227,38 +227,13 @@ async def get_locations_simple(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-# Simple items endpoint for backward compatibility
-@app.get("/api/items", tags=["items-simple"])
-async def get_master_items_simple(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Get all master items from database"""
-    try:
-        items = db.query(MasterItem).all()
-        return {
-            "success": True,
-            "count": len(items),
-            "items": [
-                {
-                    "id": item.id,
-                    "name": item.name,
-                    "description": item.description,
-                    "category": item.category,
-                    "unit_of_measure": item.unit_of_measure,
-                    "current_cost": float(item.current_cost) if item.current_cost else None,
-                    "average_cost": float(item.average_cost) if item.average_cost else None,
-                    "sku": item.sku,
-                    "vendor": item.vendor,
-                    "par_level": float(item.par_level) if item.par_level else None,
-                    "is_active": item.is_active,
-                    "created_at": item.created_at.isoformat() if item.created_at else None
-                }
-                for item in items
-            ]
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+# Redirect /api/items (no slash) to /api/items/ for consistency
+# The full-featured endpoint is at /api/items/ (with trailing slash)
+@app.get("/api/items", tags=["items-redirect"])
+async def redirect_to_items():
+    """Redirect to the proper items endpoint with trailing slash"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/api/items/", status_code=307)
 
 # HTML Routes for Web Interface
 @app.get("/", response_class=HTMLResponse)

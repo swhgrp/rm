@@ -12,6 +12,7 @@ class WasteRecordBase(BaseModel):
     location_id: int
     master_item_id: int
     quantity_wasted: float = Field(gt=0, description="Quantity wasted (must be positive)")
+    unit_of_measure: Optional[str] = Field(None, description="Unit of measure for the wasted quantity")
     reason_code: str = Field(description="Reason for waste: spoiled, damaged, expired, theft, overproduction, other")
     description: Optional[str] = None
     waste_date: datetime
@@ -23,6 +24,7 @@ class WasteRecordCreate(WasteRecordBase):
 
 class WasteRecordUpdate(BaseModel):
     quantity_wasted: Optional[float] = Field(None, gt=0)
+    unit_of_measure: Optional[str] = None
     reason_code: Optional[str] = None
     description: Optional[str] = None
     waste_date: Optional[datetime] = None
