@@ -8,7 +8,8 @@ Mapping Logic (Location-Aware):
 1. Match by SKU + location: item_code → hub_vendor_items.vendor_sku (same vendor + location)
 2. Match by SKU globally: item_code → hub_vendor_items.vendor_sku (same vendor, any location)
 3. Match by fuzzy product name (same vendor, high similarity)
-4. Match by expense mapping: item_description → expense_mappings table
+4. Match by expense mapping: item_description → invoice_item_mapping_deprecated table
+   (case-insensitive matching for expense items not tracked in inventory)
 5. No match: Item goes to unmapped queue
 
 New items are automatically marked as `needs_review` in the vendor items table.
@@ -316,26 +317,41 @@ class AutoMapperService:
 
     def match_by_expense_mapping(self, item_description: str) -> Optional[Dict]:
         """
-        Check if this item description is mapped as an expense item
+        Check if this item description is mapped as an expense item.
+        Uses invoice_item_mapping_deprecated table (source of truth for expense items)
+        with case-insensitive matching.
+
         Returns expense mapping dict if found, None otherwise
         """
         if not item_description:
             return None
 
+        # Query invoice_item_mapping_deprecated with case-insensitive matching
+        # Expense items have inventory_item_id IS NULL (not linked to inventory)
         result = self.db.execute(
             sql_text("""
-                SELECT gl_expense_account, gl_account_name
-                FROM expense_mappings
-                WHERE item_description = :desc
+                SELECT id, gl_cogs_account, gl_asset_account, gl_waste_account,
+                       inventory_category, item_description
+                FROM invoice_item_mapping_deprecated
+                WHERE LOWER(item_description) = LOWER(:desc)
+                AND is_active = true
+                AND inventory_item_id IS NULL
+                LIMIT 1
             """),
             {"desc": item_description}
         ).fetchone()
 
         if result:
+            logger.debug(f"Expense mapping found: '{item_description[:30]}' → GL {result[1]} (mapping id: {result[0]})")
             return {
                 'is_expense': True,
-                'gl_expense_account': result[0],
-                'gl_account_name': result[1]
+                'mapping_id': result[0],
+                'gl_cogs_account': result[1],
+                'gl_asset_account': result[2],
+                'gl_waste_account': result[3],
+                'inventory_category': result[4],
+                # Keep gl_expense_account as alias for backward compatibility
+                'gl_expense_account': result[1]
             }
 
         return None
@@ -445,7 +461,7 @@ class AutoMapperService:
                 result['is_cross_location'] = (location_id and vendor_item.get('location_id') != location_id)
                 return result
 
-        # 3. Try expense mapping
+        # 3. Try expense mapping (from invoice_item_mapping_deprecated table)
         expense = self.match_by_expense_mapping(item.item_description)
         if expense:
             return {
@@ -457,11 +473,12 @@ class AutoMapperService:
                 'vendor_item_name': None,
                 'master_item_id': None,
                 'master_item_name': None,
-                'category': 'Uncategorized',
-                'gl_asset_account': None,
-                'gl_cogs_account': expense['gl_expense_account'],
-                'gl_waste_account': None,
+                'category': expense.get('inventory_category', 'Uncategorized'),
+                'gl_asset_account': expense.get('gl_asset_account'),
+                'gl_cogs_account': expense.get('gl_cogs_account') or expense.get('gl_expense_account'),
+                'gl_waste_account': expense.get('gl_waste_account'),
                 'is_expense': True,
+                'expense_mapping_id': expense.get('mapping_id'),
                 'matched_location_id': None,
                 'is_cross_location': False
             }
