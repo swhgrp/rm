@@ -315,44 +315,75 @@ class AutoMapperService:
 
         return None
 
-    def match_by_expense_mapping(self, item_description: str) -> Optional[Dict]:
+    def match_by_expense_mapping(self, item_description: str, item_code: str = None) -> Optional[Dict]:
         """
-        Check if this item description is mapped as an expense item.
-        Uses invoice_item_mapping_deprecated table (source of truth for expense items)
-        with case-insensitive matching.
+        Check if this item is mapped as an expense item.
+        Uses invoice_item_mapping_deprecated table (source of truth for expense items).
+
+        Matching strategy (in order of priority):
+        1. Match by item_code (most reliable for linen, supplies, etc.)
+        2. Match by item_description (case-insensitive)
 
         Returns expense mapping dict if found, None otherwise
         """
-        if not item_description:
+        if not item_description and not item_code:
             return None
 
-        # Query invoice_item_mapping_deprecated with case-insensitive matching
-        # Expense items have inventory_item_id IS NULL (not linked to inventory)
-        result = self.db.execute(
-            sql_text("""
-                SELECT id, gl_cogs_account, gl_asset_account, gl_waste_account,
-                       inventory_category, item_description
-                FROM invoice_item_mapping_deprecated
-                WHERE LOWER(item_description) = LOWER(:desc)
-                AND is_active = true
-                AND inventory_item_id IS NULL
-                LIMIT 1
-            """),
-            {"desc": item_description}
-        ).fetchone()
+        # First try matching by item_code (most reliable)
+        if item_code:
+            result = self.db.execute(
+                sql_text("""
+                    SELECT id, gl_cogs_account, gl_asset_account, gl_waste_account,
+                           inventory_category, item_description, item_code
+                    FROM invoice_item_mapping_deprecated
+                    WHERE item_code = :code
+                    AND is_active = true
+                    AND inventory_item_id IS NULL
+                    LIMIT 1
+                """),
+                {"code": item_code}
+            ).fetchone()
 
-        if result:
-            logger.debug(f"Expense mapping found: '{item_description[:30]}' → GL {result[1]} (mapping id: {result[0]})")
-            return {
-                'is_expense': True,
-                'mapping_id': result[0],
-                'gl_cogs_account': result[1],
-                'gl_asset_account': result[2],
-                'gl_waste_account': result[3],
-                'inventory_category': result[4],
-                # Keep gl_expense_account as alias for backward compatibility
-                'gl_expense_account': result[1]
-            }
+            if result:
+                logger.debug(f"Expense mapping found by item_code: '{item_code}' → GL {result[1]} (mapping id: {result[0]})")
+                return {
+                    'is_expense': True,
+                    'mapping_id': result[0],
+                    'gl_cogs_account': result[1],
+                    'gl_asset_account': result[2],
+                    'gl_waste_account': result[3],
+                    'inventory_category': result[4],
+                    'gl_expense_account': result[1],
+                    'matched_by': 'item_code'
+                }
+
+        # Then try matching by description (case-insensitive)
+        if item_description:
+            result = self.db.execute(
+                sql_text("""
+                    SELECT id, gl_cogs_account, gl_asset_account, gl_waste_account,
+                           inventory_category, item_description, item_code
+                    FROM invoice_item_mapping_deprecated
+                    WHERE LOWER(item_description) = LOWER(:desc)
+                    AND is_active = true
+                    AND inventory_item_id IS NULL
+                    LIMIT 1
+                """),
+                {"desc": item_description}
+            ).fetchone()
+
+            if result:
+                logger.debug(f"Expense mapping found by description: '{item_description[:30]}' → GL {result[1]} (mapping id: {result[0]})")
+                return {
+                    'is_expense': True,
+                    'mapping_id': result[0],
+                    'gl_cogs_account': result[1],
+                    'gl_asset_account': result[2],
+                    'gl_waste_account': result[3],
+                    'inventory_category': result[4],
+                    'gl_expense_account': result[1],
+                    'matched_by': 'item_description'
+                }
 
         return None
 
@@ -462,7 +493,8 @@ class AutoMapperService:
                 return result
 
         # 3. Try expense mapping (from invoice_item_mapping_deprecated table)
-        expense = self.match_by_expense_mapping(item.item_description)
+        # Pass both description and item_code for better matching
+        expense = self.match_by_expense_mapping(item.item_description, item.item_code)
         if expense:
             return {
                 'mapped': True,
