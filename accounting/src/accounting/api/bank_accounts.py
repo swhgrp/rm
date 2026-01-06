@@ -2,7 +2,7 @@
 Bank Accounts API
 Endpoints for managing bank accounts, importing statements, and syncing with Plaid
 """
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
@@ -30,6 +30,7 @@ from accounting.schemas.bank_account import (
     PlaidLinkTokenResponse,
     PlaidPublicTokenExchange,
     PlaidAccountResponse,
+    PlaidExchangeResponse,
     PlaidSyncRequest,
     PlaidSyncResponse,
     TransactionMatchRequest,
@@ -605,13 +606,13 @@ def create_plaid_link_token(
     return PlaidLinkTokenResponse(**result)
 
 
-@router.post("/plaid/exchange-token", response_model=List[PlaidAccountResponse])
+@router.post("/plaid/exchange-token", response_model=PlaidExchangeResponse)
 def exchange_plaid_token(
     exchange: PlaidPublicTokenExchange,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Exchange public token and get account information"""
+    """Exchange public token and get account information with credentials"""
     plaid = get_plaid_service()
 
     if not plaid.is_enabled():
@@ -645,13 +646,18 @@ def exchange_plaid_token(
 
             db.commit()
 
-    return [PlaidAccountResponse(**acc) for acc in accounts]
+    # Return full response including credentials for client-side storage
+    return PlaidExchangeResponse(
+        access_token=token_result["access_token"],
+        item_id=token_result["item_id"],
+        accounts=[PlaidAccountResponse(**acc) for acc in accounts]
+    )
 
 
 @router.post("/{account_id}/plaid/sync", response_model=PlaidSyncResponse)
 def sync_plaid_transactions(
     account_id: int,
-    sync_request: PlaidSyncRequest,
+    sync_request: PlaidSyncRequest = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -709,3 +715,95 @@ def sync_plaid_transactions(
         transactions_removed=0,
         last_sync_date=bank_account.last_sync_date
     )
+
+
+# ============================================================================
+# Plaid Webhooks
+# ============================================================================
+
+@router.post("/plaid/webhook")
+async def plaid_webhook(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Handle Plaid webhooks for transaction updates and other events.
+
+    Webhook types handled:
+    - TRANSACTIONS: Transaction updates (new, modified, removed)
+    - ITEM: Item status changes (error, pending expiration)
+    - AUTH: Auth data changes
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        body = await request.json()
+        webhook_type = body.get("webhook_type")
+        webhook_code = body.get("webhook_code")
+        item_id = body.get("item_id")
+
+        logger.info(f"Received Plaid webhook: type={webhook_type}, code={webhook_code}, item_id={item_id}")
+
+        # Handle different webhook types
+        if webhook_type == "TRANSACTIONS":
+            # Transaction webhooks
+            if webhook_code == "SYNC_UPDATES_AVAILABLE":
+                # New transactions available - find the bank account and trigger sync
+                bank_account = db.query(BankAccount).filter(
+                    BankAccount.plaid_item_id == item_id
+                ).first()
+
+                if bank_account:
+                    logger.info(f"Transactions available for bank account {bank_account.id}, auto-sync can be triggered")
+                    # Note: Auto-sync could be triggered here if desired
+                    # For now, just log it - user can manually sync
+
+            elif webhook_code == "INITIAL_UPDATE":
+                logger.info(f"Initial transaction data available for item {item_id}")
+
+            elif webhook_code == "HISTORICAL_UPDATE":
+                logger.info(f"Historical transaction data available for item {item_id}")
+
+        elif webhook_type == "ITEM":
+            # Item webhooks
+            if webhook_code == "ERROR":
+                error = body.get("error", {})
+                logger.error(f"Plaid item error for {item_id}: {error}")
+
+                # Update bank account status
+                bank_account = db.query(BankAccount).filter(
+                    BankAccount.plaid_item_id == item_id
+                ).first()
+
+                if bank_account:
+                    bank_account.notes = f"Plaid Error: {error.get('error_message', 'Unknown error')}. {bank_account.notes or ''}"
+                    db.commit()
+
+            elif webhook_code == "PENDING_EXPIRATION":
+                logger.warning(f"Plaid access token pending expiration for item {item_id}")
+
+            elif webhook_code == "USER_PERMISSION_REVOKED":
+                logger.warning(f"User revoked permission for item {item_id}")
+
+                # Mark bank account as disconnected
+                bank_account = db.query(BankAccount).filter(
+                    BankAccount.plaid_item_id == item_id
+                ).first()
+
+                if bank_account:
+                    bank_account.sync_method = "manual"
+                    bank_account.plaid_access_token = None
+                    bank_account.notes = f"Plaid connection revoked by user. {bank_account.notes or ''}"
+                    db.commit()
+
+        elif webhook_type == "AUTH":
+            logger.info(f"Auth webhook received for item {item_id}: {webhook_code}")
+
+        # Always return 200 to acknowledge receipt
+        return {"status": "received", "webhook_type": webhook_type, "webhook_code": webhook_code}
+
+    except Exception as e:
+        logger.error(f"Error processing Plaid webhook: {str(e)}")
+        # Still return 200 to prevent Plaid from retrying
+        return {"status": "error", "message": str(e)}

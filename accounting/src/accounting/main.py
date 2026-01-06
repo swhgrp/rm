@@ -43,6 +43,9 @@ from accounting.models.user import User
 # Import all models to ensure they are registered
 import accounting.models  # noqa
 
+# Import scheduler
+from accounting.services.scheduler import start_scheduler, stop_scheduler
+
 # Initialize FastAPI app
 app = FastAPI(
     title=settings.APP_NAME,
@@ -110,6 +113,42 @@ app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
 app.include_router(safe_router)
 app.include_router(email_router, prefix="/api/email", tags=["Email"])
 app.include_router(recurring_invoices_router, prefix="/api/recurring-invoices", tags=["Recurring Invoices"])
+
+
+# Startup and shutdown events for background scheduler
+@app.on_event("startup")
+async def startup_event():
+    """Start background scheduler on application startup"""
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+
+    print(f"[STARTUP] AUTO_SYNC_ENABLED = {settings.AUTO_SYNC_ENABLED}")
+    if settings.AUTO_SYNC_ENABLED:
+        print("[STARTUP] Starting background scheduler for POS sync...")
+        logger.info("AUTO_SYNC_ENABLED is True - starting background scheduler for POS sync")
+        try:
+            start_scheduler()
+            print("[STARTUP] Background scheduler started successfully")
+        except Exception as e:
+            print(f"[STARTUP] Failed to start scheduler: {str(e)}")
+            logger.error(f"Failed to start scheduler: {str(e)}", exc_info=True)
+    else:
+        print("[STARTUP] AUTO_SYNC_ENABLED is False - background scheduler disabled")
+        logger.info("AUTO_SYNC_ENABLED is False - background scheduler disabled")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Stop background scheduler on application shutdown"""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info("Stopping background scheduler...")
+    try:
+        stop_scheduler()
+    except Exception as e:
+        logger.error(f"Error stopping scheduler: {str(e)}", exc_info=True)
 
 
 # Custom exception handler for authentication redirects

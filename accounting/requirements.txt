@@ -19,3 +19,6 @@ ofxparse==0.21  # OFX/QFX file parsing
 plaid-python==16.0.0  # Plaid API integration
 pandas==2.1.4  # CSV parsing and data manipulation
 rapidfuzz==3.5.2  # Fuzzy string matching for transaction matching
+
+# Background Tasks
+apscheduler==3.10.4  # Background task scheduling for auto-sync

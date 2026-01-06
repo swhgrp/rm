@@ -11,8 +11,11 @@
             <p class="text-muted">Manage bank accounts and sync transactions</p>
         </div>
         <div class="col-md-4 text-end">
+            <button class="btn btn-success me-2" onclick="connectWithPlaid()">
+                <i class="bi bi-link-45deg me-1"></i>Connect Bank (Plaid)
+            </button>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addAccountModal">
-                <i class="bi bi-plus-circle me-1"></i>Add Bank Account
+                <i class="bi bi-plus-circle me-1"></i>Add Manual Account
             </button>
         </div>
     </div>
@@ -159,6 +162,28 @@
                 <button type="button" class="btn btn-primary" onclick="saveAccount()">
                     <i class="bi bi-save me-1"></i>Save Account
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Plaid Account Selection Modal -->
+<div class="modal fade" id="plaidAccountModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-bank me-2"></i>Select Account to Link</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted mb-3">Select a bank account to link and create in the system:</p>
+                <div id="plaidAccountsList">
+                    <!-- Plaid accounts will be loaded here -->
+                </div>
+                <input type="hidden" id="plaidAccessData">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
             </div>
         </div>
     </div>
@@ -588,5 +613,272 @@ function showToast(title, message, type) {
     // Simple toast notification (you can enhance this with Bootstrap Toast)
     alert(`${title}: ${message}`);
 }
+
+// ============================================================================
+// Plaid Link Integration
+// ============================================================================
+
+let plaidHandler = null;
+
+async function connectWithPlaid() {
+    try {
+        // Get link token from backend
+        const response = await fetch('/accounting/api/bank-accounts/plaid/link-token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({})
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            showToast('Error', error.detail || 'Failed to initialize Plaid Link', 'danger');
+            return;
+        }
+
+        const data = await response.json();
+
+        // Initialize Plaid Link
+        plaidHandler = Plaid.create({
+            token: data.link_token,
+            onSuccess: async (public_token, metadata) => {
+                await handlePlaidSuccess(public_token, metadata);
+            },
+            onExit: (err, metadata) => {
+                if (err) {
+                    console.error('Plaid Link exit with error:', err);
+                }
+            },
+            onEvent: (eventName, metadata) => {
+                console.log('Plaid event:', eventName);
+            }
+        });
+
+        // Open Plaid Link
+        plaidHandler.open();
+
+    } catch (error) {
+        console.error('Error connecting with Plaid:', error);
+        showToast('Error', 'Failed to connect with Plaid', 'danger');
+    }
+}
+
+async function handlePlaidSuccess(public_token, metadata) {
+    try {
+        // Exchange public token for access token and get accounts
+        const response = await fetch('/accounting/api/bank-accounts/plaid/exchange-token', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                public_token: public_token
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            showToast('Error', error.detail || 'Failed to link bank account', 'danger');
+            return;
+        }
+
+        const data = await response.json();
+
+        // Store credentials and accounts for later use
+        document.getElementById('plaidAccessData').value = JSON.stringify({
+            institution: metadata.institution,
+            access_token: data.access_token,
+            item_id: data.item_id,
+            accounts: data.accounts
+        });
+
+        // Show account selection modal
+        showPlaidAccountSelection(data.accounts, metadata.institution);
+
+    } catch (error) {
+        console.error('Error handling Plaid success:', error);
+        showToast('Error', 'Failed to process bank connection', 'danger');
+    }
+}
+
+function showPlaidAccountSelection(accounts, institution) {
+    const listContainer = document.getElementById('plaidAccountsList');
+
+    if (accounts.length === 0) {
+        listContainer.innerHTML = `
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                No accounts found. Please try again.
+            </div>
+        `;
+        new bootstrap.Modal(document.getElementById('plaidAccountModal')).show();
+        return;
+    }
+
+    listContainer.innerHTML = accounts.map((account, index) => `
+        <div class="card mb-2">
+            <div class="card-body py-2">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">${account.name}</h6>
+                        <small class="text-muted">
+                            ${formatAccountType(account.type)}
+                            ${account.subtype ? '(' + account.subtype + ')' : ''}
+                            ${account.mask ? ' ****' + account.mask : ''}
+                        </small>
+                        <div>
+                            <small class="text-success fw-bold">
+                                Balance: $${parseFloat(account.current_balance || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                            </small>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-primary" onclick="createPlaidBankAccount(${index})">
+                        <i class="bi bi-plus-circle me-1"></i>Add
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    // Add institution info header
+    if (institution) {
+        listContainer.insertAdjacentHTML('afterbegin', `
+            <div class="alert alert-info mb-3 py-2">
+                <i class="bi bi-building me-1"></i>
+                <strong>${institution.name}</strong>
+            </div>
+        `);
+    }
+
+    new bootstrap.Modal(document.getElementById('plaidAccountModal')).show();
+}
+
+async function createPlaidBankAccount(accountIndex) {
+    try {
+        const plaidData = JSON.parse(document.getElementById('plaidAccessData').value);
+        const account = plaidData.accounts[accountIndex];
+        const institution = plaidData.institution;
+
+        // Pre-fill the add account form with Plaid data
+        document.getElementById('accountModalTitle').textContent = 'Add Bank Account (from Plaid)';
+        document.getElementById('accountId').value = '';
+        document.getElementById('accountName').value = account.name;
+        document.getElementById('accountType').value = mapPlaidAccountType(account.type, account.subtype);
+        document.getElementById('institutionName').value = institution ? institution.name : '';
+        document.getElementById('accountNumber').value = account.mask || '';
+        document.getElementById('openingBalance').value = account.current_balance || '0.00';
+        document.getElementById('syncMethod').value = 'plaid';
+        document.getElementById('autoSyncEnabled').checked = true;
+        document.getElementById('autoSyncEnabled').disabled = false;
+        document.getElementById('notes').value = `Connected via Plaid on ${new Date().toLocaleDateString()}. Account ID: ${account.account_id}`;
+
+        // Store Plaid credentials and account info to include when saving
+        window.pendingPlaidAccount = {
+            ...account,
+            access_token: plaidData.access_token,
+            item_id: plaidData.item_id
+        };
+
+        // Close Plaid modal and open account modal
+        bootstrap.Modal.getInstance(document.getElementById('plaidAccountModal')).hide();
+
+        setTimeout(() => {
+            new bootstrap.Modal(document.getElementById('addAccountModal')).show();
+        }, 300);
+
+    } catch (error) {
+        console.error('Error creating Plaid bank account:', error);
+        showToast('Error', 'Failed to create bank account', 'danger');
+    }
+}
+
+function mapPlaidAccountType(type, subtype) {
+    // Map Plaid account types to our types
+    const typeMap = {
+        'depository': {
+            'checking': 'checking',
+            'savings': 'savings',
+            'money market': 'money_market',
+            'default': 'checking'
+        },
+        'credit': {
+            'credit card': 'credit_card',
+            'default': 'credit_card'
+        },
+        'loan': {
+            'line of credit': 'line_of_credit',
+            'default': 'line_of_credit'
+        }
+    };
+
+    const typeCategory = typeMap[type] || {};
+    return typeCategory[subtype] || typeCategory['default'] || 'checking';
+}
+
+// Override saveAccount to handle Plaid linking
+const originalSaveAccount = saveAccount;
+saveAccount = async function() {
+    const accountId = document.getElementById('accountId').value;
+    const isEdit = !!accountId;
+    const syncMethod = document.getElementById('syncMethod').value;
+
+    const data = {
+        account_name: document.getElementById('accountName').value,
+        account_type: document.getElementById('accountType').value,
+        institution_name: document.getElementById('institutionName').value || null,
+        area_id: document.getElementById('areaId').value || null,
+        account_number: document.getElementById('accountNumber').value || null,
+        routing_number: document.getElementById('routingNumber').value || null,
+        gl_account_id: parseInt(document.getElementById('glAccountId').value),
+        opening_balance: parseFloat(document.getElementById('openingBalance').value) || 0,
+        sync_method: syncMethod,
+        auto_sync_enabled: document.getElementById('autoSyncEnabled').checked,
+        notes: document.getElementById('notes').value || null
+    };
+
+    // If creating from Plaid, include Plaid credentials
+    if (!isEdit && window.pendingPlaidAccount && syncMethod === 'plaid') {
+        data.plaid_access_token = window.pendingPlaidAccount.access_token;
+        data.plaid_item_id = window.pendingPlaidAccount.item_id;
+        data.plaid_account_id = window.pendingPlaidAccount.account_id;
+    }
+
+    try {
+        const url = isEdit
+            ? `/accounting/api/bank-accounts/${accountId}`
+            : '/accounting/api/bank-accounts/';
+
+        const response = await fetch(url, {
+            method: isEdit ? 'PUT' : 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            // Clear pending Plaid account
+            window.pendingPlaidAccount = null;
+
+            bootstrap.Modal.getInstance(document.getElementById('addAccountModal')).hide();
+            document.getElementById('accountForm').reset();
+            loadBankAccounts();
+            showToast('Success', `Bank account ${isEdit ? 'updated' : 'created'} successfully`, 'success');
+        } else {
+            const error = await response.json();
+            showToast('Error', error.detail || 'Failed to save bank account', 'danger');
+        }
+    } catch (error) {
+        console.error('Error saving account:', error);
+        showToast('Error', 'Failed to save bank account', 'danger');
+    }
+};
 </script>
+
+<!-- Plaid Link SDK -->
+<script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
 {% endblock %}

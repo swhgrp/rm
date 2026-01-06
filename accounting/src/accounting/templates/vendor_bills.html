@@ -1286,7 +1286,18 @@ function resetForm() {
 
 // Helper Functions
 function formatDate(dateStr) {
-    const date = new Date(dateStr);
+    if (!dateStr) return '-';
+    // Parse date parts directly to avoid timezone conversion issues
+    // Date strings like "2026-01-01" get interpreted as UTC, causing off-by-one errors
+    const parts = dateStr.split('T')[0].split('-');
+    if (parts.length === 3) {
+        const year = parts[0].slice(-2);
+        const month = parts[1];
+        const day = parts[2];
+        return `${month}/${day}/${year}`;
+    }
+    // Fallback for other formats
+    const date = new Date(dateStr + 'T12:00:00');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
     const year = date.getFullYear().toString().slice(-2);

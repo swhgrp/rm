@@ -63,7 +63,7 @@
             </div>
 
             <div id="transactionsContainer" style="display: none;">
-                <table class="table table-dark table-striped table-hover" id="transactionsTable">
+                <table class="table table-striped table-hover" id="transactionsTable">
                     <thead>
                         <tr>
                             <th width="100">Date</th>
@@ -90,7 +90,7 @@
 <!-- Open Bills Modal -->
 <div class="modal fade" id="openBillsModal" tabindex="-1" data-bs-backdrop="static">
     <div class="modal-dialog modal-xl">
-        <div class="modal-content bg-dark text-light">
+        <div class="modal-content">
             <div class="modal-header">
                 <div>
                     <h5 class="modal-title" id="modalVendorName">
@@ -100,7 +100,7 @@
                         Transaction info will appear here
                     </p>
                 </div>
-                <button type="button" class="btn-close btn-close-white" onclick="closeOpenBillsModal()"></button>
+                <button type="button" class="btn-close" onclick="closeOpenBillsModal()"></button>
             </div>
             <div class="modal-body">
                 <div id="billsLoadingSpinner" class="text-center py-5">
@@ -110,7 +110,7 @@
                 </div>
 
                 <div id="billsContainer" style="display: none;">
-                    <table class="table table-dark table-hover">
+                    <table class="table table-striped table-hover">
                         <thead>
                             <tr>
                                 <th width="50">
@@ -242,20 +242,22 @@
 <style>
     /* Highlight exact matches */
     .exact-match {
-        background-color: rgba(25, 135, 84, 0.2) !important;
+        background-color: rgba(25, 135, 84, 0.15) !important;
     }
 
     .exact-match:hover {
-        background-color: rgba(25, 135, 84, 0.3) !important;
+        background-color: rgba(25, 135, 84, 0.25) !important;
     }
 
     /* Status badges */
     .status-unreconciled {
         background-color: #6c757d;
+        color: white;
     }
 
     .status-reconciled {
         background-color: #198754;
+        color: white;
     }
 
     /* Vendor badge colors */
@@ -271,6 +273,29 @@
 
     .amount-positive {
         color: #198754;
+    }
+
+    /* GL Suggestion cards - light theme */
+    .suggestion-card {
+        cursor: pointer;
+        border: 2px solid var(--border-primary);
+        border-radius: 8px;
+        padding: 12px;
+        min-width: 200px;
+        transition: all 0.2s;
+        background-color: var(--bg-secondary);
+    }
+
+    .suggestion-card:hover {
+        border-color: var(--primary);
+        background-color: var(--bg-tertiary);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    .suggestion-card[data-selected="true"] {
+        border-color: var(--primary);
+        background-color: rgba(13, 110, 253, 0.1);
     }
 </style>
 
@@ -1022,12 +1047,11 @@ async function loadGLSuggestions(transactionId) {
             data.suggestions.forEach(suggestion => {
                 const card = document.createElement('div');
                 card.className = 'suggestion-card';
-                card.style.cssText = 'cursor: pointer; border: 2px solid #495057; border-radius: 8px; padding: 12px; min-width: 200px; transition: all 0.2s; background-color: #2b3035;';
 
                 // Confidence color
-                let confidenceColor = '#6c757d';
-                if (suggestion.confidence_score >= 70) confidenceColor = '#198754';
-                else if (suggestion.confidence_score >= 50) confidenceColor = '#ffc107';
+                let confidenceClass = 'bg-secondary';
+                if (suggestion.confidence_score >= 70) confidenceClass = 'bg-success';
+                else if (suggestion.confidence_score >= 50) confidenceClass = 'bg-warning text-dark';
 
                 // Type badge (Phase 3: added recurring badge)
                 let typeBadge = '';
@@ -1046,7 +1070,7 @@ async function loadGLSuggestions(transactionId) {
                             <div class="small text-muted">${suggestion.account_name}</div>
                         </div>
                         <div class="text-end">
-                            <div class="badge" style="background-color: ${confidenceColor}">
+                            <div class="badge ${confidenceClass}">
                                 ${Math.round(suggestion.confidence_score)}%
                             </div>
                         </div>
@@ -1065,36 +1089,12 @@ async function loadGLSuggestions(transactionId) {
                     // Visual feedback - clear all selections first
                     document.querySelectorAll('.suggestion-card').forEach(c => {
                         c.dataset.selected = 'false';
-                        c.style.borderColor = '#495057';
-                        c.style.backgroundColor = '#2b3035';
-                        c.style.transform = 'translateY(0)';
-                        c.style.boxShadow = 'none';
                     });
 
                     // Mark this card as selected
                     card.dataset.selected = 'true';
-                    card.style.borderColor = '#0d6efd';
-                    card.style.backgroundColor = '#e7f1ff';
 
                     showToast(`Selected: ${suggestion.account_number} - ${suggestion.account_name}`, 'success');
-                });
-
-                // Hover effect - use light blue tint on hover (only if not selected)
-                card.addEventListener('mouseenter', function() {
-                    if (card.dataset.selected !== 'true') {
-                        card.style.borderColor = '#0d6efd';
-                        card.style.backgroundColor = '#cfe2ff';  // Lighter blue for hover
-                        card.style.transform = 'translateY(-2px)';
-                        card.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-                    }
-                });
-                card.addEventListener('mouseleave', function() {
-                    if (card.dataset.selected !== 'true') {
-                        card.style.borderColor = '#495057';
-                        card.style.backgroundColor = '#2b3035';
-                        card.style.transform = 'translateY(0)';
-                        card.style.boxShadow = 'none';
-                    }
                 });
 
                 suggestionsList.appendChild(card);

@@ -8,6 +8,8 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal
 import logging
 
+logger = logging.getLogger(__name__)
+
 try:
     from plaid.api import plaid_api
     from plaid.model.products import Products
@@ -23,8 +25,6 @@ try:
 except ImportError:
     logger.warning("plaid-python library not installed. Plaid features will not be available.")
     plaid = None
-
-logger = logging.getLogger(__name__)
 
 
 class PlaidService:
@@ -95,13 +95,15 @@ class PlaidService:
             return None
 
         try:
-            request = LinkTokenCreateRequest(
-                user=LinkTokenCreateRequestUser(client_user_id=str(user_id)),
-                client_name="Restaurant Accounting System",
-                products=[Products("transactions")],
-                country_codes=[CountryCode("US")],
-                language="en"
-            )
+            request_params = {
+                "user": LinkTokenCreateRequestUser(client_user_id=str(user_id)),
+                "client_name": "SW Hospitality Group",
+                "products": [Products("transactions")],
+                "country_codes": [CountryCode("US")],
+                "language": "en"
+            }
+
+            request = LinkTokenCreateRequest(**request_params)
 
             response = self.client.link_token_create(request)
             result = response.to_dict()
@@ -203,10 +205,16 @@ class PlaidService:
             }
 
         try:
-            request = TransactionsSyncRequest(
-                access_token=access_token,
-                cursor=cursor
-            )
+            # Build request - only include cursor if it's not None
+            if cursor:
+                request = TransactionsSyncRequest(
+                    access_token=access_token,
+                    cursor=cursor
+                )
+            else:
+                request = TransactionsSyncRequest(
+                    access_token=access_token
+                )
 
             response = self.client.transactions_sync(request)
             result = response.to_dict()
@@ -221,9 +229,26 @@ class PlaidService:
             # Parse transactions
             transactions = []
             for txn in account_transactions:
+                # Handle date - Plaid may return date object or string
+                txn_date = txn["date"]
+                if isinstance(txn_date, str):
+                    txn_date = datetime.strptime(txn_date, "%Y-%m-%d").date()
+                elif isinstance(txn_date, datetime):
+                    txn_date = txn_date.date()
+                # else: already a date object
+
+                # Handle authorized_date
+                auth_date = txn.get("authorized_date")
+                if auth_date:
+                    if isinstance(auth_date, str):
+                        auth_date = datetime.strptime(auth_date, "%Y-%m-%d").date()
+                    elif isinstance(auth_date, datetime):
+                        auth_date = auth_date.date()
+                    # else: already a date object
+
                 transaction = {
-                    "transaction_date": datetime.strptime(txn["date"], "%Y-%m-%d").date(),
-                    "post_date": datetime.strptime(txn["authorized_date"], "%Y-%m-%d").date() if txn.get("authorized_date") else None,
+                    "transaction_date": txn_date,
+                    "post_date": auth_date,
                     "description": txn.get("merchant_name") or txn.get("name", ""),
                     "payee": txn.get("merchant_name"),
                     "amount": Decimal(str(txn["amount"])) * -1,  # Plaid amounts are positive for debits

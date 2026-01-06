@@ -23,6 +23,10 @@ class BankAccountCreate(BankAccountBase):
     area_id: Optional[int] = None
     sync_method: str = Field(default="manual", max_length=20)
     auto_sync_enabled: bool = False
+    # Plaid integration fields
+    plaid_access_token: Optional[str] = None
+    plaid_item_id: Optional[str] = None
+    plaid_account_id: Optional[str] = None
 
 
 class BankAccountUpdate(BaseModel):
@@ -38,6 +42,10 @@ class BankAccountUpdate(BaseModel):
     sync_method: Optional[str] = Field(None, max_length=20)
     auto_sync_enabled: Optional[bool] = None
     notes: Optional[str] = None
+    # Plaid integration fields
+    plaid_access_token: Optional[str] = None
+    plaid_item_id: Optional[str] = None
+    plaid_account_id: Optional[str] = None
 
 
 class BankAccountResponse(BankAccountBase):
@@ -294,7 +302,8 @@ class BankMatchingRuleResponse(BankMatchingRuleBase):
 # Plaid-specific schemas
 class PlaidLinkTokenRequest(BaseModel):
     """Schema for requesting a Plaid link token"""
-    user_id: int
+    # user_id is optional since it's extracted from current_user on the server
+    pass
 
 
 class PlaidLinkTokenResponse(BaseModel):
@@ -321,9 +330,16 @@ class PlaidAccountResponse(BaseModel):
     available_balance: Optional[Decimal]
 
 
+class PlaidExchangeResponse(BaseModel):
+    """Schema for Plaid token exchange response with credentials"""
+    access_token: str
+    item_id: str
+    accounts: List[PlaidAccountResponse]
+
+
 class PlaidSyncRequest(BaseModel):
     """Schema for requesting Plaid sync"""
-    bank_account_id: int
+    # bank_account_id comes from URL path, not body
     days: int = Field(default=30, ge=1, le=730)
 
 
