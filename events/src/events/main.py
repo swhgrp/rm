@@ -18,7 +18,7 @@ import sys
 
 from events.core.config import settings
 from events.core.deps import require_auth
-from events.api import public, events, tasks, documents, auth, settings as settings_api, packages, users, emails, calendar_items, clients
+from events.api import public, events, tasks, documents, auth, settings as settings_api, packages, users, emails, calendar_items, clients, quick_holds
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -203,6 +203,7 @@ app.include_router(users.router, prefix="/api/users", tags=["Users & Roles"])
 app.include_router(emails.router, prefix="/api/emails", tags=["Email History"])
 app.include_router(calendar_items.router, prefix="/api", tags=["Calendar Items"])
 app.include_router(clients.router, prefix="/api/clients", tags=["Clients"])
+app.include_router(quick_holds.router, prefix="/api/quick-holds", tags=["Quick Holds"])
 
 # Mount static files AFTER routers (matching HR pattern)
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")

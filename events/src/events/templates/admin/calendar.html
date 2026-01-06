@@ -630,6 +630,83 @@
     </div>
 </div>
 
+<!-- Convert Quick Hold to Event Modal -->
+<div class="modal-overlay" id="convertHoldModal" onclick="closeConvertHoldModal(event)">
+    <div class="modal-content" onclick="event.stopPropagation()" style="max-width: 700px;">
+        <div class="modal-header">
+            <div class="modal-title">Convert Quick Hold to Event</div>
+            <button class="modal-close" onclick="closeConvertHoldModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="background: #E3F2FD; border: 1px solid #64B5F6; padding: 12px 15px; border-radius: 6px; margin-bottom: 20px;">
+                <strong id="convertHoldTitle"></strong>
+                <div style="color: #1565C0; font-size: 13px; margin-top: 4px;" id="convertHoldDate"></div>
+            </div>
+
+            <form id="convertHoldForm">
+                <input type="hidden" id="convertHoldId">
+
+                <div class="form-row">
+                    <div class="form-group-custom" style="flex: 1;">
+                        <label for="convertEventType">Event Type *</label>
+                        <select id="convertEventType" class="form-control-custom" required>
+                            <option value="">Select event type...</option>
+                        </select>
+                    </div>
+                    <div class="form-group-custom" style="flex: 1;">
+                        <label for="convertVenue">Venue *</label>
+                        <select id="convertVenue" class="form-control-custom" required>
+                            <option value="">Select venue...</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group-custom">
+                    <label for="convertGuestCount">Estimated Guest Count</label>
+                    <input type="number" id="convertGuestCount" class="form-control-custom" min="1" placeholder="Enter expected number of guests">
+                </div>
+
+                <hr style="border-color: var(--border-primary); margin: 20px 0;">
+                <h4 style="color: var(--text-primary); margin-bottom: 15px;">Client Information</h4>
+
+                <div class="form-group-custom">
+                    <label for="convertClientSelect">Existing Client</label>
+                    <select id="convertClientSelect" class="form-control-custom" onchange="toggleNewClientFields()">
+                        <option value="">-- Create New Client --</option>
+                    </select>
+                </div>
+
+                <div id="newClientFields">
+                    <div class="form-row">
+                        <div class="form-group-custom" style="flex: 1;">
+                            <label for="convertClientName">Client Name *</label>
+                            <input type="text" id="convertClientName" class="form-control-custom" placeholder="Enter client name">
+                        </div>
+                        <div class="form-group-custom" style="flex: 1;">
+                            <label for="convertClientEmail">Email</label>
+                            <input type="email" id="convertClientEmail" class="form-control-custom" placeholder="client@example.com">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group-custom" style="flex: 1;">
+                            <label for="convertClientPhone">Phone</label>
+                            <input type="tel" id="convertClientPhone" class="form-control-custom" placeholder="(555) 123-4567">
+                        </div>
+                        <div class="form-group-custom" style="flex: 1;">
+                            <label for="convertClientOrg">Organization</label>
+                            <input type="text" id="convertClientOrg" class="form-control-custom" placeholder="Company or organization">
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-actions">
+            <button onclick="convertQuickHoldToEvent()" class="btn-primary-custom" style="flex: 1;">Convert to Event</button>
+            <button onclick="closeConvertHoldModal()" class="btn-secondary-custom" style="flex: 1;">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <!-- Toast notification container -->
 <div class="toast-container" id="toastContainer"></div>
 
@@ -829,6 +906,11 @@
                 } else if (props.type === 'calendar_item') {
                     // For calendar items, add a dashed left border to distinguish from events
                     info.el.style.borderLeft = '3px dashed #8b949e';
+                } else if (props.type === 'quick_hold') {
+                    // Quick holds have their own styling via backgroundColor/borderColor
+                    // Add a dotted border to indicate it's a hold (not a real event)
+                    info.el.style.borderLeft = '3px dotted #FFA500';
+                    info.el.style.fontStyle = 'italic';
                 }
             }
         });
@@ -912,14 +994,16 @@
 
             if (locationFilter) params.append('location', locationFilter);
 
-            // Fetch both events and calendar items
-            const [eventsResponse, itemsResponse] = await Promise.all([
+            // Fetch events, calendar items, and quick holds
+            const [eventsResponse, itemsResponse, holdsResponse] = await Promise.all([
                 fetch('api/events/calendar?' + params),
-                fetch('api/calendar-items/calendar?' + params)
+                fetch('api/calendar-items/calendar?' + params),
+                fetch('api/quick-holds/calendar/view?' + params)
             ]);
 
             let events = await eventsResponse.json();
             let items = await itemsResponse.json();
+            let holds = holdsResponse.ok ? await holdsResponse.json() : [];
 
             // Apply status filter on events
             if (statusFilter) {
@@ -928,7 +1012,6 @@
 
             // Map events to calendar format
             const calendarEvents = events.map(event => {
-                console.log(`Event "${event.title}" - status:`, event.status, 'type:', typeof event.status, 'value:', event.status?.value);
                 return {
                     id: event.id,
                     title: event.title,
@@ -954,13 +1037,32 @@
                     type: 'calendar_item',
                     item_type: item.item_type,
                     description: item.description,
-                    venue_id: item.location_id,  // Using location_id from API
+                    venue_id: item.location_id,
                     created_by: item.created_by
                 }
             }));
 
-            // Combine both
-            successCallback([...calendarEvents, ...calendarItems]);
+            // Map quick holds to calendar format
+            const quickHolds = holds.map(hold => ({
+                id: hold.id,
+                title: hold.title,
+                start: hold.start,
+                end: hold.end,
+                allDay: hold.allDay,
+                backgroundColor: hold.color || '#FFA500',
+                borderColor: hold.borderColor || '#FF8C00',
+                textColor: hold.textColor || '#000000',
+                extendedProps: {
+                    type: 'quick_hold',
+                    status: hold.status,
+                    source: hold.source,
+                    location: hold.location,
+                    description: hold.description
+                }
+            }));
+
+            // Combine all
+            successCallback([...calendarEvents, ...calendarItems, ...quickHolds]);
         } catch (error) {
             console.error('Error fetching calendar data:', error);
             failureCallback(error);
@@ -974,9 +1076,74 @@
     async function handleEventClick(info) {
         try {
             const props = info.event.extendedProps;
-            const itemType = props.type; // 'event' or 'calendar_item'
+            const itemType = props.type; // 'event', 'calendar_item', or 'quick_hold'
 
-            if (itemType === 'calendar_item') {
+            if (itemType === 'quick_hold') {
+                // Handle quick hold click
+                const response = await fetch('api/quick-holds/' + info.event.id);
+                const hold = await response.json();
+
+                const startDate = new Date(hold.start_at);
+                const endDate = hold.end_at ? new Date(hold.end_at) : null;
+
+                const sourceLabels = {
+                    'PHONE_CALENDAR': 'Phone Calendar',
+                    'WEB_APP': 'Web App',
+                    'MANUAL': 'Manual Entry'
+                };
+
+                document.getElementById('modalTitle').textContent = hold.title + ' (Quick Hold)';
+
+                // Show Convert to Event button
+                const modalViewButton = document.getElementById('modalViewButton');
+                modalViewButton.textContent = 'Convert to Event';
+                modalViewButton.style.display = 'block';
+                modalViewButton.href = '#';
+                modalViewButton.onclick = (e) => {
+                    e.preventDefault();
+                    closeModal();
+                    openConvertToEventModal(hold);
+                    return false;
+                };
+
+                document.getElementById('modalBody').innerHTML = `
+                    <div style="background: #FFF3E0; border: 1px solid #FFB74D; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px;">
+                        <i class="bi bi-info-circle" style="color: #F57C00;"></i>
+                        <span style="color: #E65100;">This is a quick hold - convert it to a full event when ready.</span>
+                    </div>
+                    <div class="detail-row">
+                        <i class="bi bi-calendar3"></i>
+                        <span class="detail-label">Start:</span>
+                        <span class="detail-value">${hold.all_day ? startDate.toLocaleDateString() : startDate.toLocaleString()}</span>
+                    </div>
+                    ${endDate ? `
+                    <div class="detail-row">
+                        <i class="bi bi-calendar3"></i>
+                        <span class="detail-label">End:</span>
+                        <span class="detail-value">${hold.all_day ? endDate.toLocaleDateString() : endDate.toLocaleString()}</span>
+                    </div>
+                    ` : ''}
+                    ${hold.location_text ? `
+                    <div class="detail-row">
+                        <i class="bi bi-geo-alt"></i>
+                        <span class="detail-label">Location:</span>
+                        <span class="detail-value">${hold.location_text}</span>
+                    </div>
+                    ` : ''}
+                    <div class="detail-row">
+                        <i class="bi bi-phone"></i>
+                        <span class="detail-label">Source:</span>
+                        <span class="detail-value">${sourceLabels[hold.source] || hold.source}</span>
+                    </div>
+                    ${hold.description ? `
+                    <div class="detail-row">
+                        <i class="bi bi-file-text"></i>
+                        <span class="detail-label">Notes:</span>
+                        <span class="detail-value">${hold.description}</span>
+                    </div>
+                    ` : ''}
+                `;
+            } else if (itemType === 'calendar_item') {
                 // Handle calendar item click
                 const response = await fetch('api/calendar-items/' + info.event.id);
                 const item = await response.json();
@@ -1414,6 +1581,182 @@
             'CANCELED': '#da3633'
         };
         return colors[status] || '#6e7681';
+    }
+
+    // Quick Hold conversion functions
+    let allEventTypes = [];
+    let allClients = [];
+
+    async function loadConvertModalData() {
+        try {
+            // Load event types
+            const eventTypesResponse = await fetch('api/settings/event-types');
+            allEventTypes = await eventTypesResponse.json();
+
+            const eventTypeSelect = document.getElementById('convertEventType');
+            eventTypeSelect.innerHTML = '<option value="">Select event type...</option>';
+            allEventTypes.forEach(et => {
+                if (et.is_active !== false) {
+                    const option = document.createElement('option');
+                    option.value = et.name;
+                    option.textContent = et.name;
+                    eventTypeSelect.appendChild(option);
+                }
+            });
+
+            // Load venues for events (actual venues)
+            const venueSelect = document.getElementById('convertVenue');
+            venueSelect.innerHTML = '<option value="">Select venue...</option>';
+            allActualVenues.forEach(venue => {
+                const option = document.createElement('option');
+                option.value = venue.id;
+                option.textContent = venue.name;
+                venueSelect.appendChild(option);
+            });
+
+            // Load clients
+            const clientsResponse = await fetch('api/clients/');
+            const clientsData = await clientsResponse.json();
+            allClients = clientsData.items || clientsData;
+
+            const clientSelect = document.getElementById('convertClientSelect');
+            clientSelect.innerHTML = '<option value="">-- Create New Client --</option>';
+            allClients.forEach(client => {
+                const option = document.createElement('option');
+                option.value = client.id;
+                option.textContent = client.name + (client.organization ? ` (${client.organization})` : '');
+                clientSelect.appendChild(option);
+            });
+
+        } catch (error) {
+            console.error('Error loading convert modal data:', error);
+        }
+    }
+
+    async function openConvertToEventModal(hold) {
+        // Ensure data is loaded
+        await loadConvertModalData();
+
+        // Populate hold info
+        document.getElementById('convertHoldId').value = hold.id;
+        document.getElementById('convertHoldTitle').textContent = hold.title;
+
+        const startDate = new Date(hold.start_at);
+        const endDate = hold.end_at ? new Date(hold.end_at) : null;
+        let dateStr = hold.all_day ? startDate.toLocaleDateString() : startDate.toLocaleString();
+        if (endDate) {
+            dateStr += ' - ' + (hold.all_day ? endDate.toLocaleDateString() : endDate.toLocaleString());
+        }
+        document.getElementById('convertHoldDate').textContent = dateStr;
+
+        // Reset form
+        document.getElementById('convertEventType').value = '';
+        document.getElementById('convertVenue').value = '';
+        document.getElementById('convertGuestCount').value = '';
+        document.getElementById('convertClientSelect').value = '';
+        document.getElementById('convertClientName').value = '';
+        document.getElementById('convertClientEmail').value = '';
+        document.getElementById('convertClientPhone').value = '';
+        document.getElementById('convertClientOrg').value = '';
+
+        // Show new client fields by default
+        document.getElementById('newClientFields').style.display = 'block';
+
+        // Show modal
+        document.getElementById('convertHoldModal').classList.add('active');
+    }
+
+    function closeConvertHoldModal(event) {
+        if (!event || event.target.id === 'convertHoldModal') {
+            document.getElementById('convertHoldModal').classList.remove('active');
+        }
+    }
+
+    function toggleNewClientFields() {
+        const clientSelect = document.getElementById('convertClientSelect');
+        const newClientFields = document.getElementById('newClientFields');
+
+        if (clientSelect.value) {
+            newClientFields.style.display = 'none';
+        } else {
+            newClientFields.style.display = 'block';
+        }
+    }
+
+    async function convertQuickHoldToEvent() {
+        const holdId = document.getElementById('convertHoldId').value;
+        const eventType = document.getElementById('convertEventType').value;
+        const venueId = document.getElementById('convertVenue').value;
+        const guestCount = document.getElementById('convertGuestCount').value;
+        const clientId = document.getElementById('convertClientSelect').value;
+        const clientName = document.getElementById('convertClientName').value;
+        const clientEmail = document.getElementById('convertClientEmail').value;
+        const clientPhone = document.getElementById('convertClientPhone').value;
+        const clientOrg = document.getElementById('convertClientOrg').value;
+
+        // Validation
+        if (!eventType) {
+            showToast('Please select an event type', 'warning');
+            return;
+        }
+        if (!venueId) {
+            showToast('Please select a venue', 'warning');
+            return;
+        }
+        if (!clientId && !clientName) {
+            showToast('Please select an existing client or enter a new client name', 'warning');
+            return;
+        }
+
+        const payload = {
+            event_type: eventType,
+            venue_id: venueId,
+            guest_count: guestCount ? parseInt(guestCount) : null
+        };
+
+        if (clientId) {
+            payload.client_id = clientId;
+        } else {
+            payload.client_name = clientName;
+            payload.client_email = clientEmail || null;
+            payload.client_phone = clientPhone || null;
+            payload.client_organization = clientOrg || null;
+        }
+
+        try {
+            const response = await fetch(`api/quick-holds/${holdId}/convert`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                showToast(error.detail || 'Failed to convert quick hold', 'error');
+                return;
+            }
+
+            const result = await response.json();
+
+            closeConvertHoldModal();
+            calendar.refetchEvents();
+
+            showToast('Quick hold converted to event successfully!', 'success');
+
+            // Optionally redirect to the new event
+            if (result.event_id) {
+                setTimeout(() => {
+                    window.location.href = `/events/event?id=${result.event_id}`;
+                }, 1500);
+            }
+
+        } catch (error) {
+            console.error('Error converting quick hold:', error);
+            showToast('Failed to convert quick hold. Please try again.', 'error');
+        }
     }
 </script>
 {% endblock %}

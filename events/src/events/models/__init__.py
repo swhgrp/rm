@@ -9,6 +9,7 @@ from .template import EventTemplate, NotificationRule
 from .audit import AuditLog
 from .settings import Location, EventType, BeverageService, MealType
 from .calendar_item import CalendarItem, CalendarItemType
+from .quick_hold import QuickHold, QuickHoldStatus, QuickHoldSource
 
 __all__ = [
     "BaseModel",
@@ -37,4 +38,7 @@ __all__ = [
     "MealType",
     "CalendarItem",
     "CalendarItemType",
+    "QuickHold",
+    "QuickHoldStatus",
+    "QuickHoldSource",
 ]

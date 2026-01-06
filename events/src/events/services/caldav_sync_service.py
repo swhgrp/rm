@@ -245,3 +245,237 @@ class CalDAVSyncService:
             'CANCELED': 'CANCELLED'
         }
         return status_map.get(status, 'TENTATIVE')
+
+    def poll_caldav_for_quick_holds(self, db: Session, user_email: str) -> dict:
+        """
+        Poll CalDAV server for events created from phone calendar.
+        Import any events that don't match existing Events as Quick Holds.
+
+        This enables two-way sync:
+        - Events created in the web app -> pushed to phone calendar
+        - Events created on phone -> imported as Quick Holds
+
+        Args:
+            db: Database session
+            user_email: Email of user to poll calendar for
+
+        Returns:
+            dict with counts: {'imported': N, 'skipped': N, 'errors': N}
+        """
+        from events.models import QuickHold, QuickHoldStatus, QuickHoldSource, Event
+        from datetime import datetime, timedelta, timezone
+        import pytz
+
+        results = {'imported': 0, 'skipped': 0, 'errors': 0, 'details': []}
+
+        try:
+            caldav_username = self._get_caldav_username(user_email)
+            client = caldav.DAVClient(
+                url=self.caldav_url,
+                headers={'X-Remote-User': caldav_username}
+            )
+
+            # Get the principal (user's calendars)
+            principal = client.principal()
+            calendars = principal.calendars()
+
+            if not calendars:
+                logger.info(f"No calendars found for {caldav_username}")
+                return results
+
+            # Get existing Event UIDs and QuickHold CalDAV UIDs to avoid duplicates
+            existing_event_uids = set()
+            for event in db.query(Event).all():
+                existing_event_uids.add(f"{event.id}@swhgrp.com")
+
+            existing_hold_uids = set()
+            for hold in db.query(QuickHold).filter(
+                QuickHold.caldav_uid.isnot(None)
+            ).all():
+                existing_hold_uids.add(hold.caldav_uid)
+
+            # Search for events in date range (past month to next year)
+            now = datetime.now(timezone.utc)
+            start_date = now - timedelta(days=30)
+            end_date = now + timedelta(days=365)
+
+            for cal in calendars:
+                try:
+                    calendar_name = cal.name or "unnamed"
+                    logger.info(f"Polling calendar: {calendar_name}")
+
+                    # Fetch events in date range
+                    events = cal.date_search(start=start_date, end=end_date)
+
+                    for cal_event in events:
+                        try:
+                            # Parse the iCalendar data
+                            ical_data = cal_event.data
+                            ical = Calendar.from_ical(ical_data)
+
+                            for component in ical.walk():
+                                if component.name != "VEVENT":
+                                    continue
+
+                                uid = str(component.get('uid', ''))
+                                summary = str(component.get('summary', 'Untitled'))
+
+                                # Skip if this is an Event we pushed to CalDAV
+                                if uid in existing_event_uids:
+                                    results['skipped'] += 1
+                                    continue
+
+                                # Skip if we already imported this as a QuickHold
+                                if uid in existing_hold_uids:
+                                    results['skipped'] += 1
+                                    continue
+
+                                # Parse dates
+                                dtstart = component.get('dtstart')
+                                dtend = component.get('dtend')
+
+                                if not dtstart:
+                                    continue
+
+                                start_dt = dtstart.dt
+                                end_dt = dtend.dt if dtend else start_dt
+
+                                # Check if all-day event (date vs datetime)
+                                all_day = False
+                                if not isinstance(start_dt, datetime):
+                                    # It's a date, not datetime - all day event
+                                    all_day = True
+                                    start_dt = datetime.combine(start_dt, datetime.min.time()).replace(tzinfo=timezone.utc)
+                                    end_dt = datetime.combine(end_dt, datetime.min.time()).replace(tzinfo=timezone.utc)
+                                else:
+                                    # Ensure timezone awareness
+                                    if start_dt.tzinfo is None:
+                                        start_dt = start_dt.replace(tzinfo=timezone.utc)
+                                    if end_dt.tzinfo is None:
+                                        end_dt = end_dt.replace(tzinfo=timezone.utc)
+
+                                # Get other fields
+                                description = str(component.get('description', '')) or None
+                                location = str(component.get('location', '')) or None
+
+                                # Get etag and href for change tracking
+                                etag = getattr(cal_event, 'etag', None)
+                                href = str(cal_event.url) if cal_event.url else None
+
+                                # Create QuickHold
+                                quick_hold = QuickHold(
+                                    title=summary,
+                                    description=description,
+                                    start_at=start_dt,
+                                    end_at=end_dt,
+                                    all_day=all_day,
+                                    location_text=location,
+                                    status=QuickHoldStatus.HOLD,
+                                    source=QuickHoldSource.PHONE_CALENDAR,
+                                    caldav_uid=uid,
+                                    caldav_etag=etag,
+                                    caldav_href=href
+                                )
+
+                                db.add(quick_hold)
+                                results['imported'] += 1
+                                results['details'].append(f"Imported: {summary}")
+                                logger.info(f"Imported QuickHold from phone: {summary} ({uid})")
+
+                        except Exception as e:
+                            logger.error(f"Error processing calendar event: {e}")
+                            results['errors'] += 1
+
+                except Exception as e:
+                    logger.error(f"Error processing calendar {calendar_name}: {e}")
+                    results['errors'] += 1
+
+            db.commit()
+            logger.info(f"CalDAV poll complete for {caldav_username}: {results}")
+
+        except Exception as e:
+            logger.error(f"Failed to poll CalDAV for {user_email}: {e}")
+            results['errors'] += 1
+            db.rollback()
+
+        return results
+
+    def sync_quick_hold_changes(self, db: Session, user_email: str) -> dict:
+        """
+        Check for changes to existing QuickHolds in CalDAV (updates/deletions).
+
+        Args:
+            db: Database session
+            user_email: User email
+
+        Returns:
+            dict with counts
+        """
+        from events.models import QuickHold, QuickHoldStatus
+
+        results = {'updated': 0, 'deleted': 0, 'errors': 0}
+
+        try:
+            caldav_username = self._get_caldav_username(user_email)
+            client = caldav.DAVClient(
+                url=self.caldav_url,
+                headers={'X-Remote-User': caldav_username}
+            )
+
+            principal = client.principal()
+            calendars = principal.calendars()
+
+            # Get all active QuickHolds from phone
+            holds = db.query(QuickHold).filter(
+                QuickHold.source == QuickHoldSource.PHONE_CALENDAR,
+                QuickHold.status == QuickHoldStatus.HOLD,
+                QuickHold.caldav_uid.isnot(None)
+            ).all()
+
+            for hold in holds:
+                found = False
+                for cal in calendars:
+                    try:
+                        # Try to find the event by UID
+                        cal_event = cal.event_by_uid(hold.caldav_uid)
+                        if cal_event:
+                            found = True
+                            # Check if etag changed (event was updated)
+                            current_etag = getattr(cal_event, 'etag', None)
+                            if current_etag and hold.caldav_etag != current_etag:
+                                # Event was updated, re-parse
+                                ical = Calendar.from_ical(cal_event.data)
+                                for component in ical.walk():
+                                    if component.name == "VEVENT":
+                                        hold.title = str(component.get('summary', hold.title))
+                                        hold.description = str(component.get('description', '')) or None
+                                        hold.location_text = str(component.get('location', '')) or None
+
+                                        dtstart = component.get('dtstart')
+                                        dtend = component.get('dtend')
+                                        if dtstart:
+                                            hold.start_at = dtstart.dt if isinstance(dtstart.dt, datetime) else datetime.combine(dtstart.dt, datetime.min.time()).replace(tzinfo=timezone.utc)
+                                        if dtend:
+                                            hold.end_at = dtend.dt if isinstance(dtend.dt, datetime) else datetime.combine(dtend.dt, datetime.min.time()).replace(tzinfo=timezone.utc)
+
+                                        hold.caldav_etag = current_etag
+                                        results['updated'] += 1
+                                        break
+                            break
+                    except Exception:
+                        continue
+
+                if not found:
+                    # Event was deleted from phone calendar
+                    hold.status = QuickHoldStatus.CANCELED
+                    results['deleted'] += 1
+                    logger.info(f"QuickHold {hold.id} was deleted from phone calendar")
+
+            db.commit()
+
+        except Exception as e:
+            logger.error(f"Failed to sync QuickHold changes: {e}")
+            results['errors'] += 1
+            db.rollback()
+
+        return results
