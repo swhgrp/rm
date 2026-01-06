@@ -560,8 +560,11 @@
         });
 
         async function accessSystem(systemKey, systemUrl) {
-            // Get the card element
+            // Get the card element - use event passed explicitly, not implicit global
             const card = event.currentTarget;
+
+            // Debug logging
+            console.log(`[SSO DEBUG] accessSystem called: systemKey=${systemKey}, systemUrl=${systemUrl}`);
 
             try {
                 // Show loading state
@@ -574,7 +577,16 @@
                 }
 
                 // Request token from Portal for other systems
-                const response = await fetch(`/portal/api/generate-token/${systemKey}`);
+                // Add cache-busting timestamp to prevent any browser caching
+                const timestamp = Date.now();
+                console.log(`[SSO DEBUG] Fetching token for: ${systemKey} (t=${timestamp})`);
+                const response = await fetch(`/portal/api/generate-token/${systemKey}?_=${timestamp}`, {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
 
                 if (!response.ok) {
                     throw new Error('Failed to generate access token');
@@ -583,8 +595,29 @@
                 const data = await response.json();
                 const token = data.token;
 
+                // Decode token to verify system claim (for debugging)
+                let tokenSystem = null;
+                try {
+                    const tokenParts = token.split('.');
+                    if (tokenParts.length === 3) {
+                        const payload = JSON.parse(atob(tokenParts[1]));
+                        tokenSystem = payload.system;
+                        console.log(`[SSO DEBUG] Token payload: system=${payload.system}, sub=${payload.sub}`);
+                        if (payload.system !== systemKey) {
+                            console.error(`[SSO DEBUG] MISMATCH! Expected system=${systemKey}, got ${payload.system}`);
+                            alert(`TOKEN MISMATCH ERROR!\n\nRequested: ${systemKey}\nReceived: ${payload.system}\n\nPlease report this issue.`);
+                            card.classList.remove('loading');
+                            return; // Don't redirect with wrong token
+                        }
+                    }
+                } catch (e) {
+                    console.warn('[SSO DEBUG] Could not decode token for debug:', e);
+                }
+
                 // Redirect to system with token
-                window.location.href = `${systemUrl}api/auth/sso-login?token=${token}`;
+                const redirectUrl = `${systemUrl}api/auth/sso-login?token=${token}`;
+                console.log(`[SSO DEBUG] Redirecting to: ${redirectUrl.substring(0, 50)}...`);
+                window.location.href = redirectUrl;
             } catch (error) {
                 console.error('Error accessing system:', error);
                 alert('Failed to access system. Please try again or contact support.');

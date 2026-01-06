@@ -497,9 +497,15 @@ async def update_user_permissions(
 @app.get("/api/generate-token/{system}")
 async def generate_system_token(
     system: str,
+    response: Response,
     user: User = Depends(require_login)
 ):
     """Generate a single-use token for accessing a system"""
+    # Prevent any caching of token responses
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+
     # Validate system access
     if system == "inventory" and not user.can_access_inventory:
         raise HTTPException(status_code=403, detail="No access to Inventory system")
@@ -532,6 +538,8 @@ async def generate_system_token(
         token_data["accounting_role_id"] = user.accounting_role_id
 
     token = jwt.encode(token_data, SECRET_KEY, algorithm=ALGORITHM)
+
+    logger.info(f"Generated token for system={system}, user={user.username}")
 
     return {"token": token}
 
