@@ -1,5 +1,54 @@
 # Changelog
 
+## [2026-01-06] - DSS Deposit Calculation & Discount Breakdown
+
+### Summary
+Enhanced Daily Sales Summary (DSS) with split deposit display (Card Deposit vs Expected Cash Deposit), complete discount breakdown showing individual line items, and proper variance calculation that accounts for cash tips paid to employees.
+
+### Added - Accounting System
+- **Split Deposit Display:**
+  - Replaced single "Deposit Amount" with **Card Deposit** and **Expected Cash Deposit**
+  - Card Deposit = Card payments + Card tips - Refunds (what processor deposits)
+  - Expected Cash Deposit = Cash sales - Cash Tips Paid - Payouts (what's left in drawer)
+  - Added Cash Tips Paid field showing tips paid to employees from cash drawer
+
+- **Payouts Tab:**
+  - New tab on DSS detail page for cash adjustments from Clover
+  - Displays cash_events (CASH_ADJUSTMENT type) with amount, note, employee, timestamp
+  - Graceful 401 handling when cash_events endpoint permissions are missing
+
+- **Database Fields:**
+  - Migration: `20260106_0001_add_deposit_and_payout_fields.py`
+  - Added to `daily_sales_summaries` and `pos_daily_sales_cache`:
+    - `card_deposit`, `cash_tips_paid`, `cash_payouts`, `expected_cash_deposit`, `payout_breakdown`
+
+### Fixed - Accounting System
+- **Discount Breakdown Completeness:**
+  - Now captures BOTH order-level AND line-item discounts
+  - Fixed percentage-based discount calculation (was using post-discount total)
+  - All discounts appear as individual line items on Discounts tab
+  - Totals match Clover's reported discount totals exactly
+
+- **Variance Calculation:**
+  - Formula: Variance = (Card Deposit + Expected Cash Deposit + Cash Tips Paid) - Total Collected
+  - Correctly accounts for tip flow: Card tips deposited via processor, then paid out in cash
+  - Variance is now $0.00 when all money is properly accounted for
+
+- **JavaScript Error:**
+  - Fixed "Cannot set properties of null" error in `calculatePaymentTotals()`
+  - Removed reference to deprecated `depositAmount` element
+
+### Files Modified
+- `accounting/src/accounting/services/pos_sync_service.py`
+- `accounting/src/accounting/templates/daily_sales_detail.html`
+- `accounting/src/accounting/models/daily_sales_summary.py`
+- `accounting/src/accounting/models/pos.py`
+- `accounting/src/accounting/schemas/daily_sales_summary.py`
+- `accounting/src/accounting/core/clover_client.py`
+- `accounting/alembic/versions/20260106_0001_add_deposit_and_payout_fields.py`
+
+---
+
 ## [2026-01-05] - Waste Log UoM & Transfer Enhancements
 
 ### Summary

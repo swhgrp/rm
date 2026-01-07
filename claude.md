@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** January 5, 2026
-**System Status:** Production (96% Complete - Waste Log UoM & Transfer Enhancements)
+**Last Updated:** January 6, 2026
+**System Status:** Production (97% Complete - DSS Deposit & Discount Enhancements)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -38,7 +38,52 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - January 5, 2026)
+### Most Recent Work (Current Session - January 6, 2026)
+
+**DSS DEPOSIT CALCULATION & DISCOUNT BREAKDOWN** ✅ **COMPLETE**
+
+#### 1. **Split Deposit Display** ✅ **COMPLETE**
+- Replaced single "Deposit Amount" field with separate **Card Deposit** and **Expected Cash Deposit**
+- Card Deposit = Card payments + Card tips - Refunds (what processor deposits to bank)
+- Expected Cash Deposit = Cash payments - Cash Tips Paid Out - Payouts (what's left in drawer)
+- Added **Cash Tips Paid** field showing tips paid to employees from cash drawer
+
+#### 2. **Deposit Reconciliation Formula** ✅ **COMPLETE**
+- **Variance = (Card Deposit + Expected Cash Deposit + Cash Tips Paid) - Total Collected**
+- This should equal $0.00 when all money is accounted for
+- Card tips are received via merchant deposit, then paid out to employees from cash drawer
+- Formula: Card + Cash + Tips = (Card + Card Tips) + (Cash - Card Tips) + Card Tips = Total Collected
+
+#### 3. **Complete Discount Breakdown** ✅ **COMPLETE**
+- Fixed discount extraction to capture BOTH order-level AND line-item discounts
+- Fixed percentage-based discount calculation (was using post-discount total, now uses line items total)
+- All discounts now appear as individual line items on Discounts tab:
+  - 6 Pack, PBC Staff, Staff Meal, Ryan & Nick - Brightview, Waste, etc.
+- Total matches Clover's reported discount total exactly
+
+#### 4. **Payouts Tab** ✅ **COMPLETE**
+- Added new Payouts tab to DSS detail page
+- Displays cash_events from Clover (CASH_ADJUSTMENT type)
+- Shows amount, note/reason, employee name, timestamp
+- Graceful handling when cash_events endpoint returns 401
+
+#### 5. **Database Migration** ✅ **COMPLETE**
+- Migration: `20260106_0001_add_deposit_and_payout_fields.py`
+- Added to `daily_sales_summaries`: card_deposit, cash_tips_paid, cash_payouts, expected_cash_deposit, payout_breakdown
+- Added to `pos_daily_sales_cache`: same fields
+
+#### 6. **Files Modified**
+- `accounting/src/accounting/services/pos_sync_service.py` - Deposit calculations, discount extraction
+- `accounting/src/accounting/templates/daily_sales_detail.html` - UI updates, variance calculation
+- `accounting/src/accounting/models/daily_sales_summary.py` - New deposit/payout fields
+- `accounting/src/accounting/models/pos.py` - New fields in POSDailySalesCache
+- `accounting/src/accounting/schemas/daily_sales_summary.py` - Schema updates
+- `accounting/src/accounting/core/clover_client.py` - get_cash_events method
+- `accounting/alembic/versions/20260106_0001_add_deposit_and_payout_fields.py` - Migration
+
+---
+
+### Previous Session Work (January 5, 2026)
 
 **WASTE LOG & TRANSFER ENHANCEMENTS** ✅ **COMPLETE**
 

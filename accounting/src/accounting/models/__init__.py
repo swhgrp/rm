@@ -21,6 +21,7 @@ from accounting.models.vendor_alias import VendorAlias
 from accounting.models.vendor_bill import VendorBill, VendorBillLine, BillPayment, BillStatus, PaymentMethod
 from accounting.models.customer import Customer
 from accounting.models.customer_invoice import CustomerInvoice, CustomerInvoiceLine, InvoicePayment, InvoiceStatus
+from accounting.models.recurring_invoice import RecurringInvoice, RecurringInvoiceLineItem
 from accounting.models.daily_sales_summary import DailySalesSummary
 from accounting.models.bank_account import (
     BankAccount,
@@ -116,6 +117,8 @@ __all__ = [
     "CustomerInvoiceLine",
     "InvoicePayment",
     "InvoiceStatus",
+    "RecurringInvoice",
+    "RecurringInvoiceLineItem",
     "DailySalesSummary",
     "BankAccount",
     "BankStatementImport",

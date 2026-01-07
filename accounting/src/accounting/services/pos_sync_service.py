@@ -84,7 +84,7 @@ class POSSyncService:
         end_date: date,
         user_id: Optional[int] = None
     ) -> Dict[str, Any]:
-        """Sync sales from Clover POS"""
+        """Sync sales from Clover POS using payments as source of truth"""
         # Initialize Clover client
         client = CloverAPIClient(
             merchant_id=config.merchant_id,
@@ -105,38 +105,92 @@ class POSSyncService:
         current_date = start_date
         while current_date <= end_date:
             try:
-                # Fetch orders for this day
-                orders_response = await client.get_orders(
-                    start_date=current_date,
-                    end_date=current_date,
-                    limit=1000  # Clover max
-                )
-
-                orders = orders_response.get("elements", [])
-
                 # Calculate timestamps for current_date range
                 day_start_ms = int(datetime.combine(current_date, datetime.min.time()).timestamp() * 1000)
                 day_end_ms = int(datetime.combine(current_date, datetime.max.time()).timestamp() * 1000)
 
-                # Filter for PAID orders within the current date
-                paid_orders = []
+                # Fetch PAYMENTS for this day (source of truth for totals)
+                # Payments are filtered by createdTime, which is when money was collected
+                payments_response = await client.get_payments(
+                    start_date=current_date,
+                    end_date=current_date,
+                    limit=1000
+                )
+                all_payments = payments_response.get("elements", [])
+
+                # Filter payments within date range
+                day_payments = []
+                for payment in all_payments:
+                    payment_time = payment.get("createdTime", 0)
+                    if day_start_ms <= payment_time <= day_end_ms:
+                        if payment.get("result") == "SUCCESS":
+                            day_payments.append(payment)
+
+                # Fetch ORDERS for this day (for category breakdown)
+                orders_response = await client.get_orders(
+                    start_date=current_date,
+                    end_date=current_date,
+                    limit=1000
+                )
+                orders = orders_response.get("elements", [])
+
+                # Build order lookup by ID for category extraction
+                order_lookup = {}
                 for order in orders:
-                    # Check if order is LOCKED (completed/paid)
-                    if order.get("state", "").upper() != "LOCKED":
-                        continue
+                    if order.get("state", "").upper() == "LOCKED":
+                        order_lookup[order.get("id")] = order
 
-                    # Get order timestamp (use clientCreatedTime which is when order was placed)
-                    order_time = order.get("clientCreatedTime", 0)
+                # Find missing orders (payments reference orders not in our date range)
+                missing_order_ids = []
+                for payment in day_payments:
+                    payment_order = payment.get("order", {})
+                    order_id = payment_order.get("id") if payment_order else None
+                    if order_id and order_id not in order_lookup:
+                        missing_order_ids.append(order_id)
 
-                    # Only include orders from the current date
-                    if day_start_ms <= order_time <= day_end_ms:
-                        paid_orders.append(order)
+                # Fetch missing orders individually
+                if missing_order_ids:
+                    logger.info(f"Fetching {len(missing_order_ids)} missing orders referenced by payments")
+                    for order_id in missing_order_ids:
+                        try:
+                            order = await client.get_order(order_id)
+                            if order and order.get("state", "").upper() == "LOCKED":
+                                order_lookup[order_id] = order
+                        except Exception as e:
+                            logger.warning(f"Could not fetch order {order_id}: {e}")
 
-                logger.info(f"Found {len(paid_orders)} paid orders for {current_date}")
+                # Fetch CASH EVENTS for this day (payouts, adjustments)
+                # Note: This endpoint requires additional Clover permissions
+                day_payouts = []
+                try:
+                    cash_events_response = await client.get_cash_events(
+                        start_date=current_date,
+                        end_date=current_date,
+                        limit=1000
+                    )
+                    all_cash_events = cash_events_response.get("elements", [])
 
-                if paid_orders:
-                    # Aggregate sales for this day
-                    daily_summary = self._aggregate_daily_sales(paid_orders, config.area_id, current_date)
+                    # Filter cash events within date range - only include CASH_ADJUSTMENT type (payouts)
+                    for event in all_cash_events:
+                        event_time = event.get("timestamp", 0)
+                        if day_start_ms <= event_time <= day_end_ms:
+                            # CASH_ADJUSTMENT events are payouts/drops
+                            # Negative amounts = money taken OUT (payout)
+                            # Positive amounts = money added IN
+                            if event.get("type") == "CASH_ADJUSTMENT":
+                                day_payouts.append(event)
+                except Exception as cash_events_error:
+                    # Cash events endpoint may require additional permissions
+                    # Continue without payout data rather than failing
+                    logger.warning(f"Could not fetch cash events for {current_date}: {cash_events_error}")
+
+                logger.info(f"Found {len(day_payments)} payments, {len(order_lookup)} orders, and {len(day_payouts)} payouts for {current_date}")
+
+                if day_payments:
+                    # Aggregate sales for this day using payments as source of truth
+                    daily_summary = self._aggregate_daily_sales_from_payments(
+                        day_payments, order_lookup, day_payouts, config.area_id, current_date
+                    )
 
                     # Save to cache (upsert)
                     existing = self.db.query(POSDailySalesCache).filter(
@@ -231,7 +285,8 @@ class POSSyncService:
             # Get order total from order object (more reliable than summing payments for split-tender)
             order_total = Decimal(order.get("total", 0)) / 100  # Includes tax, excludes tips
 
-            # For tax and tips, get from first successful payment only to avoid duplication
+            # Sum tax and tips across ALL successful payments
+            # Each payment can have its own tax and tip amounts
             order_tax = Decimal('0')
             order_tip = Decimal('0')
 
@@ -241,34 +296,42 @@ class POSSyncService:
                     if payment.get("result") == "SUCCESS":
                         payment_amount = Decimal(payment.get("amount", 0)) / 100
                         payment_tip = Decimal(payment.get("tipAmount", 0) or 0) / 100
+                        payment_tax = Decimal(payment.get("taxAmount", 0) or 0) / 100
 
-                        # Get tax and tip from first payment only (they're order-level, not payment-level)
-                        if order_tax == 0:
-                            order_tax = Decimal(payment.get("taxAmount", 0) or 0) / 100
-                        if order_tip == 0:
-                            order_tip = Decimal(payment.get("tipAmount", 0) or 0) / 100
+                        # Sum tax and tips from ALL payments (not just first)
+                        order_tax += payment_tax
+                        order_tip += payment_tip
 
-                        # Track payment method - get actual tender type from Clover
+                        # Track payment method - group Credit Card and Debit Card as "CARD"
+                        # Clover uses tender.labelKey (e.g., com.clover.tender.credit_card) to identify payment type
                         tender = payment.get("tender", {})
+                        tender_label_key = tender.get("labelKey", "") if tender else ""
                         tender_label = tender.get("label", "").upper() if tender else ""
 
-                        # Categorize payment type based on tender label
-                        # Clover uses: "Cash", "Credit Card", "Debit Card", "Gift Card", "Check", etc.
+                        # Categorize payment type - first check labelKey for most accurate categorization
                         payment_key = None
-                        if tender_label == "CASH":
+                        if "cash" in tender_label_key.lower():
+                            payment_key = "CASH"
+                        elif "debit" in tender_label_key.lower() or "credit" in tender_label_key.lower():
+                            payment_key = "CARD"  # Group credit and debit together
+                        elif "gift" in tender_label_key.lower():
+                            payment_key = "GIFT_CARD"
+                        # Fallback to label if labelKey is not available
+                        elif tender_label == "CASH":
                             payment_key = "CASH"
                         elif tender_label in ["CREDIT CARD", "DEBIT CARD"]:
-                            # Combine credit and debit cards into CARD
-                            payment_key = "CARD"
-                        elif tender_label in ["GIFT CARD"]:
+                            payment_key = "CARD"  # Group credit and debit together
+                        elif tender_label == "GIFT CARD":
                             payment_key = "GIFT_CARD"
                         elif tender_label:
-                            # Use the tender label for any other payment types
-                            # Replace spaces with underscores for consistency
                             payment_key = tender_label.replace(" ", "_")
                         else:
-                            # Default to cash if we can't determine
-                            payment_key = "CASH"
+                            # If no tender info, check if there's a cardTransaction
+                            card_txn = payment.get("cardTransaction")
+                            if card_txn:
+                                payment_key = "CARD"
+                            else:
+                                payment_key = "CASH"
 
                         # In Clover, payment.amount does NOT include tip (tip is separate)
                         # So we can use payment_amount directly as the base payment
@@ -444,6 +507,305 @@ class POSSyncService:
             }
         }
 
+    def _aggregate_daily_sales_from_payments(
+        self,
+        payments: List[Dict],
+        order_lookup: Dict[str, Dict],
+        payouts: List[Dict],
+        area_id: int,
+        sale_date: date
+    ) -> Dict[str, Any]:
+        """
+        Aggregate Clover payments into daily sales summary.
+
+        Uses payments as source of truth for totals (gross sales, tax, tips)
+        and orders for category breakdown.
+
+        Args:
+            payments: List of Clover payment objects for the day
+            order_lookup: Dictionary of order_id -> order object for category extraction
+            payouts: List of Clover cash_event objects (CASH_ADJUSTMENT type) for the day
+            area_id: Location ID
+            sale_date: Date of sales
+
+        Returns:
+            Dictionary with daily sales aggregates
+        """
+        # Initialize totals from payments (source of truth)
+        total_payment_amount = Decimal('0')  # Payment amount (includes tax, excludes tips)
+        total_tax = Decimal('0')
+        total_tips = Decimal('0')
+        total_discounts = Decimal('0')
+        total_refunds = Decimal('0')
+        transaction_count = len(payments)
+
+        # Track refunds by payment type for deposit calculation
+        card_refunds = Decimal('0')
+        cash_refunds = Decimal('0')
+
+        # Breakdowns
+        order_types = defaultdict(Decimal)
+        payment_methods = defaultdict(Decimal)
+        payment_tips_by_method = defaultdict(Decimal)
+        categories = defaultdict(Decimal)
+        discounts_breakdown = defaultdict(Decimal)
+        processed_order_ids = set()
+
+        # Process each payment
+        for payment in payments:
+            payment_amount = Decimal(payment.get("amount", 0)) / 100
+            payment_tax = Decimal(payment.get("taxAmount", 0) or 0) / 100
+            payment_tip = Decimal(payment.get("tipAmount", 0) or 0) / 100
+
+            total_payment_amount += payment_amount
+            total_tax += payment_tax
+            total_tips += payment_tip
+
+            # Track payment method - group Credit Card and Debit Card as "CARD"
+            # Clover uses tender.labelKey (e.g., com.clover.tender.credit_card) to identify payment type
+            tender = payment.get("tender", {})
+            tender_label_key = tender.get("labelKey", "") if tender else ""
+            tender_label = tender.get("label", "").upper() if tender else ""
+
+            # First check labelKey for most accurate categorization
+            if "cash" in tender_label_key.lower():
+                payment_key = "CASH"
+            elif "debit" in tender_label_key.lower() or "credit" in tender_label_key.lower():
+                payment_key = "CARD"  # Group credit and debit together
+            elif "gift" in tender_label_key.lower():
+                payment_key = "GIFT_CARD"
+            # Fallback to label if labelKey is not available
+            elif tender_label == "CASH":
+                payment_key = "CASH"
+            elif tender_label in ["CREDIT CARD", "DEBIT CARD"]:
+                payment_key = "CARD"  # Group credit and debit together
+            elif tender_label == "GIFT CARD":
+                payment_key = "GIFT_CARD"
+            elif tender_label:
+                payment_key = tender_label.replace(" ", "_")
+            else:
+                # If no tender info, check if there's a cardTransaction (card payment)
+                card_txn = payment.get("cardTransaction")
+                if card_txn:
+                    payment_key = "CARD"  # Default card payments to CARD
+                else:
+                    payment_key = "CASH"  # No card transaction = likely cash
+
+            payment_methods[payment_key] += payment_amount
+            if payment_tip > 0:
+                payment_tips_by_method[payment_key] += payment_tip
+
+            # Get order for category breakdown (only process each order once)
+            payment_order = payment.get("order", {})
+            order_id = payment_order.get("id") if payment_order else None
+
+            if order_id and order_id not in processed_order_ids:
+                processed_order_ids.add(order_id)
+                order = order_lookup.get(order_id)
+
+                if order:
+                    # Extract category breakdown from order line items
+                    if order.get("lineItems") and order["lineItems"].get("elements"):
+                        for item in order["lineItems"]["elements"]:
+                            if item.get("deleted"):
+                                continue
+
+                            item_price = Decimal(item.get("price", 0)) / 100
+                            item_qty = item.get("unitQty", 1)
+                            item_total = item_price * Decimal(item_qty)
+
+                            # Get category
+                            category_name = "Uncategorized"
+                            if item.get("item") and item["item"].get("categories") and item["item"]["categories"].get("elements"):
+                                first_category = item["item"]["categories"]["elements"][0]
+                                category_name = first_category.get("name", "Uncategorized")
+
+                            categories[category_name] += item_total
+
+                    # Track order type
+                    order_type = order.get("orderType", {}).get("label", "unknown")
+                    order_net = Decimal(order.get("total", 0)) / 100
+                    # Subtract tax from order total to get net sales for order type
+                    order_tax_est = Decimal('0')
+                    if order.get("payments") and order["payments"].get("elements"):
+                        for p in order["payments"]["elements"]:
+                            if p.get("result") == "SUCCESS":
+                                order_tax_est += Decimal(p.get("taxAmount", 0) or 0) / 100
+                    order_types[order_type.lower()] += order_net - order_tax_est
+
+                    # First, calculate order's gross total from line items (before discounts)
+                    order_line_items_total = Decimal('0')
+                    if order.get("lineItems") and order["lineItems"].get("elements"):
+                        for item in order["lineItems"]["elements"]:
+                            if item.get("deleted"):
+                                continue
+                            item_price = Decimal(item.get("price", 0)) / 100
+                            item_qty = item.get("unitQty", 1)
+                            order_line_items_total += item_price * Decimal(item_qty)
+
+                    # Extract discounts from order (order-level discounts)
+                    if order.get("discounts") and order["discounts"].get("elements"):
+                        for disc in order["discounts"]["elements"]:
+                            disc_name = disc.get("name", "Unknown Discount")
+                            if "amount" in disc:
+                                disc_amount = abs(Decimal(disc["amount"])) / 100
+                            elif "percentage" in disc:
+                                # Calculate percentage-based discount from line items total (pre-discount)
+                                percentage = Decimal(disc["percentage"])
+                                disc_amount = order_line_items_total * percentage / 100
+                            else:
+                                disc_amount = Decimal('0')
+                            if disc_amount > 0:
+                                discounts_breakdown[disc_name] += disc_amount
+                                total_discounts += disc_amount
+
+                    # Extract line item discounts (item-level discounts)
+                    if order.get("lineItems") and order["lineItems"].get("elements"):
+                        for item in order["lineItems"]["elements"]:
+                            if item.get("deleted"):
+                                continue
+                            if item.get("discounts") and item["discounts"].get("elements"):
+                                for disc in item["discounts"]["elements"]:
+                                    disc_name = disc.get("name", "Unknown Discount")
+                                    if "amount" in disc:
+                                        disc_amount = abs(Decimal(disc["amount"])) / 100
+                                    elif "percentage" in disc:
+                                        # Calculate percentage-based discount from item total
+                                        percentage = Decimal(disc["percentage"])
+                                        item_price = Decimal(item.get("price", 0)) / 100
+                                        item_qty = item.get("unitQty", 1)
+                                        item_total = item_price * Decimal(item_qty)
+                                        disc_amount = item_total * percentage / 100
+                                    else:
+                                        disc_amount = Decimal('0')
+                                    if disc_amount > 0:
+                                        discounts_breakdown[disc_name] += disc_amount
+                                        total_discounts += disc_amount
+
+                    # Extract refunds from order
+                    if order.get("refunds") and order["refunds"].get("elements"):
+                        for refund in order["refunds"]["elements"]:
+                            refund_amount = abs(Decimal(refund.get("amount", 0))) / 100
+                            total_refunds += refund_amount
+
+        # Gross sales should be calculated from line items (what Clover reports)
+        line_items_total = sum(categories.values())
+        if line_items_total > 0:
+            gross_sales = line_items_total
+        else:
+            # Fallback: derive from payment data
+            gross_sales = total_payment_amount - total_tax + total_discounts
+
+        # Calculate net sales using Clover's formula:
+        # Net Sales = Gross Sales - Discounts - Refunds
+        # Note: Payment amount includes discounts already applied, but NOT refunds
+        # So we need to derive discounts from the difference
+        payment_net = total_payment_amount - total_tax  # This is Gross - Discounts
+
+        # Effective discounts = Gross - Payment Net
+        effective_discounts = gross_sales - payment_net
+
+        # Net Sales = Gross - Discounts - Refunds (Clover's definition)
+        net_sales = gross_sales - effective_discounts - total_refunds
+
+        # Process payouts (cash adjustments)
+        # In Clover, negative amounts = money taken OUT (payout)
+        # Positive amounts = money added IN (drop)
+        total_payouts = Decimal('0')
+        payout_breakdown = []
+        for payout in payouts:
+            payout_amount = Decimal(payout.get("amount", 0)) / 100
+            # Negative amounts are money taken out (payouts)
+            if payout_amount < 0:
+                payout_amount = abs(payout_amount)
+                total_payouts += payout_amount
+
+                # Get employee name if available
+                employee = payout.get("employee", {})
+                employee_name = employee.get("name", "Unknown") if employee else "Unknown"
+
+                # Get note/reason
+                note = payout.get("note", "")
+
+                payout_breakdown.append({
+                    "amount": float(payout_amount),
+                    "note": note or "Cash payout",
+                    "employee": employee_name,
+                    "timestamp": payout.get("timestamp")
+                })
+
+        # Calculate deposit amounts
+        #
+        # How tips flow in a restaurant:
+        # 1. Customer pays $100 on card with $20 tip = $120 charged to card
+        # 2. Merchant account receives $120 (minus fees) - this is the CARD DEPOSIT
+        # 3. Restaurant pays employee $20 cash from the drawer = CASH TIPS PAID
+        # 4. Expected Cash Deposit = Cash Sales - Cash Tips Paid - Other Payouts
+        #
+        # So: Card Deposit = full card amount including tips (what processor deposits)
+        #     Expected Cash Deposit = Cash Sales - Tips Paid Out - Payouts
+        #
+        # Total Deposits = Card Deposit + Expected Cash Deposit
+        #                = (Card Amount + Card Tips) + (Cash Amount - Card Tips - Payouts)
+        #                = Card Amount + Cash Amount - Payouts
+        #                = Total Collected - Payouts (when no variance)
+
+        card_amount = payment_methods.get("CARD", Decimal('0'))
+        card_tips = payment_tips_by_method.get("CARD", Decimal('0'))
+
+        # Card deposit = full card amount INCLUDING tips (this is what the processor deposits)
+        # Minus any refunds (which reduce the deposit)
+        card_deposit = card_amount + card_tips - total_refunds
+
+        # Cash deposit calculation
+        cash_amount = payment_methods.get("CASH", Decimal('0'))
+
+        # Cash tips paid = tips from CARD payments that are paid out to employees in cash
+        # The restaurant receives card tips via the merchant account deposit,
+        # then pays them out to employees from the cash drawer
+        cash_tips_paid = card_tips
+
+        # Expected Cash Deposit = Cash Sales - Cash Tips Paid Out - Payouts
+        # This is what should be left in the drawer to deposit
+        expected_cash_deposit = cash_amount - cash_tips_paid - total_payouts
+
+        # Convert to float for JSON serialization
+        order_types_dict = {k: float(v) for k, v in order_types.items()}
+        payment_methods_dict = {k: float(v) for k, v in payment_methods.items()}
+        payment_tips_dict = {k: float(v) for k, v in payment_tips_by_method.items()}
+        categories_dict = {k: float(v) for k, v in categories.items()}
+        discounts_dict = {k: float(-v) for k, v in discounts_breakdown.items()}  # Negative for display
+
+        return {
+            "area_id": area_id,
+            "sale_date": sale_date,
+            "provider": "clover",
+            "total_sales": float(net_sales),  # Net Sales = Gross - Discounts - Refunds
+            "total_tax": float(total_tax),
+            "total_tips": float(total_tips),
+            "total_discounts": float(effective_discounts),  # Calculated from Gross - Payment Net
+            "total_refunds": float(total_refunds),
+            "gross_sales": float(gross_sales),  # Sum of line items
+            "transaction_count": transaction_count,
+            "order_types": order_types_dict,
+            "payment_methods": payment_methods_dict,
+            "categories": categories_dict,
+            "discounts": discounts_dict,
+            # Deposit calculations
+            "card_deposit": float(card_deposit),
+            "cash_tips_paid": float(cash_tips_paid),
+            "cash_payouts": float(total_payouts),
+            "expected_cash_deposit": float(expected_cash_deposit),
+            "payout_breakdown": payout_breakdown,
+            "raw_summary": {
+                "payment_count": len(payments),
+                "order_count": len(processed_order_ids),
+                "payout_count": len(payout_breakdown),
+                "sync_date": datetime.utcnow().isoformat(),
+                "payment_tips": payment_tips_dict
+            }
+        }
+
     def _categorize_item(self, item_name: str) -> str:
         """
         Simple categorization of items based on name
@@ -539,14 +901,21 @@ class POSSyncService:
             Account.account_number == '1000'
         ).first()
 
-        # Calculate expected cash deposit (cash payment amount only, excluding tips on cash)
-        # This is used for manager cash reconciliation
-        expected_cash = Decimal('0')
-        if cached_sale.payment_methods:
+        # Get deposit/payout fields from cache (calculated during sync)
+        card_deposit = cached_sale.card_deposit if cached_sale.card_deposit is not None else None
+        cash_tips_paid = cached_sale.cash_tips_paid if cached_sale.cash_tips_paid is not None else Decimal('0')
+        cash_payouts = cached_sale.cash_payouts if cached_sale.cash_payouts is not None else Decimal('0')
+        expected_cash_deposit = cached_sale.expected_cash_deposit if cached_sale.expected_cash_deposit is not None else None
+        payout_breakdown = cached_sale.payout_breakdown
+
+        # Fallback: calculate expected cash deposit from payment methods if not in cache
+        if expected_cash_deposit is None and cached_sale.payment_methods:
+            expected_cash = Decimal('0')
             for payment_type, amount in cached_sale.payment_methods.items():
                 if payment_type.upper() == 'CASH':
                     expected_cash = Decimal(str(amount))
                     break
+            expected_cash_deposit = expected_cash - cash_tips_paid - cash_payouts
 
         # Build enhanced payment breakdown with tips information
         # Extract payment_tips from raw_summary
@@ -563,11 +932,13 @@ class POSSyncService:
                     "tips": float(payment_tips.get(payment_type, 0))
                 }
 
-        # Calculate net sales and total collected
-        # Net Sales = Gross Sales - Discounts - Refunds
-        net_sales = cached_sale.gross_sales - cached_sale.total_discounts - cached_sale.total_refunds
-        # Total Collected = Net Sales + Tax + Tips
+        # Use net sales from cache (Clover's formula: Gross - Discounts - Refunds)
+        net_sales = cached_sale.total_sales
+        # Total Collected = Net Sales + Tax + Tips (this is "Amount Collected" in Clover)
         total_collected = net_sales + cached_sale.total_tax + cached_sale.total_tips
+
+        # Use discounts from cache (already calculated as Gross - Payment Net)
+        effective_discounts = cached_sale.total_discounts
 
         # Create DSS
         dss = DailySalesSummary(
@@ -575,8 +946,8 @@ class POSSyncService:
             area_id=cached_sale.area_id,
             pos_system=cached_sale.provider,
             gross_sales=cached_sale.gross_sales,
-            discounts=cached_sale.total_discounts,
-            refunds=cached_sale.total_refunds,  # Use actual refunds from cache
+            discounts=effective_discounts,  # Use effective discounts (gross - net - refunds)
+            refunds=cached_sale.total_refunds,
             net_sales=net_sales,
             tax_collected=cached_sale.total_tax,
             tips=cached_sale.total_tips,
@@ -584,7 +955,12 @@ class POSSyncService:
             payment_breakdown=enhanced_payment_breakdown,
             category_breakdown=cached_sale.categories,
             discount_breakdown=cached_sale.discounts,
-            expected_cash_deposit=expected_cash,  # Set expected cash for manager reconciliation
+            # Deposit and payout fields
+            card_deposit=card_deposit,
+            cash_tips_paid=cash_tips_paid,
+            cash_payouts=cash_payouts,
+            payout_breakdown=payout_breakdown,
+            expected_cash_deposit=expected_cash_deposit,  # Set expected cash for manager reconciliation
             status='draft',
             imported_from='clover_pos',
             imported_from_pos=True,
@@ -618,12 +994,14 @@ class POSSyncService:
             self.db.add(line_item)
 
         # Create payment records from payment_breakdown
-        total_payments = sum(Decimal(str(amt)) for amt in cached_sale.payment_methods.values())
+        # Use actual tips per payment method from raw_summary, not proportional distribution
+        actual_payment_tips = {}
+        if cached_sale.raw_summary and 'payment_tips' in cached_sale.raw_summary:
+            actual_payment_tips = cached_sale.raw_summary['payment_tips']
 
         for payment_type, amount in cached_sale.payment_methods.items():
-            # Distribute tips proportionally
-            payment_pct = Decimal(str(amount)) / total_payments if total_payments > 0 else Decimal('0')
-            payment_tips = cached_sale.total_tips * payment_pct
+            # Use actual tips for this payment method (defaults to 0 if not found)
+            tips_for_payment = Decimal(str(actual_payment_tips.get(payment_type, 0)))
 
             # Look up deposit account from GL mapping, fallback to cash account
             payment_type_upper = payment_type.upper()
@@ -637,7 +1015,7 @@ class POSSyncService:
                 dss_id=dss.id,
                 payment_type=payment_type_upper,
                 amount=Decimal(str(amount)),
-                tips=payment_tips,
+                tips=tips_for_payment,
                 deposit_account_id=deposit_account_id
             )
             self.db.add(payment)

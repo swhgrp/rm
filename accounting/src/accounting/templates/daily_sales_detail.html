@@ -87,6 +87,11 @@
             </button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link" id="payouts-tab-btn" data-bs-toggle="tab" data-bs-target="#payouts-tab" type="button">
+                Payouts
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link" id="journal-tab" data-bs-toggle="tab" data-bs-target="#journal" type="button">
                 Journal Entry
             </button>
@@ -153,19 +158,24 @@
                     </div>
 
                     <div class="row mb-3">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label"><strong>Total Collected</strong></label>
                             <input type="number" step="0.01" class="form-control" id="totalCollected" readonly>
                         </div>
-                        <div class="col-md-4">
-                            <label class="form-label">Deposit Amount</label>
-                            <input type="number" step="0.01" class="form-control" id="depositAmount" readonly>
-                            <small class="text-muted">Calculated from payments</small>
+                        <div class="col-md-3">
+                            <label class="form-label">Card Deposit</label>
+                            <input type="number" step="0.01" class="form-control" id="cardDeposit" readonly>
+                            <small class="text-muted">Card amount + tips - refunds</small>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label class="form-label">Expected Cash Deposit</label>
+                            <input type="number" step="0.01" class="form-control" id="expectedCashDeposit" readonly>
+                            <small class="text-muted">Cash - tips - payouts</small>
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label">Variance</label>
                             <input type="number" step="0.01" class="form-control" id="variance" readonly>
-                            <small class="text-muted">Deposit - Total Collected</small>
+                            <small class="text-muted">Deposits - Total Collected</small>
                         </div>
                     </div>
 
@@ -310,6 +320,42 @@
             </div>
         </div>
 
+        <!-- PAYOUTS TAB -->
+        <div class="tab-pane fade" id="payouts-tab" role="tabpanel">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Cash Payouts</h5>
+                    <span class="text-muted small">Cash adjustments from POS (money taken from drawer)</span>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th style="width: 20%;">Time</th>
+                                    <th style="width: 20%;">Employee</th>
+                                    <th style="width: 40%;">Note/Reason</th>
+                                    <th style="width: 20%; text-align: right;">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody id="payoutLines">
+                                <!-- Payout lines will be added here -->
+                            </tbody>
+                            <tfoot>
+                                <tr style="font-weight: bold; background-color: #f8f9fa;">
+                                    <td colspan="3" style="text-align: right;">TOTAL PAYOUTS:</td>
+                                    <td style="text-align: right;" id="payoutTotal">$0.00</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    <div class="mt-2 text-muted small">
+                        <i class="bi bi-info-circle"></i> Payouts are pulled from Clover cash events. They reduce the expected cash deposit.
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- JOURNAL ENTRY TAB -->
         <div class="tab-pane fade" id="journal" role="tabpanel">
             <div class="card">
@@ -371,6 +417,7 @@ let accounts = [];
 let categoryLines = [];
 let paymentLines = [];
 let discountLines = [];
+let payoutLines = [];
 
 // Standard category names
 const STANDARD_CATEGORIES = [
@@ -589,10 +636,30 @@ async function loadDSS(id) {
             debug.log('No discount_breakdown in DSS response');
         }
         debug.log('Final discountLines:', discountLines);
-        renderDiscountLines();
+
+        // Load payouts from payout_breakdown
+        debug.log('DSS payout_breakdown:', dss.payout_breakdown);
+        if (dss.payout_breakdown && Array.isArray(dss.payout_breakdown)) {
+            payoutLines = dss.payout_breakdown.map(p => ({
+                timestamp: p.timestamp,
+                employee: p.employee || 'Unknown',
+                note: p.note || 'Cash payout',
+                amount: parseFloat(p.amount) || 0
+            }));
+        } else {
+            payoutLines = [];
+        }
+        debug.log('Final payoutLines:', payoutLines);
+
+        // For POS-imported entries, preserve the stored discounts value
+        // because it includes effective discounts (Gross - Payment Net) that capture
+        // percentage-based discounts not individually tracked in discount_breakdown
+        const isPOSImported = dss.imported_from_pos || dss.pos_system;
+        renderDiscountLines(isPOSImported);
+        renderPayoutLines();
 
         // Make fields read-only for POS-imported entries
-        if (dss.imported_from_pos || dss.pos_system) {
+        if (isPOSImported) {
             document.getElementById('businessDate').readOnly = true;
             document.getElementById('areaId').disabled = true;
             document.getElementById('posSystem').disabled = true;
@@ -844,10 +911,10 @@ function calculatePaymentTotals() {
     document.getElementById('paymentTipsTotal').textContent = formatCurrency(totalTips);
     document.getElementById('paymentGrandTotal').textContent = formatCurrency(totalAmount + totalTips);
 
-    // Update tips and deposit amount
+    // Update tips field
     document.getElementById('tips').value = totalTips.toFixed(2);
-    document.getElementById('depositAmount').value = (totalAmount + totalTips).toFixed(2);
 
+    // Recalculate totals (deposit calculations are handled there)
     calculateTotals();
 }
 
@@ -862,9 +929,8 @@ function addDiscountLine() {
     renderDiscountLines();
 }
 
-function renderDiscountLines() {
-    debug.log('renderDiscountLines called, discountLines:', discountLines);
-    console.trace('Stack trace for renderDiscountLines');
+function renderDiscountLines(preserveStoredDiscounts = false) {
+    debug.log('renderDiscountLines called, discountLines:', discountLines, 'preserveStoredDiscounts:', preserveStoredDiscounts);
     const tbody = document.getElementById('discountLines');
     if (!tbody) {
         console.error('discountLines tbody not found!');
@@ -929,7 +995,7 @@ function renderDiscountLines() {
     debug.log('tbody computed display:', window.getComputedStyle(tbody).display);
     debug.log('tbody parent (table) display:', window.getComputedStyle(tbody.parentElement).display);
 
-    calculateDiscountTotals();
+    calculateDiscountTotals(preserveStoredDiscounts);
 }
 
 function updateDiscountLine(index, field, value) {
@@ -944,8 +1010,8 @@ function removeDiscountLine(index) {
     generateJournalEntryPreview();
 }
 
-function calculateDiscountTotals() {
-    debug.log('calculateDiscountTotals called with', discountLines.length, 'lines');
+function calculateDiscountTotals(preserveStoredValue = false) {
+    debug.log('calculateDiscountTotals called with', discountLines.length, 'lines, preserveStoredValue:', preserveStoredValue);
     let totalDiscounts = 0;
 
     discountLines.forEach(line => {
@@ -956,10 +1022,70 @@ function calculateDiscountTotals() {
     debug.log('Setting discountTotal to', formatCurrency(totalDiscounts));
     document.getElementById('discountTotal').textContent = formatCurrency(totalDiscounts);
 
-    // Update discounts field on Totals tab
-    document.getElementById('discounts').value = totalDiscounts.toFixed(2);
+    // For POS-imported entries, don't overwrite the stored discounts value
+    // The stored value includes effective discounts (Gross - Payment Net) which captures
+    // percentage-based discounts that aren't individually tracked in discount_breakdown
+    if (!preserveStoredValue) {
+        document.getElementById('discounts').value = totalDiscounts.toFixed(2);
+    }
 
     calculateTotals();
+}
+
+// ==================== PAYOUT LINE MANAGEMENT ====================
+
+function renderPayoutLines() {
+    debug.log('renderPayoutLines called, payoutLines:', payoutLines);
+    const tbody = document.getElementById('payoutLines');
+    if (!tbody) {
+        console.error('payoutLines tbody not found!');
+        return;
+    }
+    tbody.innerHTML = '';
+
+    if (payoutLines.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td colspan="4" class="text-center text-muted">
+                No payouts recorded for this day
+            </td>
+        `;
+        tbody.appendChild(tr);
+    } else {
+        payoutLines.forEach((line, index) => {
+            const tr = document.createElement('tr');
+
+            // Format timestamp if available
+            let timeDisplay = '-';
+            if (line.timestamp) {
+                const date = new Date(line.timestamp);
+                timeDisplay = date.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+
+            tr.innerHTML = `
+                <td>${timeDisplay}</td>
+                <td>${line.employee || 'Unknown'}</td>
+                <td>${line.note || 'Cash payout'}</td>
+                <td class="text-end">${formatCurrency(line.amount)}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    calculatePayoutTotals();
+}
+
+function calculatePayoutTotals() {
+    let totalPayouts = 0;
+
+    payoutLines.forEach(line => {
+        totalPayouts += parseFloat(line.amount) || 0;
+    });
+
+    document.getElementById('payoutTotal').textContent = formatCurrency(totalPayouts);
 }
 
 function calculateTotals() {
@@ -968,7 +1094,6 @@ function calculateTotals() {
     const refunds = parseFloat(document.getElementById('refunds').value) || 0;
     const tax = parseFloat(document.getElementById('taxCollected').value) || 0;
     const tips = parseFloat(document.getElementById('tips').value) || 0;
-    const deposit = parseFloat(document.getElementById('depositAmount').value) || 0;
 
     // Net sales = Gross - Discounts - Refunds
     const netSales = gross - discounts - refunds;
@@ -978,8 +1103,64 @@ function calculateTotals() {
     const totalCollected = netSales + tax + tips;
     document.getElementById('totalCollected').value = totalCollected.toFixed(2);
 
-    // Variance = Deposit - Total Collected
-    const variance = deposit - totalCollected;
+    // Calculate deposits from stored DSS data or payment lines
+    let cardDeposit = 0;
+    let expectedCashDeposit = 0;
+
+    if (dss) {
+        // Use stored values from DSS if available
+        cardDeposit = parseFloat(dss.card_deposit) || 0;
+        expectedCashDeposit = parseFloat(dss.expected_cash_deposit) || 0;
+
+        // If no stored values, calculate from payment lines
+        if (cardDeposit === 0 && expectedCashDeposit === 0) {
+            let cardAmount = 0;
+            let cardTips = 0;
+            let cashAmount = 0;
+            let cashTips = 0;
+
+            paymentLines.forEach(line => {
+                const paymentType = (line.payment_type || '').toUpperCase();
+                const amount = parseFloat(line.amount) || 0;
+                const lineTips = parseFloat(line.tips) || 0;
+
+                if (paymentType === 'CARD' || paymentType === 'CREDIT CARD' || paymentType === 'DEBIT CARD') {
+                    cardAmount += amount;
+                    cardTips += lineTips;
+                } else if (paymentType === 'CASH') {
+                    cashAmount += amount;
+                    cashTips += lineTips;
+                }
+            });
+
+            // Card deposit = card amount + card tips - refunds
+            cardDeposit = cardAmount + cardTips - refunds;
+
+            // Calculate total payouts
+            let totalPayouts = 0;
+            payoutLines.forEach(line => {
+                totalPayouts += parseFloat(line.amount) || 0;
+            });
+
+            // Expected cash deposit = cash amount - cash tips - payouts
+            expectedCashDeposit = cashAmount - cashTips - totalPayouts;
+        }
+    }
+
+    document.getElementById('cardDeposit').value = cardDeposit.toFixed(2);
+    document.getElementById('expectedCashDeposit').value = expectedCashDeposit.toFixed(2);
+
+    // Get cash tips paid from DSS (tips paid out to employees from cash drawer)
+    const cashTipsPaid = dss ? (parseFloat(dss.cash_tips_paid) || 0) : 0;
+
+    // Total deposits = card deposit + expected cash deposit
+    const totalDeposits = cardDeposit + expectedCashDeposit;
+
+    // Variance = (Total Deposits + Cash Tips Paid) - Total Collected
+    // Card Deposit includes card tips (processor deposits them)
+    // Expected Cash Deposit = Cash Amount - Cash Tips Paid
+    // So: Card Deposit + Expected Cash + Cash Tips Paid = Card + Card Tips + Cash - Card Tips + Card Tips = Card + Cash + Card Tips = Total Collected
+    const variance = (totalDeposits + cashTipsPaid) - totalCollected;
     document.getElementById('variance').value = variance.toFixed(2);
 
     // Add negative class if variance is negative

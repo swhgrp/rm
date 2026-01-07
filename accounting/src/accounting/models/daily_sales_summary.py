@@ -37,8 +37,14 @@ class DailySalesSummary(Base):
     discount_breakdown = Column(JSONB, nullable=True)
     # Example: {"employee_discount": 50.00, "happy_hour": 100.00}
 
+    # Deposit fields - for reconciliation
+    card_deposit = Column(Numeric(15, 2), nullable=True)  # Card payments (amount + tips - refunds)
+    cash_tips_paid = Column(Numeric(15, 2), nullable=True, server_default="0.00")  # Cash tips paid out to employees
+    cash_payouts = Column(Numeric(15, 2), nullable=True, server_default="0.00")  # Cash payouts/adjustments (money taken from drawer)
+    payout_breakdown = Column(JSONB, nullable=True)  # Details of each payout: [{"amount": 50.00, "note": "Bank run", "employee": "John"}]
+
     # Cash reconciliation fields
-    expected_cash_deposit = Column(Numeric(15, 2), nullable=True)  # Expected cash from POS
+    expected_cash_deposit = Column(Numeric(15, 2), nullable=True)  # Cash sales - cash tips - payouts
     actual_cash_deposit = Column(Numeric(15, 2), nullable=True)  # Actual cash deposited (manager entry)
     cash_variance = Column(Numeric(15, 2), nullable=True)  # Actual - Expected
     cash_reconciled_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

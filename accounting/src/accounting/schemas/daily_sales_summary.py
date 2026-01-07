@@ -127,6 +127,12 @@ class DailySalesSummary(DailySalesSummaryBase):
     posted_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
+    # Deposit and payout fields
+    card_deposit: Optional[Decimal] = None
+    cash_tips_paid: Optional[Decimal] = None
+    cash_payouts: Optional[Decimal] = None
+    payout_breakdown: Optional[List[Dict[str, Any]]] = None
+
     # Cash reconciliation fields
     expected_cash_deposit: Optional[Decimal] = None
     actual_cash_deposit: Optional[Decimal] = None

@@ -65,6 +65,13 @@ class POSDailySalesCache(Base):
     categories = Column(JSONB)  # {"Food": 1500.00, "Beverages": 800.50}
     discounts = Column(JSONB)  # {"Employee Discount": 50.00, "Happy Hour": 100.00}
 
+    # Deposit calculation fields
+    card_deposit = Column(Numeric(12, 2))  # Card payments (amount + tips - card refunds)
+    cash_tips_paid = Column(Numeric(12, 2), default=0)  # Cash tips paid out to employees
+    cash_payouts = Column(Numeric(12, 2), default=0)  # Cash payouts/adjustments (money taken from drawer)
+    expected_cash_deposit = Column(Numeric(12, 2))  # Cash Sales - Cash Tips - Payouts
+    payout_breakdown = Column(JSONB)  # Details of each payout: [{"amount": 50.00, "note": "Bank run", "employee": "John"}]
+
     # Metadata
     synced_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     raw_summary = Column(JSONB)  # Store complete POS API response for audit

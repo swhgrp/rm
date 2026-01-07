@@ -120,11 +120,11 @@ class CloverAPIClient:
         return await self._make_request("GET", "orders", params=params)
 
     async def get_order(self, order_id: str) -> Dict[str, Any]:
-        """Get a single order by ID"""
+        """Get a single order by ID with full details"""
         return await self._make_request(
             "GET",
             f"orders/{order_id}",
-            params={"expand": "lineItems"}
+            params={"expand": "lineItems.item.categories,lineItems.discounts,payments.cardTransaction,payments.tender,discounts,refunds"}
         )
 
     async def get_order_line_items(self, order_id: str) -> Dict[str, Any]:
@@ -189,7 +189,7 @@ class CloverAPIClient:
 
         params = {
             "limit": limit,
-            "expand": "lineItems,order"  # Include line items and order info
+            "expand": "tender,cardTransaction,lineItems,order"  # Include tender type and card data for payment categorization
         }
 
         # Add date filters if provided
