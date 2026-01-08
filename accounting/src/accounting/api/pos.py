@@ -206,16 +206,17 @@ async def sync_pos_sales(
         raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
 
 
-@router.get("/daily-sales-cache", response_model=List[POSDailySalesCacheResponse])
+@router.get("/daily-sales-cache")
 def list_daily_sales_cache(
     area_id: Optional[int] = Query(None, description="Filter by area ID"),
     start_date: Optional[date] = Query(None, description="Filter from date"),
     end_date: Optional[date] = Query(None, description="Filter to date"),
-    limit: int = Query(100, le=1000, description="Max results"),
+    limit: int = Query(50, le=1000, description="Max results per page"),
+    offset: int = Query(0, ge=0, description="Number of records to skip"),
     db: Session = Depends(get_db),
     user: User = Depends(require_auth)
 ):
-    """List cached daily sales from POS"""
+    """List cached daily sales from POS with pagination"""
     service = POSSyncService(db)
     results = service.get_sales_summary(
         area_id=area_id,
@@ -223,7 +224,15 @@ def list_daily_sales_cache(
         end_date=end_date
     )
 
-    return results[:limit]
+    total_count = len(results)
+    paginated_results = results[offset:offset + limit]
+
+    return {
+        "items": paginated_results,
+        "total": total_count,
+        "limit": limit,
+        "offset": offset
+    }
 
 
 @router.get("/daily-sales-cache/{sale_date}", response_model=POSDailySalesCacheResponse)

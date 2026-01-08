@@ -222,9 +222,24 @@ async def root(request: Request, current_user=Depends(require_auth)):
 
 @app.on_event("startup")
 async def startup_event():
-    """Log startup"""
+    """Log startup and initialize background tasks"""
     logger.info("=" * 60)
     logger.info(f"Starting {settings.APP_NAME}")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
     logger.info(f"Debug Mode: {settings.DEBUG}")
     logger.info("=" * 60)
+
+    # Start CalDAV scheduler for bidirectional sync
+    if settings.CALDAV_ENABLED:
+        from events.services.caldav_scheduler import caldav_scheduler
+        await caldav_scheduler.start()
+        logger.info("CalDAV scheduler initialized")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    if settings.CALDAV_ENABLED:
+        from events.services.caldav_scheduler import caldav_scheduler
+        await caldav_scheduler.stop()
+        logger.info("CalDAV scheduler stopped")

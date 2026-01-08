@@ -1,6 +1,6 @@
 # Events System - Progress
 
-**Last Updated:** December 25, 2025
+**Last Updated:** January 8, 2026
 **Status:** 99% Complete - Production Ready
 
 ---
@@ -45,9 +45,15 @@ The Events System is a comprehensive event planning platform with calendar manag
 - Calendar items (meetings, reminders, notes, blocked time)
 - Location-based filtering
 
-### CalDAV Sync (Nov 14, 2025)
+### CalDAV Sync (Nov 14, 2025 → Enhanced Jan 8, 2026)
 - Radicale integration for iOS/macOS/Outlook sync
 - Per-venue calendar organization
+- **Bidirectional sync** (Jan 8, 2026):
+  - Push: Events → CalDAV (real-time on create/update/delete)
+  - Pull: CalDAV → Events (periodic every 15 minutes)
+  - Initial bulk sync when user first connects (1 month back + all future)
+  - Automatic scheduler for periodic sync
+  - API endpoints: `/api/events/caldav/initial-sync`, `/api/events/caldav/pull-changes`
 - Event details in calendar description
 - Automatic event removal for canceled events
 - Status mapping (DRAFT→TENTATIVE, CONFIRMED→CONFIRMED)
@@ -86,6 +92,15 @@ The Events System is a comprehensive event planning platform with calendar manag
 ---
 
 ## Recent Milestones
+
+### January 8, 2026
+- **Bidirectional CalDAV Sync**:
+  - Added `initial_sync_for_user()` method to push historical + future events when user first connects
+  - Added `pull_caldav_changes()` method to sync updates/deletions from CalDAV back to Events DB
+  - Created CalDAVScheduler background service (runs every 15 minutes for all active users)
+  - Added API endpoints: `/api/events/caldav/initial-sync`, `/api/events/caldav/pull-changes`
+  - Updated documentation with bidirectional sync architecture and usage
+  - Scheduler automatically starts on app startup when CalDAV is enabled
 
 ### December 8, 2025
 - CalDAV username fix (andy vs andy@swhgrp.com)

@@ -82,7 +82,9 @@
       "Bash(inventory/src/restaurant_inventory/main.py )",
       "Bash(inventory/alembic/versions/20260105_0001_add_uom_to_waste_records.py )",
       "Bash(claude.md )",
-      "Bash(CHANGELOG.md)"
+      "Bash(CHANGELOG.md)",
+      "Bash(git push:*)",
+      "Bash(timeout 3 curl:*)"
     ],
     "deny": [],
     "ask": []

@@ -140,6 +140,71 @@ class CalDAVSyncService:
             logger.error(f"Failed to sync event {event.id} to CalDAV: {e}")
             raise
 
+    def initial_sync_for_user(self, db: Session, user_email: str, lookback_months: int = 1):
+        """
+        Initial bulk sync when user joins calendar via CalDAV.
+        Pushes all events from lookback period + all future events.
+
+        Args:
+            db: Database session
+            user_email: Email of user joining the calendar
+            lookback_months: How many months back to sync (default: 1)
+
+        Returns:
+            dict with sync results: {'synced': N, 'errors': N}
+        """
+        from events.models.user import UserLocation
+        from datetime import timedelta
+
+        results = {'synced': 0, 'errors': 0}
+
+        try:
+            # Get user
+            user = db.query(User).filter(User.email == user_email).first()
+            if not user:
+                logger.error(f"User not found: {user_email}")
+                results['errors'] += 1
+                return results
+
+            # Get user's assigned venues
+            user_venues = db.query(UserLocation.venue_id).filter(
+                UserLocation.user_id == user.id
+            ).all()
+            user_venue_ids = [v[0] for v in user_venues]
+
+            if not user_venue_ids:
+                logger.info(f"User {user_email} has no assigned venues, skipping initial sync")
+                return results
+
+            # Calculate date range: lookback_months ago to infinity
+            cutoff_date = datetime.now() - timedelta(days=lookback_months * 30)
+
+            # Get all events for user's venues from cutoff date onwards
+            events = db.query(Event).filter(
+                Event.venue_id.in_(user_venue_ids),
+                Event.start_at >= cutoff_date,
+                Event.status.in_(['PENDING', 'CONFIRMED', 'CLOSED'])
+            ).order_by(Event.start_at).all()
+
+            logger.info(f"Initial sync for {user_email}: Found {len(events)} events from {cutoff_date.date()} onwards")
+
+            # Sync each event
+            for event in events:
+                try:
+                    self.sync_event_to_caldav(event, user_email)
+                    results['synced'] += 1
+                except Exception as e:
+                    logger.error(f"Failed to sync event {event.id} during initial sync: {e}")
+                    results['errors'] += 1
+
+            logger.info(f"Initial sync complete for {user_email}: {results}")
+
+        except Exception as e:
+            logger.error(f"Failed initial sync for {user_email}: {e}")
+            results['errors'] += 1
+
+        return results
+
     def sync_all_events_for_user(self, db: Session, user: User):
         """
         Sync all events for a user based on their assigned locations
@@ -475,6 +540,178 @@ class CalDAVSyncService:
 
         except Exception as e:
             logger.error(f"Failed to sync QuickHold changes: {e}")
+            results['errors'] += 1
+            db.rollback()
+
+        return results
+
+    def pull_caldav_changes(self, db: Session, user_email: str) -> dict:
+        """
+        Pull changes from CalDAV back to Events database (bidirectional sync).
+        Checks for events created, updated, or deleted in CalDAV that need to sync back.
+
+        This complements the existing push sync (Events → CalDAV) with pull sync (CalDAV → Events).
+
+        Args:
+            db: Database session
+            user_email: User email
+
+        Returns:
+            dict with counts: {'updated': N, 'deleted': N, 'created': N, 'errors': N}
+        """
+        from datetime import timedelta, timezone
+        import pytz
+
+        results = {'updated': 0, 'deleted': 0, 'created': 0, 'errors': 0, 'details': []}
+
+        try:
+            caldav_username = self._get_caldav_username(user_email)
+            client = caldav.DAVClient(
+                url=self.caldav_url,
+                headers={'X-Remote-User': caldav_username}
+            )
+
+            # Get user for venue access
+            user = db.query(User).filter(User.email == user_email).first()
+            if not user:
+                logger.error(f"User not found: {user_email}")
+                results['errors'] += 1
+                return results
+
+            principal = client.principal()
+            calendars = principal.calendars()
+
+            if not calendars:
+                logger.info(f"No calendars found for {caldav_username}")
+                return results
+
+            # Get all existing Events created by system (have @swhgrp.com UID)
+            # Build map of UID -> Event for quick lookup
+            existing_events = {}
+            all_events = db.query(Event).all()
+            for event in all_events:
+                uid = f"{event.id}@swhgrp.com"
+                existing_events[uid] = event
+
+            # Track which events we've seen in CalDAV
+            seen_event_uids = set()
+
+            # Search for events in date range (past month to next year)
+            now = datetime.now(timezone.utc)
+            start_date = now - timedelta(days=30)
+            end_date = now + timedelta(days=365)
+
+            for cal in calendars:
+                try:
+                    calendar_name = cal.name or "unnamed"
+                    logger.info(f"Pulling changes from calendar: {calendar_name}")
+
+                    # Fetch events in date range
+                    cal_events = cal.date_search(start=start_date, end=end_date)
+
+                    for cal_event in cal_events:
+                        try:
+                            # Parse the iCalendar data
+                            ical_data = cal_event.data
+                            ical = Calendar.from_ical(ical_data)
+
+                            for component in ical.walk():
+                                if component.name != "VEVENT":
+                                    continue
+
+                                uid = str(component.get('uid', ''))
+                                summary = str(component.get('summary', 'Untitled'))
+
+                                # Only process events that originated from our system
+                                if not uid.endswith('@swhgrp.com'):
+                                    continue
+
+                                seen_event_uids.add(uid)
+
+                                # Check if this event exists in our DB
+                                if uid in existing_events:
+                                    # Event exists - check for updates
+                                    event = existing_events[uid]
+                                    current_etag = getattr(cal_event, 'etag', None)
+
+                                    # Parse CalDAV event data
+                                    cal_summary = str(component.get('summary', ''))
+                                    cal_description = str(component.get('description', '')) or None
+                                    cal_location = str(component.get('location', '')) or None
+
+                                    dtstart = component.get('dtstart')
+                                    dtend = component.get('dtend')
+
+                                    # Convert dates
+                                    if dtstart:
+                                        start_dt = dtstart.dt
+                                        if not isinstance(start_dt, datetime):
+                                            start_dt = datetime.combine(start_dt, datetime.min.time()).replace(tzinfo=timezone.utc)
+                                        elif start_dt.tzinfo is None:
+                                            start_dt = start_dt.replace(tzinfo=timezone.utc)
+                                    else:
+                                        start_dt = None
+
+                                    if dtend:
+                                        end_dt = dtend.dt
+                                        if not isinstance(end_dt, datetime):
+                                            end_dt = datetime.combine(end_dt, datetime.min.time()).replace(tzinfo=timezone.utc)
+                                        elif end_dt.tzinfo is None:
+                                            end_dt = end_dt.replace(tzinfo=timezone.utc)
+                                    else:
+                                        end_dt = None
+
+                                    # Check if any fields changed
+                                    changed = False
+                                    if cal_summary and event.title != cal_summary:
+                                        event.title = cal_summary
+                                        changed = True
+                                    if cal_description != event.description:
+                                        event.description = cal_description
+                                        changed = True
+                                    if start_dt and event.start_at != start_dt:
+                                        event.start_at = start_dt
+                                        changed = True
+                                    if end_dt and event.end_at != end_dt:
+                                        event.end_at = end_dt
+                                        changed = True
+
+                                    # Parse status
+                                    cal_status = str(component.get('status', '')).upper()
+                                    if cal_status == 'CANCELLED':
+                                        event.status = 'CANCELED'
+                                        changed = True
+
+                                    if changed:
+                                        results['updated'] += 1
+                                        results['details'].append(f"Updated: {event.title}")
+                                        logger.info(f"Updated Event {event.id} from CalDAV changes")
+
+                        except Exception as e:
+                            logger.error(f"Error processing CalDAV event: {e}")
+                            results['errors'] += 1
+
+                except Exception as e:
+                    logger.error(f"Error processing calendar {calendar_name}: {e}")
+                    results['errors'] += 1
+
+            # Check for deleted events (exist in DB but not in CalDAV)
+            for uid, event in existing_events.items():
+                if uid not in seen_event_uids:
+                    # Event was deleted from CalDAV - mark as canceled
+                    # Only if event start_at is in our search range
+                    if start_date <= event.start_at <= end_date:
+                        if event.status not in ['CANCELED', 'CLOSED']:
+                            event.status = 'CANCELED'
+                            results['deleted'] += 1
+                            results['details'].append(f"Canceled (deleted from CalDAV): {event.title}")
+                            logger.info(f"Event {event.id} was deleted from CalDAV, marking as CANCELED")
+
+            db.commit()
+            logger.info(f"CalDAV pull sync complete for {caldav_username}: {results}")
+
+        except Exception as e:
+            logger.error(f"Failed to pull CalDAV changes for {user_email}: {e}")
             results['errors'] += 1
             db.rollback()
 

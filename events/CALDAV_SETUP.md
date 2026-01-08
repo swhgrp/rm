@@ -5,15 +5,37 @@ This guide explains how to set up CalDAV synchronization for the Events system, 
 ## Overview
 
 The CalDAV integration allows:
+- **Bidirectional sync** - Events sync both ways between the web app and calendar apps
 - **Automatic sync** of events to users' calendar apps
-- **Read-only access** to events based on assigned locations/venues
 - **Real-time updates** when events are created, updated, or canceled
+- **Initial bulk sync** - When users first connect, they receive all events from 1 month back + all future events
+- **Periodic pull sync** - Changes made in calendar apps are pulled back to the Events system every 15 minutes
 - **Cross-platform support** (iOS, Android, macOS, Windows, Linux)
 
 ## Architecture
 
 ```
-Events Database → CalDAV Sync Service → Radicale CalDAV Server → User Devices
+                       ┌─────────────────────────────┐
+                       │     Events Database         │
+                       └──────────▲──────────────────┘
+                                  │
+                    Push & Pull Sync (Bidirectional)
+                                  │
+                       ┌──────────▼──────────────────┐
+                       │  CalDAV Sync Service        │
+                       │  - initial_sync_for_user    │
+                       │  - sync_event_to_caldav     │
+                       │  - pull_caldav_changes      │
+                       │  - Periodic scheduler (15min)│
+                       └──────────▲──────────────────┘
+                                  │
+                       ┌──────────▼──────────────────┐
+                       │  Radicale CalDAV Server     │
+                       └──────────▲──────────────────┘
+                                  │
+                       ┌──────────▼──────────────────┐
+                       │  User Devices (iOS/Android) │
+                       └─────────────────────────────┘
 ```
 
 ## Option 1: Radicale (Recommended)
@@ -119,6 +141,50 @@ cd /opt/restaurant-system
 docker compose up caldav -d
 docker compose restart events-app nginx-proxy
 ```
+
+## Bidirectional Sync Features
+
+### Initial Sync
+
+When a user first connects their calendar via CalDAV, they should trigger an initial sync to receive historical events:
+
+**API Endpoint**: `POST /api/events/caldav/initial-sync`
+
+This will push:
+- All events from 1 month back
+- All future events
+- Events are organized by venue into separate calendars
+
+**Automatic Trigger**: The initial sync is automatically triggered when a user first accesses the Events system after CalDAV is enabled.
+
+### Ongoing Sync
+
+The system maintains bidirectional sync automatically:
+
+**Push (Events → CalDAV)**: Immediate
+- Creating an event → Instantly pushed to CalDAV
+- Updating an event → Instantly updated in CalDAV
+- Canceling/deleting an event → Instantly removed from CalDAV
+
+**Pull (CalDAV → Events)**: Every 15 minutes
+- Updates made in phone calendar → Pulled back to Events DB
+- Events canceled in phone calendar → Marked as CANCELED in Events DB
+- Background scheduler runs every 15 minutes for all active users
+
+**Manual Pull**: Users can manually trigger a pull sync via the API:
+
+**API Endpoint**: `POST /api/events/caldav/pull-changes`
+
+This will check for:
+- Event title/description changes made in calendar app
+- Event time changes made in calendar app
+- Events deleted in calendar app (marked as CANCELED)
+
+### Sync Limitations
+
+- Only events created by the Events system (UID ends with `@swhgrp.com`) are synced bidirectionally
+- New events created directly in phone calendar are imported as Quick Holds (separate feature)
+- Users can only modify events for their assigned venues
 
 ## Connecting Devices
 
@@ -324,10 +390,18 @@ CalDAV uses the same Portal SSO credentials. Ensure:
 - CalDAV clients typically cache data locally
 - Recommended sync interval: 15 minutes
 
+## Implemented Features
+
+- [x] Two-way sync (bidirectional sync between Events DB and CalDAV)
+- [x] Initial bulk sync when users first connect
+- [x] Automatic periodic pull sync (every 15 minutes)
+- [x] Real-time push sync on event changes
+- [x] Venue-based calendar organization
+
 ## Future Enhancements
 
-- [ ] Two-way sync (allow event updates from calendar apps)
 - [ ] Task synchronization
 - [ ] Shared calendars per venue/location
 - [ ] Calendar subscriptions (webcal:// URLs)
 - [ ] Email invitations with .ics attachments
+- [ ] Conflict detection and resolution UI

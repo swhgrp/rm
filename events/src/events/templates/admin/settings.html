@@ -10,27 +10,42 @@
     <ul class="nav nav-tabs mb-4" id="settingsTabs" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="locations-tab" data-bs-toggle="tab" data-bs-target="#locations" type="button" role="tab">
-                <i class="bi bi-geo-alt"></i> Locations
+                <i class="bi bi-geo-alt"></i> <span class="tab-text">Locations</span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="event-types-tab" data-bs-toggle="tab" data-bs-target="#event-types" type="button" role="tab">
-                <i class="bi bi-calendar3"></i> Event Types
+                <i class="bi bi-calendar3"></i> <span class="tab-text">Event Types</span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="beverage-tab" data-bs-toggle="tab" data-bs-target="#beverage" type="button" role="tab">
-                <i class="bi bi-cup-straw"></i> Beverage Services
+                <i class="bi bi-cup-straw"></i> <span class="tab-text">Beverages</span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="meal-types-tab" data-bs-toggle="tab" data-bs-target="#meal-types" type="button" role="tab">
-                <i class="bi bi-egg-fried"></i> Meal Types
+                <i class="bi bi-egg-fried"></i> <span class="tab-text">Meals</span>
             </button>
         </li>
         <li class="nav-item" role="presentation">
             <button class="nav-link" id="templates-tab" data-bs-toggle="tab" data-bs-target="#templates" type="button" role="tab">
-                <i class="bi bi-file-earmark-text"></i> Event Templates
+                <i class="bi bi-file-earmark-text"></i> <span class="tab-text">Templates</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">
+                <i class="bi bi-people-fill"></i> <span class="tab-text">Users</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="emails-tab" data-bs-toggle="tab" data-bs-target="#emails" type="button" role="tab">
+                <i class="bi bi-envelope"></i> <span class="tab-text">Emails</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="calendar-sync-tab" data-bs-toggle="tab" data-bs-target="#calendar-sync" type="button" role="tab">
+                <i class="bi bi-phone"></i> <span class="tab-text">Calendar Sync</span>
             </button>
         </li>
     </ul>
@@ -90,6 +105,330 @@
                 </button>
             </div>
             <div id="templatesTable" class="settings-table"></div>
+        </div>
+
+        <!-- Users & Roles Tab -->
+        <div class="tab-pane fade" id="users" role="tabpanel">
+            <div class="users-container">
+                <!-- Search and Filters -->
+                <div class="card-custom mb-4">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label-custom">Search Users</label>
+                            <input type="text" class="form-control-custom" id="searchInput" placeholder="Search by name or email...">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label-custom">Filter by Role</label>
+                            <select class="form-control-custom" id="roleFilter">
+                                <option value="">All Roles</option>
+                                <option value="admin">Admin</option>
+                                <option value="event_manager">Event Manager</option>
+                                <option value="dept_lead">Department Lead</option>
+                                <option value="staff">Staff</option>
+                                <option value="read_only">Read Only</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label-custom">Filter by Department</label>
+                            <input type="text" class="form-control-custom" id="deptFilter" placeholder="Department...">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label-custom">&nbsp;</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="includeInactive">
+                                <label class="form-check-label" for="includeInactive">Include Inactive</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Users Table -->
+                <div class="settings-header">
+                    <h3>Users <span id="userCount" class="badge bg-primary ms-2">0</span></h3>
+                    <button class="btn-secondary-custom" onclick="loadUsers()">
+                        <i class="bi bi-arrow-clockwise"></i> Refresh
+                    </button>
+                </div>
+                <div class="settings-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Email</th>
+                                <th>Venue Access</th>
+                                <th>Roles</th>
+                                <th>Status</th>
+                                <th style="width: 120px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody">
+                            <tr><td colspan="6" class="text-center py-4">Loading users...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Roles Reference -->
+                <div class="card-custom mt-4">
+                    <div class="card-custom-header"><i class="bi bi-shield-check"></i> Role Permissions Reference</div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong class="text-danger"><i class="bi bi-star-fill"></i> Admin</strong><br>
+                            <small class="text-muted">Full access to everything including user/role management</small></p>
+                            <p><strong style="color: #ffc107;"><i class="bi bi-calendar-check"></i> Event Manager</strong><br>
+                            <small class="text-muted">Can create/update events, tasks, and settings. Cannot manage users.</small></p>
+                            <p><strong style="color: #0dcaf0;"><i class="bi bi-briefcase"></i> Department Lead</strong><br>
+                            <small class="text-muted">Can manage tasks for their department, read events and financials</small></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong class="text-success"><i class="bi bi-person"></i> Staff (Default)</strong><br>
+                            <small class="text-muted">Can read/update assigned tasks only. Limited access.</small></p>
+                            <p><strong class="text-secondary"><i class="bi bi-eye"></i> Read Only</strong><br>
+                            <small class="text-muted">Read-only access. Cannot view financial data.</small></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Email History Tab -->
+        <div class="tab-pane fade" id="emails" role="tabpanel">
+            <div class="emails-container">
+                <!-- Stats Cards -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-3 col-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-primary"><i class="bi bi-envelope"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="totalEmails">0</div>
+                                <div class="stat-label">Total</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-success"><i class="bi bi-check-circle"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="sentEmails">0</div>
+                                <div class="stat-label">Sent</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-warning"><i class="bi bi-clock-history"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="queuedEmails">0</div>
+                                <div class="stat-label">Queued</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="stat-card">
+                            <div class="stat-icon bg-danger"><i class="bi bi-x-circle"></i></div>
+                            <div class="stat-content">
+                                <div class="stat-value" id="failedEmails">0</div>
+                                <div class="stat-label">Failed</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="card-custom mb-4">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label-custom">Status</label>
+                            <select class="form-control-custom" id="statusFilter">
+                                <option value="">All Statuses</option>
+                                <option value="sent">Sent</option>
+                                <option value="queued">Queued</option>
+                                <option value="failed">Failed</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label-custom">Time Period</label>
+                            <select class="form-control-custom" id="daysFilter">
+                                <option value="7">Last 7 days</option>
+                                <option value="30" selected>Last 30 days</option>
+                                <option value="90">Last 90 days</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label-custom">Limit</label>
+                            <select class="form-control-custom" id="limitFilter">
+                                <option value="50">50 emails</option>
+                                <option value="100" selected>100 emails</option>
+                                <option value="250">250 emails</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label-custom">&nbsp;</label>
+                            <button class="btn-primary-custom w-100" onclick="loadEmails()">
+                                <i class="bi bi-arrow-clockwise"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Email List -->
+                <div class="settings-header">
+                    <h3>Email Log <span id="emailCount" class="badge bg-primary ms-2">0</span></h3>
+                </div>
+                <div class="settings-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date/Time</th>
+                                <th>Subject</th>
+                                <th>Recipients</th>
+                                <th>Status</th>
+                                <th style="width: 80px;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="emailsTableBody">
+                            <tr><td colspan="5" class="text-center py-4">Loading emails...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Calendar Sync Tab -->
+        <div class="tab-pane fade" id="calendar-sync" role="tabpanel">
+            <div class="calendar-sync-container">
+                <div class="settings-header">
+                    <h3><i class="bi bi-phone"></i> Calendar Sync Setup</h3>
+                </div>
+
+                <div class="row">
+                    <div class="col-lg-6">
+                        <!-- iPhone Setup -->
+                        <div class="card-custom">
+                            <div class="card-custom-header">
+                                <i class="bi bi-apple"></i> iPhone / iPad Setup
+                            </div>
+                            <ol class="setup-steps">
+                                <li>Open <strong>Settings</strong> on your iPhone/iPad</li>
+                                <li>Scroll down and tap <strong>Calendar</strong></li>
+                                <li>Tap <strong>Accounts</strong></li>
+                                <li>Tap <strong>Add Account</strong></li>
+                                <li>Tap <strong>Other</strong></li>
+                                <li>Tap <strong>Add CalDAV Account</strong></li>
+                                <li>Enter these details:
+                                    <div class="setup-details">
+                                        <div class="detail-row">
+                                            <span class="detail-label">Server:</span>
+                                            <code class="detail-value">rm.swhgrp.com</code>
+                                            <button class="btn-copy" onclick="copyToClipboard('rm.swhgrp.com')" title="Copy">
+                                                <i class="bi bi-clipboard"></i>
+                                            </button>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span class="detail-label">Username:</span>
+                                            <code class="detail-value">Your portal username (e.g., andy)</code>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span class="detail-label">Password:</span>
+                                            <code class="detail-value">Your portal password</code>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span class="detail-label">Description:</span>
+                                            <code class="detail-value">SW Events</code>
+                                        </div>
+                                    </div>
+                                </li>
+                                <li>Tap <strong>Next</strong> to verify the connection</li>
+                                <li>Tap <strong>Save</strong></li>
+                            </ol>
+                            <div class="alert-custom alert-warning mt-3">
+                                <i class="bi bi-exclamation-triangle"></i>
+                                <strong>Important:</strong> Use your portal <u>username</u> (e.g., <code>andy</code>), NOT your email address.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <!-- Android Setup -->
+                        <div class="card-custom">
+                            <div class="card-custom-header">
+                                <i class="bi bi-android2"></i> Android Setup
+                            </div>
+                            <p class="text-muted mb-3">Android requires a third-party CalDAV app. We recommend <strong>DAVx5</strong>.</p>
+                            <ol class="setup-steps">
+                                <li>Install <strong>DAVx5</strong> from the Play Store</li>
+                                <li>Open DAVx5 and tap <strong>+</strong> to add account</li>
+                                <li>Select <strong>Login with URL and user name</strong></li>
+                                <li>Enter these details:
+                                    <div class="setup-details">
+                                        <div class="detail-row">
+                                            <span class="detail-label">Base URL:</span>
+                                            <code class="detail-value">https://rm.swhgrp.com/caldav/</code>
+                                            <button class="btn-copy" onclick="copyToClipboard('https://rm.swhgrp.com/caldav/')" title="Copy">
+                                                <i class="bi bi-clipboard"></i>
+                                            </button>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span class="detail-label">Username:</span>
+                                            <code class="detail-value">Your portal username</code>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span class="detail-label">Password:</span>
+                                            <code class="detail-value">Your portal password</code>
+                                        </div>
+                                    </div>
+                                </li>
+                                <li>Tap <strong>Login</strong></li>
+                                <li>Select the calendars you want to sync</li>
+                            </ol>
+                        </div>
+
+                        <!-- What to Expect -->
+                        <div class="card-custom mt-4">
+                            <div class="card-custom-header">
+                                <i class="bi bi-info-circle"></i> What You'll See
+                            </div>
+                            <p>Once connected, you'll have separate calendars for each venue:</p>
+                            <ul class="venue-list">
+                                <li><span class="venue-dot" style="background: #FF5733;"></span> The Links Grill</li>
+                                <li><span class="venue-dot" style="background: #33A1FF;"></span> SW Grill</li>
+                                <li><span class="venue-dot" style="background: #28A745;"></span> Seaside Grill</li>
+                                <li><span class="venue-dot" style="background: #FFC107;"></span> Park Bistro</li>
+                                <li><span class="venue-dot" style="background: #9C27B0;"></span> Okee Grill</li>
+                                <li><span class="venue-dot" style="background: #00BCD4;"></span> The Nest Eatery</li>
+                            </ul>
+                            <p class="text-muted mt-3 mb-0">
+                                <i class="bi bi-arrow-repeat"></i> <strong>Sync is one-way:</strong> Events from the web app sync to your phone.
+                                Changes made on your phone will NOT sync back to the Events system.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Troubleshooting -->
+                <div class="card-custom mt-4">
+                    <div class="card-custom-header">
+                        <i class="bi bi-wrench"></i> Troubleshooting
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-x-circle text-danger"></i> "Cannot Connect" or "Invalid Credentials"</h6>
+                            <ul class="text-muted">
+                                <li>Make sure you're using your <strong>username</strong>, not your email</li>
+                                <li>Check that your password is correct</li>
+                                <li>Ensure you have an active internet connection</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-calendar-x text-warning"></i> Events Not Showing</h6>
+                            <ul class="text-muted">
+                                <li>Only events created/updated after CalDAV setup will appear</li>
+                                <li>To sync older events, edit and save them in the Events system</li>
+                                <li>Check that the venue calendars are enabled in your phone's calendar app</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -206,6 +545,125 @@
             <div class="modal-footer">
                 <button type="button" class="btn-secondary-custom" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn-primary-custom" onclick="saveTemplate()">Save Template</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Role Management -->
+<div class="modal fade" id="roleModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="roleModalTitle">Manage Roles</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">User:</label>
+                    <p id="modalUserName" class="mb-1"></p>
+                    <p id="modalUserEmail" class="text-muted small"></p>
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Current Roles:</label>
+                    <div id="currentRoles" class="mb-3"></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Add Role:</label>
+                    <select class="form-control-custom" id="roleSelect">
+                        <option value="">Select a role to add...</option>
+                        <option value="admin">Admin</option>
+                        <option value="event_manager">Event Manager</option>
+                        <option value="dept_lead">Department Lead</option>
+                        <option value="staff">Staff</option>
+                        <option value="read_only">Read Only</option>
+                    </select>
+                    <button class="btn-primary-custom btn-sm mt-2" onclick="assignRole()">
+                        <i class="bi bi-plus-circle"></i> Add Role
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Venue Location Assignment -->
+<div class="modal fade" id="venueModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-geo-alt"></i> Manage Venue Access</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert-custom alert-warning">
+                    <i class="bi bi-info-circle"></i>
+                    <strong>Admin users</strong> always have access to all venues.
+                    <strong>Other users</strong>: Select specific venues or leave empty for access to all venues.
+                </div>
+                <p class="mb-3">
+                    <strong id="venueModalUserName"></strong>
+                    <span class="text-muted small" id="venueModalUserEmail"></span>
+                </p>
+                <div id="venueCheckboxes">
+                    <div class="text-center py-3">Loading venues...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary-custom" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn-primary-custom" onclick="saveUserVenues()">
+                    <i class="bi bi-check-circle"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Email Detail Modal -->
+<div class="modal fade" id="emailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Email Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Subject:</label>
+                    <p id="modalSubject"></p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">To:</label>
+                    <p id="modalTo"></p>
+                </div>
+                <div class="mb-3" id="modalCcSection" style="display: none;">
+                    <label class="form-label fw-bold">CC:</label>
+                    <p id="modalCc"></p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Sent At:</label>
+                    <p id="modalSentAt"></p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Status:</label>
+                    <p id="modalStatus"></p>
+                </div>
+                <div class="mb-3" id="modalErrorSection" style="display: none;">
+                    <label class="form-label fw-bold text-danger">Error Message:</label>
+                    <div class="alert-custom alert-error" id="modalError"></div>
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Email Body:</label>
+                    <iframe class="email-preview" id="modalBody" sandbox="allow-same-origin"></iframe>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary-custom" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn-danger-custom" id="resendBtn" style="display: none;" onclick="resendEmail()">
+                    <i class="bi bi-arrow-clockwise"></i> Resend Email
+                </button>
             </div>
         </div>
     </div>
@@ -478,6 +936,170 @@
     .btn-add-checklist:hover {
         border-color: var(--accent-primary);
         background-color: var(--bg-tertiary);
+    }
+
+    /* Responsive tabs - hide text on small screens */
+    @media (max-width: 992px) {
+        .nav-tabs .nav-link {
+            padding: 10px 12px;
+            margin-right: 4px;
+        }
+        .nav-tabs .nav-link .tab-text {
+            display: none;
+        }
+        .nav-tabs .nav-link i {
+            margin-right: 0;
+        }
+    }
+
+    /* Users Tab Styles */
+    .badge-role {
+        font-size: 0.75rem;
+        padding: 0.35em 0.65em;
+        margin-right: 0.25rem;
+        margin-bottom: 0.25rem;
+        display: inline-block;
+        border-radius: 4px;
+        color: white;
+    }
+    .badge-admin { background-color: #dc3545; }
+    .badge-event_manager { background-color: #ffc107; color: #000; }
+    .badge-dept_lead { background-color: #0dcaf0; color: #000; }
+    .badge-staff { background-color: #198754; }
+    .badge-read_only { background-color: #6c757d; }
+
+    .status-badge {
+        padding: 0.25rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+    .status-active { background-color: rgba(25, 135, 84, 0.1); color: #198754; }
+    .status-inactive { background-color: rgba(220, 53, 69, 0.1); color: #dc3545; }
+    .status-sent { background-color: rgba(25, 135, 84, 0.1); color: #198754; }
+    .status-queued { background-color: rgba(255, 193, 7, 0.1); color: #ffc107; }
+    .status-failed { background-color: rgba(220, 53, 69, 0.1); color: #dc3545; }
+
+    .venue-all-access {
+        background-color: rgba(25, 135, 84, 0.1);
+        color: #198754;
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+    }
+
+    .venue-checkbox-item {
+        padding: 0.5rem;
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+        background-color: var(--bg-tertiary);
+    }
+
+    /* Email Tab Styles */
+    .stat-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        color: white;
+    }
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        line-height: 1;
+    }
+    .stat-label {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+    .email-preview {
+        background-color: #fff;
+        width: 100%;
+        height: 400px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+    }
+
+    /* Calendar Sync Tab Styles */
+    .setup-steps {
+        padding-left: 1.5rem;
+        margin: 0;
+    }
+    .setup-steps li {
+        margin-bottom: 0.75rem;
+        line-height: 1.6;
+    }
+    .setup-details {
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        padding: 1rem;
+        margin-top: 0.5rem;
+    }
+    .detail-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .detail-row:last-child {
+        margin-bottom: 0;
+    }
+    .detail-label {
+        font-weight: 600;
+        min-width: 100px;
+        color: var(--text-secondary);
+    }
+    .detail-value {
+        background: var(--bg-primary);
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.9rem;
+    }
+    .btn-copy {
+        background: none;
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+        padding: 0.25rem 0.5rem;
+        cursor: pointer;
+        color: var(--text-secondary);
+        transition: all 0.2s;
+    }
+    .btn-copy:hover {
+        background: var(--bg-tertiary);
+        color: var(--accent-primary);
+    }
+    .venue-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    .venue-list li {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .venue-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
     }
 </style>
 {% endblock %}
@@ -1054,5 +1676,381 @@
     // Load settings on page load
     loadAllSettings();
     loadTemplates();
+
+    // ============= USERS MANAGEMENT =============
+    let currentUser = null;
+    let allUsers = [];
+    let allVenues = [];
+    let currentVenueUserId = null;
+
+    async function loadVenues() {
+        try {
+            const response = await fetch('api/events/venues/actual', { credentials: 'same-origin' });
+            if (response.ok) {
+                allVenues = await response.json();
+            }
+        } catch (error) {
+            console.error('Error loading venues:', error);
+        }
+    }
+
+    async function loadUsers() {
+        const includeInactive = document.getElementById('includeInactive')?.checked || false;
+        try {
+            const response = await fetch(`api/users/?include_inactive=${includeInactive}`, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('Failed to load users');
+            allUsers = await response.json();
+            filterUsers();
+        } catch (error) {
+            console.error('Error loading users:', error);
+            document.getElementById('usersTableBody').innerHTML = '<tr><td colspan="6" class="text-center py-4 text-danger">Failed to load users</td></tr>';
+        }
+    }
+
+    function filterUsers() {
+        const search = document.getElementById('searchInput')?.value?.toLowerCase() || '';
+        const roleFilter = document.getElementById('roleFilter')?.value || '';
+        const deptFilter = document.getElementById('deptFilter')?.value?.toLowerCase() || '';
+
+        let filtered = allUsers;
+        if (search) filtered = filtered.filter(u => u.full_name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search));
+        if (roleFilter) filtered = filtered.filter(u => u.roles.some(r => r.code === roleFilter));
+        if (deptFilter) filtered = filtered.filter(u => u.department && u.department.toLowerCase().includes(deptFilter));
+        renderUsers(filtered);
+    }
+
+    function renderUsers(users) {
+        const tbody = document.getElementById('usersTableBody');
+        const countEl = document.getElementById('userCount');
+        if (countEl) countEl.textContent = users.length;
+
+        if (users.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-muted">No users found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = users.map(user => {
+            const isAdmin = user.roles.some(r => r.code === 'admin');
+            return `
+            <tr>
+                <td style="font-weight: 600;">${escapeHtml(user.full_name)}</td>
+                <td>${escapeHtml(user.email)}</td>
+                <td>
+                    <button class="btn-icon" onclick="showVenueModal('${user.id}')" title="Manage Venue Access">
+                        <i class="bi bi-geo-alt"></i>
+                    </button>
+                    ${isAdmin ? '<span class="venue-all-access ms-1">All Access</span>' : ''}
+                </td>
+                <td>${user.roles.map(role => `<span class="badge-role badge-${role.code}">${role.name}</span>`).join('')}</td>
+                <td><span class="status-badge ${user.is_active ? 'status-active' : 'status-inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
+                <td>
+                    <div class="action-buttons">
+                        <button class="btn-icon" onclick='showRoleModal(${JSON.stringify(user)})' title="Manage Roles"><i class="bi bi-shield-check"></i></button>
+                        ${user.is_active ?
+                            `<button class="btn-icon delete" onclick="deactivateUser('${user.id}', '${escapeHtml(user.full_name)}')" title="Deactivate"><i class="bi bi-pause-circle"></i></button>` :
+                            `<button class="btn-icon" onclick="activateUser('${user.id}', '${escapeHtml(user.full_name)}')" title="Activate"><i class="bi bi-play-circle"></i></button>`
+                        }
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function showRoleModal(user) {
+        currentUser = user;
+        document.getElementById('modalUserName').textContent = user.full_name;
+        document.getElementById('modalUserEmail').textContent = user.email;
+        const rolesHtml = user.roles.map(role => `
+            <div class="d-flex justify-content-between align-items-center mb-2 p-2 rounded" style="background: var(--bg-tertiary);">
+                <span class="badge-role badge-${role.code}">${role.name}</span>
+                <button class="btn-icon delete" onclick="removeRole('${role.code}')" ${user.roles.length === 1 ? 'disabled title="Cannot remove last role"' : ''}>
+                    <i class="bi bi-x-circle"></i>
+                </button>
+            </div>
+        `).join('');
+        document.getElementById('currentRoles').innerHTML = rolesHtml;
+        document.getElementById('roleSelect').value = '';
+        new bootstrap.Modal(document.getElementById('roleModal')).show();
+    }
+
+    async function assignRole() {
+        const roleCode = document.getElementById('roleSelect').value;
+        if (!roleCode) { await showAlert('Please select a role to add', 'Validation Error'); return; }
+        try {
+            const response = await fetch(`api/users/${currentUser.id}/roles/${roleCode}`, { method: 'POST' });
+            if (!response.ok) { const error = await response.json(); throw new Error(error.detail || 'Failed to assign role'); }
+            await loadUsers();
+            bootstrap.Modal.getInstance(document.getElementById('roleModal')).hide();
+            await showAlert(`Role "${roleCode}" assigned successfully`, 'Success');
+        } catch (error) {
+            console.error('Error assigning role:', error);
+            await showAlert(error.message, 'Error');
+        }
+    }
+
+    async function removeRole(roleCode) {
+        const confirmed = await showConfirm(`Remove role "${roleCode}" from ${currentUser.full_name}?`, 'Remove Role');
+        if (!confirmed) return;
+        try {
+            const response = await fetch(`api/users/${currentUser.id}/roles/${roleCode}`, { method: 'DELETE' });
+            if (!response.ok) { const error = await response.json(); throw new Error(error.detail || 'Failed to remove role'); }
+            await loadUsers();
+            const updatedUser = allUsers.find(u => u.id === currentUser.id);
+            if (updatedUser) showRoleModal(updatedUser);
+            await showAlert(`Role "${roleCode}" removed`, 'Success');
+        } catch (error) {
+            await showAlert(error.message, 'Error');
+        }
+    }
+
+    async function deactivateUser(userId, userName) {
+        const confirmed = await showConfirm(`Deactivate user "${userName}"?`, 'Deactivate User');
+        if (!confirmed) return;
+        try {
+            const response = await fetch(`api/users/${userId}/deactivate`, { method: 'PATCH' });
+            if (!response.ok) throw new Error('Failed to deactivate');
+            await loadUsers();
+            await showAlert(`User "${userName}" deactivated`, 'Success');
+        } catch (error) {
+            await showAlert(error.message, 'Error');
+        }
+    }
+
+    async function activateUser(userId, userName) {
+        try {
+            const response = await fetch(`api/users/${userId}/activate`, { method: 'PATCH' });
+            if (!response.ok) throw new Error('Failed to activate');
+            await loadUsers();
+            await showAlert(`User "${userName}" activated`, 'Success');
+        } catch (error) {
+            await showAlert(error.message, 'Error');
+        }
+    }
+
+    async function showVenueModal(userId) {
+        currentVenueUserId = userId;
+        const user = allUsers.find(u => u.id === userId);
+        if (!user) { await showAlert('User not found', 'Error'); return; }
+
+        document.getElementById('venueModalUserName').textContent = user.full_name;
+        document.getElementById('venueModalUserEmail').textContent = ` (${user.email})`;
+        document.getElementById('venueCheckboxes').innerHTML = '<div class="text-center py-3">Loading venues...</div>';
+
+        new bootstrap.Modal(document.getElementById('venueModal')).show();
+
+        try {
+            const response = await fetch(`api/users/${userId}/locations`, { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('Failed to load user venues');
+            const userData = await response.json();
+            const assignedVenueIds = userData.assigned_venues.map(v => v.id);
+            const isAdmin = user.roles.some(r => r.code === 'admin');
+
+            if (allVenues.length === 0) {
+                document.getElementById('venueCheckboxes').innerHTML = '<p class="text-muted">No venues configured</p>';
+            } else {
+                document.getElementById('venueCheckboxes').innerHTML = allVenues.map(venue => `
+                    <div class="venue-checkbox-item">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="venue_${venue.id}" value="${venue.id}"
+                                ${assignedVenueIds.includes(venue.id) ? 'checked' : ''} ${isAdmin ? 'disabled' : ''}>
+                            <label class="form-check-label" for="venue_${venue.id}">
+                                <strong>${venue.name}</strong>
+                            </label>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } catch (error) {
+            document.getElementById('venueCheckboxes').innerHTML = `<div class="text-danger">Error: ${error.message}</div>`;
+        }
+    }
+
+    async function saveUserVenues() {
+        if (!currentVenueUserId) return;
+        try {
+            const checkboxes = document.querySelectorAll('#venueCheckboxes input[type="checkbox"]:not(:disabled)');
+            const selectedVenueIds = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+            const response = await fetch(`api/users/${currentVenueUserId}/locations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ venue_ids: selectedVenueIds })
+            });
+            if (!response.ok) throw new Error('Failed to save venues');
+            await showAlert('Venue access updated successfully!', 'Success');
+            bootstrap.Modal.getInstance(document.getElementById('venueModal')).hide();
+        } catch (error) {
+            await showAlert(error.message, 'Error');
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ============= EMAILS MANAGEMENT =============
+    let currentEmailId = null;
+    let emailsCache = {};
+
+    async function loadStats() {
+        const days = parseInt(document.getElementById('daysFilter')?.value || 30);
+        try {
+            const response = await fetch(`api/emails/stats/summary?days=${days}`);
+            if (!response.ok) throw new Error('Failed to load stats');
+            const stats = await response.json();
+            document.getElementById('totalEmails').textContent = stats.total || 0;
+            document.getElementById('sentEmails').textContent = stats.sent || 0;
+            document.getElementById('queuedEmails').textContent = stats.queued || 0;
+            document.getElementById('failedEmails').textContent = stats.failed || 0;
+        } catch (error) {
+            console.error('Error loading stats:', error);
+        }
+    }
+
+    async function loadEmails() {
+        const status = document.getElementById('statusFilter')?.value || '';
+        const days = parseInt(document.getElementById('daysFilter')?.value || 30);
+        const limit = parseInt(document.getElementById('limitFilter')?.value || 100);
+
+        const params = new URLSearchParams();
+        if (status) params.append('status_filter', status);
+        params.append('days', days);
+        params.append('limit', limit);
+
+        try {
+            const response = await fetch(`api/emails/?${params.toString()}`);
+            if (!response.ok) throw new Error('Failed to load emails');
+            const emails = await response.json();
+            renderEmails(emails);
+        } catch (error) {
+            document.getElementById('emailsTableBody').innerHTML = '<tr><td colspan="5" class="text-center py-4 text-danger">Failed to load emails</td></tr>';
+        }
+    }
+
+    function renderEmails(emails) {
+        const tbody = document.getElementById('emailsTableBody');
+        document.getElementById('emailCount').textContent = emails.length;
+        emailsCache = {};
+        emails.forEach(email => { emailsCache[email.id] = email; });
+
+        if (emails.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No emails found</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = emails.map(email => {
+            const createdAt = new Date(email.created_at);
+            const recipients = email.to_list.join(', ');
+            return `
+                <tr style="cursor: pointer;" onclick="showEmailModalById('${email.id}')">
+                    <td>
+                        <div style="font-weight: 600;">${createdAt.toLocaleDateString()}</div>
+                        <div class="text-muted small">${createdAt.toLocaleTimeString()}</div>
+                    </td>
+                    <td style="font-weight: 600;">${escapeHtml(email.subject)}</td>
+                    <td class="text-muted">${escapeHtml(recipients.substring(0, 40))}${recipients.length > 40 ? '...' : ''}</td>
+                    <td><span class="status-badge status-${email.status}">${email.status}</span></td>
+                    <td>
+                        <button class="btn-icon" onclick="event.stopPropagation(); showEmailModalById('${email.id}')" title="View"><i class="bi bi-eye"></i></button>
+                    </td>
+                </tr>`;
+        }).join('');
+    }
+
+    async function showEmailModalById(emailId) {
+        try {
+            const response = await fetch(`api/emails/${emailId}`);
+            if (!response.ok) throw new Error('Failed to load email');
+            const email = await response.json();
+            showEmailModal(email);
+        } catch (error) {
+            await showAlert('Failed to load email details', 'Error');
+        }
+    }
+
+    function showEmailModal(email) {
+        currentEmailId = email.id;
+        document.getElementById('modalSubject').textContent = email.subject;
+        document.getElementById('modalTo').textContent = email.to_list.join(', ');
+
+        if (email.cc_list && email.cc_list.length > 0) {
+            document.getElementById('modalCcSection').style.display = 'block';
+            document.getElementById('modalCc').textContent = email.cc_list.join(', ');
+        } else {
+            document.getElementById('modalCcSection').style.display = 'none';
+        }
+
+        document.getElementById('modalSentAt').textContent = email.sent_at ? new Date(email.sent_at).toLocaleString() : 'Not sent yet';
+        document.getElementById('modalStatus').innerHTML = `<span class="status-badge status-${email.status}">${email.status}</span>`;
+
+        if (email.error_message) {
+            document.getElementById('modalErrorSection').style.display = 'block';
+            document.getElementById('modalError').textContent = email.error_message;
+        } else {
+            document.getElementById('modalErrorSection').style.display = 'none';
+        }
+
+        const iframe = document.getElementById('modalBody');
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        iframeDoc.open();
+        iframeDoc.write(email.body_html);
+        iframeDoc.close();
+
+        document.getElementById('resendBtn').style.display = email.status === 'failed' ? 'inline-block' : 'none';
+        new bootstrap.Modal(document.getElementById('emailModal')).show();
+    }
+
+    async function resendEmail() {
+        if (!currentEmailId) return;
+        const confirmed = await showConfirm('Resend this email?', 'Resend Email');
+        if (!confirmed) return;
+        try {
+            const response = await fetch(`api/emails/${currentEmailId}/resend`, { method: 'POST' });
+            if (!response.ok) throw new Error('Failed to resend');
+            await showAlert('Email queued for resending', 'Success');
+            bootstrap.Modal.getInstance(document.getElementById('emailModal')).hide();
+            await loadStats();
+            await loadEmails();
+        } catch (error) {
+            await showAlert(error.message, 'Error');
+        }
+    }
+
+    // ============= CALENDAR SYNC =============
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+            showAlert('Copied to clipboard!', 'Success');
+        }).catch(err => {
+            console.error('Failed to copy:', err);
+        });
+    }
+
+    // ============= TAB CHANGE HANDLER =============
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load data when tab is shown
+        const settingsTabs = document.getElementById('settingsTabs');
+        if (settingsTabs) {
+            settingsTabs.addEventListener('shown.bs.tab', function(e) {
+                const targetId = e.target.getAttribute('data-bs-target');
+                if (targetId === '#users') {
+                    loadVenues();
+                    loadUsers();
+                    // Set up filter listeners
+                    document.getElementById('searchInput')?.addEventListener('input', filterUsers);
+                    document.getElementById('roleFilter')?.addEventListener('change', filterUsers);
+                    document.getElementById('deptFilter')?.addEventListener('input', filterUsers);
+                    document.getElementById('includeInactive')?.addEventListener('change', loadUsers);
+                } else if (targetId === '#emails') {
+                    loadStats();
+                    loadEmails();
+                    // Set up filter listeners
+                    document.getElementById('statusFilter')?.addEventListener('change', loadEmails);
+                    document.getElementById('daysFilter')?.addEventListener('change', () => { loadStats(); loadEmails(); });
+                    document.getElementById('limitFilter')?.addEventListener('change', loadEmails);
+                }
+            });
+        }
+    });
 </script>
 {% endblock %}

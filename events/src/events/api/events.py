@@ -7,7 +7,7 @@ from uuid import UUID
 import logging
 
 from events.core.database import get_db
-from events.core.deps import require_auth, require_role, require_permission, check_permission
+from events.core.deps import require_auth, require_role, require_permission, check_permission, get_current_user
 from events.models import Event, EventStatus, Venue, Client, Task, TaskStatus, User
 from events.schemas.event import EventCreate, EventUpdate, EventResponse, EventListItem
 from events.services.caldav_sync_service import CalDAVSyncService
@@ -437,3 +437,59 @@ async def delete_event(
     # TODO: Audit log
 
     return None
+
+
+@router.post("/caldav/initial-sync", status_code=status.HTTP_200_OK)
+async def caldav_initial_sync(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Initial bulk CalDAV sync for user joining calendar.
+    Pushes all events from 1 month back + all future events to user's CalDAV calendar.
+
+    This should be called when a user first connects their calendar via CalDAV.
+    """
+    if not settings.CALDAV_ENABLED:
+        raise HTTPException(status_code=400, detail="CalDAV sync is not enabled")
+
+    try:
+        caldav_service = CalDAVSyncService()
+        results = caldav_service.initial_sync_for_user(db, current_user.email, lookback_months=1)
+        return {
+            "success": True,
+            "message": f"Initial sync complete: {results['synced']} events synced",
+            "results": results
+        }
+    except Exception as e:
+        logger.error(f"Initial CalDAV sync failed for {current_user.email}: {e}")
+        raise HTTPException(status_code=500, detail=f"Initial sync failed: {str(e)}")
+
+
+@router.post("/caldav/pull-changes", status_code=status.HTTP_200_OK)
+async def caldav_pull_changes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Pull changes from CalDAV back to Events database (bidirectional sync).
+    Checks for events that were updated or deleted in CalDAV and syncs changes back.
+
+    This enables two-way sync:
+    - Events created/updated/deleted in web app → automatically pushed to CalDAV
+    - Events updated/deleted in phone calendar → pulled back via this endpoint
+    """
+    if not settings.CALDAV_ENABLED:
+        raise HTTPException(status_code=400, detail="CalDAV sync is not enabled")
+
+    try:
+        caldav_service = CalDAVSyncService()
+        results = caldav_service.pull_caldav_changes(db, current_user.email)
+        return {
+            "success": True,
+            "message": f"CalDAV pull complete: {results['updated']} updated, {results['deleted']} deleted",
+            "results": results
+        }
+    except Exception as e:
+        logger.error(f"CalDAV pull sync failed for {current_user.email}: {e}")
+        raise HTTPException(status_code=500, detail=f"Pull sync failed: {str(e)}")
