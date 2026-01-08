@@ -1,6 +1,6 @@
 # Accounting System - Progress
 
-**Last Updated:** December 27, 2025
+**Last Updated:** January 8, 2026
 **Status:** 95% Complete - Production Ready
 
 ---
@@ -93,6 +93,24 @@ The Accounting System is the most complex system in the platform with 157 Python
 ---
 
 ## Recent Milestones
+
+### January 8, 2026
+- **POS Sync Critical Fixes**:
+  - Fixed Clover API date filtering (added end date filter to prevent fetching wrong date's data)
+  - Fixed Clover `unitQty` handling - FIXED price items use qty=1 per line item, PER_UNIT items scale by 1000
+  - Added `lineItems.item.priceType` and `lineItems.modifications` to API expand params
+  - Fixed modifier prices being added to gross sales calculation
+- **Dashboard Improvements**:
+  - Draft DSS entries now included in Net Sales and Sales Breakdown on dashboard
+  - Dashboard shows real-time sales even before DSS is posted to GL
+- **POS Sync UI Updates**:
+  - Renamed "Total Sales" to "Net Sales" in Cached Sales Data table
+  - Fixed Synced At timestamp to show local EST instead of UTC
+  - Added pagination (50 per page) to Cached Sales Data
+  - Removed redundant "Import to DSS" button (sync auto-creates DSS)
+- **Auto-Sync Scheduler Fix**:
+  - Scheduler now checks for existing DSS entry instead of just timestamp
+  - Manual syncs no longer block scheduled 3 AM syncs
 
 ### December 27, 2025
 - **Location Sync from Inventory**: Accounting now syncs locations from Inventory (source of truth)

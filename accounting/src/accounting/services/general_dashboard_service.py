@@ -295,8 +295,13 @@ class GeneralDashboardService:
     # ========================================================================
 
     def _get_revenue(self, start_date: date, end_date: date, area_id: Optional[int]) -> Decimal:
-        """Get total revenue for period (net of discounts/contra-revenue)"""
-        # Get revenue credits (gross sales)
+        """Get total revenue for period (net of discounts/contra-revenue)
+
+        Combines:
+        1. Posted journal entries (revenue accounts)
+        2. Draft DSS entries (that don't have journal entries yet)
+        """
+        # Get revenue from posted journal entries
         revenue_credits = self._get_account_type_balance(
             AccountType.REVENUE,
             start_date,
@@ -314,8 +319,26 @@ class GeneralDashboardService:
             is_credit=False
         )
 
-        # Net revenue = Credits - Debits
-        return revenue_credits - revenue_debits
+        # Net revenue from posted JEs
+        je_revenue = revenue_credits - revenue_debits
+
+        # Add revenue from draft DSS entries (not yet posted to GL)
+        # This ensures dashboard shows current sales even before DSS is posted
+        draft_dss_query = self.db.query(
+            func.sum(DailySalesSummary.net_sales).label('total')
+        ).filter(
+            DailySalesSummary.business_date >= start_date,
+            DailySalesSummary.business_date <= end_date,
+            DailySalesSummary.status == 'draft',
+            DailySalesSummary.journal_entry_id.is_(None)  # No JE created yet
+        )
+
+        if area_id:
+            draft_dss_query = draft_dss_query.filter(DailySalesSummary.area_id == area_id)
+
+        draft_dss_revenue = draft_dss_query.scalar() or Decimal('0.00')
+
+        return je_revenue + Decimal(str(draft_dss_revenue))
 
     def _get_cogs(self, start_date: date, end_date: date, area_id: Optional[int]) -> Decimal:
         """Get total COGS for period"""
@@ -405,13 +428,17 @@ class GeneralDashboardService:
     # ========================================================================
 
     def _get_daily_sales_metrics(self, as_of_date: date, area_id: Optional[int]) -> DailySalesMetrics:
-        """Get daily sales metrics from Daily Sales Summary (posted entries)"""
-        # Get today's sales from posted DSS entries
+        """Get daily sales metrics from Daily Sales Summary (draft and posted entries)"""
+        # Include both draft and posted entries so dashboard shows current data
+        # As entries are verified/corrected, the dashboard will update
+        valid_statuses = ['draft', 'posted']
+
+        # Get today's sales from DSS entries
         today_query = self.db.query(
             func.sum(DailySalesSummary.net_sales).label('total')
         ).filter(
             DailySalesSummary.business_date == as_of_date,
-            DailySalesSummary.status == 'posted'
+            DailySalesSummary.status.in_(valid_statuses)
         )
 
         if area_id:
@@ -428,7 +455,7 @@ class GeneralDashboardService:
         ).filter(
             DailySalesSummary.business_date >= month_start,
             DailySalesSummary.business_date <= as_of_date,
-            DailySalesSummary.status == 'posted'
+            DailySalesSummary.status.in_(valid_statuses)
         )
 
         if area_id:
@@ -448,7 +475,7 @@ class GeneralDashboardService:
             func.sum(DailySalesSummary.net_sales)
         ).filter(
             DailySalesSummary.business_date == prior_day,
-            DailySalesSummary.status == 'posted'
+            DailySalesSummary.status.in_(valid_statuses)
         )
 
         if area_id:
@@ -778,15 +805,23 @@ class GeneralDashboardService:
         return locations
 
     def _get_revenue_by_category(self, start_date: date, end_date: date, area_id: Optional[int]) -> List:
-        """Get revenue by category (net of discounts)"""
+        """Get revenue by category (GL categories like Food Sales, Beverage Sales)
+
+        Combines:
+        1. Posted journal entries by revenue account
+        2. Draft DSS category breakdowns (not yet posted to GL)
+        """
         from accounting.schemas.general_dashboard import RevenueCategory
         import logging
         logger = logging.getLogger(__name__)
 
         logger.info(f"Getting revenue by category: start={start_date}, end={end_date}, area_id={area_id}")
 
-        # Get revenue credits (gross) by account
-        query = self.db.query(
+        # Dictionary to accumulate category amounts
+        category_totals = {}
+
+        # 1. Get revenue from posted journal entries by account name
+        je_query = self.db.query(
             Account.account_name,
             func.sum(JournalEntryLine.credit_amount).label('credits'),
             func.sum(JournalEntryLine.debit_amount).label('debits')
@@ -802,32 +837,53 @@ class GeneralDashboardService:
         )
 
         if area_id:
-            query = query.filter(JournalEntryLine.area_id == area_id)
+            je_query = je_query.filter(JournalEntryLine.area_id == area_id)
 
-        query = query.group_by(Account.account_name)
-        results = query.all()
+        je_query = je_query.group_by(Account.account_name)
+        je_results = je_query.all()
 
-        logger.info(f"Query returned {len(results)} results")
-
-        # Calculate net amounts (credits - debits) and total
-        category_amounts = []
-        total_revenue = Decimal('0.00')
-
-        for account_name, credits, debits in results:
+        for account_name, credits, debits in je_results:
             credits_dec = Decimal(str(credits)) if credits else Decimal('0.00')
             debits_dec = Decimal(str(debits)) if debits else Decimal('0.00')
             net_amount = credits_dec - debits_dec
 
-            if net_amount > 0:  # Only include positive net revenue (exclude contra-revenue with net negative)
-                category_amounts.append((account_name, net_amount))
-                total_revenue += net_amount
+            if net_amount > 0:
+                category_totals[account_name] = category_totals.get(account_name, Decimal('0.00')) + net_amount
+
+        # 2. Get revenue from draft DSS entries (not yet posted to GL)
+        draft_dss_query = self.db.query(
+            DailySalesSummary.category_breakdown
+        ).filter(
+            DailySalesSummary.business_date >= start_date,
+            DailySalesSummary.business_date <= end_date,
+            DailySalesSummary.status == 'draft',
+            DailySalesSummary.journal_entry_id.is_(None),
+            DailySalesSummary.category_breakdown.isnot(None)
+        )
+
+        if area_id:
+            draft_dss_query = draft_dss_query.filter(DailySalesSummary.area_id == area_id)
+
+        draft_results = draft_dss_query.all()
+
+        for (category_breakdown,) in draft_results:
+            if category_breakdown:
+                for category_name, amount in category_breakdown.items():
+                    # Capitalize category name for display (e.g., "food" -> "Food Sales")
+                    display_name = f"{category_name.title()} Sales" if not category_name.endswith('Sales') else category_name.title()
+                    amount_dec = Decimal(str(amount)) if amount else Decimal('0.00')
+                    if amount_dec > 0:
+                        category_totals[display_name] = category_totals.get(display_name, Decimal('0.00')) + amount_dec
+
+        # Calculate total revenue
+        total_revenue = sum(category_totals.values())
 
         # Sort by amount descending
-        category_amounts.sort(key=lambda x: x[1], reverse=True)
+        sorted_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)
 
         # Build response
         categories = []
-        for category_name, amount in category_amounts:
+        for category_name, amount in sorted_categories:
             pct_of_total = (amount / total_revenue * 100) if total_revenue > 0 else Decimal('0.00')
             categories.append(RevenueCategory(
                 category_name=category_name,

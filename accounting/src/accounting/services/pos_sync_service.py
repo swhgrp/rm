@@ -118,13 +118,35 @@ class POSSyncService:
                 )
                 all_payments = payments_response.get("elements", [])
 
+                logger.info(f"API returned {len(all_payments)} payments for {current_date}")
+
                 # Filter payments within date range
                 day_payments = []
+                filtered_out_before = 0
+                filtered_out_after = 0
+                filtered_failed = 0
                 for payment in all_payments:
                     payment_time = payment.get("createdTime", 0)
-                    if day_start_ms <= payment_time <= day_end_ms:
-                        if payment.get("result") == "SUCCESS":
-                            day_payments.append(payment)
+                    payment_result = payment.get("result", "")
+
+                    if payment_time < day_start_ms:
+                        filtered_out_before += 1
+                    elif payment_time > day_end_ms:
+                        filtered_out_after += 1
+                    elif payment_result != "SUCCESS":
+                        filtered_failed += 1
+                    else:
+                        day_payments.append(payment)
+
+                if filtered_out_before > 0 or filtered_out_after > 0:
+                    # Log sample timestamps for debugging
+                    sample_times = [p.get("createdTime", 0) for p in all_payments[:3]]
+                    logger.warning(
+                        f"Date filter issue for {current_date} area {config.area_id}: "
+                        f"API returned {len(all_payments)}, kept {len(day_payments)}, "
+                        f"before_range={filtered_out_before}, after_range={filtered_out_after}, failed={filtered_failed}. "
+                        f"Range: {day_start_ms}-{day_end_ms}, sample times: {sample_times}"
+                    )
 
                 # Fetch ORDERS for this day (for category breakdown)
                 orders_response = await client.get_orders(
@@ -142,22 +164,39 @@ class POSSyncService:
 
                 # Find missing orders (payments reference orders not in our date range)
                 missing_order_ids = []
+                payments_without_order = 0
                 for payment in day_payments:
                     payment_order = payment.get("order", {})
                     order_id = payment_order.get("id") if payment_order else None
                     if order_id and order_id not in order_lookup:
                         missing_order_ids.append(order_id)
+                    elif not order_id:
+                        payments_without_order += 1
+                        payment_amount = Decimal(payment.get("amount", 0)) / 100
+                        logger.warning(f"Payment {payment.get('id')} has no order reference, amount=${payment_amount}")
+
+                if payments_without_order > 0:
+                    logger.warning(f"{payments_without_order} payments have no order reference - line items may be missing from gross sales")
 
                 # Fetch missing orders individually
                 if missing_order_ids:
                     logger.info(f"Fetching {len(missing_order_ids)} missing orders referenced by payments")
+                    orders_fetched = 0
+                    orders_not_locked = 0
                     for order_id in missing_order_ids:
                         try:
                             order = await client.get_order(order_id)
-                            if order and order.get("state", "").upper() == "LOCKED":
-                                order_lookup[order_id] = order
+                            if order:
+                                order_state = order.get("state", "").upper()
+                                if order_state == "LOCKED":
+                                    order_lookup[order_id] = order
+                                    orders_fetched += 1
+                                else:
+                                    orders_not_locked += 1
+                                    logger.debug(f"Order {order_id} not LOCKED (state={order_state}), skipping")
                         except Exception as e:
                             logger.warning(f"Could not fetch order {order_id}: {e}")
+                    logger.info(f"Fetched {orders_fetched} missing orders, {orders_not_locked} not locked")
 
                 # Fetch CASH EVENTS for this day (payouts, adjustments)
                 # Note: This endpoint requires additional Clover permissions
@@ -611,8 +650,34 @@ class POSSyncService:
                                 continue
 
                             item_price = Decimal(item.get("price", 0)) / 100
-                            item_qty = item.get("unitQty", 1)
-                            item_total = item_price * Decimal(item_qty)
+
+                            # Clover line item quantity handling:
+                            # - For PER_UNIT items (sold by weight/length): unitQty is scaled by 1000
+                            #   e.g., unitQty=2500 means 2.5 units, price = item_price * (unitQty/1000)
+                            # - For FIXED price items: each line item represents 1 unit
+                            #   Multiple quantities = multiple line items in the order
+                            #
+                            # Check priceType to determine how to handle quantity
+                            price_type = None
+                            if item.get("item") and item["item"].get("priceType"):
+                                price_type = item["item"]["priceType"]
+
+                            if price_type == "PER_UNIT":
+                                # Per-unit item: use unitQty scaled by 1000
+                                raw_qty = item.get("unitQty", 1000) or 1000
+                                item_qty = Decimal(raw_qty) / Decimal(1000)
+                            else:
+                                # Fixed price item: each line item = 1 unit
+                                item_qty = Decimal(1)
+
+                            item_total = item_price * item_qty
+
+                            # Add modification prices (add-ons like "extra cheese", "add bacon")
+                            # Modifications are priced additions to the base item
+                            if item.get("modifications") and item["modifications"].get("elements"):
+                                for mod in item["modifications"]["elements"]:
+                                    mod_price = Decimal(mod.get("amount", 0)) / 100
+                                    item_total += mod_price * item_qty
 
                             # Get category
                             category_name = "Uncategorized"
@@ -640,8 +705,16 @@ class POSSyncService:
                             if item.get("deleted"):
                                 continue
                             item_price = Decimal(item.get("price", 0)) / 100
-                            item_qty = item.get("unitQty", 1)
-                            order_line_items_total += item_price * Decimal(item_qty)
+                            # Check priceType for quantity handling
+                            price_type = None
+                            if item.get("item") and item["item"].get("priceType"):
+                                price_type = item["item"]["priceType"]
+                            if price_type == "PER_UNIT":
+                                raw_qty = item.get("unitQty", 1000) or 1000
+                                item_qty = Decimal(raw_qty) / Decimal(1000)
+                            else:
+                                item_qty = Decimal(1)
+                            order_line_items_total += item_price * item_qty
 
                     # Extract discounts from order (order-level discounts)
                     if order.get("discounts") and order["discounts"].get("elements"):
@@ -673,8 +746,16 @@ class POSSyncService:
                                         # Calculate percentage-based discount from item total
                                         percentage = Decimal(disc["percentage"])
                                         item_price = Decimal(item.get("price", 0)) / 100
-                                        item_qty = item.get("unitQty", 1)
-                                        item_total = item_price * Decimal(item_qty)
+                                        # Check priceType for quantity handling
+                                        price_type = None
+                                        if item.get("item") and item["item"].get("priceType"):
+                                            price_type = item["item"]["priceType"]
+                                        if price_type == "PER_UNIT":
+                                            raw_qty = item.get("unitQty", 1000) or 1000
+                                            item_qty = Decimal(raw_qty) / Decimal(1000)
+                                        else:
+                                            item_qty = Decimal(1)
+                                        item_total = item_price * item_qty
                                         disc_amount = item_total * percentage / 100
                                     else:
                                         disc_amount = Decimal('0')
@@ -690,11 +771,32 @@ class POSSyncService:
 
         # Gross sales should be calculated from line items (what Clover reports)
         line_items_total = sum(categories.values())
+
+        # Calculate gross from payments for comparison
+        # payment_net = what customer actually paid (minus tax)
+        # For Clover: total_payment_amount = taxable_amount + tax (discounts already applied)
+        payment_net = total_payment_amount - total_tax
+
         if line_items_total > 0:
             gross_sales = line_items_total
+            # Log discrepancy if line items total differs significantly from payment net
+            # Large discrepancy indicates either discounts or data issues
+            gross_diff = float(line_items_total) - float(payment_net)
+            if abs(gross_diff) > 100:  # More than $100 difference
+                # Log top categories for debugging
+                sorted_cats = sorted(categories.items(), key=lambda x: x[1], reverse=True)[:5]
+                top_cats_str = ", ".join([f"{k}=${float(v):.2f}" for k, v in sorted_cats])
+                logger.warning(
+                    f"Gross vs Net discrepancy: line_items=${float(line_items_total):.2f}, "
+                    f"payment_net=${float(payment_net):.2f}, "
+                    f"difference=${gross_diff:.2f} (likely discounts). "
+                    f"processed_orders={len(processed_order_ids)}, payments={len(payments)}. "
+                    f"Top categories: {top_cats_str}"
+                )
         else:
             # Fallback: derive from payment data
-            gross_sales = total_payment_amount - total_tax + total_discounts
+            gross_sales = payment_net + total_discounts
+            logger.warning(f"No line items found, using payments-based gross: ${float(gross_sales):.2f}")
 
         # Calculate net sales using Clover's formula:
         # Net Sales = Gross Sales - Discounts - Refunds

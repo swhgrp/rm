@@ -101,21 +101,31 @@ class CloverAPIClient:
         params = {
             "limit": limit,
             "offset": offset,
-            "expand": "lineItems.item.categories,lineItems.discounts,payments.cardTransaction,payments.tender,discounts,refunds"  # Include all order details with payment card data and discounts
+            "expand": "lineItems.item.categories,lineItems.item.priceType,lineItems.discounts,lineItems.modifications,payments.cardTransaction,payments.tender,discounts,refunds"  # Include all order details with payment card data, discounts, modifications, and priceType
         }
 
         # Add date filters if provided
         # Clover uses millisecond timestamps for filtering
-        # Note: Clover API doesn't support AND operations in filters
-        # We can only filter by one condition, so we use start_date and filter end_date manually
+        # Clover API supports multiple filters using repeated &filter= params
+        filters = []
         if start_date:
             # Use clientCreatedTime which is when order was placed at the POS device
             start_ms = int(datetime.combine(start_date, datetime.min.time()).timestamp() * 1000)
-            params["filter"] = f"clientCreatedTime>={start_ms}"
-        elif end_date:
-            # Only use end_date filter if no start_date
+            filters.append(f"clientCreatedTime>={start_ms}")
+        if end_date:
             end_ms = int(datetime.combine(end_date, datetime.max.time()).timestamp() * 1000)
-            params["filter"] = f"clientCreatedTime<={end_ms}"
+            filters.append(f"clientCreatedTime<={end_ms}")
+
+        if filters:
+            params["filter"] = filters[0]
+
+        # Make request - if multiple filters, we need to add them as separate query params
+        if len(filters) > 1:
+            query_parts = [f"{k}={v}" for k, v in params.items() if k != "filter"]
+            for f in filters:
+                query_parts.append(f"filter={f}")
+            query_string = "&".join(query_parts)
+            return await self._make_request("GET", f"orders?{query_string}", params=None)
 
         return await self._make_request("GET", "orders", params=params)
 
@@ -124,7 +134,7 @@ class CloverAPIClient:
         return await self._make_request(
             "GET",
             f"orders/{order_id}",
-            params={"expand": "lineItems.item.categories,lineItems.discounts,payments.cardTransaction,payments.tender,discounts,refunds"}
+            params={"expand": "lineItems.item.categories,lineItems.item.priceType,lineItems.discounts,lineItems.modifications,payments.cardTransaction,payments.tender,discounts,refunds"}
         )
 
     async def get_order_line_items(self, order_id: str) -> Dict[str, Any]:
@@ -193,9 +203,28 @@ class CloverAPIClient:
         }
 
         # Add date filters if provided
+        # Clover supports multiple filters separated by &filter=
+        filters = []
         if start_date:
             start_ms = int(datetime.combine(start_date, datetime.min.time()).timestamp() * 1000)
-            params["filter"] = f"createdTime>={start_ms}"
+            filters.append(f"createdTime>={start_ms}")
+        if end_date:
+            # End of day for end_date
+            end_ms = int(datetime.combine(end_date, datetime.max.time()).timestamp() * 1000)
+            filters.append(f"createdTime<={end_ms}")
+
+        if filters:
+            params["filter"] = filters[0]
+
+        # Make request - if multiple filters, we need to add them as separate query params
+        # Clover's API uses &filter= for each filter condition
+        if len(filters) > 1:
+            # Build URL with multiple filter params
+            query_parts = [f"{k}={v}" for k, v in params.items() if k != "filter"]
+            for f in filters:
+                query_parts.append(f"filter={f}")
+            query_string = "&".join(query_parts)
+            return await self._make_request("GET", f"payments?{query_string}", params=None)
 
         return await self._make_request("GET", "payments", params=params)
 
@@ -229,9 +258,24 @@ class CloverAPIClient:
         }
 
         # Add date filters if provided
+        filters = []
         if start_date:
             start_ms = int(datetime.combine(start_date, datetime.min.time()).timestamp() * 1000)
-            params["filter"] = f"timestamp>={start_ms}"
+            filters.append(f"timestamp>={start_ms}")
+        if end_date:
+            end_ms = int(datetime.combine(end_date, datetime.max.time()).timestamp() * 1000)
+            filters.append(f"timestamp<={end_ms}")
+
+        if filters:
+            params["filter"] = filters[0]
+
+        # Make request - if multiple filters, we need to add them as separate query params
+        if len(filters) > 1:
+            query_parts = [f"{k}={v}" for k, v in params.items() if k != "filter"]
+            for f in filters:
+                query_parts.append(f"filter={f}")
+            query_string = "&".join(query_parts)
+            return await self._make_request("GET", f"cash_events?{query_string}", params=None)
 
         return await self._make_request("GET", "cash_events", params=params)
 

@@ -160,21 +160,30 @@
                             <thead>
                                 <tr>
                                     <th>Date</th>
-                                    <th>Total Sales</th>
+                                    <th>Net Sales</th>
                                     <th>Tax</th>
                                     <th>Tips</th>
                                     <th>Gross Sales</th>
                                     <th>Transactions</th>
                                     <th>Synced At</th>
-                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="salesCacheBody">
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted">No cached sales data</td>
+                                    <td colspan="7" class="text-center text-muted">No cached sales data</td>
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                    <!-- Pagination Controls -->
+                    <div class="d-flex justify-content-between align-items-center mt-3" id="salesCachePagination" style="display: none !important;">
+                        <div class="text-muted">
+                            Showing <span id="salesCacheShowingStart">0</span>-<span id="salesCacheShowingEnd">0</span> of <span id="salesCacheTotalCount">0</span> days
+                        </div>
+                        <nav aria-label="Sales cache pagination">
+                            <ul class="pagination mb-0" id="salesCachePaginationList">
+                            </ul>
+                        </nav>
                     </div>
                 </div>
             </div>
@@ -753,20 +762,33 @@ async function syncSales(event) {
     }
 }
 
-// Load sales cache
-async function loadSalesCache(areaId) {
+// Pagination state for sales cache
+let salesCacheCurrentPage = 1;
+const salesCachePageSize = 50;
+let salesCacheTotalItems = 0;
+
+// Load sales cache with pagination
+async function loadSalesCache(areaId, page = 1) {
     try {
-        const response = await fetch(`/accounting/api/pos/daily-sales-cache?area_id=${areaId}&limit=30`, {
+        salesCacheCurrentPage = page;
+        const offset = (page - 1) * salesCachePageSize;
+
+        const response = await fetch(`/accounting/api/pos/daily-sales-cache?area_id=${areaId}&limit=${salesCachePageSize}&offset=${offset}`, {
             credentials: 'include'
         });
 
         if (!response.ok) throw new Error('Failed to load sales cache');
 
-        const data = await response.json();
-        const tbody = document.getElementById('salesCacheBody');
+        const result = await response.json();
+        const data = result.items;
+        salesCacheTotalItems = result.total;
 
-        if (data.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No cached sales data</td></tr>';
+        const tbody = document.getElementById('salesCacheBody');
+        const paginationDiv = document.getElementById('salesCachePagination');
+
+        if (data.length === 0 && page === 1) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No cached sales data</td></tr>';
+            paginationDiv.style.display = 'none';
             return;
         }
 
@@ -774,6 +796,14 @@ async function loadSalesCache(areaId) {
             // Parse date without timezone conversion (sale_date is already in local time)
             const dateParts = sale.sale_date.split('-');
             const displayDate = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]).toLocaleDateString();
+
+            // Parse synced_at as UTC (server stores in UTC) and convert to local
+            // If the timestamp doesn't end with 'Z', append it to indicate UTC
+            let syncedAtStr = sale.synced_at;
+            if (syncedAtStr && !syncedAtStr.endsWith('Z') && !syncedAtStr.includes('+') && !syncedAtStr.includes('-', 10)) {
+                syncedAtStr = syncedAtStr + 'Z';  // Append Z to indicate UTC
+            }
+            const syncedAtLocal = syncedAtStr ? new Date(syncedAtStr).toLocaleString() : 'N/A';
 
             return `
             <tr>
@@ -783,18 +813,101 @@ async function loadSalesCache(areaId) {
                 <td>$${parseFloat(sale.total_tips).toFixed(2)}</td>
                 <td>$${parseFloat(sale.gross_sales).toFixed(2)}</td>
                 <td>${sale.transaction_count}</td>
-                <td>${new Date(sale.synced_at).toLocaleString()}</td>
-                <td>
-                    <button class="btn btn-sm btn-primary" onclick="importToDaily(${areaId}, '${sale.sale_date}')">
-                        <i class="bi bi-download"></i> Import to DSS
-                    </button>
-                </td>
+                <td>${syncedAtLocal}</td>
             </tr>
             `;
         }).join('');
+
+        // Update pagination UI
+        updateSalesCachePagination(areaId);
     } catch (error) {
         console.error('Error loading sales cache:', error);
     }
+}
+
+// Update pagination controls for sales cache
+function updateSalesCachePagination(areaId) {
+    const paginationDiv = document.getElementById('salesCachePagination');
+    const paginationList = document.getElementById('salesCachePaginationList');
+    const totalPages = Math.ceil(salesCacheTotalItems / salesCachePageSize);
+
+    // Update showing text
+    const start = ((salesCacheCurrentPage - 1) * salesCachePageSize) + 1;
+    const end = Math.min(salesCacheCurrentPage * salesCachePageSize, salesCacheTotalItems);
+    document.getElementById('salesCacheShowingStart').textContent = start;
+    document.getElementById('salesCacheShowingEnd').textContent = end;
+    document.getElementById('salesCacheTotalCount').textContent = salesCacheTotalItems;
+
+    // Show/hide pagination based on total items
+    if (salesCacheTotalItems <= salesCachePageSize) {
+        paginationDiv.style.display = 'none';
+        return;
+    }
+
+    paginationDiv.style.display = 'flex';
+
+    // Build pagination buttons
+    let paginationHtml = '';
+
+    // Previous button
+    paginationHtml += `
+        <li class="page-item ${salesCacheCurrentPage === 1 ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="event.preventDefault(); ${salesCacheCurrentPage > 1 ? `loadSalesCache(${areaId}, ${salesCacheCurrentPage - 1})` : ''}">
+                <i class="bi bi-chevron-left"></i>
+            </a>
+        </li>
+    `;
+
+    // Page numbers - show max 5 pages centered around current page
+    let startPage = Math.max(1, salesCacheCurrentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) {
+        startPage = Math.max(1, endPage - 4);
+    }
+
+    // First page + ellipsis
+    if (startPage > 1) {
+        paginationHtml += `
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="event.preventDefault(); loadSalesCache(${areaId}, 1)">1</a>
+            </li>
+        `;
+        if (startPage > 2) {
+            paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+    }
+
+    // Page numbers
+    for (let i = startPage; i <= endPage; i++) {
+        paginationHtml += `
+            <li class="page-item ${i === salesCacheCurrentPage ? 'active' : ''}">
+                <a class="page-link" href="#" onclick="event.preventDefault(); loadSalesCache(${areaId}, ${i})">${i}</a>
+            </li>
+        `;
+    }
+
+    // Ellipsis + last page
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+        }
+        paginationHtml += `
+            <li class="page-item">
+                <a class="page-link" href="#" onclick="event.preventDefault(); loadSalesCache(${areaId}, ${totalPages})">${totalPages}</a>
+            </li>
+        `;
+    }
+
+    // Next button
+    paginationHtml += `
+        <li class="page-item ${salesCacheCurrentPage === totalPages ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="event.preventDefault(); ${salesCacheCurrentPage < totalPages ? `loadSalesCache(${areaId}, ${salesCacheCurrentPage + 1})` : ''}">
+                <i class="bi bi-chevron-right"></i>
+            </a>
+        </li>
+    `;
+
+    paginationList.innerHTML = paginationHtml;
 }
 
 // Load category mappings
@@ -1119,46 +1232,6 @@ async function saveBulkMappings() {
     } catch (error) {
         console.error('Error in saveBulkMappings:', error);
         await showAlert('Error saving mappings: ' + error.message);
-    }
-}
-
-// Import to Daily Sales
-async function importToDaily(areaId, saleDate) {
-    const confirmed = await showConfirm(
-        `Import POS sales for ${saleDate} to Daily Sales Summary?\n\n` +
-        `This will create a new Daily Sales entry that you can review and post to the General Ledger.`
-    );
-
-    if (!confirmed) return;
-
-    try {
-        const response = await fetch(`/accounting/api/pos/import-to-dss/${areaId}/${saleDate}`, {
-            method: 'POST',
-            credentials: 'include'
-        });
-
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Import failed');
-        }
-
-        const result = await response.json();
-
-        showNotification(
-            `✅ Successfully imported sales for ${saleDate}!\n\n` +
-            `DSS ID: ${result.dss_id}\n` +
-            `Net Sales: $${result.net_sales.toFixed(2)}\n` +
-            `Tax: $${result.tax_collected.toFixed(2)}\n` +
-            `Tips: $${result.tips.toFixed(2)}\n\n` +
-            `You can now review and post this entry in Daily Sales.`,
-            'Import Successful'
-        );
-
-        // Optionally reload the cache table to show updated status
-        await loadSalesCache(areaId);
-
-    } catch (error) {
-        showNotification('Error importing to Daily Sales: ' + error.message, 'Import Failed');
     }
 }
 

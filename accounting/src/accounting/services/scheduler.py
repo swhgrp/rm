@@ -59,9 +59,10 @@ async def auto_sync_pos_task():
         for config in configs:
             try:
                 # Check if it's time to sync (based on configured sync_time)
-                if not should_sync_now(config):
+                # Pass db session so we can check if yesterday's DSS already exists
+                if not should_sync_now(config, db):
                     logger.debug(
-                        f"Skipping area {config.area_id} - not sync time yet. "
+                        f"Skipping area {config.area_id} - not sync time yet or already synced. "
                         f"Configured sync_time: {config.sync_time}"
                     )
                     continue
@@ -112,15 +113,16 @@ async def auto_sync_pos_task():
         db.close()
 
 
-def should_sync_now(config: POSConfiguration) -> bool:
+def should_sync_now(config: POSConfiguration, db: Session = None) -> bool:
     """
     Determine if a POS configuration should be synced now.
 
     Checks if we're within a reasonable window of the configured sync_time.
-    Also checks if we haven't already synced today.
+    Also checks if yesterday's business date has already been synced.
 
     Args:
         config: POSConfiguration object
+        db: Database session (optional, used to check if yesterday's DSS exists)
 
     Returns:
         True if sync should happen now, False otherwise
@@ -152,14 +154,34 @@ def should_sync_now(config: POSConfiguration) -> bool:
     if time_diff > 30:
         return False
 
-    # Check if we already synced today
-    if config.last_sync_date:
-        last_sync = config.last_sync_date
-        if last_sync.date() == now.date():
-            logger.debug(f"Area {config.area_id} already synced today at {last_sync}")
-            return False
+    # Check if yesterday's data has already been synced by looking for a DSS entry
+    # This is more accurate than just checking last_sync_date timestamp
+    yesterday = (now - timedelta(days=1)).date()
 
-    logger.info(f"Area {config.area_id} is due for sync (sync_time={config.sync_time}, now={current_time})")
+    if db:
+        from accounting.models.daily_sales_summary import DailySalesSummary
+        existing_dss = db.query(DailySalesSummary).filter(
+            DailySalesSummary.area_id == config.area_id,
+            DailySalesSummary.business_date == yesterday,
+            DailySalesSummary.entry_type == 'pos'  # Only check POS entries, not manual
+        ).first()
+
+        if existing_dss:
+            logger.debug(f"Area {config.area_id} already has DSS for {yesterday}, skipping auto-sync")
+            return False
+    else:
+        # Fallback to old behavior if no db session provided
+        # Check if we already synced within the sync window today
+        if config.last_sync_date:
+            last_sync = config.last_sync_date
+            # Only skip if last sync was AFTER the sync time today
+            # This allows manual syncs before the sync window to not block scheduled syncs
+            sync_time_today = datetime.combine(now.date(), configured_sync_time)
+            if last_sync >= sync_time_today:
+                logger.debug(f"Area {config.area_id} already synced after {sync_time_today}")
+                return False
+
+    logger.info(f"Area {config.area_id} is due for sync (sync_time={config.sync_time}, now={current_time}, target_date={yesterday})")
     return True
 
 
