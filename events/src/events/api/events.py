@@ -432,6 +432,30 @@ async def delete_event(
 
     db.commit()
 
+    # Remove from CalDAV for all users with access to this venue
+    if settings.CALDAV_ENABLED:
+        try:
+            from events.models.user import UserLocation
+            caldav_service = CalDAVSyncService()
+
+            # Get all users who have access to this event's venue
+            if event.venue_id:
+                user_venue_assignments = db.query(UserLocation).filter(
+                    UserLocation.venue_id == event.venue_id
+                ).all()
+
+                for assignment in user_venue_assignments:
+                    user = db.query(User).filter(User.id == assignment.user_id).first()
+                    if user and user.is_active:
+                        try:
+                            caldav_service.remove_event_from_caldav(event, user.email)
+                            logger.info(f"Event {event.id} removed from CalDAV for user {user.email}")
+                        except Exception as e:
+                            logger.error(f"Failed to remove event {event.id} from CalDAV for {user.email}: {e}")
+        except Exception as e:
+            logger.error(f"Failed to remove event {event.id} from CalDAV: {e}")
+            # Don't fail the request if CalDAV removal fails
+
     # TODO: Cancel associated tasks
     # TODO: Send cancellation notifications
     # TODO: Audit log
@@ -493,3 +517,58 @@ async def caldav_pull_changes(
     except Exception as e:
         logger.error(f"CalDAV pull sync failed for {current_user.email}: {e}")
         raise HTTPException(status_code=500, detail=f"Pull sync failed: {str(e)}")
+
+
+@router.post("/caldav/cleanup-canceled", status_code=status.HTTP_200_OK)
+async def caldav_cleanup_canceled(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin"))
+):
+    """
+    Clean up canceled events from CalDAV.
+    Removes all CANCELED events from CalDAV calendars for all users.
+
+    Requires: admin role
+    """
+    if not settings.CALDAV_ENABLED:
+        raise HTTPException(status_code=400, detail="CalDAV sync is not enabled")
+
+    try:
+        from events.models.user import UserLocation
+        caldav_service = CalDAVSyncService()
+
+        # Get all canceled events
+        canceled_events = db.query(Event).filter(
+            Event.status == EventStatus.CANCELED
+        ).all()
+
+        removed_count = 0
+        error_count = 0
+
+        for event in canceled_events:
+            if event.venue_id:
+                # Get all users who have access to this event's venue
+                user_venue_assignments = db.query(UserLocation).filter(
+                    UserLocation.venue_id == event.venue_id
+                ).all()
+
+                for assignment in user_venue_assignments:
+                    user = db.query(User).filter(User.id == assignment.user_id).first()
+                    if user and user.is_active:
+                        try:
+                            caldav_service.remove_event_from_caldav(event, user.email)
+                            removed_count += 1
+                        except Exception as e:
+                            logger.error(f"Failed to remove event {event.id} from CalDAV for {user.email}: {e}")
+                            error_count += 1
+
+        return {
+            "success": True,
+            "message": f"Cleanup complete: {removed_count} events removed from CalDAV",
+            "removed": removed_count,
+            "errors": error_count,
+            "total_canceled_events": len(canceled_events)
+        }
+    except Exception as e:
+        logger.error(f"CalDAV cleanup failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")

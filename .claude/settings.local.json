@@ -84,7 +84,8 @@
       "Bash(claude.md )",
       "Bash(CHANGELOG.md)",
       "Bash(git push:*)",
-      "Bash(timeout 3 curl:*)"
+      "Bash(timeout 3 curl:*)",
+      "Bash(timeout 10 docker exec events-app python3:*)"
     ],
     "deny": [],
     "ask": []
