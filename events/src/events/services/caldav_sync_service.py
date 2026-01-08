@@ -267,34 +267,55 @@ class CalDAVSyncService:
 
             # Use username only for consistent CalDAV paths
             caldav_username = self._get_caldav_username(user_email)
+
+            # Try filesystem deletion first (most reliable for Radicale)
+            # This works because we're in Docker and can access the caldav volume
+            import subprocess
+            event_filename = f"{event_id}@swhgrp.com.ics"
+
+            for calendar_name in venue_calendars:
+                file_path = f"/data/collections/collection-root/{caldav_username}/{calendar_name}/{event_filename}"
+                try:
+                    # Use docker exec to delete the file from the caldav container
+                    result = subprocess.run(
+                        ['docker', 'exec', 'caldav', 'rm', '-f', file_path],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    if result.returncode == 0:
+                        logger.info(f"Deleted event {event_id} from CalDAV calendar '{calendar_name}' for {caldav_username}")
+                        return
+                    else:
+                        logger.debug(f"Event {event_id} not in calendar {calendar_name} (file not found)")
+                except subprocess.TimeoutExpired:
+                    logger.warning(f"Timeout deleting event {event_id} from {calendar_name}")
+                except Exception as e:
+                    logger.debug(f"Could not delete event {event_id} from {calendar_name}: {e}")
+                    continue
+
+            # Fallback to HTTP DELETE if filesystem deletion didn't work
             client = caldav.DAVClient(
                 url=self.caldav_url,
                 headers={'X-Remote-User': caldav_username}
             )
 
-            # Try to delete from relevant venue calendar(s)
             for calendar_name in venue_calendars:
                 try:
                     calendar_url = f"{self.caldav_url}/{caldav_username}/{calendar_name}/"
-                    from caldav import Calendar as CalDAVCalendar
-                    venue_cal = CalDAVCalendar(client=client, url=calendar_url)
-
-                    # Try to delete the specific event file
-                    event_filename = f"{event_id}@swhgrp.com.ics"
                     import requests
                     delete_url = f"{calendar_url}{event_filename}"
 
-                    # Use requests to delete with proper auth header
                     response = requests.delete(
                         delete_url,
                         headers={'X-Remote-User': caldav_username}
                     )
 
                     if response.status_code in [200, 204, 404]:
-                        logger.info(f"Deleted event {event_id} from CalDAV calendar '{calendar_name}' for {caldav_username}")
+                        logger.info(f"Deleted event {event_id} via HTTP from CalDAV calendar '{calendar_name}' for {caldav_username}")
                         return
                 except Exception as e:
-                    logger.debug(f"Event {event_id} not in calendar {calendar_name}: {e}")
+                    logger.debug(f"HTTP delete failed for event {event_id} in calendar {calendar_name}: {e}")
                     continue
 
         except Exception as e:
