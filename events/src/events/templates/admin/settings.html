@@ -427,6 +427,24 @@
                             </ul>
                         </div>
                     </div>
+
+                    <!-- Admin Tools -->
+                    <div class="section-header mt-4">
+                        <i class="bi bi-tools"></i> Admin Tools
+                    </div>
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <i class="bi bi-info-circle"></i>
+                                <strong>CalDAV Cleanup:</strong> If you have deleted events that are still showing in phone calendars,
+                                use this button to remove all canceled events from CalDAV.
+                            </div>
+                            <button id="btnCleanupCalDAV" class="btn btn-warning">
+                                <i class="bi bi-trash"></i> Clean Up Canceled Events from CalDAV
+                            </button>
+                            <small class="text-muted ms-2" id="cleanupStatus"></small>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2050,6 +2068,45 @@
                     document.getElementById('limitFilter')?.addEventListener('change', loadEmails);
                 }
             });
+        }
+    });
+
+    // CalDAV Cleanup button
+    document.getElementById('btnCleanupCalDAV')?.addEventListener('click', async function() {
+        const btn = this;
+        const statusEl = document.getElementById('cleanupStatus');
+
+        if (!confirm('This will remove all canceled events from CalDAV calendars for all users. Continue?')) {
+            return;
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Cleaning up...';
+        statusEl.textContent = '';
+
+        try {
+            const response = await fetch('/events/api/events/caldav/cleanup-canceled', {
+                method: 'POST',
+                credentials: 'include'
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                statusEl.textContent = `✓ ${data.message}`;
+                statusEl.className = 'text-success ms-2';
+                showSuccess(data.message);
+            } else {
+                throw new Error(data.message || 'Cleanup failed');
+            }
+        } catch (error) {
+            console.error('CalDAV cleanup error:', error);
+            statusEl.textContent = `✗ ${error.message}`;
+            statusEl.className = 'text-danger ms-2';
+            showError('CalDAV cleanup failed: ' + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-trash"></i> Clean Up Canceled Events from CalDAV';
         }
     });
 </script>
