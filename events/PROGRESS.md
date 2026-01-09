@@ -98,9 +98,14 @@ The Events System is a comprehensive event planning platform with calendar manag
   - Added `initial_sync_for_user()` method to push historical + future events when user first connects
   - Added `pull_caldav_changes()` method to sync updates/deletions from CalDAV back to Events DB
   - Created CalDAVScheduler background service (runs every 15 minutes for all active users)
-  - Added API endpoints: `/api/events/caldav/initial-sync`, `/api/events/caldav/pull-changes`
+  - Added API endpoints: `/api/events/caldav/initial-sync`, `/api/events/caldav/pull-changes`, `/api/events/caldav/cleanup-canceled`
   - Updated documentation with bidirectional sync architecture and usage
   - Scheduler automatically starts on app startup when CalDAV is enabled
+- **CalDAV Event Deletion**:
+  - Fixed delete_event endpoint to remove events from all users' CalDAV calendars
+  - Improved `remove_event_from_caldav()` to use filesystem deletion (most reliable for Radicale)
+  - Added "Clean Up Canceled Events from CalDAV" button in Settings UI
+  - Deleted events now properly removed from phone calendars
 
 ### December 8, 2025
 - CalDAV username fix (andy vs andy@swhgrp.com)

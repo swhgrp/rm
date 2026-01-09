@@ -22,18 +22,18 @@ log_alert "========================================="
 
 # Define services to check
 SERVICES=(
-    "https://rm.swhgrp.com/portal/health:Portal"
-    "https://rm.swhgrp.com/inventory/health:Inventory"
-    "https://rm.swhgrp.com/hr/health:HR"
-    "https://rm.swhgrp.com/accounting/health:Accounting"
-    "https://rm.swhgrp.com/events/health:Events"
-    "https://rm.swhgrp.com/hub/health:Integration_Hub"
-    "https://rm.swhgrp.com/files/health:Files"
+    "https://rm.swhgrp.com/portal/health|Portal"
+    "https://rm.swhgrp.com/inventory/health|Inventory"
+    "https://rm.swhgrp.com/hr/health|HR"
+    "https://rm.swhgrp.com/accounting/health|Accounting"
+    "https://rm.swhgrp.com/events/health|Events"
+    "https://rm.swhgrp.com/hub/health|Integration_Hub"
+    "https://rm.swhgrp.com/files/health|Files"
 )
 
 # Check each service
 for service in "${SERVICES[@]}"; do
-    IFS=':' read -r url name <<< "$service"
+    IFS='|' read -r url name <<< "$service"
 
     # Try to reach the health endpoint (5 second timeout)
     if curl -s -f -m 5 "$url" > /dev/null 2>&1; then
@@ -53,7 +53,12 @@ log_alert "Docker Container Status:"
 CONTAINERS=$(docker ps --format "{{.Names}}" | grep -E "(portal|inventory|hr|accounting|events|hub|files)")
 
 for container in $CONTAINERS; do
-    STATUS=$(docker inspect --format='{{.State.Health.Status}}' $container 2>/dev/null || echo "running")
+    STATUS=$(docker inspect --format='{{.State.Health.Status}}' $container 2>/dev/null | tr -d '\n' | xargs || echo "running")
+
+    # If status is empty or contains only whitespace, set to "running"
+    if [ -z "$STATUS" ] || [ "$STATUS" = "<no value>" ]; then
+        STATUS="running"
+    fi
 
     if [ "$STATUS" = "healthy" ] || [ "$STATUS" = "running" ]; then
         echo -e "${GREEN}✓ $container - $STATUS${NC}"

@@ -39,9 +39,9 @@ echo '  },'
 
 # Nginx Status
 echo '  "nginx": {'
-if docker ps --format '{{.Names}}' | grep -q "^nginx-mailcow$"; then
+if docker ps --format '{{.Names}}' | grep -q "^nginx-proxy$"; then
     NGINX_STATUS="running"
-    NGINX_UPTIME_SECS=$(docker inspect --format='{{.State.StartedAt}}' nginx-mailcow 2>/dev/null | xargs -I {} date -d {} +%s 2>/dev/null || echo 0)
+    NGINX_UPTIME_SECS=$(docker inspect --format='{{.State.StartedAt}}' nginx-proxy 2>/dev/null | xargs -I {} date -d {} +%s 2>/dev/null || echo 0)
     CURRENT_SECS=$(date +%s)
     NGINX_UPTIME_MINS=$(( ($CURRENT_SECS - $NGINX_UPTIME_SECS) / 60 ))
 

@@ -85,7 +85,20 @@
       "Bash(CHANGELOG.md)",
       "Bash(git push:*)",
       "Bash(timeout 3 curl:*)",
-      "Bash(timeout 10 docker exec events-app python3:*)"
+      "Bash(timeout 10 docker exec events-app python3:*)",
+      "Bash(openssl s_client:*)",
+      "Bash(for dir in andy kent laz)",
+      "Bash(do)",
+      "Bash(chmod:*)",
+      "Bash(test:*)",
+      "Bash(/opt/restaurant-system/scripts/dashboard-status.sh:*)",
+      "Bash(bash -x:*)",
+      "Bash(/opt/restaurant-system/scripts/monitor-services.sh:*)",
+      "Bash(systemctl list-timers:*)",
+      "Bash(journalctl:*)",
+      "Bash(crontab:*)",
+      "Bash(ping:*)",
+      "Bash(docker-compose:*)"
     ],
     "deny": [],
     "ask": []

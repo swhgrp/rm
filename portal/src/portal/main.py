@@ -3,7 +3,7 @@ from fastapi import FastAPI, Request, Depends, HTTPException, Form, status
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import create_engine, Column, Integer, String, Boolean
+from sqlalchemy import create_engine, Column, Integer, String, Boolean, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from jose import JWTError, jwt
@@ -14,6 +14,10 @@ import sys
 import bcrypt
 import httpx
 import logging
+import secrets
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 # Add shared directory to path for Sentry config
 # sys.path.insert(0, '/opt/restaurant-system/shared/python')
@@ -118,6 +122,10 @@ class User(Base):
     can_access_mail = Column(Boolean, default=False)
     accounting_role_id = Column(Integer, nullable=True)
 
+    # Password reset tokens
+    reset_token = Column(String, nullable=True, index=True)
+    reset_token_expires = Column(DateTime, nullable=True)
+
 
 # Database dependency
 def get_db():
@@ -144,6 +152,144 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+
+def generate_reset_token():
+    """Generate a secure random token for password reset"""
+    return secrets.token_urlsafe(32)
+
+
+def send_reset_email(to_email: str, reset_token: str, user_name: str) -> bool:
+    """
+    Send password reset email using SMTP configuration from HR database
+
+    Args:
+        to_email: User's email address
+        reset_token: Password reset token
+        user_name: User's full name
+
+    Returns:
+        True if email sent successfully, False otherwise
+    """
+    try:
+        # Get SMTP config from HR database (same config HR uses)
+        hr_engine = create_engine(HR_DATABASE_URL)
+        with hr_engine.connect() as conn:
+            from sqlalchemy import text
+            result = conn.execute(text(
+                "SELECT key, value, is_encrypted FROM system_settings WHERE category = 'smtp' ORDER BY key"
+            ))
+            settings = {row[0]: row[1] for row in result}
+
+        # Decrypt password if needed (using same encryption as HR)
+        smtp_password = settings.get('smtp_password', '')
+        if settings.get('smtp_password') and smtp_password.startswith('gAAAAA'):
+            # Password is encrypted, need to decrypt using HR's ENCRYPTION_KEY
+            try:
+                from cryptography.fernet import Fernet
+                # Get encryption key from HR database - stored in environment
+                with hr_engine.connect() as conn_enc:
+                    # Try to get encryption key from HR environment or use default
+                    encryption_key = os.getenv('ENCRYPTION_KEY', 'yX_axNoTYxskNPgHeaoSSi2gM1jXhXvsdwf9acQqKpM=')
+                    fernet = Fernet(encryption_key.encode() if isinstance(encryption_key, str) else encryption_key)
+                    smtp_password = fernet.decrypt(smtp_password.encode()).decode()
+            except Exception as e:
+                logger.error(f"Failed to decrypt SMTP password: {e}")
+                # Try using it as-is
+                pass
+
+        smtp_host = settings.get('smtp_host', 'mail.swhgrp.com')
+        smtp_port = int(settings.get('smtp_port', 587))
+        smtp_user = settings.get('smtp_user', 'hr@swhgrp.com')
+        smtp_from_name = settings.get('smtp_from_name', 'SW Restaurant Portal')
+        smtp_from_email = settings.get('smtp_from_email', 'hr@swhgrp.com')
+        smtp_use_tls = settings.get('smtp_use_tls', 'true').lower() == 'true'
+
+        if not smtp_user or not smtp_password:
+            logger.error("SMTP not configured")
+            return False
+
+        # Build reset URL
+        reset_url = f"https://rm.swhgrp.com/portal/reset-password?token={reset_token}"
+
+        # Create email message
+        subject = "Password Reset Request - SW Restaurant Portal"
+
+        text_content = f"""
+Hello {user_name},
+
+You requested to reset your password for the SW Restaurant Management Portal.
+
+Click the link below to reset your password:
+{reset_url}
+
+This link will expire in 1 hour.
+
+If you did not request this password reset, please ignore this email.
+
+---
+SW Restaurant Management System
+https://rm.swhgrp.com/portal
+"""
+
+        html_content = f"""
+<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #2c3e50;">Password Reset Request</h2>
+        <p>Hello {user_name},</p>
+        <p>You requested to reset your password for the SW Restaurant Management Portal.</p>
+        <p>Click the button below to reset your password:</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{reset_url}"
+               style="background-color: #3498db; color: white; padding: 12px 30px;
+                      text-decoration: none; border-radius: 5px; display: inline-block;">
+                Reset Password
+            </a>
+        </div>
+        <p style="color: #7f8c8d; font-size: 14px;">
+            This link will expire in 1 hour.
+        </p>
+        <p style="color: #7f8c8d; font-size: 14px;">
+            If you did not request this password reset, please ignore this email.
+        </p>
+        <hr style="border: none; border-top: 1px solid #ecf0f1; margin: 30px 0;">
+        <p style="color: #95a5a6; font-size: 12px;">
+            SW Restaurant Management System<br>
+            <a href="https://rm.swhgrp.com/portal">https://rm.swhgrp.com/portal</a>
+        </p>
+    </div>
+</body>
+</html>
+"""
+
+        message = MIMEMultipart('alternative')
+        message['Subject'] = subject
+        message['From'] = f"{smtp_from_name} <{smtp_from_email}>"
+        message['To'] = to_email
+
+        message.attach(MIMEText(text_content, 'plain'))
+        message.attach(MIMEText(html_content, 'html'))
+
+        # Connect and send
+        if smtp_use_tls:
+            server = smtplib.SMTP(smtp_host, smtp_port)
+            server.starttls()
+        else:
+            server = smtplib.SMTP(smtp_host, smtp_port)
+
+        if smtp_password:
+            server.login(smtp_user, smtp_password)
+
+        server.send_message(message)
+        server.quit()
+
+        logger.info(f"Password reset email sent to {to_email}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to send password reset email: {str(e)}", exc_info=True)
+        return False
 
 
 def get_current_user(request: Request, db: Session = Depends(get_db)):
@@ -404,6 +550,139 @@ async def logout():
     response.delete_cookie(SESSION_COOKIE_NAME, path="/", secure=True)
     response.delete_cookie(SESSION_COOKIE_NAME, path="/", secure=False)
     return response
+
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_page(request: Request):
+    """Forgot password page"""
+    return templates.TemplateResponse("forgot_password.html", {"request": request})
+
+
+@app.post("/forgot-password")
+async def forgot_password(
+    request: Request,
+    email: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Process forgot password request"""
+    # Always return success message to prevent email enumeration
+    success_message = "If an account exists with that email, you will receive password reset instructions."
+
+    # Look up user by email
+    user = db.query(User).filter(User.email == email).first()
+
+    if user and user.is_active:
+        # Generate reset token
+        reset_token = generate_reset_token()
+        token_expiry = datetime.now() + timedelta(hours=1)
+
+        # Save token to database
+        user.reset_token = reset_token
+        user.reset_token_expires = token_expiry
+        db.commit()
+
+        # Send reset email
+        send_reset_email(user.email, reset_token, user.full_name)
+
+    return templates.TemplateResponse(
+        "forgot_password.html",
+        {
+            "request": request,
+            "success": success_message
+        }
+    )
+
+
+@app.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request, token: str, db: Session = Depends(get_db)):
+    """Reset password page"""
+    # Validate token
+    user = db.query(User).filter(User.reset_token == token).first()
+
+    if not user or not user.reset_token_expires or user.reset_token_expires < datetime.now():
+        return templates.TemplateResponse(
+            "reset_password.html",
+            {
+                "request": request,
+                "error": "Invalid or expired reset link. Please request a new password reset."
+            }
+        )
+
+    return templates.TemplateResponse(
+        "reset_password.html",
+        {
+            "request": request,
+            "token": token
+        }
+    )
+
+
+@app.post("/reset-password")
+async def reset_password(
+    request: Request,
+    token: str = Form(...),
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Process password reset"""
+    # Validate passwords match
+    if new_password != confirm_password:
+        return templates.TemplateResponse(
+            "reset_password.html",
+            {
+                "request": request,
+                "token": token,
+                "error": "Passwords do not match"
+            },
+            status_code=400
+        )
+
+    # Validate password strength
+    if len(new_password) < 8:
+        return templates.TemplateResponse(
+            "reset_password.html",
+            {
+                "request": request,
+                "token": token,
+                "error": "Password must be at least 8 characters long"
+            },
+            status_code=400
+        )
+
+    # Validate token
+    user = db.query(User).filter(User.reset_token == token).first()
+
+    if not user or not user.reset_token_expires or user.reset_token_expires < datetime.now():
+        return templates.TemplateResponse(
+            "reset_password.html",
+            {
+                "request": request,
+                "error": "Invalid or expired reset link. Please request a new password reset."
+            },
+            status_code=400
+        )
+
+    # Hash new password
+    hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+
+    # Update password and clear reset token
+    user.hashed_password = hashed_password
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
+
+    # Sync password to other systems in background
+    import asyncio
+    asyncio.create_task(sync_password_to_systems(user.username, hashed_password))
+
+    return templates.TemplateResponse(
+        "reset_password.html",
+        {
+            "request": request,
+            "success": "Password reset successful! You can now log in with your new password."
+        }
+    )
 
 
 @app.get("/settings", response_class=HTMLResponse)

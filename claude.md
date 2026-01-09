@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** January 6, 2026
-**System Status:** Production (97% Complete - DSS Deposit & Discount Enhancements)
+**Last Updated:** January 9, 2026
+**System Status:** Production (94% Complete - Password Reset & Monitoring Fixes)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -38,7 +38,77 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - January 6, 2026)
+### Most Recent Work (Current Session - January 9, 2026)
+
+**PASSWORD RESET SYSTEM & MONITORING FIXES** ✅ **COMPLETE**
+
+#### 1. **Password Reset System** ✅ **COMPLETE**
+- **Email-Based Self-Service Password Reset**
+  - Added "Forgot your password?" link to login page
+  - Created forgot password page (email input form)
+  - Created reset password page (new password + confirmation)
+  - Integrated with existing SMTP configuration from HR system
+  - Uses HR's mailcow server at `mail.swhgrp.com`
+
+- **Security Features**
+  - Secure random token generation (32-byte URL-safe)
+  - 1-hour token expiration
+  - Tokens stored in database (reset_token, reset_token_expires columns)
+  - Anti-enumeration protection (always shows success message)
+  - Password strength validation (minimum 8 characters)
+  - Automatic password sync to all connected systems
+
+- **Email Integration**
+  - Sends professional HTML emails from `hr@swhgrp.com`
+  - Uses encrypted SMTP password from HR database
+  - Decryption using HR's ENCRYPTION_KEY
+  - Emails delivered through SpamHero
+
+- **Database Changes**
+  - Added `reset_token VARCHAR` column to users table
+  - Added `reset_token_expires TIMESTAMP` column to users table
+  - Created index on reset_token for performance
+
+- **Files Modified**
+  - `/opt/restaurant-system/portal/src/portal/main.py` - Added reset endpoints & email service
+  - `/opt/restaurant-system/portal/templates/login.html` - Added forgot password link
+  - `/opt/restaurant-system/portal/templates/forgot_password.html` - Created
+  - `/opt/restaurant-system/portal/templates/reset_password.html` - Created
+
+#### 2. **Monitoring System Fixes** ✅ **COMPLETE**
+- **Service Health Check Script Bug**
+  - Fixed URL parsing in `monitor-services.sh`
+  - Changed delimiter from `:` to `|` to avoid conflict with `https:`
+  - All 7 microservices now report correctly (Portal, Inventory, HR, Accounting, Events, Hub, Files)
+
+- **Docker Container Status Bug**
+  - Fixed newline handling in container health status
+  - Properly handles containers without health checks
+
+- **Nginx Proxy Status Fix**
+  - Updated `dashboard-status.sh` to check `nginx-proxy` instead of `nginx-mailcow`
+  - Monitoring page now correctly shows nginx as "running"
+
+- **SSL Certificate Auto-Renewal**
+  - Created reload hook: `/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh`
+  - Nginx automatically reloads when SSL certificate renews
+  - Certificate expires Jan 13, 2026 (will auto-renew)
+
+- **Files Modified**
+  - `/opt/restaurant-system/scripts/monitor-services.sh` - Fixed service checking logic
+  - `/opt/restaurant-system/scripts/dashboard-status.sh` - Fixed nginx container name
+  - `/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh` - Created
+
+#### 3. **Important Docker Container Issue Discovered**
+- **Portal Container Code Location**
+  - Portal app loads from `/app/portal/main.py` (baked into image at build time)
+  - Volume mount at `/app/src/portal/` exists but not used by uvicorn
+  - **Workaround:** Must manually copy updated main.py: `docker cp portal/src/portal/main.py portal-app:/app/portal/main.py`
+  - **Future Fix Needed:** Update Dockerfile or docker-compose to use volume-mounted code
+
+---
+
+### Previous Session Work (January 6, 2026)
 
 **DSS DEPOSIT CALCULATION & DISCOUNT BREAKDOWN** ✅ **COMPLETE**
 
