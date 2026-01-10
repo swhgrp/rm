@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Equipment - Maintenance - SW Hospitality Group</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #ECEFF1;
+            --bg-secondary: #FFFFFF;
+            --bg-tertiary: #F5F5F5;
+            --bg-elevated: #E0E0E0;
+            --border-primary: #CFD8DC;
+            --border-secondary: #B0BEC5;
+            --text-primary: #263238;
+            --text-secondary: #546E7A;
+            --text-muted: #78909C;
+            --accent-primary: #455A64;
+            --accent-secondary: #37474F;
+            --accent-hover: #263238;
+            --accent-muted: #546E7A;
+            --success: #43A047;
+            --success-bg: rgba(67, 160, 71, 0.1);
+            --error: #E53935;
+            --error-bg: rgba(229, 57, 53, 0.1);
+            --warning: #FB8C00;
+            --warning-bg: rgba(251, 140, 0, 0.1);
+            --info: #1E88E5;
+            --info-bg: rgba(30, 136, 229, 0.1);
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
+            --glow-accent: 0 0 15px rgba(69, 90, 100, 0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background-color: #455A64;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(69, 90, 100, 0.3);
+        }
+
+        .navbar-brand {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .navbar-brand h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #FFFFFF;
+        }
+
+        .navbar-nav {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nav-link, .btn-back {
+            padding: 8px 16px;
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-link:hover, .btn-back:hover {
+            background-color: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+            color: #FFFFFF;
+        }
+
+        .nav-link.active {
+            background-color: rgba(255, 255, 255, 0.25);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .btn-primary {
+            padding: 10px 20px;
+            background-color: var(--accent-primary);
+            color: #FFFFFF;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .filters-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            max-width: 400px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 15px 10px 40px;
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            font-size: 14px;
+            background-color: var(--bg-secondary);
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .search-box i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .filter-select {
+            padding: 10px 15px;
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            font-size: 14px;
+            background-color: var(--bg-secondary);
+            min-width: 150px;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-primary);
+        }
+
+        th {
+            background-color: var(--bg-tertiary);
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tr:hover {
+            background-color: var(--bg-tertiary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-operational { background-color: var(--success-bg); color: var(--success); }
+        .badge-needs_maintenance { background-color: var(--warning-bg); color: var(--warning); }
+        .badge-under_repair { background-color: var(--info-bg); color: var(--info); }
+        .badge-out_of_service { background-color: var(--error-bg); color: var(--error); }
+        .badge-retired { background-color: var(--bg-elevated); color: var(--text-muted); }
+
+        .actions-cell {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-icon {
+            padding: 6px 10px;
+            border: 1px solid var(--border-primary);
+            border-radius: 4px;
+            background-color: var(--bg-secondary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-icon:hover {
+            background-color: var(--bg-tertiary);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 60px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-primary);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            padding: 20px;
+            border-top: 1px solid var(--border-primary);
+        }
+
+        .pagination button {
+            padding: 8px 12px;
+            border: 1px solid var(--border-primary);
+            border-radius: 4px;
+            background-color: var(--bg-secondary);
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .pagination button:hover:not(:disabled) {
+            background-color: var(--bg-tertiary);
+        }
+
+        .pagination button.active {
+            background-color: var(--accent-primary);
+            color: white;
+            border-color: var(--accent-primary);
+        }
+
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            font-size: 14px;
+            background-color: var(--bg-secondary);
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid var(--border-primary);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn-secondary {
+            padding: 10px 20px;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--bg-elevated);
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <h1><i class="bi bi-tools"></i> Maintenance</h1>
+        </div>
+        <div class="navbar-nav">
+            <a href="/portal/maintenance/" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a>
+            <a href="/portal/maintenance/equipment" class="nav-link active"><i class="bi bi-gear"></i> Equipment</a>
+            <a href="/portal/maintenance/work-orders" class="nav-link"><i class="bi bi-clipboard-check"></i> Work Orders</a>
+            <a href="/portal/maintenance/schedules" class="nav-link"><i class="bi bi-calendar-check"></i> Schedules</a>
+            <a href="/portal/" class="btn-back"><i class="bi bi-arrow-left"></i> Portal</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h2 class="page-title">Equipment</h2>
+            <button class="btn-primary" onclick="openAddModal()">
+                <i class="bi bi-plus-lg"></i> Add Equipment
+            </button>
+        </div>
+
+        <div class="filters-bar">
+            <div class="search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" id="searchInput" placeholder="Search equipment..." oninput="filterEquipment()">
+            </div>
+            <select class="filter-select" id="categoryFilter" onchange="filterEquipment()">
+                <option value="">All Categories</option>
+            </select>
+            <select class="filter-select" id="statusFilter" onchange="filterEquipment()">
+                <option value="">All Statuses</option>
+                <option value="operational">Operational</option>
+                <option value="needs_maintenance">Needs Maintenance</option>
+                <option value="under_repair">Under Repair</option>
+                <option value="out_of_service">Out of Service</option>
+                <option value="retired">Retired</option>
+            </select>
+            <select class="filter-select" id="locationFilter" onchange="filterEquipment()">
+                <option value="">All Locations</option>
+            </select>
+        </div>
+
+        <div class="card">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Location</th>
+                            <th>Status</th>
+                            <th>Serial #</th>
+                            <th>Last Maintenance</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="equipmentTable">
+                        <tr>
+                            <td colspan="7">
+                                <div class="loading"><div class="spinner"></div></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pagination" id="pagination"></div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Equipment Modal -->
+    <div class="modal-overlay" id="equipmentModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Add Equipment</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="equipmentForm">
+                    <input type="hidden" id="equipmentId">
+                    <div class="form-group">
+                        <label for="name">Name *</label>
+                        <input type="text" id="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="category_id">Category *</label>
+                        <select id="category_id" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="location">Location</label>
+                        <input type="text" id="location" placeholder="e.g., Kitchen, Bar, Storage">
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Status</label>
+                        <select id="status">
+                            <option value="operational">Operational</option>
+                            <option value="needs_maintenance">Needs Maintenance</option>
+                            <option value="under_repair">Under Repair</option>
+                            <option value="out_of_service">Out of Service</option>
+                            <option value="retired">Retired</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="serial_number">Serial Number</label>
+                        <input type="text" id="serial_number">
+                    </div>
+                    <div class="form-group">
+                        <label for="model_number">Model Number</label>
+                        <input type="text" id="model_number">
+                    </div>
+                    <div class="form-group">
+                        <label for="manufacturer">Manufacturer</label>
+                        <input type="text" id="manufacturer">
+                    </div>
+                    <div class="form-group">
+                        <label for="purchase_date">Purchase Date</label>
+                        <input type="date" id="purchase_date">
+                    </div>
+                    <div class="form-group">
+                        <label for="warranty_expiry">Warranty Expiry</label>
+                        <input type="date" id="warranty_expiry">
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">Notes</label>
+                        <textarea id="notes" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveEquipment()">Save Equipment</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/maintenance';
+        let allEquipment = [];
+        let categories = [];
+        let currentPage = 1;
+        const pageSize = 20;
+
+        async function loadCategories() {
+            try {
+                const response = await fetch(`${API_BASE}/categories`);
+                categories = await response.json();
+
+                // Populate filter dropdown
+                const categoryFilter = document.getElementById('categoryFilter');
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = cat.name;
+                    categoryFilter.appendChild(option);
+                });
+
+                // Populate form dropdown
+                const categorySelect = document.getElementById('category_id');
+                categorySelect.innerHTML = '<option value="">Select category...</option>';
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat.id;
+                    option.textContent = cat.name;
+                    categorySelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading categories:', error);
+            }
+        }
+
+        async function loadEquipment() {
+            try {
+                const response = await fetch(`${API_BASE}/equipment`);
+                allEquipment = await response.json();
+
+                // Populate location filter
+                const locations = [...new Set(allEquipment.map(e => e.location).filter(Boolean))];
+                const locationFilter = document.getElementById('locationFilter');
+                locationFilter.innerHTML = '<option value="">All Locations</option>';
+                locations.forEach(loc => {
+                    const option = document.createElement('option');
+                    option.value = loc;
+                    option.textContent = loc;
+                    locationFilter.appendChild(option);
+                });
+
+                filterEquipment();
+            } catch (error) {
+                console.error('Error loading equipment:', error);
+                document.getElementById('equipmentTable').innerHTML = `
+                    <tr><td colspan="7">
+                        <div class="empty-state">
+                            <i class="bi bi-exclamation-circle"></i>
+                            <p>Error loading equipment</p>
+                        </div>
+                    </td></tr>
+                `;
+            }
+        }
+
+        function filterEquipment() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const category = document.getElementById('categoryFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            const location = document.getElementById('locationFilter').value;
+
+            let filtered = allEquipment.filter(e => {
+                const matchesSearch = !search ||
+                    e.name.toLowerCase().includes(search) ||
+                    (e.serial_number && e.serial_number.toLowerCase().includes(search)) ||
+                    (e.model_number && e.model_number.toLowerCase().includes(search));
+                const matchesCategory = !category || e.category_id == category;
+                const matchesStatus = !status || e.status === status;
+                const matchesLocation = !location || e.location === location;
+                return matchesSearch && matchesCategory && matchesStatus && matchesLocation;
+            });
+
+            currentPage = 1;
+            renderEquipment(filtered);
+        }
+
+        function renderEquipment(equipment) {
+            const tbody = document.getElementById('equipmentTable');
+
+            if (equipment.length === 0) {
+                tbody.innerHTML = `
+                    <tr><td colspan="7">
+                        <div class="empty-state">
+                            <i class="bi bi-gear"></i>
+                            <p>No equipment found</p>
+                        </div>
+                    </td></tr>
+                `;
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+
+            const totalPages = Math.ceil(equipment.length / pageSize);
+            const start = (currentPage - 1) * pageSize;
+            const pageData = equipment.slice(start, start + pageSize);
+
+            const statusLabels = {
+                'operational': 'Operational',
+                'needs_maintenance': 'Needs Maintenance',
+                'under_repair': 'Under Repair',
+                'out_of_service': 'Out of Service',
+                'retired': 'Retired'
+            };
+
+            tbody.innerHTML = pageData.map(e => {
+                const category = categories.find(c => c.id === e.category_id);
+                const lastMaint = e.last_maintenance_date ? new Date(e.last_maintenance_date).toLocaleDateString() : 'Never';
+                return `
+                    <tr>
+                        <td><strong>${escapeHtml(e.name)}</strong></td>
+                        <td>${category ? escapeHtml(category.name) : '-'}</td>
+                        <td>${e.location ? escapeHtml(e.location) : '-'}</td>
+                        <td><span class="badge badge-${e.status}">${statusLabels[e.status] || e.status}</span></td>
+                        <td>${e.serial_number ? escapeHtml(e.serial_number) : '-'}</td>
+                        <td>${lastMaint}</td>
+                        <td class="actions-cell">
+                            <button class="btn-icon" onclick="editEquipment(${e.id})" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn-icon" onclick="viewHistory(${e.id})" title="History">
+                                <i class="bi bi-clock-history"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Render pagination
+            renderPagination(totalPages, equipment);
+        }
+
+        function renderPagination(totalPages, equipment) {
+            const pagination = document.getElementById('pagination');
+            if (totalPages <= 1) {
+                pagination.innerHTML = '';
+                return;
+            }
+
+            let html = `
+                <button onclick="changePage(${currentPage - 1}, ${JSON.stringify(equipment).replace(/"/g, '&quot;')})" ${currentPage === 1 ? 'disabled' : ''}>
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+            `;
+
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+                    html += `<button class="${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+                } else if (i === currentPage - 2 || i === currentPage + 2) {
+                    html += `<button disabled>...</button>`;
+                }
+            }
+
+            html += `
+                <button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            `;
+
+            pagination.innerHTML = html;
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            filterEquipment();
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            filterEquipment();
+        }
+
+        function openAddModal() {
+            document.getElementById('modalTitle').textContent = 'Add Equipment';
+            document.getElementById('equipmentForm').reset();
+            document.getElementById('equipmentId').value = '';
+            document.getElementById('status').value = 'operational';
+            document.getElementById('equipmentModal').classList.add('active');
+        }
+
+        async function editEquipment(id) {
+            try {
+                const response = await fetch(`${API_BASE}/equipment/${id}`);
+                const equipment = await response.json();
+
+                document.getElementById('modalTitle').textContent = 'Edit Equipment';
+                document.getElementById('equipmentId').value = equipment.id;
+                document.getElementById('name').value = equipment.name || '';
+                document.getElementById('category_id').value = equipment.category_id || '';
+                document.getElementById('location').value = equipment.location || '';
+                document.getElementById('status').value = equipment.status || 'operational';
+                document.getElementById('serial_number').value = equipment.serial_number || '';
+                document.getElementById('model_number').value = equipment.model_number || '';
+                document.getElementById('manufacturer').value = equipment.manufacturer || '';
+                document.getElementById('purchase_date').value = equipment.purchase_date ? equipment.purchase_date.split('T')[0] : '';
+                document.getElementById('warranty_expiry').value = equipment.warranty_expiry ? equipment.warranty_expiry.split('T')[0] : '';
+                document.getElementById('notes').value = equipment.notes || '';
+
+                document.getElementById('equipmentModal').classList.add('active');
+            } catch (error) {
+                console.error('Error loading equipment:', error);
+                alert('Error loading equipment details');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('equipmentModal').classList.remove('active');
+        }
+
+        async function saveEquipment() {
+            const id = document.getElementById('equipmentId').value;
+            const data = {
+                name: document.getElementById('name').value,
+                category_id: parseInt(document.getElementById('category_id').value),
+                location: document.getElementById('location').value || null,
+                status: document.getElementById('status').value,
+                serial_number: document.getElementById('serial_number').value || null,
+                model_number: document.getElementById('model_number').value || null,
+                manufacturer: document.getElementById('manufacturer').value || null,
+                purchase_date: document.getElementById('purchase_date').value || null,
+                warranty_expiry: document.getElementById('warranty_expiry').value || null,
+                notes: document.getElementById('notes').value || null
+            };
+
+            if (!data.name || !data.category_id) {
+                alert('Please fill in required fields (Name and Category)');
+                return;
+            }
+
+            try {
+                const url = id ? `${API_BASE}/equipment/${id}` : `${API_BASE}/equipment`;
+                const method = id ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    closeModal();
+                    loadEquipment();
+                } else {
+                    const error = await response.json();
+                    alert('Error saving equipment: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error saving equipment:', error);
+                alert('Error saving equipment');
+            }
+        }
+
+        function viewHistory(id) {
+            // TODO: Implement history view modal
+            alert('Equipment history view coming soon');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        loadCategories().then(() => loadEquipment());
+    </script>
+</body>
+</html>

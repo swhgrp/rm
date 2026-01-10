@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  maintenance-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: maintenance-service
+    restart: unless-stopped
+    ports:
+      - "8006:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://maintenance:maintenance@postgres:5432/maintenance
+      - DATABASE_URL_SYNC=postgresql://maintenance:maintenance@postgres:5432/maintenance
+      - DEBUG=false
+      - SERVICE_NAME=maintenance-service
+    depends_on:
+      - postgres
+    networks:
+      - restaurant-network
+    volumes:
+      - ./src:/app/src:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: maintenance-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=maintenance
+      - POSTGRES_PASSWORD=maintenance
+      - POSTGRES_DB=maintenance
+    volumes:
+      - maintenance_postgres_data:/var/lib/postgresql/data
+    networks:
+      - restaurant-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U maintenance"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  restaurant-network:
+    external: true
+
+volumes:
+  maintenance_postgres_data:

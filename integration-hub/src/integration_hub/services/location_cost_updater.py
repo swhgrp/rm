@@ -263,6 +263,22 @@ class LocationCostUpdaterService:
                     }
                 )
 
+                # Check if history already exists for this invoice/item/location combo
+                existing_history = conn.execute(
+                    text("""
+                        SELECT id FROM master_item_location_cost_history
+                        WHERE master_item_id = :master_item_id
+                          AND location_id = :location_id
+                          AND invoice_id = :invoice_id
+                    """),
+                    {"master_item_id": master_item_id, "location_id": location_id, "invoice_id": invoice.id}
+                ).fetchone()
+
+                if existing_history:
+                    logger.debug(f"History already exists for item {master_item_id}, location {location_id}, invoice {invoice.id}")
+                    conn.commit()
+                    return {'skipped': True, 'reason': 'history_already_exists'}
+
                 # Record history
                 conn.execute(
                     text("""
@@ -298,6 +314,22 @@ class LocationCostUpdaterService:
                 return {'updated': True, 'old_cost': old_cost, 'new_cost': new_cost}
 
             else:
+                # Check if history already exists for this invoice/item/location combo
+                # (This can happen if invoice was re-sent)
+                existing_history = conn.execute(
+                    text("""
+                        SELECT id FROM master_item_location_cost_history
+                        WHERE master_item_id = :master_item_id
+                          AND location_id = :location_id
+                          AND invoice_id = :invoice_id
+                    """),
+                    {"master_item_id": master_item_id, "location_id": location_id, "invoice_id": invoice.id}
+                ).fetchone()
+
+                if existing_history:
+                    logger.debug(f"History already exists for item {master_item_id}, location {location_id}, invoice {invoice.id}")
+                    return {'skipped': True, 'reason': 'history_already_exists'}
+
                 # Create new location cost record
                 result = conn.execute(
                     text("""

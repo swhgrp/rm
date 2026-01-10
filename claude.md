@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** January 9, 2026
-**System Status:** Production (94% Complete - Password Reset & Monitoring Fixes)
+**Last Updated:** January 10, 2026
+**System Status:** Production (96% Complete - Maintenance Portal UI Added)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -38,11 +38,93 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - January 9, 2026)
+### Most Recent Work (Current Session - January 10, 2026)
+
+**MAINTENANCE PORTAL UI** ✅ **COMPLETE**
+
+#### 1. **Maintenance Portal Interface** ✅ **DEPLOYED**
+- **Complete Web UI for Maintenance System**
+  - Dashboard with real-time stats and alerts
+  - Equipment management with search, filters, CRUD
+  - Work orders with status workflow
+  - Maintenance schedules with completion tracking
+  - Consistent styling with Portal design
+
+- **Portal Routes Added**
+  - `/portal/maintenance/` - Dashboard
+  - `/portal/maintenance/equipment` - Equipment list
+  - `/portal/maintenance/work-orders` - Work orders list
+  - `/portal/maintenance/work-orders/new` - New work order form
+  - `/portal/maintenance/schedules` - Maintenance schedules
+
+- **Templates Created**
+  - `maintenance/dashboard.html` - Stats cards, alerts, recent work orders
+  - `maintenance/equipment.html` - Equipment list with filters and modal
+  - `maintenance/work_orders.html` - Work orders with status management
+  - `maintenance/work_order_form.html` - New work order creation
+  - `maintenance/schedules.html` - PM schedules with completion tracking
+
+- **Features**
+  - Search and filter equipment by category, status, location
+  - Work order priority badges and status workflow
+  - Inline status updates for work orders
+  - Schedule frequency configuration (daily/weekly/monthly/quarterly/yearly)
+  - Auto-generate work orders from schedules
+  - Permission-based access (can_access_maintenance)
+
+- **Files Modified**
+  - `/opt/restaurant-system/portal/src/portal/main.py` - Added maintenance routes
+  - `/opt/restaurant-system/portal/templates/home.html` - Added maintenance icon and navigation
+  - Created 5 new templates in `portal/templates/maintenance/`
+
+---
+
+### Previous Session Work (January 9, 2026)
+
+**MAINTENANCE SERVICE BACKEND & PASSWORD RESET** ✅ **COMPLETE**
+
+#### 1. **Maintenance & Equipment Tracking Service** ✅ **DEPLOYED**
+- **New Microservice Created**
+  - Full FastAPI backend with async SQLAlchemy
+  - Equipment tracking with auto-generated QR codes
+  - Equipment categories (hierarchical)
+  - Work order management (create, assign, start, complete)
+  - Preventive maintenance scheduling
+  - Vendor management
+  - Dashboard with alerts
+
+- **API Endpoints**
+  - `/maintenance/health` - Health check
+  - `/maintenance/dashboard` - Dashboard with stats
+  - `/maintenance/equipment` - Equipment CRUD
+  - `/maintenance/categories` - Category management
+  - `/maintenance/work-orders` - Work order management
+  - `/maintenance/schedules` - PM scheduling
+  - `/maintenance/vendors` - Vendor management
+
+- **Database Tables**
+  - `equipment_categories`, `equipment`, `equipment_history`
+  - `maintenance_schedules`, `work_orders`, `work_order_comments`, `work_order_parts`
+  - `vendors`
+
+- **Infrastructure**
+  - Container: `maintenance-service` (port 8006)
+  - Database: `maintenance-postgres`
+  - Added to nginx routing
+  - Added to monitoring scripts
+  - Added to backup scripts
+  - Swagger docs at `/maintenance/docs`
+
+- **Files Created**
+  - `/opt/restaurant-system/maintenance/` - Complete service directory
+  - Models, schemas, routers, Dockerfile, docker-compose.yml
+  - Alembic migrations
+
+---
 
 **PASSWORD RESET SYSTEM & MONITORING FIXES** ✅ **COMPLETE**
 
-#### 1. **Password Reset System** ✅ **COMPLETE**
+#### 2. **Password Reset System** ✅ **COMPLETE**
 - **Email-Based Self-Service Password Reset**
   - Added "Forgot your password?" link to login page
   - Created forgot password page (email input form)
@@ -75,11 +157,11 @@ When fixing issues, **always implement the permanent/architectural solution**, n
   - `/opt/restaurant-system/portal/templates/forgot_password.html` - Created
   - `/opt/restaurant-system/portal/templates/reset_password.html` - Created
 
-#### 2. **Monitoring System Fixes** ✅ **COMPLETE**
+#### 3. **Monitoring System Fixes** ✅ **COMPLETE**
 - **Service Health Check Script Bug**
   - Fixed URL parsing in `monitor-services.sh`
   - Changed delimiter from `:` to `|` to avoid conflict with `https:`
-  - All 7 microservices now report correctly (Portal, Inventory, HR, Accounting, Events, Hub, Files)
+  - All 8 microservices now report correctly (Portal, Inventory, HR, Accounting, Events, Hub, Files, Maintenance)
 
 - **Docker Container Status Bug**
   - Fixed newline handling in container health status
@@ -99,7 +181,7 @@ When fixing issues, **always implement the permanent/architectural solution**, n
   - `/opt/restaurant-system/scripts/dashboard-status.sh` - Fixed nginx container name
   - `/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh` - Created
 
-#### 3. **Important Docker Container Issue Discovered**
+#### 4. **Important Docker Container Issue Discovered**
 - **Portal Container Code Location**
   - Portal app loads from `/app/portal/main.py` (baked into image at build time)
   - Volume mount at `/app/src/portal/` exists but not used by uvicorn
@@ -2470,9 +2552,77 @@ Email → PDF Extract → AI Parse → Auto-Map → Ready for Review → Route t
 
 ---
 
+### 8. Maintenance & Equipment Tracking System ✅ 100% Backend Complete
+
+**Purpose:** Track equipment, maintenance schedules, work orders, and vendors across all locations
+
+**Location:** `/opt/restaurant-system/maintenance/`
+
+**Technology:** FastAPI, SQLAlchemy (async), PostgreSQL
+
+**Container:** `maintenance-service` (port 8006)
+**Database:** `maintenance-postgres`
+
+**Database Models:**
+- `equipment_categories` - Hierarchical equipment categorization
+- `equipment` - Equipment/asset tracking with QR codes
+- `equipment_history` - Audit log for status/location changes
+- `maintenance_schedules` - Preventive maintenance scheduling
+- `work_orders` - Repair and maintenance work orders
+- `work_order_comments` - Work order communication
+- `work_order_parts` - Parts/materials used in work orders
+- `vendors` - External service vendors
+
+**Features:**
+- ✅ Equipment CRUD with QR code generation
+- ✅ Equipment categories (hierarchical tree structure)
+- ✅ Equipment history tracking (status changes, maintenance)
+- ✅ Work order management (create, assign, start, complete)
+- ✅ Work order comments and parts tracking
+- ✅ Preventive maintenance scheduling (daily to annual frequencies)
+- ✅ Automatic next-due calculation when maintenance completed
+- ✅ Vendor management
+- ✅ Dashboard with alerts (overdue maintenance, critical work orders)
+- ✅ Multi-location support (via location_id)
+- ❌ Portal UI (Phase 7 - TODO)
+- ❌ QR code printing/PDF export (Future)
+- ❌ Email notifications (Future)
+
+**API Endpoints:**
+- `GET /maintenance/health` - Health check
+- `GET /maintenance/dashboard` - Dashboard stats
+- `GET /maintenance/dashboard/alerts` - System alerts
+- `GET /maintenance/dashboard/maintenance-due` - Upcoming maintenance
+- `GET /maintenance/dashboard/equipment-status` - Equipment by location
+- Equipment CRUD: `/maintenance/equipment`
+- Categories CRUD: `/maintenance/categories`
+- Work Orders CRUD: `/maintenance/work-orders`
+- Schedules CRUD: `/maintenance/schedules`
+- Vendors CRUD: `/maintenance/vendors`
+
+**Documentation:**
+- `/maintenance/docs` - Swagger UI
+- `/maintenance/redoc` - ReDoc
+
+**Key Files:**
+- `src/maintenance/main.py` - FastAPI application
+- `src/maintenance/models.py` - SQLAlchemy models
+- `src/maintenance/schemas.py` - Pydantic schemas
+- `src/maintenance/routers/` - API routers (equipment, categories, schedules, work_orders, vendors, dashboard)
+- `alembic/versions/001_initial.py` - Initial migration
+
+---
+
 ## 🔧 RECENT DEVELOPMENT HISTORY
 
 ### Major Milestones (Last 2 Weeks)
+
+**January 9, 2026:**
+- Maintenance & Equipment Tracking Service created and deployed
+- Complete backend API (equipment, categories, schedules, work orders, vendors, dashboard)
+- Added to nginx routing and monitoring scripts
+- Password reset system implemented for Portal
+- Monitoring script bugs fixed
 
 **Nov 1, 2025:**
 - Sentry error tracking integrated (awaiting DSN)

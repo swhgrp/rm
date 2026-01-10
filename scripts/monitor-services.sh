@@ -29,6 +29,7 @@ SERVICES=(
     "https://rm.swhgrp.com/events/health|Events"
     "https://rm.swhgrp.com/hub/health|Integration_Hub"
     "https://rm.swhgrp.com/files/health|Files"
+    "https://rm.swhgrp.com/maintenance/health|Maintenance"
 )
 
 # Check each service
@@ -50,7 +51,7 @@ done
 log_alert "-----------------------------------"
 log_alert "Docker Container Status:"
 
-CONTAINERS=$(docker ps --format "{{.Names}}" | grep -E "(portal|inventory|hr|accounting|events|hub|files)")
+CONTAINERS=$(docker ps --format "{{.Names}}" | grep -E "(portal|inventory|hr|accounting|events|hub|files|maintenance)")
 
 for container in $CONTAINERS; do
     STATUS=$(docker inspect --format='{{.State.Health.Status}}' $container 2>/dev/null | tr -d '\n' | xargs || echo "running")
@@ -73,7 +74,7 @@ done
 log_alert "-----------------------------------"
 log_alert "Database Status:"
 
-DBS=("inventory-db" "accounting-db" "hr-db" "events-db" "hub-db")
+DBS=("inventory-db" "accounting-db" "hr-db" "events-db" "hub-db" "maintenance-postgres")
 
 for db in "${DBS[@]}"; do
     if docker exec $db pg_isready -q 2>/dev/null; then

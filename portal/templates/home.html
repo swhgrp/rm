@@ -443,6 +443,8 @@
                         <i class="bi bi-globe"></i>
                     {% elif system.system_key == 'mail' %}
                         <i class="bi bi-envelope"></i>
+                    {% elif system.system_key == 'maintenance' %}
+                        <i class="bi bi-tools"></i>
                     {% else %}
                         <i class="bi bi-grid"></i>
                     {% endif %}
@@ -570,8 +572,8 @@
                 // Show loading state
                 card.classList.add('loading');
 
-                // Monitoring and Mail systems use direct access, no token needed
-                if (systemKey === 'monitoring' || systemKey === 'mail') {
+                // Monitoring, Mail, and Maintenance systems use direct portal access, no token needed
+                if (systemKey === 'monitoring' || systemKey === 'mail' || systemKey === 'maintenance') {
                     window.location.href = systemUrl;
                     return;
                 }

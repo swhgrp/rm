@@ -1,15 +1,15 @@
 # SW Hospitality Group - Restaurant Management System
 
 [![Status](https://img.shields.io/badge/status-production-green)]()
-[![Completion](https://img.shields.io/badge/completion-94%25-brightgreen)]()
+[![Completion](https://img.shields.io/badge/completion-96%25-brightgreen)]()
 [![Documentation](https://img.shields.io/badge/docs-updated-blue)]()
 
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** January 9, 2026
-**Status:** ~94% Complete - All 8 Systems Production Ready ✅
-**Latest:** Password reset system & monitoring fixes (Jan 9, 2026) ✅
+**Last Updated:** January 10, 2026
+**Status:** ~96% Complete - All 9 Systems Production Ready ✅
+**Latest:** Maintenance & Equipment Tracking System with Portal UI (Jan 10, 2026) ✅
 
 ---
 
@@ -31,14 +31,14 @@
 
 The SW Hospitality Group Restaurant Management System is a comprehensive microservices platform handling all aspects of restaurant operations including inventory management, human resources, accounting, event planning, and third-party integrations.
 
-### Key Statistics (Verified Jan 8, 2026)
-- **8 microservices** running in production (including Websites CMS)
-- **450+ Python files** across all systems
-- **140+ HTML templates** for user interfaces
-- **140+ database models** with full relationships
-- **750+ API endpoints** for system integration
-- **19 Docker containers** orchestrated via Docker Compose
-- **~94% completion** - all core systems production ready
+### Key Statistics (Verified Jan 10, 2026)
+- **9 microservices** running in production (including Maintenance)
+- **470+ Python files** across all systems
+- **150+ HTML templates** for user interfaces
+- **150+ database models** with full relationships
+- **800+ API endpoints** for system integration
+- **21 Docker containers** orchestrated via Docker Compose
+- **~96% completion** - all core systems production ready
 
 ### Source of Truth Architecture (Dec 27, 2025)
 | Data Domain | Owner System | Consumer Systems |
@@ -156,6 +156,19 @@ restaurant-system/
 │   ├── requirements.txt
 │   └── .env
 │
+├── maintenance/        # Maintenance & Equipment Tracking (NEW - Jan 2026) 🌟
+│   ├── src/            # FastAPI application code (12 Python files)
+│   │   └── maintenance/
+│   │       ├── models.py     # SQLAlchemy models
+│   │       ├── schemas.py    # Pydantic schemas
+│   │       ├── routers/      # API routers (6 modules)
+│   │       └── services/     # External integrations
+│   ├── alembic/        # Database migrations
+│   ├── Dockerfile
+│   ├── docker-compose.yml  # Standalone deployment
+│   ├── requirements.txt
+│   └── .env
+│
 ├── shared/             # Shared Infrastructure
 │   ├── nginx/          # Reverse proxy configuration
 │   │   └── conf.d/     # Site configurations
@@ -199,6 +212,7 @@ restaurant-system/
 │  /files/        → files-app:8000       (Web UI)              │
 │  /files/webdav/ → files-app:8000       (Desktop Sync)        │
 │  /websites/     → websites-app:8000    (Website CMS)         │
+│  /maintenance/  → maintenance-service:8000 (Equipment)       │
 │  /onlyoffice/   → onlyoffice:80        (Document Editing)    │
 └──────────────────────────────────────────────────────────────┘
          │           │           │           │
@@ -278,18 +292,18 @@ restaurant-system/
 
 ## 📦 System Components
 
-### 1. Portal System ✅ **~87% Complete**
-**Central authentication and system monitoring hub**
+### 1. Portal System ✅ **~95% Complete**
+**Central authentication, system monitoring hub, and maintenance management**
 
 - **URL:** https://rm.swhgrp.com/portal/
-- **Purpose:** JWT-based SSO and infrastructure monitoring
+- **Purpose:** JWT-based SSO, infrastructure monitoring, and maintenance UI
 - **Technology:** FastAPI (Python), PostgreSQL
-- **Files:** 3 Python files, 5 templates
+- **Files:** 3 Python files, 15 templates
 
 **Core Authentication:**
 - ✅ JWT token authentication with secure HTTP-only cookies
 - ✅ Session management (30-min timeout with auto-refresh)
-- ✅ Permission-based system access control (7 systems)
+- ✅ Permission-based system access control (9 systems)
 - ✅ Admin user management interface
 - ✅ Single sign-on (SSO) token generation (5-min tokens)
 - ✅ Cross-system password synchronization
@@ -299,10 +313,15 @@ restaurant-system/
 - ✅ Password change system with cross-system sync
 - ✅ Password complexity enforcement (8+ characters minimum)
 - ✅ Session auto-refresh (extends when <10 min remaining)
+- ✅ **Self-service password reset** via email (NEW Jan 2026) 🌟
+  - Secure random token generation (32-byte URL-safe)
+  - 1-hour token expiration
+  - Anti-enumeration protection
+  - Professional HTML email templates
 
 **System Monitoring Dashboard:**
 - ✅ Real-time infrastructure monitoring (admin-only)
-- ✅ 7 microservices health status
+- ✅ 9 microservices health status
 - ✅ Database health with connection counts
 - ✅ SSL certificate expiration tracking
 - ✅ Per-database backup status
@@ -311,10 +330,15 @@ restaurant-system/
 - ✅ Local time display (EDT/EST timezone aware)
 - ✅ **URL:** https://rm.swhgrp.com/portal/monitoring
 
-**Missing (~13%):**
-- ⚠️ **Missing profile.html template** - `/profile` route returns 500 error (CRITICAL)
+**Maintenance Portal (NEW Jan 2026):** 🌟
+- ✅ Equipment management UI
+- ✅ Work order management UI
+- ✅ Maintenance schedules UI
+- ✅ Dashboard with stats and alerts
+- ✅ **URL:** https://rm.swhgrp.com/portal/maintenance/
+
+**Missing (~5%):**
 - ⚠️ `/debug` endpoint has no authentication - security risk
-- ❌ Password reset via email (not implemented)
 - ❌ Two-factor authentication (future)
 
 **[→ View Portal Documentation](./portal/README.md)**
@@ -810,6 +834,80 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 - Preview: https://rm.swhgrp.com/websites/preview/{site-slug}/
 
 **[→ View Websites Documentation](./websites/README.md)**
+
+---
+
+### 9. Maintenance System ✅ **Production Ready (NEW - Jan 2026)** 🌟
+**Equipment tracking, work order management, and preventive maintenance scheduling**
+
+- **URL:** https://rm.swhgrp.com/portal/maintenance/
+- **API:** https://rm.swhgrp.com/maintenance/
+- **Database:** maintenance (PostgreSQL 15)
+- **Technology:** FastAPI, async SQLAlchemy, Alembic
+- **Files:** 12 Python files, 5 Portal templates
+- **Status:** Production ready with full feature set ✅
+
+**Features:**
+
+**Equipment Management:**
+- ✅ Equipment catalog with categories (hierarchical)
+- ✅ Auto-generated QR codes for asset tracking
+- ✅ Equipment status tracking (operational, needs maintenance, under repair, out of service, retired)
+- ✅ Location-based organization
+- ✅ Serial number and model tracking
+- ✅ Purchase date and warranty expiry tracking
+- ✅ Equipment history audit trail
+- ✅ Search and filter by category, status, location
+
+**Work Order Management:**
+- ✅ Work order creation with priority levels (low, medium, high, critical)
+- ✅ Work order types (repair, preventive, inspection, installation, other)
+- ✅ Assignment to technicians
+- ✅ Status workflow (open → in progress → on hold → completed/cancelled)
+- ✅ Due date tracking
+- ✅ Work order comments
+- ✅ Parts tracking per work order
+- ✅ Auto-generation from maintenance schedules
+
+**Preventive Maintenance Scheduling:**
+- ✅ Recurring maintenance schedules
+- ✅ Frequency options (daily, weekly, monthly, quarterly, yearly)
+- ✅ Configurable intervals (e.g., every 2 weeks, every 3 months)
+- ✅ Next due date calculation
+- ✅ Overdue maintenance alerts
+- ✅ Schedule completion tracking
+- ✅ One-click work order creation from schedules
+
+**Vendor Management:**
+- ✅ Vendor contact information
+- ✅ Service type categorization
+- ✅ Link vendors to equipment
+
+**Dashboard & Alerts:**
+- ✅ Real-time statistics (total equipment, open work orders, overdue items)
+- ✅ Alert system for critical maintenance
+- ✅ Recent work orders list
+- ✅ Upcoming maintenance preview
+- ✅ Equipment by status breakdown
+
+**Portal Integration:**
+- ✅ Full Portal UI with consistent styling
+- ✅ Permission-based access (can_access_maintenance)
+- ✅ Dashboard, Equipment, Work Orders, and Schedules pages
+- ✅ Mobile-responsive design
+
+**API Endpoints:**
+- `/maintenance/health` - Health check
+- `/maintenance/dashboard` - Dashboard stats and alerts
+- `/maintenance/equipment` - Equipment CRUD
+- `/maintenance/categories` - Category management
+- `/maintenance/work-orders` - Work order management
+- `/maintenance/schedules` - PM scheduling
+- `/maintenance/vendors` - Vendor management
+
+**Access:**
+- Portal UI: https://rm.swhgrp.com/portal/maintenance/
+- API Docs: https://rm.swhgrp.com/maintenance/docs
 
 ---
 

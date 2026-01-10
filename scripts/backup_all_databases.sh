@@ -54,6 +54,11 @@ DATABASES=(
     "websites-db:websites_user:websites_db"
 )
 
+# Standalone databases (not in main docker-compose)
+STANDALONE_DATABASES=(
+    "maintenance-postgres:maintenance:maintenance"
+)
+
 BACKUP_COUNT=0
 FAILED_COUNT=0
 
@@ -76,6 +81,27 @@ for db_config in "${DATABASES[@]}"; do
         log_error "$database backup FAILED"
         FAILED_COUNT=$((FAILED_COUNT + 1))
         # Don't exit - try to backup remaining databases
+    fi
+done
+
+# Backup standalone databases (not in main docker-compose)
+for db_config in "${STANDALONE_DATABASES[@]}"; do
+    IFS=':' read -r container user database <<< "$db_config"
+
+    log_message "Backing up $database (standalone)..."
+
+    BACKUP_FILE="$BACKUP_DIR/${database}_${DATE}.sql.gz"
+
+    if docker exec "$container" \
+        pg_dump -U "$user" "$database" | \
+        gzip > "$BACKUP_FILE" 2>>"$LOG_FILE"; then
+
+        FILE_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+        log_success "$database backed up successfully ($FILE_SIZE)"
+        BACKUP_COUNT=$((BACKUP_COUNT + 1))
+    else
+        log_error "$database backup FAILED"
+        FAILED_COUNT=$((FAILED_COUNT + 1))
     fi
 done
 

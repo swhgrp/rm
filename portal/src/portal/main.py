@@ -120,6 +120,7 @@ class User(Base):
     can_access_files = Column(Boolean, default=True)
     can_access_websites = Column(Boolean, default=True)
     can_access_mail = Column(Boolean, default=False)
+    can_access_maintenance = Column(Boolean, default=True)
     accounting_role_id = Column(Integer, nullable=True)
 
     # Password reset tokens
@@ -395,6 +396,15 @@ async def home(request: Request, db: Session = Depends(get_db)):
             "url": "/files/",
             "icon": "📁",
             "system_key": "files"
+        })
+
+    if getattr(user, 'can_access_maintenance', False) or user.is_admin:
+        systems.append({
+            "name": "Maintenance",
+            "description": "Equipment tracking, work orders, and preventive maintenance",
+            "url": "/portal/maintenance/",
+            "icon": "🔧",
+            "system_key": "maintenance"
         })
 
     # Websites - always show for admins
@@ -1040,6 +1050,63 @@ async def health_check():
     return {"status": "healthy", "service": "portal"}
 
 
+# Maintenance Routes
+@app.get("/maintenance/", response_class=HTMLResponse)
+@app.get("/maintenance", response_class=HTMLResponse)
+async def maintenance_dashboard(request: Request, current_user: User = Depends(get_current_user)):
+    """Display maintenance dashboard"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/maintenance/", status_code=303)
+    if not getattr(current_user, 'can_access_maintenance', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Maintenance system")
+
+    return templates.TemplateResponse("maintenance/dashboard.html", {"request": request, "user": current_user})
+
+
+@app.get("/maintenance/equipment", response_class=HTMLResponse)
+async def maintenance_equipment(request: Request, current_user: User = Depends(get_current_user)):
+    """Display equipment list"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/maintenance/equipment", status_code=303)
+    if not getattr(current_user, 'can_access_maintenance', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Maintenance system")
+
+    return templates.TemplateResponse("maintenance/equipment.html", {"request": request, "user": current_user})
+
+
+@app.get("/maintenance/work-orders", response_class=HTMLResponse)
+async def maintenance_work_orders(request: Request, current_user: User = Depends(get_current_user)):
+    """Display work orders list"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/maintenance/work-orders", status_code=303)
+    if not getattr(current_user, 'can_access_maintenance', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Maintenance system")
+
+    return templates.TemplateResponse("maintenance/work_orders.html", {"request": request, "user": current_user})
+
+
+@app.get("/maintenance/work-orders/new", response_class=HTMLResponse)
+async def maintenance_new_work_order(request: Request, current_user: User = Depends(get_current_user)):
+    """Display new work order form"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/maintenance/work-orders/new", status_code=303)
+    if not getattr(current_user, 'can_access_maintenance', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Maintenance system")
+
+    return templates.TemplateResponse("maintenance/work_order_form.html", {"request": request, "user": current_user})
+
+
+@app.get("/maintenance/schedules", response_class=HTMLResponse)
+async def maintenance_schedules(request: Request, current_user: User = Depends(get_current_user)):
+    """Display maintenance schedules"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/maintenance/schedules", status_code=303)
+    if not getattr(current_user, 'can_access_maintenance', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Maintenance system")
+
+    return templates.TemplateResponse("maintenance/schedules.html", {"request": request, "user": current_user})
+
+
 # Monitoring Dashboard Routes
 @app.get("/monitoring", response_class=HTMLResponse)
 async def monitoring_dashboard(request: Request, current_user: User = Depends(get_current_user)):
@@ -1140,9 +1207,3 @@ async def monitoring_status(current_user: User = Depends(get_current_user)):
             os.unlink(output_file)
         logger.error(f"Monitoring status error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "service": "portal"}

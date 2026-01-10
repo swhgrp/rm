@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maintenance Schedules - SW Hospitality Group</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #ECEFF1;
+            --bg-secondary: #FFFFFF;
+            --bg-tertiary: #F5F5F5;
+            --bg-elevated: #E0E0E0;
+            --border-primary: #CFD8DC;
+            --border-secondary: #B0BEC5;
+            --text-primary: #263238;
+            --text-secondary: #546E7A;
+            --text-muted: #78909C;
+            --accent-primary: #455A64;
+            --accent-secondary: #37474F;
+            --accent-hover: #263238;
+            --accent-muted: #546E7A;
+            --success: #43A047;
+            --success-bg: rgba(67, 160, 71, 0.1);
+            --error: #E53935;
+            --error-bg: rgba(229, 57, 53, 0.1);
+            --warning: #FB8C00;
+            --warning-bg: rgba(251, 140, 0, 0.1);
+            --info: #1E88E5;
+            --info-bg: rgba(30, 136, 229, 0.1);
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
+            --glow-accent: 0 0 15px rgba(69, 90, 100, 0.15);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .navbar {
+            background-color: #455A64;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 8px rgba(69, 90, 100, 0.3);
+        }
+
+        .navbar-brand h1 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #FFFFFF;
+        }
+
+        .navbar-nav {
+            display: flex;
+            gap: 10px;
+        }
+
+        .nav-link, .btn-back {
+            padding: 8px 16px;
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-link:hover, .btn-back:hover {
+            background-color: rgba(255, 255, 255, 0.25);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        .nav-link.active {
+            background-color: rgba(255, 255, 255, 0.25);
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            padding: 10px 20px;
+            background-color: var(--accent-primary);
+            color: #FFFFFF;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .filters-bar {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            flex: 1;
+            min-width: 200px;
+            max-width: 400px;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 10px 15px 10px 40px;
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            font-size: 14px;
+            background-color: var(--bg-secondary);
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .search-box i {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .filter-select {
+            padding: 10px 15px;
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            font-size: 14px;
+            background-color: var(--bg-secondary);
+            min-width: 140px;
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .card {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-primary);
+        }
+
+        th {
+            background-color: var(--bg-tertiary);
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tr:hover {
+            background-color: var(--bg-tertiary);
+        }
+
+        tr:last-child td {
+            border-bottom: none;
+        }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-active { background-color: var(--success-bg); color: var(--success); }
+        .badge-paused { background-color: var(--warning-bg); color: var(--warning); }
+        .badge-completed { background-color: var(--info-bg); color: var(--info); }
+
+        .badge-overdue { background-color: var(--error-bg); color: var(--error); }
+        .badge-due-soon { background-color: var(--warning-bg); color: var(--warning); }
+        .badge-upcoming { background-color: var(--success-bg); color: var(--success); }
+
+        .actions-cell {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-icon {
+            padding: 6px 10px;
+            border: 1px solid var(--border-primary);
+            border-radius: 4px;
+            background-color: var(--bg-secondary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-icon:hover {
+            background-color: var(--bg-tertiary);
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        .btn-icon.success:hover {
+            border-color: var(--success);
+            color: var(--success);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-muted);
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .loading {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 60px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-primary);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px 15px;
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            font-size: 14px;
+            background-color: var(--bg-secondary);
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .modal-footer {
+            padding: 20px;
+            border-top: 1px solid var(--border-primary);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .btn-secondary {
+            padding: 10px 20px;
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-primary);
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--bg-elevated);
+        }
+
+        .schedule-info {
+            background-color: var(--bg-tertiary);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .schedule-info p {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .schedule-info p:last-child {
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">
+            <h1><i class="bi bi-tools"></i> Maintenance</h1>
+        </div>
+        <div class="navbar-nav">
+            <a href="/portal/maintenance/" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a>
+            <a href="/portal/maintenance/equipment" class="nav-link"><i class="bi bi-gear"></i> Equipment</a>
+            <a href="/portal/maintenance/work-orders" class="nav-link"><i class="bi bi-clipboard-check"></i> Work Orders</a>
+            <a href="/portal/maintenance/schedules" class="nav-link active"><i class="bi bi-calendar-check"></i> Schedules</a>
+            <a href="/portal/" class="btn-back"><i class="bi bi-arrow-left"></i> Portal</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h2 class="page-title">Maintenance Schedules</h2>
+            <button class="btn-primary" onclick="openCreateModal()">
+                <i class="bi bi-plus-lg"></i> New Schedule
+            </button>
+        </div>
+
+        <div class="filters-bar">
+            <div class="search-box">
+                <i class="bi bi-search"></i>
+                <input type="text" id="searchInput" placeholder="Search schedules..." oninput="filterSchedules()">
+            </div>
+            <select class="filter-select" id="statusFilter" onchange="filterSchedules()">
+                <option value="">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+                <option value="completed">Completed</option>
+            </select>
+            <select class="filter-select" id="frequencyFilter" onchange="filterSchedules()">
+                <option value="">All Frequencies</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
+                <option value="quarterly">Quarterly</option>
+                <option value="yearly">Yearly</option>
+            </select>
+        </div>
+
+        <div class="card">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Equipment</th>
+                            <th>Frequency</th>
+                            <th>Next Due</th>
+                            <th>Status</th>
+                            <th>Last Completed</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schedulesTable">
+                        <tr>
+                            <td colspan="7">
+                                <div class="loading"><div class="spinner"></div></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Schedule Modal -->
+    <div class="modal-overlay" id="createModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">New Maintenance Schedule</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="scheduleForm">
+                    <input type="hidden" id="scheduleId">
+                    <div class="form-group">
+                        <label for="sched_name">Schedule Name *</label>
+                        <input type="text" id="sched_name" required placeholder="e.g., Weekly Hood Cleaning">
+                    </div>
+                    <div class="form-group">
+                        <label for="sched_equipment_id">Equipment *</label>
+                        <select id="sched_equipment_id" required></select>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="sched_frequency">Frequency *</label>
+                            <select id="sched_frequency" required onchange="updateFrequencyInfo()">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="monthly" selected>Monthly</option>
+                                <option value="quarterly">Quarterly</option>
+                                <option value="yearly">Yearly</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="sched_interval">Every X Periods</label>
+                            <input type="number" id="sched_interval" value="1" min="1" max="12">
+                        </div>
+                    </div>
+                    <div class="schedule-info" id="frequencyInfo">
+                        <p><i class="bi bi-info-circle"></i> This will run every month</p>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="sched_next_due">Next Due Date *</label>
+                            <input type="date" id="sched_next_due" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="sched_status">Status</label>
+                            <select id="sched_status">
+                                <option value="active">Active</option>
+                                <option value="paused">Paused</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="sched_description">Description</label>
+                        <textarea id="sched_description" rows="3" placeholder="What maintenance tasks should be performed..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="sched_estimated_duration">Estimated Duration (minutes)</label>
+                        <input type="number" id="sched_estimated_duration" min="0" placeholder="e.g., 30">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveSchedule()">Save Schedule</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/maintenance';
+        let allSchedules = [];
+        let equipment = [];
+
+        async function loadEquipment() {
+            try {
+                const response = await fetch(`${API_BASE}/equipment`);
+                equipment = await response.json();
+
+                const select = document.getElementById('sched_equipment_id');
+                select.innerHTML = '<option value="">Select equipment...</option>';
+                equipment.forEach(e => {
+                    const option = document.createElement('option');
+                    option.value = e.id;
+                    option.textContent = `${e.name} (${e.location || 'No location'})`;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading equipment:', error);
+            }
+        }
+
+        async function loadSchedules() {
+            try {
+                const response = await fetch(`${API_BASE}/schedules`);
+                allSchedules = await response.json();
+                filterSchedules();
+            } catch (error) {
+                console.error('Error loading schedules:', error);
+                document.getElementById('schedulesTable').innerHTML = `
+                    <tr><td colspan="7">
+                        <div class="empty-state">
+                            <i class="bi bi-exclamation-circle"></i>
+                            <p>Error loading schedules</p>
+                        </div>
+                    </td></tr>
+                `;
+            }
+        }
+
+        function filterSchedules() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const status = document.getElementById('statusFilter').value;
+            const frequency = document.getElementById('frequencyFilter').value;
+
+            let filtered = allSchedules.filter(s => {
+                const matchesSearch = !search ||
+                    s.name.toLowerCase().includes(search) ||
+                    (s.description && s.description.toLowerCase().includes(search));
+                const matchesStatus = !status || s.status === status;
+                const matchesFrequency = !frequency || s.frequency === frequency;
+                return matchesSearch && matchesStatus && matchesFrequency;
+            });
+
+            renderSchedules(filtered);
+        }
+
+        function renderSchedules(schedules) {
+            const tbody = document.getElementById('schedulesTable');
+
+            if (schedules.length === 0) {
+                tbody.innerHTML = `
+                    <tr><td colspan="7">
+                        <div class="empty-state">
+                            <i class="bi bi-calendar-x"></i>
+                            <p>No maintenance schedules found</p>
+                        </div>
+                    </td></tr>
+                `;
+                return;
+            }
+
+            const frequencyLabels = {
+                'daily': 'Daily',
+                'weekly': 'Weekly',
+                'monthly': 'Monthly',
+                'quarterly': 'Quarterly',
+                'yearly': 'Yearly'
+            };
+
+            const statusLabels = {
+                'active': 'Active',
+                'paused': 'Paused',
+                'completed': 'Completed'
+            };
+
+            tbody.innerHTML = schedules.map(s => {
+                const eq = equipment.find(e => e.id === s.equipment_id);
+                const nextDue = s.next_due_date ? new Date(s.next_due_date) : null;
+                const lastCompleted = s.last_completed_date ? new Date(s.last_completed_date).toLocaleDateString() : 'Never';
+
+                let dueStatus = 'upcoming';
+                let dueBadge = '';
+                if (nextDue) {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    const daysUntil = Math.floor((nextDue - today) / (1000 * 60 * 60 * 24));
+
+                    if (daysUntil < 0) {
+                        dueStatus = 'overdue';
+                        dueBadge = `<span class="badge badge-overdue">${Math.abs(daysUntil)} days overdue</span>`;
+                    } else if (daysUntil <= 7) {
+                        dueStatus = 'due-soon';
+                        dueBadge = `<span class="badge badge-due-soon">${daysUntil === 0 ? 'Today' : daysUntil + ' days'}</span>`;
+                    } else {
+                        dueBadge = `<span class="badge badge-upcoming">${nextDue.toLocaleDateString()}</span>`;
+                    }
+                } else {
+                    dueBadge = '<span class="badge">Not set</span>';
+                }
+
+                const frequencyText = s.frequency_interval > 1
+                    ? `Every ${s.frequency_interval} ${frequencyLabels[s.frequency].toLowerCase()}s`
+                    : frequencyLabels[s.frequency];
+
+                return `
+                    <tr>
+                        <td><strong>${escapeHtml(s.name)}</strong></td>
+                        <td>${eq ? escapeHtml(eq.name) : '-'}</td>
+                        <td>${frequencyText}</td>
+                        <td>${dueBadge}</td>
+                        <td><span class="badge badge-${s.status}">${statusLabels[s.status] || s.status}</span></td>
+                        <td>${lastCompleted}</td>
+                        <td class="actions-cell">
+                            <button class="btn-icon success" onclick="markCompleted(${s.id})" title="Mark Completed">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                            <button class="btn-icon" onclick="editSchedule(${s.id})" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn-icon" onclick="createWorkOrder(${s.id})" title="Create Work Order">
+                                <i class="bi bi-clipboard-plus"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function openCreateModal() {
+            document.getElementById('modalTitle').textContent = 'New Maintenance Schedule';
+            document.getElementById('scheduleForm').reset();
+            document.getElementById('scheduleId').value = '';
+            document.getElementById('sched_frequency').value = 'monthly';
+            document.getElementById('sched_interval').value = '1';
+            document.getElementById('sched_status').value = 'active';
+
+            // Set default next due date to today
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('sched_next_due').value = today;
+
+            updateFrequencyInfo();
+            document.getElementById('createModal').classList.add('active');
+        }
+
+        async function editSchedule(id) {
+            try {
+                const response = await fetch(`${API_BASE}/schedules/${id}`);
+                const schedule = await response.json();
+
+                document.getElementById('modalTitle').textContent = 'Edit Schedule';
+                document.getElementById('scheduleId').value = schedule.id;
+                document.getElementById('sched_name').value = schedule.name || '';
+                document.getElementById('sched_equipment_id').value = schedule.equipment_id || '';
+                document.getElementById('sched_frequency').value = schedule.frequency || 'monthly';
+                document.getElementById('sched_interval').value = schedule.frequency_interval || 1;
+                document.getElementById('sched_next_due').value = schedule.next_due_date ? schedule.next_due_date.split('T')[0] : '';
+                document.getElementById('sched_status').value = schedule.status || 'active';
+                document.getElementById('sched_description').value = schedule.description || '';
+                document.getElementById('sched_estimated_duration').value = schedule.estimated_duration_minutes || '';
+
+                updateFrequencyInfo();
+                document.getElementById('createModal').classList.add('active');
+            } catch (error) {
+                console.error('Error loading schedule:', error);
+                alert('Error loading schedule details');
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('createModal').classList.remove('active');
+        }
+
+        function updateFrequencyInfo() {
+            const frequency = document.getElementById('sched_frequency').value;
+            const interval = parseInt(document.getElementById('sched_interval').value) || 1;
+
+            const labels = {
+                'daily': interval === 1 ? 'day' : 'days',
+                'weekly': interval === 1 ? 'week' : 'weeks',
+                'monthly': interval === 1 ? 'month' : 'months',
+                'quarterly': interval === 1 ? 'quarter' : 'quarters',
+                'yearly': interval === 1 ? 'year' : 'years'
+            };
+
+            const text = interval === 1
+                ? `This will run every ${labels[frequency].replace('s', '')}`
+                : `This will run every ${interval} ${labels[frequency]}`;
+
+            document.getElementById('frequencyInfo').innerHTML = `<p><i class="bi bi-info-circle"></i> ${text}</p>`;
+        }
+
+        async function saveSchedule() {
+            const id = document.getElementById('scheduleId').value;
+            const data = {
+                name: document.getElementById('sched_name').value,
+                equipment_id: parseInt(document.getElementById('sched_equipment_id').value),
+                frequency: document.getElementById('sched_frequency').value,
+                frequency_interval: parseInt(document.getElementById('sched_interval').value) || 1,
+                next_due_date: document.getElementById('sched_next_due').value,
+                status: document.getElementById('sched_status').value,
+                description: document.getElementById('sched_description').value || null,
+                estimated_duration_minutes: parseInt(document.getElementById('sched_estimated_duration').value) || null
+            };
+
+            if (!data.name || !data.equipment_id || !data.next_due_date) {
+                alert('Please fill in required fields');
+                return;
+            }
+
+            try {
+                const url = id ? `${API_BASE}/schedules/${id}` : `${API_BASE}/schedules`;
+                const method = id ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    closeModal();
+                    loadSchedules();
+                } else {
+                    const error = await response.json();
+                    alert('Error saving schedule: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error saving schedule:', error);
+                alert('Error saving schedule');
+            }
+        }
+
+        async function markCompleted(id) {
+            if (!confirm('Mark this maintenance as completed? This will update the next due date.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/schedules/${id}/complete`, {
+                    method: 'POST'
+                });
+
+                if (response.ok) {
+                    loadSchedules();
+                } else {
+                    const error = await response.json();
+                    alert('Error: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error marking completed:', error);
+                alert('Error marking schedule as completed');
+            }
+        }
+
+        async function createWorkOrder(scheduleId) {
+            const schedule = allSchedules.find(s => s.id === scheduleId);
+            if (!schedule) return;
+
+            const data = {
+                title: `Scheduled: ${schedule.name}`,
+                equipment_id: schedule.equipment_id,
+                work_order_type: 'preventive',
+                priority: 'medium',
+                description: schedule.description || `Scheduled maintenance: ${schedule.name}`,
+                status: 'open'
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/work-orders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    alert('Work order created successfully');
+                } else {
+                    const error = await response.json();
+                    alert('Error creating work order: ' + (error.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error creating work order:', error);
+                alert('Error creating work order');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Initialize
+        loadEquipment().then(() => loadSchedules());
+
+        // Update frequency info when interval changes
+        document.getElementById('sched_interval').addEventListener('input', updateFrequencyInfo);
+    </script>
+</body>
+</html>
