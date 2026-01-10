@@ -1,0 +1,254 @@
+{% extends "food-safety/base.html" %}
+
+{% block title %}Dashboard - Food Safety{% endblock %}
+
+{% block nav_dashboard %}active{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: var(--shadow-sm);
+        border-left: 4px solid var(--accent-primary);
+    }
+
+    .stat-card.alert {
+        border-left-color: var(--error);
+    }
+
+    .stat-card.warning {
+        border-left-color: var(--warning);
+    }
+
+    .stat-card.success {
+        border-left-color: var(--success);
+    }
+
+    .stat-value {
+        font-size: 32px;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .stat-label {
+        color: var(--text-secondary);
+        font-size: 14px;
+        margin-top: 5px;
+    }
+
+    .section-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 15px;
+        color: var(--text-primary);
+    }
+
+    .card {
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: var(--shadow-sm);
+        margin-bottom: 20px;
+    }
+
+    .alert-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .alert-item {
+        display: flex;
+        align-items: center;
+        padding: 12px;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    .alert-item:last-child {
+        border-bottom: none;
+    }
+
+    .alert-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 15px;
+        font-size: 18px;
+    }
+
+    .alert-icon.temp {
+        background: var(--error-bg);
+        color: var(--error);
+    }
+
+    .alert-icon.checklist {
+        background: var(--warning-bg);
+        color: var(--warning);
+    }
+
+    .alert-icon.incident {
+        background: var(--info-bg);
+        color: var(--info);
+    }
+
+    .alert-content {
+        flex: 1;
+    }
+
+    .alert-title {
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .alert-subtitle {
+        font-size: 13px;
+        color: var(--text-secondary);
+    }
+
+    .quick-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 15px;
+    }
+
+    .quick-action-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 15px 20px;
+        background: var(--accent-primary);
+        color: white;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 500;
+        transition: background 0.2s;
+    }
+
+    .quick-action-btn:hover {
+        background: var(--accent-hover);
+        color: white;
+    }
+
+    .quick-action-btn i {
+        margin-right: 10px;
+        font-size: 18px;
+    }
+
+    .two-column {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+        .two-column {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 30px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 15px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card alert">
+        <div class="stat-value" id="tempAlerts">-</div>
+        <div class="stat-label">Temperature Alerts Today</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-value" id="pendingChecklists">-</div>
+        <div class="stat-label">Checklists Due</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="completedChecklists">-</div>
+        <div class="stat-label">Checklists Completed</div>
+    </div>
+    <div class="stat-card alert">
+        <div class="stat-value" id="openIncidents">-</div>
+        <div class="stat-label">Open Incidents</div>
+    </div>
+</div>
+
+<div class="card">
+    <h3 class="section-title"><i class="bi bi-lightning"></i> Quick Actions</h3>
+    <div class="quick-actions">
+        <a href="/portal/food-safety/temperatures" class="quick-action-btn">
+            <i class="bi bi-thermometer-half"></i> Log Temperature
+        </a>
+        <a href="/portal/food-safety/checklists" class="quick-action-btn">
+            <i class="bi bi-check2-square"></i> Complete Checklist
+        </a>
+        <a href="/portal/food-safety/incidents/new" class="quick-action-btn">
+            <i class="bi bi-exclamation-circle"></i> Report Incident
+        </a>
+        <a href="/portal/food-safety/inspections/new" class="quick-action-btn">
+            <i class="bi bi-clipboard-check"></i> Record Inspection
+        </a>
+    </div>
+</div>
+
+<div class="two-column">
+    <div class="card">
+        <h3 class="section-title"><i class="bi bi-exclamation-triangle"></i> Active Alerts</h3>
+        <ul class="alert-list" id="alertList">
+            <li class="empty-state">
+                <i class="bi bi-check-circle"></i>
+                <p>No active alerts</p>
+            </li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3 class="section-title"><i class="bi bi-clock"></i> Pending Sign-offs</h3>
+        <ul class="alert-list" id="signoffList">
+            <li class="empty-state">
+                <i class="bi bi-check-circle"></i>
+                <p>No pending sign-offs</p>
+            </li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    async function loadDashboard() {
+        try {
+            const response = await fetch('/food-safety/dashboard/stats');
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('tempAlerts').textContent = data.temperature_alerts_today || 0;
+                document.getElementById('pendingChecklists').textContent = data.checklists_due_today || 0;
+                document.getElementById('completedChecklists').textContent = data.checklists_completed_today || 0;
+                document.getElementById('openIncidents').textContent = data.open_incidents || 0;
+            }
+        } catch (error) {
+            console.error('Failed to load dashboard stats:', error);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+{% endblock %}

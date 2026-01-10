@@ -1,0 +1,190 @@
+{% extends "food-safety/base.html" %}
+
+{% block title %}Settings - Food Safety - SW Hospitality Group{% endblock %}
+
+{% block nav_settings %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        margin-bottom: 30px;
+    }
+
+    .page-header h2 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .settings-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+    }
+
+    .settings-card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        padding: 25px;
+        text-decoration: none;
+        color: inherit;
+        transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .settings-card:hover {
+        border-color: var(--accent-primary);
+        transform: translateY(-2px);
+    }
+
+    .settings-card .icon {
+        width: 50px;
+        height: 50px;
+        background-color: var(--accent-primary);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 15px;
+    }
+
+    .settings-card .icon i {
+        font-size: 24px;
+        color: #FFFFFF;
+    }
+
+    .settings-card h3 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .settings-card p {
+        font-size: 13px;
+        color: var(--text-secondary);
+        line-height: 1.5;
+    }
+
+    .section-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        margin-bottom: 15px;
+        margin-top: 30px;
+    }
+
+    .section-title:first-child {
+        margin-top: 0;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h2><i class="bi bi-gear"></i> Settings</h2>
+        <p class="page-subtitle">Configure your food safety system</p>
+    </div>
+
+    <div class="section-title">Locations & Equipment</div>
+    <div class="settings-grid">
+        <a href="/portal/food-safety/settings/locations" class="settings-card">
+            <div class="icon"><i class="bi bi-geo-alt"></i></div>
+            <h3>Locations</h3>
+            <p>Manage restaurant locations, configure shifts, and set location-specific requirements.</p>
+        </a>
+
+        <a href="/portal/food-safety/equipment" class="settings-card">
+            <div class="icon"><i class="bi bi-thermometer-half"></i></div>
+            <h3>Equipment</h3>
+            <p>Configure temperature monitoring equipment, sensors, and device settings.</p>
+        </a>
+
+        <a href="/portal/food-safety/settings/thresholds" class="settings-card">
+            <div class="icon"><i class="bi bi-sliders"></i></div>
+            <h3>Temperature Thresholds</h3>
+            <p>Set critical temperature limits for different equipment types and alerts.</p>
+        </a>
+    </div>
+
+    <div class="section-title">Users & Permissions</div>
+    <div class="settings-grid">
+        <a href="/portal/food-safety/settings/users" class="settings-card">
+            <div class="icon"><i class="bi bi-people"></i></div>
+            <h3>Users</h3>
+            <p>Manage user accounts, assign roles, and configure access permissions.</p>
+        </a>
+
+        <div class="settings-card" style="cursor: default; opacity: 0.6;">
+            <div class="icon" style="background-color: var(--text-muted);"><i class="bi bi-shield-lock"></i></div>
+            <h3>Roles & Permissions</h3>
+            <p>Define custom roles and permission levels. (Coming Soon)</p>
+        </div>
+    </div>
+
+    <div class="section-title">Checklists & Compliance</div>
+    <div class="settings-grid">
+        <a href="/portal/food-safety/templates" class="settings-card">
+            <div class="icon"><i class="bi bi-ui-checks"></i></div>
+            <h3>Checklist Templates</h3>
+            <p>Create and manage checklist templates for daily, weekly, and monthly tasks.</p>
+        </a>
+
+        <a href="/portal/food-safety/haccp" class="settings-card">
+            <div class="icon"><i class="bi bi-shield-check"></i></div>
+            <h3>HACCP Plans</h3>
+            <p>Configure Critical Control Points, hazard analysis, and monitoring procedures.</p>
+        </a>
+
+        <div class="settings-card" style="cursor: default; opacity: 0.6;">
+            <div class="icon" style="background-color: var(--text-muted);"><i class="bi bi-calendar-check"></i></div>
+            <h3>Inspection Schedules</h3>
+            <p>Set up recurring internal inspection schedules. (Coming Soon)</p>
+        </div>
+    </div>
+
+    <div class="section-title">Notifications</div>
+    <div class="settings-grid">
+        <div class="settings-card" onclick="showNotificationSettings()" style="cursor: pointer;">
+            <div class="icon"><i class="bi bi-bell"></i></div>
+            <h3>Alert Settings</h3>
+            <p>Configure temperature alerts, incident notifications, and escalation rules.</p>
+        </div>
+
+        <div class="settings-card" onclick="showEmailSettings()" style="cursor: pointer;">
+            <div class="icon"><i class="bi bi-envelope"></i></div>
+            <h3>Email Notifications</h3>
+            <p>Manage email recipients and notification preferences.</p>
+        </div>
+    </div>
+
+    <div class="section-title">Data & Reports</div>
+    <div class="settings-grid">
+        <div class="settings-card" style="cursor: default; opacity: 0.6;">
+            <div class="icon" style="background-color: var(--text-muted);"><i class="bi bi-file-earmark-pdf"></i></div>
+            <h3>Report Templates</h3>
+            <p>Customize report formats and automated report schedules. (Coming Soon)</p>
+        </div>
+
+        <div class="settings-card" style="cursor: default; opacity: 0.6;">
+            <div class="icon" style="background-color: var(--text-muted);"><i class="bi bi-download"></i></div>
+            <h3>Data Export</h3>
+            <p>Export historical data for compliance audits. (Coming Soon)</p>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    function showNotificationSettings() {
+        showInfo('Notification settings modal would open here. Configure temperature deviation alerts, escalation timers, and notification channels.');
+    }
+
+    function showEmailSettings() {
+        showInfo('Email settings modal would open here. Manage recipient lists for different alert types.');
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,624 @@
+{% extends "food-safety/base.html" %}
+
+{% block title %}Inspections - Food Safety - SW Hospitality Group{% endblock %}
+
+{% block nav_inspections %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-title-section h2 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
+
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+    }
+
+    .stat-card .number {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .stat-card .label {
+        color: var(--text-secondary);
+        font-size: 13px;
+    }
+
+    .stat-card.passed .number { color: var(--success); }
+    .stat-card.failed .number { color: var(--error); }
+
+    .filters-bar {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .filter-select {
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        min-width: 160px;
+    }
+
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    th {
+        background-color: var(--bg-tertiary);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
+
+    tr:hover {
+        background-color: var(--bg-tertiary);
+        cursor: pointer;
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .badge-passed { background-color: var(--success-bg); color: var(--success); }
+    .badge-failed { background-color: var(--error-bg); color: var(--error); }
+    .badge-pending { background-color: var(--warning-bg); color: var(--warning); }
+
+    .score-excellent { color: var(--success); font-weight: 700; }
+    .score-good { color: var(--info); font-weight: 700; }
+    .score-fair { color: var(--warning); font-weight: 700; }
+    .score-poor { color: var(--error); font-weight: 700; }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 60px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-primary);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        overflow-y: auto;
+        padding: 20px;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+        background-color: var(--bg-secondary);
+        border-radius: 12px;
+        max-width: 800px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title { font-size: 18px; font-weight: 600; }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+
+    .modal-body { padding: 20px; }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-secondary {
+        padding: 10px 20px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .detail-section {
+        margin-bottom: 25px;
+    }
+
+    .detail-section h4 {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+        text-transform: uppercase;
+    }
+
+    .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+
+    .detail-item label {
+        font-size: 12px;
+        color: var(--text-muted);
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .detail-item span {
+        font-size: 14px;
+        color: var(--text-primary);
+    }
+
+    .violations-list {
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .violation-item {
+        padding: 12px 15px;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    .violation-item:last-child {
+        border-bottom: none;
+    }
+
+    .violation-item.critical {
+        border-left: 4px solid var(--error);
+    }
+
+    .violation-item.major {
+        border-left: 4px solid var(--warning);
+    }
+
+    .violation-item.minor {
+        border-left: 4px solid var(--info);
+    }
+
+    .violation-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <div class="page-title-section">
+            <h2><i class="bi bi-clipboard-check"></i> Inspections</h2>
+            <p class="page-subtitle">Track health department and internal inspections</p>
+        </div>
+        <a href="/portal/food-safety/inspections/new" class="btn-primary">
+            <i class="bi bi-plus-lg"></i> Record Inspection
+        </a>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-card passed">
+            <div class="number" id="passedCount">0</div>
+            <div class="label">Passed</div>
+        </div>
+        <div class="stat-card failed">
+            <div class="number" id="failedCount">0</div>
+            <div class="label">Failed</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" id="avgScore">--</div>
+            <div class="label">Avg Score</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" id="totalCount">0</div>
+            <div class="label">Total (This Year)</div>
+        </div>
+    </div>
+
+    <div class="filters-bar">
+        <select class="filter-select" id="locationFilter" onchange="loadInspections()">
+            <option value="">All Locations</option>
+        </select>
+        <select class="filter-select" id="typeFilter" onchange="filterInspections()">
+            <option value="">All Types</option>
+            <option value="health_department">Health Department</option>
+            <option value="internal">Internal</option>
+            <option value="third_party">Third Party</option>
+            <option value="corporate">Corporate</option>
+        </select>
+        <select class="filter-select" id="resultFilter" onchange="filterInspections()">
+            <option value="">All Results</option>
+            <option value="passed">Passed</option>
+            <option value="failed">Failed</option>
+            <option value="pending">Pending</option>
+        </select>
+        <select class="filter-select" id="yearFilter" onchange="loadInspections()">
+            <option value="2026">2026</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+        </select>
+    </div>
+
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Location</th>
+                        <th>Type</th>
+                        <th>Inspector</th>
+                        <th>Score</th>
+                        <th>Violations</th>
+                        <th>Result</th>
+                    </tr>
+                </thead>
+                <tbody id="inspectionsTable">
+                    <tr>
+                        <td colspan="7">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- View Inspection Modal -->
+    <div class="modal-overlay" id="viewModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="viewModalTitle">Inspection Details</h3>
+                <button class="modal-close" onclick="closeViewModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="viewModalBody">
+                <!-- Populated by JS -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeViewModal()">Close</button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/food-safety';
+    let inspections = [];
+    let locations = [];
+
+    async function loadLocations() {
+        try {
+            const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+            if (response.ok) {
+                locations = await response.json();
+                const select = document.getElementById('locationFilter');
+                select.innerHTML = '<option value="">All Locations</option>';
+                locations.forEach(loc => {
+                    select.innerHTML += `<option value="${loc.id}">${escapeHtml(loc.name)}</option>`;
+                });
+            }
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+    }
+
+    async function loadInspections() {
+        try {
+            const locationId = document.getElementById('locationFilter').value;
+            const year = document.getElementById('yearFilter').value;
+            let url = `${API_BASE}/inspections?`;
+            if (locationId) url += `location_id=${locationId}&`;
+            if (year) url += `year=${year}&`;
+
+            const response = await fetch(url);
+            if (response.ok) {
+                inspections = await response.json();
+                updateStats();
+                filterInspections();
+            }
+        } catch (error) {
+            console.error('Error loading inspections:', error);
+            document.getElementById('inspectionsTable').innerHTML = `
+                <tr><td colspan="7">
+                    <div class="empty-state">
+                        <i class="bi bi-exclamation-circle"></i>
+                        <p>Error loading inspections</p>
+                    </div>
+                </td></tr>
+            `;
+        }
+    }
+
+    function updateStats() {
+        const passed = inspections.filter(i => i.result === 'passed').length;
+        const failed = inspections.filter(i => i.result === 'failed').length;
+        const scores = inspections.filter(i => i.score !== null).map(i => i.score);
+        const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : '--';
+
+        document.getElementById('passedCount').textContent = passed;
+        document.getElementById('failedCount').textContent = failed;
+        document.getElementById('avgScore').textContent = avgScore;
+        document.getElementById('totalCount').textContent = inspections.length;
+    }
+
+    function filterInspections() {
+        const type = document.getElementById('typeFilter').value;
+        const result = document.getElementById('resultFilter').value;
+
+        let filtered = inspections;
+        if (type) filtered = filtered.filter(i => i.inspection_type === type);
+        if (result) filtered = filtered.filter(i => i.result === result);
+
+        renderInspections(filtered);
+    }
+
+    function renderInspections(list) {
+        const tbody = document.getElementById('inspectionsTable');
+
+        if (!list || list.length === 0) {
+            tbody.innerHTML = `
+                <tr><td colspan="7">
+                    <div class="empty-state">
+                        <i class="bi bi-clipboard-check"></i>
+                        <p>No inspections found</p>
+                    </div>
+                </td></tr>
+            `;
+            return;
+        }
+
+        const typeLabels = {
+            'health_department': 'Health Dept',
+            'internal': 'Internal',
+            'third_party': 'Third Party',
+            'corporate': 'Corporate'
+        };
+
+        tbody.innerHTML = list.map(i => {
+            const loc = locations.find(l => l.id === i.location_id);
+            const scoreClass = getScoreClass(i.score);
+
+            return `
+                <tr onclick="viewInspection('${i.id}')">
+                    <td>${formatDate(i.inspection_date)}</td>
+                    <td><strong>${loc ? escapeHtml(loc.name) : '-'}</strong></td>
+                    <td>${typeLabels[i.inspection_type] || i.inspection_type}</td>
+                    <td>${i.inspector_name || '-'}</td>
+                    <td class="${scoreClass}">${i.score !== null ? i.score : '-'}</td>
+                    <td>${i.violation_count || 0}</td>
+                    <td><span class="badge badge-${i.result || 'pending'}">${i.result || 'Pending'}</span></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function getScoreClass(score) {
+        if (score === null) return '';
+        if (score >= 90) return 'score-excellent';
+        if (score >= 80) return 'score-good';
+        if (score >= 70) return 'score-fair';
+        return 'score-poor';
+    }
+
+    async function viewInspection(id) {
+        try {
+            const response = await fetch(`${API_BASE}/inspections/${id}`);
+            if (response.ok) {
+                const inspection = await response.json();
+                const loc = locations.find(l => l.id === inspection.location_id);
+
+                const typeLabels = {
+                    'health_department': 'Health Department',
+                    'internal': 'Internal',
+                    'third_party': 'Third Party',
+                    'corporate': 'Corporate'
+                };
+
+                let violationsHtml = '';
+                if (inspection.violations && inspection.violations.length > 0) {
+                    violationsHtml = `
+                        <div class="detail-section">
+                            <h4>Violations (${inspection.violations.length})</h4>
+                            <div class="violations-list">
+                                ${inspection.violations.map(v => `
+                                    <div class="violation-item ${v.severity}">
+                                        <div class="violation-header">
+                                            <strong>${escapeHtml(v.code || 'Violation')}</strong>
+                                            <span class="badge badge-${v.severity === 'critical' ? 'failed' : v.severity === 'major' ? 'pending' : 'passed'}">${v.severity}</span>
+                                        </div>
+                                        <p>${escapeHtml(v.description)}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                document.getElementById('viewModalTitle').textContent = `Inspection - ${formatDate(inspection.inspection_date)}`;
+                document.getElementById('viewModalBody').innerHTML = `
+                    <div class="detail-section">
+                        <h4>Details</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <label>Location</label>
+                                <span>${loc ? escapeHtml(loc.name) : '-'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Type</label>
+                                <span>${typeLabels[inspection.inspection_type] || inspection.inspection_type}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Inspector</label>
+                                <span>${inspection.inspector_name || '-'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Agency/Organization</label>
+                                <span>${inspection.inspector_agency || '-'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Score</label>
+                                <span class="${getScoreClass(inspection.score)}">${inspection.score !== null ? inspection.score : '-'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Result</label>
+                                <span class="badge badge-${inspection.result || 'pending'}">${inspection.result || 'Pending'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    ${inspection.notes ? `
+                        <div class="detail-section">
+                            <h4>Notes</h4>
+                            <div style="background-color: var(--bg-tertiary); padding: 15px; border-radius: 8px;">
+                                ${escapeHtml(inspection.notes)}
+                            </div>
+                        </div>
+                    ` : ''}
+                    ${violationsHtml}
+                `;
+
+                document.getElementById('viewModal').classList.add('active');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('loading inspection');
+        }
+    }
+
+    function closeViewModal() {
+        document.getElementById('viewModal').classList.remove('active');
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '-';
+        const date = new Date(dateStr);
+        return date.toLocaleDateString();
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize
+    loadLocations().then(() => loadInspections());
+</script>
+{% endblock %}

@@ -4,7 +4,7 @@ from typing import Optional, List
 from decimal import Decimal
 from pydantic import BaseModel, Field
 from maintenance.models import (
-    EquipmentStatus, WorkOrderStatus, WorkOrderPriority, ScheduleFrequency
+    EquipmentStatus, WorkOrderStatus, WorkOrderPriority, ScheduleFrequency, OwnershipType
 )
 
 
@@ -54,6 +54,12 @@ class EquipmentBase(BaseModel):
     warranty_expiration: Optional[date] = None
     installation_date: Optional[date] = None
     purchase_cost: Optional[Decimal] = None
+    # Ownership
+    ownership_type: OwnershipType = OwnershipType.OWNED
+    owner_name: Optional[str] = Field(None, max_length=200)
+    lease_contract_number: Optional[str] = Field(None, max_length=100)
+    lease_expiration: Optional[date] = None
+    # Additional
     notes: Optional[str] = None
     specifications: Optional[str] = None
 
@@ -77,6 +83,12 @@ class EquipmentUpdate(BaseModel):
     last_maintenance_date: Optional[date] = None
     next_maintenance_date: Optional[date] = None
     purchase_cost: Optional[Decimal] = None
+    # Ownership
+    ownership_type: Optional[OwnershipType] = None
+    owner_name: Optional[str] = Field(None, max_length=200)
+    lease_contract_number: Optional[str] = Field(None, max_length=100)
+    lease_expiration: Optional[date] = None
+    # Additional
     notes: Optional[str] = None
     specifications: Optional[str] = None
 
@@ -97,6 +109,7 @@ class EquipmentResponse(EquipmentBase):
 class EquipmentListResponse(BaseModel):
     id: int
     name: str
+    description: Optional[str] = None
     category_id: Optional[int]
     category_name: Optional[str] = None
     location_id: int
@@ -105,6 +118,8 @@ class EquipmentListResponse(BaseModel):
     serial_number: Optional[str]
     next_maintenance_date: Optional[date]
     qr_code: str
+    ownership_type: OwnershipType = OwnershipType.OWNED
+    owner_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -215,15 +230,30 @@ class WorkOrderUpdate(BaseModel):
     priority: Optional[WorkOrderPriority] = None
     status: Optional[WorkOrderStatus] = None
     location_id: Optional[int] = None
-    assigned_to: Optional[int] = None
+    assigned_to: Optional[str] = None  # Name of assignee (string)
     is_external: Optional[bool] = None
     vendor_id: Optional[int] = None
     due_date: Optional[date] = None
+    completed_date: Optional[date] = None
     resolution_notes: Optional[str] = None
     root_cause: Optional[str] = None
     estimated_cost: Optional[Decimal] = None
     actual_cost: Optional[Decimal] = None
     labor_hours: Optional[Decimal] = None
+
+
+class LogCompletedWork(BaseModel):
+    """Schema for logging work that has already been completed"""
+    title: str = Field(..., max_length=200)
+    location_id: int
+    resolution_notes: str
+    completed_date: date
+    equipment_id: Optional[int] = None
+    description: Optional[str] = None
+    root_cause: Optional[str] = None
+    actual_cost: Optional[Decimal] = None
+    labor_hours: Optional[Decimal] = None
+    assigned_to: Optional[str] = None
 
 
 class WorkOrderResponse(WorkOrderBase):

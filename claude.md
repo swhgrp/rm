@@ -2613,9 +2613,74 @@ Email → PDF Extract → AI Parse → Auto-Map → Ready for Review → Route t
 
 ---
 
+### 9. Food Safety & Compliance System ✅ 90% Complete
+
+**Purpose:** Comprehensive food safety management including temperature monitoring, daily checklists, incident tracking, health inspections, and compliance reporting
+
+**Location:** `/opt/restaurant-system/food-safety/`
+
+**Technology:** FastAPI, SQLAlchemy (async), PostgreSQL
+
+**Container:** `food-safety-service` (port 8007)
+**Database:** `food-safety-postgres` (port 5440)
+
+**Core Features:**
+- Temperature logging with threshold alerts
+- Daily checklists with manager sign-off
+- Incident tracking (auto-generated INC-YYYY-NNNN numbers)
+- Health inspection records with violation tracking
+- HACCP plan management
+- Comprehensive reports with CSV/PDF export
+- Equipment integration with Maintenance service
+
+**Database Models:**
+- `user_permissions` - Role-based access control
+- `locations` - Restaurant locations (synced from inventory)
+- `temperature_logs`, `temperature_thresholds` - Temperature monitoring
+- `checklist_templates`, `checklist_submissions`, `checklist_responses` - Checklists
+- `incidents`, `corrective_actions` - Incident management
+- `inspections`, `inspection_violations` - Health inspections
+- `haccp_plans`, `critical_control_points` - HACCP compliance
+
+**API Endpoints:**
+- `GET /food-safety/health` - Health check
+- `GET /food-safety/dashboard` - Dashboard stats
+- Temperature CRUD: `/food-safety/temperatures`
+- Checklists CRUD: `/food-safety/checklists`
+- Incidents CRUD: `/food-safety/incidents`
+- Inspections CRUD: `/food-safety/inspections`
+- HACCP CRUD: `/food-safety/haccp`
+- Reports: `/food-safety/reports/temperature`, `/checklist`, `/inspection`, `/incident`
+- Export: `/food-safety/reports/{type}/export/csv`, `/food-safety/reports/{type}/export/pdf`
+
+**Portal UI:**
+- `/portal/food-safety/` - Dashboard
+- `/portal/food-safety/temperatures` - Temperature logging
+- `/portal/food-safety/checklists` - Daily checklists
+- `/portal/food-safety/incidents` - Incident management
+- `/portal/food-safety/inspections` - Health inspections
+- `/portal/food-safety/haccp` - HACCP plans
+- `/portal/food-safety/reports` - Reports with chart visualization and export
+
+**Key Files:**
+- `src/food_safety/main.py` - FastAPI application
+- `src/food_safety/models/` - SQLAlchemy models
+- `src/food_safety/schemas.py` - Pydantic schemas
+- `src/food_safety/routers/` - API routers (dashboard, temperatures, checklists, incidents, inspections, haccp, reports)
+- `src/food_safety/services/maintenance_client.py` - Maintenance service integration
+
+---
+
 ## 🔧 RECENT DEVELOPMENT HISTORY
 
 ### Major Milestones (Last 2 Weeks)
+
+**January 10, 2026:**
+- Food Safety Reports feature implemented
+- 4 report types: Temperature, Checklist, Inspection, Incident
+- CSV and PDF export for all reports (using reportlab)
+- Reports UI with Chart.js trend visualization
+- Equipment integration with Maintenance service fixed
 
 **January 9, 2026:**
 - Maintenance & Equipment Tracking Service created and deployed

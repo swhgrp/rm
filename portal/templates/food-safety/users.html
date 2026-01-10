@@ -1,0 +1,741 @@
+{% extends "food-safety/base.html" %}
+
+{% block title %}Users - Food Safety Settings - SW Hospitality Group{% endblock %}
+
+{% block nav_settings %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-title-section h2 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+        font-size: 14px;
+    }
+
+    .breadcrumb a {
+        color: var(--text-secondary);
+        text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+        color: var(--accent-primary);
+    }
+
+    .breadcrumb span {
+        color: var(--text-muted);
+    }
+
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
+
+    .filters-bar {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .search-input {
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        min-width: 250px;
+    }
+
+    .filter-select {
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        min-width: 160px;
+    }
+
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    th {
+        background-color: var(--bg-tertiary);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
+
+    tr:hover {
+        background-color: var(--bg-tertiary);
+        cursor: pointer;
+    }
+
+    .user-info {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .user-name {
+        font-weight: 500;
+    }
+
+    .user-email {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .badge-active { background-color: var(--success-bg); color: var(--success); }
+    .badge-inactive { background-color: var(--bg-tertiary); color: var(--text-muted); }
+    .badge-admin { background-color: var(--error-bg); color: var(--error); }
+    .badge-manager { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-staff { background-color: var(--info-bg); color: var(--info); }
+
+    .location-badges {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+    }
+
+    .location-badge {
+        background-color: var(--bg-tertiary);
+        padding: 3px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        color: var(--text-secondary);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 60px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-primary);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        overflow-y: auto;
+        padding: 20px;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+        background-color: var(--bg-secondary);
+        border-radius: 12px;
+        max-width: 550px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title { font-size: 18px; font-weight: 600; }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+
+    .modal-body { padding: 20px; }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-secondary {
+        padding: 10px 20px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-primary);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+
+    .checkbox-group {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+
+    .checkbox-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .checkbox-item input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+    }
+
+    .checkbox-item label {
+        font-size: 14px;
+        margin: 0;
+    }
+
+    .section-title {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        margin: 25px 0 15px 0;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-primary);
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="breadcrumb">
+        <a href="/portal/food-safety/settings"><i class="bi bi-gear"></i> Settings</a>
+        <span>/</span>
+        <span>Users</span>
+    </div>
+
+    <div class="page-header">
+        <div class="page-title-section">
+            <h2><i class="bi bi-people"></i> Users</h2>
+            <p class="page-subtitle">Manage food safety system users and permissions</p>
+        </div>
+        <button class="btn-primary" onclick="showAddModal()">
+            <i class="bi bi-person-plus"></i> Add User
+        </button>
+    </div>
+
+    <div class="filters-bar">
+        <input type="text" class="search-input" id="searchInput" placeholder="Search users..." oninput="filterUsers()">
+        <select class="filter-select" id="roleFilter" onchange="filterUsers()">
+            <option value="">All Roles</option>
+            <option value="admin">Admin</option>
+            <option value="manager">Manager</option>
+            <option value="staff">Staff</option>
+        </select>
+        <select class="filter-select" id="locationFilter" onchange="filterUsers()">
+            <option value="">All Locations</option>
+        </select>
+    </div>
+
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Locations</th>
+                        <th>Last Active</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTable">
+                    <tr>
+                        <td colspan="5">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- User Modal -->
+    <div class="modal-overlay" id="userModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Add User</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="userId">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>First Name *</label>
+                            <input type="text" id="firstName" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Last Name *</label>
+                            <input type="text" id="lastName" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Email *</label>
+                        <input type="email" id="userEmail" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Phone</label>
+                            <input type="tel" id="userPhone">
+                        </div>
+                        <div class="form-group">
+                            <label>Role *</label>
+                            <select id="userRole" required>
+                                <option value="staff">Staff</option>
+                                <option value="manager">Manager</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="section-title">Location Access</div>
+                    <div class="checkbox-group" id="locationCheckboxes">
+                        <!-- Populated by JS -->
+                    </div>
+
+                    <div class="section-title">Permissions</div>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="permTemp" checked>
+                            <label for="permTemp">Log Temperatures</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="permChecklist" checked>
+                            <label for="permChecklist">Complete Checklists</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="permIncident">
+                            <label for="permIncident">Report Incidents</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="permSignoff">
+                            <label for="permSignoff">Manager Sign-off</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="permInspection">
+                            <label for="permInspection">Record Inspections</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="permSettings">
+                            <label for="permSettings">Manage Settings</label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveUser()">Save User</button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/food-safety';
+    let users = [];
+    let locations = [];
+    let editingId = null;
+
+    async function loadLocations() {
+        try {
+            const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+            if (response.ok) {
+                locations = await response.json();
+
+                // Populate filter
+                const select = document.getElementById('locationFilter');
+                select.innerHTML = '<option value="">All Locations</option>';
+                locations.forEach(loc => {
+                    select.innerHTML += `<option value="${loc.id}">${escapeHtml(loc.name)}</option>`;
+                });
+
+                // Populate modal checkboxes
+                const container = document.getElementById('locationCheckboxes');
+                container.innerHTML = locations.map(loc => `
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="loc_${loc.id}" value="${loc.id}">
+                        <label for="loc_${loc.id}">${escapeHtml(loc.name)}</label>
+                    </div>
+                `).join('');
+            }
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+    }
+
+    async function loadUsers() {
+        try {
+            const response = await fetch(`${API_BASE}/users`);
+            if (response.ok) {
+                users = await response.json();
+                filterUsers();
+            } else {
+                // Show sample data
+                loadSampleUsers();
+            }
+        } catch (error) {
+            console.error('Error loading users:', error);
+            loadSampleUsers();
+        }
+    }
+
+    function loadSampleUsers() {
+        users = [
+            { id: 1, first_name: 'John', last_name: 'Smith', email: 'john.smith@swhg.com', role: 'admin', location_ids: [1, 2, 3], is_active: true, last_active: '2026-01-10T14:30:00Z' },
+            { id: 2, first_name: 'Maria', last_name: 'Garcia', email: 'maria.garcia@swhg.com', role: 'manager', location_ids: [1], is_active: true, last_active: '2026-01-10T12:15:00Z' },
+            { id: 3, first_name: 'Tom', last_name: 'Johnson', email: 'tom.johnson@swhg.com', role: 'manager', location_ids: [2], is_active: true, last_active: '2026-01-09T18:45:00Z' },
+            { id: 4, first_name: 'Sarah', last_name: 'Williams', email: 'sarah.williams@swhg.com', role: 'staff', location_ids: [1], is_active: true, last_active: '2026-01-10T08:00:00Z' },
+            { id: 5, first_name: 'Mike', last_name: 'Brown', email: 'mike.brown@swhg.com', role: 'staff', location_ids: [2, 3], is_active: true, last_active: '2026-01-08T16:30:00Z' },
+            { id: 6, first_name: 'Emily', last_name: 'Davis', email: 'emily.davis@swhg.com', role: 'staff', location_ids: [1], is_active: false, last_active: '2025-12-15T10:00:00Z' }
+        ];
+        filterUsers();
+    }
+
+    function filterUsers() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const role = document.getElementById('roleFilter').value;
+        const locationId = parseInt(document.getElementById('locationFilter').value) || null;
+
+        let filtered = users;
+
+        if (search) {
+            filtered = filtered.filter(u =>
+                u.first_name.toLowerCase().includes(search) ||
+                u.last_name.toLowerCase().includes(search) ||
+                u.email.toLowerCase().includes(search)
+            );
+        }
+
+        if (role) {
+            filtered = filtered.filter(u => u.role === role);
+        }
+
+        if (locationId) {
+            filtered = filtered.filter(u => u.location_ids && u.location_ids.includes(locationId));
+        }
+
+        renderUsers(filtered);
+    }
+
+    function renderUsers(list) {
+        const tbody = document.getElementById('usersTable');
+
+        if (!list || list.length === 0) {
+            tbody.innerHTML = `
+                <tr><td colspan="5">
+                    <div class="empty-state">
+                        <i class="bi bi-people"></i>
+                        <p>No users found</p>
+                    </div>
+                </td></tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = list.map(user => {
+            const initials = (user.first_name[0] + user.last_name[0]).toUpperCase();
+            const locationBadges = user.location_ids && user.location_ids.length > 0
+                ? user.location_ids.map(id => {
+                    const loc = locations.find(l => l.id === id);
+                    return loc ? `<span class="location-badge">${escapeHtml(loc.name)}</span>` : '';
+                }).join('')
+                : '<span style="color: var(--text-muted); font-size: 12px;">No locations</span>';
+
+            return `
+                <tr onclick="editUser(${user.id})">
+                    <td>
+                        <div class="user-info">
+                            <div class="user-avatar">${initials}</div>
+                            <div>
+                                <div class="user-name">${escapeHtml(user.first_name)} ${escapeHtml(user.last_name)}</div>
+                                <div class="user-email">${escapeHtml(user.email)}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="badge badge-${user.role}">${capitalizeFirst(user.role)}</span></td>
+                    <td><div class="location-badges">${locationBadges}</div></td>
+                    <td>${user.last_active ? formatRelativeTime(user.last_active) : 'Never'}</td>
+                    <td><span class="badge badge-${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function showAddModal() {
+        editingId = null;
+        document.getElementById('modalTitle').textContent = 'Add User';
+        document.getElementById('userForm').reset();
+
+        // Reset checkboxes
+        locations.forEach(loc => {
+            const checkbox = document.getElementById(`loc_${loc.id}`);
+            if (checkbox) checkbox.checked = false;
+        });
+
+        document.getElementById('userModal').classList.add('active');
+    }
+
+    function editUser(id) {
+        const user = users.find(u => u.id === id);
+        if (!user) return;
+
+        editingId = id;
+        document.getElementById('modalTitle').textContent = 'Edit User';
+        document.getElementById('userId').value = id;
+        document.getElementById('firstName').value = user.first_name;
+        document.getElementById('lastName').value = user.last_name;
+        document.getElementById('userEmail').value = user.email;
+        document.getElementById('userPhone').value = user.phone || '';
+        document.getElementById('userRole').value = user.role;
+
+        // Set location checkboxes
+        locations.forEach(loc => {
+            const checkbox = document.getElementById(`loc_${loc.id}`);
+            if (checkbox) {
+                checkbox.checked = user.location_ids && user.location_ids.includes(loc.id);
+            }
+        });
+
+        // Set permission checkboxes based on role
+        const isManager = user.role === 'manager' || user.role === 'admin';
+        document.getElementById('permTemp').checked = true;
+        document.getElementById('permChecklist').checked = true;
+        document.getElementById('permIncident').checked = true;
+        document.getElementById('permSignoff').checked = isManager;
+        document.getElementById('permInspection').checked = isManager;
+        document.getElementById('permSettings').checked = user.role === 'admin';
+
+        document.getElementById('userModal').classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('userModal').classList.remove('active');
+    }
+
+    async function saveUser() {
+        const form = document.getElementById('userForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const selectedLocations = [];
+        locations.forEach(loc => {
+            const checkbox = document.getElementById(`loc_${loc.id}`);
+            if (checkbox && checkbox.checked) {
+                selectedLocations.push(loc.id);
+            }
+        });
+
+        const data = {
+            first_name: document.getElementById('firstName').value,
+            last_name: document.getElementById('lastName').value,
+            email: document.getElementById('userEmail').value,
+            phone: document.getElementById('userPhone').value,
+            role: document.getElementById('userRole').value,
+            location_ids: selectedLocations,
+            permissions: {
+                log_temperatures: document.getElementById('permTemp').checked,
+                complete_checklists: document.getElementById('permChecklist').checked,
+                report_incidents: document.getElementById('permIncident').checked,
+                manager_signoff: document.getElementById('permSignoff').checked,
+                record_inspections: document.getElementById('permInspection').checked,
+                manage_settings: document.getElementById('permSettings').checked
+            }
+        };
+
+        try {
+            const url = editingId
+                ? `${API_BASE}/users/${editingId}`
+                : `${API_BASE}/users`;
+            const method = editingId ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                closeModal();
+                loadUsers();
+            } else {
+                showError('saving user');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('saving user. API may not be available.');
+        }
+    }
+
+    function formatRelativeTime(dateStr) {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        return date.toLocaleDateString();
+    }
+
+    function capitalizeFirst(str) {
+        return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize
+    loadLocations().then(() => loadUsers());
+</script>
+{% endblock %}

@@ -1,0 +1,479 @@
+{% extends "maintenance/base.html" %}
+
+{% block title %}Equipment Categories - Maintenance - SW Hospitality Group{% endblock %}
+
+{% block nav_categories %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
+
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    th {
+        background-color: var(--bg-tertiary);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    tr:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    .actions-cell {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-icon {
+        padding: 6px 10px;
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+        background-color: var(--bg-secondary);
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s ease;
+    }
+
+    .btn-icon:hover {
+        background-color: var(--bg-tertiary);
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
+    .btn-icon.danger:hover {
+        border-color: var(--error);
+        color: var(--error);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 60px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-primary);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-overlay.active {
+        display: flex;
+    }
+
+    .modal {
+        background-color: var(--bg-secondary);
+        border-radius: 12px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title {
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .form-group input, .form-group textarea {
+        width: 100%;
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
+
+    .form-group input:focus, .form-group textarea:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-secondary {
+        padding: 10px 20px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .btn-secondary:hover {
+        background-color: var(--bg-elevated);
+    }
+
+    .equipment-count {
+        font-size: 12px;
+        color: var(--text-muted);
+        background: var(--bg-tertiary);
+        padding: 2px 8px;
+        border-radius: 10px;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h2 class="page-title">Equipment Categories</h2>
+        <button class="btn-primary" onclick="openAddModal()">
+            <i class="bi bi-plus-lg"></i> Add Category
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Equipment Count</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="categoriesTable">
+                    <tr>
+                        <td colspan="4">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add/Edit Category Modal -->
+    <div class="modal-overlay" id="categoryModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Add Category</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="categoryForm">
+                    <input type="hidden" id="categoryId">
+                    <div class="form-group">
+                        <label for="name">Category Name *</label>
+                        <input type="text" id="name" required placeholder="e.g., HVAC, Kitchen Equipment">
+                    </div>
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" rows="3" placeholder="Brief description of this category..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveCategory()">Save Category</button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/maintenance';
+    let categories = [];
+    let equipmentCounts = {};
+
+    async function loadCategories() {
+        try {
+            const response = await fetch(`${API_BASE}/categories`);
+            categories = await response.json();
+
+            // Load equipment to count per category
+            const eqResponse = await fetch(`${API_BASE}/equipment`);
+            const equipment = await eqResponse.json();
+
+            // Count equipment per category
+            equipmentCounts = {};
+            equipment.forEach(e => {
+                if (e.category_id) {
+                    equipmentCounts[e.category_id] = (equipmentCounts[e.category_id] || 0) + 1;
+                }
+            });
+
+            renderCategories();
+        } catch (error) {
+            console.error('Error loading categories:', error);
+            document.getElementById('categoriesTable').innerHTML = `
+                <tr><td colspan="4">
+                    <div class="empty-state">
+                        <i class="bi bi-exclamation-circle"></i>
+                        <p>Error loading categories</p>
+                    </div>
+                </td></tr>
+            `;
+        }
+    }
+
+    function renderCategories() {
+        const tbody = document.getElementById('categoriesTable');
+
+        if (categories.length === 0) {
+            tbody.innerHTML = `
+                <tr><td colspan="4">
+                    <div class="empty-state">
+                        <i class="bi bi-tags"></i>
+                        <p>No categories found</p>
+                        <p style="font-size: 14px; margin-top: 10px;">Add categories to organize your equipment</p>
+                    </div>
+                </td></tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = categories.map(cat => {
+            const count = equipmentCounts[cat.id] || 0;
+            return `
+                <tr>
+                    <td><strong>${escapeHtml(cat.name)}</strong></td>
+                    <td>${cat.description ? escapeHtml(cat.description) : '<span style="color: var(--text-muted);">No description</span>'}</td>
+                    <td><span class="equipment-count">${count} equipment</span></td>
+                    <td class="actions-cell">
+                        <button class="btn-icon" onclick="editCategory(${cat.id})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn-icon danger" onclick="deleteCategory(${cat.id}, '${escapeHtml(cat.name)}', ${count})" title="Delete">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function openAddModal() {
+        document.getElementById('modalTitle').textContent = 'Add Category';
+        document.getElementById('categoryForm').reset();
+        document.getElementById('categoryId').value = '';
+        document.getElementById('categoryModal').classList.add('active');
+    }
+
+    async function editCategory(id) {
+        try {
+            const category = categories.find(c => c.id === id);
+            if (!category) return;
+
+            document.getElementById('modalTitle').textContent = 'Edit Category';
+            document.getElementById('categoryId').value = category.id;
+            document.getElementById('name').value = category.name || '';
+            document.getElementById('description').value = category.description || '';
+
+            document.getElementById('categoryModal').classList.add('active');
+        } catch (error) {
+            console.error('Error loading category:', error);
+            showError('Failed to load category details');
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('categoryModal').classList.remove('active');
+    }
+
+    async function saveCategory() {
+        const id = document.getElementById('categoryId').value;
+        const data = {
+            name: document.getElementById('name').value,
+            description: document.getElementById('description').value || null
+        };
+
+        if (!data.name) {
+            showWarning('Please enter a category name');
+            return;
+        }
+
+        try {
+            const url = id ? `${API_BASE}/categories/${id}` : `${API_BASE}/categories`;
+            const method = id ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                closeModal();
+                loadCategories();
+            } else {
+                const error = await response.json();
+                showError('Failed to save category: ' + (error.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error saving category:', error);
+            showError('Failed to save category');
+        }
+    }
+
+    async function deleteCategory(id, name, equipmentCount) {
+        if (equipmentCount > 0) {
+            showWarning(`Cannot delete "${name}" because it has ${equipmentCount} equipment items assigned. Please reassign or delete those items first.`);
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete the category "${name}"?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/categories/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                loadCategories();
+            } else {
+                const error = await response.json();
+                showError('Failed to delete category: ' + (error.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error deleting category:', error);
+            showError('Failed to delete category');
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize
+    loadCategories();
+</script>
+{% endblock %}

@@ -1,0 +1,589 @@
+{% extends "maintenance/base.html" %}
+
+{% block title %}Vendors - Maintenance - SW Hospitality Group{% endblock %}
+
+{% block nav_vendors %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
+
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
+
+    .filters-bar {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .search-box {
+        flex: 1;
+        min-width: 200px;
+        max-width: 400px;
+        position: relative;
+    }
+
+    .search-box input {
+        width: 100%;
+        padding: 10px 15px 10px 40px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
+
+    .search-box input:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+    }
+
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    th {
+        background-color: var(--bg-tertiary);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    tr:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .badge-active { background-color: var(--success-bg); color: var(--success); }
+    .badge-inactive { background-color: var(--bg-elevated); color: var(--text-muted); }
+
+    .actions-cell {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-icon {
+        padding: 6px 10px;
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+        background-color: var(--bg-secondary);
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s ease;
+    }
+
+    .btn-icon:hover {
+        background-color: var(--bg-tertiary);
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
+    .btn-icon.danger:hover {
+        border-color: var(--error);
+        color: var(--error);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 60px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-primary);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-overlay.active {
+        display: flex;
+    }
+
+    .modal {
+        background-color: var(--bg-secondary);
+        border-radius: 12px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title {
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%;
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
+
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-secondary {
+        padding: 10px 20px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .btn-secondary:hover {
+        background-color: var(--bg-elevated);
+    }
+
+    .contact-info {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .contact-info span {
+        font-size: 13px;
+        color: var(--text-secondary);
+    }
+
+    .contact-info a {
+        color: var(--accent-primary);
+        text-decoration: none;
+    }
+
+    .contact-info a:hover {
+        text-decoration: underline;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h2 class="page-title">Vendors</h2>
+        <button class="btn-primary" onclick="openAddModal()">
+            <i class="bi bi-plus-lg"></i> Add Vendor
+        </button>
+    </div>
+
+    <div class="filters-bar">
+        <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="searchInput" placeholder="Search vendors..." oninput="filterVendors()">
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Company Name</th>
+                        <th>Contact Person</th>
+                        <th>Contact Info</th>
+                        <th>Specialty</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="vendorsTable">
+                    <tr>
+                        <td colspan="6">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Add/Edit Vendor Modal -->
+    <div class="modal-overlay" id="vendorModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Add Vendor</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="vendorForm">
+                    <input type="hidden" id="vendorId">
+                    <div class="form-group">
+                        <label for="company_name">Company Name *</label>
+                        <input type="text" id="company_name" required placeholder="e.g., ABC HVAC Services">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="contact_name">Contact Person</label>
+                            <input type="text" id="contact_name" placeholder="Primary contact name">
+                        </div>
+                        <div class="form-group">
+                            <label for="specialty">Specialty</label>
+                            <input type="text" id="specialty" placeholder="e.g., HVAC, Refrigeration">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="phone">Phone</label>
+                            <input type="tel" id="phone" placeholder="(555) 123-4567">
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email</label>
+                            <input type="email" id="email" placeholder="contact@vendor.com">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="address">Address</label>
+                        <textarea id="address" rows="2" placeholder="Full address..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">Notes</label>
+                        <textarea id="notes" rows="3" placeholder="Service contract details, special instructions..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="is_active">Status</label>
+                        <select id="is_active">
+                            <option value="true">Active</option>
+                            <option value="false">Inactive</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveVendor()">Save Vendor</button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/maintenance';
+    let allVendors = [];
+
+    async function loadVendors() {
+        try {
+            const response = await fetch(`${API_BASE}/vendors`);
+            if (response.ok) {
+                allVendors = await response.json();
+            } else {
+                allVendors = [];
+            }
+            filterVendors();
+        } catch (error) {
+            console.error('Error loading vendors:', error);
+            allVendors = [];
+            filterVendors();
+        }
+    }
+
+    function filterVendors() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+
+        let filtered = allVendors.filter(v => {
+            const matchesSearch = !search ||
+                v.company_name.toLowerCase().includes(search) ||
+                (v.contact_name && v.contact_name.toLowerCase().includes(search)) ||
+                (v.specialty && v.specialty.toLowerCase().includes(search));
+            return matchesSearch;
+        });
+
+        renderVendors(filtered);
+    }
+
+    function renderVendors(vendors) {
+        const tbody = document.getElementById('vendorsTable');
+
+        if (vendors.length === 0) {
+            tbody.innerHTML = `
+                <tr><td colspan="6">
+                    <div class="empty-state">
+                        <i class="bi bi-building"></i>
+                        <p>No vendors found</p>
+                        <p style="font-size: 14px; margin-top: 10px;">Add vendors to manage your service providers</p>
+                    </div>
+                </td></tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = vendors.map(v => `
+            <tr>
+                <td><strong>${escapeHtml(v.company_name)}</strong></td>
+                <td>${v.contact_name ? escapeHtml(v.contact_name) : '<span style="color: var(--text-muted);">-</span>'}</td>
+                <td>
+                    <div class="contact-info">
+                        ${v.phone ? `<span><i class="bi bi-telephone"></i> ${escapeHtml(v.phone)}</span>` : ''}
+                        ${v.email ? `<span><i class="bi bi-envelope"></i> <a href="mailto:${escapeHtml(v.email)}">${escapeHtml(v.email)}</a></span>` : ''}
+                        ${!v.phone && !v.email ? '<span style="color: var(--text-muted);">No contact info</span>' : ''}
+                    </div>
+                </td>
+                <td>${v.specialty ? escapeHtml(v.specialty) : '<span style="color: var(--text-muted);">-</span>'}</td>
+                <td><span class="badge badge-${v.is_active !== false ? 'active' : 'inactive'}">${v.is_active !== false ? 'Active' : 'Inactive'}</span></td>
+                <td class="actions-cell">
+                    <button class="btn-icon" onclick="editVendor(${v.id})" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn-icon danger" onclick="deleteVendor(${v.id}, '${escapeHtml(v.company_name)}')" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    function openAddModal() {
+        document.getElementById('modalTitle').textContent = 'Add Vendor';
+        document.getElementById('vendorForm').reset();
+        document.getElementById('vendorId').value = '';
+        document.getElementById('is_active').value = 'true';
+        document.getElementById('vendorModal').classList.add('active');
+    }
+
+    async function editVendor(id) {
+        const vendor = allVendors.find(v => v.id === id);
+        if (!vendor) return;
+
+        document.getElementById('modalTitle').textContent = 'Edit Vendor';
+        document.getElementById('vendorId').value = vendor.id;
+        document.getElementById('company_name').value = vendor.company_name || '';
+        document.getElementById('contact_name').value = vendor.contact_name || '';
+        document.getElementById('specialty').value = vendor.specialty || '';
+        document.getElementById('phone').value = vendor.phone || '';
+        document.getElementById('email').value = vendor.email || '';
+        document.getElementById('address').value = vendor.address || '';
+        document.getElementById('notes').value = vendor.notes || '';
+        document.getElementById('is_active').value = vendor.is_active !== false ? 'true' : 'false';
+
+        document.getElementById('vendorModal').classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('vendorModal').classList.remove('active');
+    }
+
+    async function saveVendor() {
+        const id = document.getElementById('vendorId').value;
+        const data = {
+            company_name: document.getElementById('company_name').value,
+            contact_name: document.getElementById('contact_name').value || null,
+            specialty: document.getElementById('specialty').value || null,
+            phone: document.getElementById('phone').value || null,
+            email: document.getElementById('email').value || null,
+            address: document.getElementById('address').value || null,
+            notes: document.getElementById('notes').value || null,
+            is_active: document.getElementById('is_active').value === 'true'
+        };
+
+        if (!data.company_name) {
+            showWarning('Please enter a company name');
+            return;
+        }
+
+        try {
+            const url = id ? `${API_BASE}/vendors/${id}` : `${API_BASE}/vendors`;
+            const method = id ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                closeModal();
+                loadVendors();
+            } else {
+                const error = await response.json();
+                showError('Failed to save vendor: ' + (error.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error saving vendor:', error);
+            showError('Failed to save vendor');
+        }
+    }
+
+    async function deleteVendor(id, name) {
+        if (!confirm(`Are you sure you want to delete the vendor "${name}"?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/vendors/${id}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                loadVendors();
+            } else {
+                const error = await response.json();
+                showError('Failed to delete vendor: ' + (error.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error deleting vendor:', error);
+            showError('Failed to delete vendor');
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize
+    loadVendors();
+</script>
+{% endblock %}

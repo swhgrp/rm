@@ -1,0 +1,570 @@
+{% extends "food-safety/base.html" %}
+
+{% block title %}Corrective Actions - Food Safety - SW Hospitality Group{% endblock %}
+
+{% block nav_corrective %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        margin-bottom: 30px;
+    }
+
+    .page-header h2 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+    }
+
+    .stat-card .number {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .stat-card .label {
+        color: var(--text-secondary);
+        font-size: 13px;
+    }
+
+    .stat-card.pending .number { color: var(--warning); }
+    .stat-card.overdue .number { color: var(--error); }
+
+    .filters-bar {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .filter-select {
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        min-width: 160px;
+    }
+
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    th {
+        background-color: var(--bg-tertiary);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
+
+    tr:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .badge-pending { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-in_progress { background-color: var(--info-bg); color: var(--info); }
+    .badge-completed { background-color: var(--success-bg); color: var(--success); }
+    .badge-verified { background-color: var(--accent-primary); color: #FFFFFF; }
+    .badge-overdue { background-color: var(--error-bg); color: var(--error); }
+
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 13px;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 1px solid var(--border-primary);
+        background-color: var(--bg-secondary);
+        margin-right: 5px;
+    }
+
+    .btn-sm:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 60px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-primary);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        overflow-y: auto;
+        padding: 20px;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+        background-color: var(--bg-secondary);
+        border-radius: 12px;
+        max-width: 600px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title { font-size: 18px; font-weight: 600; }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+
+    .modal-body { padding: 20px; }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .btn-secondary {
+        padding: 10px 20px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%;
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
+
+    .detail-box {
+        background-color: var(--bg-tertiary);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+
+    .detail-box p {
+        margin: 5px 0;
+    }
+
+    .incident-link {
+        color: var(--accent-primary);
+        text-decoration: none;
+    }
+
+    .incident-link:hover {
+        text-decoration: underline;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h2><i class="bi bi-check-circle"></i> Corrective Actions</h2>
+        <p class="page-subtitle">Track and complete corrective actions from incidents and inspections</p>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-card pending">
+            <div class="number" id="pendingCount">0</div>
+            <div class="label">Pending</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" id="inProgressCount">0</div>
+            <div class="label">In Progress</div>
+        </div>
+        <div class="stat-card overdue">
+            <div class="number" id="overdueCount">0</div>
+            <div class="label">Overdue</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" id="completedCount">0</div>
+            <div class="label">Completed</div>
+        </div>
+    </div>
+
+    <div class="filters-bar">
+        <select class="filter-select" id="locationFilter" onchange="loadActions()">
+            <option value="">All Locations</option>
+        </select>
+        <select class="filter-select" id="statusFilter" onchange="filterActions()">
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="verified">Verified</option>
+            <option value="overdue">Overdue</option>
+        </select>
+        <select class="filter-select" id="sourceFilter" onchange="filterActions()">
+            <option value="">All Sources</option>
+            <option value="incident">Incidents</option>
+            <option value="inspection">Inspections</option>
+        </select>
+    </div>
+
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Action</th>
+                        <th>Source</th>
+                        <th>Assigned To</th>
+                        <th>Due Date</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="actionsTable">
+                    <tr>
+                        <td colspan="6">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Update Action Modal -->
+    <div class="modal-overlay" id="updateModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Update Corrective Action</h3>
+                <button class="modal-close" onclick="closeUpdateModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="detail-box" id="actionDetails">
+                    <!-- Populated by JS -->
+                </div>
+                <div class="form-group">
+                    <label for="update_status">Status</label>
+                    <select id="update_status">
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="update_notes">Notes</label>
+                    <textarea id="update_notes" rows="3" placeholder="Progress notes or completion details..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeUpdateModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveUpdate()">
+                    <i class="bi bi-check-lg"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/food-safety';
+    let actions = [];
+    let locations = [];
+    let currentActionId = null;
+
+    async function loadLocations() {
+        try {
+            const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+            if (response.ok) {
+                locations = await response.json();
+                const select = document.getElementById('locationFilter');
+                select.innerHTML = '<option value="">All Locations</option>';
+                locations.forEach(loc => {
+                    select.innerHTML += `<option value="${loc.id}">${escapeHtml(loc.name)}</option>`;
+                });
+            }
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+    }
+
+    async function loadActions() {
+        try {
+            const locationId = document.getElementById('locationFilter').value;
+            let url = `${API_BASE}/incidents/corrective-actions?`;
+            if (locationId) url += `location_id=${locationId}&`;
+
+            const response = await fetch(url);
+            if (response.ok) {
+                actions = await response.json();
+                updateStats();
+                filterActions();
+            }
+        } catch (error) {
+            console.error('Error loading actions:', error);
+            document.getElementById('actionsTable').innerHTML = `
+                <tr><td colspan="6">
+                    <div class="empty-state">
+                        <i class="bi bi-exclamation-circle"></i>
+                        <p>Error loading corrective actions</p>
+                    </div>
+                </td></tr>
+            `;
+        }
+    }
+
+    function updateStats() {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const pending = actions.filter(a => a.status === 'pending').length;
+        const inProgress = actions.filter(a => a.status === 'in_progress').length;
+        const overdue = actions.filter(a => {
+            if (a.status === 'completed' || a.status === 'verified') return false;
+            if (!a.due_date) return false;
+            return new Date(a.due_date) < today;
+        }).length;
+        const completed = actions.filter(a => a.status === 'completed' || a.status === 'verified').length;
+
+        document.getElementById('pendingCount').textContent = pending;
+        document.getElementById('inProgressCount').textContent = inProgress;
+        document.getElementById('overdueCount').textContent = overdue;
+        document.getElementById('completedCount').textContent = completed;
+    }
+
+    function filterActions() {
+        const status = document.getElementById('statusFilter').value;
+        const source = document.getElementById('sourceFilter').value;
+
+        let filtered = actions;
+
+        if (status === 'overdue') {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            filtered = filtered.filter(a => {
+                if (a.status === 'completed' || a.status === 'verified') return false;
+                if (!a.due_date) return false;
+                return new Date(a.due_date) < today;
+            });
+        } else if (status) {
+            filtered = filtered.filter(a => a.status === status);
+        }
+
+        if (source) {
+            filtered = filtered.filter(a => a.source_type === source);
+        }
+
+        renderActions(filtered);
+    }
+
+    function renderActions(list) {
+        const tbody = document.getElementById('actionsTable');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (!list || list.length === 0) {
+            tbody.innerHTML = `
+                <tr><td colspan="6">
+                    <div class="empty-state">
+                        <i class="bi bi-check-circle"></i>
+                        <p>No corrective actions found</p>
+                    </div>
+                </td></tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = list.map(a => {
+            const isOverdue = a.due_date && new Date(a.due_date) < today && a.status !== 'completed' && a.status !== 'verified';
+            const statusClass = isOverdue ? 'overdue' : a.status;
+            const sourceLabel = a.source_type === 'incident' ? `INC-${a.incident_id}` : `INSP-${a.inspection_id}`;
+
+            return `
+                <tr>
+                    <td><strong>${escapeHtml(a.action_description)}</strong></td>
+                    <td><span class="incident-link">${sourceLabel}</span></td>
+                    <td>${a.assigned_to || '-'}</td>
+                    <td>${a.due_date ? formatDate(a.due_date) : '-'}</td>
+                    <td><span class="badge badge-${statusClass}">${isOverdue ? 'Overdue' : a.status.replace('_', ' ')}</span></td>
+                    <td>
+                        ${a.status !== 'verified' ? `<button class="btn-sm" onclick="openUpdateModal('${a.id}')"><i class="bi bi-pencil"></i> Update</button>` : ''}
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function openUpdateModal(actionId) {
+        currentActionId = actionId;
+        const action = actions.find(a => a.id === actionId);
+        if (!action) return;
+
+        document.getElementById('actionDetails').innerHTML = `
+            <p><strong>Action:</strong> ${escapeHtml(action.action_description)}</p>
+            <p><strong>Due Date:</strong> ${action.due_date ? formatDate(action.due_date) : 'Not set'}</p>
+            <p><strong>Assigned To:</strong> ${action.assigned_to || 'Unassigned'}</p>
+        `;
+
+        document.getElementById('update_status').value = action.status;
+        document.getElementById('update_notes').value = action.notes || '';
+        document.getElementById('updateModal').classList.add('active');
+    }
+
+    function closeUpdateModal() {
+        document.getElementById('updateModal').classList.remove('active');
+        currentActionId = null;
+    }
+
+    async function saveUpdate() {
+        if (!currentActionId) return;
+
+        try {
+            const response = await fetch(`${API_BASE}/incidents/corrective-actions/${currentActionId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    status: document.getElementById('update_status').value,
+                    notes: document.getElementById('update_notes').value || null
+                })
+            });
+
+            if (response.ok) {
+                closeUpdateModal();
+                loadActions();
+            } else {
+                const error = await response.json();
+                showError(error.detail || 'Unknown error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('updating action');
+        }
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '-';
+        const date = new Date(dateStr);
+        return date.toLocaleDateString();
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize
+    loadLocations().then(() => loadActions());
+</script>
+{% endblock %}

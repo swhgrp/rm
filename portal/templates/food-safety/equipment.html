@@ -1,0 +1,701 @@
+{% extends "food-safety/base.html" %}
+
+{% block title %}Equipment - Food Safety - SW Hospitality Group{% endblock %}
+
+{% block nav_equipment %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-title-section h2 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .info-banner {
+        background-color: var(--info-bg);
+        border: 1px solid var(--info);
+        border-radius: 8px;
+        padding: 12px 16px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--info);
+    }
+
+    .info-banner i { font-size: 18px; }
+
+    .filters-bar {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .search-box {
+        flex: 1;
+        min-width: 200px;
+        max-width: 400px;
+        position: relative;
+    }
+
+    .search-box input {
+        width: 100%;
+        padding: 10px 15px 10px 40px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+    }
+
+    .filter-select {
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        min-width: 160px;
+    }
+
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    th {
+        background-color: var(--bg-tertiary);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
+
+    tr:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .badge-operational { background-color: var(--success-bg); color: var(--success); }
+    .badge-needs_maintenance { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-under_repair { background-color: var(--info-bg); color: var(--info); }
+    .badge-out_of_service { background-color: var(--error-bg); color: var(--error); }
+
+    .temp-range {
+        font-family: monospace;
+        font-size: 13px;
+    }
+
+    .temp-range.override {
+        color: var(--accent-primary);
+        font-weight: 500;
+    }
+
+    .btn-icon {
+        padding: 6px 10px;
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+        background-color: var(--bg-secondary);
+        cursor: pointer;
+        margin-right: 5px;
+    }
+
+    .btn-icon:hover {
+        background-color: var(--bg-tertiary);
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 60px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-primary);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+        background-color: var(--bg-secondary);
+        border-radius: 12px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title { font-size: 18px; font-weight: 600; }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+
+    .modal-body { padding: 20px; }
+
+    .equipment-details {
+        background-color: var(--bg-tertiary);
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+
+    .equipment-details h4 {
+        margin: 0 0 10px 0;
+        font-size: 16px;
+    }
+
+    .equipment-details p {
+        margin: 5px 0;
+        font-size: 13px;
+        color: var(--text-secondary);
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .form-group input, .form-group select {
+        width: 100%;
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 80px;
+        gap: 15px;
+        align-items: end;
+    }
+
+    .form-hint {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 5px;
+    }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
+
+    .btn-secondary {
+        padding: 10px 20px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .btn-link {
+        background: none;
+        border: none;
+        color: var(--accent-primary);
+        cursor: pointer;
+        font-size: 13px;
+        padding: 0;
+        text-decoration: underline;
+    }
+
+    /* Confirm Modal */
+    .confirm-modal {
+        max-width: 400px;
+    }
+
+    .confirm-modal .modal-body {
+        text-align: center;
+        padding: 30px 20px;
+    }
+
+    .confirm-modal .modal-body i {
+        font-size: 48px;
+        color: var(--warning);
+        margin-bottom: 15px;
+    }
+
+    .confirm-modal .modal-body p {
+        color: var(--text-secondary);
+        margin-top: 10px;
+    }
+
+    .btn-danger {
+        padding: 10px 20px;
+        background-color: var(--error);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .btn-danger:hover {
+        opacity: 0.9;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <div class="page-title-section">
+            <h2><i class="bi bi-thermometer"></i> Temperature Equipment</h2>
+            <p class="page-subtitle">View and configure temperature thresholds for equipment</p>
+        </div>
+    </div>
+
+    <div class="info-banner">
+        <i class="bi bi-info-circle"></i>
+        <span>Equipment is managed in the <strong>Maintenance</strong> system. Here you can set temperature threshold overrides for food safety monitoring.</span>
+    </div>
+
+    <div class="filters-bar">
+        <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="searchInput" placeholder="Search equipment..." oninput="filterEquipment()">
+        </div>
+        <select class="filter-select" id="statusFilter" onchange="filterEquipment()">
+            <option value="">All Status</option>
+            <option value="operational">Operational</option>
+            <option value="needs_maintenance">Needs Maintenance</option>
+            <option value="under_repair">Under Repair</option>
+            <option value="out_of_service">Out of Service</option>
+        </select>
+    </div>
+
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Equipment</th>
+                        <th>Category</th>
+                        <th>Status</th>
+                        <th>Temp Range</th>
+                        <th>QR Code</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="equipmentTable">
+                    <tr>
+                        <td colspan="6">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Set Threshold Modal -->
+    <div class="modal-overlay" id="thresholdModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Set Temperature Thresholds</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="equipment-details" id="equipmentDetails">
+                    <h4 id="eqName">Equipment Name</h4>
+                    <p><strong>Category:</strong> <span id="eqCategory">-</span></p>
+                    <p><strong>Serial #:</strong> <span id="eqSerial">-</span></p>
+                    <p><strong>QR Code:</strong> <span id="eqQR">-</span></p>
+                </div>
+
+                <form id="thresholdForm">
+                    <input type="hidden" id="eq_id">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="min_temp">Min Temp</label>
+                            <input type="number" id="min_temp" step="0.1" placeholder="e.g., 32">
+                        </div>
+                        <div class="form-group">
+                            <label for="max_temp">Max Temp</label>
+                            <input type="number" id="max_temp" step="0.1" placeholder="e.g., 40">
+                        </div>
+                        <div class="form-group">
+                            <label for="temp_unit">Unit</label>
+                            <select id="temp_unit">
+                                <option value="F">°F</option>
+                                <option value="C">°C</option>
+                            </select>
+                        </div>
+                    </div>
+                    <p class="form-hint">Leave blank to use default thresholds based on equipment type. Custom thresholds override the defaults.</p>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-link" onclick="clearThreshold()" id="clearBtn" style="display: none;">Clear Override</button>
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveThreshold()">
+                    <i class="bi bi-check-lg"></i> Save
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Clear Modal -->
+    <div class="modal-overlay" id="confirmModal">
+        <div class="modal confirm-modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Confirm Clear Override</h3>
+                <button class="modal-close" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <i class="bi bi-exclamation-triangle"></i>
+                <h4>Remove custom temperature thresholds?</h4>
+                <p>This equipment will revert to using default thresholds based on its type.</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeConfirmModal()">Cancel</button>
+                <button class="btn-danger" onclick="confirmClearThreshold()">
+                    <i class="bi bi-trash"></i> Clear Override
+                </button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/food-safety';
+    let equipment = [];
+    let currentEquipment = null;
+
+    async function loadEquipment() {
+        try {
+            const response = await fetch(`${API_BASE}/temperatures/equipment`);
+            if (response.ok) {
+                equipment = await response.json();
+                filterEquipment();
+            } else {
+                throw new Error('Failed to load equipment');
+            }
+        } catch (error) {
+            console.error('Error loading equipment:', error);
+            document.getElementById('equipmentTable').innerHTML = `
+                <tr><td colspan="6">
+                    <div class="empty-state">
+                        <i class="bi bi-exclamation-circle"></i>
+                        <p>Unable to load equipment from Maintenance service</p>
+                        <p style="font-size: 12px; margin-top: 10px;">Make sure the Maintenance service is running</p>
+                    </div>
+                </td></tr>
+            `;
+        }
+    }
+
+    function filterEquipment() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const status = document.getElementById('statusFilter').value;
+
+        let filtered = equipment.filter(eq => {
+            const matchesSearch = !search ||
+                eq.name.toLowerCase().includes(search) ||
+                (eq.serial_number && eq.serial_number.toLowerCase().includes(search)) ||
+                (eq.qr_code && eq.qr_code.toLowerCase().includes(search));
+            const matchesStatus = !status || eq.status === status;
+            return matchesSearch && matchesStatus;
+        });
+
+        renderEquipment(filtered);
+    }
+
+    function renderEquipment(list) {
+        const tbody = document.getElementById('equipmentTable');
+
+        if (!list || list.length === 0) {
+            tbody.innerHTML = `
+                <tr><td colspan="6">
+                    <div class="empty-state">
+                        <i class="bi bi-thermometer"></i>
+                        <p>No temperature-monitored equipment found</p>
+                        <p style="font-size: 12px; margin-top: 10px;">Add refrigeration equipment in the Maintenance system</p>
+                    </div>
+                </td></tr>
+            `;
+            return;
+        }
+
+        const statusLabels = {
+            'operational': 'Operational',
+            'needs_maintenance': 'Needs Maintenance',
+            'under_repair': 'Under Repair',
+            'out_of_service': 'Out of Service'
+        };
+
+        tbody.innerHTML = list.map(eq => {
+            let tempRange = '-';
+            let tempClass = '';
+            if (eq.min_temp !== null && eq.max_temp !== null) {
+                tempRange = `${eq.min_temp}° - ${eq.max_temp}°${eq.temp_unit}`;
+                if (eq.has_override) {
+                    tempClass = 'override';
+                }
+            }
+
+            return `
+                <tr>
+                    <td>
+                        <strong>${escapeHtml(eq.name)}</strong>
+                        ${eq.serial_number ? `<br><small style="color: var(--text-muted);">S/N: ${escapeHtml(eq.serial_number)}</small>` : ''}
+                    </td>
+                    <td>${eq.category_name || eq.equipment_type || '-'}</td>
+                    <td><span class="badge badge-${eq.status}">${statusLabels[eq.status] || eq.status}</span></td>
+                    <td>
+                        <span class="temp-range ${tempClass}">${tempRange}</span>
+                        ${eq.has_override ? '<br><small style="color: var(--accent-primary);">Custom</small>' : ''}
+                    </td>
+                    <td><code>${eq.qr_code || '-'}</code></td>
+                    <td>
+                        <button class="btn-icon" onclick="openThresholdModal(${eq.id})" title="Set Thresholds">
+                            <i class="bi bi-thermometer-half"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function openThresholdModal(equipmentId) {
+        currentEquipment = equipment.find(e => e.id === equipmentId);
+        if (!currentEquipment) return;
+
+        document.getElementById('eq_id').value = equipmentId;
+        document.getElementById('eqName').textContent = currentEquipment.name;
+        document.getElementById('eqCategory').textContent = currentEquipment.category_name || currentEquipment.equipment_type || '-';
+        document.getElementById('eqSerial').textContent = currentEquipment.serial_number || '-';
+        document.getElementById('eqQR').textContent = currentEquipment.qr_code || '-';
+
+        // Set current values
+        document.getElementById('min_temp').value = currentEquipment.min_temp !== null ? currentEquipment.min_temp : '';
+        document.getElementById('max_temp').value = currentEquipment.max_temp !== null ? currentEquipment.max_temp : '';
+        document.getElementById('temp_unit').value = currentEquipment.temp_unit || 'F';
+
+        // Show/hide clear button based on override status
+        document.getElementById('clearBtn').style.display = currentEquipment.has_override ? 'inline' : 'none';
+
+        document.getElementById('thresholdModal').classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('thresholdModal').classList.remove('active');
+        currentEquipment = null;
+    }
+
+    async function saveThreshold() {
+        const equipmentId = document.getElementById('eq_id').value;
+        const minTemp = document.getElementById('min_temp').value;
+        const maxTemp = document.getElementById('max_temp').value;
+        const tempUnit = document.getElementById('temp_unit').value;
+
+        if (!minTemp && !maxTemp) {
+            showWarning('Please enter at least one threshold value');
+            return;
+        }
+
+        const data = {
+            maintenance_equipment_id: parseInt(equipmentId),
+            equipment_name: currentEquipment.name,
+            equipment_type: currentEquipment.equipment_type,
+            location_id: currentEquipment.location_id,
+            min_temp: minTemp ? parseFloat(minTemp) : null,
+            max_temp: maxTemp ? parseFloat(maxTemp) : null,
+            temp_unit: tempUnit,
+            alert_on_violation: true,
+            is_active: true
+        };
+
+        try {
+            // Note: This would need an API endpoint to save threshold overrides
+            // For now, this is a placeholder showing the intended functionality
+            const response = await fetch(`${API_BASE}/locations/equipment-thresholds`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                closeModal();
+                loadEquipment();
+            } else {
+                const error = await response.json();
+                showError(error.detail || 'Unknown error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('saving threshold');
+        }
+    }
+
+    function clearThreshold() {
+        if (!currentEquipment || !currentEquipment.has_override || !currentEquipment.threshold_id) {
+            showWarning('No custom threshold to clear');
+            return;
+        }
+        // Show custom confirm modal instead of browser confirm()
+        document.getElementById('confirmModal').classList.add('active');
+    }
+
+    function closeConfirmModal() {
+        document.getElementById('confirmModal').classList.remove('active');
+    }
+
+    async function confirmClearThreshold() {
+        if (!currentEquipment || !currentEquipment.threshold_id) return;
+
+        try {
+            const response = await fetch(`${API_BASE}/locations/equipment-thresholds/${currentEquipment.threshold_id}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                closeConfirmModal();
+                closeModal();
+                showSuccess('Custom threshold cleared successfully');
+                loadEquipment();
+            } else {
+                const error = await response.json();
+                showError(error.detail || 'Failed to clear threshold');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('clearing threshold');
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize
+    loadEquipment();
+</script>
+{% endblock %}

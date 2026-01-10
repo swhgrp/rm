@@ -121,6 +121,7 @@ class User(Base):
     can_access_websites = Column(Boolean, default=True)
     can_access_mail = Column(Boolean, default=False)
     can_access_maintenance = Column(Boolean, default=True)
+    can_access_food_safety = Column(Boolean, default=True)
     accounting_role_id = Column(Integer, nullable=True)
 
     # Password reset tokens
@@ -405,6 +406,15 @@ async def home(request: Request, db: Session = Depends(get_db)):
             "url": "/portal/maintenance/",
             "icon": "🔧",
             "system_key": "maintenance"
+        })
+
+    if getattr(user, 'can_access_food_safety', False) or user.is_admin:
+        systems.append({
+            "name": "Food Safety",
+            "description": "Temperature monitoring, checklists, inspections, and HACCP compliance",
+            "url": "/portal/food-safety/",
+            "icon": "🛡️",
+            "system_key": "food_safety"
         })
 
     # Websites - always show for admins
@@ -1107,6 +1117,195 @@ async def maintenance_schedules(request: Request, current_user: User = Depends(g
     return templates.TemplateResponse("maintenance/schedules.html", {"request": request, "user": current_user})
 
 
+@app.get("/maintenance/categories", response_class=HTMLResponse)
+async def maintenance_categories(request: Request, current_user: User = Depends(get_current_user)):
+    """Display equipment categories"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/maintenance/categories", status_code=303)
+    if not getattr(current_user, 'can_access_maintenance', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Maintenance system")
+
+    return templates.TemplateResponse("maintenance/categories.html", {"request": request, "user": current_user})
+
+
+@app.get("/maintenance/vendors", response_class=HTMLResponse)
+async def maintenance_vendors(request: Request, current_user: User = Depends(get_current_user)):
+    """Display maintenance vendors"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/maintenance/vendors", status_code=303)
+    if not getattr(current_user, 'can_access_maintenance', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Maintenance system")
+
+    return templates.TemplateResponse("maintenance/vendors.html", {"request": request, "user": current_user})
+
+
+@app.get("/maintenance/settings", response_class=HTMLResponse)
+async def maintenance_settings(request: Request, current_user: User = Depends(get_current_user)):
+    """Display maintenance settings"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/maintenance/settings", status_code=303)
+    if not getattr(current_user, 'can_access_maintenance', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Maintenance system")
+
+    return templates.TemplateResponse("maintenance/settings.html", {"request": request, "user": current_user})
+
+
+# Food Safety Routes
+@app.get("/food-safety/", response_class=HTMLResponse)
+@app.get("/food-safety", response_class=HTMLResponse)
+async def food_safety_dashboard(request: Request, current_user: User = Depends(get_current_user)):
+    """Display food safety dashboard"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/dashboard.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/temperatures", response_class=HTMLResponse)
+async def food_safety_temperatures(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/temperatures", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/temperatures.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/alerts", response_class=HTMLResponse)
+async def food_safety_alerts(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/alerts", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/alerts.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/equipment", response_class=HTMLResponse)
+async def food_safety_equipment(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/equipment", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/equipment.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/checklists", response_class=HTMLResponse)
+async def food_safety_checklists(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/checklists", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/checklists.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/templates", response_class=HTMLResponse)
+async def food_safety_templates(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/templates", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/templates.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/pending", response_class=HTMLResponse)
+async def food_safety_pending(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/pending", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/pending.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/incidents", response_class=HTMLResponse)
+async def food_safety_incidents(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/incidents", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/incidents.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/incidents/new", response_class=HTMLResponse)
+async def food_safety_new_incident(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/incidents/new", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/incident_form.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/corrective-actions", response_class=HTMLResponse)
+async def food_safety_corrective_actions(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/corrective-actions", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/corrective_actions.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/inspections", response_class=HTMLResponse)
+async def food_safety_inspections(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/inspections", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/inspections.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/inspections/new", response_class=HTMLResponse)
+async def food_safety_new_inspection(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/inspections/new", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/inspection_form.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/haccp", response_class=HTMLResponse)
+async def food_safety_haccp(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/haccp", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/haccp.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/settings", response_class=HTMLResponse)
+async def food_safety_settings(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/settings", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/settings.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/settings/locations", response_class=HTMLResponse)
+async def food_safety_locations(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/settings/locations", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/locations.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/settings/users", response_class=HTMLResponse)
+async def food_safety_users(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/settings/users", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/users.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/settings/thresholds", response_class=HTMLResponse)
+async def food_safety_thresholds(request: Request, current_user: User = Depends(get_current_user)):
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/settings/thresholds", status_code=303)
+    if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/thresholds.html", {"request": request, "user": current_user})
+
+
 # Monitoring Dashboard Routes
 @app.get("/monitoring", response_class=HTMLResponse)
 async def monitoring_dashboard(request: Request, current_user: User = Depends(get_current_user)):
@@ -1207,3 +1406,204 @@ async def monitoring_status(current_user: User = Depends(get_current_user)):
             os.unlink(output_file)
         logger.error(f"Monitoring status error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Food Safety Routes
+@app.get("/food-safety/", response_class=HTMLResponse)
+@app.get("/food-safety", response_class=HTMLResponse)
+async def food_safety_dashboard(request: Request, current_user: User = Depends(get_current_user)):
+    """Display food safety dashboard"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/", status_code=303)
+    # For now, allow admin access. Can add can_access_food_safety permission later
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/dashboard.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/temperatures", response_class=HTMLResponse)
+async def food_safety_temperatures(request: Request, current_user: User = Depends(get_current_user)):
+    """Display temperature logging page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/temperatures", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/temperatures.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/temperatures/alerts", response_class=HTMLResponse)
+async def food_safety_alerts(request: Request, current_user: User = Depends(get_current_user)):
+    """Display temperature alerts page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/temperatures/alerts", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/alerts.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/equipment", response_class=HTMLResponse)
+async def food_safety_equipment(request: Request, current_user: User = Depends(get_current_user)):
+    """Display food safety equipment page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/equipment", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/equipment.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/checklists", response_class=HTMLResponse)
+async def food_safety_checklists(request: Request, current_user: User = Depends(get_current_user)):
+    """Display daily checklists page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/checklists", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/checklists.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/checklists/templates", response_class=HTMLResponse)
+async def food_safety_templates(request: Request, current_user: User = Depends(get_current_user)):
+    """Display checklist templates page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/checklists/templates", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/templates.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/checklists/pending", response_class=HTMLResponse)
+async def food_safety_pending(request: Request, current_user: User = Depends(get_current_user)):
+    """Display pending sign-offs page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/checklists/pending", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/pending.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/incidents", response_class=HTMLResponse)
+async def food_safety_incidents(request: Request, current_user: User = Depends(get_current_user)):
+    """Display incidents list page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/incidents", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/incidents.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/incidents/new", response_class=HTMLResponse)
+async def food_safety_new_incident(request: Request, current_user: User = Depends(get_current_user)):
+    """Display new incident form page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/incidents/new", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/incident_form.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/corrective-actions", response_class=HTMLResponse)
+async def food_safety_corrective_actions(request: Request, current_user: User = Depends(get_current_user)):
+    """Display corrective actions page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/corrective-actions", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/corrective_actions.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/inspections", response_class=HTMLResponse)
+async def food_safety_inspections(request: Request, current_user: User = Depends(get_current_user)):
+    """Display inspections list page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/inspections", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/inspections.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/inspections/new", response_class=HTMLResponse)
+async def food_safety_new_inspection(request: Request, current_user: User = Depends(get_current_user)):
+    """Display new inspection form page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/inspections/new", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/inspection_form.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/haccp", response_class=HTMLResponse)
+async def food_safety_haccp(request: Request, current_user: User = Depends(get_current_user)):
+    """Display HACCP plans page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/haccp", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/haccp.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/settings", response_class=HTMLResponse)
+async def food_safety_settings(request: Request, current_user: User = Depends(get_current_user)):
+    """Display food safety settings page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/settings", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/settings.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/locations", response_class=HTMLResponse)
+async def food_safety_locations(request: Request, current_user: User = Depends(get_current_user)):
+    """Display locations page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/locations", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/locations.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/users", response_class=HTMLResponse)
+async def food_safety_users(request: Request, current_user: User = Depends(get_current_user)):
+    """Display user permissions page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/users", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/users.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/thresholds", response_class=HTMLResponse)
+async def food_safety_thresholds(request: Request, current_user: User = Depends(get_current_user)):
+    """Display temperature thresholds page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/thresholds", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/thresholds.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/reports", response_class=HTMLResponse)
+async def food_safety_reports(request: Request, current_user: User = Depends(get_current_user)):
+    """Display food safety reports page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/reports", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+
+    return templates.TemplateResponse("food-safety/reports.html", {"request": request, "user": current_user})

@@ -1,0 +1,438 @@
+{% extends "food-safety/base.html" %}
+
+{% block title %}Record Inspection - Food Safety - SW Hospitality Group{% endblock %}
+
+{% block nav_new_inspection %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        margin-bottom: 30px;
+    }
+
+    .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        padding: 30px;
+        max-width: 900px;
+    }
+
+    .form-group {
+        margin-bottom: 25px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .form-group label .required {
+        color: var(--error);
+    }
+
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%;
+        padding: 12px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
+
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    .form-row-3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+        .form-row, .form-row-3 {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 15px;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-primary);
+    }
+
+    .btn-primary {
+        padding: 12px 24px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
+
+    .btn-secondary {
+        padding: 12px 24px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .alert {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: none;
+    }
+
+    .alert-success {
+        background-color: rgba(67, 160, 71, 0.1);
+        border: 1px solid var(--success);
+        color: var(--success);
+    }
+
+    .alert-error {
+        background-color: rgba(229, 57, 53, 0.1);
+        border: 1px solid var(--error);
+        color: var(--error);
+    }
+
+    /* Violations Section */
+    .violations-section {
+        margin-top: 30px;
+        padding-top: 30px;
+        border-top: 1px solid var(--border-primary);
+    }
+
+    .violations-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .violations-header h3 {
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .violation-card {
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 15px;
+        position: relative;
+    }
+
+    .violation-card .remove-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: none;
+        border: none;
+        color: var(--error);
+        cursor: pointer;
+        font-size: 18px;
+    }
+
+    .add-violation-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 20px;
+        border: 1px dashed var(--border-primary);
+        border-radius: 6px;
+        background: none;
+        color: var(--text-muted);
+        cursor: pointer;
+        width: 100%;
+        font-size: 14px;
+    }
+
+    .add-violation-btn:hover {
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h2 class="page-title">Record Inspection</h2>
+        <p class="page-subtitle">Document a health department or internal inspection</p>
+    </div>
+
+    <div class="alert alert-success" id="successAlert">
+        Inspection recorded successfully! Redirecting...
+    </div>
+    <div class="alert alert-error" id="errorAlert"></div>
+
+    <div class="card">
+        <form id="inspectionForm">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="location_id">Location <span class="required">*</span></label>
+                    <select id="location_id" required>
+                        <option value="">Select location...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="inspection_type">Inspection Type <span class="required">*</span></label>
+                    <select id="inspection_type" required>
+                        <option value="">Select type...</option>
+                        <option value="health_department">Health Department</option>
+                        <option value="internal">Internal Audit</option>
+                        <option value="third_party">Third Party</option>
+                        <option value="corporate">Corporate</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row-3">
+                <div class="form-group">
+                    <label for="inspection_date">Inspection Date <span class="required">*</span></label>
+                    <input type="date" id="inspection_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="score">Score (0-100)</label>
+                    <input type="number" id="score" min="0" max="100" placeholder="e.g., 95">
+                </div>
+                <div class="form-group">
+                    <label for="result">Result <span class="required">*</span></label>
+                    <select id="result" required>
+                        <option value="">Select result...</option>
+                        <option value="passed">Passed</option>
+                        <option value="failed">Failed</option>
+                        <option value="pending">Pending</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="inspector_name">Inspector Name</label>
+                    <input type="text" id="inspector_name" placeholder="Name of the inspector">
+                </div>
+                <div class="form-group">
+                    <label for="inspector_agency">Agency/Organization</label>
+                    <input type="text" id="inspector_agency" placeholder="e.g., County Health Dept">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="notes">Notes</label>
+                <textarea id="notes" rows="3" placeholder="General notes about the inspection..."></textarea>
+            </div>
+
+            <!-- Violations Section -->
+            <div class="violations-section">
+                <div class="violations-header">
+                    <h3><i class="bi bi-exclamation-triangle"></i> Violations</h3>
+                </div>
+                <div id="violationsList">
+                    <!-- Violations added dynamically -->
+                </div>
+                <button type="button" class="add-violation-btn" onclick="addViolation()">
+                    <i class="bi bi-plus-circle"></i> Add Violation
+                </button>
+            </div>
+
+            <div class="form-actions">
+                <a href="/portal/food-safety/inspections" class="btn-secondary">
+                    <i class="bi bi-x-lg"></i> Cancel
+                </a>
+                <button type="submit" class="btn-primary">
+                    <i class="bi bi-check-lg"></i> Save Inspection
+                </button>
+            </div>
+        </form>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/food-safety';
+    let locations = [];
+    let violationCount = 0;
+
+    async function loadLocations() {
+        try {
+            const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+            if (response.ok) {
+                locations = await response.json();
+                const select = document.getElementById('location_id');
+                select.innerHTML = '<option value="">Select location...</option>';
+                locations.forEach(loc => {
+                    select.innerHTML += `<option value="${loc.id}">${escapeHtml(loc.name)}</option>`;
+                });
+            }
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+    }
+
+    // Set default date to today
+    document.getElementById('inspection_date').value = new Date().toISOString().split('T')[0];
+
+    function addViolation() {
+        violationCount++;
+        const container = document.getElementById('violationsList');
+
+        const violationHtml = `
+            <div class="violation-card" id="violation_${violationCount}">
+                <button type="button" class="remove-btn" onclick="removeViolation(${violationCount})">&times;</button>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Violation Code</label>
+                        <input type="text" class="violation-code" placeholder="e.g., 3-501.17">
+                    </div>
+                    <div class="form-group">
+                        <label>Severity</label>
+                        <select class="violation-severity">
+                            <option value="minor">Minor</option>
+                            <option value="major">Major</option>
+                            <option value="critical">Critical</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea class="violation-description" rows="2" placeholder="Describe the violation..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Corrective Action Required</label>
+                    <textarea class="violation-corrective" rows="2" placeholder="Required corrective action..."></textarea>
+                </div>
+            </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', violationHtml);
+    }
+
+    function removeViolation(id) {
+        const element = document.getElementById(`violation_${id}`);
+        if (element) {
+            element.remove();
+        }
+    }
+
+    function collectViolations() {
+        const violations = [];
+        const cards = document.querySelectorAll('.violation-card');
+
+        cards.forEach(card => {
+            const description = card.querySelector('.violation-description').value;
+            if (description.trim()) {
+                violations.push({
+                    code: card.querySelector('.violation-code').value || null,
+                    severity: card.querySelector('.violation-severity').value,
+                    description: description,
+                    corrective_action: card.querySelector('.violation-corrective').value || null
+                });
+            }
+        });
+
+        return violations;
+    }
+
+    document.getElementById('inspectionForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const locationId = document.getElementById('location_id').value;
+        if (!locationId) {
+            showError('Please select a location');
+            return;
+        }
+
+        const violations = collectViolations();
+
+        const data = {
+            location_id: locationId,
+            inspection_type: document.getElementById('inspection_type').value,
+            inspection_date: document.getElementById('inspection_date').value,
+            score: document.getElementById('score').value ? parseInt(document.getElementById('score').value) : null,
+            result: document.getElementById('result').value,
+            inspector_name: document.getElementById('inspector_name').value || null,
+            inspector_agency: document.getElementById('inspector_agency').value || null,
+            notes: document.getElementById('notes').value || null,
+            violations: violations
+        };
+
+        try {
+            const response = await fetch(`${API_BASE}/inspections`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                document.getElementById('successAlert').style.display = 'block';
+                document.getElementById('errorAlert').style.display = 'none';
+                setTimeout(() => {
+                    window.location.href = '/portal/food-safety/inspections';
+                }, 1500);
+            } else {
+                const error = await response.json();
+                showError('Error: ' + (error.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error saving inspection:', error);
+            showError('Error saving inspection. Please try again.');
+        }
+    });
+
+    function showError(message) {
+        document.getElementById('errorAlert').textContent = message;
+        document.getElementById('errorAlert').style.display = 'block';
+        document.getElementById('successAlert').style.display = 'none';
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize
+    loadLocations();
+</script>
+{% endblock %}

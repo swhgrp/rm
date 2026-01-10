@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Food Safety - SW Hospitality Group{% endblock %}</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+
+    <style>
+        :root {
+            --bg-primary: #ECEFF1;
+            --bg-secondary: #FFFFFF;
+            --bg-tertiary: #F5F5F5;
+            --bg-elevated: #E0E0E0;
+            --border-primary: #CFD8DC;
+            --border-secondary: #B0BEC5;
+            --text-primary: #263238;
+            --text-secondary: #546E7A;
+            --text-muted: #78909C;
+            --accent-primary: #455A64;
+            --accent-secondary: #37474F;
+            --accent-hover: #263238;
+            --accent-muted: #546E7A;
+            --success: #43A047;
+            --success-bg: rgba(67, 160, 71, 0.1);
+            --error: #E53935;
+            --error-bg: rgba(229, 57, 53, 0.1);
+            --warning: #FB8C00;
+            --warning-bg: rgba(251, 140, 0, 0.1);
+            --info: #1E88E5;
+            --info-bg: rgba(30, 136, 229, 0.1);
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Toast notifications */
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 100000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 8px;
+            padding: 15px 20px;
+            min-width: 300px;
+            max-width: 450px;
+            box-shadow: var(--shadow-md);
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .toast.toast-error { border-left: 4px solid var(--error); }
+        .toast.toast-success { border-left: 4px solid var(--success); }
+        .toast.toast-warning { border-left: 4px solid var(--warning); }
+        .toast.toast-info { border-left: 4px solid var(--info); }
+
+        .toast-icon { font-size: 20px; flex-shrink: 0; }
+        .toast-error .toast-icon { color: var(--error); }
+        .toast-success .toast-icon { color: var(--success); }
+        .toast-warning .toast-icon { color: var(--warning); }
+        .toast-info .toast-icon { color: var(--info); }
+
+        .toast-content { flex: 1; }
+        .toast-title { font-weight: 600; margin-bottom: 4px; }
+        .toast-message { font-size: 14px; color: var(--text-secondary); }
+
+        .toast-close {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: var(--text-muted);
+            padding: 0;
+            line-height: 1;
+        }
+        .toast-close:hover { color: var(--text-primary); }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(100%); opacity: 0; }
+        }
+        .toast.hiding { animation: slideOut 0.3s ease-in forwards; }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ========== SIDEBAR NAVIGATION ========== */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 200px;
+            background-color: #455A64;
+            padding-top: 20px;
+            z-index: 1000;
+            overflow-y: auto;
+            transition: transform 0.3s ease-in-out;
+            box-shadow: 2px 0 8px rgba(69, 90, 100, 0.25);
+        }
+
+        .sidebar-brand {
+            padding: 20px 15px;
+            text-align: center;
+            color: #FFFFFF;
+            font-size: 16px;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 10px;
+        }
+
+        .sidebar-brand img {
+            max-width: 180px;
+            height: auto;
+            filter: brightness(0) invert(1);
+        }
+
+        .sidebar-nav {
+            list-style: none;
+            padding: 0 0 100px 0;
+            margin: 0;
+        }
+
+        .sidebar-nav li {
+            margin: 0;
+        }
+
+        .sidebar-nav a {
+            display: block;
+            padding: 12px 20px;
+            padding-left: 17px;
+            color: rgba(255, 255, 255, 0.85);
+            text-decoration: none;
+            font-size: 14px;
+            transition: all 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar-nav i {
+            margin-right: 10px;
+            font-size: 16px;
+            width: 20px;
+            display: inline-block;
+        }
+
+        .sidebar-nav a:hover,
+        .sidebar-nav a.active {
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
+            border-left: 3px solid #FFFFFF;
+        }
+
+        /* Submenu styles */
+        .submenu {
+            list-style: none;
+            padding-left: 0;
+            margin: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .submenu.open {
+            max-height: 500px;
+            overflow: visible;
+        }
+
+        .submenu li a {
+            padding-left: 50px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.75);
+            white-space: nowrap;
+        }
+
+        .submenu li a:hover,
+        .submenu li a.active {
+            background-color: rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
+            border-left: 3px solid #FFFFFF;
+            padding-left: 47px;
+        }
+
+        .nav-section-toggle {
+            position: relative;
+            font-weight: 600 !important;
+            color: #FFFFFF !important;
+            background-color: rgba(255, 255, 255, 0.1) !important;
+            border-left: none !important;
+            padding-left: 20px !important;
+            padding-right: 20px !important;
+            display: flex !important;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .nav-section-toggle .float-end {
+            font-size: 12px;
+            transition: transform 0.3s ease;
+            flex-shrink: 0;
+            margin-left: auto;
+            padding-left: 8px;
+        }
+
+        .nav-section-toggle.open .float-end {
+            transform: rotate(180deg);
+        }
+
+        .nav-section-toggle:hover {
+            background-color: rgba(255, 255, 255, 0.2) !important;
+        }
+
+        /* Main content area */
+        .main-wrapper {
+            margin-left: 200px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top navbar */
+        .top-navbar {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-primary);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .page-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .page-title i {
+            color: var(--accent-primary);
+        }
+
+        /* Content area */
+        .content-area {
+            padding: 20px;
+            flex: 1;
+        }
+
+        /* Mobile Menu Toggle Button */
+        .mobile-menu-toggle {
+            display: none;
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 1001;
+            background-color: #455A64;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: #FFFFFF;
+            padding: 6px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 22px;
+            line-height: 1;
+        }
+
+        .mobile-menu-toggle:hover {
+            background-color: #37474F;
+        }
+
+        /* Mobile Overlay */
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .mobile-overlay.active {
+            display: block;
+        }
+
+        /* Footer */
+        footer {
+            background-color: var(--bg-secondary);
+            border-top: 1px solid var(--border-primary);
+            padding: 15px 0;
+            margin-top: auto;
+            text-align: center;
+        }
+
+        .text-muted {
+            color: var(--text-muted) !important;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .main-wrapper {
+                margin-left: 0;
+            }
+
+            .sidebar {
+                transform: translateX(-200px);
+                box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+            }
+
+            .sidebar.active {
+                transform: translateX(0);
+            }
+
+            .mobile-menu-toggle {
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .top-navbar {
+                padding: 10px 10px;
+            }
+
+            .page-title {
+                font-size: 13px;
+                margin-left: 48px;
+            }
+
+            .page-title i {
+                display: none;
+            }
+
+            .content-area {
+                padding: 15px !important;
+            }
+        }
+
+        {% block extra_styles %}{% endblock %}
+    </style>
+</head>
+<body>
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <img src="/inventory/static/images/sw-logo.png" alt="SW Logo">
+        </div>
+        <ul class="sidebar-nav">
+            <li><a href="/portal/" title="Return to Portal"><i class="bi bi-house-door"></i> Portal Home</a></li>
+            <li><a href="/portal/food-safety/" class="{% block nav_dashboard %}{% endblock %}"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+
+            <!-- TEMPERATURE SECTION -->
+            <li>
+                <a href="#" class="nav-section-toggle" onclick="toggleSection('tempSection', event); return false;">
+                    <i class="bi bi-thermometer-half"></i> Temperature
+                    <i class="bi bi-chevron-down float-end"></i>
+                </a>
+                <ul id="tempSection" class="submenu">
+                    <li><a href="/portal/food-safety/temperatures" class="{% block nav_temperatures %}{% endblock %}"><i class="bi bi-list-ul"></i> Log Temperatures</a></li>
+                    <li><a href="/portal/food-safety/temperatures/alerts" class="{% block nav_alerts %}{% endblock %}"><i class="bi bi-exclamation-triangle"></i> Alerts</a></li>
+                    <li><a href="/portal/food-safety/equipment" class="{% block nav_equipment %}{% endblock %}"><i class="bi bi-thermometer"></i> Equipment</a></li>
+                </ul>
+            </li>
+
+            <!-- CHECKLISTS SECTION -->
+            <li>
+                <a href="#" class="nav-section-toggle" onclick="toggleSection('checklistSection', event); return false;">
+                    <i class="bi bi-check2-square"></i> Checklists
+                    <i class="bi bi-chevron-down float-end"></i>
+                </a>
+                <ul id="checklistSection" class="submenu">
+                    <li><a href="/portal/food-safety/checklists" class="{% block nav_checklists %}{% endblock %}"><i class="bi bi-list-task"></i> Daily Checklists</a></li>
+                    <li><a href="/portal/food-safety/checklists/templates" class="{% block nav_templates %}{% endblock %}"><i class="bi bi-file-earmark-text"></i> Templates</a></li>
+                    <li><a href="/portal/food-safety/checklists/pending" class="{% block nav_pending %}{% endblock %}"><i class="bi bi-clock"></i> Pending Sign-off</a></li>
+                </ul>
+            </li>
+
+            <!-- INCIDENTS SECTION -->
+            <li>
+                <a href="#" class="nav-section-toggle" onclick="toggleSection('incidentSection', event); return false;">
+                    <i class="bi bi-exclamation-circle"></i> Incidents
+                    <i class="bi bi-chevron-down float-end"></i>
+                </a>
+                <ul id="incidentSection" class="submenu">
+                    <li><a href="/portal/food-safety/incidents" class="{% block nav_incidents %}{% endblock %}"><i class="bi bi-list-ul"></i> All Incidents</a></li>
+                    <li><a href="/portal/food-safety/incidents/new" class="{% block nav_new_incident %}{% endblock %}"><i class="bi bi-plus-circle"></i> Report Incident</a></li>
+                    <li><a href="/portal/food-safety/corrective-actions" class="{% block nav_corrective %}{% endblock %}"><i class="bi bi-check-circle"></i> Corrective Actions</a></li>
+                </ul>
+            </li>
+
+            <!-- INSPECTIONS SECTION -->
+            <li>
+                <a href="#" class="nav-section-toggle" onclick="toggleSection('inspectionSection', event); return false;">
+                    <i class="bi bi-clipboard-check"></i> Inspections
+                    <i class="bi bi-chevron-down float-end"></i>
+                </a>
+                <ul id="inspectionSection" class="submenu">
+                    <li><a href="/portal/food-safety/inspections" class="{% block nav_inspections %}{% endblock %}"><i class="bi bi-list-ul"></i> All Inspections</a></li>
+                    <li><a href="/portal/food-safety/inspections/new" class="{% block nav_new_inspection %}{% endblock %}"><i class="bi bi-plus-circle"></i> Record Inspection</a></li>
+                </ul>
+            </li>
+
+            <!-- COMPLIANCE SECTION -->
+            <li>
+                <a href="#" class="nav-section-toggle" onclick="toggleSection('complianceSection', event); return false;">
+                    <i class="bi bi-shield-check"></i> Compliance
+                    <i class="bi bi-chevron-down float-end"></i>
+                </a>
+                <ul id="complianceSection" class="submenu">
+                    <li><a href="/portal/food-safety/haccp" class="{% block nav_haccp %}{% endblock %}"><i class="bi bi-diagram-3"></i> HACCP Plans</a></li>
+                </ul>
+            </li>
+
+            <!-- REPORTS SECTION -->
+            <li>
+                <a href="/portal/food-safety/reports" class="{% block nav_reports %}{% endblock %}">
+                    <i class="bi bi-file-earmark-bar-graph"></i> Reports
+                </a>
+            </li>
+
+            <!-- SETTINGS SECTION -->
+            <li>
+                <a href="#" class="nav-section-toggle" onclick="toggleSection('settingsSection', event); return false;">
+                    <i class="bi bi-gear-fill"></i> Settings
+                    <i class="bi bi-chevron-down float-end"></i>
+                </a>
+                <ul id="settingsSection" class="submenu">
+                    <li><a href="/portal/food-safety/settings" class="{% block nav_settings %}{% endblock %}"><i class="bi bi-sliders"></i> General</a></li>
+                    <li><a href="/portal/food-safety/locations" class="{% block nav_locations %}{% endblock %}"><i class="bi bi-geo-alt"></i> Locations</a></li>
+                    <li><a href="/portal/food-safety/users" class="{% block nav_users %}{% endblock %}"><i class="bi bi-people"></i> User Permissions</a></li>
+                    <li><a href="/portal/food-safety/thresholds" class="{% block nav_thresholds %}{% endblock %}"><i class="bi bi-sliders2"></i> Temp Thresholds</a></li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Mobile Overlay -->
+    <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
+
+    <!-- Mobile Menu Toggle Button -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileMenu()">
+        <i class="bi bi-list"></i>
+    </button>
+
+    <!-- Main wrapper -->
+    <div class="main-wrapper">
+        <!-- Top navbar -->
+        <div class="top-navbar">
+            <div class="page-title">
+                <i class="bi bi-shield-check"></i> Food Safety & Compliance
+            </div>
+        </div>
+
+        <!-- Main content -->
+        <main class="content-area">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- Footer -->
+        <footer>
+            <small class="text-muted">&copy; 2026 SW Hospitality Group - Food Safety System</small>
+        </footer>
+    </div>
+
+    <script>
+        // Section toggle functionality
+        function toggleSection(sectionId, event) {
+            if (event) event.preventDefault();
+
+            const submenu = document.getElementById(sectionId);
+            const toggle = event ? event.currentTarget : document.querySelector(`[onclick*="${sectionId}"]`);
+
+            if (submenu.classList.contains('open')) {
+                submenu.classList.remove('open');
+                toggle.classList.remove('open');
+            } else {
+                submenu.classList.add('open');
+                toggle.classList.add('open');
+            }
+        }
+
+        // Mobile menu toggle
+        function toggleMobileMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
+        // Highlight current page and expand appropriate section
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            // Remove trailing slash for comparison
+            const normalizedPath = currentPath.endsWith('/') ? currentPath.slice(0, -1) : currentPath;
+
+            // Dashboard path - don't expand any submenu
+            if (normalizedPath === '/portal/food-safety') {
+                // Just highlight Dashboard link, no submenu expansion
+                const dashLink = document.querySelector('a[href="/portal/food-safety/"]');
+                if (dashLink) dashLink.classList.add('active');
+                return;
+            }
+
+            // Only look at submenu links for matching
+            const submenuLinks = document.querySelectorAll('.submenu a');
+            let matchedLink = null;
+
+            submenuLinks.forEach(link => {
+                const href = link.getAttribute('href');
+                if (href) {
+                    const normalizedHref = href.endsWith('/') ? href.slice(0, -1) : href;
+
+                    // Exact match or path starts with href followed by /
+                    if (normalizedPath === normalizedHref ||
+                        normalizedPath.startsWith(normalizedHref + '/')) {
+                        // Pick longest match
+                        if (!matchedLink || normalizedHref.length > matchedLink.getAttribute('href').length) {
+                            matchedLink = link;
+                        }
+                    }
+                }
+            });
+
+            // Apply active state and expand section
+            if (matchedLink) {
+                matchedLink.classList.add('active');
+
+                const submenu = matchedLink.closest('.submenu');
+                if (submenu) {
+                    submenu.classList.add('open');
+                    const toggle = submenu.previousElementSibling;
+                    if (toggle && toggle.classList.contains('nav-section-toggle')) {
+                        toggle.classList.add('open');
+                    }
+                }
+            }
+
+            // Handle Portal Home link
+            const portalLink = document.querySelector('a[href="/portal/"]');
+            if (portalLink && normalizedPath === '/portal') {
+                portalLink.classList.add('active');
+            }
+
+            // Close sidebar on link click (mobile)
+            if (window.innerWidth <= 768) {
+                const allLinks = document.querySelectorAll('.sidebar-nav a');
+                allLinks.forEach(link => {
+                    link.addEventListener('click', function() {
+                        const sidebar = document.getElementById('sidebar');
+                        const overlay = document.getElementById('mobileOverlay');
+                        sidebar.classList.remove('active');
+                        overlay.classList.remove('active');
+                    });
+                });
+            }
+        });
+    </script>
+
+    <!-- Toast notification system -->
+    <script>
+        function showToast(message, type = 'info', title = null) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+
+            const icons = {
+                error: 'bi-exclamation-circle',
+                success: 'bi-check-circle',
+                warning: 'bi-exclamation-triangle',
+                info: 'bi-info-circle'
+            };
+            const titles = {
+                error: 'Error',
+                success: 'Success',
+                warning: 'Warning',
+                info: 'Notice'
+            };
+
+            toast.innerHTML = `
+                <i class="bi ${icons[type]} toast-icon"></i>
+                <div class="toast-content">
+                    <div class="toast-title">${title || titles[type]}</div>
+                    <div class="toast-message">${message}</div>
+                </div>
+                <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+            `;
+
+            container.appendChild(toast);
+
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                toast.classList.add('hiding');
+                setTimeout(() => toast.remove(), 300);
+            }, 5000);
+        }
+
+        // Global error handler replacement
+        window.showError = (msg) => showToast(msg, 'error');
+        window.showSuccess = (msg) => showToast(msg, 'success');
+        window.showWarning = (msg) => showToast(msg, 'warning');
+        window.showInfo = (msg) => showToast(msg, 'info');
+    </script>
+
+    {% block extra_scripts %}{% endblock %}
+
+    <!-- Auto-logout after 30 minutes of inactivity -->
+    <script>
+        (function() {
+            let inactivityTimeout;
+            let warningTimeout;
+            const INACTIVITY_LIMIT = 30 * 60 * 1000; // 30 minutes
+            const WARNING_TIME = 2 * 60 * 1000; // Show warning 2 minutes before logout
+            let lastActivity = Date.now();
+            let lastActivityReset = 0;
+            let warningShown = false;
+
+            function logoutUser() {
+                console.log('Logging out due to inactivity');
+                window.location.href = '/portal/logout?reason=inactivity';
+            }
+
+            function showWarning() {
+                if (warningShown) return;
+                warningShown = true;
+
+                let warningEl = document.getElementById('inactivityWarning');
+                if (!warningEl) {
+                    warningEl = document.createElement('div');
+                    warningEl.id = 'inactivityWarning';
+                    warningEl.style.cssText = 'position:fixed;top:0;left:0;right:0;background:#E53935;color:white;padding:12px 20px;text-align:center;z-index:99999;font-weight:500;box-shadow:0 2px 4px rgba(0,0,0,0.1);';
+                    warningEl.innerHTML = '<i class="bi bi-exclamation-triangle"></i> You will be logged out in 2 minutes due to inactivity. <button onclick="window.resetInactivityTimer()" style="margin-left:15px;background:white;color:#E53935;border:none;padding:5px 15px;border-radius:4px;cursor:pointer;font-weight:600;">Stay Logged In</button>';
+                    document.body.appendChild(warningEl);
+                }
+                warningEl.style.display = 'block';
+            }
+
+            function hideWarning() {
+                const warningEl = document.getElementById('inactivityWarning');
+                if (warningEl) {
+                    warningEl.style.display = 'none';
+                }
+                warningShown = false;
+            }
+
+            function resetInactivityTimer() {
+                const now = Date.now();
+                if (now - lastActivityReset < 1000) return;
+                lastActivityReset = now;
+                lastActivity = now;
+
+                clearTimeout(inactivityTimeout);
+                clearTimeout(warningTimeout);
+                hideWarning();
+
+                warningTimeout = setTimeout(showWarning, INACTIVITY_LIMIT - WARNING_TIME);
+                inactivityTimeout = setTimeout(logoutUser, INACTIVITY_LIMIT);
+            }
+
+            window.resetInactivityTimer = resetInactivityTimer;
+
+            const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+            activityEvents.forEach(function(eventName) {
+                document.addEventListener(eventName, resetInactivityTimer, true);
+            });
+
+            resetInactivityTimer();
+            console.log('Inactivity timer started: will logout after 30 minutes of no activity');
+
+            document.addEventListener('visibilitychange', function() {
+                if (document.visibilityState === 'visible') {
+                    const timeSinceActivity = Date.now() - lastActivity;
+                    if (timeSinceActivity >= INACTIVITY_LIMIT) {
+                        logoutUser();
+                    }
+                }
+            });
+
+            window.addEventListener('focus', function() {
+                const timeSinceActivity = Date.now() - lastActivity;
+                if (timeSinceActivity >= INACTIVITY_LIMIT) {
+                    logoutUser();
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

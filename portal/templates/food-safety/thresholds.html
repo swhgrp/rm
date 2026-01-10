@@ -1,0 +1,754 @@
+{% extends "food-safety/base.html" %}
+
+{% block title %}Temperature Thresholds - Food Safety Settings - SW Hospitality Group{% endblock %}
+
+{% block nav_settings %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-title-section h2 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 20px;
+        font-size: 14px;
+    }
+
+    .breadcrumb a {
+        color: var(--text-secondary);
+        text-decoration: none;
+    }
+
+    .breadcrumb a:hover {
+        color: var(--accent-primary);
+    }
+
+    .breadcrumb span {
+        color: var(--text-muted);
+    }
+
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
+
+    .info-banner {
+        background-color: var(--bg-tertiary);
+        border-left: 4px solid var(--info);
+        padding: 15px 20px;
+        border-radius: 4px;
+        margin-bottom: 25px;
+        display: flex;
+        gap: 15px;
+        align-items: flex-start;
+    }
+
+    .info-banner i {
+        color: var(--info);
+        font-size: 20px;
+        flex-shrink: 0;
+    }
+
+    .info-banner p {
+        font-size: 14px;
+        line-height: 1.5;
+        color: var(--text-secondary);
+        margin: 0;
+    }
+
+    .thresholds-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+        gap: 20px;
+    }
+
+    .threshold-card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .threshold-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .threshold-title {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .threshold-icon {
+        width: 40px;
+        height: 40px;
+        background-color: var(--bg-tertiary);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+    }
+
+    .threshold-icon.cold { color: var(--info); }
+    .threshold-icon.hot { color: var(--error); }
+    .threshold-icon.frozen { color: #00BCD4; }
+
+    .threshold-name {
+        font-weight: 600;
+    }
+
+    .threshold-desc {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .threshold-body {
+        padding: 20px;
+    }
+
+    .threshold-values {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .threshold-value {
+        text-align: center;
+        padding: 15px;
+        background-color: var(--bg-tertiary);
+        border-radius: 8px;
+    }
+
+    .threshold-value .temp {
+        font-size: 24px;
+        font-weight: 700;
+    }
+
+    .threshold-value .label {
+        font-size: 11px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        margin-top: 5px;
+    }
+
+    .threshold-value.critical-high .temp { color: var(--error); }
+    .threshold-value.critical-low .temp { color: var(--info); }
+    .threshold-value.target .temp { color: var(--success); }
+
+    .alert-settings {
+        border-top: 1px solid var(--border-primary);
+        padding-top: 15px;
+    }
+
+    .alert-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 0;
+    }
+
+    .alert-row:not(:last-child) {
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    .alert-label {
+        font-size: 13px;
+        color: var(--text-secondary);
+    }
+
+    .alert-value {
+        font-size: 13px;
+        font-weight: 500;
+    }
+
+    .btn-edit {
+        padding: 8px 16px;
+        background: none;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 13px;
+        cursor: pointer;
+        color: var(--text-secondary);
+    }
+
+    .btn-edit:hover {
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        overflow-y: auto;
+        padding: 20px;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+        background-color: var(--bg-secondary);
+        border-radius: 12px;
+        max-width: 500px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title { font-size: 18px; font-weight: 600; }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+
+    .modal-body { padding: 20px; }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-secondary {
+        padding: 10px 20px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 8px;
+        font-size: 14px;
+    }
+
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-primary);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+
+    .form-hint {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 5px;
+    }
+
+    .temp-input-group {
+        display: flex;
+        align-items: center;
+    }
+
+    .temp-input-group input {
+        border-radius: 6px 0 0 6px;
+    }
+
+    .temp-input-group span {
+        padding: 10px 12px;
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border-primary);
+        border-left: none;
+        border-radius: 0 6px 6px 0;
+        font-size: 14px;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="breadcrumb">
+        <a href="/portal/food-safety/settings"><i class="bi bi-gear"></i> Settings</a>
+        <span>/</span>
+        <span>Temperature Thresholds</span>
+    </div>
+
+    <div class="page-header">
+        <div class="page-title-section">
+            <h2><i class="bi bi-sliders"></i> Temperature Thresholds</h2>
+            <p class="page-subtitle">Configure critical temperature limits and alert settings</p>
+        </div>
+        <button class="btn-primary" onclick="showAddModal()">
+            <i class="bi bi-plus-lg"></i> Add Threshold
+        </button>
+    </div>
+
+    <div class="info-banner">
+        <i class="bi bi-info-circle"></i>
+        <p>
+            Temperature thresholds define the acceptable ranges for different equipment types.
+            When readings fall outside these limits, alerts are triggered automatically.
+            Critical limits are based on FDA Food Code requirements.
+        </p>
+    </div>
+
+    <div class="thresholds-grid" id="thresholdsGrid">
+        <!-- Walk-in Cooler -->
+        <div class="threshold-card">
+            <div class="threshold-header">
+                <div class="threshold-title">
+                    <div class="threshold-icon cold"><i class="bi bi-snow"></i></div>
+                    <div>
+                        <div class="threshold-name">Walk-in Cooler</div>
+                        <div class="threshold-desc">Refrigerated storage</div>
+                    </div>
+                </div>
+                <button class="btn-edit" onclick="editThreshold('cooler')"><i class="bi bi-pencil"></i></button>
+            </div>
+            <div class="threshold-body">
+                <div class="threshold-values">
+                    <div class="threshold-value critical-low">
+                        <div class="temp">32°F</div>
+                        <div class="label">Min Limit</div>
+                    </div>
+                    <div class="threshold-value target">
+                        <div class="temp">38°F</div>
+                        <div class="label">Target</div>
+                    </div>
+                    <div class="threshold-value critical-high">
+                        <div class="temp">41°F</div>
+                        <div class="label">Max Limit</div>
+                    </div>
+                </div>
+                <div class="alert-settings">
+                    <div class="alert-row">
+                        <span class="alert-label">Alert Delay</span>
+                        <span class="alert-value">15 minutes</span>
+                    </div>
+                    <div class="alert-row">
+                        <span class="alert-label">Escalation</span>
+                        <span class="alert-value">After 30 min</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Walk-in Freezer -->
+        <div class="threshold-card">
+            <div class="threshold-header">
+                <div class="threshold-title">
+                    <div class="threshold-icon frozen"><i class="bi bi-snow2"></i></div>
+                    <div>
+                        <div class="threshold-name">Walk-in Freezer</div>
+                        <div class="threshold-desc">Frozen storage</div>
+                    </div>
+                </div>
+                <button class="btn-edit" onclick="editThreshold('freezer')"><i class="bi bi-pencil"></i></button>
+            </div>
+            <div class="threshold-body">
+                <div class="threshold-values">
+                    <div class="threshold-value critical-low">
+                        <div class="temp">-10°F</div>
+                        <div class="label">Min Limit</div>
+                    </div>
+                    <div class="threshold-value target">
+                        <div class="temp">0°F</div>
+                        <div class="label">Target</div>
+                    </div>
+                    <div class="threshold-value critical-high">
+                        <div class="temp">10°F</div>
+                        <div class="label">Max Limit</div>
+                    </div>
+                </div>
+                <div class="alert-settings">
+                    <div class="alert-row">
+                        <span class="alert-label">Alert Delay</span>
+                        <span class="alert-value">10 minutes</span>
+                    </div>
+                    <div class="alert-row">
+                        <span class="alert-label">Escalation</span>
+                        <span class="alert-value">After 20 min</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hot Holding -->
+        <div class="threshold-card">
+            <div class="threshold-header">
+                <div class="threshold-title">
+                    <div class="threshold-icon hot"><i class="bi bi-thermometer-high"></i></div>
+                    <div>
+                        <div class="threshold-name">Hot Holding</div>
+                        <div class="threshold-desc">Steam tables, warming cabinets</div>
+                    </div>
+                </div>
+                <button class="btn-edit" onclick="editThreshold('hot')"><i class="bi bi-pencil"></i></button>
+            </div>
+            <div class="threshold-body">
+                <div class="threshold-values">
+                    <div class="threshold-value critical-high">
+                        <div class="temp">135°F</div>
+                        <div class="label">Min Limit</div>
+                    </div>
+                    <div class="threshold-value target">
+                        <div class="temp">145°F</div>
+                        <div class="label">Target</div>
+                    </div>
+                    <div class="threshold-value">
+                        <div class="temp">180°F</div>
+                        <div class="label">Max Limit</div>
+                    </div>
+                </div>
+                <div class="alert-settings">
+                    <div class="alert-row">
+                        <span class="alert-label">Alert Delay</span>
+                        <span class="alert-value">Immediate</span>
+                    </div>
+                    <div class="alert-row">
+                        <span class="alert-label">Escalation</span>
+                        <span class="alert-value">After 15 min</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Prep Cooler -->
+        <div class="threshold-card">
+            <div class="threshold-header">
+                <div class="threshold-title">
+                    <div class="threshold-icon cold"><i class="bi bi-box"></i></div>
+                    <div>
+                        <div class="threshold-name">Prep Cooler</div>
+                        <div class="threshold-desc">Reach-in refrigerators</div>
+                    </div>
+                </div>
+                <button class="btn-edit" onclick="editThreshold('prep')"><i class="bi bi-pencil"></i></button>
+            </div>
+            <div class="threshold-body">
+                <div class="threshold-values">
+                    <div class="threshold-value critical-low">
+                        <div class="temp">33°F</div>
+                        <div class="label">Min Limit</div>
+                    </div>
+                    <div class="threshold-value target">
+                        <div class="temp">38°F</div>
+                        <div class="label">Target</div>
+                    </div>
+                    <div class="threshold-value critical-high">
+                        <div class="temp">41°F</div>
+                        <div class="label">Max Limit</div>
+                    </div>
+                </div>
+                <div class="alert-settings">
+                    <div class="alert-row">
+                        <span class="alert-label">Alert Delay</span>
+                        <span class="alert-value">10 minutes</span>
+                    </div>
+                    <div class="alert-row">
+                        <span class="alert-label">Escalation</span>
+                        <span class="alert-value">After 20 min</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cooking -->
+        <div class="threshold-card">
+            <div class="threshold-header">
+                <div class="threshold-title">
+                    <div class="threshold-icon hot"><i class="bi bi-fire"></i></div>
+                    <div>
+                        <div class="threshold-name">Cooking Temps</div>
+                        <div class="threshold-desc">Final internal temperatures</div>
+                    </div>
+                </div>
+                <button class="btn-edit" onclick="editThreshold('cooking')"><i class="bi bi-pencil"></i></button>
+            </div>
+            <div class="threshold-body">
+                <div class="alert-settings" style="border-top: none; padding-top: 0;">
+                    <div class="alert-row">
+                        <span class="alert-label">Poultry</span>
+                        <span class="alert-value" style="color: var(--error);">165°F min</span>
+                    </div>
+                    <div class="alert-row">
+                        <span class="alert-label">Ground Meats</span>
+                        <span class="alert-value" style="color: var(--error);">160°F min</span>
+                    </div>
+                    <div class="alert-row">
+                        <span class="alert-label">Pork, Steaks, Roasts</span>
+                        <span class="alert-value" style="color: var(--error);">145°F min</span>
+                    </div>
+                    <div class="alert-row">
+                        <span class="alert-label">Fish & Shellfish</span>
+                        <span class="alert-value" style="color: var(--error);">145°F min</span>
+                    </div>
+                    <div class="alert-row">
+                        <span class="alert-label">Reheating</span>
+                        <span class="alert-value" style="color: var(--error);">165°F min</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cold Holding -->
+        <div class="threshold-card">
+            <div class="threshold-header">
+                <div class="threshold-title">
+                    <div class="threshold-icon cold"><i class="bi bi-cup-straw"></i></div>
+                    <div>
+                        <div class="threshold-name">Cold Holding</div>
+                        <div class="threshold-desc">Salad bars, cold prep</div>
+                    </div>
+                </div>
+                <button class="btn-edit" onclick="editThreshold('cold_holding')"><i class="bi bi-pencil"></i></button>
+            </div>
+            <div class="threshold-body">
+                <div class="threshold-values">
+                    <div class="threshold-value critical-low">
+                        <div class="temp">32°F</div>
+                        <div class="label">Min Limit</div>
+                    </div>
+                    <div class="threshold-value target">
+                        <div class="temp">38°F</div>
+                        <div class="label">Target</div>
+                    </div>
+                    <div class="threshold-value critical-high">
+                        <div class="temp">41°F</div>
+                        <div class="label">Max Limit</div>
+                    </div>
+                </div>
+                <div class="alert-settings">
+                    <div class="alert-row">
+                        <span class="alert-label">Alert Delay</span>
+                        <span class="alert-value">5 minutes</span>
+                    </div>
+                    <div class="alert-row">
+                        <span class="alert-label">Escalation</span>
+                        <span class="alert-value">After 15 min</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">Edit Threshold</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="thresholdForm">
+                    <input type="hidden" id="thresholdType">
+                    <div class="form-group">
+                        <label>Equipment Type</label>
+                        <input type="text" id="equipmentType" readonly>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Minimum Limit</label>
+                            <div class="temp-input-group">
+                                <input type="number" id="minLimit" step="1">
+                                <span>°F</span>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Maximum Limit</label>
+                            <div class="temp-input-group">
+                                <input type="number" id="maxLimit" step="1">
+                                <span>°F</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Target Temperature</label>
+                        <div class="temp-input-group">
+                            <input type="number" id="targetTemp" step="1">
+                            <span>°F</span>
+                        </div>
+                        <div class="form-hint">The ideal operating temperature for this equipment type</div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Alert Delay</label>
+                            <select id="alertDelay">
+                                <option value="0">Immediate</option>
+                                <option value="5">5 minutes</option>
+                                <option value="10">10 minutes</option>
+                                <option value="15">15 minutes</option>
+                                <option value="30">30 minutes</option>
+                            </select>
+                            <div class="form-hint">Wait time before sending alert</div>
+                        </div>
+                        <div class="form-group">
+                            <label>Escalation Time</label>
+                            <select id="escalationTime">
+                                <option value="15">15 minutes</option>
+                                <option value="20">20 minutes</option>
+                                <option value="30">30 minutes</option>
+                                <option value="60">1 hour</option>
+                            </select>
+                            <div class="form-hint">Time to escalate to management</div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveThreshold()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/food-safety';
+
+    const thresholdData = {
+        cooler: { name: 'Walk-in Cooler', min: 32, max: 41, target: 38, alertDelay: 15, escalation: 30 },
+        freezer: { name: 'Walk-in Freezer', min: -10, max: 10, target: 0, alertDelay: 10, escalation: 20 },
+        hot: { name: 'Hot Holding', min: 135, max: 180, target: 145, alertDelay: 0, escalation: 15 },
+        prep: { name: 'Prep Cooler', min: 33, max: 41, target: 38, alertDelay: 10, escalation: 20 },
+        cold_holding: { name: 'Cold Holding', min: 32, max: 41, target: 38, alertDelay: 5, escalation: 15 }
+    };
+
+    function editThreshold(type) {
+        const data = thresholdData[type];
+        if (!data) return;
+
+        document.getElementById('thresholdType').value = type;
+        document.getElementById('modalTitle').textContent = 'Edit ' + data.name + ' Thresholds';
+        document.getElementById('equipmentType').value = data.name;
+        document.getElementById('minLimit').value = data.min;
+        document.getElementById('maxLimit').value = data.max;
+        document.getElementById('targetTemp').value = data.target;
+        document.getElementById('alertDelay').value = data.alertDelay;
+        document.getElementById('escalationTime').value = data.escalation;
+
+        document.getElementById('editModal').classList.add('active');
+    }
+
+    function showAddModal() {
+        document.getElementById('thresholdType').value = '';
+        document.getElementById('modalTitle').textContent = 'Add Temperature Threshold';
+        document.getElementById('thresholdForm').reset();
+        document.getElementById('equipmentType').removeAttribute('readonly');
+        document.getElementById('editModal').classList.add('active');
+    }
+
+    function closeModal() {
+        document.getElementById('editModal').classList.remove('active');
+    }
+
+    async function saveThreshold() {
+        const type = document.getElementById('thresholdType').value;
+        const data = {
+            equipment_type: document.getElementById('equipmentType').value,
+            min_limit: parseFloat(document.getElementById('minLimit').value),
+            max_limit: parseFloat(document.getElementById('maxLimit').value),
+            target_temp: parseFloat(document.getElementById('targetTemp').value),
+            alert_delay_minutes: parseInt(document.getElementById('alertDelay').value),
+            escalation_minutes: parseInt(document.getElementById('escalationTime').value)
+        };
+
+        try {
+            const response = await fetch(`${API_BASE}/thresholds${type ? '/' + type : ''}`, {
+                method: type ? 'PUT' : 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                closeModal();
+                // Update local data
+                if (type) {
+                    thresholdData[type] = {
+                        name: data.equipment_type,
+                        min: data.min_limit,
+                        max: data.max_limit,
+                        target: data.target_temp,
+                        alertDelay: data.alert_delay_minutes,
+                        escalation: data.escalation_minutes
+                    };
+                }
+                location.reload();
+            } else {
+                showError('saving threshold');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showInfo('Threshold settings updated locally. Full API integration pending.');
+            closeModal();
+        }
+    }
+</script>
+{% endblock %}

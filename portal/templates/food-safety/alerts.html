@@ -1,0 +1,647 @@
+{% extends "food-safety/base.html" %}
+
+{% block title %}Temperature Alerts - Food Safety - SW Hospitality Group{% endblock %}
+
+{% block nav_alerts %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-title-section h2 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+    }
+
+    .stat-card.critical {
+        border-color: var(--error);
+        background-color: var(--error-bg);
+    }
+
+    .stat-card.warning {
+        border-color: var(--warning);
+        background-color: var(--warning-bg);
+    }
+
+    .stat-card .number {
+        font-size: 36px;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .stat-card.critical .number { color: var(--error); }
+    .stat-card.warning .number { color: var(--warning); }
+
+    .stat-card .label {
+        color: var(--text-secondary);
+        font-size: 14px;
+    }
+
+    .filters-bar {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .filter-select {
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        min-width: 160px;
+    }
+
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    th {
+        background-color: var(--bg-tertiary);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
+
+    tr:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .badge-critical { background-color: var(--error-bg); color: var(--error); }
+    .badge-warning { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-acknowledged { background-color: var(--info-bg); color: var(--info); }
+    .badge-resolved { background-color: var(--success-bg); color: var(--success); }
+
+    .temp-value {
+        font-weight: 600;
+        font-size: 16px;
+    }
+
+    .temp-critical { color: var(--error); }
+    .temp-warning { color: var(--warning); }
+
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 13px;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 1px solid var(--border-primary);
+        background-color: var(--bg-secondary);
+    }
+
+    .btn-sm:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 60px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-primary);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .alert-row-critical {
+        border-left: 4px solid var(--error);
+    }
+
+    .alert-row-warning {
+        border-left: 4px solid var(--warning);
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+        background-color: var(--bg-secondary);
+        border-radius: 12px;
+        max-width: 500px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title { font-size: 18px; font-weight: 600; }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+
+    .modal-body { padding: 20px; }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+    }
+
+    .form-group textarea {
+        width: 100%;
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .btn-secondary {
+        padding: 10px 20px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <div class="page-title-section">
+            <h2><i class="bi bi-exclamation-triangle"></i> Temperature Alerts</h2>
+            <p class="page-subtitle">Monitor and respond to temperature violations</p>
+        </div>
+    </div>
+
+    <!-- Alert Stats -->
+    <div class="stats-row">
+        <div class="stat-card critical">
+            <div class="number" id="criticalCount">0</div>
+            <div class="label">Critical Alerts</div>
+        </div>
+        <div class="stat-card warning">
+            <div class="number" id="warningCount">0</div>
+            <div class="label">Warning Alerts</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" id="acknowledgedCount">0</div>
+            <div class="label">Acknowledged</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" id="resolvedCount">0</div>
+            <div class="label">Resolved Today</div>
+        </div>
+    </div>
+
+    <div class="filters-bar">
+        <select class="filter-select" id="locationFilter" onchange="loadAlerts()">
+            <option value="">All Locations</option>
+        </select>
+        <select class="filter-select" id="statusFilter" onchange="filterAlerts()">
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="acknowledged">Acknowledged</option>
+            <option value="resolved">Resolved</option>
+        </select>
+        <select class="filter-select" id="severityFilter" onchange="filterAlerts()">
+            <option value="">All Severities</option>
+            <option value="critical">Critical</option>
+            <option value="warning">Warning</option>
+        </select>
+    </div>
+
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Equipment</th>
+                        <th>Location</th>
+                        <th>Temperature</th>
+                        <th>Threshold</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                        <th>Time</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="alertsTable">
+                    <tr>
+                        <td colspan="8">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Acknowledge Modal -->
+    <div class="modal-overlay" id="acknowledgeModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Acknowledge Alert</h3>
+                <button class="modal-close" onclick="closeAcknowledgeModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="alertDetails"></div>
+                <div class="form-group">
+                    <label for="ack_notes">Notes (optional)</label>
+                    <textarea id="ack_notes" rows="3" placeholder="Action taken or observations..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeAcknowledgeModal()">Cancel</button>
+                <button class="btn-primary" onclick="submitAcknowledge()">
+                    <i class="bi bi-check-lg"></i> Acknowledge
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resolve Modal -->
+    <div class="modal-overlay" id="resolveModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Resolve Alert</h3>
+                <button class="modal-close" onclick="closeResolveModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div id="resolveAlertDetails"></div>
+                <div class="form-group">
+                    <label for="resolve_notes">Resolution Notes *</label>
+                    <textarea id="resolve_notes" rows="3" required placeholder="Describe how the issue was resolved..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeResolveModal()">Cancel</button>
+                <button class="btn-primary" onclick="submitResolve()">
+                    <i class="bi bi-check-circle"></i> Mark Resolved
+                </button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/food-safety';
+    let alerts = [];
+    let locations = [];
+    let equipment = [];
+    let currentAlertId = null;
+
+    async function loadLocations() {
+        try {
+            const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+            if (response.ok) {
+                locations = await response.json();
+                const select = document.getElementById('locationFilter');
+                select.innerHTML = '<option value="">All Locations</option>';
+                locations.forEach(loc => {
+                    const option = document.createElement('option');
+                    option.value = loc.id;
+                    option.textContent = loc.name;
+                    select.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+    }
+
+    async function loadEquipment() {
+        try {
+            // Equipment now comes from Maintenance service via temperatures endpoint
+            const response = await fetch(`${API_BASE}/temperatures/equipment`);
+            if (response.ok) {
+                equipment = await response.json();
+            }
+        } catch (error) {
+            console.error('Error loading equipment:', error);
+        }
+    }
+
+    async function loadAlerts() {
+        try {
+            const locationId = document.getElementById('locationFilter').value;
+            let url = `${API_BASE}/temperatures/alerts?`;
+            if (locationId) url += `location_id=${locationId}&`;
+
+            const response = await fetch(url);
+            if (response.ok) {
+                alerts = await response.json();
+                updateStats();
+                filterAlerts();
+            }
+        } catch (error) {
+            console.error('Error loading alerts:', error);
+            document.getElementById('alertsTable').innerHTML = `
+                <tr><td colspan="8">
+                    <div class="empty-state">
+                        <i class="bi bi-exclamation-circle"></i>
+                        <p>Error loading alerts</p>
+                    </div>
+                </td></tr>
+            `;
+        }
+    }
+
+    function updateStats() {
+        const critical = alerts.filter(a => a.severity === 'critical' && a.status === 'active').length;
+        const warning = alerts.filter(a => a.severity === 'warning' && a.status === 'active').length;
+        const acknowledged = alerts.filter(a => a.status === 'acknowledged').length;
+        const resolved = alerts.filter(a => a.status === 'resolved').length;
+
+        document.getElementById('criticalCount').textContent = critical;
+        document.getElementById('warningCount').textContent = warning;
+        document.getElementById('acknowledgedCount').textContent = acknowledged;
+        document.getElementById('resolvedCount').textContent = resolved;
+    }
+
+    function filterAlerts() {
+        const status = document.getElementById('statusFilter').value;
+        const severity = document.getElementById('severityFilter').value;
+
+        let filtered = alerts;
+        if (status) filtered = filtered.filter(a => a.status === status);
+        if (severity) filtered = filtered.filter(a => a.severity === severity);
+
+        renderAlerts(filtered);
+    }
+
+    function renderAlerts(alertsList) {
+        const tbody = document.getElementById('alertsTable');
+
+        if (!alertsList || alertsList.length === 0) {
+            tbody.innerHTML = `
+                <tr><td colspan="8">
+                    <div class="empty-state">
+                        <i class="bi bi-check-circle"></i>
+                        <p>No temperature alerts</p>
+                    </div>
+                </td></tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = alertsList.map(alert => {
+            const eq = equipment.find(e => e.id === alert.equipment_id);
+            const loc = locations.find(l => l.id === alert.location_id);
+            const rowClass = alert.severity === 'critical' ? 'alert-row-critical' : 'alert-row-warning';
+            const tempClass = alert.severity === 'critical' ? 'temp-critical' : 'temp-warning';
+
+            let actions = '';
+            if (alert.status === 'active') {
+                actions = `<button class="btn-sm" onclick="openAcknowledgeModal('${alert.id}')"><i class="bi bi-check"></i> Ack</button>`;
+            } else if (alert.status === 'acknowledged') {
+                actions = `<button class="btn-sm" onclick="openResolveModal('${alert.id}')"><i class="bi bi-check-circle"></i> Resolve</button>`;
+            } else {
+                actions = '<span style="color: var(--text-muted);">-</span>';
+            }
+
+            return `
+                <tr class="${rowClass}">
+                    <td><strong>${eq ? escapeHtml(eq.name) : 'Unknown'}</strong></td>
+                    <td>${loc ? escapeHtml(loc.name) : 'Unknown'}</td>
+                    <td class="temp-value ${tempClass}">${alert.temperature.toFixed(1)}°F</td>
+                    <td>${alert.min_threshold}°F - ${alert.max_threshold}°F</td>
+                    <td><span class="badge badge-${alert.severity}">${alert.severity}</span></td>
+                    <td><span class="badge badge-${alert.status}">${alert.status}</span></td>
+                    <td>${formatTime(alert.created_at)}</td>
+                    <td>${actions}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function openAcknowledgeModal(alertId) {
+        currentAlertId = alertId;
+        const alert = alerts.find(a => a.id === alertId);
+        const eq = equipment.find(e => e.id === alert.equipment_id);
+
+        document.getElementById('alertDetails').innerHTML = `
+            <div style="background-color: var(--bg-tertiary); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p><strong>Equipment:</strong> ${eq ? escapeHtml(eq.name) : 'Unknown'}</p>
+                <p><strong>Temperature:</strong> ${alert.temperature.toFixed(1)}°F</p>
+                <p><strong>Threshold:</strong> ${alert.min_threshold}°F - ${alert.max_threshold}°F</p>
+            </div>
+        `;
+        document.getElementById('ack_notes').value = '';
+        document.getElementById('acknowledgeModal').classList.add('active');
+    }
+
+    function closeAcknowledgeModal() {
+        document.getElementById('acknowledgeModal').classList.remove('active');
+        currentAlertId = null;
+    }
+
+    async function submitAcknowledge() {
+        if (!currentAlertId) return;
+
+        try {
+            const response = await fetch(`${API_BASE}/temperatures/alerts/${currentAlertId}/acknowledge`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    notes: document.getElementById('ack_notes').value || null
+                })
+            });
+
+            if (response.ok) {
+                closeAcknowledgeModal();
+                loadAlerts();
+            } else {
+                const error = await response.json();
+                showError(error.detail || 'Unknown error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('acknowledging alert');
+        }
+    }
+
+    function openResolveModal(alertId) {
+        currentAlertId = alertId;
+        const alert = alerts.find(a => a.id === alertId);
+        const eq = equipment.find(e => e.id === alert.equipment_id);
+
+        document.getElementById('resolveAlertDetails').innerHTML = `
+            <div style="background-color: var(--bg-tertiary); padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <p><strong>Equipment:</strong> ${eq ? escapeHtml(eq.name) : 'Unknown'}</p>
+                <p><strong>Temperature:</strong> ${alert.temperature.toFixed(1)}°F</p>
+            </div>
+        `;
+        document.getElementById('resolve_notes').value = '';
+        document.getElementById('resolveModal').classList.add('active');
+    }
+
+    function closeResolveModal() {
+        document.getElementById('resolveModal').classList.remove('active');
+        currentAlertId = null;
+    }
+
+    async function submitResolve() {
+        if (!currentAlertId) return;
+
+        const notes = document.getElementById('resolve_notes').value;
+        if (!notes) {
+            showWarning('Please enter resolution notes');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/temperatures/alerts/${currentAlertId}/resolve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ notes: notes })
+            });
+
+            if (response.ok) {
+                closeResolveModal();
+                loadAlerts();
+            } else {
+                const error = await response.json();
+                showError(error.detail || 'Unknown error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('resolving alert');
+        }
+    }
+
+    function formatTime(dateStr) {
+        if (!dateStr) return '-';
+        const date = new Date(dateStr);
+        return date.toLocaleString();
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize
+    Promise.all([loadLocations(), loadEquipment()]).then(() => loadAlerts());
+
+    // Auto-refresh every 30 seconds
+    setInterval(loadAlerts, 30000);
+</script>
+{% endblock %}

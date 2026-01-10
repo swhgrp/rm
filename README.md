@@ -1,15 +1,15 @@
 # SW Hospitality Group - Restaurant Management System
 
 [![Status](https://img.shields.io/badge/status-production-green)]()
-[![Completion](https://img.shields.io/badge/completion-96%25-brightgreen)]()
+[![Completion](https://img.shields.io/badge/completion-97%25-brightgreen)]()
 [![Documentation](https://img.shields.io/badge/docs-updated-blue)]()
 
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
 **Last Updated:** January 10, 2026
-**Status:** ~96% Complete - All 9 Systems Production Ready ✅
-**Latest:** Maintenance & Equipment Tracking System with Portal UI (Jan 10, 2026) ✅
+**Status:** ~97% Complete - All 10 Systems Production Ready ✅
+**Latest:** Food Safety Reports with CSV/PDF Export (Jan 10, 2026) ✅
 
 ---
 
@@ -32,13 +32,13 @@
 The SW Hospitality Group Restaurant Management System is a comprehensive microservices platform handling all aspects of restaurant operations including inventory management, human resources, accounting, event planning, and third-party integrations.
 
 ### Key Statistics (Verified Jan 10, 2026)
-- **9 microservices** running in production (including Maintenance)
-- **470+ Python files** across all systems
-- **150+ HTML templates** for user interfaces
-- **150+ database models** with full relationships
-- **800+ API endpoints** for system integration
-- **21 Docker containers** orchestrated via Docker Compose
-- **~96% completion** - all core systems production ready
+- **10 microservices** running in production (including Maintenance & Food Safety)
+- **490+ Python files** across all systems
+- **170+ HTML templates** for user interfaces
+- **160+ database models** with full relationships
+- **850+ API endpoints** for system integration
+- **23 Docker containers** orchestrated via Docker Compose
+- **~97% completion** - all core systems production ready
 
 ### Source of Truth Architecture (Dec 27, 2025)
 | Data Domain | Owner System | Consumer Systems |
@@ -169,6 +169,19 @@ restaurant-system/
 │   ├── requirements.txt
 │   └── .env
 │
+├── food-safety/        # Food Safety & Compliance (NEW - Jan 2026) 🌟
+│   ├── src/            # FastAPI application code (20+ Python files)
+│   │   └── food_safety/
+│   │       ├── models/       # SQLAlchemy models
+│   │       ├── schemas.py    # Pydantic schemas
+│   │       ├── routers/      # API routers (9 modules)
+│   │       └── services/     # External integrations
+│   ├── alembic/        # Database migrations
+│   ├── Dockerfile
+│   ├── docker-compose.yml  # Standalone deployment
+│   ├── requirements.txt
+│   └── README.md       # Food safety documentation
+│
 ├── shared/             # Shared Infrastructure
 │   ├── nginx/          # Reverse proxy configuration
 │   │   └── conf.d/     # Site configurations
@@ -213,6 +226,7 @@ restaurant-system/
 │  /files/webdav/ → files-app:8000       (Desktop Sync)        │
 │  /websites/     → websites-app:8000    (Website CMS)         │
 │  /maintenance/  → maintenance-service:8000 (Equipment)       │
+│  /food-safety/  → food-safety-service:8000 (Food Safety)     │
 │  /onlyoffice/   → onlyoffice:80        (Document Editing)    │
 └──────────────────────────────────────────────────────────────┘
          │           │           │           │

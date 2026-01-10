@@ -1,0 +1,403 @@
+{% extends "food-safety/base.html" %}
+
+{% block title %}Report Incident - Food Safety - SW Hospitality Group{% endblock %}
+
+{% block nav_new_incident %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        margin-bottom: 30px;
+    }
+
+    .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        padding: 30px;
+        max-width: 800px;
+    }
+
+    .form-group {
+        margin-bottom: 25px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .form-group label .required {
+        color: var(--error);
+    }
+
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%;
+        padding: 12px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
+
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+
+    @media (max-width: 600px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 15px;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-primary);
+    }
+
+    .btn-primary {
+        padding: 12px 24px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
+
+    .btn-secondary {
+        padding: 12px 24px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-secondary:hover {
+        background-color: var(--bg-primary);
+    }
+
+    .alert {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: none;
+    }
+
+    .alert-success {
+        background-color: rgba(67, 160, 71, 0.1);
+        border: 1px solid var(--success);
+        color: var(--success);
+    }
+
+    .alert-error {
+        background-color: rgba(229, 57, 53, 0.1);
+        border: 1px solid var(--error);
+        color: var(--error);
+    }
+
+    .severity-option {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        margin-bottom: 8px;
+        cursor: pointer;
+    }
+
+    .severity-option:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    .severity-option.selected {
+        border-color: var(--accent-primary);
+        background-color: var(--accent-primary);
+        background-color: rgba(46, 125, 50, 0.1);
+    }
+
+    .severity-option input[type="radio"] {
+        width: auto;
+        margin: 0;
+    }
+
+    .severity-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+    }
+
+    .severity-critical { background-color: var(--error); }
+    .severity-high { background-color: var(--warning); }
+    .severity-medium { background-color: var(--info); }
+    .severity-low { background-color: var(--success); }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h2 class="page-title">Report Food Safety Incident</h2>
+        <p class="page-subtitle">Document a new food safety incident for investigation</p>
+    </div>
+
+    <div class="alert alert-success" id="successAlert">
+        Incident reported successfully! Redirecting...
+    </div>
+    <div class="alert alert-error" id="errorAlert"></div>
+
+    <div class="card">
+        <form id="incidentForm">
+            <div class="form-group">
+                <label for="title">Incident Title <span class="required">*</span></label>
+                <input type="text" id="title" required placeholder="Brief description of the incident">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="location_id">Location <span class="required">*</span></label>
+                    <select id="location_id" required>
+                        <option value="">Select location...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="incident_type">Incident Type <span class="required">*</span></label>
+                    <select id="incident_type" required>
+                        <option value="">Select type...</option>
+                        <option value="contamination">Contamination</option>
+                        <option value="temperature_abuse">Temperature Abuse</option>
+                        <option value="pest">Pest Sighting</option>
+                        <option value="allergen">Allergen Issue</option>
+                        <option value="foreign_object">Foreign Object</option>
+                        <option value="illness">Foodborne Illness</option>
+                        <option value="injury">Employee Injury</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="incident_date">Date of Incident <span class="required">*</span></label>
+                    <input type="date" id="incident_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="incident_time">Time (approximate)</label>
+                    <input type="time" id="incident_time">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Severity <span class="required">*</span></label>
+                <div class="severity-options">
+                    <label class="severity-option" onclick="selectSeverity('critical')">
+                        <input type="radio" name="severity" value="critical" required>
+                        <span class="severity-indicator severity-critical"></span>
+                        <div>
+                            <strong>Critical</strong>
+                            <div style="font-size: 12px; color: var(--text-muted);">Immediate health risk, requires immediate action</div>
+                        </div>
+                    </label>
+                    <label class="severity-option" onclick="selectSeverity('high')">
+                        <input type="radio" name="severity" value="high">
+                        <span class="severity-indicator severity-high"></span>
+                        <div>
+                            <strong>High</strong>
+                            <div style="font-size: 12px; color: var(--text-muted);">Significant risk, needs prompt attention</div>
+                        </div>
+                    </label>
+                    <label class="severity-option" onclick="selectSeverity('medium')">
+                        <input type="radio" name="severity" value="medium">
+                        <span class="severity-indicator severity-medium"></span>
+                        <div>
+                            <strong>Medium</strong>
+                            <div style="font-size: 12px; color: var(--text-muted);">Moderate risk, requires investigation</div>
+                        </div>
+                    </label>
+                    <label class="severity-option" onclick="selectSeverity('low')">
+                        <input type="radio" name="severity" value="low">
+                        <span class="severity-indicator severity-low"></span>
+                        <div>
+                            <strong>Low</strong>
+                            <div style="font-size: 12px; color: var(--text-muted);">Minor issue, document for tracking</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description <span class="required">*</span></label>
+                <textarea id="description" rows="5" required placeholder="Provide a detailed description of what happened, including any products, equipment, or personnel involved..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="immediate_actions">Immediate Actions Taken</label>
+                <textarea id="immediate_actions" rows="3" placeholder="Describe any immediate corrective actions taken..."></textarea>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="products_affected">Products Affected</label>
+                    <input type="text" id="products_affected" placeholder="List any products involved">
+                </div>
+                <div class="form-group">
+                    <label for="witnesses">Witnesses</label>
+                    <input type="text" id="witnesses" placeholder="Names of any witnesses">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <a href="/portal/food-safety/incidents" class="btn-secondary">
+                    <i class="bi bi-x-lg"></i> Cancel
+                </a>
+                <button type="submit" class="btn-primary">
+                    <i class="bi bi-check-lg"></i> Report Incident
+                </button>
+            </div>
+        </form>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/food-safety';
+    let locations = [];
+
+    async function loadLocations() {
+        try {
+            const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+            if (response.ok) {
+                locations = await response.json();
+                const select = document.getElementById('location_id');
+                select.innerHTML = '<option value="">Select location...</option>';
+                locations.forEach(loc => {
+                    select.innerHTML += `<option value="${loc.id}">${escapeHtml(loc.name)}</option>`;
+                });
+            }
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+    }
+
+    function selectSeverity(severity) {
+        document.querySelectorAll('.severity-option').forEach(opt => {
+            opt.classList.remove('selected');
+        });
+        document.querySelector(`input[value="${severity}"]`).checked = true;
+        document.querySelector(`input[value="${severity}"]`).closest('.severity-option').classList.add('selected');
+    }
+
+    // Set default date to today
+    document.getElementById('incident_date').value = new Date().toISOString().split('T')[0];
+
+    document.getElementById('incidentForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const locationId = document.getElementById('location_id').value;
+        const severity = document.querySelector('input[name="severity"]:checked');
+
+        if (!locationId) {
+            showError('Please select a location');
+            return;
+        }
+
+        if (!severity) {
+            showError('Please select a severity level');
+            return;
+        }
+
+        const data = {
+            title: document.getElementById('title').value,
+            location_id: locationId,
+            incident_type: document.getElementById('incident_type').value,
+            incident_date: document.getElementById('incident_date').value,
+            severity: severity.value,
+            description: document.getElementById('description').value,
+            immediate_actions: document.getElementById('immediate_actions').value || null,
+            products_affected: document.getElementById('products_affected').value || null,
+            witnesses: document.getElementById('witnesses').value || null,
+            status: 'open'
+        };
+
+        // Add time if provided
+        const time = document.getElementById('incident_time').value;
+        if (time) {
+            data.incident_date = `${data.incident_date}T${time}`;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/incidents`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                document.getElementById('successAlert').style.display = 'block';
+                document.getElementById('errorAlert').style.display = 'none';
+                setTimeout(() => {
+                    window.location.href = '/portal/food-safety/incidents';
+                }, 1500);
+            } else {
+                const error = await response.json();
+                showError('Error: ' + (error.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error creating incident:', error);
+            showError('Error creating incident. Please try again.');
+        }
+    });
+
+    function showError(message) {
+        document.getElementById('errorAlert').textContent = message;
+        document.getElementById('errorAlert').style.display = 'block';
+        document.getElementById('successAlert').style.display = 'none';
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize
+    loadLocations();
+</script>
+{% endblock %}

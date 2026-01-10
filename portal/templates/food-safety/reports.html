@@ -1,0 +1,1189 @@
+{% extends "food-safety/base.html" %}
+
+{% block title %}Reports - Food Safety - SW Hospitality Group{% endblock %}
+
+{% block nav_reports %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-title-section h2 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    /* Report Type Tabs */
+    .report-tabs {
+        display: flex;
+        gap: 0;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+
+    .report-tab {
+        flex: 1;
+        padding: 14px 20px;
+        text-align: center;
+        cursor: pointer;
+        background: none;
+        border: none;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        border-right: 1px solid var(--border-primary);
+        transition: all 0.2s;
+    }
+
+    .report-tab:last-child {
+        border-right: none;
+    }
+
+    .report-tab:hover {
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+
+    .report-tab.active {
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+    }
+
+    .report-tab i {
+        margin-right: 8px;
+    }
+
+    /* Filters Bar */
+    .filters-bar {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+        align-items: flex-end;
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .filter-group label {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .filter-select, .filter-input {
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        min-width: 160px;
+    }
+
+    .filter-select:focus, .filter-input:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .period-buttons {
+        display: flex;
+        gap: 0;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        overflow: hidden;
+    }
+
+    .period-btn {
+        padding: 10px 16px;
+        background: var(--bg-secondary);
+        border: none;
+        font-size: 13px;
+        cursor: pointer;
+        border-right: 1px solid var(--border-primary);
+        color: var(--text-secondary);
+        transition: all 0.2s;
+    }
+
+    .period-btn:last-child {
+        border-right: none;
+    }
+
+    .period-btn:hover {
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+
+    .period-btn.active {
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+    }
+
+    .date-range-inputs {
+        display: none;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .date-range-inputs.visible {
+        display: flex;
+    }
+
+    .date-range-inputs input {
+        padding: 10px 12px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
+
+    .btn-generate {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+    }
+
+    .btn-generate:hover {
+        background-color: var(--accent-hover);
+    }
+
+    /* Export Buttons */
+    .export-buttons {
+        display: flex;
+        gap: 10px;
+        margin-left: auto;
+    }
+
+    .btn-export {
+        padding: 10px 16px;
+        background-color: var(--bg-secondary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 13px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transition: all 0.2s;
+    }
+
+    .btn-export:hover {
+        background-color: var(--bg-tertiary);
+        border-color: var(--accent-primary);
+    }
+
+    .btn-export:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 25px;
+    }
+
+    .stat-card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 10px;
+        padding: 20px;
+    }
+
+    .stat-card .stat-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 12px;
+        font-size: 18px;
+    }
+
+    .stat-card .stat-icon.blue {
+        background-color: var(--info-bg);
+        color: var(--info);
+    }
+
+    .stat-card .stat-icon.green {
+        background-color: var(--success-bg);
+        color: var(--success);
+    }
+
+    .stat-card .stat-icon.red {
+        background-color: var(--error-bg);
+        color: var(--error);
+    }
+
+    .stat-card .stat-icon.orange {
+        background-color: var(--warning-bg);
+        color: var(--warning);
+    }
+
+    .stat-card .stat-value {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .stat-card .stat-label {
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+
+    /* Chart Section */
+    .chart-section {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 25px;
+    }
+
+    .chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .chart-title {
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .chart-container {
+        height: 300px;
+        position: relative;
+    }
+
+    /* Data Table */
+    .table-section {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .table-header {
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .table-title {
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    th {
+        background-color: var(--bg-tertiary);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    tr:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .badge-ok { background-color: var(--success-bg); color: var(--success); }
+    .badge-warning { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-critical { background-color: var(--error-bg); color: var(--error); }
+    .badge-info { background-color: var(--info-bg); color: var(--info); }
+
+    .temp-ok { color: var(--success); font-weight: 600; }
+    .temp-warning { color: var(--warning); font-weight: 600; }
+    .temp-critical { color: var(--error); font-weight: 600; }
+
+    /* Loading & Empty States */
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 60px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-primary);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    /* Report content areas - show/hide based on active tab */
+    .report-content {
+        display: none;
+    }
+
+    .report-content.active {
+        display: block;
+    }
+
+    @media (max-width: 768px) {
+        .report-tabs {
+            flex-direction: column;
+        }
+
+        .report-tab {
+            border-right: none;
+            border-bottom: 1px solid var(--border-primary);
+        }
+
+        .report-tab:last-child {
+            border-bottom: none;
+        }
+
+        .period-buttons {
+            flex-wrap: wrap;
+        }
+
+        .filters-bar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .export-buttons {
+            margin-left: 0;
+            justify-content: flex-start;
+        }
+
+        .stats-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <div class="page-title-section">
+            <h2>Reports</h2>
+            <p class="page-subtitle">Generate and export food safety compliance reports</p>
+        </div>
+    </div>
+
+    <!-- Report Type Tabs -->
+    <div class="report-tabs">
+        <button class="report-tab active" data-report="temperature" onclick="switchReport('temperature')">
+            <i class="bi bi-thermometer-half"></i> Temperature Logs
+        </button>
+        <button class="report-tab" data-report="checklist" onclick="switchReport('checklist')">
+            <i class="bi bi-check2-square"></i> Checklist Compliance
+        </button>
+        <button class="report-tab" data-report="inspection" onclick="switchReport('inspection')">
+            <i class="bi bi-clipboard-check"></i> Inspection Results
+        </button>
+        <button class="report-tab" data-report="incident" onclick="switchReport('incident')">
+            <i class="bi bi-exclamation-triangle"></i> Incidents
+        </button>
+    </div>
+
+    <!-- Filters Bar -->
+    <div class="filters-bar">
+        <div class="filter-group">
+            <label>Location</label>
+            <select class="filter-select" id="locationFilter">
+                <option value="">All Locations</option>
+            </select>
+        </div>
+
+        <div class="filter-group">
+            <label>Time Period</label>
+            <div class="period-buttons">
+                <button class="period-btn" data-period="today" onclick="setPeriod('today')">Today</button>
+                <button class="period-btn active" data-period="week" onclick="setPeriod('week')">This Week</button>
+                <button class="period-btn" data-period="month" onclick="setPeriod('month')">This Month</button>
+                <button class="period-btn" data-period="custom" onclick="setPeriod('custom')">Custom</button>
+            </div>
+        </div>
+
+        <div class="filter-group date-range-inputs" id="customDateRange">
+            <label>Date Range</label>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="date" id="startDate" class="filter-input">
+                <span>to</span>
+                <input type="date" id="endDate" class="filter-input">
+            </div>
+        </div>
+
+        <button class="btn-generate" onclick="generateReport()">
+            <i class="bi bi-arrow-repeat"></i> Generate Report
+        </button>
+
+        <div class="export-buttons">
+            <button class="btn-export" id="btnExportCSV" onclick="exportReport('csv')" disabled>
+                <i class="bi bi-filetype-csv"></i> Export CSV
+            </button>
+            <button class="btn-export" id="btnExportPDF" onclick="exportReport('pdf')" disabled>
+                <i class="bi bi-filetype-pdf"></i> Export PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- Report Content Area -->
+    <div id="reportContent">
+        <div class="loading" id="initialLoading">
+            <div class="spinner"></div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    const API_BASE = '/food-safety';
+    let currentReport = 'temperature';
+    let currentPeriod = 'week';
+    let reportData = null;
+    let trendChart = null;
+    let locations = [];
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadLocations();
+        setDefaultDates();
+        await generateReport();
+    });
+
+    async function loadLocations() {
+        try {
+            const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+            if (response.ok) {
+                locations = await response.json();
+                const select = document.getElementById('locationFilter');
+                locations.forEach(loc => {
+                    const option = document.createElement('option');
+                    option.value = loc.id;
+                    option.textContent = loc.name;
+                    select.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+    }
+
+    function setDefaultDates() {
+        const today = new Date();
+        const weekAgo = new Date(today);
+        weekAgo.setDate(weekAgo.getDate() - 7);
+
+        document.getElementById('endDate').value = today.toISOString().split('T')[0];
+        document.getElementById('startDate').value = weekAgo.toISOString().split('T')[0];
+    }
+
+    function switchReport(reportType) {
+        currentReport = reportType;
+
+        // Update tab styling
+        document.querySelectorAll('.report-tab').forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.report === reportType);
+        });
+
+        // Regenerate report
+        generateReport();
+    }
+
+    function setPeriod(period) {
+        currentPeriod = period;
+
+        // Update button styling
+        document.querySelectorAll('.period-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.period === period);
+        });
+
+        // Show/hide custom date range
+        document.getElementById('customDateRange').classList.toggle('visible', period === 'custom');
+
+        // Update dates based on period
+        if (period !== 'custom') {
+            const today = new Date();
+            const endDate = today.toISOString().split('T')[0];
+            let startDate;
+
+            switch (period) {
+                case 'today':
+                    startDate = endDate;
+                    break;
+                case 'week':
+                    const weekAgo = new Date(today);
+                    weekAgo.setDate(weekAgo.getDate() - 7);
+                    startDate = weekAgo.toISOString().split('T')[0];
+                    break;
+                case 'month':
+                    const monthAgo = new Date(today);
+                    monthAgo.setMonth(monthAgo.getMonth() - 1);
+                    startDate = monthAgo.toISOString().split('T')[0];
+                    break;
+            }
+
+            document.getElementById('startDate').value = startDate;
+            document.getElementById('endDate').value = endDate;
+        }
+    }
+
+    async function generateReport() {
+        const container = document.getElementById('reportContent');
+        container.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+        const locationId = document.getElementById('locationFilter').value;
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+
+        if (!startDate || !endDate) {
+            showWarning('Please select a date range');
+            return;
+        }
+
+        let url = `${API_BASE}/reports/${currentReport}?start_date=${startDate}&end_date=${endDate}`;
+        if (locationId) {
+            url += `&location_id=${locationId}`;
+        }
+
+        try {
+            const response = await fetch(url);
+            if (response.ok) {
+                reportData = await response.json();
+                renderReport();
+                document.getElementById('btnExportCSV').disabled = false;
+                document.getElementById('btnExportPDF').disabled = false;
+            } else {
+                const error = await response.json();
+                throw new Error(error.detail || 'Failed to generate report');
+            }
+        } catch (error) {
+            console.error('Error generating report:', error);
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="bi bi-exclamation-circle"></i>
+                    <p>Error generating report</p>
+                    <p style="font-size: 12px; margin-top: 5px;">${escapeHtml(error.message)}</p>
+                </div>
+            `;
+            document.getElementById('btnExportCSV').disabled = true;
+            document.getElementById('btnExportPDF').disabled = true;
+        }
+    }
+
+    function renderReport() {
+        const container = document.getElementById('reportContent');
+
+        switch (currentReport) {
+            case 'temperature':
+                renderTemperatureReport(container);
+                break;
+            case 'checklist':
+                renderChecklistReport(container);
+                break;
+            case 'inspection':
+                renderInspectionReport(container);
+                break;
+            case 'incident':
+                renderIncidentReport(container);
+                break;
+        }
+    }
+
+    function renderTemperatureReport(container) {
+        const { summary, trends, details } = reportData;
+
+        container.innerHTML = `
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="bi bi-thermometer-half"></i></div>
+                    <div class="stat-value">${summary.total_readings}</div>
+                    <div class="stat-label">Total Readings</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon red"><i class="bi bi-exclamation-triangle"></i></div>
+                    <div class="stat-value">${summary.alerts_count}</div>
+                    <div class="stat-label">Alerts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="bi bi-check-circle"></i></div>
+                    <div class="stat-value">${summary.compliance_rate.toFixed(1)}%</div>
+                    <div class="stat-label">Compliance Rate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange"><i class="bi bi-graph-up"></i></div>
+                    <div class="stat-value">${summary.avg_temperature ? summary.avg_temperature.toFixed(1) + '°F' : 'N/A'}</div>
+                    <div class="stat-label">Average Temp</div>
+                </div>
+            </div>
+
+            <!-- Trend Chart -->
+            <div class="chart-section">
+                <div class="chart-header">
+                    <h3 class="chart-title">Temperature Trends</h3>
+                </div>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Details Table -->
+            <div class="table-section">
+                <div class="table-header">
+                    <h3 class="table-title">Temperature Readings (${details.length})</h3>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date/Time</th>
+                                <th>Equipment</th>
+                                <th>Location</th>
+                                <th>Temperature</th>
+                                <th>Range</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${details.length === 0 ? `
+                                <tr><td colspan="6" class="empty-state">No temperature readings found</td></tr>
+                            ` : details.slice(0, 100).map(d => `
+                                <tr>
+                                    <td>${formatDateTime(d.logged_at)}</td>
+                                    <td>${escapeHtml(d.equipment_name || 'Unknown')}</td>
+                                    <td>${escapeHtml(d.location_name || 'Unknown')}</td>
+                                    <td class="${d.is_within_range ? 'temp-ok' : 'temp-critical'}">${d.temperature.toFixed(1)}°${d.temp_unit}</td>
+                                    <td>${d.min_threshold ? `${d.min_threshold}° - ${d.max_threshold}°` : 'N/A'}</td>
+                                    <td><span class="badge ${d.is_within_range ? 'badge-ok' : 'badge-critical'}">${d.is_within_range ? 'OK' : 'Alert'}</span></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        // Render trend chart
+        if (trends && trends.length > 0) {
+            renderTrendChart(trends, 'Temperature Readings', 'readings_count', 'alerts_count');
+        }
+    }
+
+    function renderChecklistReport(container) {
+        const { summary, trends, details } = reportData;
+
+        container.innerHTML = `
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="bi bi-list-check"></i></div>
+                    <div class="stat-value">${summary.total_submissions}</div>
+                    <div class="stat-label">Total Submissions</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="bi bi-check-circle"></i></div>
+                    <div class="stat-value">${summary.completion_rate.toFixed(1)}%</div>
+                    <div class="stat-label">Completion Rate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange"><i class="bi bi-clock"></i></div>
+                    <div class="stat-value">${summary.pending_signoffs}</div>
+                    <div class="stat-label">Pending Sign-offs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon red"><i class="bi bi-x-circle"></i></div>
+                    <div class="stat-value">${summary.failed_items}</div>
+                    <div class="stat-label">Failed Items</div>
+                </div>
+            </div>
+
+            <!-- Trend Chart -->
+            <div class="chart-section">
+                <div class="chart-header">
+                    <h3 class="chart-title">Checklist Completion Trends</h3>
+                </div>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Details Table -->
+            <div class="table-section">
+                <div class="table-header">
+                    <h3 class="table-title">Checklist Submissions (${details.length})</h3>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Checklist</th>
+                                <th>Location</th>
+                                <th>Submitted By</th>
+                                <th>Items Passed</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${details.length === 0 ? `
+                                <tr><td colspan="6" class="empty-state">No checklist submissions found</td></tr>
+                            ` : details.slice(0, 100).map(d => {
+                                const passRate = d.total_items > 0 ? (d.passed_items / d.total_items * 100) : 0;
+                                const status = passRate === 100 ? 'ok' : passRate >= 80 ? 'warning' : 'critical';
+                                return `
+                                    <tr>
+                                        <td>${formatDateTime(d.submitted_at)}</td>
+                                        <td>${escapeHtml(d.checklist_name || 'Unknown')}</td>
+                                        <td>${escapeHtml(d.location_name || 'Unknown')}</td>
+                                        <td>${escapeHtml(d.submitted_by_name || 'Unknown')}</td>
+                                        <td>${d.passed_items}/${d.total_items} (${passRate.toFixed(0)}%)</td>
+                                        <td><span class="badge badge-${status}">${status === 'ok' ? 'Complete' : status === 'warning' ? 'Partial' : 'Failed'}</span></td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        // Render trend chart
+        if (trends && trends.length > 0) {
+            renderTrendChart(trends, 'Submissions', 'submissions_count', 'failed_count');
+        }
+    }
+
+    function renderInspectionReport(container) {
+        const { summary, trends, details } = reportData;
+
+        container.innerHTML = `
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="bi bi-clipboard-check"></i></div>
+                    <div class="stat-value">${summary.total_inspections}</div>
+                    <div class="stat-label">Total Inspections</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="bi bi-graph-up"></i></div>
+                    <div class="stat-value">${summary.avg_score ? summary.avg_score.toFixed(1) : 'N/A'}</div>
+                    <div class="stat-label">Average Score</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon red"><i class="bi bi-exclamation-circle"></i></div>
+                    <div class="stat-value">${summary.total_violations}</div>
+                    <div class="stat-label">Total Violations</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange"><i class="bi bi-arrow-repeat"></i></div>
+                    <div class="stat-value">${summary.pending_followups}</div>
+                    <div class="stat-label">Pending Follow-ups</div>
+                </div>
+            </div>
+
+            <!-- Trend Chart -->
+            <div class="chart-section">
+                <div class="chart-header">
+                    <h3 class="chart-title">Inspection Score Trends</h3>
+                </div>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Details Table -->
+            <div class="table-section">
+                <div class="table-header">
+                    <h3 class="table-title">Inspections (${details.length})</h3>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Location</th>
+                                <th>Inspector</th>
+                                <th>Score</th>
+                                <th>Violations</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${details.length === 0 ? `
+                                <tr><td colspan="7" class="empty-state">No inspections found</td></tr>
+                            ` : details.slice(0, 100).map(d => {
+                                const status = d.score >= 90 ? 'ok' : d.score >= 70 ? 'warning' : 'critical';
+                                return `
+                                    <tr>
+                                        <td>${formatDate(d.inspection_date)}</td>
+                                        <td>${escapeHtml(d.inspection_type || 'Unknown')}</td>
+                                        <td>${escapeHtml(d.location_name || 'Unknown')}</td>
+                                        <td>${escapeHtml(d.inspector_name || 'Unknown')}</td>
+                                        <td><strong>${d.score ? d.score.toFixed(1) : 'N/A'}</strong></td>
+                                        <td>${d.violations_count || 0}</td>
+                                        <td><span class="badge badge-${status}">${d.status || 'Completed'}</span></td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        // Render trend chart with scores
+        if (trends && trends.length > 0) {
+            renderScoreTrendChart(trends);
+        }
+    }
+
+    function renderIncidentReport(container) {
+        const { summary, trends, details } = reportData;
+
+        container.innerHTML = `
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-icon blue"><i class="bi bi-exclamation-triangle"></i></div>
+                    <div class="stat-value">${summary.total_incidents}</div>
+                    <div class="stat-label">Total Incidents</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon red"><i class="bi bi-folder-x"></i></div>
+                    <div class="stat-value">${summary.open_incidents}</div>
+                    <div class="stat-label">Open</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green"><i class="bi bi-check-circle"></i></div>
+                    <div class="stat-value">${summary.resolved_incidents}</div>
+                    <div class="stat-label">Resolved</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon orange"><i class="bi bi-clock-history"></i></div>
+                    <div class="stat-value">${summary.avg_resolution_hours ? summary.avg_resolution_hours.toFixed(1) + 'h' : 'N/A'}</div>
+                    <div class="stat-label">Avg Resolution Time</div>
+                </div>
+            </div>
+
+            <!-- Trend Chart -->
+            <div class="chart-section">
+                <div class="chart-header">
+                    <h3 class="chart-title">Incident Trends</h3>
+                </div>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Details Table -->
+            <div class="table-section">
+                <div class="table-header">
+                    <h3 class="table-title">Incidents (${details.length})</h3>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Type</th>
+                                <th>Severity</th>
+                                <th>Location</th>
+                                <th>Description</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${details.length === 0 ? `
+                                <tr><td colspan="6" class="empty-state">No incidents found</td></tr>
+                            ` : details.slice(0, 100).map(d => {
+                                const severityClass = d.severity === 'critical' ? 'critical' : d.severity === 'high' ? 'warning' : 'ok';
+                                const statusClass = d.status === 'resolved' ? 'ok' : d.status === 'open' ? 'critical' : 'warning';
+                                return `
+                                    <tr>
+                                        <td>${formatDateTime(d.reported_at)}</td>
+                                        <td>${escapeHtml(d.incident_type || 'Unknown')}</td>
+                                        <td><span class="badge badge-${severityClass}">${escapeHtml(d.severity || 'Unknown')}</span></td>
+                                        <td>${escapeHtml(d.location_name || 'Unknown')}</td>
+                                        <td>${escapeHtml((d.description || '').substring(0, 50))}${(d.description || '').length > 50 ? '...' : ''}</td>
+                                        <td><span class="badge badge-${statusClass}">${escapeHtml(d.status || 'Unknown')}</span></td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        // Render trend chart
+        if (trends && trends.length > 0) {
+            renderIncidentTrendChart(trends);
+        }
+    }
+
+    function renderTrendChart(trends, label1, field1, field2) {
+        const ctx = document.getElementById('trendChart');
+        if (!ctx) return;
+
+        if (trendChart) {
+            trendChart.destroy();
+        }
+
+        trendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: trends.map(t => t.date),
+                datasets: [
+                    {
+                        label: label1,
+                        data: trends.map(t => t[field1] || 0),
+                        borderColor: '#1E88E5',
+                        backgroundColor: 'rgba(30, 136, 229, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Alerts/Failures',
+                        data: trends.map(t => t[field2] || 0),
+                        borderColor: '#E53935',
+                        backgroundColor: 'rgba(229, 57, 53, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    function renderScoreTrendChart(trends) {
+        const ctx = document.getElementById('trendChart');
+        if (!ctx) return;
+
+        if (trendChart) {
+            trendChart.destroy();
+        }
+
+        trendChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: trends.map(t => t.date),
+                datasets: [
+                    {
+                        label: 'Average Score',
+                        data: trends.map(t => t.avg_score || 0),
+                        borderColor: '#43A047',
+                        backgroundColor: 'rgba(67, 160, 71, 0.1)',
+                        fill: true,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Violations',
+                        data: trends.map(t => t.violations_count || 0),
+                        borderColor: '#E53935',
+                        backgroundColor: 'rgba(229, 57, 53, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        type: 'linear',
+                        position: 'left',
+                        min: 0,
+                        max: 100,
+                        title: {
+                            display: true,
+                            text: 'Score'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        position: 'right',
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Violations'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderIncidentTrendChart(trends) {
+        const ctx = document.getElementById('trendChart');
+        if (!ctx) return;
+
+        if (trendChart) {
+            trendChart.destroy();
+        }
+
+        trendChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: trends.map(t => t.date),
+                datasets: [
+                    {
+                        label: 'Incidents Reported',
+                        data: trends.map(t => t.incidents_count || 0),
+                        backgroundColor: 'rgba(229, 57, 53, 0.7)',
+                        borderColor: '#E53935',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Resolved',
+                        data: trends.map(t => t.resolved_count || 0),
+                        backgroundColor: 'rgba(67, 160, 71, 0.7)',
+                        borderColor: '#43A047',
+                        borderWidth: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    function exportReport(format) {
+        const locationId = document.getElementById('locationFilter').value;
+        const startDate = document.getElementById('startDate').value;
+        const endDate = document.getElementById('endDate').value;
+
+        let url = `${API_BASE}/reports/${currentReport}/export/${format}?start_date=${startDate}&end_date=${endDate}`;
+        if (locationId) {
+            url += `&location_id=${locationId}`;
+        }
+
+        // Trigger download
+        window.location.href = url;
+    }
+
+    function formatDateTime(dateStr) {
+        if (!dateStr) return '-';
+        const date = new Date(dateStr);
+        return date.toLocaleString();
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '-';
+        const date = new Date(dateStr);
+        return date.toLocaleDateString();
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+</script>
+{% endblock %}

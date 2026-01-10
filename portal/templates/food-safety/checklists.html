@@ -1,0 +1,793 @@
+{% extends "food-safety/base.html" %}
+
+{% block title %}Daily Checklists - Food Safety - SW Hospitality Group{% endblock %}
+
+{% block nav_checklists %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-title-section h2 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
+
+    .filters-bar {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .filter-select {
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        min-width: 160px;
+    }
+
+    .checklist-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 20px;
+    }
+
+    .checklist-card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        padding: 20px;
+        transition: all 0.2s ease;
+    }
+
+    .checklist-card:hover {
+        border-color: var(--accent-primary);
+        box-shadow: var(--shadow-md);
+    }
+
+    .checklist-card.completed {
+        border-left: 4px solid var(--success);
+    }
+
+    .checklist-card.pending {
+        border-left: 4px solid var(--warning);
+    }
+
+    .checklist-card.overdue {
+        border-left: 4px solid var(--error);
+    }
+
+    .checklist-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 15px;
+    }
+
+    .checklist-title {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .checklist-meta {
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .badge-completed { background-color: var(--success-bg); color: var(--success); }
+    .badge-pending { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-overdue { background-color: var(--error-bg); color: var(--error); }
+    .badge-in_progress { background-color: var(--info-bg); color: var(--info); }
+
+    .progress-section {
+        margin: 15px 0;
+    }
+
+    .progress-bar-bg {
+        height: 8px;
+        background-color: var(--bg-tertiary);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        background-color: var(--accent-primary);
+        border-radius: 4px;
+        transition: width 0.3s ease;
+    }
+
+    .progress-text {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 5px;
+    }
+
+    .checklist-footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding-top: 15px;
+        border-top: 1px solid var(--border-primary);
+    }
+
+    .shift-badge {
+        font-size: 12px;
+        padding: 4px 8px;
+        background-color: var(--bg-tertiary);
+        border-radius: 4px;
+    }
+
+    .btn-sm {
+        padding: 8px 16px;
+        font-size: 13px;
+        border-radius: 6px;
+        cursor: pointer;
+        border: none;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+    }
+
+    .btn-sm:hover {
+        background-color: var(--accent-hover);
+    }
+
+    .btn-outline-sm {
+        padding: 8px 16px;
+        font-size: 13px;
+        border-radius: 6px;
+        cursor: pointer;
+        border: 1px solid var(--border-primary);
+        background-color: transparent;
+        color: var(--text-primary);
+    }
+
+    .btn-outline-sm:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 60px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-primary);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        overflow-y: auto;
+        padding: 20px;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+        background-color: var(--bg-secondary);
+        border-radius: 12px;
+        max-width: 700px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        background-color: var(--bg-secondary);
+        z-index: 10;
+    }
+
+    .modal-title { font-size: 18px; font-weight: 600; }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+
+    .modal-body { padding: 20px; }
+
+    .checklist-item {
+        display: flex;
+        align-items: flex-start;
+        padding: 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        margin-bottom: 10px;
+        gap: 15px;
+    }
+
+    .checklist-item.completed {
+        background-color: var(--success-bg);
+        border-color: var(--success);
+    }
+
+    .checklist-checkbox {
+        width: 24px;
+        height: 24px;
+        border: 2px solid var(--border-secondary);
+        border-radius: 4px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .checklist-checkbox.checked {
+        background-color: var(--success);
+        border-color: var(--success);
+        color: #FFFFFF;
+    }
+
+    .checklist-item-content {
+        flex: 1;
+    }
+
+    .checklist-item-title {
+        font-weight: 500;
+        margin-bottom: 5px;
+    }
+
+    .checklist-item-description {
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+
+    .checklist-item-notes {
+        margin-top: 10px;
+    }
+
+    .checklist-item-notes input {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+        font-size: 13px;
+    }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        position: sticky;
+        bottom: 0;
+        background-color: var(--bg-secondary);
+    }
+
+    .btn-secondary {
+        padding: 10px 20px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <div class="page-title-section">
+            <h2><i class="bi bi-check2-square"></i> Daily Checklists</h2>
+            <p class="page-subtitle">Complete and track daily food safety checklists</p>
+        </div>
+        <button class="btn-primary" onclick="openStartChecklistModal()">
+            <i class="bi bi-plus-lg"></i> Start Checklist
+        </button>
+    </div>
+
+    <div class="filters-bar">
+        <select class="filter-select" id="locationFilter" onchange="loadChecklists()">
+            <option value="">All Locations</option>
+        </select>
+        <select class="filter-select" id="dateFilter" onchange="loadChecklists()">
+            <option value="today">Today</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="week">This Week</option>
+            <option value="month">This Month</option>
+        </select>
+        <select class="filter-select" id="statusFilter" onchange="filterChecklists()">
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="completed">Completed</option>
+            <option value="overdue">Overdue</option>
+        </select>
+        <select class="filter-select" id="shiftFilter" onchange="filterChecklists()">
+            <option value="">All Shifts</option>
+            <option value="opening">Opening</option>
+            <option value="midday">Midday</option>
+            <option value="closing">Closing</option>
+        </select>
+    </div>
+
+    <div class="checklist-cards" id="checklistCards">
+        <div class="loading"><div class="spinner"></div></div>
+    </div>
+
+    <!-- Start Checklist Modal -->
+    <div class="modal-overlay" id="startModal">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Start New Checklist</h3>
+                <button class="modal-close" onclick="closeStartModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="start_location">Location *</label>
+                    <select id="start_location" class="filter-select" style="width: 100%;" required>
+                        <option value="">Select location...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="start_template">Checklist Template *</label>
+                    <select id="start_template" class="filter-select" style="width: 100%;" required>
+                        <option value="">Select template...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="start_shift">Shift *</label>
+                    <select id="start_shift" class="filter-select" style="width: 100%;" required>
+                        <option value="">Select shift...</option>
+                        <option value="opening">Opening</option>
+                        <option value="midday">Midday</option>
+                        <option value="closing">Closing</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeStartModal()">Cancel</button>
+                <button class="btn-primary" onclick="startChecklist()">
+                    <i class="bi bi-play-fill"></i> Start Checklist
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fill Checklist Modal -->
+    <div class="modal-overlay" id="fillModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="fillModalTitle">Complete Checklist</h3>
+                <button class="modal-close" onclick="closeFillModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="fillModalBody">
+                <!-- Checklist items populated by JS -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeFillModal()">Save & Close</button>
+                <button class="btn-primary" onclick="submitChecklist()">
+                    <i class="bi bi-check-lg"></i> Submit Checklist
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Submit Incomplete Modal -->
+    <div class="modal-overlay" id="confirmIncompleteModal">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Submit Incomplete Checklist?</h3>
+                <button class="modal-close" onclick="closeConfirmIncompleteModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="text-align: center; padding: 30px 20px;">
+                <i class="bi bi-exclamation-triangle" style="font-size: 48px; color: var(--warning); margin-bottom: 15px;"></i>
+                <h4>Not all items are completed</h4>
+                <p style="color: var(--text-secondary); margin-top: 10px;">Are you sure you want to submit this checklist with incomplete items?</p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeConfirmIncompleteModal()">Cancel</button>
+                <button class="btn-primary" onclick="confirmSubmitIncomplete()" style="background-color: var(--warning);">
+                    <i class="bi bi-check-lg"></i> Submit Anyway
+                </button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/food-safety';
+    let checklists = [];
+    let templates = [];
+    let locations = [];
+    let currentSubmission = null;
+
+    async function loadLocations() {
+        try {
+            const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+            if (response.ok) {
+                locations = await response.json();
+
+                ['locationFilter', 'start_location'].forEach(id => {
+                    const select = document.getElementById(id);
+                    const defaultOption = id === 'locationFilter'
+                        ? '<option value="">All Locations</option>'
+                        : '<option value="">Select location...</option>';
+                    select.innerHTML = defaultOption;
+                    locations.forEach(loc => {
+                        select.innerHTML += `<option value="${loc.id}">${escapeHtml(loc.name)}</option>`;
+                    });
+                });
+            }
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+    }
+
+    async function loadTemplates() {
+        try {
+            const response = await fetch(`${API_BASE}/checklists/templates`);
+            if (response.ok) {
+                templates = await response.json();
+                updateTemplateDropdown();
+            }
+        } catch (error) {
+            console.error('Error loading templates:', error);
+        }
+    }
+
+    function updateTemplateDropdown() {
+        const select = document.getElementById('start_template');
+        select.innerHTML = '<option value="">Select template...</option>';
+        templates.filter(t => t.is_active).forEach(t => {
+            select.innerHTML += `<option value="${t.id}">${escapeHtml(t.name)} (${t.checklist_type})</option>`;
+        });
+    }
+
+    async function loadChecklists() {
+        try {
+            const locationId = document.getElementById('locationFilter').value;
+            const dateFilter = document.getElementById('dateFilter').value;
+
+            let url = `${API_BASE}/checklists/submissions?`;
+            if (locationId) url += `location_id=${locationId}&`;
+            if (dateFilter) url += `period=${dateFilter}&`;
+
+            const response = await fetch(url);
+            if (response.ok) {
+                checklists = await response.json();
+                filterChecklists();
+            }
+        } catch (error) {
+            console.error('Error loading checklists:', error);
+            document.getElementById('checklistCards').innerHTML = `
+                <div class="empty-state">
+                    <i class="bi bi-exclamation-circle"></i>
+                    <p>Error loading checklists</p>
+                </div>
+            `;
+        }
+    }
+
+    function filterChecklists() {
+        const status = document.getElementById('statusFilter').value;
+        const shift = document.getElementById('shiftFilter').value;
+
+        let filtered = checklists;
+        if (status) filtered = filtered.filter(c => c.status === status);
+        if (shift) filtered = filtered.filter(c => c.shift === shift);
+
+        renderChecklists(filtered);
+    }
+
+    function renderChecklists(list) {
+        const container = document.getElementById('checklistCards');
+
+        if (!list || list.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="bi bi-check2-square"></i>
+                    <p>No checklists found. Start a new checklist to begin.</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = list.map(c => {
+            const loc = locations.find(l => l.id === c.location_id);
+            const template = templates.find(t => t.id === c.template_id);
+            const progress = c.total_items > 0 ? Math.round((c.completed_items / c.total_items) * 100) : 0;
+
+            return `
+                <div class="checklist-card ${c.status}">
+                    <div class="checklist-header">
+                        <div>
+                            <div class="checklist-title">${template ? escapeHtml(template.name) : 'Checklist'}</div>
+                            <div class="checklist-meta">
+                                <i class="bi bi-geo-alt"></i> ${loc ? escapeHtml(loc.name) : 'Unknown'}
+                            </div>
+                        </div>
+                        <span class="badge badge-${c.status}">${c.status.replace('_', ' ')}</span>
+                    </div>
+                    <div class="progress-section">
+                        <div class="progress-bar-bg">
+                            <div class="progress-bar-fill" style="width: ${progress}%"></div>
+                        </div>
+                        <div class="progress-text">${c.completed_items} of ${c.total_items} items completed (${progress}%)</div>
+                    </div>
+                    <div class="checklist-footer">
+                        <span class="shift-badge"><i class="bi bi-clock"></i> ${c.shift || 'N/A'}</span>
+                        ${c.status === 'completed'
+                            ? `<button class="btn-outline-sm" onclick="viewChecklist('${c.id}')"><i class="bi bi-eye"></i> View</button>`
+                            : `<button class="btn-sm" onclick="continueChecklist('${c.id}')"><i class="bi bi-pencil"></i> Continue</button>`
+                        }
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function openStartChecklistModal() {
+        document.getElementById('start_location').value = '';
+        document.getElementById('start_template').value = '';
+        document.getElementById('start_shift').value = '';
+        document.getElementById('startModal').classList.add('active');
+    }
+
+    function closeStartModal() {
+        document.getElementById('startModal').classList.remove('active');
+    }
+
+    async function startChecklist() {
+        const locationId = document.getElementById('start_location').value;
+        const templateId = document.getElementById('start_template').value;
+        const shift = document.getElementById('start_shift').value;
+
+        if (!locationId || !templateId || !shift) {
+            showWarning('Please fill in all fields');
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/checklists/submissions`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    template_id: templateId,
+                    location_id: locationId,
+                    shift: shift
+                })
+            });
+
+            if (response.ok) {
+                const submission = await response.json();
+                closeStartModal();
+                loadChecklists();
+                continueChecklist(submission.id);
+            } else {
+                const error = await response.json();
+                showError(error.detail || 'Unknown error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('starting checklist');
+        }
+    }
+
+    async function continueChecklist(submissionId) {
+        try {
+            const response = await fetch(`${API_BASE}/checklists/submissions/${submissionId}`);
+            if (response.ok) {
+                currentSubmission = await response.json();
+                renderFillModal();
+                document.getElementById('fillModal').classList.add('active');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('loading checklist');
+        }
+    }
+
+    async function viewChecklist(submissionId) {
+        await continueChecklist(submissionId);
+    }
+
+    function renderFillModal() {
+        const template = templates.find(t => t.id === currentSubmission.template_id);
+        document.getElementById('fillModalTitle').textContent = template ? template.name : 'Checklist';
+
+        const items = currentSubmission.items || [];
+        const body = document.getElementById('fillModalBody');
+
+        if (items.length === 0) {
+            body.innerHTML = '<p class="text-muted">No items in this checklist.</p>';
+            return;
+        }
+
+        body.innerHTML = items.map((item, index) => `
+            <div class="checklist-item ${item.is_completed ? 'completed' : ''}" id="item_${item.id}">
+                <div class="checklist-checkbox ${item.is_completed ? 'checked' : ''}"
+                     onclick="toggleItem('${item.id}')"
+                     ${currentSubmission.status === 'completed' ? 'style="pointer-events: none;"' : ''}>
+                    ${item.is_completed ? '<i class="bi bi-check"></i>' : ''}
+                </div>
+                <div class="checklist-item-content">
+                    <div class="checklist-item-title">${escapeHtml(item.item_text)}</div>
+                    ${item.description ? `<div class="checklist-item-description">${escapeHtml(item.description)}</div>` : ''}
+                    ${currentSubmission.status !== 'completed' ? `
+                        <div class="checklist-item-notes">
+                            <input type="text" placeholder="Notes (optional)" value="${item.notes || ''}"
+                                   onchange="updateItemNotes('${item.id}', this.value)">
+                        </div>
+                    ` : (item.notes ? `<div class="checklist-item-description"><strong>Notes:</strong> ${escapeHtml(item.notes)}</div>` : '')}
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function toggleItem(itemId) {
+        if (currentSubmission.status === 'completed') return;
+
+        const item = currentSubmission.items.find(i => i.id === itemId);
+        if (!item) return;
+
+        try {
+            const response = await fetch(`${API_BASE}/checklists/submissions/${currentSubmission.id}/items/${itemId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    is_completed: !item.is_completed,
+                    notes: item.notes
+                })
+            });
+
+            if (response.ok) {
+                item.is_completed = !item.is_completed;
+                renderFillModal();
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        }
+    }
+
+    function updateItemNotes(itemId, notes) {
+        const item = currentSubmission.items.find(i => i.id === itemId);
+        if (item) item.notes = notes;
+    }
+
+    function closeFillModal() {
+        document.getElementById('fillModal').classList.remove('active');
+        currentSubmission = null;
+        loadChecklists();
+    }
+
+    async function submitChecklist() {
+        if (!currentSubmission) return;
+
+        const allCompleted = currentSubmission.items.every(i => i.is_completed);
+        if (!allCompleted) {
+            // Show custom confirm modal instead of browser confirm()
+            document.getElementById('confirmIncompleteModal').classList.add('active');
+            return;
+        }
+
+        await doSubmitChecklist();
+    }
+
+    function closeConfirmIncompleteModal() {
+        document.getElementById('confirmIncompleteModal').classList.remove('active');
+    }
+
+    async function confirmSubmitIncomplete() {
+        closeConfirmIncompleteModal();
+        await doSubmitChecklist();
+    }
+
+    async function doSubmitChecklist() {
+        try {
+            const response = await fetch(`${API_BASE}/checklists/submissions/${currentSubmission.id}/submit`, {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                closeFillModal();
+                showSuccess('Checklist submitted successfully');
+                loadChecklists();
+            } else {
+                const error = await response.json();
+                showError(error.detail || 'Unknown error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('submitting checklist');
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize
+    Promise.all([loadLocations(), loadTemplates()]).then(() => loadChecklists());
+</script>
+{% endblock %}

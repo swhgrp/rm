@@ -1,0 +1,693 @@
+{% extends "food-safety/base.html" %}
+
+{% block title %}Incidents - Food Safety - SW Hospitality Group{% endblock %}
+
+{% block nav_incidents %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-title-section h2 {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 5px;
+    }
+
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
+
+    .stats-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+    }
+
+    .stat-card .number {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 5px;
+    }
+
+    .stat-card .label {
+        color: var(--text-secondary);
+        font-size: 13px;
+    }
+
+    .stat-card.open .number { color: var(--warning); }
+    .stat-card.critical .number { color: var(--error); }
+
+    .filters-bar {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .search-box {
+        flex: 1;
+        min-width: 200px;
+        max-width: 400px;
+        position: relative;
+    }
+
+    .search-box input {
+        width: 100%;
+        padding: 10px 15px 10px 40px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+    }
+
+    .filter-select {
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        min-width: 140px;
+    }
+
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    th {
+        background-color: var(--bg-tertiary);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+    }
+
+    tr:hover {
+        background-color: var(--bg-tertiary);
+        cursor: pointer;
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .badge-open { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-investigating { background-color: var(--info-bg); color: var(--info); }
+    .badge-resolved { background-color: var(--success-bg); color: var(--success); }
+    .badge-closed { background-color: var(--bg-elevated); color: var(--text-muted); }
+
+    .badge-critical { background-color: var(--error-bg); color: var(--error); }
+    .badge-high { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-medium { background-color: var(--info-bg); color: var(--info); }
+    .badge-low { background-color: var(--success-bg); color: var(--success); }
+
+    .incident-number {
+        font-family: monospace;
+        color: var(--accent-primary);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 60px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-primary);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        overflow-y: auto;
+        padding: 20px;
+    }
+
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+        background-color: var(--bg-secondary);
+        border-radius: 12px;
+        max-width: 800px;
+        width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title { font-size: 18px; font-weight: 600; }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+
+    .modal-body { padding: 20px; }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-secondary {
+        padding: 10px 20px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .detail-section {
+        margin-bottom: 25px;
+    }
+
+    .detail-section h4 {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+
+    .detail-item label {
+        font-size: 12px;
+        color: var(--text-muted);
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .detail-item span {
+        font-size: 14px;
+        color: var(--text-primary);
+    }
+
+    .description-box {
+        background-color: var(--bg-tertiary);
+        padding: 15px;
+        border-radius: 8px;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .status-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn-status {
+        padding: 8px 16px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        background-color: var(--bg-secondary);
+        cursor: pointer;
+        font-size: 13px;
+    }
+
+    .btn-status:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    .btn-status.active {
+        background-color: var(--accent-primary);
+        color: white;
+        border-color: var(--accent-primary);
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <div class="page-title-section">
+            <h2><i class="bi bi-exclamation-circle"></i> Incidents</h2>
+            <p class="page-subtitle">Track and manage food safety incidents</p>
+        </div>
+        <a href="/portal/food-safety/incidents/new" class="btn-primary">
+            <i class="bi bi-plus-lg"></i> Report Incident
+        </a>
+    </div>
+
+    <div class="stats-row">
+        <div class="stat-card open">
+            <div class="number" id="openCount">0</div>
+            <div class="label">Open Incidents</div>
+        </div>
+        <div class="stat-card critical">
+            <div class="number" id="criticalCount">0</div>
+            <div class="label">Critical/High</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" id="thisMonthCount">0</div>
+            <div class="label">This Month</div>
+        </div>
+        <div class="stat-card">
+            <div class="number" id="resolvedCount">0</div>
+            <div class="label">Resolved</div>
+        </div>
+    </div>
+
+    <div class="filters-bar">
+        <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="searchInput" placeholder="Search incidents..." oninput="filterIncidents()">
+        </div>
+        <select class="filter-select" id="locationFilter" onchange="loadIncidents()">
+            <option value="">All Locations</option>
+        </select>
+        <select class="filter-select" id="statusFilter" onchange="filterIncidents()">
+            <option value="">All Status</option>
+            <option value="open">Open</option>
+            <option value="investigating">Investigating</option>
+            <option value="resolved">Resolved</option>
+            <option value="closed">Closed</option>
+        </select>
+        <select class="filter-select" id="severityFilter" onchange="filterIncidents()">
+            <option value="">All Severity</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+        </select>
+        <select class="filter-select" id="typeFilter" onchange="filterIncidents()">
+            <option value="">All Types</option>
+            <option value="contamination">Contamination</option>
+            <option value="temperature_abuse">Temperature Abuse</option>
+            <option value="pest">Pest</option>
+            <option value="allergen">Allergen</option>
+            <option value="foreign_object">Foreign Object</option>
+            <option value="illness">Illness</option>
+            <option value="injury">Injury</option>
+            <option value="other">Other</option>
+        </select>
+    </div>
+
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Incident #</th>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Location</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody id="incidentsTable">
+                    <tr>
+                        <td colspan="7">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- View Incident Modal -->
+    <div class="modal-overlay" id="viewModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="viewModalTitle">Incident Details</h3>
+                <button class="modal-close" onclick="closeViewModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="viewModalBody">
+                <!-- Populated by JS -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeViewModal()">Close</button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/food-safety';
+    let incidents = [];
+    let locations = [];
+
+    async function loadLocations() {
+        try {
+            const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+            if (response.ok) {
+                locations = await response.json();
+                const select = document.getElementById('locationFilter');
+                select.innerHTML = '<option value="">All Locations</option>';
+                locations.forEach(loc => {
+                    select.innerHTML += `<option value="${loc.id}">${escapeHtml(loc.name)}</option>`;
+                });
+            }
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+    }
+
+    async function loadIncidents() {
+        try {
+            const locationId = document.getElementById('locationFilter').value;
+            let url = `${API_BASE}/incidents?`;
+            if (locationId) url += `location_id=${locationId}&`;
+
+            const response = await fetch(url);
+            if (response.ok) {
+                incidents = await response.json();
+                updateStats();
+                filterIncidents();
+            }
+        } catch (error) {
+            console.error('Error loading incidents:', error);
+            document.getElementById('incidentsTable').innerHTML = `
+                <tr><td colspan="7">
+                    <div class="empty-state">
+                        <i class="bi bi-exclamation-circle"></i>
+                        <p>Error loading incidents</p>
+                    </div>
+                </td></tr>
+            `;
+        }
+    }
+
+    function updateStats() {
+        const open = incidents.filter(i => i.status === 'open' || i.status === 'investigating').length;
+        const critical = incidents.filter(i => (i.severity === 'critical' || i.severity === 'high') && i.status !== 'closed').length;
+        const thisMonth = incidents.filter(i => {
+            const date = new Date(i.created_at);
+            const now = new Date();
+            return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        }).length;
+        const resolved = incidents.filter(i => i.status === 'resolved' || i.status === 'closed').length;
+
+        document.getElementById('openCount').textContent = open;
+        document.getElementById('criticalCount').textContent = critical;
+        document.getElementById('thisMonthCount').textContent = thisMonth;
+        document.getElementById('resolvedCount').textContent = resolved;
+    }
+
+    function filterIncidents() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const status = document.getElementById('statusFilter').value;
+        const severity = document.getElementById('severityFilter').value;
+        const type = document.getElementById('typeFilter').value;
+
+        let filtered = incidents.filter(i => {
+            const matchesSearch = !search ||
+                i.incident_number.toLowerCase().includes(search) ||
+                i.title.toLowerCase().includes(search) ||
+                (i.description && i.description.toLowerCase().includes(search));
+            const matchesStatus = !status || i.status === status;
+            const matchesSeverity = !severity || i.severity === severity;
+            const matchesType = !type || i.incident_type === type;
+            return matchesSearch && matchesStatus && matchesSeverity && matchesType;
+        });
+
+        renderIncidents(filtered);
+    }
+
+    function renderIncidents(list) {
+        const tbody = document.getElementById('incidentsTable');
+
+        if (!list || list.length === 0) {
+            tbody.innerHTML = `
+                <tr><td colspan="7">
+                    <div class="empty-state">
+                        <i class="bi bi-check-circle"></i>
+                        <p>No incidents found</p>
+                    </div>
+                </td></tr>
+            `;
+            return;
+        }
+
+        const typeLabels = {
+            'contamination': 'Contamination',
+            'temperature_abuse': 'Temperature Abuse',
+            'pest': 'Pest',
+            'allergen': 'Allergen',
+            'foreign_object': 'Foreign Object',
+            'illness': 'Illness',
+            'injury': 'Injury',
+            'other': 'Other'
+        };
+
+        tbody.innerHTML = list.map(i => {
+            const loc = locations.find(l => l.id === i.location_id);
+            return `
+                <tr onclick="viewIncident('${i.id}')">
+                    <td><span class="incident-number">${i.incident_number}</span></td>
+                    <td><strong>${escapeHtml(i.title)}</strong></td>
+                    <td>${typeLabels[i.incident_type] || i.incident_type}</td>
+                    <td>${loc ? escapeHtml(loc.name) : '-'}</td>
+                    <td><span class="badge badge-${i.severity}">${i.severity}</span></td>
+                    <td><span class="badge badge-${i.status}">${i.status}</span></td>
+                    <td>${formatDate(i.incident_date || i.created_at)}</td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    async function viewIncident(id) {
+        try {
+            const response = await fetch(`${API_BASE}/incidents/${id}`);
+            if (response.ok) {
+                const incident = await response.json();
+                const loc = locations.find(l => l.id === incident.location_id);
+
+                const typeLabels = {
+                    'contamination': 'Contamination',
+                    'temperature_abuse': 'Temperature Abuse',
+                    'pest': 'Pest',
+                    'allergen': 'Allergen',
+                    'foreign_object': 'Foreign Object',
+                    'illness': 'Illness',
+                    'injury': 'Injury',
+                    'other': 'Other'
+                };
+
+                document.getElementById('viewModalTitle').textContent = `${incident.incident_number} - ${incident.title}`;
+                document.getElementById('viewModalBody').innerHTML = `
+                    <div class="detail-section">
+                        <h4>Details</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <label>Status</label>
+                                <span class="badge badge-${incident.status}">${incident.status}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Severity</label>
+                                <span class="badge badge-${incident.severity}">${incident.severity}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Type</label>
+                                <span>${typeLabels[incident.incident_type] || incident.incident_type}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Location</label>
+                                <span>${loc ? escapeHtml(loc.name) : '-'}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Incident Date</label>
+                                <span>${formatDate(incident.incident_date)}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Reported By</label>
+                                <span>${incident.reported_by || '-'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    ${incident.description ? `
+                        <div class="detail-section">
+                            <h4>Description</h4>
+                            <div class="description-box">${escapeHtml(incident.description)}</div>
+                        </div>
+                    ` : ''}
+                    ${incident.root_cause ? `
+                        <div class="detail-section">
+                            <h4>Root Cause</h4>
+                            <div class="description-box">${escapeHtml(incident.root_cause)}</div>
+                        </div>
+                    ` : ''}
+                    ${incident.resolution_notes ? `
+                        <div class="detail-section">
+                            <h4>Resolution</h4>
+                            <div class="description-box">${escapeHtml(incident.resolution_notes)}</div>
+                        </div>
+                    ` : ''}
+                    <div class="detail-section">
+                        <h4>Update Status</h4>
+                        <div class="status-actions">
+                            <button class="btn-status ${incident.status === 'open' ? 'active' : ''}" onclick="updateStatus('${incident.id}', 'open')">Open</button>
+                            <button class="btn-status ${incident.status === 'investigating' ? 'active' : ''}" onclick="updateStatus('${incident.id}', 'investigating')">Investigating</button>
+                            <button class="btn-status ${incident.status === 'resolved' ? 'active' : ''}" onclick="updateStatus('${incident.id}', 'resolved')">Resolved</button>
+                            <button class="btn-status ${incident.status === 'closed' ? 'active' : ''}" onclick="updateStatus('${incident.id}', 'closed')">Closed</button>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('viewModal').classList.add('active');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('loading incident');
+        }
+    }
+
+    function closeViewModal() {
+        document.getElementById('viewModal').classList.remove('active');
+    }
+
+    async function updateStatus(id, status) {
+        try {
+            const response = await fetch(`${API_BASE}/incidents/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: status })
+            });
+
+            if (response.ok) {
+                loadIncidents();
+                viewIncident(id);
+            } else {
+                const error = await response.json();
+                showError(error.detail || 'Unknown error');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            showError('updating status');
+        }
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '-';
+        const date = new Date(dateStr);
+        return date.toLocaleDateString();
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Initialize
+    loadLocations().then(() => loadIncidents());
+</script>
+{% endblock %}
