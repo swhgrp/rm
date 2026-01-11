@@ -11,20 +11,29 @@ from maintenance.database import Base
 
 class EquipmentStatus(str, PyEnum):
     """Equipment operational status"""
-    OPERATIONAL = "operational"
-    NEEDS_MAINTENANCE = "needs_maintenance"
-    UNDER_REPAIR = "under_repair"
-    OUT_OF_SERVICE = "out_of_service"
-    RETIRED = "retired"
+    OPERATIONAL = "OPERATIONAL"
+    NEEDS_MAINTENANCE = "NEEDS_MAINTENANCE"
+    UNDER_REPAIR = "UNDER_REPAIR"
+    OUT_OF_SERVICE = "OUT_OF_SERVICE"
+    RETIRED = "RETIRED"
+
+
+class OwnershipType(str, PyEnum):
+    """Equipment ownership type"""
+    OWNED = "OWNED"  # Company owns this equipment
+    LEASED = "LEASED"  # Leased from vendor/supplier
+    BUILDING = "BUILDING"  # Part of building lease / landlord's property
+    RENTAL = "RENTAL"  # Short-term rental
+    LOANER = "LOANER"  # Temporary loaner equipment
 
 
 class WorkOrderStatus(str, PyEnum):
     """Work order status"""
-    OPEN = "open"
-    IN_PROGRESS = "in_progress"
-    ON_HOLD = "on_hold"
-    COMPLETED = "completed"
-    CANCELLED = "cancelled"
+    OPEN = "OPEN"
+    IN_PROGRESS = "IN_PROGRESS"
+    ON_HOLD = "ON_HOLD"
+    COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
 
 
 class WorkOrderPriority(str, PyEnum):
@@ -90,6 +99,12 @@ class Equipment(Base):
     # Financial
     purchase_cost = Column(Numeric(12, 2), nullable=True)
 
+    # Ownership
+    ownership_type = Column(Enum(OwnershipType), default=OwnershipType.OWNED, nullable=False)
+    owner_name = Column(String(200), nullable=True)  # e.g., "Building Management", "Lease Co."
+    lease_contract_number = Column(String(100), nullable=True)
+    lease_expiration = Column(Date, nullable=True)
+
     # Additional info
     notes = Column(Text)
     specifications = Column(Text)  # JSON string for flexible specs
@@ -147,7 +162,8 @@ class MaintenanceSchedule(Base):
     checklist = Column(Text)  # JSON string for checklist items
 
     # Assignment
-    assigned_to = Column(Integer, nullable=True)  # User ID or vendor ID
+    assigned_to = Column(Integer, nullable=True)  # User ID
+    vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=True)  # Vendor for external work
     is_external = Column(Boolean, default=False)  # External vendor vs internal staff
 
     # Status
@@ -159,6 +175,7 @@ class MaintenanceSchedule(Base):
 
     # Relationships
     equipment = relationship("Equipment", back_populates="maintenance_schedules")
+    vendor = relationship("Vendor", back_populates="maintenance_schedules")
 
 
 class WorkOrder(Base):
@@ -180,7 +197,7 @@ class WorkOrder(Base):
 
     # Assignment
     reported_by = Column(Integer, nullable=True)  # User ID
-    assigned_to = Column(Integer, nullable=True)  # User ID or vendor ID
+    assigned_to = Column(String(200), nullable=True)  # Name of assignee
     is_external = Column(Boolean, default=False)
     vendor_id = Column(Integer, ForeignKey("vendors.id"), nullable=True)
 
@@ -274,3 +291,4 @@ class Vendor(Base):
 
     # Relationships
     work_orders = relationship("WorkOrder", back_populates="vendor")
+    maintenance_schedules = relationship("MaintenanceSchedule", back_populates="vendor")

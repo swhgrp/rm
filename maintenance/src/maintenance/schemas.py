@@ -166,6 +166,7 @@ class MaintenanceScheduleBase(BaseModel):
     estimated_duration_minutes: Optional[int] = None
     checklist: Optional[str] = None
     assigned_to: Optional[int] = None
+    vendor_id: Optional[int] = None
     is_external: bool = False
     is_active: bool = True
 
@@ -183,6 +184,7 @@ class MaintenanceScheduleUpdate(BaseModel):
     estimated_duration_minutes: Optional[int] = None
     checklist: Optional[str] = None
     assigned_to: Optional[int] = None
+    vendor_id: Optional[int] = None
     is_external: Optional[bool] = None
     is_active: Optional[bool] = None
 

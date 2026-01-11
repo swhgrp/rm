@@ -1,482 +1,473 @@
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Maintenance Schedules - SW Hospitality Group</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --bg-primary: #ECEFF1;
-            --bg-secondary: #FFFFFF;
-            --bg-tertiary: #F5F5F5;
-            --bg-elevated: #E0E0E0;
-            --border-primary: #CFD8DC;
-            --border-secondary: #B0BEC5;
-            --text-primary: #263238;
-            --text-secondary: #546E7A;
-            --text-muted: #78909C;
-            --accent-primary: #455A64;
-            --accent-secondary: #37474F;
-            --accent-hover: #263238;
-            --accent-muted: #546E7A;
-            --success: #43A047;
-            --success-bg: rgba(67, 160, 71, 0.1);
-            --error: #E53935;
-            --error-bg: rgba(229, 57, 53, 0.1);
-            --warning: #FB8C00;
-            --warning-bg: rgba(251, 140, 0, 0.1);
-            --info: #1E88E5;
-            --info-bg: rgba(30, 136, 229, 0.1);
-            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
-            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
-            --glow-accent: 0 0 15px rgba(69, 90, 100, 0.15);
-        }
+{% extends "maintenance/base.html" %}
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+{% block title %}Maintenance Schedules - SW Hospitality Group{% endblock %}
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-        }
+{% block nav_schedules %}active{% endblock %}
 
-        .navbar {
-            background-color: #455A64;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 8px rgba(69, 90, 100, 0.3);
-        }
+{% block extra_styles %}
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
 
-        .navbar-brand h1 {
-            font-size: 20px;
-            font-weight: 600;
-            color: #FFFFFF;
-        }
+    .page-title {
+        font-size: 24px;
+        font-weight: 600;
+    }
 
-        .navbar-nav {
-            display: flex;
-            gap: 10px;
-        }
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    }
 
-        .nav-link, .btn-back {
-            padding: 8px 16px;
-            background-color: rgba(255, 255, 255, 0.15);
-            color: #FFFFFF;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 14px;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
 
-        .nav-link:hover, .btn-back:hover {
-            background-color: rgba(255, 255, 255, 0.25);
-            border-color: rgba(255, 255, 255, 0.5);
-        }
+    .filters-bar {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
 
-        .nav-link.active {
-            background-color: rgba(255, 255, 255, 0.25);
-        }
+    .search-box {
+        flex: 1;
+        min-width: 200px;
+        max-width: 400px;
+        position: relative;
+    }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 30px 20px;
-        }
+    .search-box input {
+        width: 100%;
+        padding: 10px 15px 10px 40px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
 
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
+    .search-box input:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
 
-        .page-title {
-            font-size: 28px;
-            font-weight: 600;
-        }
+    .search-box i {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+    }
 
-        .btn-primary {
-            padding: 10px 20px;
-            background-color: var(--accent-primary);
-            color: #FFFFFF;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s ease;
-        }
+    .filter-select {
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        min-width: 140px;
+    }
 
-        .btn-primary:hover {
-            background-color: var(--accent-hover);
-        }
+    .filter-select:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
 
-        .filters-bar {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        overflow: hidden;
+    }
 
-        .search-box {
-            flex: 1;
-            min-width: 200px;
-            max-width: 400px;
-            position: relative;
-        }
+    .table-container {
+        overflow-x: auto;
+    }
 
-        .search-box input {
-            width: 100%;
-            padding: 10px 15px 10px 40px;
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            font-size: 14px;
-            background-color: var(--bg-secondary);
-        }
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
 
-        .search-box input:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-        }
+    th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-primary);
+    }
 
-        .search-box i {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-muted);
-        }
+    th {
+        background-color: var(--bg-tertiary);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
 
-        .filter-select {
-            padding: 10px 15px;
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            font-size: 14px;
-            background-color: var(--bg-secondary);
-            min-width: 140px;
-        }
+    tr:hover {
+        background-color: var(--bg-tertiary);
+    }
 
-        .filter-select:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-        }
+    tr:last-child td {
+        border-bottom: none;
+    }
 
-        .card {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: 12px;
-            overflow: hidden;
-        }
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
 
-        .table-container {
-            overflow-x: auto;
-        }
+    .badge-active { background-color: var(--success-bg); color: var(--success); }
+    .badge-paused { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-completed { background-color: var(--info-bg); color: var(--info); }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
+    .badge-overdue { background-color: var(--error-bg); color: var(--error); }
+    .badge-due-soon { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-upcoming { background-color: var(--success-bg); color: var(--success); }
 
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-primary);
-        }
+    .actions-cell {
+        display: flex;
+        gap: 8px;
+    }
 
-        th {
-            background-color: var(--bg-tertiary);
-            font-weight: 600;
-            font-size: 13px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
+    .btn-icon {
+        padding: 6px 10px;
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+        background-color: var(--bg-secondary);
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s ease;
+    }
 
-        tr:hover {
-            background-color: var(--bg-tertiary);
-        }
+    .btn-icon:hover {
+        background-color: var(--bg-tertiary);
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
 
-        tr:last-child td {
-            border-bottom: none;
-        }
+    .btn-icon.success:hover {
+        border-color: var(--success);
+        color: var(--success);
+    }
 
-        .badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
 
-        .badge-active { background-color: var(--success-bg); color: var(--success); }
-        .badge-paused { background-color: var(--warning-bg); color: var(--warning); }
-        .badge-completed { background-color: var(--info-bg); color: var(--info); }
+    .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
 
-        .badge-overdue { background-color: var(--error-bg); color: var(--error); }
-        .badge-due-soon { background-color: var(--warning-bg); color: var(--warning); }
-        .badge-upcoming { background-color: var(--success-bg); color: var(--success); }
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 60px;
+    }
 
-        .actions-cell {
-            display: flex;
-            gap: 8px;
-        }
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-primary);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
 
-        .btn-icon {
-            padding: 6px 10px;
-            border: 1px solid var(--border-primary);
-            border-radius: 4px;
-            background-color: var(--bg-secondary);
-            color: var(--text-secondary);
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s ease;
-        }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
 
-        .btn-icon:hover {
-            background-color: var(--bg-tertiary);
-            border-color: var(--accent-primary);
-            color: var(--accent-primary);
-        }
+    /* Modal styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
 
-        .btn-icon.success:hover {
-            border-color: var(--success);
-            color: var(--success);
-        }
+    .modal-overlay.active {
+        display: flex;
+    }
 
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--text-muted);
-        }
+    .modal {
+        background-color: var(--bg-secondary);
+        border-radius: 12px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
 
-        .empty-state i {
-            font-size: 64px;
-            margin-bottom: 20px;
-            opacity: 0.5;
-        }
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
 
-        .loading {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 60px;
-        }
+    .modal-title {
+        font-size: 18px;
+        font-weight: 600;
+    }
 
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--border-primary);
-            border-top-color: var(--accent-primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
 
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
+    .modal-body {
+        padding: 20px;
+    }
 
-        /* Modal styles */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
+    .form-group {
+        margin-bottom: 20px;
+    }
 
-        .modal-overlay.active {
-            display: flex;
-        }
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
 
-        .modal {
-            background-color: var(--bg-secondary);
-            border-radius: 12px;
-            max-width: 600px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%;
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
 
-        .modal-header {
-            padding: 20px;
-            border-bottom: 1px solid var(--border-primary);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
 
-        .modal-title {
-            font-size: 18px;
-            font-weight: 600;
-        }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
 
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: var(--text-muted);
-        }
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
 
-        .modal-body {
-            padding: 20px;
-        }
+    .btn-secondary {
+        padding: 10px 20px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
 
-        .form-group {
-            margin-bottom: 20px;
-        }
+    .btn-secondary:hover {
+        background-color: var(--bg-elevated);
+    }
 
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: var(--text-secondary);
-        }
+    .schedule-info {
+        background-color: var(--bg-tertiary);
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
 
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 10px 15px;
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            font-size: 14px;
-            background-color: var(--bg-secondary);
-        }
+    .schedule-info p {
+        font-size: 13px;
+        color: var(--text-secondary);
+        margin-bottom: 5px;
+    }
 
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-        }
+    .schedule-info p:last-child {
+        margin-bottom: 0;
+    }
 
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
+    /* Searchable dropdown styles */
+    .searchable-select {
+        position: relative;
+    }
 
-        .modal-footer {
-            padding: 20px;
-            border-top: 1px solid var(--border-primary);
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
+    .searchable-select-input {
+        width: 100%;
+        padding: 10px 35px 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        cursor: pointer;
+    }
 
-        .btn-secondary {
-            padding: 10px 20px;
-            background-color: var(--bg-tertiary);
-            color: var(--text-primary);
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            font-size: 14px;
-            cursor: pointer;
-        }
+    .searchable-select-input:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
 
-        .btn-secondary:hover {
-            background-color: var(--bg-elevated);
-        }
+    .searchable-select-arrow {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        pointer-events: none;
+        color: var(--text-muted);
+        transition: transform 0.2s;
+    }
 
-        .schedule-info {
-            background-color: var(--bg-tertiary);
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
+    .searchable-select.open .searchable-select-arrow {
+        transform: translateY(-50%) rotate(180deg);
+    }
 
-        .schedule-info p {
-            font-size: 13px;
-            color: var(--text-secondary);
-            margin-bottom: 5px;
-        }
+    .searchable-select-dropdown {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        max-height: 250px;
+        overflow-y: auto;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        z-index: 100;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
 
-        .schedule-info p:last-child {
-            margin-bottom: 0;
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar">
-        <div class="navbar-brand">
-            <h1><i class="bi bi-tools"></i> Maintenance</h1>
+    .searchable-select.open .searchable-select-dropdown {
+        display: block;
+    }
+
+    .searchable-select-option {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    .searchable-select-option:last-child {
+        border-bottom: none;
+    }
+
+    .searchable-select-option:hover,
+    .searchable-select-option.highlighted {
+        background-color: var(--bg-tertiary);
+    }
+
+    .searchable-select-option .eq-name {
+        font-weight: 500;
+    }
+
+    .searchable-select-option .eq-details {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+
+    .searchable-select-empty {
+        padding: 15px;
+        color: var(--text-muted);
+        text-align: center;
+        font-style: italic;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h2 class="page-title">Maintenance Schedules</h2>
+        <button class="btn-primary" onclick="openCreateModal()">
+            <i class="bi bi-plus-lg"></i> New Schedule
+        </button>
+    </div>
+
+    <div class="filters-bar">
+        <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="searchInput" placeholder="Search schedules..." oninput="filterSchedules()">
         </div>
-        <div class="navbar-nav">
-            <a href="/portal/maintenance/" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a>
-            <a href="/portal/maintenance/equipment" class="nav-link"><i class="bi bi-gear"></i> Equipment</a>
-            <a href="/portal/maintenance/work-orders" class="nav-link"><i class="bi bi-clipboard-check"></i> Work Orders</a>
-            <a href="/portal/maintenance/schedules" class="nav-link active"><i class="bi bi-calendar-check"></i> Schedules</a>
-            <a href="/portal/" class="btn-back"><i class="bi bi-arrow-left"></i> Portal</a>
-        </div>
-    </nav>
+        <select class="filter-select" id="locationFilter" onchange="filterSchedules()">
+            <option value="">All Locations</option>
+            <!-- Populated by JS -->
+        </select>
+        <select class="filter-select" id="statusFilter" onchange="filterSchedules()">
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="paused">Paused</option>
+        </select>
+        <select class="filter-select" id="frequencyFilter" onchange="filterSchedules()">
+            <option value="">All Frequencies</option>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="biweekly">Bi-weekly</option>
+            <option value="monthly">Monthly</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="semiannual">Semi-annual</option>
+            <option value="annual">Annual</option>
+        </select>
+    </div>
 
-    <div class="container">
-        <div class="page-header">
-            <h2 class="page-title">Maintenance Schedules</h2>
-            <button class="btn-primary" onclick="openCreateModal()">
-                <i class="bi bi-plus-lg"></i> New Schedule
-            </button>
-        </div>
-
-        <div class="filters-bar">
-            <div class="search-box">
-                <i class="bi bi-search"></i>
-                <input type="text" id="searchInput" placeholder="Search schedules..." oninput="filterSchedules()">
-            </div>
-            <select class="filter-select" id="statusFilter" onchange="filterSchedules()">
-                <option value="">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="paused">Paused</option>
-                <option value="completed">Completed</option>
-            </select>
-            <select class="filter-select" id="frequencyFilter" onchange="filterSchedules()">
-                <option value="">All Frequencies</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="quarterly">Quarterly</option>
-                <option value="yearly">Yearly</option>
-            </select>
-        </div>
-
-        <div class="card">
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Equipment</th>
-                            <th>Frequency</th>
-                            <th>Next Due</th>
-                            <th>Status</th>
-                            <th>Last Completed</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="schedulesTable">
-                        <tr>
-                            <td colspan="7">
-                                <div class="loading"><div class="spinner"></div></div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Equipment</th>
+                        <th>Location</th>
+                        <th>Frequency</th>
+                        <th>Next Due</th>
+                        <th>Status</th>
+                        <th>Last Completed</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="schedulesTable">
+                    <tr>
+                        <td colspan="8">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -496,23 +487,30 @@
                     </div>
                     <div class="form-group">
                         <label for="sched_equipment_id">Equipment *</label>
-                        <select id="sched_equipment_id" required></select>
+                        <div class="searchable-select" id="equipmentSearchable">
+                            <input type="text"
+                                   class="searchable-select-input"
+                                   id="equipmentSearchInput"
+                                   placeholder="Type to search equipment..."
+                                   autocomplete="off">
+                            <i class="bi bi-chevron-down searchable-select-arrow"></i>
+                            <div class="searchable-select-dropdown" id="equipmentDropdown">
+                                <!-- Options populated by JS -->
+                            </div>
+                        </div>
+                        <input type="hidden" id="sched_equipment_id">
                     </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="sched_frequency">Frequency *</label>
-                            <select id="sched_frequency" required onchange="updateFrequencyInfo()">
-                                <option value="daily">Daily</option>
-                                <option value="weekly">Weekly</option>
-                                <option value="monthly" selected>Monthly</option>
-                                <option value="quarterly">Quarterly</option>
-                                <option value="yearly">Yearly</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="sched_interval">Every X Periods</label>
-                            <input type="number" id="sched_interval" value="1" min="1" max="12">
-                        </div>
+                    <div class="form-group">
+                        <label for="sched_frequency">Frequency *</label>
+                        <select id="sched_frequency" required onchange="updateFrequencyInfo()">
+                            <option value="daily">Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="biweekly">Bi-weekly</option>
+                            <option value="monthly" selected>Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="semiannual">Semi-annual</option>
+                            <option value="annual">Annual</option>
+                        </select>
                     </div>
                     <div class="schedule-info" id="frequencyInfo">
                         <p><i class="bi bi-info-circle"></i> This will run every month</p>
@@ -534,9 +532,26 @@
                         <label for="sched_description">Description</label>
                         <textarea id="sched_description" rows="3" placeholder="What maintenance tasks should be performed..."></textarea>
                     </div>
-                    <div class="form-group">
-                        <label for="sched_estimated_duration">Estimated Duration (minutes)</label>
-                        <input type="number" id="sched_estimated_duration" min="0" placeholder="e.g., 30">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="sched_estimated_duration">Estimated Duration (minutes)</label>
+                            <input type="number" id="sched_estimated_duration" min="0" placeholder="e.g., 30">
+                        </div>
+                        <div class="form-group">
+                            <label for="sched_vendor_id">Vendor</label>
+                            <div class="searchable-select" id="vendorSearchable">
+                                <input type="text"
+                                       class="searchable-select-input"
+                                       id="vendorSearchInput"
+                                       placeholder="Type to search vendors..."
+                                       autocomplete="off">
+                                <i class="bi bi-chevron-down searchable-select-arrow"></i>
+                                <div class="searchable-select-dropdown" id="vendorDropdown">
+                                    <!-- Options populated by JS -->
+                                </div>
+                            </div>
+                            <input type="hidden" id="sched_vendor_id">
+                        </div>
                     </div>
                 </form>
             </div>
@@ -547,315 +562,722 @@
         </div>
     </div>
 
-    <script>
-        const API_BASE = '/maintenance';
-        let allSchedules = [];
-        let equipment = [];
-
-        async function loadEquipment() {
-            try {
-                const response = await fetch(`${API_BASE}/equipment`);
-                equipment = await response.json();
-
-                const select = document.getElementById('sched_equipment_id');
-                select.innerHTML = '<option value="">Select equipment...</option>';
-                equipment.forEach(e => {
-                    const option = document.createElement('option');
-                    option.value = e.id;
-                    option.textContent = `${e.name} (${e.location || 'No location'})`;
-                    select.appendChild(option);
-                });
-            } catch (error) {
-                console.error('Error loading equipment:', error);
-            }
-        }
-
-        async function loadSchedules() {
-            try {
-                const response = await fetch(`${API_BASE}/schedules`);
-                allSchedules = await response.json();
-                filterSchedules();
-            } catch (error) {
-                console.error('Error loading schedules:', error);
-                document.getElementById('schedulesTable').innerHTML = `
-                    <tr><td colspan="7">
-                        <div class="empty-state">
-                            <i class="bi bi-exclamation-circle"></i>
-                            <p>Error loading schedules</p>
+    <!-- Add Vendor Modal (Quick Add) -->
+    <div class="modal-overlay" id="addVendorModal">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Add New Vendor</h3>
+                <button class="modal-close" onclick="closeAddVendorModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="addVendorForm">
+                    <div class="form-group">
+                        <label for="new_vendor_name">Company Name *</label>
+                        <input type="text" id="new_vendor_name" required placeholder="e.g., ABC HVAC Services">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="new_vendor_contact">Contact Person</label>
+                            <input type="text" id="new_vendor_contact" placeholder="Primary contact name">
                         </div>
-                    </td></tr>
-                `;
+                        <div class="form-group">
+                            <label for="new_vendor_services">Service Types</label>
+                            <input type="text" id="new_vendor_services" placeholder="e.g., HVAC, Refrigeration">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="new_vendor_phone">Phone</label>
+                            <input type="tel" id="new_vendor_phone" placeholder="(555) 123-4567">
+                        </div>
+                        <div class="form-group">
+                            <label for="new_vendor_email">Email</label>
+                            <input type="email" id="new_vendor_email" placeholder="contact@vendor.com">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeAddVendorModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveNewVendor()">
+                    <i class="bi bi-plus-lg"></i> Add Vendor
+                </button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/maintenance';
+    let allSchedules = [];
+    let equipment = [];
+    let locations = [];
+    let vendors = [];
+
+    let highlightedEquipmentIndex = -1;
+    let highlightedVendorIndex = -1;
+
+    async function loadEquipment() {
+        try {
+            const response = await fetch(`${API_BASE}/equipment`);
+            equipment = await response.json();
+            renderEquipmentOptions('');
+        } catch (error) {
+            console.error('Error loading equipment:', error);
+        }
+    }
+
+    async function loadLocations() {
+        try {
+            const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+            if (response.ok) {
+                locations = await response.json();
+                populateLocationFilter();
             }
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+    }
+
+    function populateLocationFilter() {
+        const select = document.getElementById('locationFilter');
+        select.innerHTML = '<option value="">All Locations</option>';
+        locations.forEach(loc => {
+            const option = document.createElement('option');
+            option.value = loc.id;
+            option.textContent = loc.name;
+            select.appendChild(option);
+        });
+    }
+
+    async function loadVendors() {
+        try {
+            const response = await fetch(`${API_BASE}/vendors`);
+            if (response.ok) {
+                vendors = await response.json();
+            } else {
+                vendors = [];
+            }
+        } catch (error) {
+            console.error('Error loading vendors:', error);
+            vendors = [];
+        }
+    }
+
+    // Vendor searchable dropdown functions
+    function renderVendorOptions(searchTerm) {
+        const dropdown = document.getElementById('vendorDropdown');
+        const term = searchTerm.toLowerCase().trim();
+
+        let filtered = vendors.filter(v => v.is_active !== false);
+        if (term) {
+            filtered = filtered.filter(v => {
+                const name = v.name?.toLowerCase() || '';
+                const serviceTypes = v.service_types?.toLowerCase() || '';
+                const contactName = v.contact_name?.toLowerCase() || '';
+                return name.includes(term) || serviceTypes.includes(term) || contactName.includes(term);
+            });
         }
 
-        function filterSchedules() {
-            const search = document.getElementById('searchInput').value.toLowerCase();
-            const status = document.getElementById('statusFilter').value;
-            const frequency = document.getElementById('frequencyFilter').value;
+        let html = `
+            <div class="searchable-select-option add-new" onclick="openAddVendorModal()">
+                <i class="bi bi-plus-lg"></i> Add New Vendor
+            </div>
+        `;
 
-            let filtered = allSchedules.filter(s => {
-                const matchesSearch = !search ||
-                    s.name.toLowerCase().includes(search) ||
-                    (s.description && s.description.toLowerCase().includes(search));
-                const matchesStatus = !status || s.status === status;
-                const matchesFrequency = !frequency || s.frequency === frequency;
-                return matchesSearch && matchesStatus && matchesFrequency;
+        if (filtered.length === 0) {
+            html += `<div class="searchable-select-empty">
+                ${vendors.length === 0 ? 'No vendors available' : 'No vendors match your search'}
+            </div>`;
+        } else {
+            html += filtered.map((v, idx) => `
+                <div class="searchable-select-option ${idx === highlightedVendorIndex ? 'highlighted' : ''}"
+                     data-id="${v.id}"
+                     onclick="selectVendor(${v.id})">
+                    <div class="vendor-name">${escapeHtml(v.name)}</div>
+                    <div class="vendor-details">${v.service_types || 'General'}${v.contact_name ? ' • ' + v.contact_name : ''}</div>
+                </div>
+            `).join('');
+        }
+
+        dropdown.innerHTML = html;
+        highlightedVendorIndex = -1;
+    }
+
+    function selectVendor(vendorId) {
+        const vendor = vendors.find(v => v.id === vendorId);
+        if (!vendor) return;
+
+        document.getElementById('sched_vendor_id').value = vendor.id;
+        document.getElementById('vendorSearchInput').value = vendor.name;
+        closeVendorDropdown();
+    }
+
+    function openVendorDropdown() {
+        document.getElementById('vendorSearchable').classList.add('open');
+        renderVendorOptions(document.getElementById('vendorSearchInput').value);
+    }
+
+    function closeVendorDropdown() {
+        document.getElementById('vendorSearchable').classList.remove('open');
+        highlightedVendorIndex = -1;
+    }
+
+    function openAddVendorModal() {
+        closeVendorDropdown();
+        document.getElementById('addVendorModal').classList.add('active');
+        document.getElementById('addVendorForm').reset();
+    }
+
+    function closeAddVendorModal() {
+        document.getElementById('addVendorModal').classList.remove('active');
+    }
+
+    async function saveNewVendor() {
+        const name = document.getElementById('new_vendor_name').value;
+        if (!name) {
+            showWarning('Please enter a company name');
+            return;
+        }
+
+        const data = {
+            name: name,
+            contact_name: document.getElementById('new_vendor_contact').value || null,
+            service_types: document.getElementById('new_vendor_services').value || null,
+            phone: document.getElementById('new_vendor_phone').value || null,
+            email: document.getElementById('new_vendor_email').value || null,
+            is_active: true
+        };
+
+        try {
+            const response = await fetch(`${API_BASE}/vendors`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
             });
 
-            renderSchedules(filtered);
+            if (response.ok) {
+                const newVendor = await response.json();
+                await loadVendors();
+                closeAddVendorModal();
+                selectVendor(newVendor.id);
+                showSuccess('Vendor created successfully');
+            } else {
+                const error = await response.json();
+                showError('Failed to create vendor: ' + (error.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error creating vendor:', error);
+            showError('Failed to create vendor');
+        }
+    }
+
+    // Initialize vendor dropdown event listeners
+    function initVendorDropdown() {
+        const searchInput = document.getElementById('vendorSearchInput');
+        const container = document.getElementById('vendorSearchable');
+
+        if (!searchInput || !container) return;
+
+        searchInput.addEventListener('focus', openVendorDropdown);
+
+        searchInput.addEventListener('input', (e) => {
+            if (document.getElementById('sched_vendor_id').value) {
+                document.getElementById('sched_vendor_id').value = '';
+            }
+            renderVendorOptions(e.target.value);
+            openVendorDropdown();
+        });
+
+        searchInput.addEventListener('keydown', (e) => {
+            const dropdown = document.getElementById('vendorDropdown');
+            const options = dropdown.querySelectorAll('.searchable-select-option:not(.add-new)');
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                highlightedVendorIndex = Math.min(highlightedVendorIndex + 1, options.length - 1);
+                updateVendorHighlight(options);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                highlightedVendorIndex = Math.max(highlightedVendorIndex - 1, 0);
+                updateVendorHighlight(options);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (highlightedVendorIndex >= 0 && options[highlightedVendorIndex]) {
+                    const vendorId = options[highlightedVendorIndex].dataset.id;
+                    selectVendor(parseInt(vendorId));
+                }
+            } else if (e.key === 'Escape') {
+                closeVendorDropdown();
+                searchInput.blur();
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!container.contains(e.target)) {
+                closeVendorDropdown();
+            }
+        });
+    }
+
+    function updateVendorHighlight(options) {
+        options.forEach((opt, idx) => {
+            opt.classList.toggle('highlighted', idx === highlightedVendorIndex);
+            if (idx === highlightedVendorIndex) {
+                opt.scrollIntoView({ block: 'nearest' });
+            }
+        });
+    }
+
+    function renderEquipmentOptions(searchTerm) {
+        const dropdown = document.getElementById('equipmentDropdown');
+        const term = searchTerm.toLowerCase().trim();
+
+        let filtered = equipment;
+        if (term) {
+            filtered = equipment.filter(e => {
+                const name = e.name?.toLowerCase() || '';
+                const location = e.location_name?.toLowerCase() || '';
+                const serial = e.serial_number?.toLowerCase() || '';
+                return name.includes(term) || location.includes(term) || serial.includes(term);
+            });
         }
 
-        function renderSchedules(schedules) {
-            const tbody = document.getElementById('schedulesTable');
+        if (filtered.length === 0) {
+            dropdown.innerHTML = `<div class="searchable-select-empty">
+                ${equipment.length === 0 ? 'No equipment available' : 'No equipment matches your search'}
+            </div>`;
+        } else {
+            dropdown.innerHTML = filtered.map((e, idx) => `
+                <div class="searchable-select-option ${idx === highlightedEquipmentIndex ? 'highlighted' : ''}"
+                     data-id="${e.id}"
+                     onclick="selectEquipment(${e.id})">
+                    <div class="eq-name">${escapeHtml(e.name)}</div>
+                    <div class="eq-details">${e.location_name || 'No location'}${e.serial_number ? ' • ' + e.serial_number : ''}</div>
+                </div>
+            `).join('');
+        }
 
-            if (schedules.length === 0) {
-                tbody.innerHTML = `
-                    <tr><td colspan="7">
-                        <div class="empty-state">
-                            <i class="bi bi-calendar-x"></i>
-                            <p>No maintenance schedules found</p>
-                        </div>
-                    </td></tr>
-                `;
-                return;
+        highlightedEquipmentIndex = -1;
+    }
+
+    function selectEquipment(eqId) {
+        const eq = equipment.find(e => e.id === eqId);
+        if (!eq) return;
+
+        document.getElementById('sched_equipment_id').value = eq.id;
+        document.getElementById('equipmentSearchInput').value = `${eq.name} (${eq.location_name || 'No location'})`;
+        closeEquipmentDropdown();
+    }
+
+    function openEquipmentDropdown() {
+        const container = document.getElementById('equipmentSearchable');
+        container.classList.add('open');
+        renderEquipmentOptions(document.getElementById('equipmentSearchInput').value);
+    }
+
+    function closeEquipmentDropdown() {
+        const container = document.getElementById('equipmentSearchable');
+        container.classList.remove('open');
+        highlightedEquipmentIndex = -1;
+    }
+
+    function updateEquipmentHighlight(options) {
+        options.forEach((opt, idx) => {
+            opt.classList.toggle('highlighted', idx === highlightedEquipmentIndex);
+            if (idx === highlightedEquipmentIndex) {
+                opt.scrollIntoView({ block: 'nearest' });
+            }
+        });
+    }
+
+    // Initialize searchable equipment dropdown
+    document.addEventListener('DOMContentLoaded', () => {
+        const searchInput = document.getElementById('equipmentSearchInput');
+        const container = document.getElementById('equipmentSearchable');
+
+        searchInput.addEventListener('focus', () => {
+            openEquipmentDropdown();
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            // Clear selection if user is typing
+            if (document.getElementById('sched_equipment_id').value) {
+                document.getElementById('sched_equipment_id').value = '';
+            }
+            renderEquipmentOptions(e.target.value);
+            openEquipmentDropdown();
+        });
+
+        searchInput.addEventListener('keydown', (e) => {
+            const dropdown = document.getElementById('equipmentDropdown');
+            const options = dropdown.querySelectorAll('.searchable-select-option');
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                highlightedEquipmentIndex = Math.min(highlightedEquipmentIndex + 1, options.length - 1);
+                updateEquipmentHighlight(options);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                highlightedEquipmentIndex = Math.max(highlightedEquipmentIndex - 1, 0);
+                updateEquipmentHighlight(options);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (highlightedEquipmentIndex >= 0 && options[highlightedEquipmentIndex]) {
+                    const eqId = options[highlightedEquipmentIndex].dataset.id;
+                    selectEquipment(parseInt(eqId));
+                }
+            } else if (e.key === 'Escape') {
+                closeEquipmentDropdown();
+                searchInput.blur();
+            }
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!container.contains(e.target)) {
+                closeEquipmentDropdown();
+            }
+        });
+    });
+
+    async function loadSchedules() {
+        try {
+            const response = await fetch(`${API_BASE}/schedules`);
+            allSchedules = await response.json();
+            filterSchedules();
+        } catch (error) {
+            console.error('Error loading schedules:', error);
+            document.getElementById('schedulesTable').innerHTML = `
+                <tr><td colspan="8">
+                    <div class="empty-state">
+                        <i class="bi bi-exclamation-circle"></i>
+                        <p>Error loading schedules</p>
+                    </div>
+                </td></tr>
+            `;
+        }
+    }
+
+    function filterSchedules() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const status = document.getElementById('statusFilter').value;
+        const frequency = document.getElementById('frequencyFilter').value;
+        const locationId = document.getElementById('locationFilter').value;
+
+        let filtered = allSchedules.filter(s => {
+            const matchesSearch = !search ||
+                s.name.toLowerCase().includes(search) ||
+                (s.description && s.description.toLowerCase().includes(search));
+
+            // Map filter status to is_active boolean
+            let matchesStatus = true;
+            if (status === 'active') matchesStatus = s.is_active === true;
+            else if (status === 'paused') matchesStatus = s.is_active === false;
+
+            const matchesFrequency = !frequency || s.frequency === frequency;
+
+            // Location filter - get location from equipment
+            let matchesLocation = true;
+            if (locationId) {
+                const eq = equipment.find(e => e.id === s.equipment_id);
+                matchesLocation = eq && eq.location_id == locationId;
             }
 
-            const frequencyLabels = {
-                'daily': 'Daily',
-                'weekly': 'Weekly',
-                'monthly': 'Monthly',
-                'quarterly': 'Quarterly',
-                'yearly': 'Yearly'
-            };
+            return matchesSearch && matchesStatus && matchesFrequency && matchesLocation;
+        });
 
-            const statusLabels = {
-                'active': 'Active',
-                'paused': 'Paused',
-                'completed': 'Completed'
-            };
+        renderSchedules(filtered);
+    }
 
-            tbody.innerHTML = schedules.map(s => {
-                const eq = equipment.find(e => e.id === s.equipment_id);
-                const nextDue = s.next_due_date ? new Date(s.next_due_date) : null;
-                const lastCompleted = s.last_completed_date ? new Date(s.last_completed_date).toLocaleDateString() : 'Never';
+    function renderSchedules(schedules) {
+        const tbody = document.getElementById('schedulesTable');
 
-                let dueStatus = 'upcoming';
-                let dueBadge = '';
-                if (nextDue) {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const daysUntil = Math.floor((nextDue - today) / (1000 * 60 * 60 * 24));
-
-                    if (daysUntil < 0) {
-                        dueStatus = 'overdue';
-                        dueBadge = `<span class="badge badge-overdue">${Math.abs(daysUntil)} days overdue</span>`;
-                    } else if (daysUntil <= 7) {
-                        dueStatus = 'due-soon';
-                        dueBadge = `<span class="badge badge-due-soon">${daysUntil === 0 ? 'Today' : daysUntil + ' days'}</span>`;
-                    } else {
-                        dueBadge = `<span class="badge badge-upcoming">${nextDue.toLocaleDateString()}</span>`;
-                    }
-                } else {
-                    dueBadge = '<span class="badge">Not set</span>';
-                }
-
-                const frequencyText = s.frequency_interval > 1
-                    ? `Every ${s.frequency_interval} ${frequencyLabels[s.frequency].toLowerCase()}s`
-                    : frequencyLabels[s.frequency];
-
-                return `
-                    <tr>
-                        <td><strong>${escapeHtml(s.name)}</strong></td>
-                        <td>${eq ? escapeHtml(eq.name) : '-'}</td>
-                        <td>${frequencyText}</td>
-                        <td>${dueBadge}</td>
-                        <td><span class="badge badge-${s.status}">${statusLabels[s.status] || s.status}</span></td>
-                        <td>${lastCompleted}</td>
-                        <td class="actions-cell">
-                            <button class="btn-icon success" onclick="markCompleted(${s.id})" title="Mark Completed">
-                                <i class="bi bi-check-lg"></i>
-                            </button>
-                            <button class="btn-icon" onclick="editSchedule(${s.id})" title="Edit">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                            <button class="btn-icon" onclick="createWorkOrder(${s.id})" title="Create Work Order">
-                                <i class="bi bi-clipboard-plus"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
+        if (schedules.length === 0) {
+            tbody.innerHTML = `
+                <tr><td colspan="8">
+                    <div class="empty-state">
+                        <i class="bi bi-calendar-x"></i>
+                        <p>No maintenance schedules found</p>
+                    </div>
+                </td></tr>
+            `;
+            return;
         }
 
-        function openCreateModal() {
-            document.getElementById('modalTitle').textContent = 'New Maintenance Schedule';
-            document.getElementById('scheduleForm').reset();
-            document.getElementById('scheduleId').value = '';
-            document.getElementById('sched_frequency').value = 'monthly';
-            document.getElementById('sched_interval').value = '1';
-            document.getElementById('sched_status').value = 'active';
+        const frequencyLabels = {
+            'daily': 'Daily',
+            'weekly': 'Weekly',
+            'biweekly': 'Bi-weekly',
+            'monthly': 'Monthly',
+            'quarterly': 'Quarterly',
+            'semiannual': 'Semi-annual',
+            'annual': 'Annual'
+        };
 
-            // Set default next due date to today
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('sched_next_due').value = today;
+        tbody.innerHTML = schedules.map(s => {
+            const eq = equipment.find(e => e.id === s.equipment_id);
+            const nextDue = s.next_due ? new Date(s.next_due) : null;
+            const lastPerformed = s.last_performed ? new Date(s.last_performed).toLocaleDateString() : 'Never';
 
+            let dueStatus = 'upcoming';
+            let dueBadge = '';
+            if (nextDue) {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const daysUntil = Math.floor((nextDue - today) / (1000 * 60 * 60 * 24));
+
+                if (daysUntil < 0) {
+                    dueStatus = 'overdue';
+                    dueBadge = `<span class="badge badge-overdue">${Math.abs(daysUntil)} days overdue</span>`;
+                } else if (daysUntil <= 7) {
+                    dueStatus = 'due-soon';
+                    dueBadge = `<span class="badge badge-due-soon">${daysUntil === 0 ? 'Today' : daysUntil + ' days'}</span>`;
+                } else {
+                    dueBadge = `<span class="badge badge-upcoming">${nextDue.toLocaleDateString()}</span>`;
+                }
+            } else {
+                dueBadge = '<span class="badge">Not set</span>';
+            }
+
+            const frequencyText = frequencyLabels[s.frequency] || s.frequency;
+            const statusBadge = s.is_active ? 'active' : 'paused';
+            const statusLabel = s.is_active ? 'Active' : 'Paused';
+
+            return `
+                <tr>
+                    <td><strong>${escapeHtml(s.name)}</strong></td>
+                    <td>${eq ? escapeHtml(eq.name) : '-'}</td>
+                    <td>${eq && eq.location_name ? escapeHtml(eq.location_name) : '-'}</td>
+                    <td>${frequencyText}</td>
+                    <td>${dueBadge}</td>
+                    <td><span class="badge badge-${statusBadge}">${statusLabel}</span></td>
+                    <td>${lastPerformed}</td>
+                    <td class="actions-cell">
+                        <button class="btn-icon success" onclick="markCompleted(${s.id})" title="Mark Completed">
+                            <i class="bi bi-check-lg"></i>
+                        </button>
+                        <button class="btn-icon" onclick="editSchedule(${s.id})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn-icon" onclick="createWorkOrder(${s.id})" title="Create Work Order">
+                            <i class="bi bi-clipboard-plus"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    function openCreateModal() {
+        document.getElementById('modalTitle').textContent = 'New Maintenance Schedule';
+        document.getElementById('scheduleForm').reset();
+        document.getElementById('scheduleId').value = '';
+        document.getElementById('sched_equipment_id').value = '';
+        document.getElementById('equipmentSearchInput').value = '';
+        document.getElementById('sched_frequency').value = 'monthly';
+        document.getElementById('sched_status').value = 'active';
+        document.getElementById('sched_vendor_id').value = '';
+        document.getElementById('vendorSearchInput').value = '';
+
+        // Set default next due date to today
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('sched_next_due').value = today;
+
+        closeEquipmentDropdown();
+        closeVendorDropdown();
+        updateFrequencyInfo();
+        document.getElementById('createModal').classList.add('active');
+    }
+
+    async function editSchedule(id) {
+        try {
+            const response = await fetch(`${API_BASE}/schedules/${id}`);
+            const schedule = await response.json();
+
+            document.getElementById('modalTitle').textContent = 'Edit Schedule';
+            document.getElementById('scheduleId').value = schedule.id;
+            document.getElementById('sched_name').value = schedule.name || '';
+            document.getElementById('sched_equipment_id').value = schedule.equipment_id || '';
+
+            // Set searchable input display
+            const eq = equipment.find(e => e.id === schedule.equipment_id);
+            if (eq) {
+                document.getElementById('equipmentSearchInput').value = `${eq.name} (${eq.location_name || 'No location'})`;
+            } else {
+                document.getElementById('equipmentSearchInput').value = '';
+            }
+
+            document.getElementById('sched_frequency').value = schedule.frequency || 'monthly';
+            document.getElementById('sched_next_due').value = schedule.next_due ? schedule.next_due.split('T')[0] : '';
+            document.getElementById('sched_status').value = schedule.is_active ? 'active' : 'paused';
+            document.getElementById('sched_description').value = schedule.description || '';
+            document.getElementById('sched_estimated_duration').value = schedule.estimated_duration_minutes || '';
+
+            // Set vendor
+            document.getElementById('sched_vendor_id').value = schedule.vendor_id || '';
+            if (schedule.vendor_id) {
+                const vendor = vendors.find(v => v.id === schedule.vendor_id);
+                document.getElementById('vendorSearchInput').value = vendor ? vendor.name : '';
+            } else {
+                document.getElementById('vendorSearchInput').value = '';
+            }
+
+            closeEquipmentDropdown();
+            closeVendorDropdown();
             updateFrequencyInfo();
             document.getElementById('createModal').classList.add('active');
+        } catch (error) {
+            console.error('Error loading schedule:', error);
+            showError('Failed to load schedule details');
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('createModal').classList.remove('active');
+    }
+
+    function updateFrequencyInfo() {
+        const frequency = document.getElementById('sched_frequency').value;
+
+        const labels = {
+            'daily': 'day',
+            'weekly': 'week',
+            'biweekly': 'two weeks',
+            'monthly': 'month',
+            'quarterly': 'quarter',
+            'semiannual': 'six months',
+            'annual': 'year'
+        };
+
+        const text = `This will run every ${labels[frequency] || frequency}`;
+        document.getElementById('frequencyInfo').innerHTML = `<p><i class="bi bi-info-circle"></i> ${text}</p>`;
+    }
+
+    async function saveSchedule() {
+        const id = document.getElementById('scheduleId').value;
+        const equipmentId = document.getElementById('sched_equipment_id').value;
+
+        if (!equipmentId) {
+            showWarning('Please select equipment');
+            return;
         }
 
-        async function editSchedule(id) {
-            try {
-                const response = await fetch(`${API_BASE}/schedules/${id}`);
-                const schedule = await response.json();
+        const nextDue = document.getElementById('sched_next_due').value;
+        const scheduleName = document.getElementById('sched_name').value;
 
-                document.getElementById('modalTitle').textContent = 'Edit Schedule';
-                document.getElementById('scheduleId').value = schedule.id;
-                document.getElementById('sched_name').value = schedule.name || '';
-                document.getElementById('sched_equipment_id').value = schedule.equipment_id || '';
-                document.getElementById('sched_frequency').value = schedule.frequency || 'monthly';
-                document.getElementById('sched_interval').value = schedule.frequency_interval || 1;
-                document.getElementById('sched_next_due').value = schedule.next_due_date ? schedule.next_due_date.split('T')[0] : '';
-                document.getElementById('sched_status').value = schedule.status || 'active';
-                document.getElementById('sched_description').value = schedule.description || '';
-                document.getElementById('sched_estimated_duration').value = schedule.estimated_duration_minutes || '';
+        if (!scheduleName || !nextDue) {
+            showWarning('Please fill in required fields');
+            return;
+        }
 
-                updateFrequencyInfo();
-                document.getElementById('createModal').classList.add('active');
-            } catch (error) {
-                console.error('Error loading schedule:', error);
-                alert('Error loading schedule details');
+        // Map frontend status to backend is_active
+        const statusValue = document.getElementById('sched_status').value;
+        const vendorId = document.getElementById('sched_vendor_id').value;
+
+        const data = {
+            name: scheduleName,
+            equipment_id: parseInt(equipmentId),
+            frequency: document.getElementById('sched_frequency').value,
+            next_due: nextDue,
+            is_active: statusValue === 'active',
+            description: document.getElementById('sched_description').value || null,
+            estimated_duration_minutes: parseInt(document.getElementById('sched_estimated_duration').value) || null,
+            vendor_id: vendorId ? parseInt(vendorId) : null
+        };
+
+        try {
+            const url = id ? `${API_BASE}/schedules/${id}` : `${API_BASE}/schedules`;
+            const method = id ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                closeModal();
+                loadSchedules();
+            } else {
+                const error = await response.json();
+                showError('Failed to save schedule: ' + (error.detail || 'Unknown error'));
             }
+        } catch (error) {
+            console.error('Error saving schedule:', error);
+            showError('Failed to save schedule');
         }
+    }
 
-        function closeModal() {
-            document.getElementById('createModal').classList.remove('active');
-        }
+    async function markCompleted(id) {
+        const confirmed = await showConfirm(
+            'Mark this maintenance as completed? This will update the next due date.',
+            'Mark Completed'
+        );
+        if (!confirmed) return;
 
-        function updateFrequencyInfo() {
-            const frequency = document.getElementById('sched_frequency').value;
-            const interval = parseInt(document.getElementById('sched_interval').value) || 1;
+        try {
+            const response = await fetch(`${API_BASE}/schedules/${id}/complete`, {
+                method: 'POST'
+            });
 
-            const labels = {
-                'daily': interval === 1 ? 'day' : 'days',
-                'weekly': interval === 1 ? 'week' : 'weeks',
-                'monthly': interval === 1 ? 'month' : 'months',
-                'quarterly': interval === 1 ? 'quarter' : 'quarters',
-                'yearly': interval === 1 ? 'year' : 'years'
-            };
-
-            const text = interval === 1
-                ? `This will run every ${labels[frequency].replace('s', '')}`
-                : `This will run every ${interval} ${labels[frequency]}`;
-
-            document.getElementById('frequencyInfo').innerHTML = `<p><i class="bi bi-info-circle"></i> ${text}</p>`;
-        }
-
-        async function saveSchedule() {
-            const id = document.getElementById('scheduleId').value;
-            const data = {
-                name: document.getElementById('sched_name').value,
-                equipment_id: parseInt(document.getElementById('sched_equipment_id').value),
-                frequency: document.getElementById('sched_frequency').value,
-                frequency_interval: parseInt(document.getElementById('sched_interval').value) || 1,
-                next_due_date: document.getElementById('sched_next_due').value,
-                status: document.getElementById('sched_status').value,
-                description: document.getElementById('sched_description').value || null,
-                estimated_duration_minutes: parseInt(document.getElementById('sched_estimated_duration').value) || null
-            };
-
-            if (!data.name || !data.equipment_id || !data.next_due_date) {
-                alert('Please fill in required fields');
-                return;
+            if (response.ok) {
+                loadSchedules();
+                showSuccess('Maintenance marked as completed');
+            } else {
+                const error = await response.json();
+                showError(error.detail || 'Unknown error');
             }
-
-            try {
-                const url = id ? `${API_BASE}/schedules/${id}` : `${API_BASE}/schedules`;
-                const method = id ? 'PUT' : 'POST';
-
-                const response = await fetch(url, {
-                    method: method,
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-
-                if (response.ok) {
-                    closeModal();
-                    loadSchedules();
-                } else {
-                    const error = await response.json();
-                    alert('Error saving schedule: ' + (error.detail || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Error saving schedule:', error);
-                alert('Error saving schedule');
-            }
+        } catch (error) {
+            console.error('Error marking completed:', error);
+            showError('Failed to mark schedule as completed');
         }
+    }
 
-        async function markCompleted(id) {
-            if (!confirm('Mark this maintenance as completed? This will update the next due date.')) {
-                return;
+    async function createWorkOrder(scheduleId) {
+        const schedule = allSchedules.find(s => s.id === scheduleId);
+        if (!schedule) return;
+
+        const data = {
+            title: `Scheduled: ${schedule.name}`,
+            equipment_id: schedule.equipment_id,
+            work_order_type: 'preventive',
+            priority: 'medium',
+            description: schedule.description || `Scheduled maintenance: ${schedule.name}`,
+            status: 'open'
+        };
+
+        try {
+            const response = await fetch(`${API_BASE}/work-orders`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                showSuccess('Work order created successfully');
+            } else {
+                const error = await response.json();
+                showError('Failed to create work order: ' + (error.detail || 'Unknown error'));
             }
-
-            try {
-                const response = await fetch(`${API_BASE}/schedules/${id}/complete`, {
-                    method: 'POST'
-                });
-
-                if (response.ok) {
-                    loadSchedules();
-                } else {
-                    const error = await response.json();
-                    alert('Error: ' + (error.detail || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Error marking completed:', error);
-                alert('Error marking schedule as completed');
-            }
+        } catch (error) {
+            console.error('Error creating work order:', error);
+            showError('Failed to create work order');
         }
+    }
 
-        async function createWorkOrder(scheduleId) {
-            const schedule = allSchedules.find(s => s.id === scheduleId);
-            if (!schedule) return;
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 
-            const data = {
-                title: `Scheduled: ${schedule.name}`,
-                equipment_id: schedule.equipment_id,
-                work_order_type: 'preventive',
-                priority: 'medium',
-                description: schedule.description || `Scheduled maintenance: ${schedule.name}`,
-                status: 'open'
-            };
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        initVendorDropdown();
+    });
 
-            try {
-                const response = await fetch(`${API_BASE}/work-orders`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-
-                if (response.ok) {
-                    alert('Work order created successfully');
-                } else {
-                    const error = await response.json();
-                    alert('Error creating work order: ' + (error.detail || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Error creating work order:', error);
-                alert('Error creating work order');
-            }
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        // Initialize
-        loadEquipment().then(() => loadSchedules());
-
-        // Update frequency info when interval changes
-        document.getElementById('sched_interval').addEventListener('input', updateFrequencyInfo);
-    </script>
-</body>
-</html>
+    Promise.all([loadEquipment(), loadLocations(), loadVendors()]).then(() => loadSchedules());
+</script>
+{% endblock %}

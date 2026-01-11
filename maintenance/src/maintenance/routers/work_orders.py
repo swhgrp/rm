@@ -16,7 +16,8 @@ from maintenance.schemas import (
     WorkOrderCreate, WorkOrderUpdate, WorkOrderResponse,
     WorkOrderListResponse, WorkOrderDetailResponse,
     WorkOrderCommentCreate, WorkOrderCommentResponse,
-    WorkOrderPartCreate, WorkOrderPartResponse
+    WorkOrderPartCreate, WorkOrderPartResponse,
+    LogCompletedWork
 )
 
 logger = logging.getLogger(__name__)
@@ -227,6 +228,46 @@ async def create_work_order(
     await db.refresh(work_order)
 
     logger.info(f"Created work order: {work_order.title} (ID: {work_order.id})")
+    return work_order
+
+
+@router.post("/log-completed", response_model=WorkOrderResponse, status_code=201)
+async def log_completed_work(
+    data: LogCompletedWork,
+    db: AsyncSession = Depends(get_db)
+):
+    """Log work that has already been completed (emergency repairs, vendor call-outs, etc.)
+
+    This creates a work order and marks it as completed in one step.
+    """
+    # Verify equipment exists if specified
+    if data.equipment_id:
+        eq_query = select(Equipment.id).where(Equipment.id == data.equipment_id)
+        result = await db.execute(eq_query)
+        if not result.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="Equipment not found")
+
+    work_order = WorkOrder(
+        title=data.title,
+        location_id=data.location_id,
+        equipment_id=data.equipment_id,
+        description=data.description,
+        priority=WorkOrderPriority.HIGH,
+        status=WorkOrderStatus.COMPLETED,
+        is_external=True,
+        resolution_notes=data.resolution_notes,
+        root_cause=data.root_cause,
+        actual_cost=data.actual_cost,
+        labor_hours=data.labor_hours,
+        reported_date=datetime.utcnow(),
+        completed_date=datetime.combine(data.completed_date, datetime.min.time())
+    )
+
+    db.add(work_order)
+    await db.commit()
+    await db.refresh(work_order)
+
+    logger.info(f"Logged completed work: {work_order.title} (ID: {work_order.id})")
     return work_order
 
 

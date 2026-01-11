@@ -1,11 +1,12 @@
 """Equipment router for Maintenance Service"""
 import secrets
 import logging
-from typing import Optional, List
+from typing import Optional, List, Dict
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_
 from sqlalchemy.orm import selectinload
+import httpx
 
 from maintenance.database import get_db
 from maintenance.models import Equipment, EquipmentCategory, EquipmentHistory, EquipmentStatus
@@ -14,9 +15,26 @@ from maintenance.schemas import (
     EquipmentListResponse, EquipmentDetailResponse,
     EquipmentHistoryResponse
 )
+from maintenance.config import settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+async def get_location_names() -> Dict[int, str]:
+    """Fetch location names from inventory service"""
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(
+                f"{settings.INVENTORY_SERVICE_URL}/api/locations/_sync",
+                params={"include_inactive": "false"}
+            )
+            if response.status_code == 200:
+                locations = response.json()
+                return {loc["id"]: loc["name"] for loc in locations}
+    except Exception as e:
+        logger.warning(f"Failed to fetch location names: {e}")
+    return {}
 
 
 def generate_qr_code() -> str:
@@ -58,17 +76,24 @@ async def list_equipment(
     result = await db.execute(query)
     equipment_list = result.scalars().all()
 
+    # Fetch location names
+    location_names = await get_location_names()
+
     return [
         EquipmentListResponse(
             id=eq.id,
             name=eq.name,
+            description=eq.description,
             category_id=eq.category_id,
             category_name=eq.category.name if eq.category else None,
             location_id=eq.location_id,
+            location_name=location_names.get(eq.location_id),
             status=eq.status,
             serial_number=eq.serial_number,
             next_maintenance_date=eq.next_maintenance_date,
-            qr_code=eq.qr_code
+            qr_code=eq.qr_code,
+            ownership_type=eq.ownership_type,
+            owner_name=eq.owner_name
         )
         for eq in equipment_list
     ]

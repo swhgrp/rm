@@ -94,6 +94,112 @@
         }
         .toast.hiding { animation: slideOut 0.3s ease-in forwards; }
 
+        /* Confirm dialog */
+        .confirm-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100001;
+            animation: fadeIn 0.2s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .confirm-dialog {
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
+            border-radius: 12px;
+            min-width: 380px;
+            max-width: 90%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            animation: scaleIn 0.2s ease;
+        }
+
+        @keyframes scaleIn {
+            from { transform: scale(0.9); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .confirm-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .confirm-icon {
+            font-size: 24px;
+            color: var(--warning);
+        }
+
+        .confirm-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .confirm-body {
+            padding: 20px;
+        }
+
+        .confirm-body p {
+            font-size: 15px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        .confirm-footer {
+            padding: 15px 20px;
+            border-top: 1px solid var(--border-primary);
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .confirm-btn {
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .confirm-btn-cancel {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-primary);
+        }
+
+        .confirm-btn-cancel:hover {
+            background-color: var(--bg-elevated);
+        }
+
+        .confirm-btn-ok {
+            background-color: var(--accent-primary);
+            color: white;
+            border: none;
+        }
+
+        .confirm-btn-ok:hover {
+            background-color: var(--accent-hover);
+        }
+
+        .confirm-btn:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px var(--accent-primary);
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
@@ -584,6 +690,68 @@
         window.showSuccess = (msg) => showToast(msg, 'success');
         window.showWarning = (msg) => showToast(msg, 'warning');
         window.showInfo = (msg) => showToast(msg, 'info');
+
+        // Styled confirm dialog
+        window.showConfirm = function(message, title = 'Confirm') {
+            return new Promise((resolve) => {
+                // Create overlay
+                const overlay = document.createElement('div');
+                overlay.className = 'confirm-overlay';
+                overlay.innerHTML = `
+                    <div class="confirm-dialog">
+                        <div class="confirm-header">
+                            <i class="bi bi-question-circle confirm-icon"></i>
+                            <h3 class="confirm-title">${title}</h3>
+                        </div>
+                        <div class="confirm-body">
+                            <p>${message}</p>
+                        </div>
+                        <div class="confirm-footer">
+                            <button class="confirm-btn confirm-btn-cancel">Cancel</button>
+                            <button class="confirm-btn confirm-btn-ok">OK</button>
+                        </div>
+                    </div>
+                `;
+
+                document.body.appendChild(overlay);
+
+                // Focus the OK button
+                const okBtn = overlay.querySelector('.confirm-btn-ok');
+                const cancelBtn = overlay.querySelector('.confirm-btn-cancel');
+
+                setTimeout(() => okBtn.focus(), 10);
+
+                // Handle clicks
+                okBtn.onclick = () => {
+                    overlay.remove();
+                    resolve(true);
+                };
+
+                cancelBtn.onclick = () => {
+                    overlay.remove();
+                    resolve(false);
+                };
+
+                // Handle escape key
+                overlay.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape') {
+                        overlay.remove();
+                        resolve(false);
+                    } else if (e.key === 'Enter') {
+                        overlay.remove();
+                        resolve(true);
+                    }
+                });
+
+                // Click outside to cancel
+                overlay.addEventListener('click', (e) => {
+                    if (e.target === overlay) {
+                        overlay.remove();
+                        resolve(false);
+                    }
+                });
+            });
+        };
     </script>
 
     {% block extra_scripts %}{% endblock %}

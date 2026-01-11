@@ -891,11 +891,15 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 - ✅ Overdue maintenance alerts
 - ✅ Schedule completion tracking
 - ✅ One-click work order creation from schedules
+- ✅ Location filter on schedules page
+- ✅ Vendor assignment to scheduled maintenance
 
 **Vendor Management:**
-- ✅ Vendor contact information
+- ✅ Vendor contact information with phone formatting
 - ✅ Service type categorization
-- ✅ Link vendors to equipment
+- ✅ Link vendors to equipment and schedules
+- ✅ Searchable vendor dropdown in work orders
+- ✅ Quick-add vendor from work order/schedule forms
 
 **Dashboard & Alerts:**
 - ✅ Real-time statistics (total equipment, open work orders, overdue items)
@@ -907,8 +911,10 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 **Portal Integration:**
 - ✅ Full Portal UI with consistent styling
 - ✅ Permission-based access (can_access_maintenance)
-- ✅ Dashboard, Equipment, Work Orders, and Schedules pages
+- ✅ Dashboard, Equipment, Work Orders, Schedules, Vendors pages
 - ✅ Mobile-responsive design
+- ✅ Styled confirmation dialogs (replaces browser alerts)
+- ✅ Searchable dropdown components for equipment and vendors
 
 **API Endpoints:**
 - `/maintenance/health` - Health check

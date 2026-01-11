@@ -333,7 +333,7 @@
                         <th>Company Name</th>
                         <th>Contact Person</th>
                         <th>Contact Info</th>
-                        <th>Specialty</th>
+                        <th>Service Types</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -360,8 +360,8 @@
                 <form id="vendorForm">
                     <input type="hidden" id="vendorId">
                     <div class="form-group">
-                        <label for="company_name">Company Name *</label>
-                        <input type="text" id="company_name" required placeholder="e.g., ABC HVAC Services">
+                        <label for="vendor_name">Company Name *</label>
+                        <input type="text" id="vendor_name" required placeholder="e.g., ABC HVAC Services">
                     </div>
                     <div class="form-row">
                         <div class="form-group">
@@ -369,8 +369,8 @@
                             <input type="text" id="contact_name" placeholder="Primary contact name">
                         </div>
                         <div class="form-group">
-                            <label for="specialty">Specialty</label>
-                            <input type="text" id="specialty" placeholder="e.g., HVAC, Refrigeration">
+                            <label for="service_types">Service Types</label>
+                            <input type="text" id="service_types" placeholder="e.g., HVAC, Refrigeration">
                         </div>
                     </div>
                     <div class="form-row">
@@ -413,6 +413,31 @@
     const API_BASE = '/maintenance';
     let allVendors = [];
 
+    // Phone number formatting
+    function formatPhoneNumber(value) {
+        if (!value) return '';
+        // Remove all non-digits
+        const digits = value.replace(/\D/g, '');
+
+        // Format based on length
+        if (digits.length === 0) return '';
+        if (digits.length <= 3) return `(${digits}`;
+        if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+        return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+    }
+
+    function handlePhoneInput(input) {
+        const cursorPos = input.selectionStart;
+        const oldLength = input.value.length;
+        const formatted = formatPhoneNumber(input.value);
+        input.value = formatted;
+
+        // Adjust cursor position after formatting
+        const newLength = formatted.length;
+        const diff = newLength - oldLength;
+        input.setSelectionRange(cursorPos + diff, cursorPos + diff);
+    }
+
     async function loadVendors() {
         try {
             const response = await fetch(`${API_BASE}/vendors`);
@@ -434,9 +459,9 @@
 
         let filtered = allVendors.filter(v => {
             const matchesSearch = !search ||
-                v.company_name.toLowerCase().includes(search) ||
+                v.name.toLowerCase().includes(search) ||
                 (v.contact_name && v.contact_name.toLowerCase().includes(search)) ||
-                (v.specialty && v.specialty.toLowerCase().includes(search));
+                (v.service_types && v.service_types.toLowerCase().includes(search));
             return matchesSearch;
         });
 
@@ -461,22 +486,22 @@
 
         tbody.innerHTML = vendors.map(v => `
             <tr>
-                <td><strong>${escapeHtml(v.company_name)}</strong></td>
+                <td><strong>${escapeHtml(v.name)}</strong></td>
                 <td>${v.contact_name ? escapeHtml(v.contact_name) : '<span style="color: var(--text-muted);">-</span>'}</td>
                 <td>
                     <div class="contact-info">
-                        ${v.phone ? `<span><i class="bi bi-telephone"></i> ${escapeHtml(v.phone)}</span>` : ''}
+                        ${v.phone ? `<span><i class="bi bi-telephone"></i> ${formatPhoneNumber(v.phone)}</span>` : ''}
                         ${v.email ? `<span><i class="bi bi-envelope"></i> <a href="mailto:${escapeHtml(v.email)}">${escapeHtml(v.email)}</a></span>` : ''}
                         ${!v.phone && !v.email ? '<span style="color: var(--text-muted);">No contact info</span>' : ''}
                     </div>
                 </td>
-                <td>${v.specialty ? escapeHtml(v.specialty) : '<span style="color: var(--text-muted);">-</span>'}</td>
+                <td>${v.service_types ? escapeHtml(v.service_types) : '<span style="color: var(--text-muted);">-</span>'}</td>
                 <td><span class="badge badge-${v.is_active !== false ? 'active' : 'inactive'}">${v.is_active !== false ? 'Active' : 'Inactive'}</span></td>
                 <td class="actions-cell">
                     <button class="btn-icon" onclick="editVendor(${v.id})" title="Edit">
                         <i class="bi bi-pencil"></i>
                     </button>
-                    <button class="btn-icon danger" onclick="deleteVendor(${v.id}, '${escapeHtml(v.company_name)}')" title="Delete">
+                    <button class="btn-icon danger" onclick="deleteVendor(${v.id}, '${escapeHtml(v.name)}')" title="Delete">
                         <i class="bi bi-trash"></i>
                     </button>
                 </td>
@@ -498,10 +523,10 @@
 
         document.getElementById('modalTitle').textContent = 'Edit Vendor';
         document.getElementById('vendorId').value = vendor.id;
-        document.getElementById('company_name').value = vendor.company_name || '';
+        document.getElementById('vendor_name').value = vendor.name || '';
         document.getElementById('contact_name').value = vendor.contact_name || '';
-        document.getElementById('specialty').value = vendor.specialty || '';
-        document.getElementById('phone').value = vendor.phone || '';
+        document.getElementById('service_types').value = vendor.service_types || '';
+        document.getElementById('phone').value = formatPhoneNumber(vendor.phone || '');
         document.getElementById('email').value = vendor.email || '';
         document.getElementById('address').value = vendor.address || '';
         document.getElementById('notes').value = vendor.notes || '';
@@ -517,9 +542,9 @@
     async function saveVendor() {
         const id = document.getElementById('vendorId').value;
         const data = {
-            company_name: document.getElementById('company_name').value,
+            name: document.getElementById('vendor_name').value,
             contact_name: document.getElementById('contact_name').value || null,
-            specialty: document.getElementById('specialty').value || null,
+            service_types: document.getElementById('service_types').value || null,
             phone: document.getElementById('phone').value || null,
             email: document.getElementById('email').value || null,
             address: document.getElementById('address').value || null,
@@ -527,7 +552,7 @@
             is_active: document.getElementById('is_active').value === 'true'
         };
 
-        if (!data.company_name) {
+        if (!data.name) {
             showWarning('Please enter a company name');
             return;
         }
@@ -556,9 +581,11 @@
     }
 
     async function deleteVendor(id, name) {
-        if (!confirm(`Are you sure you want to delete the vendor "${name}"?`)) {
-            return;
-        }
+        const confirmed = await showConfirm(
+            `Are you sure you want to delete the vendor "${name}"?`,
+            'Delete Vendor'
+        );
+        if (!confirmed) return;
 
         try {
             const response = await fetch(`${API_BASE}/vendors/${id}`, {
@@ -567,6 +594,7 @@
 
             if (response.ok) {
                 loadVendors();
+                showSuccess('Vendor deleted successfully');
             } else {
                 const error = await response.json();
                 showError('Failed to delete vendor: ' + (error.detail || 'Unknown error'));
@@ -582,6 +610,16 @@
         div.textContent = text;
         return div.innerHTML;
     }
+
+    // Initialize phone input formatting
+    document.addEventListener('DOMContentLoaded', () => {
+        const phoneInput = document.getElementById('phone');
+        if (phoneInput) {
+            phoneInput.addEventListener('input', function() {
+                handlePhoneInput(this);
+            });
+        }
+    });
 
     // Initialize
     loadVendors();

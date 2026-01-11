@@ -1,364 +1,336 @@
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>New Work Order - Maintenance - SW Hospitality Group</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --bg-primary: #ECEFF1;
-            --bg-secondary: #FFFFFF;
-            --bg-tertiary: #F5F5F5;
-            --border-primary: #CFD8DC;
-            --text-primary: #263238;
-            --text-secondary: #546E7A;
-            --text-muted: #78909C;
-            --accent-primary: #455A64;
-            --accent-hover: #263238;
-            --success: #43A047;
-            --error: #E53935;
-        }
+{% extends "maintenance/base.html" %}
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+{% block title %}New Work Order - Maintenance - SW Hospitality Group{% endblock %}
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-        }
+{% block nav_new_work_order %}active{% endblock %}
 
-        .navbar {
-            background-color: #455A64;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 8px rgba(69, 90, 100, 0.3);
-        }
+{% block extra_styles %}
+    .page-header {
+        margin-bottom: 30px;
+    }
 
-        .navbar-brand h1 {
-            font-size: 20px;
-            font-weight: 600;
-            color: #FFFFFF;
-        }
+    .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
 
-        .navbar-nav {
-            display: flex;
-            gap: 10px;
-        }
+    .page-subtitle {
+        color: var(--text-muted);
+        font-size: 14px;
+    }
 
-        .nav-link, .btn-back {
-            padding: 8px 16px;
-            background-color: rgba(255, 255, 255, 0.15);
-            color: #FFFFFF;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 14px;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        padding: 30px;
+        max-width: 800px;
+    }
 
-        .nav-link:hover, .btn-back:hover {
-            background-color: rgba(255, 255, 255, 0.25);
-            border-color: rgba(255, 255, 255, 0.5);
-        }
+    .form-group {
+        margin-bottom: 25px;
+    }
 
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 30px 20px;
-        }
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
 
-        .page-header {
-            margin-bottom: 30px;
-        }
+    .form-group label .required {
+        color: var(--error);
+    }
 
-        .page-title {
-            font-size: 28px;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%;
+        padding: 12px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        transition: border-color 0.2s;
+    }
 
-        .page-subtitle {
-            color: var(--text-muted);
-            font-size: 14px;
-        }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
 
-        .card {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: 12px;
-            padding: 30px;
-        }
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
 
-        .form-group {
-            margin-bottom: 25px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: var(--text-secondary);
-        }
-
-        .form-group label .required {
-            color: var(--error);
-        }
-
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 12px 15px;
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            font-size: 14px;
-            background-color: var(--bg-secondary);
-            transition: border-color 0.2s;
-        }
-
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-        }
-
+    @media (max-width: 600px) {
         .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            grid-template-columns: 1fr;
         }
+    }
 
-        @media (max-width: 600px) {
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-        }
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 15px;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-primary);
+    }
 
-        .form-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 15px;
-            margin-top: 30px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border-primary);
-        }
+    .btn-primary {
+        padding: 12px 24px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    }
 
-        .btn-primary {
-            padding: 12px 24px;
-            background-color: var(--accent-primary);
-            color: #FFFFFF;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s ease;
-        }
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
 
-        .btn-primary:hover {
-            background-color: var(--accent-hover);
-        }
+    .btn-secondary {
+        padding: 12px 24px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
 
-        .btn-secondary {
-            padding: 12px 24px;
-            background-color: var(--bg-tertiary);
-            color: var(--text-primary);
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            font-size: 14px;
-            cursor: pointer;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+    .btn-secondary:hover {
+        background-color: var(--bg-primary);
+    }
 
-        .btn-secondary:hover {
-            background-color: var(--bg-primary);
-        }
+    .alert {
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: none;
+    }
 
-        .alert {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: none;
-        }
+    .alert-success {
+        background-color: rgba(67, 160, 71, 0.1);
+        border: 1px solid var(--success);
+        color: var(--success);
+    }
 
-        .alert-success {
-            background-color: rgba(67, 160, 71, 0.1);
-            border: 1px solid var(--success);
-            color: var(--success);
-        }
+    .alert-error {
+        background-color: rgba(229, 57, 53, 0.1);
+        border: 1px solid var(--error);
+        color: var(--error);
+    }
+{% endblock %}
 
-        .alert-error {
-            background-color: rgba(229, 57, 53, 0.1);
-            border: 1px solid var(--error);
-            color: var(--error);
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar">
-        <div class="navbar-brand">
-            <h1><i class="bi bi-tools"></i> Maintenance</h1>
-        </div>
-        <div class="navbar-nav">
-            <a href="/portal/maintenance/" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a>
-            <a href="/portal/maintenance/equipment" class="nav-link"><i class="bi bi-gear"></i> Equipment</a>
-            <a href="/portal/maintenance/work-orders" class="nav-link"><i class="bi bi-clipboard-check"></i> Work Orders</a>
-            <a href="/portal/maintenance/schedules" class="nav-link"><i class="bi bi-calendar-check"></i> Schedules</a>
-            <a href="/portal/" class="btn-back"><i class="bi bi-arrow-left"></i> Portal</a>
-        </div>
-    </nav>
+{% block content %}
+    <div class="page-header">
+        <h2 class="page-title">New Work Order</h2>
+        <p class="page-subtitle">Create a new maintenance work order</p>
+    </div>
 
-    <div class="container">
-        <div class="page-header">
-            <h2 class="page-title">New Work Order</h2>
-            <p class="page-subtitle">Create a new maintenance work order</p>
-        </div>
+    <div class="alert alert-success" id="successAlert">
+        Work order created successfully! Redirecting...
+    </div>
+    <div class="alert alert-error" id="errorAlert"></div>
 
-        <div class="alert alert-success" id="successAlert">
-            Work order created successfully! Redirecting...
-        </div>
-        <div class="alert alert-error" id="errorAlert"></div>
+    <div class="card">
+        <form id="workOrderForm">
+            <div class="form-group">
+                <label for="title">Title <span class="required">*</span></label>
+                <input type="text" id="title" required placeholder="Brief description of the work needed">
+            </div>
 
-        <div class="card">
-            <form id="workOrderForm">
+            <div class="form-row">
                 <div class="form-group">
-                    <label for="title">Title <span class="required">*</span></label>
-                    <input type="text" id="title" required placeholder="Brief description of the work needed">
+                    <label for="location_id">Location <span class="required">*</span></label>
+                    <select id="location_id" required>
+                        <option value="">Select location...</option>
+                    </select>
                 </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="equipment_id">Equipment</label>
-                        <select id="equipment_id">
-                            <option value="">Select equipment (optional)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="work_order_type">Type <span class="required">*</span></label>
-                        <select id="work_order_type" required>
-                            <option value="repair">Repair</option>
-                            <option value="preventive">Preventive Maintenance</option>
-                            <option value="inspection">Inspection</option>
-                            <option value="installation">Installation</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
+                <div class="form-group">
+                    <label for="equipment_id">Equipment</label>
+                    <select id="equipment_id">
+                        <option value="">Select equipment (optional)</option>
+                    </select>
                 </div>
+            </div>
 
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="priority">Priority <span class="required">*</span></label>
-                        <select id="priority" required>
-                            <option value="low">Low - Can wait</option>
-                            <option value="medium" selected>Medium - Normal priority</option>
-                            <option value="high">High - Needs attention soon</option>
-                            <option value="critical">Critical - Urgent!</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="due_date">Due Date</label>
-                        <input type="date" id="due_date">
-                    </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="work_order_type">Type <span class="required">*</span></label>
+                    <select id="work_order_type" required>
+                        <option value="repair">Repair</option>
+                        <option value="preventive">Preventive Maintenance</option>
+                        <option value="inspection">Inspection</option>
+                        <option value="installation">Installation</option>
+                        <option value="other">Other</option>
+                    </select>
                 </div>
+                <div class="form-group">
+                    <label for="priority">Priority <span class="required">*</span></label>
+                    <select id="priority" required>
+                        <option value="low">Low - Can wait</option>
+                        <option value="medium" selected>Medium - Normal priority</option>
+                        <option value="high">High - Needs attention soon</option>
+                        <option value="critical">Critical - Urgent!</option>
+                    </select>
+                </div>
+            </div>
 
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="due_date">Due Date</label>
+                    <input type="date" id="due_date">
+                </div>
                 <div class="form-group">
                     <label for="assigned_to">Assigned To</label>
                     <input type="text" id="assigned_to" placeholder="Name of person responsible">
                 </div>
+            </div>
 
-                <div class="form-group">
-                    <label for="description">Description</label>
-                    <textarea id="description" rows="5" placeholder="Detailed description of the work to be done, symptoms observed, or instructions for the technician..."></textarea>
-                </div>
+            <div class="form-group">
+                <label for="description">Description</label>
+                <textarea id="description" rows="5" placeholder="Detailed description of the work to be done, symptoms observed, or instructions for the technician..."></textarea>
+            </div>
 
-                <div class="form-actions">
-                    <a href="/portal/maintenance/work-orders" class="btn-secondary">
-                        <i class="bi bi-x-lg"></i> Cancel
-                    </a>
-                    <button type="submit" class="btn-primary">
-                        <i class="bi bi-check-lg"></i> Create Work Order
-                    </button>
-                </div>
-            </form>
-        </div>
+            <div class="form-actions">
+                <a href="/portal/maintenance/work-orders" class="btn-secondary">
+                    <i class="bi bi-x-lg"></i> Cancel
+                </a>
+                <button type="submit" class="btn-primary">
+                    <i class="bi bi-check-lg"></i> Create Work Order
+                </button>
+            </div>
+        </form>
     </div>
+{% endblock %}
 
-    <script>
-        const API_BASE = '/maintenance';
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/maintenance';
+    let locations = [];
+    let allEquipment = [];
 
-        async function loadEquipment() {
-            try {
-                const response = await fetch(`${API_BASE}/equipment`);
-                const equipment = await response.json();
+    async function loadLocations() {
+        try {
+            const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+            if (response.ok) {
+                locations = await response.json();
 
-                const select = document.getElementById('equipment_id');
-                equipment.forEach(e => {
+                const select = document.getElementById('location_id');
+                select.innerHTML = '<option value="">Select location...</option>';
+                locations.forEach(loc => {
                     const option = document.createElement('option');
-                    option.value = e.id;
-                    option.textContent = `${e.name} (${e.location || 'No location'})`;
+                    option.value = loc.id;
+                    option.textContent = loc.name;
                     select.appendChild(option);
                 });
-            } catch (error) {
-                console.error('Error loading equipment:', error);
             }
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+    }
+
+    async function loadEquipment() {
+        try {
+            const response = await fetch(`${API_BASE}/equipment`);
+            allEquipment = await response.json();
+            updateEquipmentDropdown();
+        } catch (error) {
+            console.error('Error loading equipment:', error);
+        }
+    }
+
+    function updateEquipmentDropdown() {
+        const locationId = document.getElementById('location_id').value;
+        const select = document.getElementById('equipment_id');
+
+        // Filter equipment by selected location if a location is chosen
+        let filteredEquipment = allEquipment;
+        if (locationId) {
+            filteredEquipment = allEquipment.filter(e => e.location_id == locationId);
         }
 
-        document.getElementById('workOrderForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const data = {
-                title: document.getElementById('title').value,
-                equipment_id: document.getElementById('equipment_id').value || null,
-                work_order_type: document.getElementById('work_order_type').value,
-                priority: document.getElementById('priority').value,
-                due_date: document.getElementById('due_date').value || null,
-                assigned_to: document.getElementById('assigned_to').value || null,
-                description: document.getElementById('description').value || null,
-                status: 'open'
-            };
-
-            if (data.equipment_id) {
-                data.equipment_id = parseInt(data.equipment_id);
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/work-orders`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-
-                if (response.ok) {
-                    document.getElementById('successAlert').style.display = 'block';
-                    document.getElementById('errorAlert').style.display = 'none';
-                    setTimeout(() => {
-                        window.location.href = '/portal/maintenance/work-orders';
-                    }, 1500);
-                } else {
-                    const error = await response.json();
-                    document.getElementById('errorAlert').textContent = 'Error: ' + (error.detail || 'Unknown error');
-                    document.getElementById('errorAlert').style.display = 'block';
-                    document.getElementById('successAlert').style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Error creating work order:', error);
-                document.getElementById('errorAlert').textContent = 'Error creating work order. Please try again.';
-                document.getElementById('errorAlert').style.display = 'block';
-            }
+        select.innerHTML = '<option value="">Select equipment (optional)</option>';
+        filteredEquipment.forEach(e => {
+            const option = document.createElement('option');
+            option.value = e.id;
+            const location = locations.find(l => l.id === e.location_id);
+            option.textContent = `${e.name} (${location ? location.name : e.location || 'No location'})`;
+            select.appendChild(option);
         });
+    }
 
-        // Initialize
-        loadEquipment();
-    </script>
-</body>
-</html>
+    // Update equipment dropdown when location changes
+    document.getElementById('location_id').addEventListener('change', updateEquipmentDropdown);
+
+    document.getElementById('workOrderForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const locationId = document.getElementById('location_id').value;
+        if (!locationId) {
+            document.getElementById('errorAlert').textContent = 'Please select a location';
+            document.getElementById('errorAlert').style.display = 'block';
+            return;
+        }
+
+        const data = {
+            title: document.getElementById('title').value,
+            location_id: parseInt(locationId),
+            equipment_id: document.getElementById('equipment_id').value || null,
+            work_order_type: document.getElementById('work_order_type').value,
+            priority: document.getElementById('priority').value,
+            due_date: document.getElementById('due_date').value || null,
+            assigned_to: document.getElementById('assigned_to').value || null,
+            description: document.getElementById('description').value || null,
+            status: 'open'
+        };
+
+        if (data.equipment_id) {
+            data.equipment_id = parseInt(data.equipment_id);
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/work-orders`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                document.getElementById('successAlert').style.display = 'block';
+                document.getElementById('errorAlert').style.display = 'none';
+                setTimeout(() => {
+                    window.location.href = '/portal/maintenance/work-orders';
+                }, 1500);
+            } else {
+                const error = await response.json();
+                document.getElementById('errorAlert').textContent = 'Error: ' + (error.detail || 'Unknown error');
+                document.getElementById('errorAlert').style.display = 'block';
+                document.getElementById('successAlert').style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error creating work order:', error);
+            document.getElementById('errorAlert').textContent = 'Error creating work order. Please try again.';
+            document.getElementById('errorAlert').style.display = 'block';
+        }
+    });
+
+    // Initialize
+    Promise.all([loadLocations(), loadEquipment()]);
+</script>
+{% endblock %}

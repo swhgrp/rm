@@ -1,544 +1,433 @@
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Maintenance Dashboard - SW Hospitality Group</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --bg-primary: #ECEFF1;
-            --bg-secondary: #FFFFFF;
-            --bg-tertiary: #F5F5F5;
-            --bg-elevated: #E0E0E0;
-            --border-primary: #CFD8DC;
-            --border-secondary: #B0BEC5;
-            --text-primary: #263238;
-            --text-secondary: #546E7A;
-            --text-muted: #78909C;
-            --accent-primary: #455A64;
-            --accent-secondary: #37474F;
-            --accent-hover: #263238;
-            --accent-muted: #546E7A;
-            --success: #43A047;
-            --success-bg: rgba(67, 160, 71, 0.1);
-            --error: #E53935;
-            --error-bg: rgba(229, 57, 53, 0.1);
-            --warning: #FB8C00;
-            --warning-bg: rgba(251, 140, 0, 0.1);
-            --info: #1E88E5;
-            --info-bg: rgba(30, 136, 229, 0.1);
-            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
-            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
-            --glow-accent: 0 0 15px rgba(69, 90, 100, 0.15);
-        }
+{% extends "maintenance/base.html" %}
 
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+{% block title %}Maintenance Dashboard - SW Hospitality Group{% endblock %}
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-        }
+{% block nav_dashboard %}active{% endblock %}
 
-        .navbar {
-            background-color: #455A64;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 8px rgba(69, 90, 100, 0.3);
-        }
+{% block extra_styles %}
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
 
-        .navbar-brand {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
+    .stat-card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+        transition: all 0.2s ease;
+    }
 
-        .navbar-brand h1 {
-            font-size: 20px;
-            font-weight: 600;
-            color: #FFFFFF;
-        }
+    .stat-card:hover {
+        border-color: var(--accent-muted);
+        box-shadow: var(--glow-accent);
+    }
 
-        .navbar-nav {
-            display: flex;
-            gap: 10px;
-        }
+    .stat-value {
+        font-size: 36px;
+        font-weight: 700;
+        color: var(--accent-primary);
+        margin-bottom: 5px;
+    }
 
-        .nav-link, .btn-back {
-            padding: 8px 16px;
-            background-color: rgba(255, 255, 255, 0.15);
-            color: #FFFFFF;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 14px;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
+    .stat-label {
+        font-size: 14px;
+        color: var(--text-secondary);
+    }
 
-        .nav-link:hover, .btn-back:hover {
-            background-color: rgba(255, 255, 255, 0.25);
-            border-color: rgba(255, 255, 255, 0.5);
-            color: #FFFFFF;
-        }
+    .stat-card.warning .stat-value { color: var(--warning); }
+    .stat-card.error .stat-value { color: var(--error); }
+    .stat-card.success .stat-value { color: var(--success); }
 
-        .nav-link.active {
-            background-color: rgba(255, 255, 255, 0.25);
-        }
+    .content-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
 
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 30px 20px;
-        }
+    @media (max-width: 992px) {
+        .content-grid { grid-template-columns: 1fr; }
+    }
 
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        overflow: hidden;
+    }
 
-        .page-title {
-            font-size: 28px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
+    .card-header {
+        padding: 15px 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background-color: var(--bg-tertiary);
+    }
 
-        .btn-primary {
-            padding: 10px 20px;
-            background-color: var(--accent-primary);
-            color: #FFFFFF;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s ease;
-        }
+    .card-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
 
-        .btn-primary:hover {
-            background-color: var(--accent-hover);
-        }
+    .card-body {
+        padding: 20px;
+    }
 
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
+    .list-item {
+        padding: 12px 0;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
 
-        .stat-card {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            transition: all 0.2s ease;
-        }
+    .list-item:last-child { border-bottom: none; }
 
-        .stat-card:hover {
-            border-color: var(--accent-muted);
-            box-shadow: var(--glow-accent);
-        }
+    .list-item-title {
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 3px;
+    }
 
-        .stat-value {
-            font-size: 36px;
-            font-weight: 700;
-            color: var(--accent-primary);
-            margin-bottom: 5px;
-        }
+    .list-item-subtitle {
+        font-size: 13px;
+        color: var(--text-muted);
+    }
 
-        .stat-label {
-            font-size: 14px;
-            color: var(--text-secondary);
-        }
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
 
-        .stat-card.warning .stat-value { color: var(--warning); }
-        .stat-card.error .stat-value { color: var(--error); }
-        .stat-card.success .stat-value { color: var(--success); }
+    .badge-critical { background-color: var(--error-bg); color: var(--error); }
+    .badge-high { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-medium { background-color: var(--info-bg); color: var(--info); }
+    .badge-low { background-color: var(--success-bg); color: var(--success); }
+    .badge-open { background-color: var(--info-bg); color: var(--info); }
+    .badge-in_progress { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-completed { background-color: var(--success-bg); color: var(--success); }
+    .badge-overdue { background-color: var(--error-bg); color: var(--error); }
 
-        .content-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
+    .empty-state {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--text-muted);
+    }
 
-        @media (max-width: 992px) {
-            .content-grid { grid-template-columns: 1fr; }
-        }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 15px;
+        opacity: 0.5;
+    }
 
-        .card {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: 12px;
-            overflow: hidden;
-        }
+    .alert-item {
+        padding: 12px 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
 
-        .card-header {
-            padding: 15px 20px;
-            border-bottom: 1px solid var(--border-primary);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: var(--bg-tertiary);
-        }
+    .alert-item:last-child { margin-bottom: 0; }
 
-        .card-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+    .alert-critical { background-color: var(--error-bg); border-left: 4px solid var(--error); }
+    .alert-high { background-color: var(--warning-bg); border-left: 4px solid var(--warning); }
+    .alert-medium { background-color: var(--info-bg); border-left: 4px solid var(--info); }
 
-        .card-body {
-            padding: 20px;
-        }
+    .alert-icon { font-size: 20px; }
+    .alert-critical .alert-icon { color: var(--error); }
+    .alert-high .alert-icon { color: var(--warning); }
+    .alert-medium .alert-icon { color: var(--info); }
 
-        .list-item {
-            padding: 12px 0;
-            border-bottom: 1px solid var(--border-primary);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    .alert-message { flex: 1; font-size: 14px; }
 
-        .list-item:last-child { border-bottom: none; }
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 40px;
+    }
 
-        .list-item-title {
-            font-weight: 500;
-            color: var(--text-primary);
-            margin-bottom: 3px;
-        }
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-primary);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
 
-        .list-item-subtitle {
-            font-size: 13px;
-            color: var(--text-muted);
-        }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
 
-        .badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
+    .view-all {
+        display: block;
+        text-align: center;
+        padding: 12px;
+        color: var(--accent-primary);
+        text-decoration: none;
+        font-size: 14px;
+        border-top: 1px solid var(--border-primary);
+    }
 
-        .badge-critical { background-color: var(--error-bg); color: var(--error); }
-        .badge-high { background-color: var(--warning-bg); color: var(--warning); }
-        .badge-medium { background-color: var(--info-bg); color: var(--info); }
-        .badge-low { background-color: var(--success-bg); color: var(--success); }
-        .badge-open { background-color: var(--info-bg); color: var(--info); }
-        .badge-in_progress { background-color: var(--warning-bg); color: var(--warning); }
-        .badge-completed { background-color: var(--success-bg); color: var(--success); }
-        .badge-overdue { background-color: var(--error-bg); color: var(--error); }
+    .view-all:hover { background-color: var(--bg-tertiary); }
 
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: var(--text-muted);
-        }
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+    }
 
-        .empty-state i {
-            font-size: 48px;
-            margin-bottom: 15px;
-            opacity: 0.5;
-        }
+    .page-title {
+        font-size: 24px;
+        font-weight: 600;
+        color: var(--text-primary);
+    }
 
-        .alert-item {
-            padding: 12px 15px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    }
 
-        .alert-item:last-child { margin-bottom: 0; }
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
+{% endblock %}
 
-        .alert-critical { background-color: var(--error-bg); border-left: 4px solid var(--error); }
-        .alert-high { background-color: var(--warning-bg); border-left: 4px solid var(--warning); }
-        .alert-medium { background-color: var(--info-bg); border-left: 4px solid var(--info); }
-
-        .alert-icon { font-size: 20px; }
-        .alert-critical .alert-icon { color: var(--error); }
-        .alert-high .alert-icon { color: var(--warning); }
-        .alert-medium .alert-icon { color: var(--info); }
-
-        .alert-message { flex: 1; font-size: 14px; }
-
-        .loading {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 40px;
-        }
-
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--border-primary);
-            border-top-color: var(--accent-primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .view-all {
-            display: block;
-            text-align: center;
-            padding: 12px;
-            color: var(--accent-primary);
-            text-decoration: none;
-            font-size: 14px;
-            border-top: 1px solid var(--border-primary);
-        }
-
-        .view-all:hover { background-color: var(--bg-tertiary); }
-    </style>
-</head>
-<body>
-    <nav class="navbar">
-        <div class="navbar-brand">
-            <h1><i class="bi bi-tools"></i> Maintenance Dashboard</h1>
-        </div>
-        <div class="navbar-nav">
-            <a href="/portal/maintenance/" class="nav-link active"><i class="bi bi-speedometer2"></i> Dashboard</a>
-            <a href="/portal/maintenance/equipment" class="nav-link"><i class="bi bi-gear"></i> Equipment</a>
-            <a href="/portal/maintenance/work-orders" class="nav-link"><i class="bi bi-clipboard-check"></i> Work Orders</a>
-            <a href="/portal/maintenance/schedules" class="nav-link"><i class="bi bi-calendar-check"></i> Schedules</a>
-            <a href="/portal/" class="btn-back"><i class="bi bi-arrow-left"></i> Portal</a>
-        </div>
-    </nav>
-
-    <div class="container">
-        <div class="page-header">
-            <h2 class="page-title">Dashboard</h2>
-            <div style="display: flex; gap: 10px;">
-                <a href="/portal/maintenance/work-orders/new" class="btn-primary">
-                    <i class="bi bi-plus-lg"></i> New Work Order
-                </a>
-            </div>
-        </div>
-
-        <div class="stats-grid" id="statsGrid">
-            <div class="stat-card">
-                <div class="stat-value" id="totalEquipment">-</div>
-                <div class="stat-label">Total Equipment</div>
-            </div>
-            <div class="stat-card" id="openWoCard">
-                <div class="stat-value" id="openWorkOrders">-</div>
-                <div class="stat-label">Open Work Orders</div>
-            </div>
-            <div class="stat-card warning" id="overdueCard">
-                <div class="stat-value" id="overdueMaintenance">-</div>
-                <div class="stat-label">Overdue Maintenance</div>
-            </div>
-            <div class="stat-card" id="upcomingCard">
-                <div class="stat-value" id="upcomingMaintenance">-</div>
-                <div class="stat-label">Due in 7 Days</div>
-            </div>
-        </div>
-
-        <div class="content-grid">
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title"><i class="bi bi-exclamation-triangle"></i> Alerts</div>
-                </div>
-                <div class="card-body" id="alertsContainer">
-                    <div class="loading"><div class="spinner"></div></div>
-                </div>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title"><i class="bi bi-clipboard-check"></i> Recent Work Orders</div>
-                </div>
-                <div class="card-body" id="workOrdersContainer">
-                    <div class="loading"><div class="spinner"></div></div>
-                </div>
-                <a href="/portal/maintenance/work-orders" class="view-all">View All Work Orders <i class="bi bi-arrow-right"></i></a>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title"><i class="bi bi-calendar-check"></i> Upcoming Maintenance</div>
-                </div>
-                <div class="card-body" id="maintenanceContainer">
-                    <div class="loading"><div class="spinner"></div></div>
-                </div>
-                <a href="/portal/maintenance/schedules" class="view-all">View All Schedules <i class="bi bi-arrow-right"></i></a>
-            </div>
-
-            <div class="card">
-                <div class="card-header">
-                    <div class="card-title"><i class="bi bi-pie-chart"></i> Equipment by Status</div>
-                </div>
-                <div class="card-body" id="equipmentStatusContainer">
-                    <div class="loading"><div class="spinner"></div></div>
-                </div>
-            </div>
+{% block content %}
+    <div class="page-header">
+        <h2 class="page-title">Dashboard</h2>
+        <div style="display: flex; gap: 10px;">
+            <a href="/portal/maintenance/work-orders/new" class="btn-primary">
+                <i class="bi bi-plus-lg"></i> New Work Order
+            </a>
         </div>
     </div>
 
-    <script>
-        const API_BASE = '/maintenance';
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+            <div class="stat-value" id="totalEquipment">-</div>
+            <div class="stat-label">Total Equipment</div>
+        </div>
+        <div class="stat-card" id="openWoCard">
+            <div class="stat-value" id="openWorkOrders">-</div>
+            <div class="stat-label">Open Work Orders</div>
+        </div>
+        <div class="stat-card warning" id="overdueCard">
+            <div class="stat-value" id="overdueMaintenance">-</div>
+            <div class="stat-label">Overdue Maintenance</div>
+        </div>
+        <div class="stat-card" id="upcomingCard">
+            <div class="stat-value" id="upcomingMaintenance">-</div>
+            <div class="stat-label">Due in 7 Days</div>
+        </div>
+    </div>
 
-        async function loadDashboard() {
-            try {
-                const response = await fetch(`${API_BASE}/dashboard`);
-                const data = await response.json();
+    <div class="content-grid">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title"><i class="bi bi-exclamation-triangle"></i> Alerts</div>
+            </div>
+            <div class="card-body" id="alertsContainer">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
 
-                document.getElementById('totalEquipment').textContent = data.total_equipment || 0;
-                document.getElementById('openWorkOrders').textContent = data.open_work_orders || 0;
-                document.getElementById('overdueMaintenance').textContent = data.overdue_maintenance || 0;
-                document.getElementById('upcomingMaintenance').textContent = data.upcoming_maintenance_7_days || 0;
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title"><i class="bi bi-clipboard-check"></i> Recent Work Orders</div>
+            </div>
+            <div class="card-body" id="workOrdersContainer">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+            <a href="/portal/maintenance/work-orders" class="view-all">View All Work Orders <i class="bi bi-arrow-right"></i></a>
+        </div>
 
-                // Update card colors based on counts
-                if (data.open_work_orders > 0) {
-                    document.getElementById('openWoCard').classList.add('warning');
-                }
-                if (data.overdue_maintenance > 0) {
-                    document.getElementById('overdueCard').classList.add('error');
-                }
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title"><i class="bi bi-calendar-check"></i> Upcoming Maintenance</div>
+            </div>
+            <div class="card-body" id="maintenanceContainer">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+            <a href="/portal/maintenance/schedules" class="view-all">View All Schedules <i class="bi bi-arrow-right"></i></a>
+        </div>
 
-                // Render work orders
-                renderWorkOrders(data.recent_work_orders || []);
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title"><i class="bi bi-pie-chart"></i> Equipment by Status</div>
+            </div>
+            <div class="card-body" id="equipmentStatusContainer">
+                <div class="loading"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
 
-                // Render equipment by status
-                renderEquipmentStatus(data.equipment_by_status || {});
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/maintenance';
 
-            } catch (error) {
-                console.error('Error loading dashboard:', error);
+    async function loadDashboard() {
+        try {
+            const response = await fetch(`${API_BASE}/dashboard`);
+            const data = await response.json();
+
+            document.getElementById('totalEquipment').textContent = data.total_equipment || 0;
+            document.getElementById('openWorkOrders').textContent = data.open_work_orders || 0;
+            document.getElementById('overdueMaintenance').textContent = data.overdue_maintenance || 0;
+            document.getElementById('upcomingMaintenance').textContent = data.upcoming_maintenance_7_days || 0;
+
+            if (data.open_work_orders > 0) {
+                document.getElementById('openWoCard').classList.add('warning');
             }
+            if (data.overdue_maintenance > 0) {
+                document.getElementById('overdueCard').classList.add('error');
+            }
+
+            renderWorkOrders(data.recent_work_orders || []);
+            renderEquipmentStatus(data.equipment_by_status || {});
+
+        } catch (error) {
+            console.error('Error loading dashboard:', error);
+        }
+    }
+
+    async function loadAlerts() {
+        try {
+            const response = await fetch(`${API_BASE}/dashboard/alerts`);
+            const data = await response.json();
+            renderAlerts(data.alerts || []);
+        } catch (error) {
+            console.error('Error loading alerts:', error);
+            document.getElementById('alertsContainer').innerHTML = '<div class="empty-state"><i class="bi bi-check-circle"></i><p>Unable to load alerts</p></div>';
+        }
+    }
+
+    async function loadUpcomingMaintenance() {
+        try {
+            const response = await fetch(`${API_BASE}/dashboard/maintenance-due?days_ahead=14`);
+            const data = await response.json();
+            renderUpcomingMaintenance(data || []);
+        } catch (error) {
+            console.error('Error loading maintenance:', error);
+            document.getElementById('maintenanceContainer').innerHTML = '<div class="empty-state"><i class="bi bi-calendar"></i><p>Unable to load schedules</p></div>';
+        }
+    }
+
+    function renderAlerts(alerts) {
+        const container = document.getElementById('alertsContainer');
+        if (alerts.length === 0) {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-check-circle"></i><p>No active alerts</p></div>';
+            return;
         }
 
-        async function loadAlerts() {
-            try {
-                const response = await fetch(`${API_BASE}/dashboard/alerts`);
-                const data = await response.json();
-                renderAlerts(data.alerts || []);
-            } catch (error) {
-                console.error('Error loading alerts:', error);
-                document.getElementById('alertsContainer').innerHTML = '<div class="empty-state"><i class="bi bi-check-circle"></i><p>Unable to load alerts</p></div>';
-            }
+        container.innerHTML = alerts.slice(0, 5).map(alert => `
+            <div class="alert-item alert-${alert.severity}">
+                <i class="bi bi-exclamation-circle alert-icon"></i>
+                <div class="alert-message">${alert.message}</div>
+            </div>
+        `).join('');
+    }
+
+    function renderWorkOrders(workOrders) {
+        const container = document.getElementById('workOrdersContainer');
+        if (workOrders.length === 0) {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-clipboard"></i><p>No open work orders</p></div>';
+            return;
         }
 
-        async function loadUpcomingMaintenance() {
-            try {
-                const response = await fetch(`${API_BASE}/dashboard/maintenance-due?days_ahead=14`);
-                const data = await response.json();
-                renderUpcomingMaintenance(data || []);
-            } catch (error) {
-                console.error('Error loading maintenance:', error);
-                document.getElementById('maintenanceContainer').innerHTML = '<div class="empty-state"><i class="bi bi-calendar"></i><p>Unable to load schedules</p></div>';
-            }
-        }
-
-        function renderAlerts(alerts) {
-            const container = document.getElementById('alertsContainer');
-            if (alerts.length === 0) {
-                container.innerHTML = '<div class="empty-state"><i class="bi bi-check-circle"></i><p>No active alerts</p></div>';
-                return;
-            }
-
-            container.innerHTML = alerts.slice(0, 5).map(alert => `
-                <div class="alert-item alert-${alert.severity}">
-                    <i class="bi bi-exclamation-circle alert-icon"></i>
-                    <div class="alert-message">${alert.message}</div>
+        container.innerHTML = workOrders.slice(0, 5).map(wo => `
+            <div class="list-item">
+                <div>
+                    <div class="list-item-title">${wo.title}</div>
+                    <div class="list-item-subtitle">${wo.equipment_name || 'General'}</div>
                 </div>
-            `).join('');
+                <span class="badge badge-${wo.priority}">${wo.priority}</span>
+            </div>
+        `).join('');
+    }
+
+    function renderUpcomingMaintenance(items) {
+        const container = document.getElementById('maintenanceContainer');
+        if (items.length === 0) {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-calendar-check"></i><p>No upcoming maintenance</p></div>';
+            return;
         }
 
-        function renderWorkOrders(workOrders) {
-            const container = document.getElementById('workOrdersContainer');
-            if (workOrders.length === 0) {
-                container.innerHTML = '<div class="empty-state"><i class="bi bi-clipboard"></i><p>No open work orders</p></div>';
-                return;
-            }
-
-            container.innerHTML = workOrders.slice(0, 5).map(wo => `
-                <div class="list-item">
-                    <div>
-                        <div class="list-item-title">${wo.title}</div>
-                        <div class="list-item-subtitle">${wo.equipment_name || 'General'}</div>
-                    </div>
-                    <span class="badge badge-${wo.priority}">${wo.priority}</span>
+        container.innerHTML = items.slice(0, 5).map(item => `
+            <div class="list-item">
+                <div>
+                    <div class="list-item-title">${item.schedule_name}</div>
+                    <div class="list-item-subtitle">${item.equipment_name}</div>
                 </div>
-            `).join('');
+                <span class="badge ${item.days_until_due < 0 ? 'badge-overdue' : 'badge-medium'}">
+                    ${item.days_until_due < 0 ? Math.abs(item.days_until_due) + ' days overdue' : item.days_until_due + ' days'}
+                </span>
+            </div>
+        `).join('');
+    }
+
+    function renderEquipmentStatus(statusCounts) {
+        const container = document.getElementById('equipmentStatusContainer');
+        const statuses = Object.entries(statusCounts);
+
+        if (statuses.length === 0) {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-gear"></i><p>No equipment data</p></div>';
+            return;
         }
 
-        function renderUpcomingMaintenance(items) {
-            const container = document.getElementById('maintenanceContainer');
-            if (items.length === 0) {
-                container.innerHTML = '<div class="empty-state"><i class="bi bi-calendar-check"></i><p>No upcoming maintenance</p></div>';
-                return;
-            }
+        const statusLabels = {
+            'operational': 'Operational',
+            'needs_maintenance': 'Needs Maintenance',
+            'under_repair': 'Under Repair',
+            'out_of_service': 'Out of Service',
+            'retired': 'Retired'
+        };
 
-            container.innerHTML = items.slice(0, 5).map(item => `
-                <div class="list-item">
-                    <div>
-                        <div class="list-item-title">${item.schedule_name}</div>
-                        <div class="list-item-subtitle">${item.equipment_name}</div>
-                    </div>
-                    <span class="badge ${item.days_until_due < 0 ? 'badge-overdue' : 'badge-medium'}">
-                        ${item.days_until_due < 0 ? Math.abs(item.days_until_due) + ' days overdue' : item.days_until_due + ' days'}
-                    </span>
-                </div>
-            `).join('');
-        }
+        const statusColors = {
+            'operational': 'success',
+            'needs_maintenance': 'warning',
+            'under_repair': 'info',
+            'out_of_service': 'error',
+            'retired': 'muted'
+        };
 
-        function renderEquipmentStatus(statusCounts) {
-            const container = document.getElementById('equipmentStatusContainer');
-            const statuses = Object.entries(statusCounts);
+        container.innerHTML = statuses.map(([status, count]) => `
+            <div class="list-item">
+                <div class="list-item-title">${statusLabels[status] || status}</div>
+                <span class="badge badge-${statusColors[status] || 'medium'}">${count}</span>
+            </div>
+        `).join('');
+    }
 
-            if (statuses.length === 0) {
-                container.innerHTML = '<div class="empty-state"><i class="bi bi-gear"></i><p>No equipment data</p></div>';
-                return;
-            }
-
-            const statusLabels = {
-                'operational': 'Operational',
-                'needs_maintenance': 'Needs Maintenance',
-                'under_repair': 'Under Repair',
-                'out_of_service': 'Out of Service',
-                'retired': 'Retired'
-            };
-
-            const statusColors = {
-                'operational': 'success',
-                'needs_maintenance': 'warning',
-                'under_repair': 'info',
-                'out_of_service': 'error',
-                'retired': 'muted'
-            };
-
-            container.innerHTML = statuses.map(([status, count]) => `
-                <div class="list-item">
-                    <div class="list-item-title">${statusLabels[status] || status}</div>
-                    <span class="badge badge-${statusColors[status] || 'medium'}">${count}</span>
-                </div>
-            `).join('');
-        }
-
-        // Load all data on page load
-        loadDashboard();
-        loadAlerts();
-        loadUpcomingMaintenance();
-    </script>
-</body>
-</html>
+    // Load all data on page load
+    loadDashboard();
+    loadAlerts();
+    loadUpcomingMaintenance();
+</script>
+{% endblock %}

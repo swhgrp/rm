@@ -1,571 +1,589 @@
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="light">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Work Orders - Maintenance - SW Hospitality Group</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
-    <style>
-        :root {
-            --bg-primary: #ECEFF1;
-            --bg-secondary: #FFFFFF;
-            --bg-tertiary: #F5F5F5;
-            --bg-elevated: #E0E0E0;
-            --border-primary: #CFD8DC;
-            --border-secondary: #B0BEC5;
-            --text-primary: #263238;
-            --text-secondary: #546E7A;
-            --text-muted: #78909C;
-            --accent-primary: #455A64;
-            --accent-secondary: #37474F;
-            --accent-hover: #263238;
-            --accent-muted: #546E7A;
-            --success: #43A047;
-            --success-bg: rgba(67, 160, 71, 0.1);
-            --error: #E53935;
-            --error-bg: rgba(229, 57, 53, 0.1);
-            --warning: #FB8C00;
-            --warning-bg: rgba(251, 140, 0, 0.1);
-            --info: #1E88E5;
-            --info-bg: rgba(30, 136, 229, 0.1);
-            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
-            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
-            --glow-accent: 0 0 15px rgba(69, 90, 100, 0.15);
-        }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            min-height: 100vh;
-        }
-
-        .navbar {
-            background-color: #455A64;
-            padding: 15px 30px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 8px rgba(69, 90, 100, 0.3);
-        }
-
-        .navbar-brand h1 {
-            font-size: 20px;
-            font-weight: 600;
-            color: #FFFFFF;
-        }
-
-        .navbar-nav {
-            display: flex;
-            gap: 10px;
-        }
-
-        .nav-link, .btn-back {
-            padding: 8px 16px;
-            background-color: rgba(255, 255, 255, 0.15);
-            color: #FFFFFF;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 14px;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .nav-link:hover, .btn-back:hover {
-            background-color: rgba(255, 255, 255, 0.25);
-            border-color: rgba(255, 255, 255, 0.5);
-        }
-
-        .nav-link.active {
-            background-color: rgba(255, 255, 255, 0.25);
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 30px 20px;
-        }
-
-        .page-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-
-        .page-title {
-            font-size: 28px;
-            font-weight: 600;
-        }
-
-        .btn-primary {
-            padding: 10px 20px;
-            background-color: var(--accent-primary);
-            color: #FFFFFF;
-            border: none;
-            border-radius: 6px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            text-decoration: none;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s ease;
-        }
-
-        .btn-primary:hover {
-            background-color: var(--accent-hover);
-        }
-
-        .filters-bar {
-            display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        .search-box {
-            flex: 1;
-            min-width: 200px;
-            max-width: 400px;
-            position: relative;
-        }
-
-        .search-box input {
-            width: 100%;
-            padding: 10px 15px 10px 40px;
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            font-size: 14px;
-            background-color: var(--bg-secondary);
-        }
-
-        .search-box input:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-        }
-
-        .search-box i {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-muted);
-        }
-
-        .filter-select {
-            padding: 10px 15px;
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            font-size: 14px;
-            background-color: var(--bg-secondary);
-            min-width: 140px;
-        }
-
-        .filter-select:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-        }
-
-        .card {
-            background-color: var(--bg-secondary);
-            border: 1px solid var(--border-primary);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-
-        .table-container {
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        th, td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid var(--border-primary);
-        }
-
-        th {
-            background-color: var(--bg-tertiary);
-            font-weight: 600;
-            font-size: 13px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        tr:hover {
-            background-color: var(--bg-tertiary);
-        }
-
-        tr:last-child td {
-            border-bottom: none;
-        }
-
-        .badge {
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-
-        .badge-open { background-color: var(--info-bg); color: var(--info); }
-        .badge-in_progress { background-color: var(--warning-bg); color: var(--warning); }
-        .badge-on_hold { background-color: var(--bg-elevated); color: var(--text-secondary); }
-        .badge-completed { background-color: var(--success-bg); color: var(--success); }
-        .badge-cancelled { background-color: var(--error-bg); color: var(--error); }
-
-        .badge-critical { background-color: var(--error-bg); color: var(--error); }
-        .badge-high { background-color: var(--warning-bg); color: var(--warning); }
-        .badge-medium { background-color: var(--info-bg); color: var(--info); }
-        .badge-low { background-color: var(--success-bg); color: var(--success); }
-
-        .actions-cell {
-            display: flex;
-            gap: 8px;
-        }
-
-        .btn-icon {
-            padding: 6px 10px;
-            border: 1px solid var(--border-primary);
-            border-radius: 4px;
-            background-color: var(--bg-secondary);
-            color: var(--text-secondary);
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.2s ease;
-        }
-
-        .btn-icon:hover {
-            background-color: var(--bg-tertiary);
-            border-color: var(--accent-primary);
-            color: var(--accent-primary);
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--text-muted);
-        }
-
-        .empty-state i {
-            font-size: 64px;
-            margin-bottom: 20px;
-            opacity: 0.5;
-        }
-
-        .loading {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 60px;
-        }
-
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--border-primary);
-            border-top-color: var(--accent-primary);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .pagination {
-            display: flex;
-            justify-content: center;
-            gap: 5px;
-            padding: 20px;
-            border-top: 1px solid var(--border-primary);
-        }
-
-        .pagination button {
-            padding: 8px 12px;
-            border: 1px solid var(--border-primary);
-            border-radius: 4px;
-            background-color: var(--bg-secondary);
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .pagination button:hover:not(:disabled) {
-            background-color: var(--bg-tertiary);
-        }
-
-        .pagination button.active {
-            background-color: var(--accent-primary);
-            color: white;
-            border-color: var(--accent-primary);
-        }
-
-        .pagination button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        /* Modal styles */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-overlay.active {
-            display: flex;
-        }
-
-        .modal {
-            background-color: var(--bg-secondary);
-            border-radius: 12px;
-            max-width: 700px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            padding: 20px;
-            border-bottom: 1px solid var(--border-primary);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-title {
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: var(--text-muted);
-        }
-
-        .modal-body {
-            padding: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: var(--text-secondary);
-        }
-
-        .form-group input, .form-group select, .form-group textarea {
-            width: 100%;
-            padding: 10px 15px;
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            font-size: 14px;
-            background-color: var(--bg-secondary);
-        }
-
-        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
-            outline: none;
-            border-color: var(--accent-primary);
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-
-        .modal-footer {
-            padding: 20px;
-            border-top: 1px solid var(--border-primary);
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-        }
-
-        .btn-secondary {
-            padding: 10px 20px;
-            background-color: var(--bg-tertiary);
-            color: var(--text-primary);
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            font-size: 14px;
-            cursor: pointer;
-        }
-
-        .btn-secondary:hover {
-            background-color: var(--bg-elevated);
-        }
-
-        .wo-detail-section {
-            margin-bottom: 25px;
-        }
-
-        .wo-detail-section h4 {
-            font-size: 14px;
-            color: var(--text-secondary);
-            margin-bottom: 10px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .wo-detail-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-        }
-
-        .wo-detail-item label {
-            font-size: 12px;
-            color: var(--text-muted);
-            display: block;
-            margin-bottom: 4px;
-        }
-
-        .wo-detail-item span {
-            font-size: 14px;
-            color: var(--text-primary);
-        }
-
-        .wo-description {
-            background-color: var(--bg-tertiary);
-            padding: 15px;
-            border-radius: 8px;
-            font-size: 14px;
-            line-height: 1.5;
-        }
-
-        .status-actions {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-
-        .btn-status {
-            padding: 8px 16px;
-            border: 1px solid var(--border-primary);
-            border-radius: 6px;
-            background-color: var(--bg-secondary);
-            cursor: pointer;
-            font-size: 13px;
-            transition: all 0.2s ease;
-        }
-
-        .btn-status:hover {
-            background-color: var(--bg-tertiary);
-        }
-
-        .btn-status.active {
-            background-color: var(--accent-primary);
-            color: white;
-            border-color: var(--accent-primary);
-        }
-    </style>
-</head>
-<body>
-    <nav class="navbar">
-        <div class="navbar-brand">
-            <h1><i class="bi bi-tools"></i> Maintenance</h1>
-        </div>
-        <div class="navbar-nav">
-            <a href="/portal/maintenance/" class="nav-link"><i class="bi bi-speedometer2"></i> Dashboard</a>
-            <a href="/portal/maintenance/equipment" class="nav-link"><i class="bi bi-gear"></i> Equipment</a>
-            <a href="/portal/maintenance/work-orders" class="nav-link active"><i class="bi bi-clipboard-check"></i> Work Orders</a>
-            <a href="/portal/maintenance/schedules" class="nav-link"><i class="bi bi-calendar-check"></i> Schedules</a>
-            <a href="/portal/" class="btn-back"><i class="bi bi-arrow-left"></i> Portal</a>
-        </div>
-    </nav>
-
-    <div class="container">
-        <div class="page-header">
-            <h2 class="page-title">Work Orders</h2>
+{% extends "maintenance/base.html" %}
+
+{% block title %}Work Orders - Maintenance - SW Hospitality Group{% endblock %}
+
+{% block nav_work_orders %}active{% endblock %}
+
+{% block extra_styles %}
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        flex-wrap: wrap;
+        gap: 15px;
+    }
+
+    .page-title {
+        font-size: 24px;
+        font-weight: 600;
+    }
+
+    .btn-primary {
+        padding: 10px 20px;
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--accent-hover);
+    }
+
+    .btn-outline {
+        padding: 10px 20px;
+        background-color: transparent;
+        color: var(--accent-primary);
+        border: 1px solid var(--accent-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s ease;
+    }
+
+    .btn-outline:hover {
+        background-color: var(--accent-primary);
+        color: #FFFFFF;
+    }
+
+    .filters-bar {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        flex-wrap: wrap;
+    }
+
+    .search-box {
+        flex: 1;
+        min-width: 200px;
+        max-width: 400px;
+        position: relative;
+    }
+
+    .search-box input {
+        width: 100%;
+        padding: 10px 15px 10px 40px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
+
+    .search-box input:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .search-box i {
+        position: absolute;
+        left: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: var(--text-muted);
+    }
+
+    .filter-select {
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        min-width: 140px;
+    }
+
+    .filter-select:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .card {
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .table-container {
+        overflow-x: auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    th, td {
+        padding: 12px 15px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    th {
+        background-color: var(--bg-tertiary);
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--text-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    tr:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .badge-OPEN { background-color: var(--info-bg); color: var(--info); }
+    .badge-IN_PROGRESS { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-ON_HOLD { background-color: var(--bg-elevated); color: var(--text-secondary); }
+    .badge-COMPLETED { background-color: var(--success-bg); color: var(--success); }
+    .badge-CANCELLED { background-color: var(--error-bg); color: var(--error); }
+
+    .badge-critical { background-color: var(--error-bg); color: var(--error); }
+    .badge-high { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-medium { background-color: var(--info-bg); color: var(--info); }
+    .badge-low { background-color: var(--success-bg); color: var(--success); }
+
+    .actions-cell {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-icon {
+        padding: 6px 10px;
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+        background-color: var(--bg-secondary);
+        color: var(--text-secondary);
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s ease;
+    }
+
+    .btn-icon:hover {
+        background-color: var(--bg-tertiary);
+        border-color: var(--accent-primary);
+        color: var(--accent-primary);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: var(--text-muted);
+    }
+
+    .empty-state i {
+        font-size: 64px;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    .loading {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 60px;
+    }
+
+    .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid var(--border-primary);
+        border-top-color: var(--accent-primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 5px;
+        padding: 20px;
+        border-top: 1px solid var(--border-primary);
+    }
+
+    .pagination button {
+        padding: 8px 12px;
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+        background-color: var(--bg-secondary);
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    .pagination button:hover:not(:disabled) {
+        background-color: var(--bg-tertiary);
+    }
+
+    .pagination button.active {
+        background-color: var(--accent-primary);
+        color: white;
+        border-color: var(--accent-primary);
+    }
+
+    .pagination button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .modal-overlay.active {
+        display: flex;
+    }
+
+    .modal {
+        background-color: var(--bg-secondary);
+        border-radius: 12px;
+        max-width: 700px;
+        width: 90%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .modal-header {
+        padding: 20px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-title {
+        font-size: 18px;
+        font-weight: 600;
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    .form-group input, .form-group select, .form-group textarea {
+        width: 100%;
+        padding: 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+    }
+
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 15px;
+    }
+
+    .modal-footer {
+        padding: 20px;
+        border-top: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+    }
+
+    .btn-secondary {
+        padding: 10px 20px;
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        cursor: pointer;
+    }
+
+    .btn-secondary:hover {
+        background-color: var(--bg-elevated);
+    }
+
+    .wo-detail-section {
+        margin-bottom: 25px;
+    }
+
+    .wo-detail-section h4 {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-bottom: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .wo-detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+
+    .wo-detail-item label {
+        font-size: 12px;
+        color: var(--text-muted);
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .wo-detail-item span {
+        font-size: 14px;
+        color: var(--text-primary);
+    }
+
+    .wo-description {
+        background-color: var(--bg-tertiary);
+        padding: 15px;
+        border-radius: 8px;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+
+    .status-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .btn-status {
+        padding: 8px 16px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        background-color: var(--bg-secondary);
+        cursor: pointer;
+        font-size: 13px;
+        transition: all 0.2s ease;
+    }
+
+    .btn-status:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    .btn-status.active {
+        background-color: var(--accent-primary);
+        color: white;
+        border-color: var(--accent-primary);
+    }
+
+    /* Searchable dropdown styles */
+    .searchable-select {
+        position: relative;
+    }
+
+    .searchable-select-input {
+        width: 100%;
+        padding: 10px 35px 10px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-secondary);
+        cursor: pointer;
+    }
+
+    .searchable-select-input:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .searchable-select-arrow {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        pointer-events: none;
+        color: var(--text-muted);
+        transition: transform 0.2s;
+    }
+
+    .searchable-select.open .searchable-select-arrow {
+        transform: translateY(-50%) rotate(180deg);
+    }
+
+    .searchable-select-dropdown {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        max-height: 250px;
+        overflow-y: auto;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        z-index: 100;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .searchable-select.open .searchable-select-dropdown {
+        display: block;
+    }
+
+    .searchable-select-option {
+        padding: 10px 15px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    .searchable-select-option:last-child {
+        border-bottom: none;
+    }
+
+    .searchable-select-option:hover,
+    .searchable-select-option.highlighted {
+        background-color: var(--bg-tertiary);
+    }
+
+    .searchable-select-option .vendor-name {
+        font-weight: 500;
+    }
+
+    .searchable-select-option .vendor-details {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+
+    .searchable-select-option.add-new {
+        background-color: var(--info-bg);
+        color: var(--info);
+        font-weight: 500;
+    }
+
+    .searchable-select-option.add-new:hover {
+        background-color: var(--accent-primary);
+        color: white;
+    }
+
+    .searchable-select-empty {
+        padding: 15px;
+        color: var(--text-muted);
+        text-align: center;
+        font-style: italic;
+    }
+{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <h2 class="page-title">Work Orders</h2>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn-outline" onclick="openLogWorkModal()">
+                <i class="bi bi-journal-check"></i> Log Completed Work
+            </button>
             <button class="btn-primary" onclick="openCreateModal()">
                 <i class="bi bi-plus-lg"></i> New Work Order
             </button>
         </div>
+    </div>
 
-        <div class="filters-bar">
-            <div class="search-box">
-                <i class="bi bi-search"></i>
-                <input type="text" id="searchInput" placeholder="Search work orders..." oninput="filterWorkOrders()">
-            </div>
-            <select class="filter-select" id="statusFilter" onchange="filterWorkOrders()">
-                <option value="">All Statuses</option>
-                <option value="open">Open</option>
-                <option value="in_progress">In Progress</option>
-                <option value="on_hold">On Hold</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-            </select>
-            <select class="filter-select" id="priorityFilter" onchange="filterWorkOrders()">
-                <option value="">All Priorities</option>
-                <option value="critical">Critical</option>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-            </select>
-            <select class="filter-select" id="typeFilter" onchange="filterWorkOrders()">
-                <option value="">All Types</option>
-                <option value="repair">Repair</option>
-                <option value="preventive">Preventive</option>
-                <option value="inspection">Inspection</option>
-                <option value="installation">Installation</option>
-                <option value="other">Other</option>
-            </select>
+    <div class="filters-bar">
+        <div class="search-box">
+            <i class="bi bi-search"></i>
+            <input type="text" id="searchInput" placeholder="Search work orders..." oninput="filterWorkOrders()">
         </div>
+        <select class="filter-select" id="statusFilter" onchange="filterWorkOrders()">
+            <option value="">Open Work Orders</option>
+            <option value="all">All Statuses</option>
+            <option value="OPEN">Open</option>
+            <option value="IN_PROGRESS">In Progress</option>
+            <option value="ON_HOLD">On Hold</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+        </select>
+        <select class="filter-select" id="priorityFilter" onchange="filterWorkOrders()">
+            <option value="">All Priorities</option>
+            <option value="critical">Critical</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+        </select>
+        <select class="filter-select" id="locationFilter" onchange="filterWorkOrders()">
+            <option value="">All Locations</option>
+        </select>
+    </div>
 
-        <div class="card">
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Title</th>
-                            <th>Equipment</th>
-                            <th>Type</th>
-                            <th>Priority</th>
-                            <th>Status</th>
-                            <th>Assigned To</th>
-                            <th>Due Date</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody id="workOrdersTable">
-                        <tr>
-                            <td colspan="8">
-                                <div class="loading"><div class="spinner"></div></div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="pagination" id="pagination"></div>
+    <div class="card">
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Location</th>
+                        <th>Equipment</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Assigned To</th>
+                        <th>Due Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="workOrdersTable">
+                    <tr>
+                        <td colspan="8">
+                            <div class="loading"><div class="spinner"></div></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
+        <div class="pagination" id="pagination"></div>
     </div>
 
     <!-- Create Work Order Modal -->
@@ -583,19 +601,15 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="wo_equipment_id">Equipment</label>
-                            <select id="wo_equipment_id">
-                                <option value="">Select equipment (optional)</option>
+                            <label for="wo_location_id">Location *</label>
+                            <select id="wo_location_id" required>
+                                <option value="">Select location...</option>
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="wo_type">Type *</label>
-                            <select id="wo_type" required>
-                                <option value="repair">Repair</option>
-                                <option value="preventive">Preventive</option>
-                                <option value="inspection">Inspection</option>
-                                <option value="installation">Installation</option>
-                                <option value="other">Other</option>
+                            <label for="wo_equipment_id">Equipment</label>
+                            <select id="wo_equipment_id">
+                                <option value="">Select equipment (optional)</option>
                             </select>
                         </div>
                     </div>
@@ -614,9 +628,26 @@
                             <input type="date" id="wo_due_date">
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label for="wo_assigned_to">Assigned To</label>
-                        <input type="text" id="wo_assigned_to" placeholder="Name of assignee">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wo_assigned_to">Assigned To</label>
+                            <input type="text" id="wo_assigned_to" placeholder="Name of assignee">
+                        </div>
+                        <div class="form-group">
+                            <label for="wo_vendor_id">Vendor (External)</label>
+                            <div class="searchable-select" id="vendorSearchable">
+                                <input type="text"
+                                       class="searchable-select-input"
+                                       id="vendorSearchInput"
+                                       placeholder="Type to search vendors..."
+                                       autocomplete="off">
+                                <i class="bi bi-chevron-down searchable-select-arrow"></i>
+                                <div class="searchable-select-dropdown" id="vendorDropdown">
+                                    <!-- Options populated by JS -->
+                                </div>
+                            </div>
+                            <input type="hidden" id="wo_vendor_id">
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="wo_description">Description</label>
@@ -631,7 +662,7 @@
         </div>
     </div>
 
-    <!-- View/Edit Work Order Modal -->
+    <!-- View Work Order Modal -->
     <div class="modal-overlay" id="detailModal">
         <div class="modal">
             <div class="modal-header">
@@ -647,343 +678,1144 @@
         </div>
     </div>
 
-    <script>
-        const API_BASE = '/maintenance';
-        let allWorkOrders = [];
-        let equipment = [];
-        let currentPage = 1;
-        const pageSize = 20;
+    <!-- Edit Work Order Modal -->
+    <div class="modal-overlay" id="editModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Edit Work Order</h3>
+                <button class="modal-close" onclick="closeEditModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="editWorkOrderForm">
+                    <input type="hidden" id="edit_wo_id">
+                    <div class="form-group">
+                        <label for="edit_wo_title">Title *</label>
+                        <input type="text" id="edit_wo_title" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit_wo_location_id">Location *</label>
+                            <select id="edit_wo_location_id" required>
+                                <option value="">Select location...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_wo_equipment_id">Equipment</label>
+                            <select id="edit_wo_equipment_id">
+                                <option value="">Select equipment (optional)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit_wo_status">Status *</label>
+                            <select id="edit_wo_status" required>
+                                <option value="OPEN">Open</option>
+                                <option value="IN_PROGRESS">In Progress</option>
+                                <option value="ON_HOLD">On Hold</option>
+                                <option value="COMPLETED">Completed</option>
+                                <option value="CANCELLED">Cancelled</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_wo_priority">Priority *</label>
+                            <select id="edit_wo_priority" required>
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                                <option value="critical">Critical</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit_wo_due_date">Due Date</label>
+                            <input type="date" id="edit_wo_due_date">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_wo_completed_date">Completed Date</label>
+                            <input type="date" id="edit_wo_completed_date">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit_wo_assigned_to">Assigned To</label>
+                            <input type="text" id="edit_wo_assigned_to" placeholder="Name of assignee">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_wo_vendor_id">Vendor (External)</label>
+                            <div class="searchable-select" id="editVendorSearchable">
+                                <input type="text"
+                                       class="searchable-select-input"
+                                       id="editVendorSearchInput"
+                                       placeholder="Type to search vendors..."
+                                       autocomplete="off">
+                                <i class="bi bi-chevron-down searchable-select-arrow"></i>
+                                <div class="searchable-select-dropdown" id="editVendorDropdown">
+                                    <!-- Options populated by JS -->
+                                </div>
+                            </div>
+                            <input type="hidden" id="edit_wo_vendor_id">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_wo_description">Description</label>
+                        <textarea id="edit_wo_description" rows="3" placeholder="Describe the work to be done..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_wo_resolution_notes">Resolution Notes</label>
+                        <textarea id="edit_wo_resolution_notes" rows="3" placeholder="What was done to resolve the issue..."></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="edit_wo_actual_cost">Actual Cost ($)</label>
+                            <input type="number" id="edit_wo_actual_cost" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit_wo_labor_hours">Labor Hours</label>
+                            <input type="number" id="edit_wo_labor_hours" step="0.5" min="0" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_wo_root_cause">Root Cause</label>
+                        <input type="text" id="edit_wo_root_cause" placeholder="e.g., Age, wear, power surge">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveWorkOrderEdit()">
+                    <i class="bi bi-check-lg"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
 
-        async function loadEquipment() {
-            try {
-                const response = await fetch(`${API_BASE}/equipment`);
-                equipment = await response.json();
+    <!-- Log Completed Work Modal -->
+    <div class="modal-overlay" id="logWorkModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Log Completed Work</h3>
+                <button class="modal-close" onclick="closeLogWorkModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div style="background-color: var(--info-bg); border: 1px solid var(--info); border-radius: 8px; padding: 12px; margin-bottom: 20px;">
+                    <i class="bi bi-info-circle" style="color: var(--info);"></i>
+                    <span style="color: var(--info); font-size: 14px; margin-left: 8px;">Use this form to record work that has already been completed (e.g., emergency repairs, vendor call-outs).</span>
+                </div>
+                <form id="logWorkForm">
+                    <div class="form-group">
+                        <label for="log_title">What was done? *</label>
+                        <input type="text" id="log_title" required placeholder="e.g., Walk-in cooler compressor replaced">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="log_location_id">Location *</label>
+                            <select id="log_location_id" required>
+                                <option value="">Select location...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="log_equipment_id">Equipment</label>
+                            <select id="log_equipment_id">
+                                <option value="">Select equipment (optional)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="log_completed_date">Date Completed *</label>
+                            <input type="date" id="log_completed_date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="log_vendor_id">Vendor</label>
+                            <div class="searchable-select" id="logVendorSearchable">
+                                <input type="text"
+                                       class="searchable-select-input"
+                                       id="logVendorSearchInput"
+                                       placeholder="Type to search vendors..."
+                                       autocomplete="off">
+                                <i class="bi bi-chevron-down searchable-select-arrow"></i>
+                                <div class="searchable-select-dropdown" id="logVendorDropdown">
+                                    <!-- Options populated by JS -->
+                                </div>
+                            </div>
+                            <input type="hidden" id="log_vendor_id">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="log_cost">Cost ($)</label>
+                            <input type="number" id="log_cost" step="0.01" min="0" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label for="log_labor_hours">Labor Hours</label>
+                            <input type="number" id="log_labor_hours" step="0.5" min="0" placeholder="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="log_description">Problem Description</label>
+                        <textarea id="log_description" rows="2" placeholder="What was the issue?"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="log_resolution">Resolution Notes *</label>
+                        <textarea id="log_resolution" rows="3" required placeholder="What was done to fix it? Include parts replaced, repairs made, etc."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="log_root_cause">Root Cause (if known)</label>
+                        <input type="text" id="log_root_cause" placeholder="e.g., Age, wear, power surge">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeLogWorkModal()">Cancel</button>
+                <button class="btn-primary" onclick="logCompletedWork()">
+                    <i class="bi bi-check-lg"></i> Log Work
+                </button>
+            </div>
+        </div>
+    </div>
 
-                const select = document.getElementById('wo_equipment_id');
-                select.innerHTML = '<option value="">Select equipment (optional)</option>';
-                equipment.forEach(e => {
+    <!-- Add Vendor Modal (Quick Add) -->
+    <div class="modal-overlay" id="addVendorModal">
+        <div class="modal" style="max-width: 500px;">
+            <div class="modal-header">
+                <h3 class="modal-title">Add New Vendor</h3>
+                <button class="modal-close" onclick="closeAddVendorModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="addVendorForm">
+                    <div class="form-group">
+                        <label for="new_vendor_name">Company Name *</label>
+                        <input type="text" id="new_vendor_name" required placeholder="e.g., ABC HVAC Services">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="new_vendor_contact">Contact Person</label>
+                            <input type="text" id="new_vendor_contact" placeholder="Primary contact name">
+                        </div>
+                        <div class="form-group">
+                            <label for="new_vendor_services">Service Types</label>
+                            <input type="text" id="new_vendor_services" placeholder="e.g., HVAC, Refrigeration">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="new_vendor_phone">Phone</label>
+                            <input type="tel" id="new_vendor_phone" placeholder="(555) 123-4567">
+                        </div>
+                        <div class="form-group">
+                            <label for="new_vendor_email">Email</label>
+                            <input type="email" id="new_vendor_email" placeholder="contact@vendor.com">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeAddVendorModal()">Cancel</button>
+                <button class="btn-primary" onclick="saveNewVendor()">
+                    <i class="bi bi-plus-lg"></i> Add Vendor
+                </button>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    const API_BASE = '/maintenance';
+    let allWorkOrders = [];
+    let equipment = [];
+    let locations = [];
+    let vendors = [];
+    let currentPage = 1;
+    const pageSize = 20;
+
+    // Vendor dropdown state
+    let highlightedVendorIndex = -1;
+
+    async function loadLocations() {
+        try {
+            const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+            if (response.ok) {
+                locations = await response.json();
+
+                // Populate create work order modal
+                const select = document.getElementById('wo_location_id');
+                select.innerHTML = '<option value="">Select location...</option>';
+                locations.forEach(loc => {
                     const option = document.createElement('option');
-                    option.value = e.id;
-                    option.textContent = `${e.name} (${e.location || 'No location'})`;
+                    option.value = loc.id;
+                    option.textContent = loc.name;
                     select.appendChild(option);
                 });
-            } catch (error) {
-                console.error('Error loading equipment:', error);
+
+                // Populate log work modal
+                const logSelect = document.getElementById('log_location_id');
+                logSelect.innerHTML = '<option value="">Select location...</option>';
+                locations.forEach(loc => {
+                    const option = document.createElement('option');
+                    option.value = loc.id;
+                    option.textContent = loc.name;
+                    logSelect.appendChild(option);
+                });
+
+                // Populate location filter
+                const filterSelect = document.getElementById('locationFilter');
+                filterSelect.innerHTML = '<option value="">All Locations</option>';
+                locations.forEach(loc => {
+                    const option = document.createElement('option');
+                    option.value = loc.id;
+                    option.textContent = loc.name;
+                    filterSelect.appendChild(option);
+                });
             }
+        } catch (error) {
+            console.error('Error loading locations:', error);
+        }
+    }
+
+    async function loadEquipment() {
+        try {
+            const response = await fetch(`${API_BASE}/equipment`);
+            equipment = await response.json();
+            updateEquipmentDropdown();
+        } catch (error) {
+            console.error('Error loading equipment:', error);
+        }
+    }
+
+    async function loadVendors() {
+        try {
+            const response = await fetch(`${API_BASE}/vendors`);
+            if (response.ok) {
+                vendors = await response.json();
+            } else {
+                vendors = [];
+            }
+        } catch (error) {
+            console.error('Error loading vendors:', error);
+            vendors = [];
+        }
+    }
+
+    // Vendor searchable dropdown functions
+    function renderVendorOptions(dropdownId, searchTerm, hiddenInputId) {
+        const dropdown = document.getElementById(dropdownId);
+        const term = searchTerm.toLowerCase().trim();
+
+        let filtered = vendors.filter(v => v.is_active !== false);
+        if (term) {
+            filtered = filtered.filter(v => {
+                const name = v.name?.toLowerCase() || '';
+                const serviceTypes = v.service_types?.toLowerCase() || '';
+                const contactName = v.contact_name?.toLowerCase() || '';
+                return name.includes(term) || serviceTypes.includes(term) || contactName.includes(term);
+            });
         }
 
-        async function loadWorkOrders() {
-            try {
-                const response = await fetch(`${API_BASE}/work-orders`);
-                allWorkOrders = await response.json();
-                filterWorkOrders();
-            } catch (error) {
-                console.error('Error loading work orders:', error);
-                document.getElementById('workOrdersTable').innerHTML = `
-                    <tr><td colspan="8">
-                        <div class="empty-state">
-                            <i class="bi bi-exclamation-circle"></i>
-                            <p>Error loading work orders</p>
-                        </div>
-                    </td></tr>
-                `;
-            }
+        let html = `
+            <div class="searchable-select-option add-new" onclick="openAddVendorModal('${dropdownId}', '${hiddenInputId}')">
+                <i class="bi bi-plus-lg"></i> Add New Vendor
+            </div>
+        `;
+
+        if (filtered.length === 0) {
+            html += `<div class="searchable-select-empty">
+                ${vendors.length === 0 ? 'No vendors available' : 'No vendors match your search'}
+            </div>`;
+        } else {
+            html += filtered.map((v, idx) => `
+                <div class="searchable-select-option ${idx === highlightedVendorIndex ? 'highlighted' : ''}"
+                     data-id="${v.id}"
+                     onclick="selectVendor(${v.id}, '${dropdownId}', '${hiddenInputId}')">
+                    <div class="vendor-name">${escapeHtml(v.name)}</div>
+                    <div class="vendor-details">${v.service_types || 'General'}${v.contact_name ? ' • ' + v.contact_name : ''}</div>
+                </div>
+            `).join('');
         }
 
-        function filterWorkOrders() {
-            const search = document.getElementById('searchInput').value.toLowerCase();
-            const status = document.getElementById('statusFilter').value;
-            const priority = document.getElementById('priorityFilter').value;
-            const type = document.getElementById('typeFilter').value;
+        dropdown.innerHTML = html;
+        highlightedVendorIndex = -1;
+    }
 
-            let filtered = allWorkOrders.filter(wo => {
-                const matchesSearch = !search ||
-                    wo.title.toLowerCase().includes(search) ||
-                    (wo.description && wo.description.toLowerCase().includes(search));
-                const matchesStatus = !status || wo.status === status;
-                const matchesPriority = !priority || wo.priority === priority;
-                const matchesType = !type || wo.work_order_type === type;
-                return matchesSearch && matchesStatus && matchesPriority && matchesType;
+    function selectVendor(vendorId, dropdownId, hiddenInputId) {
+        const vendor = vendors.find(v => v.id === vendorId);
+        if (!vendor) return;
+
+        // Determine the input field based on dropdownId
+        let searchInputId;
+        if (dropdownId === 'vendorDropdown') searchInputId = 'vendorSearchInput';
+        else if (dropdownId === 'editVendorDropdown') searchInputId = 'editVendorSearchInput';
+        else if (dropdownId === 'logVendorDropdown') searchInputId = 'logVendorSearchInput';
+
+        document.getElementById(hiddenInputId).value = vendor.id;
+        document.getElementById(searchInputId).value = vendor.name;
+        closeVendorDropdown(dropdownId);
+    }
+
+    function clearVendorSelection(dropdownId, hiddenInputId) {
+        let searchInputId;
+        if (dropdownId === 'vendorDropdown') searchInputId = 'vendorSearchInput';
+        else if (dropdownId === 'editVendorDropdown') searchInputId = 'editVendorSearchInput';
+        else if (dropdownId === 'logVendorDropdown') searchInputId = 'logVendorSearchInput';
+
+        document.getElementById(hiddenInputId).value = '';
+        document.getElementById(searchInputId).value = '';
+    }
+
+    function openVendorDropdown(dropdownId, hiddenInputId) {
+        let containerId, searchInputId;
+        if (dropdownId === 'vendorDropdown') {
+            containerId = 'vendorSearchable';
+            searchInputId = 'vendorSearchInput';
+        } else if (dropdownId === 'editVendorDropdown') {
+            containerId = 'editVendorSearchable';
+            searchInputId = 'editVendorSearchInput';
+        } else if (dropdownId === 'logVendorDropdown') {
+            containerId = 'logVendorSearchable';
+            searchInputId = 'logVendorSearchInput';
+        }
+
+        const container = document.getElementById(containerId);
+        container.classList.add('open');
+        renderVendorOptions(dropdownId, document.getElementById(searchInputId).value, hiddenInputId);
+    }
+
+    function closeVendorDropdown(dropdownId) {
+        let containerId;
+        if (dropdownId === 'vendorDropdown') containerId = 'vendorSearchable';
+        else if (dropdownId === 'editVendorDropdown') containerId = 'editVendorSearchable';
+        else if (dropdownId === 'logVendorDropdown') containerId = 'logVendorSearchable';
+
+        const container = document.getElementById(containerId);
+        if (container) container.classList.remove('open');
+        highlightedVendorIndex = -1;
+    }
+
+    function closeAllVendorDropdowns() {
+        closeVendorDropdown('vendorDropdown');
+        closeVendorDropdown('editVendorDropdown');
+        closeVendorDropdown('logVendorDropdown');
+    }
+
+    // Initialize vendor dropdowns
+    function initVendorDropdown(searchInputId, dropdownId, hiddenInputId, containerId) {
+        const searchInput = document.getElementById(searchInputId);
+        const container = document.getElementById(containerId);
+
+        if (!searchInput || !container) return;
+
+        searchInput.addEventListener('focus', () => {
+            openVendorDropdown(dropdownId, hiddenInputId);
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            // Clear selection if user is typing
+            if (document.getElementById(hiddenInputId).value) {
+                document.getElementById(hiddenInputId).value = '';
+            }
+            renderVendorOptions(dropdownId, e.target.value, hiddenInputId);
+            openVendorDropdown(dropdownId, hiddenInputId);
+        });
+
+        searchInput.addEventListener('keydown', (e) => {
+            const dropdown = document.getElementById(dropdownId);
+            const options = dropdown.querySelectorAll('.searchable-select-option:not(.add-new)');
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                highlightedVendorIndex = Math.min(highlightedVendorIndex + 1, options.length - 1);
+                updateVendorHighlight(options);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                highlightedVendorIndex = Math.max(highlightedVendorIndex - 1, 0);
+                updateVendorHighlight(options);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (highlightedVendorIndex >= 0 && options[highlightedVendorIndex]) {
+                    const vendorId = options[highlightedVendorIndex].dataset.id;
+                    selectVendor(parseInt(vendorId), dropdownId, hiddenInputId);
+                }
+            } else if (e.key === 'Escape') {
+                closeVendorDropdown(dropdownId);
+                searchInput.blur();
+            }
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!container.contains(e.target)) {
+                closeVendorDropdown(dropdownId);
+            }
+        });
+    }
+
+    function updateVendorHighlight(options) {
+        options.forEach((opt, idx) => {
+            opt.classList.toggle('highlighted', idx === highlightedVendorIndex);
+            if (idx === highlightedVendorIndex) {
+                opt.scrollIntoView({ block: 'nearest' });
+            }
+        });
+    }
+
+    // Add vendor modal functions
+    let addVendorCallback = null;
+
+    function openAddVendorModal(dropdownId, hiddenInputId) {
+        closeAllVendorDropdowns();
+        // Store callback info to select the new vendor after creation
+        addVendorCallback = { dropdownId, hiddenInputId };
+        // Open the add vendor modal
+        document.getElementById('addVendorModal').classList.add('active');
+        document.getElementById('addVendorForm').reset();
+    }
+
+    function closeAddVendorModal() {
+        document.getElementById('addVendorModal').classList.remove('active');
+        addVendorCallback = null;
+    }
+
+    async function saveNewVendor() {
+        const name = document.getElementById('new_vendor_name').value;
+        if (!name) {
+            showWarning('Please enter a company name');
+            return;
+        }
+
+        const data = {
+            name: name,
+            contact_name: document.getElementById('new_vendor_contact').value || null,
+            service_types: document.getElementById('new_vendor_services').value || null,
+            phone: document.getElementById('new_vendor_phone').value || null,
+            email: document.getElementById('new_vendor_email').value || null,
+            is_active: true
+        };
+
+        try {
+            const response = await fetch(`${API_BASE}/vendors`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
             });
 
-            currentPage = 1;
-            renderWorkOrders(filtered);
+            if (response.ok) {
+                const newVendor = await response.json();
+                // Reload vendors list
+                await loadVendors();
+                closeAddVendorModal();
+
+                // Select the newly created vendor if we have a callback
+                if (addVendorCallback) {
+                    selectVendor(newVendor.id, addVendorCallback.dropdownId, addVendorCallback.hiddenInputId);
+                }
+                showSuccess('Vendor created successfully');
+            } else {
+                const error = await response.json();
+                showError('Failed to create vendor: ' + (error.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error creating vendor:', error);
+            showError('Failed to create vendor');
+        }
+    }
+
+    function updateEquipmentDropdown() {
+        const locationId = document.getElementById('wo_location_id').value;
+        const select = document.getElementById('wo_equipment_id');
+
+        let filteredEquipment = equipment;
+        if (locationId) {
+            filteredEquipment = equipment.filter(e => e.location_id == locationId);
         }
 
-        function renderWorkOrders(workOrders) {
-            const tbody = document.getElementById('workOrdersTable');
+        select.innerHTML = '<option value="">Select equipment (optional)</option>';
+        filteredEquipment.forEach(e => {
+            const option = document.createElement('option');
+            option.value = e.id;
+            const loc = locations.find(l => l.id === e.location_id);
+            option.textContent = `${e.name} (${loc ? loc.name : e.location || 'No location'})`;
+            select.appendChild(option);
+        });
+    }
 
-            if (workOrders.length === 0) {
-                tbody.innerHTML = `
-                    <tr><td colspan="8">
-                        <div class="empty-state">
-                            <i class="bi bi-clipboard"></i>
-                            <p>No work orders found</p>
-                        </div>
-                    </td></tr>
-                `;
-                document.getElementById('pagination').innerHTML = '';
-                return;
+    // Update equipment when location changes
+    document.getElementById('wo_location_id').addEventListener('change', updateEquipmentDropdown);
+
+    async function loadWorkOrders() {
+        try {
+            // Always fetch all work orders (include_closed=true) and filter client-side
+            const response = await fetch(`${API_BASE}/work-orders?include_closed=true`);
+            allWorkOrders = await response.json();
+            filterWorkOrders();
+        } catch (error) {
+            console.error('Error loading work orders:', error);
+            document.getElementById('workOrdersTable').innerHTML = `
+                <tr><td colspan="8">
+                    <div class="empty-state">
+                        <i class="bi bi-exclamation-circle"></i>
+                        <p>Error loading work orders</p>
+                    </div>
+                </td></tr>
+            `;
+        }
+    }
+
+    function filterWorkOrders() {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const status = document.getElementById('statusFilter').value;
+        const priority = document.getElementById('priorityFilter').value;
+        const locationId = document.getElementById('locationFilter').value;
+
+        let filtered = allWorkOrders.filter(wo => {
+            const matchesSearch = !search ||
+                wo.title.toLowerCase().includes(search) ||
+                (wo.description && wo.description.toLowerCase().includes(search));
+
+            // Status filtering logic:
+            // - empty string = open work orders only (exclude completed/cancelled)
+            // - "all" = show everything
+            // - specific status = filter to that status
+            let matchesStatus = true;
+            if (status === '') {
+                // Default: show only open work orders (not completed or cancelled)
+                matchesStatus = !['COMPLETED', 'CANCELLED'].includes(wo.status);
+            } else if (status !== 'all') {
+                matchesStatus = wo.status === status;
             }
 
-            const totalPages = Math.ceil(workOrders.length / pageSize);
-            const start = (currentPage - 1) * pageSize;
-            const pageData = workOrders.slice(start, start + pageSize);
+            const matchesPriority = !priority || wo.priority === priority;
+            const matchesLocation = !locationId || wo.location_id == locationId;
+            return matchesSearch && matchesStatus && matchesPriority && matchesLocation;
+        });
+
+        currentPage = 1;
+        renderWorkOrders(filtered);
+    }
+
+    function renderWorkOrders(workOrders) {
+        const tbody = document.getElementById('workOrdersTable');
+
+        if (workOrders.length === 0) {
+            tbody.innerHTML = `
+                <tr><td colspan="8">
+                    <div class="empty-state">
+                        <i class="bi bi-clipboard"></i>
+                        <p>No work orders found</p>
+                    </div>
+                </td></tr>
+            `;
+            document.getElementById('pagination').innerHTML = '';
+            return;
+        }
+
+        const totalPages = Math.ceil(workOrders.length / pageSize);
+        const start = (currentPage - 1) * pageSize;
+        const pageData = workOrders.slice(start, start + pageSize);
+
+        const statusLabels = {
+            'OPEN': 'Open',
+            'IN_PROGRESS': 'In Progress',
+            'ON_HOLD': 'On Hold',
+            'COMPLETED': 'Completed',
+            'CANCELLED': 'Cancelled'
+        };
+
+        tbody.innerHTML = pageData.map(wo => {
+            const eq = equipment.find(e => e.id === wo.equipment_id);
+            const loc = locations.find(l => l.id === wo.location_id);
+            const dueDate = formatDate(wo.due_date);
+            return `
+                <tr>
+                    <td><strong>${escapeHtml(wo.title)}</strong></td>
+                    <td>${loc ? escapeHtml(loc.name) : '-'}</td>
+                    <td>${eq ? escapeHtml(eq.name) : '-'}</td>
+                    <td><span class="badge badge-${wo.priority}">${wo.priority}</span></td>
+                    <td><span class="badge badge-${wo.status}">${statusLabels[wo.status] || wo.status}</span></td>
+                    <td>${wo.assigned_to ? escapeHtml(wo.assigned_to) : '-'}</td>
+                    <td>${dueDate}</td>
+                    <td class="actions-cell">
+                        <button class="btn-icon" onclick="viewWorkOrder(${wo.id})" title="View">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn-icon" onclick="editWorkOrder(${wo.id})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+
+        renderPagination(totalPages, workOrders);
+    }
+
+    function renderPagination(totalPages, workOrders) {
+        const pagination = document.getElementById('pagination');
+        if (totalPages <= 1) {
+            pagination.innerHTML = '';
+            return;
+        }
+
+        let html = `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
+            <i class="bi bi-chevron-left"></i>
+        </button>`;
+
+        for (let i = 1; i <= totalPages; i++) {
+            if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+                html += `<button class="${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+            } else if (i === currentPage - 2 || i === currentPage + 2) {
+                html += `<button disabled>...</button>`;
+            }
+        }
+
+        html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
+            <i class="bi bi-chevron-right"></i>
+        </button>`;
+
+        pagination.innerHTML = html;
+    }
+
+    function goToPage(page) {
+        currentPage = page;
+        filterWorkOrders();
+    }
+
+    function changePage(page) {
+        currentPage = page;
+        filterWorkOrders();
+    }
+
+    function openCreateModal() {
+        document.getElementById('workOrderForm').reset();
+        document.getElementById('wo_priority').value = 'medium';
+        document.getElementById('wo_vendor_id').value = '';
+        document.getElementById('vendorSearchInput').value = '';
+        closeVendorDropdown('vendorDropdown');
+        document.getElementById('createModal').classList.add('active');
+    }
+
+    function closeCreateModal() {
+        document.getElementById('createModal').classList.remove('active');
+    }
+
+    async function createWorkOrder() {
+        const locationId = document.getElementById('wo_location_id').value;
+        if (!locationId) {
+            showWarning('Please select a location');
+            return;
+        }
+
+        const vendorId = document.getElementById('wo_vendor_id').value;
+
+        const data = {
+            title: document.getElementById('wo_title').value,
+            location_id: parseInt(locationId),
+            equipment_id: document.getElementById('wo_equipment_id').value || null,
+            priority: document.getElementById('wo_priority').value,
+            due_date: document.getElementById('wo_due_date').value || null,
+            assigned_to: document.getElementById('wo_assigned_to').value || null,
+            description: document.getElementById('wo_description').value || null,
+            vendor_id: vendorId ? parseInt(vendorId) : null,
+            is_external: vendorId ? true : false,
+            status: 'OPEN'
+        };
+
+        if (!data.title) {
+            showWarning('Please enter a title');
+            return;
+        }
+
+        if (data.equipment_id) {
+            data.equipment_id = parseInt(data.equipment_id);
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/work-orders`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                closeCreateModal();
+                loadWorkOrders();
+            } else {
+                const error = await response.json();
+                showError('Failed to create work order: ' + (error.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error creating work order:', error);
+            showError('Failed to create work order');
+        }
+    }
+
+    async function viewWorkOrder(id) {
+        try {
+            const response = await fetch(`${API_BASE}/work-orders/${id}`);
+            const wo = await response.json();
+            const eq = equipment.find(e => e.id === wo.equipment_id);
+            const loc = locations.find(l => l.id === wo.location_id);
 
             const statusLabels = {
-                'open': 'Open',
-                'in_progress': 'In Progress',
-                'on_hold': 'On Hold',
-                'completed': 'Completed',
-                'cancelled': 'Cancelled'
+                'OPEN': 'Open',
+                'IN_PROGRESS': 'In Progress',
+                'ON_HOLD': 'On Hold',
+                'COMPLETED': 'Completed',
+                'CANCELLED': 'Cancelled'
             };
 
-            const typeLabels = {
-                'repair': 'Repair',
-                'preventive': 'Preventive',
-                'inspection': 'Inspection',
-                'installation': 'Installation',
-                'other': 'Other'
-            };
-
-            tbody.innerHTML = pageData.map(wo => {
-                const eq = equipment.find(e => e.id === wo.equipment_id);
-                const dueDate = wo.due_date ? new Date(wo.due_date).toLocaleDateString() : '-';
-                return `
-                    <tr>
-                        <td><strong>${escapeHtml(wo.title)}</strong></td>
-                        <td>${eq ? escapeHtml(eq.name) : '-'}</td>
-                        <td>${typeLabels[wo.work_order_type] || wo.work_order_type}</td>
-                        <td><span class="badge badge-${wo.priority}">${wo.priority}</span></td>
-                        <td><span class="badge badge-${wo.status}">${statusLabels[wo.status] || wo.status}</span></td>
-                        <td>${wo.assigned_to ? escapeHtml(wo.assigned_to) : '-'}</td>
-                        <td>${dueDate}</td>
-                        <td class="actions-cell">
-                            <button class="btn-icon" onclick="viewWorkOrder(${wo.id})" title="View">
-                                <i class="bi bi-eye"></i>
-                            </button>
-                            <button class="btn-icon" onclick="editWorkOrder(${wo.id})" title="Edit">
-                                <i class="bi bi-pencil"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
-
-            renderPagination(totalPages, workOrders);
-        }
-
-        function renderPagination(totalPages, workOrders) {
-            const pagination = document.getElementById('pagination');
-            if (totalPages <= 1) {
-                pagination.innerHTML = '';
-                return;
-            }
-
-            let html = `<button onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
-                <i class="bi bi-chevron-left"></i>
-            </button>`;
-
-            for (let i = 1; i <= totalPages; i++) {
-                if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
-                    html += `<button class="${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
-                } else if (i === currentPage - 2 || i === currentPage + 2) {
-                    html += `<button disabled>...</button>`;
-                }
-            }
-
-            html += `<button onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
-                <i class="bi bi-chevron-right"></i>
-            </button>`;
-
-            pagination.innerHTML = html;
-        }
-
-        function goToPage(page) {
-            currentPage = page;
-            filterWorkOrders();
-        }
-
-        function changePage(page) {
-            currentPage = page;
-            filterWorkOrders();
-        }
-
-        function openCreateModal() {
-            document.getElementById('workOrderForm').reset();
-            document.getElementById('wo_priority').value = 'medium';
-            document.getElementById('createModal').classList.add('active');
-        }
-
-        function closeCreateModal() {
-            document.getElementById('createModal').classList.remove('active');
-        }
-
-        async function createWorkOrder() {
-            const data = {
-                title: document.getElementById('wo_title').value,
-                equipment_id: document.getElementById('wo_equipment_id').value || null,
-                work_order_type: document.getElementById('wo_type').value,
-                priority: document.getElementById('wo_priority').value,
-                due_date: document.getElementById('wo_due_date').value || null,
-                assigned_to: document.getElementById('wo_assigned_to').value || null,
-                description: document.getElementById('wo_description').value || null,
-                status: 'open'
-            };
-
-            if (!data.title) {
-                alert('Please enter a title');
-                return;
-            }
-
-            if (data.equipment_id) {
-                data.equipment_id = parseInt(data.equipment_id);
-            }
-
-            try {
-                const response = await fetch(`${API_BASE}/work-orders`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-
-                if (response.ok) {
-                    closeCreateModal();
-                    loadWorkOrders();
-                } else {
-                    const error = await response.json();
-                    alert('Error creating work order: ' + (error.detail || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Error creating work order:', error);
-                alert('Error creating work order');
-            }
-        }
-
-        async function viewWorkOrder(id) {
-            try {
-                const response = await fetch(`${API_BASE}/work-orders/${id}`);
-                const wo = await response.json();
-                const eq = equipment.find(e => e.id === wo.equipment_id);
-
-                const statusLabels = {
-                    'open': 'Open',
-                    'in_progress': 'In Progress',
-                    'on_hold': 'On Hold',
-                    'completed': 'Completed',
-                    'cancelled': 'Cancelled'
-                };
-
-                const typeLabels = {
-                    'repair': 'Repair',
-                    'preventive': 'Preventive',
-                    'inspection': 'Inspection',
-                    'installation': 'Installation',
-                    'other': 'Other'
-                };
-
-                document.getElementById('detailTitle').textContent = wo.title;
-                document.getElementById('detailContent').innerHTML = `
-                    <div class="wo-detail-section">
-                        <h4>Details</h4>
-                        <div class="wo-detail-grid">
-                            <div class="wo-detail-item">
-                                <label>Status</label>
-                                <span class="badge badge-${wo.status}">${statusLabels[wo.status] || wo.status}</span>
-                            </div>
-                            <div class="wo-detail-item">
-                                <label>Priority</label>
-                                <span class="badge badge-${wo.priority}">${wo.priority}</span>
-                            </div>
-                            <div class="wo-detail-item">
-                                <label>Type</label>
-                                <span>${typeLabels[wo.work_order_type] || wo.work_order_type}</span>
-                            </div>
-                            <div class="wo-detail-item">
-                                <label>Equipment</label>
-                                <span>${eq ? escapeHtml(eq.name) : 'None'}</span>
-                            </div>
-                            <div class="wo-detail-item">
-                                <label>Assigned To</label>
-                                <span>${wo.assigned_to || 'Unassigned'}</span>
-                            </div>
-                            <div class="wo-detail-item">
-                                <label>Due Date</label>
-                                <span>${wo.due_date ? new Date(wo.due_date).toLocaleDateString() : 'Not set'}</span>
-                            </div>
-                            <div class="wo-detail-item">
-                                <label>Created</label>
-                                <span>${new Date(wo.created_at).toLocaleDateString()}</span>
-                            </div>
-                            <div class="wo-detail-item">
-                                <label>Completed</label>
-                                <span>${wo.completed_at ? new Date(wo.completed_at).toLocaleDateString() : '-'}</span>
-                            </div>
+            document.getElementById('detailTitle').textContent = wo.title;
+            document.getElementById('detailContent').innerHTML = `
+                <div class="wo-detail-section">
+                    <h4>Details</h4>
+                    <div class="wo-detail-grid">
+                        <div class="wo-detail-item">
+                            <label>Status</label>
+                            <span class="badge badge-${wo.status}">${statusLabels[wo.status] || wo.status}</span>
+                        </div>
+                        <div class="wo-detail-item">
+                            <label>Priority</label>
+                            <span class="badge badge-${wo.priority}">${wo.priority}</span>
+                        </div>
+                        <div class="wo-detail-item">
+                            <label>Location</label>
+                            <span>${loc ? escapeHtml(loc.name) : '-'}</span>
+                        </div>
+                        <div class="wo-detail-item">
+                            <label>Equipment</label>
+                            <span>${eq ? escapeHtml(eq.name) : 'None'}</span>
+                        </div>
+                        <div class="wo-detail-item">
+                            <label>Assigned To</label>
+                            <span>${wo.assigned_to || 'Unassigned'}</span>
+                        </div>
+                        <div class="wo-detail-item">
+                            <label>Due Date</label>
+                            <span>${wo.due_date ? formatDate(wo.due_date) : 'Not set'}</span>
+                        </div>
+                        <div class="wo-detail-item">
+                            <label>Created</label>
+                            <span>${formatDate(wo.created_at)}</span>
+                        </div>
+                        <div class="wo-detail-item">
+                            <label>Completed</label>
+                            <span>${wo.completed_date ? formatDate(wo.completed_date) : '-'}</span>
                         </div>
                     </div>
-                    ${wo.description ? `
-                        <div class="wo-detail-section">
-                            <h4>Description</h4>
-                            <div class="wo-description">${escapeHtml(wo.description)}</div>
-                        </div>
-                    ` : ''}
+                </div>
+                ${wo.description ? `
                     <div class="wo-detail-section">
-                        <h4>Update Status</h4>
-                        <div class="status-actions">
-                            <button class="btn-status ${wo.status === 'open' ? 'active' : ''}" onclick="updateStatus(${wo.id}, 'open')">Open</button>
-                            <button class="btn-status ${wo.status === 'in_progress' ? 'active' : ''}" onclick="updateStatus(${wo.id}, 'in_progress')">In Progress</button>
-                            <button class="btn-status ${wo.status === 'on_hold' ? 'active' : ''}" onclick="updateStatus(${wo.id}, 'on_hold')">On Hold</button>
-                            <button class="btn-status ${wo.status === 'completed' ? 'active' : ''}" onclick="updateStatus(${wo.id}, 'completed')">Completed</button>
-                            <button class="btn-status ${wo.status === 'cancelled' ? 'active' : ''}" onclick="updateStatus(${wo.id}, 'cancelled')">Cancelled</button>
-                        </div>
+                        <h4>Description</h4>
+                        <div class="wo-description">${escapeHtml(wo.description)}</div>
                     </div>
-                `;
+                ` : ''}
+                <div class="wo-detail-section">
+                    <h4>Update Status</h4>
+                    <div class="status-actions">
+                        <button class="btn-status ${wo.status === 'OPEN' ? 'active' : ''}" onclick="updateStatus(${wo.id}, 'OPEN')">Open</button>
+                        <button class="btn-status ${wo.status === 'IN_PROGRESS' ? 'active' : ''}" onclick="updateStatus(${wo.id}, 'IN_PROGRESS')">In Progress</button>
+                        <button class="btn-status ${wo.status === 'ON_HOLD' ? 'active' : ''}" onclick="updateStatus(${wo.id}, 'ON_HOLD')">On Hold</button>
+                        <button class="btn-status ${wo.status === 'COMPLETED' ? 'active' : ''}" onclick="updateStatus(${wo.id}, 'COMPLETED')">Completed</button>
+                        <button class="btn-status ${wo.status === 'CANCELLED' ? 'active' : ''}" onclick="updateStatus(${wo.id}, 'CANCELLED')">Cancelled</button>
+                    </div>
+                </div>
+            `;
 
-                document.getElementById('detailModal').classList.add('active');
-            } catch (error) {
-                console.error('Error loading work order:', error);
-                alert('Error loading work order details');
+            document.getElementById('detailModal').classList.add('active');
+        } catch (error) {
+            console.error('Error loading work order:', error);
+            showError('Failed to load work order details');
+        }
+    }
+
+    function closeDetailModal() {
+        document.getElementById('detailModal').classList.remove('active');
+    }
+
+    async function updateStatus(id, status) {
+        try {
+            const response = await fetch(`${API_BASE}/work-orders/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: status })
+            });
+
+            if (response.ok) {
+                loadWorkOrders();
+                viewWorkOrder(id);
+            } else {
+                const error = await response.json();
+                showError('Failed to update status: ' + (error.detail || 'Unknown error'));
             }
+        } catch (error) {
+            console.error('Error updating status:', error);
+            showError('Failed to update status');
         }
+    }
 
-        function closeDetailModal() {
-            document.getElementById('detailModal').classList.remove('active');
-        }
+    async function editWorkOrder(id) {
+        try {
+            const response = await fetch(`${API_BASE}/work-orders/${id}`);
+            const wo = await response.json();
 
-        async function updateStatus(id, status) {
-            try {
-                const response = await fetch(`${API_BASE}/work-orders/${id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: status })
-                });
+            // Populate edit modal locations dropdown
+            const editLocSelect = document.getElementById('edit_wo_location_id');
+            editLocSelect.innerHTML = '<option value="">Select location...</option>';
+            locations.forEach(loc => {
+                const option = document.createElement('option');
+                option.value = loc.id;
+                option.textContent = loc.name;
+                editLocSelect.appendChild(option);
+            });
 
-                if (response.ok) {
-                    loadWorkOrders();
-                    viewWorkOrder(id); // Refresh detail view
-                } else {
-                    const error = await response.json();
-                    alert('Error updating status: ' + (error.detail || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Error updating status:', error);
-                alert('Error updating status');
+            // Populate form fields
+            document.getElementById('edit_wo_id').value = wo.id;
+            document.getElementById('edit_wo_title').value = wo.title || '';
+            document.getElementById('edit_wo_location_id').value = wo.location_id || '';
+            updateEditEquipmentDropdown();
+            document.getElementById('edit_wo_equipment_id').value = wo.equipment_id || '';
+            document.getElementById('edit_wo_status').value = wo.status || 'open';
+            document.getElementById('edit_wo_priority').value = wo.priority || 'medium';
+            document.getElementById('edit_wo_due_date').value = wo.due_date ? wo.due_date.split('T')[0] : '';
+            document.getElementById('edit_wo_completed_date').value = wo.completed_date ? wo.completed_date.split('T')[0] : '';
+            document.getElementById('edit_wo_assigned_to').value = wo.assigned_to || '';
+            document.getElementById('edit_wo_description').value = wo.description || '';
+            document.getElementById('edit_wo_resolution_notes').value = wo.resolution_notes || '';
+            document.getElementById('edit_wo_actual_cost').value = wo.actual_cost || '';
+            document.getElementById('edit_wo_labor_hours').value = wo.labor_hours || '';
+            document.getElementById('edit_wo_root_cause').value = wo.root_cause || '';
+
+            // Set vendor
+            document.getElementById('edit_wo_vendor_id').value = wo.vendor_id || '';
+            if (wo.vendor_id) {
+                const vendor = vendors.find(v => v.id === wo.vendor_id);
+                document.getElementById('editVendorSearchInput').value = vendor ? vendor.name : '';
+            } else {
+                document.getElementById('editVendorSearchInput').value = '';
             }
+            closeVendorDropdown('editVendorDropdown');
+
+            document.getElementById('editModal').classList.add('active');
+        } catch (error) {
+            console.error('Error loading work order:', error);
+            showError('Failed to load work order for editing');
+        }
+    }
+
+    function closeEditModal() {
+        document.getElementById('editModal').classList.remove('active');
+    }
+
+    function updateEditEquipmentDropdown() {
+        const locationId = document.getElementById('edit_wo_location_id').value;
+        const select = document.getElementById('edit_wo_equipment_id');
+
+        let filteredEquipment = equipment;
+        if (locationId) {
+            filteredEquipment = equipment.filter(e => e.location_id == locationId);
         }
 
-        function editWorkOrder(id) {
-            // For now, just open the detail view - full edit can be added later
-            viewWorkOrder(id);
+        select.innerHTML = '<option value="">Select equipment (optional)</option>';
+        filteredEquipment.forEach(e => {
+            const option = document.createElement('option');
+            option.value = e.id;
+            const loc = locations.find(l => l.id === e.location_id);
+            option.textContent = `${e.name} (${loc ? loc.name : e.location || 'No location'})`;
+            select.appendChild(option);
+        });
+    }
+
+    // Update equipment when location changes in edit modal
+    document.getElementById('edit_wo_location_id').addEventListener('change', updateEditEquipmentDropdown);
+
+    async function saveWorkOrderEdit() {
+        const id = document.getElementById('edit_wo_id').value;
+        const locationId = document.getElementById('edit_wo_location_id').value;
+
+        if (!locationId) {
+            showWarning('Please select a location');
+            return;
         }
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
+        const vendorId = document.getElementById('edit_wo_vendor_id').value;
+
+        const data = {
+            title: document.getElementById('edit_wo_title').value,
+            location_id: parseInt(locationId),
+            equipment_id: document.getElementById('edit_wo_equipment_id').value ? parseInt(document.getElementById('edit_wo_equipment_id').value) : null,
+            status: document.getElementById('edit_wo_status').value,
+            priority: document.getElementById('edit_wo_priority').value,
+            due_date: document.getElementById('edit_wo_due_date').value || null,
+            completed_date: document.getElementById('edit_wo_completed_date').value || null,
+            assigned_to: document.getElementById('edit_wo_assigned_to').value || null,
+            description: document.getElementById('edit_wo_description').value || null,
+            resolution_notes: document.getElementById('edit_wo_resolution_notes').value || null,
+            actual_cost: document.getElementById('edit_wo_actual_cost').value ? parseFloat(document.getElementById('edit_wo_actual_cost').value) : null,
+            labor_hours: document.getElementById('edit_wo_labor_hours').value ? parseFloat(document.getElementById('edit_wo_labor_hours').value) : null,
+            root_cause: document.getElementById('edit_wo_root_cause').value || null,
+            vendor_id: vendorId ? parseInt(vendorId) : null,
+            is_external: vendorId ? true : false
+        };
+
+        if (!data.title) {
+            showWarning('Please enter a title');
+            return;
         }
 
-        // Initialize
-        loadEquipment().then(() => loadWorkOrders());
-    </script>
-</body>
-</html>
+        try {
+            const response = await fetch(`${API_BASE}/work-orders/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                closeEditModal();
+                loadWorkOrders();
+                showSuccess('Work order updated successfully');
+            } else {
+                const error = await response.json();
+                showError('Failed to update work order: ' + (error.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error updating work order:', error);
+            showError('Failed to update work order');
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Format date string (YYYY-MM-DD) to local display without timezone shift
+    function formatDate(dateStr) {
+        if (!dateStr) return '-';
+        // Parse the date string parts directly to avoid timezone conversion
+        const parts = dateStr.split('T')[0].split('-');
+        if (parts.length !== 3) return dateStr;
+        const year = parseInt(parts[0]);
+        const month = parseInt(parts[1]);
+        const day = parseInt(parts[2]);
+        return `${month}/${day}/${year}`;
+    }
+
+    // ========== Log Completed Work Functions ==========
+
+    function openLogWorkModal() {
+        document.getElementById('logWorkForm').reset();
+        // Set default date to today
+        document.getElementById('log_completed_date').value = new Date().toISOString().split('T')[0];
+        updateLogEquipmentDropdown();
+        // Clear vendor
+        document.getElementById('log_vendor_id').value = '';
+        document.getElementById('logVendorSearchInput').value = '';
+        closeVendorDropdown('logVendorDropdown');
+        document.getElementById('logWorkModal').classList.add('active');
+    }
+
+    function closeLogWorkModal() {
+        document.getElementById('logWorkModal').classList.remove('active');
+    }
+
+    function updateLogEquipmentDropdown() {
+        const locationId = document.getElementById('log_location_id').value;
+        const select = document.getElementById('log_equipment_id');
+
+        let filteredEquipment = equipment;
+        if (locationId) {
+            filteredEquipment = equipment.filter(e => e.location_id == locationId);
+        }
+
+        select.innerHTML = '<option value="">Select equipment (optional)</option>';
+        filteredEquipment.forEach(e => {
+            const option = document.createElement('option');
+            option.value = e.id;
+            const loc = locations.find(l => l.id === e.location_id);
+            option.textContent = `${e.name} (${loc ? loc.name : e.location || 'No location'})`;
+            select.appendChild(option);
+        });
+    }
+
+    // Update equipment when location changes in log work modal
+    document.getElementById('log_location_id').addEventListener('change', updateLogEquipmentDropdown);
+
+    async function logCompletedWork() {
+        const locationId = document.getElementById('log_location_id').value;
+        const resolution = document.getElementById('log_resolution').value;
+        const title = document.getElementById('log_title').value;
+        const completedDate = document.getElementById('log_completed_date').value;
+
+        if (!locationId) {
+            showWarning('Please select a location');
+            return;
+        }
+        if (!title) {
+            showWarning('Please enter what was done');
+            return;
+        }
+        if (!resolution) {
+            showWarning('Please enter resolution notes');
+            return;
+        }
+        if (!completedDate) {
+            showWarning('Please enter the date completed');
+            return;
+        }
+
+        const vendorId = document.getElementById('log_vendor_id').value;
+        const vendor = vendorId ? vendors.find(v => v.id === parseInt(vendorId)) : null;
+
+        // Create work order data - already completed
+        const data = {
+            title: title,
+            location_id: parseInt(locationId),
+            equipment_id: document.getElementById('log_equipment_id').value ? parseInt(document.getElementById('log_equipment_id').value) : null,
+            work_order_type: 'repair',
+            priority: 'high',
+            description: document.getElementById('log_description').value || null,
+            status: 'completed',
+            is_external: vendorId ? true : false,
+            vendor_id: vendorId ? parseInt(vendorId) : null,
+            resolution_notes: resolution,
+            root_cause: document.getElementById('log_root_cause').value || null,
+            actual_cost: document.getElementById('log_cost').value ? parseFloat(document.getElementById('log_cost').value) : null,
+            labor_hours: document.getElementById('log_labor_hours').value ? parseFloat(document.getElementById('log_labor_hours').value) : null,
+            completed_date: completedDate,
+            assigned_to: vendor ? vendor.name : null
+        };
+
+        try {
+            const response = await fetch(`${API_BASE}/work-orders/log-completed`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                closeLogWorkModal();
+                loadWorkOrders();
+                showSuccess('Completed work logged successfully');
+            } else {
+                const error = await response.json();
+                showError('Failed to log work: ' + (error.detail || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error logging completed work:', error);
+            showError('Failed to log completed work');
+        }
+    }
+
+    // Initialize vendor dropdowns on page load
+    document.addEventListener('DOMContentLoaded', () => {
+        initVendorDropdown('vendorSearchInput', 'vendorDropdown', 'wo_vendor_id', 'vendorSearchable');
+        initVendorDropdown('editVendorSearchInput', 'editVendorDropdown', 'edit_wo_vendor_id', 'editVendorSearchable');
+        initVendorDropdown('logVendorSearchInput', 'logVendorDropdown', 'log_vendor_id', 'logVendorSearchable');
+    });
+
+    // Initialize
+    Promise.all([loadLocations(), loadEquipment(), loadVendors()]).then(() => loadWorkOrders());
+</script>
+{% endblock %}
