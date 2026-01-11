@@ -1,0 +1,1101 @@
+{% extends "base.html" %}
+
+{% block title %}E-Signature Templates - HR Management{% endblock %}
+{% block nav_esignature %}active{% endblock %}
+
+{% block extra_styles %}
+<style>
+    /* Field Editor Modal Overrides */
+    #fieldEditorModal .modal-content {
+        max-width: 1100px;
+        width: 95vw;
+        margin: 1vh auto;
+        max-height: 98vh;
+        height: 98vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    #fieldEditorModal .modal-body {
+        padding: 0 !important;
+        flex: 1;
+        overflow: hidden;
+        max-height: none !important;
+        min-height: 0;
+    }
+
+    /* Field Editor Container - side by side layout */
+    .field-editor-container {
+        display: flex;
+        flex-direction: row;
+        gap: 0;
+        height: 100%;
+        min-height: 0;
+    }
+
+    /* PDF Preview Panel - left side */
+    .pdf-preview-panel {
+        flex: 1;
+        min-height: 0;
+        background: #e8e8e8;
+        overflow: auto;
+        position: relative;
+        padding: 15px;
+        /* Allow both horizontal and vertical scrolling */
+    }
+
+    .pdf-canvas-container {
+        position: relative;
+        display: inline-block;
+        line-height: 0;
+    }
+
+    .pdf-canvas-container canvas {
+        display: block;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+        background: white;
+    }
+
+    .fields-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        /* Width and height set by JavaScript */
+        pointer-events: auto;
+        z-index: 10;
+    }
+
+    .fields-overlay.active {
+        cursor: crosshair;
+        background: rgba(59, 130, 246, 0.05);
+    }
+
+    /* Field Tools Panel - right side */
+    .field-tools-panel {
+        width: 260px;
+        min-width: 260px;
+        background: var(--bg-secondary);
+        padding: 15px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        overflow-y: auto;
+        border-left: 1px solid var(--border-primary);
+    }
+
+    /* Selection hint message */
+    .field-selection-hint {
+        background: var(--accent-primary);
+        color: white;
+        padding: 10px 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        text-align: center;
+        display: none;
+    }
+
+    .field-selection-hint.active {
+        display: block;
+    }
+
+    .signature-field {
+        position: absolute;
+        border: 2px dashed;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: move;
+        user-select: none;
+        min-width: 80px;
+        min-height: 30px;
+    }
+
+    .signature-field.type-signature {
+        border-color: #1976D2;
+        background: rgba(25, 118, 210, 0.15);
+        color: #1976D2;
+    }
+
+    .signature-field.type-initial {
+        border-color: #7B1FA2;
+        background: rgba(123, 31, 162, 0.15);
+        color: #7B1FA2;
+    }
+
+    .signature-field.type-date {
+        border-color: #388E3C;
+        background: rgba(56, 142, 60, 0.15);
+        color: #388E3C;
+    }
+
+    .signature-field.type-text {
+        border-color: #F57C00;
+        background: rgba(245, 124, 0, 0.15);
+        color: #F57C00;
+    }
+
+    .signature-field .delete-field {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 18px;
+        height: 18px;
+        background: #E53935;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .signature-field:hover .delete-field {
+        display: flex;
+    }
+
+    .signature-field .resize-handle {
+        position: absolute;
+        bottom: -4px;
+        right: -4px;
+        width: 10px;
+        height: 10px;
+        background: var(--accent-primary);
+        cursor: se-resize;
+        border-radius: 2px;
+    }
+
+    .field-tool-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border: 2px solid var(--border-primary);
+        border-radius: 6px;
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 13px;
+        flex-shrink: 0;
+    }
+
+    .field-tool-btn:hover {
+        border-color: var(--accent-primary);
+    }
+
+    .field-tool-btn.active {
+        border-color: var(--accent-primary);
+        background: var(--accent-primary);
+        color: white;
+    }
+
+    .field-tool-btn.active i {
+        color: white !important;
+    }
+
+    .field-tool-btn i {
+        font-size: 18px;
+    }
+
+    .page-nav {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 15px;
+        padding: 10px;
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border-primary);
+    }
+
+    .page-nav button {
+        padding: 6px 12px;
+        background: var(--bg-tertiary);
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+        cursor: pointer;
+        color: var(--text-primary);
+    }
+
+    .page-nav button:hover:not(:disabled) {
+        background: var(--accent-primary);
+        color: white;
+    }
+
+    .page-nav button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .fields-list {
+        flex: 1;
+        min-height: 80px;
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        background: var(--bg-tertiary);
+    }
+
+    .fields-list-item {
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 13px;
+    }
+
+    .fields-list-item:last-child {
+        border-bottom: none;
+    }
+
+    .fields-list-empty {
+        padding: 20px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 13px;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 900px) {
+        .field-editor-container {
+            flex-direction: column;
+            height: auto;
+        }
+
+        .pdf-preview-panel {
+            border-right: none;
+            border-bottom: 1px solid var(--border-primary);
+            min-height: 400px;
+        }
+
+        .field-tools-panel {
+            width: 100%;
+            min-width: unset;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div style="margin-bottom: 20px; color: var(--text-secondary);">
+    <a href="/hr/" style="color: var(--accent-primary);">Dashboard</a> /
+    <span>E-Signature Templates</span>
+</div>
+
+<!-- Alert Container -->
+<div id="alertContainer"></div>
+
+<!-- Header Card -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h2><i class="bi bi-pen"></i> E-Signature Templates</h2>
+        <button class="btn btn-primary" onclick="openUploadModal()">
+            <i class="bi bi-upload"></i> Upload Template
+        </button>
+    </div>
+</div>
+
+<!-- Templates List -->
+<div class="card">
+    <div class="card-header">
+        <h3>Available Templates</h3>
+    </div>
+    <div id="templatesContainer" style="padding: 20px;">
+        <p style="text-align: center; color: var(--text-secondary);"><i class="bi bi-hourglass-split"></i> Loading templates...</p>
+    </div>
+</div>
+
+<!-- Upload Template Modal (Step 1) -->
+<div id="uploadModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="bi bi-upload"></i> Upload Signature Template</h3>
+            <button class="close-modal" onclick="closeUploadModal()">&times;</button>
+        </div>
+
+        <form id="uploadForm" class="modal-body">
+            <div class="form-group">
+                <label for="templateName">Template Name <span style="color: #E53935;">*</span></label>
+                <input type="text" id="templateName" required placeholder="e.g., New Hire Packet">
+            </div>
+
+            <div class="form-group">
+                <label for="documentType">Document Type <span style="color: #E53935;">*</span></label>
+                <select id="documentType" required>
+                    <option value="">Select Type</option>
+                    <option value="new_hire_packet">New Hire Packet</option>
+                    <option value="policy_update">Policy Update</option>
+                    <option value="handbook_acknowledgment">Employee Handbook</option>
+                    <option value="confidentiality_agreement">Confidentiality Agreement</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="templateDescription">Description (Optional)</label>
+                <textarea id="templateDescription" rows="2" placeholder="Brief description of this template"></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="templateFile">PDF File <span style="color: #E53935;">*</span></label>
+                <input type="file" id="templateFile" accept=".pdf" required>
+                <small style="color: var(--text-muted); display: block; margin-top: 5px;">
+                    Only PDF files are allowed
+                </small>
+            </div>
+
+            <div style="background: var(--bg-tertiary); padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+                <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
+                    <i class="bi bi-info-circle"></i> After uploading, you'll be able to place signature fields on the document.
+                </p>
+            </div>
+
+            <div class="modal-footer" style="border-top: none; padding: 0; margin-top: 20px;">
+                <button type="button" class="btn btn-secondary" onclick="closeUploadModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-arrow-right"></i> Upload & Add Fields
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Field Editor Modal (Step 2) -->
+<div id="fieldEditorModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3><i class="bi bi-pencil-square"></i> Place Signature Fields - <span id="editorTemplateName"></span></h3>
+            <button class="close-modal" onclick="closeFieldEditor()">&times;</button>
+        </div>
+
+        <div class="modal-body" style="padding: 0;">
+            <div class="field-editor-container">
+                <!-- PDF Preview Panel with Page Nav -->
+                <div style="display: flex; flex-direction: column; flex: 1; min-width: 0; overflow: hidden;">
+                    <div class="pdf-preview-panel" id="pdfPreviewPanel">
+                        <div class="pdf-canvas-container" id="pdfCanvasContainer">
+                            <canvas id="pdfCanvas"></canvas>
+                            <div class="fields-overlay" id="fieldsOverlay"></div>
+                        </div>
+                    </div>
+                    <!-- Page Navigation and Zoom -->
+                    <div class="page-nav">
+                        <button type="button" onclick="zoomPdf(-0.1)" title="Zoom Out">
+                            <i class="bi bi-zoom-out"></i>
+                        </button>
+                        <span id="zoomLevel" style="color: var(--text-primary); min-width: 50px; text-align: center;">100%</span>
+                        <button type="button" onclick="zoomPdf(0.1)" title="Zoom In">
+                            <i class="bi bi-zoom-in"></i>
+                        </button>
+                        <span style="border-left: 1px solid var(--border-primary); height: 20px; margin: 0 10px;"></span>
+                        <button type="button" id="prevPageBtn" onclick="changePage(-1)" disabled>
+                            <i class="bi bi-chevron-left"></i>
+                        </button>
+                        <span id="pageInfo" style="color: var(--text-primary);">1 / 1</span>
+                        <button type="button" id="nextPageBtn" onclick="changePage(1)" disabled>
+                            <i class="bi bi-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Field Tools Panel -->
+                <div class="field-tools-panel">
+                    <div>
+                        <h4 style="margin: 0 0 8px 0; color: var(--text-primary); font-size: 15px;">Add Field</h4>
+                        <p style="margin: 0 0 8px 0; color: var(--text-muted); font-size: 12px;">
+                            Select a field type, then click on the document.
+                        </p>
+                    </div>
+
+                    <div class="field-selection-hint" id="fieldSelectionHint">
+                        <i class="bi bi-cursor"></i> Click on the document to place the field
+                    </div>
+
+                    <button type="button" class="field-tool-btn" data-field-type="signature" onclick="selectFieldType('signature')">
+                        <i class="bi bi-pen" style="color: #1976D2;"></i>
+                        <span>Signature</span>
+                    </button>
+
+                    <button type="button" class="field-tool-btn" data-field-type="initial" onclick="selectFieldType('initial')">
+                        <i class="bi bi-fonts" style="color: #7B1FA2;"></i>
+                        <span>Initials</span>
+                    </button>
+
+                    <button type="button" class="field-tool-btn" data-field-type="date" onclick="selectFieldType('date')">
+                        <i class="bi bi-calendar" style="color: #388E3C;"></i>
+                        <span>Date Signed</span>
+                    </button>
+
+                    <button type="button" class="field-tool-btn" data-field-type="text" onclick="selectFieldType('text')">
+                        <i class="bi bi-input-cursor-text" style="color: #F57C00;"></i>
+                        <span>Text Input</span>
+                    </button>
+
+                    <div style="border-top: 1px solid var(--border-primary); padding-top: 10px; margin-top: 5px;">
+                        <h4 style="margin: 0 0 8px 0; color: var(--text-primary); font-size: 14px;">Placed Fields</h4>
+                    </div>
+
+                    <div class="fields-list" id="fieldsList">
+                        <div class="fields-list-empty">No fields added yet</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid var(--border-primary); flex-shrink: 0;">
+            <button type="button" class="btn btn-secondary" onclick="closeFieldEditor()">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="saveTemplateFields()">
+                <i class="bi bi-check-circle"></i> Save Template
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<!-- PDF.js Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// State variables
+let currentTemplateId = null;
+let currentTemplateName = '';
+let pdfDoc = null;
+let currentPage = 1;
+let totalPages = 1;
+let pdfScale = 1.0;
+let selectedFieldType = null;
+let placedFields = []; // [{id, type, page, x, y, width, height, required}]
+let fieldIdCounter = 0;
+let isDragging = false;
+let isResizing = false;
+let draggedField = null;
+let dragOffset = { x: 0, y: 0 };
+
+// Field type configurations
+const fieldTypes = {
+    signature: { label: 'Signature', width: 150, height: 40 },
+    initial: { label: 'Initials', width: 60, height: 30 },
+    date: { label: 'Date', width: 100, height: 25 },
+    text: { label: 'Text', width: 150, height: 25 }
+};
+
+async function loadTemplates() {
+    try {
+        const response = await fetch('/hr/api/esignature/templates', {
+            credentials: 'include'
+        });
+        const templates = await response.json();
+        renderTemplates(templates);
+    } catch (error) {
+        console.error('Error loading templates:', error);
+        document.getElementById('templatesContainer').innerHTML = `
+            <p style="text-align: center; color: #E53935;">Error loading templates</p>
+        `;
+    }
+}
+
+function renderTemplates(templates) {
+    const container = document.getElementById('templatesContainer');
+
+    if (templates.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px;">
+                <i class="bi bi-file-earmark-pdf" style="font-size: 48px; color: var(--text-muted);"></i>
+                <p style="color: var(--text-secondary); margin-top: 15px;">No templates uploaded yet</p>
+                <p style="color: var(--text-muted); font-size: 14px;">Click "Upload Template" to add your first signature template</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--border-primary);">
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Name</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Type</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Fields</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Created</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${templates.map(template => `
+                        <tr style="border-bottom: 1px solid var(--border-primary);">
+                            <td style="padding: 12px; color: var(--text-primary);">
+                                <strong>${template.name}</strong>
+                                ${template.description ? `<br><small style="color: var(--text-muted);">${template.description}</small>` : ''}
+                            </td>
+                            <td style="padding: 12px; color: var(--text-primary);">
+                                <span style="padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; background: var(--accent-primary); color: #ffffff;">
+                                    ${formatDocType(template.document_type)}
+                                </span>
+                            </td>
+                            <td style="padding: 12px; color: var(--text-primary);">
+                                ${template.signature_fields ? template.signature_fields.length : 0} fields
+                            </td>
+                            <td style="padding: 12px; color: var(--text-primary);">
+                                ${template.created_at ? new Date(template.created_at).toLocaleDateString() : '-'}
+                            </td>
+                            <td style="padding: 12px;">
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;"
+                                            onclick="editTemplateFields(${template.id}, '${template.name.replace(/'/g, "\\'")}')">
+                                        <i class="bi bi-pencil"></i> Edit Fields
+                                    </button>
+                                    ${template.template_file_path ? `
+                                        <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;"
+                                                onclick="downloadTemplate(${template.id})">
+                                            <i class="bi bi-download"></i> Download
+                                        </button>
+                                    ` : ''}
+                                    <button class="btn btn-danger" style="padding: 6px 12px; font-size: 13px;"
+                                            onclick="deleteTemplate(${template.id}, '${template.name.replace(/'/g, "\\'")}')">
+                                        <i class="bi bi-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function formatDocType(type) {
+    const typeMap = {
+        'new_hire_packet': 'New Hire Packet',
+        'policy_update': 'Policy Update',
+        'handbook_acknowledgment': 'Employee Handbook',
+        'confidentiality_agreement': 'Confidentiality Agreement',
+        'other': 'Other'
+    };
+    return typeMap[type] || type;
+}
+
+function openUploadModal() {
+    document.getElementById('uploadModal').classList.add('active');
+}
+
+function closeUploadModal() {
+    document.getElementById('uploadModal').classList.remove('active');
+    document.getElementById('uploadForm').reset();
+}
+
+// Upload form handler - uploads PDF then opens field editor
+document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Uploading...';
+    submitBtn.disabled = true;
+
+    try {
+        const formData = new FormData();
+        formData.append('name', document.getElementById('templateName').value);
+        formData.append('document_type', document.getElementById('documentType').value);
+        formData.append('description', document.getElementById('templateDescription').value);
+        formData.append('file', document.getElementById('templateFile').files[0]);
+
+        const response = await fetch('/hr/api/esignature/templates/upload', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            closeUploadModal();
+            // Open field editor for the new template
+            openFieldEditor(result.id, document.getElementById('templateName').value);
+        } else {
+            showAlert('Error: ' + (result.detail || 'Failed to upload template'), 'error');
+        }
+    } catch (error) {
+        console.error('Error uploading template:', error);
+        showAlert('Error uploading template', 'error');
+    } finally {
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+    }
+});
+
+// Field Editor Functions
+async function openFieldEditor(templateId, templateName) {
+    currentTemplateId = templateId;
+    currentTemplateName = templateName;
+    document.getElementById('editorTemplateName').textContent = templateName;
+
+    // Reset state
+    placedFields = [];
+    selectedFieldType = null;
+    currentPage = 1;
+    fieldIdCounter = 0;
+    clearFieldTypeSelection();
+
+    document.getElementById('fieldEditorModal').classList.add('active');
+
+    // Load existing fields if any
+    try {
+        const response = await fetch(`/hr/api/esignature/templates/${templateId}`, {
+            credentials: 'include'
+        });
+        if (response.ok) {
+            const template = await response.json();
+            if (template.signature_fields && template.signature_fields.length > 0) {
+                placedFields = template.signature_fields.map(f => ({
+                    ...f,
+                    id: ++fieldIdCounter
+                }));
+            }
+        }
+    } catch (error) {
+        console.error('Error loading template fields:', error);
+    }
+
+    // Load PDF
+    await loadPdf(templateId);
+}
+
+async function editTemplateFields(templateId, templateName) {
+    await openFieldEditor(templateId, templateName);
+}
+
+function closeFieldEditor() {
+    document.getElementById('fieldEditorModal').classList.remove('active');
+    currentTemplateId = null;
+    pdfDoc = null;
+    placedFields = [];
+    loadTemplates(); // Refresh list
+}
+
+async function loadPdf(templateId) {
+    try {
+        const response = await fetch(`/hr/api/esignature/templates/${templateId}/download`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to load PDF');
+        }
+
+        const blob = await response.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+
+        pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        totalPages = pdfDoc.numPages;
+
+        updatePageNav();
+        await renderPage(currentPage);
+        renderFieldsList();
+    } catch (error) {
+        console.error('Error loading PDF:', error);
+        showAlert('Error loading PDF preview', 'error');
+    }
+}
+
+async function renderPage(pageNum) {
+    if (!pdfDoc) return;
+
+    const page = await pdfDoc.getPage(pageNum);
+    const viewport = page.getViewport({ scale: pdfScale });
+
+    const canvas = document.getElementById('pdfCanvas');
+    const context = canvas.getContext('2d');
+
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+
+    const overlay = document.getElementById('fieldsOverlay');
+    overlay.style.width = viewport.width + 'px';
+    overlay.style.height = viewport.height + 'px';
+
+    await page.render({
+        canvasContext: context,
+        viewport: viewport
+    }).promise;
+
+    // Render fields for this page
+    renderPageFields();
+}
+
+function renderPageFields() {
+    const overlay = document.getElementById('fieldsOverlay');
+    overlay.innerHTML = '';
+
+    const pageFields = placedFields.filter(f => f.page === currentPage);
+
+    pageFields.forEach(field => {
+        const fieldEl = createFieldElement(field);
+        overlay.appendChild(fieldEl);
+    });
+}
+
+function createFieldElement(field) {
+    const el = document.createElement('div');
+    el.className = `signature-field type-${field.type}`;
+    el.dataset.fieldId = field.id;
+    el.style.left = field.x + 'px';
+    el.style.top = field.y + 'px';
+    el.style.width = field.width + 'px';
+    el.style.height = field.height + 'px';
+
+    el.innerHTML = `
+        <span>${fieldTypes[field.type].label}</span>
+        <button class="delete-field" onclick="deleteField(${field.id})">&times;</button>
+        <div class="resize-handle"></div>
+    `;
+
+    // Drag functionality
+    el.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('delete-field')) return;
+        if (e.target.classList.contains('resize-handle')) {
+            startResize(e, field);
+        } else {
+            startDrag(e, field);
+        }
+    });
+
+    return el;
+}
+
+function startDrag(e, field) {
+    e.preventDefault();
+    isDragging = true;
+    draggedField = field;
+
+    const rect = e.target.closest('.signature-field').getBoundingClientRect();
+    const overlayRect = document.getElementById('fieldsOverlay').getBoundingClientRect();
+
+    dragOffset.x = e.clientX - rect.left;
+    dragOffset.y = e.clientY - rect.top;
+}
+
+function startResize(e, field) {
+    e.preventDefault();
+    e.stopPropagation();
+    isResizing = true;
+    draggedField = field;
+}
+
+document.addEventListener('mousemove', (e) => {
+    if (!isDragging && !isResizing) return;
+
+    const overlay = document.getElementById('fieldsOverlay');
+    const overlayRect = overlay.getBoundingClientRect();
+
+    if (isDragging && draggedField) {
+        const newX = Math.max(0, Math.min(e.clientX - overlayRect.left - dragOffset.x, overlayRect.width - draggedField.width));
+        const newY = Math.max(0, Math.min(e.clientY - overlayRect.top - dragOffset.y, overlayRect.height - draggedField.height));
+
+        draggedField.x = Math.round(newX);
+        draggedField.y = Math.round(newY);
+
+        const fieldEl = overlay.querySelector(`[data-field-id="${draggedField.id}"]`);
+        if (fieldEl) {
+            fieldEl.style.left = draggedField.x + 'px';
+            fieldEl.style.top = draggedField.y + 'px';
+        }
+    }
+
+    if (isResizing && draggedField) {
+        const fieldEl = overlay.querySelector(`[data-field-id="${draggedField.id}"]`);
+        if (fieldEl) {
+            const fieldRect = fieldEl.getBoundingClientRect();
+            const newWidth = Math.max(60, e.clientX - fieldRect.left);
+            const newHeight = Math.max(20, e.clientY - fieldRect.top);
+
+            draggedField.width = Math.round(newWidth);
+            draggedField.height = Math.round(newHeight);
+
+            fieldEl.style.width = draggedField.width + 'px';
+            fieldEl.style.height = draggedField.height + 'px';
+        }
+    }
+});
+
+document.addEventListener('mouseup', () => {
+    if (isDragging || isResizing) {
+        renderFieldsList();
+    }
+    isDragging = false;
+    isResizing = false;
+    draggedField = null;
+});
+
+// Click to place field - using event delegation on the container
+function handleOverlayClick(e) {
+    // Skip if dragging/resizing
+    if (isDragging || isResizing) return;
+
+    // Skip if clicking on an existing field
+    if (e.target.closest('.signature-field')) return;
+
+    // Require a field type to be selected
+    if (!selectedFieldType) {
+        showAlert('Please select a field type first (Signature, Initials, Date, or Text)', 'error');
+        return;
+    }
+
+    const overlay = document.getElementById('fieldsOverlay');
+    const rect = overlay.getBoundingClientRect();
+
+    // Calculate click position relative to overlay
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const config = fieldTypes[selectedFieldType];
+    const newField = {
+        id: ++fieldIdCounter,
+        type: selectedFieldType,
+        page: currentPage,
+        x: Math.round(x - config.width / 2),
+        y: Math.round(y - config.height / 2),
+        width: config.width,
+        height: config.height,
+        required: true
+    };
+
+    // Keep within bounds
+    newField.x = Math.max(0, Math.min(newField.x, rect.width - config.width));
+    newField.y = Math.max(0, Math.min(newField.y, rect.height - config.height));
+
+    placedFields.push(newField);
+    renderPageFields();
+    renderFieldsList();
+
+    // Show success feedback
+    console.log('Field placed:', newField);
+}
+
+// Attach click handler
+document.getElementById('fieldsOverlay').addEventListener('click', handleOverlayClick);
+
+function selectFieldType(type) {
+    // If clicking the same type, deselect it
+    if (selectedFieldType === type) {
+        clearFieldTypeSelection();
+        return;
+    }
+
+    selectedFieldType = type;
+
+    // Update button styles
+    document.querySelectorAll('.field-tool-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`.field-tool-btn[data-field-type="${type}"]`).classList.add('active');
+
+    // Update overlay cursor and hint
+    const overlay = document.getElementById('fieldsOverlay');
+    overlay.classList.add('active');
+
+    const hint = document.getElementById('fieldSelectionHint');
+    hint.classList.add('active');
+    hint.innerHTML = `<i class="bi bi-cursor"></i> Click on the document to place <strong>${fieldTypes[type].label}</strong>`;
+}
+
+function clearFieldTypeSelection() {
+    document.querySelectorAll('.field-tool-btn').forEach(btn => btn.classList.remove('active'));
+
+    const overlay = document.getElementById('fieldsOverlay');
+    if (overlay) overlay.classList.remove('active');
+
+    const hint = document.getElementById('fieldSelectionHint');
+    if (hint) hint.classList.remove('active');
+
+    selectedFieldType = null;
+}
+
+function deleteField(fieldId) {
+    placedFields = placedFields.filter(f => f.id !== fieldId);
+    renderPageFields();
+    renderFieldsList();
+}
+
+function renderFieldsList() {
+    const list = document.getElementById('fieldsList');
+
+    if (placedFields.length === 0) {
+        list.innerHTML = '<div class="fields-list-empty">No fields added yet</div>';
+        return;
+    }
+
+    list.innerHTML = placedFields.map(field => `
+        <div class="fields-list-item">
+            <span>
+                <strong>${fieldTypes[field.type].label}</strong>
+                <small style="color: var(--text-muted);"> (Page ${field.page})</small>
+            </span>
+            <button onclick="deleteField(${field.id})" style="background: none; border: none; color: #E53935; cursor: pointer; font-size: 16px;">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function updatePageNav() {
+    document.getElementById('pageInfo').textContent = `${currentPage} / ${totalPages}`;
+    document.getElementById('prevPageBtn').disabled = currentPage <= 1;
+    document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
+    document.getElementById('zoomLevel').textContent = `${Math.round(pdfScale * 100)}%`;
+}
+
+async function changePage(delta) {
+    const newPage = currentPage + delta;
+    if (newPage < 1 || newPage > totalPages) return;
+
+    currentPage = newPage;
+    updatePageNav();
+    await renderPage(currentPage);
+}
+
+async function zoomPdf(delta) {
+    const newScale = Math.max(0.5, Math.min(2.0, pdfScale + delta));
+    if (newScale === pdfScale) return;
+
+    pdfScale = newScale;
+    updatePageNav();
+    await renderPage(currentPage);
+}
+
+async function saveTemplateFields() {
+    if (!currentTemplateId) return;
+
+    try {
+        // Convert field positions to percentages for consistent sizing
+        const canvas = document.getElementById('pdfCanvas');
+        const fieldsToSave = placedFields.map(f => ({
+            type: f.type,
+            page: f.page,
+            x: f.x,
+            y: f.y,
+            width: f.width,
+            height: f.height,
+            required: f.required,
+            // Store as percentages for Dropbox Sign API
+            x_percent: (f.x / canvas.width * 100).toFixed(2),
+            y_percent: (f.y / canvas.height * 100).toFixed(2),
+            width_percent: (f.width / canvas.width * 100).toFixed(2),
+            height_percent: (f.height / canvas.height * 100).toFixed(2)
+        }));
+
+        const response = await fetch(`/hr/api/esignature/templates/${currentTemplateId}/fields`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ fields: fieldsToSave })
+        });
+
+        if (response.ok) {
+            showAlert('Template fields saved successfully', 'success');
+            closeFieldEditor();
+        } else {
+            const error = await response.json();
+            showAlert('Error: ' + (error.detail || 'Failed to save fields'), 'error');
+        }
+    } catch (error) {
+        console.error('Error saving fields:', error);
+        showAlert('Error saving template fields', 'error');
+    }
+}
+
+async function downloadTemplate(templateId) {
+    try {
+        const response = await fetch(`/hr/api/esignature/templates/${templateId}/download`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to download template');
+        }
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'template.pdf';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+    } catch (error) {
+        console.error('Error downloading template:', error);
+        showAlert('Error downloading template', 'error');
+    }
+}
+
+async function deleteTemplate(templateId, templateName) {
+    if (!confirm(`Are you sure you want to delete the template "${templateName}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hr/api/esignature/templates/${templateId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showAlert(result.message || 'Template deleted', 'success');
+            loadTemplates();
+        } else {
+            showAlert('Error: ' + (result.detail || 'Failed to delete template'), 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting template:', error);
+        showAlert('Error deleting template', 'error');
+    }
+}
+
+function showAlert(message, type) {
+    const alertContainer = document.getElementById('alertContainer');
+    const bgColor = type === 'error' ? '#E53935' : '#238636';
+
+    alertContainer.innerHTML = `
+        <div style="background: ${bgColor}; color: #ffffff; padding: 15px 20px; border-radius: 6px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <span><i class="bi bi-${type === 'error' ? 'exclamation-circle' : 'check-circle'}"></i> ${message}</span>
+            <button onclick="this.parentElement.remove()" style="background: none; border: none; color: #ffffff; font-size: 20px; cursor: pointer; padding: 0; line-height: 1;">&times;</button>
+        </div>
+    `;
+
+    setTimeout(() => {
+        alertContainer.innerHTML = '';
+    }, 5000);
+}
+
+// Close modals when clicking outside
+document.getElementById('uploadModal').addEventListener('click', (e) => {
+    if (e.target.id === 'uploadModal') {
+        closeUploadModal();
+    }
+});
+
+document.getElementById('fieldEditorModal').addEventListener('click', (e) => {
+    if (e.target.id === 'fieldEditorModal') {
+        closeFieldEditor();
+    }
+});
+
+// Load templates on page load
+loadTemplates();
+</script>
+{% endblock %}

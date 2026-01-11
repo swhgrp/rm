@@ -1,6 +1,6 @@
 # HR System - TODO
 
-**Last Updated:** December 25, 2025
+**Last Updated:** January 11, 2026
 
 ## Priority Legend
 - P0: Critical - Blocking production use
@@ -13,6 +13,20 @@
 ## Important Note
 
 This is an **employee information management system**, NOT a full HRIS. It intentionally does NOT include scheduling, time tracking, or payroll - those would be separate systems or third-party integrations.
+
+---
+
+## Recently Completed
+
+### January 2026
+
+- [x] **E-Signature Template Field Editor** ✅
+  - Visual PDF field placement with PDF.js
+  - Click-to-place signature, initials, date, text fields
+  - Drag and resize field boxes
+  - Multi-page navigation and zoom controls (50%-200%)
+  - Dropbox Sign webhook integration
+  - Field positions stored as pixels and percentages for API
 
 ---
 

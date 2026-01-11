@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
 from hr.api.api_v1.endpoints import positions, employees, documents, roles, locations, departments, audit
-from hr.api.api_v1.endpoints import settings
+from hr.api.api_v1.endpoints import settings, esignature
 from hr.api.auth_helpers import require_login, require_admin
 from hr.api import auth, users
 from hr.db.database import get_db
@@ -37,6 +37,7 @@ app.include_router(documents.router, prefix="/api/documents", tags=["documents"]
 app.include_router(departments.router, prefix="/api/departments", tags=["departments"])
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
+app.include_router(esignature.router, prefix="/api/esignature", tags=["esignature"])
 
 # Setup templates
 templates_dir = os.path.join(os.path.dirname(__file__), "templates")
@@ -216,4 +217,10 @@ async def api_root():
 async def settings_page(request: Request, user: User = Depends(require_admin)):
     """System Settings page (protected)"""
     return templates.TemplateResponse("settings.html", {"request": request})
+
+
+@app.get("/esignature/templates", response_class=HTMLResponse)
+async def esignature_templates_page(request: Request, user: User = Depends(require_login)):
+    """E-Signature Templates management page (protected)"""
+    return templates.TemplateResponse("esignature_templates.html", {"request": request, "current_user": user})
 
