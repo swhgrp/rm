@@ -467,6 +467,10 @@
                                 <div class="metric-value" style="font-size: 18px;">${data.system.memory_used} / ${data.system.memory_total}</div>
                             </div>
                             <div class="metric">
+                                <div class="metric-label">Swap</div>
+                                <div class="metric-value" style="font-size: 18px;">${data.system.swap_used} / ${data.system.swap_total}</div>
+                            </div>
+                            <div class="metric">
                                 <div class="metric-label">Uptime</div>
                                 <div class="metric-value" style="font-size: 16px;">${data.system.uptime}</div>
                             </div>
@@ -475,7 +479,7 @@
                         <!-- Microservices -->
                         <div class="card">
                             <div class="card-header">
-                                <div class="card-title"><i class="bi bi-grid"></i> Microservices (${countHealthy(data.services)}/8)</div>
+                                <div class="card-title"><i class="bi bi-grid"></i> Microservices (${countHealthy(data.services)}/9)</div>
                             </div>
                             <ul class="service-list">
                                 ${generateServiceList(data.services)}
@@ -490,7 +494,7 @@
                         <!-- Databases -->
                         <div class="card">
                             <div class="card-header">
-                                <div class="card-title"><i class="bi bi-database"></i> Databases (${countHealthyDBs(data.databases)}/6)</div>
+                                <div class="card-title"><i class="bi bi-database"></i> Databases (${countHealthyDBs(data.databases)}/7)</div>
                             </div>
                             <ul class="service-list">
                                 ${generateDatabaseList(data.databases)}

@@ -10,9 +10,53 @@ from food_safety.models import UserPermission, UserRole
 from food_safety.schemas import (
     UserPermissionCreate, UserPermissionUpdate, UserPermissionResponse
 )
+from food_safety.services.hr_client import hr_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.get("/hr-employees")
+async def list_hr_employees(
+    status: Optional[str] = Query("Active", description="Filter by employment status"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List employees from HR service for user selection.
+    Returns simplified employee data for dropdown selection.
+    """
+    try:
+        employees = await hr_client.list_employees()
+
+        # Get existing food safety users to mark them
+        existing_query = select(UserPermission.hr_user_id)
+        result = await db.execute(existing_query)
+        existing_ids = set(row[0] for row in result.fetchall())
+
+        # Format for dropdown with assignment status
+        formatted = []
+        for emp in employees:
+            # Skip inactive employees unless explicitly requested
+            if status and emp.get("employment_status") != status:
+                continue
+
+            formatted.append({
+                "id": emp.get("id"),
+                "employee_number": emp.get("employee_number"),
+                "first_name": emp.get("first_name"),
+                "last_name": emp.get("last_name"),
+                "full_name": f"{emp.get('first_name', '')} {emp.get('last_name', '')}".strip(),
+                "email": emp.get("email"),
+                "employment_status": emp.get("employment_status"),
+                "has_food_safety_access": emp.get("id") in existing_ids
+            })
+
+        return formatted
+
+    except Exception as e:
+        logger.error(f"Failed to fetch HR employees: {e}")
+        # Return empty list if HR service is unavailable
+        return []
 
 
 @router.get("", response_model=List[UserPermissionResponse])

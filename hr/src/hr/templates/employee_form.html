@@ -115,9 +115,9 @@
 
 {% block content %}
 <!-- Breadcrumb -->
-<div style="margin-bottom: 20px; color: #8b949e;">
-    <a href="/hr/" style="color: #58a6ff;">Dashboard</a> /
-    <a href="/hr/employees" style="color: #58a6ff;">Employees</a> /
+<div style="margin-bottom: 20px; color: var(--text-secondary);">
+    <a href="/hr/" style="color: var(--accent-primary);">Dashboard</a> /
+    <a href="/hr/employees" style="color: var(--accent-primary);">Employees</a> /
     {{ 'Edit ' + employee.first_name + ' ' + employee.last_name if employee else 'New Employee' }}
 </div>
 
@@ -134,7 +134,7 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
             <!-- Employee Number -->
             <div class="form-group" style="grid-column: span 2;">
-                <label for="employee_number">Employee Number <span style="color: #f85149;">*</span></label>
+                <label for="employee_number">Employee Number <span style="color: #E53935;">*</span></label>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <input type="text" id="employee_number" name="employee_number"
                            value="{{ employee.employee_number if employee else '' }}"
@@ -144,16 +144,16 @@
                     <label style="margin: 0; display: flex; align-items: center; gap: 5px; cursor: pointer;">
                         <input type="checkbox" id="autoGenerate" checked
                                style="width: auto; margin: 0;">
-                        <span style="color: #8b949e; font-size: 14px;">Auto-generate</span>
+                        <span style="color: var(--text-muted); font-size: 14px;">Auto-generate</span>
                     </label>
                     {% endif %}
                 </div>
-                <small style="color: #8b949e; font-size: 12px;">Format: EMP001, EMP002, etc.</small>
+                <small style="color: var(--text-muted); font-size: 12px;">Format: EMP001, EMP002, etc.</small>
             </div>
 
             <!-- First Name -->
             <div class="form-group">
-                <label for="first_name">First Name <span style="color: #f85149;">*</span></label>
+                <label for="first_name">First Name <span style="color: #E53935;">*</span></label>
                 <input type="text" id="first_name" name="first_name"
                        value="{{ employee.first_name if employee else '' }}" required>
             </div>
@@ -167,14 +167,14 @@
 
             <!-- Last Name -->
             <div class="form-group">
-                <label for="last_name">Last Name <span style="color: #f85149;">*</span></label>
+                <label for="last_name">Last Name <span style="color: #E53935;">*</span></label>
                 <input type="text" id="last_name" name="last_name"
                        value="{{ employee.last_name if employee else '' }}" required>
             </div>
 
             <!-- Date of Birth -->
             <div class="form-group">
-                <label for="date_of_birth">Date of Birth <span style="color: #f85149;">*</span></label>
+                <label for="date_of_birth">Date of Birth <span style="color: #E53935;">*</span></label>
                 <input type="date" id="date_of_birth" name="date_of_birth" required
                        value="{{ employee.date_of_birth if employee else '' }}">
             </div>
@@ -190,14 +190,14 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
             <!-- Email -->
             <div class="form-group">
-                <label for="email">Email <span style="color: #f85149;">*</span></label>
+                <label for="email">Email <span style="color: #E53935;">*</span></label>
                 <input type="email" id="email" name="email"
                        value="{{ employee.email if employee else '' }}" required>
             </div>
 
             <!-- Phone Number -->
             <div class="form-group">
-                <label for="phone_number">Phone Number <span style="color: #f85149;">*</span></label>
+                <label for="phone_number">Phone Number <span style="color: #E53935;">*</span></label>
                 <input type="tel" id="phone_number" name="phone_number" required
                        value="{{ employee.phone_number if employee else '' }}"
                        placeholder="(555) 123-4567">
@@ -205,21 +205,21 @@
 
             <!-- Address -->
             <div class="form-group" style="grid-column: span 2;">
-                <label for="street_address">Street Address <span style="color: #f85149;">*</span></label>
+                <label for="street_address">Street Address <span style="color: #E53935;">*</span></label>
                 <input type="text" id="street_address" name="street_address" required
                        value="{{ employee.street_address if employee else '' }}">
             </div>
 
             <!-- City -->
             <div class="form-group">
-                <label for="city">City <span style="color: #f85149;">*</span></label>
+                <label for="city">City <span style="color: #E53935;">*</span></label>
                 <input type="text" id="city" name="city" required
                        value="{{ employee.city if employee else '' }}">
             </div>
 
             <!-- State -->
             <div class="form-group">
-                <label for="state">State <span style="color: #f85149;">*</span></label>
+                <label for="state">State <span style="color: #E53935;">*</span></label>
                 <select id="state" name="state" required>
                     <option value="">Select State</option>
                     <option value="AL" {% if employee and employee.state == 'AL' %}selected{% endif %}>Alabama</option>
@@ -277,7 +277,7 @@
 
             <!-- Zip Code -->
             <div class="form-group">
-                <label for="zip_code">Zip Code <span style="color: #f85149;">*</span></label>
+                <label for="zip_code">Zip Code <span style="color: #E53935;">*</span></label>
                 <input type="text" id="zip_code" name="zip_code" required
                        value="{{ employee.zip_code if employee else '' }}"
                        placeholder="12345">
@@ -326,14 +326,14 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
             <!-- Hire Date -->
             <div class="form-group">
-                <label for="hire_date">Hire Date <span style="color: #f85149;">*</span></label>
+                <label for="hire_date">Hire Date <span style="color: #E53935;">*</span></label>
                 <input type="date" id="hire_date" name="hire_date"
                        value="{{ employee.hire_date if employee else '' }}" required>
             </div>
 
             <!-- Employment Status -->
             <div class="form-group">
-                <label for="employment_status">Employment Status <span style="color: #f85149;">*</span></label>
+                <label for="employment_status">Employment Status <span style="color: #E53935;">*</span></label>
                 <select id="employment_status" name="employment_status" required>
                     <option value="Active" {% if not employee or employee.employment_status == 'Active' %}selected{% endif %}>Active</option>
                     <option value="On Leave" {% if employee and employee.employment_status == 'On Leave' %}selected{% endif %}>On Leave</option>
@@ -343,7 +343,7 @@
 
             <!-- Employee Type -->
             <div class="form-group">
-                <label for="employee_type">Employee Type <span style="color: #f85149;">*</span></label>
+                <label for="employee_type">Employee Type <span style="color: #E53935;">*</span></label>
                 <select id="employee_type" name="employee_type" required>
                     <option value="Full-Time" {% if employee and employee.employee_type == 'Full-Time' %}selected{% endif %}>Full-Time</option>
                     <option value="Part-Time" {% if not employee or employee.employee_type == 'Part-Time' %}selected{% endif %}>Part-Time</option>
@@ -354,7 +354,7 @@
 
             <!-- Position -->
             <div class="form-group">
-                <label for="position_id">Position <span style="color: #f85149;">*</span></label>
+                <label for="position_id">Position <span style="color: #E53935;">*</span></label>
                 <select id="position_id" name="position_id" required>
                     <option value="">Select Position</option>
                 </select>
@@ -364,34 +364,34 @@
             <div class="form-group">
                 <label for="starting_pay_rate">Starting Pay Rate</label>
                 <div style="position: relative;">
-                    <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #8b949e;">$</span>
+                    <span style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);">$</span>
                     <input type="number" id="starting_pay_rate" name="starting_pay_rate"
                            value="{{ employee.starting_pay_rate if employee and employee.starting_pay_rate else '' }}"
                            step="0.01" min="0"
                            placeholder="15.00"
                            style="padding-left: 28px;">
                 </div>
-                <small style="color: #8b949e; font-size: 12px;">
+                <small style="color: var(--text-muted); font-size: 12px;">
                     <i class="bi bi-info-circle"></i> Hourly rate or annual salary
                 </small>
             </div>
         </div>
 
         <!-- Termination Details (conditionally shown) -->
-        <div id="terminationSection" style="display: none; margin-top: 20px; padding: 20px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px;">
-            <h3 style="margin-bottom: 15px; color: #f85149;"><i class="bi bi-exclamation-triangle"></i> Termination Details</h3>
+        <div id="terminationSection" style="display: none; margin-top: 20px; padding: 20px; background: var(--bg-tertiary); border: 1px solid var(--border-primary); border-radius: 6px;">
+            <h3 style="margin-bottom: 15px; color: #E53935;"><i class="bi bi-exclamation-triangle"></i> Termination Details</h3>
 
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
                 <!-- Termination Date -->
                 <div class="form-group">
-                    <label for="termination_date">Termination Date <span style="color: #f85149;">*</span></label>
+                    <label for="termination_date">Termination Date <span style="color: #E53935;">*</span></label>
                     <input type="date" id="termination_date" name="termination_date"
                            value="{{ employee.termination_date if employee else '' }}">
                 </div>
 
                 <!-- Type of Termination -->
                 <div class="form-group">
-                    <label for="termination_type">Type of Termination <span style="color: #f85149;">*</span></label>
+                    <label for="termination_type">Type of Termination <span style="color: #E53935;">*</span></label>
                     <select id="termination_type" name="termination_type">
                         <option value="">Select Type</option>
                         <option value="Voluntary" {% if employee and employee.termination_type == 'Voluntary' %}selected{% endif %}>Voluntary (resignation, retirement)</option>
@@ -402,24 +402,24 @@
 
                 <!-- Final Decision Date -->
                 <div class="form-group">
-                    <label for="final_decision_date">Final Decision Date <span style="color: #f85149;">*</span></label>
+                    <label for="final_decision_date">Final Decision Date <span style="color: #E53935;">*</span></label>
                     <input type="date" id="final_decision_date" name="final_decision_date"
                            value="{{ employee.final_decision_date if employee else '' }}">
-                    <small style="color: #8b949e; font-size: 12px;">When termination was approved/confirmed</small>
+                    <small style="color: var(--text-muted); font-size: 12px;">When termination was approved/confirmed</small>
                 </div>
 
                 <!-- Authorized By -->
                 <div class="form-group">
-                    <label for="authorized_by">Authorized By <span style="color: #f85149;">*</span></label>
+                    <label for="authorized_by">Authorized By <span style="color: #E53935;">*</span></label>
                     <input type="text" id="authorized_by" name="authorized_by"
                            value="{{ employee.authorized_by if employee else '' }}"
                            placeholder="Name of authorizing person">
-                    <small style="color: #8b949e; font-size: 12px;">Usually HR or upper management</small>
+                    <small style="color: var(--text-muted); font-size: 12px;">Usually HR or upper management</small>
                 </div>
 
                 <!-- Reason for Termination -->
                 <div class="form-group" style="grid-column: span 2;">
-                    <label for="termination_reason">Reason for Termination <span style="color: #f85149;">*</span></label>
+                    <label for="termination_reason">Reason for Termination <span style="color: #E53935;">*</span></label>
                     <textarea id="termination_reason" name="termination_reason" rows="4"
                               placeholder="Brief explanation (e.g., 'Repeated tardiness despite written warnings.')">{{ employee.termination_reason if employee else '' }}</textarea>
                 </div>
@@ -429,8 +429,8 @@
                     <label for="supporting_docs">Supporting Documentation</label>
                     <input type="file" id="supporting_docs" name="supporting_docs"
                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                           style="padding: 8px; background: #0d1117;">
-                    <small style="color: #8b949e; font-size: 12px;">Optional: Attach warnings, PIPs, etc. Can also add documents later from Documents section.</small>
+                           style="padding: 8px; background: var(--bg-secondary);">
+                    <small style="color: var(--text-muted); font-size: 12px;">Optional: Attach warnings, PIPs, etc. Can also add documents later from Documents section.</small>
                 </div>
             </div>
         </div>
@@ -440,26 +440,26 @@
     <div class="card" style="margin-bottom: 20px;">
         <div class="card-header">
             <h2><i class="bi bi-geo-alt"></i> Assigned Locations</h2>
-            <small style="color: #8b949e;">Select all locations this employee works at</small>
+            <small style="color: var(--text-muted);">Select all locations this employee works at</small>
         </div>
 
         <div class="form-group">
-            <label>Locations <span style="color: #f85149;">*</span></label>
+            <label>Locations <span style="color: #E53935;">*</span></label>
             <div id="assigned_location_ids" style="
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
                 gap: 12px;
                 padding: 15px;
-                background: #0d1117;
-                border: 1px solid #30363d;
+                background: var(--bg-tertiary);
+                border: 1px solid var(--border-primary);
                 border-radius: 6px;
                 margin-top: 8px;
             ">
-                <div style="color: #8b949e; grid-column: 1 / -1;">
+                <div style="color: var(--text-muted); grid-column: 1 / -1;">
                     <i class="bi bi-hourglass-split"></i> Loading locations...
                 </div>
             </div>
-            <small style="color: #8b949e; font-size: 12px; margin-top: 8px; display: block;">
+            <small style="color: var(--text-muted); font-size: 12px; margin-top: 8px; display: block;">
                 <i class="bi bi-info-circle"></i> Check all locations where this employee will work
             </small>
         </div>
@@ -470,7 +470,7 @@
     <div class="card" style="margin-bottom: 20px;">
         <div class="card-header">
             <h2><i class="bi bi-file-earmark-text"></i> Required Documents</h2>
-            <small style="color: #8b949e;">These documents must be uploaded for new hires</small>
+            <small style="color: var(--text-muted);">These documents must be uploaded for new hires</small>
         </div>
 
         <div style="padding: 20px;">
@@ -478,12 +478,12 @@
                 <!-- ID Copy -->
                 <div class="form-group" style="margin: 0;">
                     <label for="doc_id" style="display: block; margin-bottom: 8px; font-weight: 600;">
-                        ID Copy <span style="color: #f85149;">*</span>
+                        ID Copy <span style="color: #E53935;">*</span>
                     </label>
                     <input type="file" id="doc_id" name="doc_id" required
                            accept=".pdf,.jpg,.jpeg,.png"
-                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
-                    <small style="color: #8b949e; font-size: 12px; display: block; margin-top: 5px;">
+                           style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px;">
+                    <small style="color: var(--text-muted); font-size: 12px; display: block; margin-top: 5px;">
                         <i class="bi bi-info-circle"></i> Driver's license or government-issued ID
                     </small>
                 </div>
@@ -491,12 +491,12 @@
                 <!-- Social Security Card -->
                 <div class="form-group" style="margin: 0;">
                     <label for="doc_ssn" style="display: block; margin-bottom: 8px; font-weight: 600;">
-                        Social Security Card <span style="color: #f85149;">*</span>
+                        Social Security Card <span style="color: #E53935;">*</span>
                     </label>
                     <input type="file" id="doc_ssn" name="doc_ssn" required
                            accept=".pdf,.jpg,.jpeg,.png"
-                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
-                    <small style="color: #8b949e; font-size: 12px; display: block; margin-top: 5px;">
+                           style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px;">
+                    <small style="color: var(--text-muted); font-size: 12px; display: block; margin-top: 5px;">
                         <i class="bi bi-info-circle"></i> Copy of Social Security card
                     </small>
                 </div>
@@ -504,22 +504,22 @@
                 <!-- Food Certificate (Handler or Manager) -->
                 <div class="form-group" style="margin: 0;">
                     <label for="doc_food_cert_type" style="display: block; margin-bottom: 8px; font-weight: 600;">
-                        Food Certificate <span style="color: #f85149;">*</span>
+                        Food Certificate <span style="color: #E53935;">*</span>
                     </label>
                     <select id="doc_food_cert_type" name="doc_food_cert_type" required
-                            style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; margin-bottom: 10px;">
+                            style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px; margin-bottom: 10px;">
                         <option value="">Select Certificate Type</option>
                         <option value="Food Handler Certificate">Food Handler Certificate</option>
                         <option value="Food Manager Certificate">Food Manager Certificate</option>
                     </select>
                     <input type="file" id="doc_food_cert" name="doc_food_cert" required
                            accept=".pdf,.jpg,.jpeg,.png"
-                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; margin-bottom: 10px;">
-                    <label for="doc_food_cert_exp" style="display: block; margin-bottom: 5px; font-size: 13px; color: #8b949e;">
+                           style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px; margin-bottom: 10px;">
+                    <label for="doc_food_cert_exp" style="display: block; margin-bottom: 5px; font-size: 13px; color: var(--text-muted);">
                         Expiration Date (Optional)
                     </label>
                     <input type="date" id="doc_food_cert_exp" name="doc_food_cert_exp"
-                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                           style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px;">
                 </div>
 
                 <!-- TIPS Certification -->
@@ -529,12 +529,12 @@
                     </label>
                     <input type="file" id="doc_tips" name="doc_tips"
                            accept=".pdf,.jpg,.jpeg,.png"
-                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px; margin-bottom: 10px;">
-                    <label for="doc_tips_exp" style="display: block; margin-bottom: 5px; font-size: 13px; color: #8b949e;">
+                           style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px; margin-bottom: 10px;">
+                    <label for="doc_tips_exp" style="display: block; margin-bottom: 5px; font-size: 13px; color: var(--text-muted);">
                         Expiration Date (Optional)
                     </label>
                     <input type="date" id="doc_tips_exp" name="doc_tips_exp"
-                           style="width: 100%; padding: 10px; background: #161b22; border: 1px solid #30363d; color: #c9d1d9; border-radius: 6px;">
+                           style="width: 100%; padding: 10px; background: var(--bg-tertiary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 6px;">
                 </div>
             </div>
         </div>
@@ -717,19 +717,19 @@ async function loadAssignedLocations() {
                 align-items: center;
                 gap: 8px;
                 padding: 10px;
-                background: #161b22;
-                border: 1px solid #30363d;
+                background: var(--bg-secondary);
+                border: 1px solid var(--border-primary);
                 border-radius: 6px;
                 cursor: pointer;
                 transition: all 0.2s;
             `;
             checkboxWrapper.onmouseover = function() {
-                this.style.background = '#1c2128';
-                this.style.borderColor = '#58a6ff';
+                this.style.background = 'var(--bg-tertiary)';
+                this.style.borderColor = 'var(--accent-primary)';
             };
             checkboxWrapper.onmouseout = function() {
-                this.style.background = '#161b22';
-                this.style.borderColor = '#30363d';
+                this.style.background = 'var(--bg-secondary)';
+                this.style.borderColor = 'var(--border-primary)';
             };
 
             const checkbox = document.createElement('input');
@@ -752,7 +752,7 @@ async function loadAssignedLocations() {
             const label = document.createElement('span');
             label.textContent = loc.name;
             label.style.cssText = `
-                color: #c9d1d9;
+                color: var(--text-primary);
                 font-size: 14px;
                 flex: 1;
             `;
@@ -764,7 +764,7 @@ async function loadAssignedLocations() {
     } catch (error) {
         console.error('Error loading assigned locations:', error);
         const assignedLocContainer = document.getElementById('assigned_location_ids');
-        assignedLocContainer.innerHTML = '<div style="color: #f85149; grid-column: 1 / -1;"><i class="bi bi-exclamation-triangle"></i> Error loading locations</div>';
+        assignedLocContainer.innerHTML = '<div style="color: #E53935; grid-column: 1 / -1;"><i class="bi bi-exclamation-triangle"></i> Error loading locations</div>';
     }
 }
 
@@ -927,9 +927,9 @@ function showAlert(message, type) {
         padding: 15px 20px;
         margin-bottom: 20px;
         border-radius: 6px;
-        background: ${type === 'success' ? '#238636' : '#da3633'};
+        background: ${type === 'success' ? '#238636' : '#E53935'};
         color: white;
-        border: 1px solid ${type === 'success' ? '#2ea043' : '#f85149'};
+        border: 1px solid ${type === 'success' ? '#2ea043' : '#E53935'};
     `;
     alert.innerHTML = `
         <i class="bi bi-${type === 'success' ? 'check-circle' : 'exclamation-triangle'}"></i>

@@ -57,6 +57,7 @@ DATABASES=(
 # Standalone databases (not in main docker-compose)
 STANDALONE_DATABASES=(
     "maintenance-postgres:maintenance:maintenance"
+    "food-safety-postgres:food_safety:food_safety"
 )
 
 BACKUP_COUNT=0

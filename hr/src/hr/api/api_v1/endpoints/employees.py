@@ -817,3 +817,37 @@ async def upload_employee_document(
         "status": document.status,
         "message": "Document uploaded successfully"
     }
+
+
+# ==================== Internal Service-to-Service Endpoints ====================
+# These endpoints are for internal microservice communication (no auth required)
+# They return minimal data and should only be accessible within the Docker network
+
+@router.get("/_internal/list")
+def list_employees_internal(
+    status: str = "Active",
+    db: Session = Depends(get_db)
+):
+    """
+    Internal endpoint for service-to-service communication.
+    Returns simplified active employee list for dropdowns.
+    No authentication required - intended for internal use only.
+    """
+    query = db.query(EmployeeModel)
+
+    if status:
+        query = query.filter(EmployeeModel.employment_status == status)
+
+    employees = query.order_by(EmployeeModel.last_name, EmployeeModel.first_name).all()
+
+    return [
+        {
+            "id": emp.id,
+            "employee_number": emp.employee_number,
+            "first_name": emp.first_name,
+            "last_name": emp.last_name,
+            "email": emp.email,
+            "employment_status": emp.employment_status
+        }
+        for emp in employees
+    ]

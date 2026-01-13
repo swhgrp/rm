@@ -102,6 +102,7 @@ food-safety/
 
 ### Users & Permissions
 - `GET /api/users` - List users with permissions
+- `GET /api/users/hr-employees` - List HR employees for user selection (with assignment status)
 - `POST /api/users/{hr_user_id}/permissions` - Set user permissions
 - `DELETE /api/users/{hr_user_id}/permissions` - Remove user access
 

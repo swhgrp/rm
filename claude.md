@@ -2753,12 +2753,20 @@ Email → PDF Extract → AI Parse → Auto-Map → Ready for Review → Route t
 - `/portal/food-safety/haccp` - HACCP plans
 - `/portal/food-safety/reports` - Reports with chart visualization and export
 
+**User Management:**
+- `/portal/food-safety/users` - User permission management
+- Searchable HR employee dropdown for adding users
+- Role assignment (Admin, Manager, Supervisor, Staff, Read Only)
+- Location-based access control
+- HR integration via internal service-to-service API
+
 **Key Files:**
 - `src/food_safety/main.py` - FastAPI application
 - `src/food_safety/models/` - SQLAlchemy models
 - `src/food_safety/schemas.py` - Pydantic schemas
-- `src/food_safety/routers/` - API routers (dashboard, temperatures, checklists, incidents, inspections, haccp, reports)
+- `src/food_safety/routers/` - API routers (dashboard, temperatures, checklists, incidents, inspections, haccp, reports, users)
 - `src/food_safety/services/maintenance_client.py` - Maintenance service integration
+- `src/food_safety/services/hr_client.py` - HR service integration for employee lookup
 
 ---
 
@@ -2772,6 +2780,17 @@ Email → PDF Extract → AI Parse → Auto-Map → Ready for Review → Route t
 - CSV and PDF export for all reports (using reportlab)
 - Reports UI with Chart.js trend visualization
 - Equipment integration with Maintenance service fixed
+- Food Safety User Management with HR integration
+  - `/hr-employees` endpoint to fetch employees from HR
+  - HR internal endpoint `/_internal/list` for service-to-service calls
+  - Searchable employee dropdown in Portal users page
+  - Delete user functionality added
+- HR templates converted to CSS variables (employee_detail, employee_form)
+- Portal home page updated (Food Safety icon, direct access routing)
+- Monitoring dashboard shows swap memory stats
+- Dashboard status script updated for maintenance & food-safety services
+- Backup script includes food-safety database
+- Nginx config updated with `/food-safety/` location block
 
 **January 9, 2026:**
 - Maintenance & Equipment Tracking Service created and deployed

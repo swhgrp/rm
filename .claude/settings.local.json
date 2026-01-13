@@ -98,7 +98,12 @@
       "Bash(journalctl:*)",
       "Bash(crontab:*)",
       "Bash(ping:*)",
-      "Bash(docker-compose:*)"
+      "Bash(docker-compose:*)",
+      "Bash(dmesg:*)",
+      "Bash(docker run:*)",
+      "Bash(source:*)",
+      "Bash(alembic revision:*)",
+      "Bash(openssl x509:*)"
     ],
     "deny": [],
     "ask": []

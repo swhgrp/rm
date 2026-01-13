@@ -34,7 +34,15 @@ MEM_USED=$(free -h | awk 'NR==2 {print $3}')
 MEM_FREE=$(free -h | awk 'NR==2 {print $4}')
 echo "    \"memory_total\": \"$MEM_TOTAL\","
 echo "    \"memory_used\": \"$MEM_USED\","
-echo "    \"memory_free\": \"$MEM_FREE\""
+echo "    \"memory_free\": \"$MEM_FREE\","
+
+# Swap
+SWAP_TOTAL=$(free -h | awk 'NR==3 {print $2}')
+SWAP_USED=$(free -h | awk 'NR==3 {print $3}')
+SWAP_FREE=$(free -h | awk 'NR==3 {print $4}')
+echo "    \"swap_total\": \"$SWAP_TOTAL\","
+echo "    \"swap_used\": \"$SWAP_USED\","
+echo "    \"swap_free\": \"$SWAP_FREE\""
 echo '  },'
 
 # Nginx Status
@@ -65,7 +73,7 @@ echo '  },'
 # Services
 echo '  "services": {'
 
-SERVICES=("portal-app" "inventory-app" "hr-app" "accounting-app" "events-app" "integration-hub" "files-app" "websites-app")
+SERVICES=("portal-app" "inventory-app" "hr-app" "accounting-app" "events-app" "integration-hub" "files-app" "websites-app" "maintenance-service" "food-safety-service")
 SERVICE_COUNT=0
 TOTAL_SERVICES=${#SERVICES[@]}
 
@@ -107,7 +115,7 @@ echo '  },'
 # Databases with connection counts
 echo '  "databases": {'
 
-DBS=("inventory-db" "accounting-db" "hr-db" "events-db" "hub-db" "websites-db")
+DBS=("inventory-db" "accounting-db" "hr-db" "events-db" "hub-db" "websites-db" "maintenance-postgres" "food-safety-postgres")
 DB_COUNT=0
 TOTAL_DBS=${#DBS[@]}
 
@@ -142,6 +150,14 @@ for db in "${DBS[@]}"; do
                 SIZE=$(docker exec $db psql -U websites_user -d websites_db -t -c "SELECT pg_size_pretty(pg_database_size('websites_db'));" 2>/dev/null | xargs || echo "unknown")
                 CONNECTIONS=$(docker exec $db psql -U websites_user -d websites_db -t -c "SELECT count(*) FROM pg_stat_activity WHERE datname='websites_db';" 2>/dev/null | xargs || echo 0)
                 ;;
+            "maintenance-postgres")
+                SIZE=$(docker exec $db psql -U maintenance -d maintenance -t -c "SELECT pg_size_pretty(pg_database_size('maintenance'));" 2>/dev/null | xargs || echo "unknown")
+                CONNECTIONS=$(docker exec $db psql -U maintenance -d maintenance -t -c "SELECT count(*) FROM pg_stat_activity WHERE datname='maintenance';" 2>/dev/null | xargs || echo 0)
+                ;;
+            "food-safety-postgres")
+                SIZE=$(docker exec $db psql -U food_safety -d food_safety -t -c "SELECT pg_size_pretty(pg_database_size('food_safety'));" 2>/dev/null | xargs || echo "unknown")
+                CONNECTIONS=$(docker exec $db psql -U food_safety -d food_safety -t -c "SELECT count(*) FROM pg_stat_activity WHERE datname='food_safety';" 2>/dev/null | xargs || echo 0)
+                ;;
         esac
     else
         STATUS="down"
@@ -167,7 +183,7 @@ echo '  },'
 echo '  "backup_details": {'
 
 BACKUP_DIR="/opt/restaurant-system/backups"
-DB_NAMES=("inventory_db" "accounting_db" "hr_db" "events_db" "integration_hub_db" "websites_db")
+DB_NAMES=("inventory_db" "accounting_db" "hr_db" "events_db" "integration_hub_db" "websites_db" "maintenance" "food_safety")
 DETAIL_COUNT=0
 TOTAL_DETAILS=${#DB_NAMES[@]}
 

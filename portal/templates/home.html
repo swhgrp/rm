@@ -445,6 +445,8 @@
                         <i class="bi bi-envelope"></i>
                     {% elif system.system_key == 'maintenance' %}
                         <i class="bi bi-tools"></i>
+                    {% elif system.system_key == 'food_safety' %}
+                        <i class="bi bi-shield-check"></i>
                     {% else %}
                         <i class="bi bi-grid"></i>
                     {% endif %}
@@ -572,8 +574,8 @@
                 // Show loading state
                 card.classList.add('loading');
 
-                // Monitoring, Mail, and Maintenance systems use direct portal access, no token needed
-                if (systemKey === 'monitoring' || systemKey === 'mail' || systemKey === 'maintenance') {
+                // Monitoring, Mail, Maintenance, and Food Safety systems use direct portal access, no token needed
+                if (systemKey === 'monitoring' || systemKey === 'mail' || systemKey === 'maintenance' || systemKey === 'food_safety') {
                     window.location.href = systemUrl;
                     return;
                 }

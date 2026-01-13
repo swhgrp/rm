@@ -65,6 +65,26 @@
         background-color: var(--accent-hover);
     }
 
+    .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .btn-danger {
+        padding: 10px 20px;
+        background-color: var(--error);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .btn-danger:hover {
+        opacity: 0.9;
+    }
+
     .filters-bar {
         display: flex;
         gap: 15px;
@@ -164,7 +184,9 @@
     .badge-inactive { background-color: var(--bg-tertiary); color: var(--text-muted); }
     .badge-admin { background-color: var(--error-bg); color: var(--error); }
     .badge-manager { background-color: var(--warning-bg); color: var(--warning); }
-    .badge-staff { background-color: var(--info-bg); color: var(--info); }
+    .badge-supervisor { background-color: var(--info-bg); color: var(--info); }
+    .badge-staff { background-color: var(--bg-tertiary); color: var(--text-secondary); }
+    .badge-readonly { background-color: var(--bg-tertiary); color: var(--text-muted); }
 
     .location-badges {
         display: flex;
@@ -263,7 +285,17 @@
         padding: 20px;
         border-top: 1px solid var(--border-primary);
         display: flex;
-        justify-content: flex-end;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .modal-footer-left {
+        display: flex;
+        gap: 10px;
+    }
+
+    .modal-footer-right {
+        display: flex;
         gap: 10px;
     }
 
@@ -335,6 +367,149 @@
         padding-top: 20px;
         border-top: 1px solid var(--border-primary);
     }
+
+    .section-title:first-of-type {
+        margin-top: 0;
+        padding-top: 0;
+        border-top: none;
+    }
+
+    .employee-select-container {
+        position: relative;
+    }
+
+    /* Searchable dropdown styles */
+    .searchable-select {
+        position: relative;
+    }
+
+    .searchable-select-input {
+        width: 100%;
+        padding: 10px 35px 10px 12px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-primary);
+        cursor: pointer;
+    }
+
+    .searchable-select-input:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+
+    .searchable-select-arrow {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        pointer-events: none;
+        color: var(--text-muted);
+        transition: transform 0.2s;
+    }
+
+    .searchable-select.open .searchable-select-arrow {
+        transform: translateY(-50%) rotate(180deg);
+    }
+
+    .searchable-select-dropdown {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        max-height: 300px;
+        overflow-y: auto;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-top: none;
+        border-radius: 0 0 6px 6px;
+        z-index: 100;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+
+    .searchable-select.open .searchable-select-dropdown {
+        display: block;
+    }
+
+    .searchable-select-option {
+        padding: 10px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    .searchable-select-option:last-child {
+        border-bottom: none;
+    }
+
+    .searchable-select-option:hover,
+    .searchable-select-option.highlighted {
+        background-color: var(--bg-tertiary);
+    }
+
+    .searchable-select-option .emp-name {
+        font-weight: 500;
+    }
+
+    .searchable-select-option .emp-details {
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-top: 2px;
+    }
+
+    .searchable-select-empty {
+        padding: 15px 12px;
+        color: var(--text-muted);
+        text-align: center;
+        font-style: italic;
+    }
+
+    .employee-info {
+        background-color: var(--bg-tertiary);
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 10px;
+        font-size: 13px;
+    }
+
+    .employee-info-row {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 5px;
+    }
+
+    .employee-info-row:last-child {
+        margin-bottom: 0;
+    }
+
+    .employee-info-label {
+        color: var(--text-muted);
+    }
+
+    .info-box {
+        background-color: var(--info-bg);
+        color: var(--info);
+        padding: 12px 15px;
+        border-radius: 6px;
+        font-size: 13px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .info-box i {
+        margin-top: 2px;
+    }
+
+    .hr-unavailable {
+        background-color: var(--warning-bg);
+        color: var(--warning);
+        padding: 15px;
+        border-radius: 8px;
+        text-align: center;
+        margin-bottom: 20px;
+    }
 {% endblock %}
 
 {% block content %}
@@ -349,9 +524,14 @@
             <h2><i class="bi bi-people"></i> Users</h2>
             <p class="page-subtitle">Manage food safety system users and permissions</p>
         </div>
-        <button class="btn-primary" onclick="showAddModal()">
+        <button class="btn-primary" onclick="showAddModal()" id="addUserBtn">
             <i class="bi bi-person-plus"></i> Add User
         </button>
+    </div>
+
+    <div id="hrWarning" class="hr-unavailable" style="display: none;">
+        <i class="bi bi-exclamation-triangle"></i>
+        <strong>HR Service Unavailable:</strong> Cannot fetch employees. Users can only be managed when the HR service is running.
     </div>
 
     <div class="filters-bar">
@@ -360,10 +540,14 @@
             <option value="">All Roles</option>
             <option value="admin">Admin</option>
             <option value="manager">Manager</option>
+            <option value="supervisor">Supervisor</option>
             <option value="staff">Staff</option>
+            <option value="readonly">Read Only</option>
         </select>
-        <select class="filter-select" id="locationFilter" onchange="filterUsers()">
-            <option value="">All Locations</option>
+        <select class="filter-select" id="statusFilter" onchange="filterUsers()">
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
         </select>
     </div>
 
@@ -375,7 +559,7 @@
                         <th>User</th>
                         <th>Role</th>
                         <th>Locations</th>
-                        <th>Last Active</th>
+                        <th>Permissions</th>
                         <th>Status</th>
                     </tr>
                 </thead>
@@ -399,73 +583,113 @@
             </div>
             <div class="modal-body">
                 <form id="userForm">
-                    <input type="hidden" id="userId">
-                    <div class="form-row">
+                    <input type="hidden" id="editingHrUserId">
+
+                    <!-- Employee Selection (only for Add mode) -->
+                    <div id="employeeSelectSection">
                         <div class="form-group">
-                            <label>First Name *</label>
-                            <input type="text" id="firstName" required>
+                            <label>Select Employee from HR *</label>
+                            <div class="searchable-select" id="employeeSearchable">
+                                <input type="text"
+                                       class="searchable-select-input"
+                                       id="employeeSearchInput"
+                                       placeholder="Type to search employees..."
+                                       autocomplete="off">
+                                <i class="bi bi-chevron-down searchable-select-arrow"></i>
+                                <div class="searchable-select-dropdown" id="employeeDropdown">
+                                    <!-- Options populated by JS -->
+                                </div>
+                            </div>
+                            <input type="hidden" id="selectedEmployeeId">
                         </div>
-                        <div class="form-group">
-                            <label>Last Name *</label>
-                            <input type="text" id="lastName" required>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label>Email *</label>
-                        <input type="email" id="userEmail" required>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label>Phone</label>
-                            <input type="tel" id="userPhone">
-                        </div>
-                        <div class="form-group">
-                            <label>Role *</label>
-                            <select id="userRole" required>
-                                <option value="staff">Staff</option>
-                                <option value="manager">Manager</option>
-                                <option value="admin">Admin</option>
-                            </select>
+                        <div id="employeeInfo" class="employee-info" style="display: none;">
+                            <div class="employee-info-row">
+                                <span class="employee-info-label">Employee #:</span>
+                                <span id="empNumber">-</span>
+                            </div>
+                            <div class="employee-info-row">
+                                <span class="employee-info-label">Email:</span>
+                                <span id="empEmail">-</span>
+                            </div>
                         </div>
                     </div>
 
+                    <!-- Employee Info (only for Edit mode) -->
+                    <div id="employeeDisplaySection" style="display: none;">
+                        <div class="form-group">
+                            <label>Employee</label>
+                            <div class="employee-info">
+                                <div class="employee-info-row">
+                                    <span class="employee-info-label">Name:</span>
+                                    <span id="editEmpName">-</span>
+                                </div>
+                                <div class="employee-info-row">
+                                    <span class="employee-info-label">Email:</span>
+                                    <span id="editEmpEmail">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="section-title">Role & Access</div>
+
+                    <div class="form-group">
+                        <label>Role *</label>
+                        <select id="userRole" required onchange="onRoleChanged()">
+                            <option value="staff">Staff - Basic access (log temps, complete checklists)</option>
+                            <option value="supervisor">Supervisor - Can create incidents</option>
+                            <option value="manager">Manager - Can sign off and manage incidents</option>
+                            <option value="admin">Admin - Full access to all features</option>
+                            <option value="readonly">Read Only - View dashboards and reports only</option>
+                        </select>
+                    </div>
+
                     <div class="section-title">Location Access</div>
+                    <div class="info-box">
+                        <i class="bi bi-info-circle"></i>
+                        <span>Leave all unchecked to grant access to ALL locations</span>
+                    </div>
                     <div class="checkbox-group" id="locationCheckboxes">
                         <!-- Populated by JS -->
                     </div>
 
-                    <div class="section-title">Permissions</div>
+                    <div class="section-title">Permission Overrides</div>
                     <div class="checkbox-group">
                         <div class="checkbox-item">
-                            <input type="checkbox" id="permTemp" checked>
-                            <label for="permTemp">Log Temperatures</label>
+                            <input type="checkbox" id="permTemplates">
+                            <label for="permTemplates">Manage Templates</label>
                         </div>
                         <div class="checkbox-item">
-                            <input type="checkbox" id="permChecklist" checked>
-                            <label for="permChecklist">Complete Checklists</label>
+                            <input type="checkbox" id="permUsers">
+                            <label for="permUsers">Manage Users</label>
                         </div>
                         <div class="checkbox-item">
-                            <input type="checkbox" id="permIncident">
-                            <label for="permIncident">Report Incidents</label>
+                            <input type="checkbox" id="permReports" checked>
+                            <label for="permReports">View Reports</label>
                         </div>
                         <div class="checkbox-item">
                             <input type="checkbox" id="permSignoff">
                             <label for="permSignoff">Manager Sign-off</label>
                         </div>
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="permInspection">
-                            <label for="permInspection">Record Inspections</label>
-                        </div>
-                        <div class="checkbox-item">
-                            <input type="checkbox" id="permSettings">
-                            <label for="permSettings">Manage Settings</label>
-                        </div>
+                    </div>
+
+                    <div class="section-title">Status</div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="isActive" checked>
+                        <label for="isActive">Active (user can access the system)</label>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeModal()">Cancel</button>
-                <button class="btn-primary" onclick="saveUser()">Save User</button>
+                <div class="modal-footer-left">
+                    <button class="btn-danger" id="deleteBtn" onclick="deleteUser()" style="display: none;">
+                        <i class="bi bi-trash"></i> Remove Access
+                    </button>
+                </div>
+                <div class="modal-footer-right">
+                    <button class="btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button class="btn-primary" onclick="saveUser()" id="saveBtn">Save</button>
+                </div>
             </div>
         </div>
     </div>
@@ -475,21 +699,25 @@
 <script>
     const API_BASE = '/food-safety';
     let users = [];
+    let hrEmployees = [];
     let locations = [];
-    let editingId = null;
+    let editingHrUserId = null;
+    let hrAvailable = true;
+
+    // Load data on page load
+    document.addEventListener('DOMContentLoaded', async () => {
+        await Promise.all([
+            loadLocations(),
+            loadHREmployees(),
+            loadUsers()
+        ]);
+    });
 
     async function loadLocations() {
         try {
             const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
             if (response.ok) {
                 locations = await response.json();
-
-                // Populate filter
-                const select = document.getElementById('locationFilter');
-                select.innerHTML = '<option value="">All Locations</option>';
-                locations.forEach(loc => {
-                    select.innerHTML += `<option value="${loc.id}">${escapeHtml(loc.name)}</option>`;
-                });
 
                 // Populate modal checkboxes
                 const container = document.getElementById('locationCheckboxes');
@@ -505,46 +733,205 @@
         }
     }
 
+    async function loadHREmployees() {
+        try {
+            const response = await fetch(`${API_BASE}/users/hr-employees`);
+            if (response.ok) {
+                hrEmployees = await response.json();
+                hrAvailable = true;
+                document.getElementById('hrWarning').style.display = 'none';
+
+                // Populate employee dropdown (only those without food safety access)
+                populateEmployeeDropdown();
+            } else {
+                showHRUnavailable();
+            }
+        } catch (error) {
+            console.error('Error loading HR employees:', error);
+            showHRUnavailable();
+        }
+    }
+
+    function showHRUnavailable() {
+        hrAvailable = false;
+        document.getElementById('hrWarning').style.display = 'block';
+        document.getElementById('addUserBtn').disabled = true;
+    }
+
+    let availableEmployees = [];
+    let highlightedIndex = -1;
+
+    function populateEmployeeDropdown() {
+        // Only show employees who don't already have food safety access
+        availableEmployees = hrEmployees.filter(emp => !emp.has_food_safety_access);
+
+        // Reset selection
+        document.getElementById('selectedEmployeeId').value = '';
+        document.getElementById('employeeSearchInput').value = '';
+        document.getElementById('employeeInfo').style.display = 'none';
+
+        // Render initial dropdown
+        renderEmployeeOptions('');
+    }
+
+    function renderEmployeeOptions(searchTerm) {
+        const dropdown = document.getElementById('employeeDropdown');
+        const term = searchTerm.toLowerCase().trim();
+
+        let filtered = availableEmployees;
+        if (term) {
+            filtered = availableEmployees.filter(emp => {
+                const fullName = emp.full_name?.toLowerCase() || '';
+                const empNumber = emp.employee_number?.toLowerCase() || '';
+                const email = emp.email?.toLowerCase() || '';
+                return fullName.includes(term) || empNumber.includes(term) || email.includes(term);
+            });
+        }
+
+        if (filtered.length === 0) {
+            dropdown.innerHTML = `<div class="searchable-select-empty">
+                ${availableEmployees.length === 0 ? 'All employees already have access' : 'No employees match your search'}
+            </div>`;
+        } else {
+            dropdown.innerHTML = filtered.map((emp, idx) => `
+                <div class="searchable-select-option ${idx === highlightedIndex ? 'highlighted' : ''}"
+                     data-id="${emp.id}"
+                     data-name="${escapeHtml(emp.full_name)}"
+                     data-email="${emp.email || ''}"
+                     data-number="${emp.employee_number || ''}"
+                     onclick="selectEmployee(${emp.id})">
+                    <div class="emp-name">${escapeHtml(emp.full_name)}</div>
+                    <div class="emp-details">${emp.employee_number || 'No #'} ${emp.email ? '• ' + emp.email : ''}</div>
+                </div>
+            `).join('');
+        }
+
+        highlightedIndex = -1;
+    }
+
+    function selectEmployee(empId) {
+        const emp = availableEmployees.find(e => e.id === empId);
+        if (!emp) return;
+
+        // Set hidden value and display
+        document.getElementById('selectedEmployeeId').value = emp.id;
+        document.getElementById('employeeSearchInput').value = emp.full_name;
+
+        // Show employee info
+        document.getElementById('empNumber').textContent = emp.employee_number || '-';
+        document.getElementById('empEmail').textContent = emp.email || '-';
+        document.getElementById('employeeInfo').style.display = 'block';
+
+        // Close dropdown
+        closeEmployeeDropdown();
+    }
+
+    function openEmployeeDropdown() {
+        const container = document.getElementById('employeeSearchable');
+        container.classList.add('open');
+        renderEmployeeOptions(document.getElementById('employeeSearchInput').value);
+    }
+
+    function closeEmployeeDropdown() {
+        const container = document.getElementById('employeeSearchable');
+        container.classList.remove('open');
+        highlightedIndex = -1;
+    }
+
+    function onEmployeeSelected() {
+        // Legacy function - kept for compatibility
+        const empId = document.getElementById('selectedEmployeeId').value;
+        if (empId) {
+            selectEmployee(parseInt(empId));
+        }
+    }
+
+    // Initialize searchable dropdown event listeners
+    document.addEventListener('DOMContentLoaded', () => {
+        const searchInput = document.getElementById('employeeSearchInput');
+        const container = document.getElementById('employeeSearchable');
+
+        searchInput.addEventListener('focus', () => {
+            openEmployeeDropdown();
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            // Clear selection if user is typing
+            if (document.getElementById('selectedEmployeeId').value) {
+                document.getElementById('selectedEmployeeId').value = '';
+                document.getElementById('employeeInfo').style.display = 'none';
+            }
+            renderEmployeeOptions(e.target.value);
+            openEmployeeDropdown();
+        });
+
+        searchInput.addEventListener('keydown', (e) => {
+            const dropdown = document.getElementById('employeeDropdown');
+            const options = dropdown.querySelectorAll('.searchable-select-option');
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                highlightedIndex = Math.min(highlightedIndex + 1, options.length - 1);
+                updateHighlight(options);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                highlightedIndex = Math.max(highlightedIndex - 1, 0);
+                updateHighlight(options);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (highlightedIndex >= 0 && options[highlightedIndex]) {
+                    const empId = options[highlightedIndex].dataset.id;
+                    selectEmployee(parseInt(empId));
+                }
+            } else if (e.key === 'Escape') {
+                closeEmployeeDropdown();
+                searchInput.blur();
+            }
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!container.contains(e.target)) {
+                closeEmployeeDropdown();
+            }
+        });
+    });
+
+    function updateHighlight(options) {
+        options.forEach((opt, idx) => {
+            opt.classList.toggle('highlighted', idx === highlightedIndex);
+            if (idx === highlightedIndex) {
+                opt.scrollIntoView({ block: 'nearest' });
+            }
+        });
+    }
+
     async function loadUsers() {
         try {
-            const response = await fetch(`${API_BASE}/users`);
+            const response = await fetch(`${API_BASE}/users?is_active=`);  // Get all users
             if (response.ok) {
                 users = await response.json();
                 filterUsers();
             } else {
-                // Show sample data
-                loadSampleUsers();
+                renderUsers([]);
             }
         } catch (error) {
             console.error('Error loading users:', error);
-            loadSampleUsers();
+            renderUsers([]);
         }
-    }
-
-    function loadSampleUsers() {
-        users = [
-            { id: 1, first_name: 'John', last_name: 'Smith', email: 'john.smith@swhg.com', role: 'admin', location_ids: [1, 2, 3], is_active: true, last_active: '2026-01-10T14:30:00Z' },
-            { id: 2, first_name: 'Maria', last_name: 'Garcia', email: 'maria.garcia@swhg.com', role: 'manager', location_ids: [1], is_active: true, last_active: '2026-01-10T12:15:00Z' },
-            { id: 3, first_name: 'Tom', last_name: 'Johnson', email: 'tom.johnson@swhg.com', role: 'manager', location_ids: [2], is_active: true, last_active: '2026-01-09T18:45:00Z' },
-            { id: 4, first_name: 'Sarah', last_name: 'Williams', email: 'sarah.williams@swhg.com', role: 'staff', location_ids: [1], is_active: true, last_active: '2026-01-10T08:00:00Z' },
-            { id: 5, first_name: 'Mike', last_name: 'Brown', email: 'mike.brown@swhg.com', role: 'staff', location_ids: [2, 3], is_active: true, last_active: '2026-01-08T16:30:00Z' },
-            { id: 6, first_name: 'Emily', last_name: 'Davis', email: 'emily.davis@swhg.com', role: 'staff', location_ids: [1], is_active: false, last_active: '2025-12-15T10:00:00Z' }
-        ];
-        filterUsers();
     }
 
     function filterUsers() {
         const search = document.getElementById('searchInput').value.toLowerCase();
         const role = document.getElementById('roleFilter').value;
-        const locationId = parseInt(document.getElementById('locationFilter').value) || null;
+        const status = document.getElementById('statusFilter').value;
 
         let filtered = users;
 
         if (search) {
             filtered = filtered.filter(u =>
-                u.first_name.toLowerCase().includes(search) ||
-                u.last_name.toLowerCase().includes(search) ||
-                u.email.toLowerCase().includes(search)
+                (u.employee_name || '').toLowerCase().includes(search) ||
+                (u.employee_email || '').toLowerCase().includes(search)
             );
         }
 
@@ -552,8 +939,9 @@
             filtered = filtered.filter(u => u.role === role);
         }
 
-        if (locationId) {
-            filtered = filtered.filter(u => u.location_ids && u.location_ids.includes(locationId));
+        if (status) {
+            const isActive = status === 'active';
+            filtered = filtered.filter(u => u.is_active === isActive);
         }
 
         renderUsers(filtered);
@@ -568,6 +956,7 @@
                     <div class="empty-state">
                         <i class="bi bi-people"></i>
                         <p>No users found</p>
+                        <p style="font-size: 12px; margin-top: 5px;">Add users by selecting employees from HR</p>
                     </div>
                 </td></tr>
             `;
@@ -575,28 +964,40 @@
         }
 
         tbody.innerHTML = list.map(user => {
-            const initials = (user.first_name[0] + user.last_name[0]).toUpperCase();
-            const locationBadges = user.location_ids && user.location_ids.length > 0
-                ? user.location_ids.map(id => {
+            const name = user.employee_name || 'Unknown';
+            const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+
+            // Parse location IDs
+            let locationBadges = '<span style="color: var(--text-muted); font-size: 12px;">All Locations</span>';
+            if (user.location_ids) {
+                const locIds = user.location_ids.split(',').map(id => parseInt(id.trim()));
+                locationBadges = locIds.map(id => {
                     const loc = locations.find(l => l.id === id);
                     return loc ? `<span class="location-badge">${escapeHtml(loc.name)}</span>` : '';
-                }).join('')
-                : '<span style="color: var(--text-muted); font-size: 12px;">No locations</span>';
+                }).filter(b => b).join('') || locationBadges;
+            }
+
+            // Build permissions display
+            const perms = [];
+            if (user.can_manage_templates) perms.push('Templates');
+            if (user.can_manage_users) perms.push('Users');
+            if (user.can_sign_off) perms.push('Sign-off');
+            const permDisplay = perms.length > 0 ? perms.join(', ') : '<span style="color: var(--text-muted);">Default</span>';
 
             return `
-                <tr onclick="editUser(${user.id})">
+                <tr onclick="editUser(${user.hr_user_id})">
                     <td>
                         <div class="user-info">
                             <div class="user-avatar">${initials}</div>
                             <div>
-                                <div class="user-name">${escapeHtml(user.first_name)} ${escapeHtml(user.last_name)}</div>
-                                <div class="user-email">${escapeHtml(user.email)}</div>
+                                <div class="user-name">${escapeHtml(name)}</div>
+                                <div class="user-email">${escapeHtml(user.employee_email || '-')}</div>
                             </div>
                         </div>
                     </td>
                     <td><span class="badge badge-${user.role}">${capitalizeFirst(user.role)}</span></td>
                     <td><div class="location-badges">${locationBadges}</div></td>
-                    <td>${user.last_active ? formatRelativeTime(user.last_active) : 'Never'}</td>
+                    <td>${permDisplay}</td>
                     <td><span class="badge badge-${user.is_active ? 'active' : 'inactive'}">${user.is_active ? 'Active' : 'Inactive'}</span></td>
                 </tr>
             `;
@@ -604,11 +1005,30 @@
     }
 
     function showAddModal() {
-        editingId = null;
+        if (!hrAvailable) {
+            alert('HR Service is not available. Cannot add users.');
+            return;
+        }
+
+        editingHrUserId = null;
         document.getElementById('modalTitle').textContent = 'Add User';
         document.getElementById('userForm').reset();
+        document.getElementById('isActive').checked = true;
+        document.getElementById('permReports').checked = true;
 
-        // Reset checkboxes
+        // Show employee select, hide display section
+        document.getElementById('employeeSelectSection').style.display = 'block';
+        document.getElementById('employeeDisplaySection').style.display = 'none';
+        document.getElementById('employeeInfo').style.display = 'none';
+        document.getElementById('deleteBtn').style.display = 'none';
+
+        // Clear and refresh employee dropdown
+        document.getElementById('selectedEmployeeId').value = '';
+        document.getElementById('employeeSearchInput').value = '';
+        closeEmployeeDropdown();
+        populateEmployeeDropdown();
+
+        // Reset location checkboxes
         locations.forEach(loc => {
             const checkbox = document.getElementById(`loc_${loc.id}`);
             if (checkbox) checkbox.checked = false;
@@ -617,35 +1037,37 @@
         document.getElementById('userModal').classList.add('active');
     }
 
-    function editUser(id) {
-        const user = users.find(u => u.id === id);
+    function editUser(hrUserId) {
+        const user = users.find(u => u.hr_user_id === hrUserId);
         if (!user) return;
 
-        editingId = id;
-        document.getElementById('modalTitle').textContent = 'Edit User';
-        document.getElementById('userId').value = id;
-        document.getElementById('firstName').value = user.first_name;
-        document.getElementById('lastName').value = user.last_name;
-        document.getElementById('userEmail').value = user.email;
-        document.getElementById('userPhone').value = user.phone || '';
+        editingHrUserId = hrUserId;
+        document.getElementById('editingHrUserId').value = hrUserId;
+        document.getElementById('modalTitle').textContent = 'Edit User Permissions';
+
+        // Hide employee select, show display section
+        document.getElementById('employeeSelectSection').style.display = 'none';
+        document.getElementById('employeeDisplaySection').style.display = 'block';
+        document.getElementById('editEmpName').textContent = user.employee_name || 'Unknown';
+        document.getElementById('editEmpEmail').textContent = user.employee_email || '-';
+        document.getElementById('deleteBtn').style.display = 'block';
+
+        // Set form values
         document.getElementById('userRole').value = user.role;
+        document.getElementById('permTemplates').checked = user.can_manage_templates;
+        document.getElementById('permUsers').checked = user.can_manage_users;
+        document.getElementById('permReports').checked = user.can_view_reports;
+        document.getElementById('permSignoff').checked = user.can_sign_off;
+        document.getElementById('isActive').checked = user.is_active;
 
         // Set location checkboxes
+        const locIds = user.location_ids ? user.location_ids.split(',').map(id => parseInt(id.trim())) : [];
         locations.forEach(loc => {
             const checkbox = document.getElementById(`loc_${loc.id}`);
             if (checkbox) {
-                checkbox.checked = user.location_ids && user.location_ids.includes(loc.id);
+                checkbox.checked = locIds.includes(loc.id);
             }
         });
-
-        // Set permission checkboxes based on role
-        const isManager = user.role === 'manager' || user.role === 'admin';
-        document.getElementById('permTemp').checked = true;
-        document.getElementById('permChecklist').checked = true;
-        document.getElementById('permIncident').checked = true;
-        document.getElementById('permSignoff').checked = isManager;
-        document.getElementById('permInspection').checked = isManager;
-        document.getElementById('permSettings').checked = user.role === 'admin';
 
         document.getElementById('userModal').classList.add('active');
     }
@@ -654,13 +1076,43 @@
         document.getElementById('userModal').classList.remove('active');
     }
 
+    function onRoleChanged() {
+        const role = document.getElementById('userRole').value;
+
+        // Auto-set permissions based on role
+        if (role === 'admin') {
+            document.getElementById('permTemplates').checked = true;
+            document.getElementById('permUsers').checked = true;
+            document.getElementById('permReports').checked = true;
+            document.getElementById('permSignoff').checked = true;
+        } else if (role === 'manager') {
+            document.getElementById('permTemplates').checked = false;
+            document.getElementById('permUsers').checked = false;
+            document.getElementById('permReports').checked = true;
+            document.getElementById('permSignoff').checked = true;
+        } else if (role === 'supervisor') {
+            document.getElementById('permTemplates').checked = false;
+            document.getElementById('permUsers').checked = false;
+            document.getElementById('permReports').checked = true;
+            document.getElementById('permSignoff').checked = false;
+        } else if (role === 'readonly') {
+            document.getElementById('permTemplates').checked = false;
+            document.getElementById('permUsers').checked = false;
+            document.getElementById('permReports').checked = true;
+            document.getElementById('permSignoff').checked = false;
+        } else {
+            // staff
+            document.getElementById('permTemplates').checked = false;
+            document.getElementById('permUsers').checked = false;
+            document.getElementById('permReports').checked = true;
+            document.getElementById('permSignoff').checked = false;
+        }
+    }
+
     async function saveUser() {
         const form = document.getElementById('userForm');
-        if (!form.checkValidity()) {
-            form.reportValidity();
-            return;
-        }
 
+        // Get selected locations
         const selectedLocations = [];
         locations.forEach(loc => {
             const checkbox = document.getElementById(`loc_${loc.id}`);
@@ -669,28 +1121,55 @@
             }
         });
 
-        const data = {
-            first_name: document.getElementById('firstName').value,
-            last_name: document.getElementById('lastName').value,
-            email: document.getElementById('userEmail').value,
-            phone: document.getElementById('userPhone').value,
-            role: document.getElementById('userRole').value,
-            location_ids: selectedLocations,
-            permissions: {
-                log_temperatures: document.getElementById('permTemp').checked,
-                complete_checklists: document.getElementById('permChecklist').checked,
-                report_incidents: document.getElementById('permIncident').checked,
-                manager_signoff: document.getElementById('permSignoff').checked,
-                record_inspections: document.getElementById('permInspection').checked,
-                manage_settings: document.getElementById('permSettings').checked
+        let data;
+        let url;
+        let method;
+
+        if (editingHrUserId) {
+            // Update existing user
+            url = `${API_BASE}/users/${editingHrUserId}`;
+            method = 'PUT';
+            data = {
+                role: document.getElementById('userRole').value,
+                location_ids: selectedLocations.length > 0 ? selectedLocations.join(',') : null,
+                can_manage_templates: document.getElementById('permTemplates').checked,
+                can_manage_users: document.getElementById('permUsers').checked,
+                can_view_reports: document.getElementById('permReports').checked,
+                can_sign_off: document.getElementById('permSignoff').checked,
+                is_active: document.getElementById('isActive').checked
+            };
+        } else {
+            // Create new user
+            const selectedEmployeeId = document.getElementById('selectedEmployeeId').value;
+            if (!selectedEmployeeId) {
+                alert('Please select an employee');
+                return;
             }
-        };
+
+            const selectedEmp = hrEmployees.find(e => e.id === parseInt(selectedEmployeeId));
+            if (!selectedEmp) {
+                alert('Invalid employee selected');
+                return;
+            }
+
+            url = `${API_BASE}/users`;
+            method = 'POST';
+            data = {
+                hr_user_id: selectedEmp.id,
+                employee_name: selectedEmp.full_name,
+                employee_email: selectedEmp.email,
+                role: document.getElementById('userRole').value,
+                location_ids: selectedLocations.length > 0 ? selectedLocations.join(',') : null,
+                can_manage_templates: document.getElementById('permTemplates').checked,
+                can_manage_users: document.getElementById('permUsers').checked,
+                can_view_reports: document.getElementById('permReports').checked,
+                can_sign_off: document.getElementById('permSignoff').checked,
+                is_active: document.getElementById('isActive').checked
+            };
+        }
 
         try {
-            const url = editingId
-                ? `${API_BASE}/users/${editingId}`
-                : `${API_BASE}/users`;
-            const method = editingId ? 'PUT' : 'POST';
+            document.getElementById('saveBtn').disabled = true;
 
             const response = await fetch(url, {
                 method: method,
@@ -700,31 +1179,51 @@
 
             if (response.ok) {
                 closeModal();
-                loadUsers();
+                await loadHREmployees();  // Refresh to update has_food_safety_access flags
+                await loadUsers();
             } else {
-                showError('saving user');
+                const error = await response.json();
+                alert('Error: ' + (error.detail || 'Failed to save user'));
             }
         } catch (error) {
             console.error('Error:', error);
-            showError('saving user. API may not be available.');
+            alert('Error saving user. Please try again.');
+        } finally {
+            document.getElementById('saveBtn').disabled = false;
         }
     }
 
-    function formatRelativeTime(dateStr) {
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffMins = Math.floor(diffMs / 60000);
-        const diffHours = Math.floor(diffMs / 3600000);
-        const diffDays = Math.floor(diffMs / 86400000);
+    async function deleteUser() {
+        if (!editingHrUserId) return;
 
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
-        return date.toLocaleDateString();
+        const user = users.find(u => u.hr_user_id === editingHrUserId);
+        const name = user ? user.employee_name : 'this user';
+
+        if (!confirm(`Are you sure you want to remove Food Safety access for ${name}?\n\nThis will revoke their permissions but not affect their HR record.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`${API_BASE}/users/${editingHrUserId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                closeModal();
+                await loadHREmployees();
+                await loadUsers();
+            } else {
+                const error = await response.json();
+                alert('Error: ' + (error.detail || 'Failed to remove user'));
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Error removing user. Please try again.');
+        }
     }
 
     function capitalizeFirst(str) {
+        if (!str) return '';
         return str.charAt(0).toUpperCase() + str.slice(1);
     }
 
@@ -734,8 +1233,5 @@
         div.textContent = text;
         return div.innerHTML;
     }
-
-    // Initialize
-    loadLocations().then(() => loadUsers());
 </script>
 {% endblock %}

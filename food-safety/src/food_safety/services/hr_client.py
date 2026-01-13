@@ -40,15 +40,16 @@ class HRServiceClient:
             return f"{first} {last}".strip() or None
         return None
 
-    async def list_employees(self, location_id: Optional[int] = None) -> List[Dict[str, Any]]:
-        """List employees from HR service"""
+    async def list_employees(self, location_id: Optional[int] = None, status: str = "Active") -> List[Dict[str, Any]]:
+        """List employees from HR service using internal endpoint"""
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:
-                params = {}
+                params = {"status": status}
                 if location_id:
                     params["location_id"] = location_id
 
-                response = await client.get(f"{self.base_url}/employees", params=params)
+                # Use internal endpoint that doesn't require auth
+                response = await client.get(f"{self.base_url}/api/employees/_internal/list", params=params)
                 if response.status_code == 200:
                     return response.json()
                 else:

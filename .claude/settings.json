@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sudo fallocate:*)",
+      "Bash(sudo chmod:*)",
+      "Bash(sudo mkswap:*)",
+      "Bash(sudo swapon:*)",
+      "Bash(sudo tee:*)"
+    ]
+  }
+}
