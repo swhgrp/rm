@@ -697,11 +697,14 @@ class CalDAVSyncService:
                                         event.end_at = end_dt
                                         changed = True
 
-                                    # Parse status
-                                    cal_status = str(component.get('status', '')).upper()
-                                    if cal_status == 'CANCELLED':
-                                        event.status = 'CANCELED'
-                                        changed = True
+                                    # NOTE: We do NOT sync status from CalDAV back to database.
+                                    # The web app is the source of truth for event status.
+                                    # If someone marks an event as cancelled on their phone,
+                                    # it should not affect the master event record.
+                                    # cal_status = str(component.get('status', '')).upper()
+                                    # if cal_status == 'CANCELLED':
+                                    #     event.status = 'CANCELED'
+                                    #     changed = True
 
                                     if changed:
                                         results['updated'] += 1
@@ -716,17 +719,21 @@ class CalDAVSyncService:
                     logger.error(f"Error processing calendar {calendar_name}: {e}")
                     results['errors'] += 1
 
-            # Check for deleted events (exist in DB but not in CalDAV)
-            for uid, event in existing_events.items():
-                if uid not in seen_event_uids:
-                    # Event was deleted from CalDAV - mark as canceled
-                    # Only if event start_at is in our search range
-                    if start_date <= event.start_at <= end_date:
-                        if event.status not in ['CANCELED', 'CLOSED']:
-                            event.status = 'CANCELED'
-                            results['deleted'] += 1
-                            results['details'].append(f"Canceled (deleted from CalDAV): {event.title}")
-                            logger.info(f"Event {event.id} was deleted from CalDAV, marking as CANCELED")
+            # NOTE: We do NOT mark events as canceled if they're missing from CalDAV.
+            # Events might not be in a user's CalDAV calendar for many reasons:
+            # - Not synced yet
+            # - User doesn't have venue access
+            # - CalDAV search limitations
+            # The web app is the source of truth for event status.
+            #
+            # for uid, event in existing_events.items():
+            #     if uid not in seen_event_uids:
+            #         if start_date <= event.start_at <= end_date:
+            #             if event.status not in ['CANCELED', 'CLOSED']:
+            #                 event.status = 'CANCELED'
+            #                 results['deleted'] += 1
+            #                 results['details'].append(f"Canceled (deleted from CalDAV): {event.title}")
+            #                 logger.info(f"Event {event.id} was deleted from CalDAV, marking as CANCELED")
 
             db.commit()
             logger.info(f"CalDAV pull sync complete for {caldav_username}: {results}")

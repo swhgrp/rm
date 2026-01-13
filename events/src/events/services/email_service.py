@@ -101,9 +101,11 @@ class EmailService:
         msg.attach(html_part)
 
         # Send via SMTP
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as server:
-            # Note: Mailcow SMTP on port 2555 does not require STARTTLS
-            # Skip starttls() for internal Mailcow relay
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=30) as server:
+            if settings.SMTP_USE_TLS:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             all_recipients = to_list + cc_list
             server.sendmail(settings.FROM_EMAIL, all_recipients, msg.as_string())

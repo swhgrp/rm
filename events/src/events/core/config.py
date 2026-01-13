@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int
     SMTP_USER: str
     SMTP_PASSWORD: str
+    SMTP_USE_TLS: bool = True
     FROM_EMAIL: str
     FROM_NAME: str
 

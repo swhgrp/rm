@@ -9,6 +9,30 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
 
     <style>
+        /* =====================================================
+           SW Hospitality Group - Slate Blue Light Theme
+           Events Intake Form
+           ===================================================== */
+
+        :root {
+            --bg-primary: #ECEFF1;
+            --bg-secondary: #FFFFFF;
+            --bg-tertiary: #F5F5F5;
+            --bg-elevated: #E0E0E0;
+            --border-primary: #CFD8DC;
+            --border-secondary: #B0BEC5;
+            --text-primary: #263238;
+            --text-secondary: #546E7A;
+            --text-muted: #78909C;
+            --accent-primary: #455A64;
+            --accent-secondary: #37474F;
+            --accent-hover: #263238;
+            --success: #43A047;
+            --error: #E53935;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+            --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.15);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -17,8 +41,8 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background-color: #0d1117;
-            color: #c9d1d9;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
             min-height: 100vh;
             padding: 20px;
             -webkit-font-smoothing: antialiased;
@@ -28,14 +52,15 @@
         .container {
             max-width: 900px;
             margin: 0 auto;
-            background-color: #161b22;
-            border: 1px solid #30363d;
+            background-color: var(--bg-secondary);
+            border: 1px solid var(--border-primary);
             border-radius: 12px;
             overflow: hidden;
+            box-shadow: var(--shadow-md);
         }
 
         .header {
-            background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
             color: white;
             padding: clamp(30px, 8vw, 50px) 30px;
             text-align: center;
@@ -86,10 +111,10 @@
 
         .section-title {
             font-size: clamp(18px, 4vw, 22px);
-            color: #c9d1d9;
+            color: var(--text-primary);
             margin-bottom: 20px;
             padding-bottom: 12px;
-            border-bottom: 2px solid #30363d;
+            border-bottom: 2px solid var(--border-primary);
             font-weight: 600;
             display: flex;
             align-items: center;
@@ -97,7 +122,7 @@
         }
 
         .section-title i {
-            color: #238636;
+            color: var(--accent-primary);
             font-size: clamp(20px, 4vw, 24px);
         }
 
@@ -125,13 +150,13 @@
 
         label {
             font-weight: 600;
-            color: #c9d1d9;
+            color: var(--text-primary);
             margin-bottom: 8px;
             font-size: clamp(14px, 3vw, 15px);
         }
 
         label .required {
-            color: #f85149;
+            color: var(--error);
         }
 
         input[type="text"],
@@ -142,13 +167,13 @@
         select,
         textarea {
             padding: 12px 15px;
-            border: 1px solid #30363d;
+            border: 1px solid var(--border-primary);
             border-radius: 6px;
             font-size: 16px;
             font-family: inherit;
             transition: all 0.2s;
-            background-color: #0d1117;
-            color: #c9d1d9;
+            background-color: var(--bg-secondary);
+            color: var(--text-primary);
             min-height: 44px;
         }
 
@@ -156,18 +181,18 @@
         select:focus,
         textarea:focus {
             outline: none;
-            border-color: #238636;
-            box-shadow: 0 0 0 3px rgba(35, 134, 54, 0.15);
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(69, 90, 100, 0.15);
         }
 
         input::placeholder,
         textarea::placeholder {
-            color: #6e7681;
+            color: var(--text-muted);
         }
 
         select {
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23546E7A' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
             background-position: right 12px center;
             padding-right: 40px;
@@ -189,17 +214,17 @@
         .checkbox-item {
             display: flex;
             align-items: center;
-            background-color: #0d1117;
+            background-color: var(--bg-tertiary);
             padding: 10px 15px;
-            border: 1px solid #30363d;
+            border: 1px solid var(--border-primary);
             border-radius: 6px;
             transition: all 0.2s;
             min-height: 44px;
         }
 
         .checkbox-item:hover {
-            border-color: #238636;
-            background-color: #161b22;
+            border-color: var(--accent-primary);
+            background-color: var(--bg-elevated);
         }
 
         .checkbox-item input[type="checkbox"] {
@@ -207,7 +232,7 @@
             width: 20px;
             height: 20px;
             cursor: pointer;
-            accent-color: #238636;
+            accent-color: var(--accent-primary);
         }
 
         .checkbox-item label {
@@ -220,7 +245,7 @@
         .submit-btn {
             width: 100%;
             padding: 16px;
-            background: linear-gradient(135deg, #238636 0%, #2ea043 100%);
+            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
             color: white;
             border: none;
             border-radius: 8px;
@@ -237,12 +262,12 @@
 
         .submit-btn:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(35, 134, 54, 0.3);
+            box-shadow: 0 10px 25px rgba(69, 90, 100, 0.3);
         }
 
         .submit-btn:disabled {
-            background: #21262d;
-            color: #6e7681;
+            background: var(--bg-elevated);
+            color: var(--text-muted);
             cursor: not-allowed;
             transform: none;
         }
@@ -257,15 +282,15 @@
         }
 
         .alert.success {
-            background-color: #1a7f37;
-            color: #aff5b4;
-            border-color: #2ea043;
+            background-color: #E8F5E9;
+            color: #2E7D32;
+            border-color: var(--success);
         }
 
         .alert.error {
-            background-color: #da3633;
-            color: #ffdcd7;
-            border-color: #f85149;
+            background-color: #FFEBEE;
+            color: #C62828;
+            border-color: var(--error);
         }
 
         .alert.show {
@@ -290,8 +315,8 @@
         }
 
         .spinner {
-            border: 3px solid #30363d;
-            border-top: 3px solid #238636;
+            border: 3px solid var(--border-primary);
+            border-top: 3px solid var(--accent-primary);
             border-radius: 50%;
             width: 50px;
             height: 50px;
@@ -306,7 +331,7 @@
 
         .help-text {
             font-size: 13px;
-            color: #8b949e;
+            color: var(--text-muted);
             margin-top: 6px;
             display: flex;
             align-items: flex-start;
@@ -331,9 +356,9 @@
             font-size: 16px;
             font-weight: 500;
             line-height: 1.5;
-            color: #c9d1d9;
-            background-color: #21262d;
-            border: 1px solid #30363d;
+            color: var(--text-secondary);
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-primary);
             border-radius: 6px;
             white-space: nowrap;
         }
@@ -370,16 +395,16 @@
         }
 
         .footer {
-            background-color: #0d1117;
+            background-color: var(--bg-tertiary);
             padding: 25px 30px;
             text-align: center;
-            color: #8b949e;
+            color: var(--text-muted);
             font-size: clamp(13px, 3vw, 15px);
-            border-top: 1px solid #30363d;
+            border-top: 1px solid var(--border-primary);
         }
 
         .footer a {
-            color: #58a6ff;
+            color: var(--accent-primary);
             text-decoration: none;
         }
 
@@ -388,7 +413,7 @@
         }
 
         .footer i {
-            color: #238636;
+            color: var(--accent-primary);
         }
 
         @media (max-width: 480px) {
@@ -442,7 +467,7 @@
 
             <div id="loadingIndicator" class="loading">
                 <div class="spinner"></div>
-                <p style="color: #8b949e;">Submitting your request...</p>
+                <p style="color: var(--text-muted);">Submitting your request...</p>
             </div>
 
             <form id="eventForm">

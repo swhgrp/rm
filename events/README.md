@@ -2,11 +2,38 @@
 
 ## Status: 99% Production Ready ✅
 
-**LAST UPDATED:** 2026-01-05
+**LAST UPDATED:** 2026-01-12
 
 A comprehensive event planning system with calendar, task management, document generation, email notifications, CalDAV sync, Quick Holds, and role-based access control. The system is **production-ready** and actively used.
 
 ## Recent Updates (Latest)
+
+### January 12, 2026 - CalDAV Sync Fixes & Admin Access 🔧
+
+**Critical Bug Fix - CalDAV Bidirectional Sync:**
+- ⚠️ **FIXED:** CalDAV pull sync was incorrectly overwriting event statuses
+  - Phone calendar CANCELLED status was syncing back to master database
+  - Events missing from CalDAV were being marked as CANCELED
+  - ~15 events were incorrectly canceled before fix
+- ✅ **Solution:** Web app is now source of truth for event status
+  - Status changes from phone calendars no longer affect master records
+  - CalDAV still syncs title, description, times (not status)
+- **Files:** `events/src/events/services/caldav_sync_service.py` (lines 700-736)
+
+**Administrator Venue Access:**
+- ⚠️ **FIXED:** Admin users weren't seeing all events on phone calendars
+  - CalDAV sync filters by user's assigned venues
+  - Admins weren't automatically assigned to all venues
+- ✅ **Solution:** Auto-assign all venues to Administrators
+  - New `sync_admin_venues()` function in location sync script
+  - Runs automatically after HR location sync
+- **Files:** `events/src/events/scripts/sync_locations_from_hr.py`
+
+**Intake Form Theme Update:**
+- ✅ Updated public intake form to Slate Blue Light theme
+- ✅ CSS variables for consistent styling across portal
+
+---
 
 ### January 5, 2026 - Quick Holds Feature 📅
 

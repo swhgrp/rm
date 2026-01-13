@@ -23,6 +23,52 @@ EVENTS_DATABASE_URL = os.getenv(
     "postgresql://events_user:events_pass@events-db:5432/events_db"
 )
 
+def sync_admin_venues(events_session):
+    """
+    Ensure all Administrators have access to all venues.
+    Admins should see all events regardless of HR location assignments.
+    """
+    synced_count = 0
+
+    # Get all admin user IDs
+    admin_users = events_session.execute(text("""
+        SELECT u.id, u.email
+        FROM users u
+        JOIN user_roles ur ON u.id = ur.user_id
+        JOIN roles r ON ur.role_id = r.id
+        WHERE r.name = 'Administrator' AND u.is_active = true
+    """)).fetchall()
+
+    # Get all venue IDs
+    venues = events_session.execute(text("SELECT id, name FROM venues")).fetchall()
+
+    for admin in admin_users:
+        admin_id = admin[0]
+        admin_email = admin[1]
+
+        for venue in venues:
+            venue_id = venue[0]
+            venue_name = venue[1]
+
+            # Insert if not exists
+            result = events_session.execute(
+                text("""
+                    INSERT INTO user_locations (user_id, venue_id, created_at)
+                    VALUES (:user_id, :venue_id, NOW())
+                    ON CONFLICT (user_id, venue_id) DO NOTHING
+                    RETURNING user_id
+                """),
+                {"user_id": admin_id, "venue_id": venue_id}
+            ).fetchone()
+
+            if result:
+                print(f"✓ Admin access: {admin_email} → {venue_name}")
+                synced_count += 1
+
+    events_session.commit()
+    return synced_count
+
+
 def sync_locations():
     """Sync user-location assignments from HR to Events"""
 
@@ -117,6 +163,14 @@ def sync_locations():
         print(f"  ✓ Synced: {synced_count}")
         print(f"  ⚠️  Skipped: {skipped_count}")
         print("=" * 60)
+
+        # Now ensure all Administrators have access to all venues
+        print("\n" + "=" * 60)
+        print("Ensuring Administrators have access to all venues...")
+        print("=" * 60 + "\n")
+
+        admin_synced = sync_admin_venues(events_session)
+        print(f"\n✓ Admin venue assignments added: {admin_synced}")
 
     except Exception as e:
         events_session.rollback()

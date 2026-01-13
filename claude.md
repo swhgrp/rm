@@ -38,7 +38,59 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - January 11, 2026)
+### Most Recent Work (Current Session - January 12, 2026)
+
+**EVENTS CALDAV SYNC FIXES & SSL CERTIFICATE RENEWAL** ✅ **COMPLETE**
+
+#### 1. **CalDAV Bidirectional Sync Fix** ✅ **CRITICAL BUG FIX**
+- **Problem:** CalDAV pull sync was overwriting event statuses from phone calendars back to database
+  - If someone marked an event CANCELLED on their phone, it would cancel the master event
+  - Events not found in CalDAV were being marked as CANCELED incorrectly
+  - This caused 15+ events to be incorrectly canceled
+
+- **Solution:** Made web app the source of truth for event status
+  - Disabled status sync from CalDAV → database
+  - Disabled "missing from CalDAV = canceled" logic
+  - CalDAV now only syncs title, description, and times (not status)
+
+- **Files Modified:**
+  - `/opt/restaurant-system/events/src/events/services/caldav_sync_service.py`
+    - Lines 700-707: Commented out status sync from CalDAV
+    - Lines 722-736: Commented out deletion detection logic
+
+#### 2. **Administrator Venue Access Fix** ✅ **DEPLOYED**
+- **Problem:** Admin users (like Tina) weren't seeing events on phone calendars
+  - CalDAV sync filters events by user's assigned venues
+  - Admins weren't automatically assigned to all venues
+
+- **Solution:** Auto-assign all venues to Administrators during HR sync
+  - Added `sync_admin_venues()` function to location sync script
+  - Queries users with Administrator role
+  - Assigns all venues to each admin automatically
+
+- **Files Modified:**
+  - `/opt/restaurant-system/events/src/events/scripts/sync_locations_from_hr.py`
+    - Added `sync_admin_venues()` function (lines 26-69)
+    - Called at end of `sync_locations()` (lines 121-127)
+
+#### 3. **SSL Certificate Renewal** ✅ **FIXED**
+- **Problem:** Let's Encrypt certificate expired January 13, 2026
+  - Site showing "NET::ERR_CERT_DATE_INVALID" error
+  - Old renewal config had incorrect webroot path
+
+- **Solution:** Renewed certificate with correct configuration
+  - Fixed webroot path from host path to container path (`/var/www/certbot`)
+  - Certificate now valid until April 13, 2026
+  - Certbot container running for auto-renewal
+
+#### 4. **Events Intake Form Theme Update** ✅ **DEPLOYED**
+- Updated public intake form to use Slate Blue Light theme
+- CSS variables for consistent styling
+- Matches portal design language
+
+---
+
+### Previous Session Work (January 11, 2026)
 
 **E-SIGNATURE TEMPLATE FIELD EDITOR** ✅ **COMPLETE**
 
