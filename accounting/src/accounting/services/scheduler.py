@@ -185,6 +185,83 @@ def should_sync_now(config: POSConfiguration, db: Session = None) -> bool:
     return True
 
 
+async def catchup_missed_syncs():
+    """
+    On startup, check for any missed days and sync them.
+    This handles cases where the container was down during the normal sync window.
+    """
+    logger.info("Checking for missed POS syncs on startup...")
+    db: Session = SessionLocal()
+
+    try:
+        from accounting.models.daily_sales_summary import DailySalesSummary
+
+        # Get all configurations with auto-sync enabled
+        configs = db.query(POSConfiguration).filter(
+            POSConfiguration.auto_sync_enabled == True,
+            POSConfiguration.is_active == True
+        ).all()
+
+        if not configs:
+            logger.info("No POS configurations with auto-sync enabled")
+            return
+
+        today = date.today()
+        system_user_id = 1
+        total_synced = 0
+
+        for config in configs:
+            try:
+                # Find the last date we have DSS data for this area
+                last_dss = db.query(DailySalesSummary).filter(
+                    DailySalesSummary.area_id == config.area_id
+                ).order_by(DailySalesSummary.business_date.desc()).first()
+
+                if last_dss:
+                    last_date = last_dss.business_date
+                else:
+                    # If no DSS, start from 7 days ago
+                    last_date = today - timedelta(days=7)
+
+                # Calculate days to catch up (from last_date + 1 to yesterday)
+                yesterday = today - timedelta(days=1)
+                start_catchup = last_date + timedelta(days=1)
+
+                if start_catchup > yesterday:
+                    logger.debug(f"Area {config.area_id}: No missed days to catch up (last DSS: {last_date})")
+                    continue
+
+                days_missed = (yesterday - last_date).days
+                if days_missed > 0:
+                    logger.info(f"Area {config.area_id}: Catching up {days_missed} missed day(s) from {start_catchup} to {yesterday}")
+
+                    sync_service = POSSyncService(db)
+                    result = await sync_service.sync_location(
+                        area_id=config.area_id,
+                        start_date=start_catchup,
+                        end_date=yesterday,
+                        user_id=system_user_id
+                    )
+
+                    synced = result.get('synced_count', 0)
+                    total_synced += synced
+                    logger.info(f"Area {config.area_id}: Caught up {synced} days")
+
+            except Exception as e:
+                logger.error(f"Error catching up area {config.area_id}: {str(e)}", exc_info=True)
+                continue
+
+        if total_synced > 0:
+            logger.info(f"Startup catchup complete: synced {total_synced} total days across all locations")
+        else:
+            logger.info("Startup catchup: No missed days found")
+
+    except Exception as e:
+        logger.error(f"Error in startup catchup: {str(e)}", exc_info=True)
+    finally:
+        db.close()
+
+
 def start_scheduler():
     """
     Start the background scheduler with all periodic tasks.
@@ -210,10 +287,20 @@ def start_scheduler():
             max_instances=1  # Prevent overlapping executions
         )
 
+        # Add startup catchup task - runs once immediately to sync any missed days
+        scheduler.add_job(
+            catchup_missed_syncs,
+            trigger='date',  # Run once immediately
+            id='startup_catchup',
+            name='Startup catchup for missed POS syncs',
+            replace_existing=True
+        )
+
         # Start the scheduler
         scheduler.start()
         logger.info("Background scheduler started successfully")
         logger.info("Auto-sync task will check every 10 minutes for locations due for sync")
+        logger.info("Startup catchup task will run immediately to sync any missed days")
         logger.info(f"Scheduler jobs: {scheduler.get_jobs()}")
 
     except Exception as e:

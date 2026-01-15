@@ -82,7 +82,7 @@ def create_opening_balance_journal_entry(
     Create a journal entry for the bank account opening balance.
 
     Debit: Bank Account GL (asset increases)
-    Credit: Retained Earnings (3300) or Opening Balance Equity
+    Credit: Opening Balance Equity (3350)
 
     For negative opening balances (overdraft), entries are reversed.
 
@@ -102,10 +102,11 @@ def create_opening_balance_journal_entry(
         logger.warning(f"GL account {bank_account.gl_account_id} not found")
         return None
 
-    # Get Retained Earnings account (3300) for the offset
-    retained_earnings = db.query(Account).filter(Account.account_number == '3300').first()
-    if not retained_earnings:
-        logger.warning("Retained Earnings account (3300) not found, cannot create opening balance JE")
+    # Get Opening Balance Equity account (3350) for the offset
+    # This can be closed to Retained Earnings later after reconciliation
+    opening_bal_equity = db.query(Account).filter(Account.account_number == '3350').first()
+    if not opening_bal_equity:
+        logger.warning("Opening Balance Equity account (3350) not found, cannot create opening balance JE")
         return None
 
     # Use provided date or default to today
@@ -126,7 +127,7 @@ def create_opening_balance_journal_entry(
     abs_amount = abs(opening_balance)
 
     if opening_balance > 0:
-        # Positive balance: Debit Bank, Credit Retained Earnings
+        # Positive balance: Debit Bank, Credit Opening Balance Equity
         debit_line = JournalEntryLine(
             journal_entry_id=je.id,
             line_number=1,
@@ -141,7 +142,7 @@ def create_opening_balance_journal_entry(
         credit_line = JournalEntryLine(
             journal_entry_id=je.id,
             line_number=2,
-            account_id=retained_earnings.id,
+            account_id=opening_bal_equity.id,
             area_id=bank_account.area_id,
             description=f"Opening balance - {bank_account.account_name}",
             debit_amount=Decimal('0'),
@@ -149,11 +150,11 @@ def create_opening_balance_journal_entry(
         )
         db.add(credit_line)
     else:
-        # Negative balance (overdraft): Debit Retained Earnings, Credit Bank
+        # Negative balance (overdraft): Debit Opening Balance Equity, Credit Bank
         debit_line = JournalEntryLine(
             journal_entry_id=je.id,
             line_number=1,
-            account_id=retained_earnings.id,
+            account_id=opening_bal_equity.id,
             area_id=bank_account.area_id,
             description=f"Opening balance (overdraft) - {bank_account.account_name}",
             debit_amount=abs_amount,

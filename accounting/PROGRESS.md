@@ -1,6 +1,6 @@
 # Accounting System - Progress
 
-**Last Updated:** January 8, 2026
+**Last Updated:** January 15, 2026
 **Status:** 95% Complete - Production Ready
 
 ---
@@ -93,6 +93,22 @@ The Accounting System is the most complex system in the platform with 157 Python
 ---
 
 ## Recent Milestones
+
+### January 15, 2026
+- **Dashboard Reorganization**:
+  - AP Aging and AR Aging now side-by-side for easy comparison
+  - Cash Position now full-width with bank accounts displayed side-by-side (responsive grid)
+  - Cleaner visual hierarchy in Cash & Working Capital section
+- **Chart of Accounts Enhancements**:
+  - Added "View Transactions" button to each GL account
+  - Navigate directly to account detail page from both hierarchy and flat list views
+- **Bank Account Fixes**:
+  - Fixed SW Grill bank account area assignment for proper dashboard grouping
+  - Opening Balance Equity (3350) now used for bank opening balances (cleaner closing)
+- **POS Auto-Sync Reliability**:
+  - Added `catchup_missed_syncs()` function that runs on container startup
+  - Automatically syncs any missed days when container restarts
+  - Prevents gaps from container downtime during scheduled sync window
 
 ### January 8, 2026
 - **POS Sync Critical Fixes**:

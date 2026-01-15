@@ -10,24 +10,32 @@ The Accounting System is a comprehensive double-entry accounting platform provid
 
 ## Recent Updates
 
-### January 15, 2026 - Bank Account & Dashboard Enhancements 🏦
+### January 15, 2026 - Dashboard Reorganization & GL Enhancements 📊
 
-**Bank Account Opening Balances:**
-- ✅ **Opening balance journal entry** - Auto-creates JE when opening balance is set
-- ✅ **Balance As Of date field** - Specify effective date for opening balance
-- ✅ **Double-entry posting** - Debit Bank Account, Credit Retained Earnings (3300)
-- ✅ **Entry number generation** - Format: `JE-OB-YYYYMMDD-NNN`
+**Dashboard Reorganization:**
+- ✅ **AP/AR Aging side-by-side** - Accounts Payable and Receivable aging now next to each other for easy comparison
+- ✅ **Cash Position full-width** - Bank accounts displayed in responsive grid (4/row on large, 3/medium, 2/small)
+- ✅ **Cleaner layout** - Total Available Cash moved to header row for better visual hierarchy
+- ✅ **Top 5 Sales** - Limited sales breakdown to top 5 categories (matching Top 5 Expenses)
+
+**Chart of Accounts Enhancements:**
+- ✅ **View Transactions button** - Navigate directly to GL account transactions from chart of accounts
+- ✅ **Both views supported** - Works in hierarchy view and flat list view
+
+**Bank Account Fixes:**
+- ✅ **Opening Balance Equity (3350)** - New account for bank opening balances (cleaner closing)
+- ✅ **Area assignment fix** - SW Grill bank account now properly grouped on dashboard
+- ✅ **Opening balance JE** - Auto-creates JE when opening balance is set
+
+**POS Auto-Sync Reliability:**
+- ✅ **Startup catchup function** - Automatically syncs missed days when container restarts
+- ✅ **No sync gaps** - Handles container downtime during scheduled sync window
 
 **Check Payments Page:**
 - ✅ **Searchable vendor selection** - Type-ahead vendor search instead of dropdown
 - ✅ **Vendor bills filtering** - Shows only selected vendor's bills
 - ✅ **View bill button** - Quick access to bill details for reference
 - ✅ **Fixed date display** - Correct EST timezone handling
-- ✅ **Vendor column** - Shows vendor name in bills table
-
-**Dashboard Improvements:**
-- ✅ **Top 5 Sales** - Limited sales breakdown to top 5 categories (matching Top 5 Expenses)
-- ✅ **Full bank account numbers** - Removed 4-digit limit for check printing
 
 ---
 

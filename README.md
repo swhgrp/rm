@@ -9,7 +9,7 @@
 **Production URL:** https://rm.swhgrp.com
 **Last Updated:** January 15, 2026
 **Status:** ~97% Complete - All 10 Systems Production Ready ✅
-**Latest:** Accounting: Bank Account Opening Balances, Check Payments UI, Dashboard Top 5 Sales (Jan 15, 2026) ✅
+**Latest:** Accounting: Dashboard Reorganization (AP/AR side-by-side), GL View Transactions, POS Sync Catchup (Jan 15, 2026) ✅
 
 ---
 

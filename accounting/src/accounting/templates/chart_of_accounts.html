@@ -203,6 +203,9 @@ function renderAccountRow(account, level = 0) {
                     : '<span class="badge bg-secondary">Inactive</span>'}
             </td>
             <td>
+                <a href="/accounting/accounts/${account.id}" class="btn btn-sm btn-primary" title="View Transactions" style="margin-right: 4px;">
+                    <i class="bi bi-list-ul"></i>
+                </a>
                 <button class="btn btn-sm btn-secondary" onclick="editAccount(${account.id})" title="Edit">
                     <i class="bi bi-pencil"></i>
                 </button>
@@ -254,6 +257,9 @@ function renderAccounts() {
                         : '<span class="badge bg-secondary">Inactive</span>'}
                 </td>
                 <td>
+                    <a href="/accounting/accounts/${account.id}" class="btn btn-sm btn-primary" title="View Transactions" style="margin-right: 4px;">
+                        <i class="bi bi-list-ul"></i>
+                    </a>
                     <button class="btn btn-sm btn-secondary" onclick="editAccount(${account.id})" title="Edit">
                         <i class="bi bi-pencil"></i>
                     </button>
