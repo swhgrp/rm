@@ -19,6 +19,7 @@ class BankAccount(Base):
     routing_number = Column(String(20), nullable=True)
     gl_account_id = Column(Integer, ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
     opening_balance = Column(Numeric(15, 2), nullable=True)
+    opening_balance_date = Column(Date, nullable=True)  # Date of opening balance for JE
     current_balance = Column(Numeric(15, 2), nullable=True)
     status = Column(String(20), nullable=False, default="active", index=True)
 

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
 from decimal import Decimal
+import logging
 
 from accounting.db.database import get_db
 from accounting.models.bank_account import (
@@ -15,6 +16,8 @@ from accounting.models.bank_account import (
     BankStatementImport,
     BankMatchingRule
 )
+from accounting.models.account import Account
+from accounting.models.journal_entry import JournalEntry, JournalEntryLine
 from accounting.schemas.bank_account import (
     BankAccountCreate,
     BankAccountUpdate,
@@ -45,7 +48,132 @@ from accounting.services.csv_parser import CSVParserService
 from accounting.services.plaid_service import get_plaid_service
 from accounting.services.transaction_matcher import TransactionMatcher
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _generate_entry_number(db: Session, entry_date: date, prefix: str = "JE-OB") -> str:
+    """Generate sequential entry number for opening balance: PREFIX-YYYYMMDD-NNN"""
+    date_str = entry_date.strftime('%Y%m%d')
+    entry_prefix = f"{prefix}-{date_str}-"
+
+    # Find the highest number for this date/prefix
+    last_entry = db.query(JournalEntry).filter(
+        JournalEntry.entry_number.like(f"{entry_prefix}%")
+    ).order_by(JournalEntry.entry_number.desc()).first()
+
+    if last_entry:
+        last_num = int(last_entry.entry_number.split('-')[-1])
+        new_num = last_num + 1
+    else:
+        new_num = 1
+
+    return f"{entry_prefix}{new_num:03d}"
+
+
+def create_opening_balance_journal_entry(
+    db: Session,
+    bank_account: BankAccount,
+    opening_balance: Decimal,
+    user_id: int,
+    balance_date: Optional[date] = None
+) -> Optional[JournalEntry]:
+    """
+    Create a journal entry for the bank account opening balance.
+
+    Debit: Bank Account GL (asset increases)
+    Credit: Retained Earnings (3300) or Opening Balance Equity
+
+    For negative opening balances (overdraft), entries are reversed.
+
+    Args:
+        balance_date: The date for the journal entry (defaults to today if not provided)
+    """
+    if not opening_balance or opening_balance == 0:
+        return None
+
+    if not bank_account.gl_account_id:
+        logger.warning(f"Bank account {bank_account.id} has no GL account assigned, skipping opening balance JE")
+        return None
+
+    # Get the bank account's GL account
+    bank_gl_account = db.query(Account).filter(Account.id == bank_account.gl_account_id).first()
+    if not bank_gl_account:
+        logger.warning(f"GL account {bank_account.gl_account_id} not found")
+        return None
+
+    # Get Retained Earnings account (3300) for the offset
+    retained_earnings = db.query(Account).filter(Account.account_number == '3300').first()
+    if not retained_earnings:
+        logger.warning("Retained Earnings account (3300) not found, cannot create opening balance JE")
+        return None
+
+    # Use provided date or default to today
+    entry_date_val = balance_date if balance_date else date.today()
+    entry_number = _generate_entry_number(db, entry_date_val, "JE-OB")
+
+    # Create journal entry
+    je = JournalEntry(
+        entry_date=entry_date_val,
+        entry_number=entry_number,
+        description=f"Opening balance for {bank_account.account_name}",
+        status='POSTED',
+        created_by=user_id
+    )
+    db.add(je)
+    db.flush()
+
+    abs_amount = abs(opening_balance)
+
+    if opening_balance > 0:
+        # Positive balance: Debit Bank, Credit Retained Earnings
+        debit_line = JournalEntryLine(
+            journal_entry_id=je.id,
+            line_number=1,
+            account_id=bank_gl_account.id,
+            area_id=bank_account.area_id,
+            description=f"Opening balance - {bank_account.account_name}",
+            debit_amount=abs_amount,
+            credit_amount=Decimal('0')
+        )
+        db.add(debit_line)
+
+        credit_line = JournalEntryLine(
+            journal_entry_id=je.id,
+            line_number=2,
+            account_id=retained_earnings.id,
+            area_id=bank_account.area_id,
+            description=f"Opening balance - {bank_account.account_name}",
+            debit_amount=Decimal('0'),
+            credit_amount=abs_amount
+        )
+        db.add(credit_line)
+    else:
+        # Negative balance (overdraft): Debit Retained Earnings, Credit Bank
+        debit_line = JournalEntryLine(
+            journal_entry_id=je.id,
+            line_number=1,
+            account_id=retained_earnings.id,
+            area_id=bank_account.area_id,
+            description=f"Opening balance (overdraft) - {bank_account.account_name}",
+            debit_amount=abs_amount,
+            credit_amount=Decimal('0')
+        )
+        db.add(debit_line)
+
+        credit_line = JournalEntryLine(
+            journal_entry_id=je.id,
+            line_number=2,
+            account_id=bank_gl_account.id,
+            area_id=bank_account.area_id,
+            description=f"Opening balance (overdraft) - {bank_account.account_name}",
+            debit_amount=Decimal('0'),
+            credit_amount=abs_amount
+        )
+        db.add(credit_line)
+
+    logger.info(f"Created opening balance journal entry {je.id} for bank account {bank_account.id}: ${opening_balance}")
+    return je
 
 
 # ============================================================================
@@ -101,6 +229,20 @@ def create_bank_account(
         created_by=current_user.id
     )
     db.add(db_account)
+    db.flush()
+
+    # Create opening balance journal entry if opening_balance is set
+    if account.opening_balance and account.opening_balance != 0:
+        create_opening_balance_journal_entry(
+            db=db,
+            bank_account=db_account,
+            opening_balance=account.opening_balance,
+            user_id=current_user.id,
+            balance_date=account.opening_balance_date
+        )
+        # Also set the current balance to the opening balance
+        db_account.current_balance = account.opening_balance
+
     db.commit()
     db.refresh(db_account)
 
@@ -149,10 +291,42 @@ def update_bank_account(
     if not db_account:
         raise HTTPException(status_code=404, detail="Bank account not found")
 
-    # Update fields
+    # Check if opening_balance is being changed
     update_data = account_update.dict(exclude_unset=True)
+    old_opening_balance = db_account.opening_balance or Decimal('0')
+    new_opening_balance = update_data.get('opening_balance')
+    new_balance_date = update_data.get('opening_balance_date')
+
+    # Update fields
     for field, value in update_data.items():
         setattr(db_account, field, value)
+
+    # Create journal entry if opening_balance changed from zero/null to a value
+    if new_opening_balance is not None and new_opening_balance != 0:
+        if old_opening_balance == 0:
+            # First time setting opening balance - create JE
+            create_opening_balance_journal_entry(
+                db=db,
+                bank_account=db_account,
+                opening_balance=new_opening_balance,
+                user_id=current_user.id,
+                balance_date=new_balance_date or db_account.opening_balance_date
+            )
+            # Also update current balance if not set
+            if not db_account.current_balance:
+                db_account.current_balance = new_opening_balance
+            logger.info(f"Created opening balance JE for existing bank account {account_id}")
+        elif new_opening_balance != old_opening_balance:
+            # Opening balance changed - create adjustment JE for the difference
+            difference = new_opening_balance - old_opening_balance
+            create_opening_balance_journal_entry(
+                db=db,
+                bank_account=db_account,
+                opening_balance=difference,
+                user_id=current_user.id,
+                balance_date=new_balance_date or db_account.opening_balance_date
+            )
+            logger.info(f"Created adjustment JE for bank account {account_id} opening balance change: {difference}")
 
     db.commit()
     db.refresh(db_account)

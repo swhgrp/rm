@@ -80,9 +80,9 @@
                 <div class="row">
                     <div class="col-md-6">
                         <label class="form-label">Vendor <span class="text-danger">*</span></label>
-                        <select class="form-select" id="vendorSelect" required>
-                            <option value="">Choose vendor...</option>
-                        </select>
+                        <input type="text" class="form-control" id="vendorSearch" placeholder="Type to search vendors..." autocomplete="off">
+                        <input type="hidden" id="vendorSelect" required>
+                        <div id="vendorDropdown" class="dropdown-menu w-100" style="max-height: 300px; overflow-y: auto;"></div>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Location/Area</label>
@@ -124,6 +124,7 @@
                                     <th width="50">
                                         <input type="checkbox" id="selectAllCheckbox" class="form-check-input">
                                     </th>
+                                    <th>Vendor</th>
                                     <th>Bill #</th>
                                     <th>Date</th>
                                     <th>Due Date</th>
@@ -132,6 +133,7 @@
                                     <th>Balance</th>
                                     <th>Discount Available</th>
                                     <th>Status</th>
+                                    <th width="60"></th>
                                 </tr>
                             </thead>
                             <tbody id="billsTableBody">
@@ -284,7 +286,7 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
 <script>
 let selectedBills = [];
 let selectedVendor = null;
@@ -303,23 +305,70 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 async function loadVendors() {
     try {
-        const response = await fetch('/api/vendors/');
+        const response = await fetch('/accounting/api/vendors/');
+        if (!response.ok) {
+            console.error('Error loading vendors:', response.status, response.statusText);
+            return;
+        }
         vendors = await response.json();
-        const select = document.getElementById('vendorSelect');
-        vendors.forEach(vendor => {
-            const option = document.createElement('option');
-            option.value = vendor.id;
-            option.textContent = vendor.vendor_name;
-            select.appendChild(option);
-        });
+        setupVendorSearch();
     } catch (error) {
         console.error('Error loading vendors:', error);
     }
 }
 
+function setupVendorSearch() {
+    const searchInput = document.getElementById('vendorSearch');
+    const dropdown = document.getElementById('vendorDropdown');
+    const hiddenInput = document.getElementById('vendorSelect');
+
+    searchInput.addEventListener('focus', () => showVendorDropdown(''));
+    searchInput.addEventListener('input', (e) => showVendorDropdown(e.target.value));
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+            dropdown.classList.remove('show');
+        }
+    });
+
+    function showVendorDropdown(filter) {
+        const filtered = vendors.filter(v =>
+            v.vendor_name.toLowerCase().includes(filter.toLowerCase())
+        ).slice(0, 20);
+
+        dropdown.innerHTML = '';
+        if (filtered.length === 0) {
+            dropdown.innerHTML = '<div class="dropdown-item text-muted">No vendors found</div>';
+        } else {
+            filtered.forEach(vendor => {
+                const item = document.createElement('a');
+                item.className = 'dropdown-item';
+                item.href = '#';
+                item.textContent = vendor.vendor_name;
+                item.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    selectVendor(vendor);
+                });
+                dropdown.appendChild(item);
+            });
+        }
+        dropdown.classList.add('show');
+    }
+
+    async function selectVendor(vendor) {
+        searchInput.value = vendor.vendor_name;
+        hiddenInput.value = vendor.id;
+        dropdown.classList.remove('show');
+        selectedVendor = vendor;
+        await loadVendorBills(vendor.id);
+        document.getElementById('billsCard').style.display = 'block';
+    }
+}
+
 async function loadAreas() {
     try {
-        const response = await fetch('/api/areas/');
+        const response = await fetch('/accounting/api/areas/');
         areas = await response.json();
         const select = document.getElementById('areaSelect');
         areas.forEach(area => {
@@ -335,7 +384,7 @@ async function loadAreas() {
 
 async function loadBankAccounts() {
     try {
-        const response = await fetch('/api/bank-accounts/');
+        const response = await fetch('/accounting/api/bank-accounts/');
         bankAccounts = await response.json();
         const select = document.getElementById('bankAccountSelect');
         bankAccounts.forEach(account => {
@@ -354,18 +403,7 @@ function setDefaultDate() {
     document.getElementById('paymentDate').value = today;
 }
 
-// Vendor selection handler
-document.getElementById('vendorSelect').addEventListener('change', async function() {
-    const vendorId = this.value;
-    if (!vendorId) {
-        document.getElementById('billsCard').style.display = 'none';
-        return;
-    }
-
-    selectedVendor = vendors.find(v => v.id == vendorId);
-    await loadVendorBills(vendorId);
-    document.getElementById('billsCard').style.display = 'block';
-});
+// Vendor selection is now handled by setupVendorSearch()
 
 async function loadVendorBills(vendorId) {
     const billsLoading = document.getElementById('billsLoading');
@@ -379,8 +417,23 @@ async function loadVendorBills(vendorId) {
     tableBody.innerHTML = '';
 
     try {
-        const response = await fetch(`/api/vendor-bills/?vendor_id=${vendorId}&status=approved,partially_paid`);
-        const bills = await response.json();
+        // Fetch approved and partially paid bills separately, then combine
+        // Use vendor_name filter (API doesn't have vendor_id filter)
+        const vendorName = encodeURIComponent(selectedVendor.vendor_name);
+        const [approvedRes, partialRes] = await Promise.all([
+            fetch(`/accounting/api/vendor-bills/?vendor_name=${vendorName}&status=approved`),
+            fetch(`/accounting/api/vendor-bills/?vendor_name=${vendorName}&status=partially_paid`)
+        ]);
+
+        let bills = [];
+        if (approvedRes.ok) {
+            const approved = await approvedRes.json();
+            bills = bills.concat(approved);
+        }
+        if (partialRes.ok) {
+            const partial = await partialRes.json();
+            bills = bills.concat(partial);
+        }
 
         billsLoading.style.display = 'none';
 
@@ -407,23 +460,29 @@ function createBillRow(bill) {
     tr.className = 'bill-row';
     tr.dataset.billId = bill.id;
 
+    // Convert amounts to numbers (API may return strings or Decimal)
+    const totalAmount = parseFloat(bill.total_amount) || 0;
+    const balanceDue = parseFloat(bill.balance_due) || 0;
+
     const dueDate = new Date(bill.due_date);
     const today = new Date();
     const daysUntilDue = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
 
     // Calculate discount if available (simplified - should come from API)
-    const discountAvailable = daysUntilDue > 0 && daysUntilDue <= 10 ? bill.total_amount * 0.02 : 0;
+    const discountAvailable = daysUntilDue > 0 && daysUntilDue <= 10 ? totalAmount * 0.02 : 0;
 
     tr.innerHTML = `
         <td><input type="checkbox" class="form-check-input bill-checkbox" data-bill-id="${bill.id}"></td>
+        <td>${bill.vendor_name || 'N/A'}</td>
         <td>${bill.bill_number || 'N/A'}</td>
         <td>${formatDate(bill.bill_date)}</td>
         <td>${formatDate(bill.due_date)}</td>
-        <td>$${bill.total_amount.toFixed(2)}</td>
-        <td>$${(bill.total_amount - bill.balance_due).toFixed(2)}</td>
-        <td><strong>$${bill.balance_due.toFixed(2)}</strong></td>
+        <td>$${totalAmount.toFixed(2)}</td>
+        <td>$${(totalAmount - balanceDue).toFixed(2)}</td>
+        <td><strong>$${balanceDue.toFixed(2)}</strong></td>
         <td>${discountAvailable > 0 ? `<span class="discount-badge">$${discountAvailable.toFixed(2)}</span>` : '-'}</td>
         <td><span class="badge bg-${getStatusColor(bill.status)}">${bill.status}</span></td>
+        <td><a href="/accounting/vendor-bills/${bill.id}" target="_blank" class="btn btn-sm btn-outline-primary" title="View Bill" onclick="event.stopPropagation();"><i class="bi bi-eye"></i></a></td>
     `;
 
     // Click row to toggle checkbox
@@ -440,7 +499,7 @@ function createBillRow(bill) {
         if (this.checked) {
             selectedBills.push({
                 id: bill.id,
-                amount: bill.balance_due,
+                amount: balanceDue,
                 discount: discountAvailable
             });
             tr.classList.add('selected');
@@ -566,7 +625,7 @@ document.getElementById('paymentForm').addEventListener('submit', async function
     paymentData.discount_amount = selectedBills.reduce((sum, bill) => sum + bill.discount, 0);
 
     try {
-        const response = await fetch('/api/payments/', {
+        const response = await fetch('/accounting/api/payments/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -602,6 +661,18 @@ document.getElementById('saveDraftBtn').addEventListener('click', function() {
 
 // Helper functions
 function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    // Parse date string as local date (avoid UTC conversion issues)
+    // Handle YYYY-MM-DD format by treating as EST local date
+    const parts = dateString.split('T')[0].split('-');
+    if (parts.length === 3) {
+        const year = parseInt(parts[0]);
+        const month = parseInt(parts[1]) - 1; // JS months are 0-indexed
+        const day = parseInt(parts[2]);
+        const date = new Date(year, month, day);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+    // Fallback for other formats
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }

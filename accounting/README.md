@@ -6,9 +6,30 @@ The Accounting System is a comprehensive double-entry accounting platform provid
 
 ## Status: 95% Production Ready ✅
 
-**Last Updated:** January 5, 2026
+**Last Updated:** January 15, 2026
 
 ## Recent Updates
+
+### January 15, 2026 - Bank Account & Dashboard Enhancements 🏦
+
+**Bank Account Opening Balances:**
+- ✅ **Opening balance journal entry** - Auto-creates JE when opening balance is set
+- ✅ **Balance As Of date field** - Specify effective date for opening balance
+- ✅ **Double-entry posting** - Debit Bank Account, Credit Retained Earnings (3300)
+- ✅ **Entry number generation** - Format: `JE-OB-YYYYMMDD-NNN`
+
+**Check Payments Page:**
+- ✅ **Searchable vendor selection** - Type-ahead vendor search instead of dropdown
+- ✅ **Vendor bills filtering** - Shows only selected vendor's bills
+- ✅ **View bill button** - Quick access to bill details for reference
+- ✅ **Fixed date display** - Correct EST timezone handling
+- ✅ **Vendor column** - Shows vendor name in bills table
+
+**Dashboard Improvements:**
+- ✅ **Top 5 Sales** - Limited sales breakdown to top 5 categories (matching Top 5 Expenses)
+- ✅ **Full bank account numbers** - Removed 4-digit limit for check printing
+
+---
 
 ### January 5, 2026 - Plaid Integration & Scheduler Service 🏦
 

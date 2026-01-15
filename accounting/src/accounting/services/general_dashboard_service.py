@@ -804,12 +804,15 @@ class GeneralDashboardService:
 
         return locations
 
-    def _get_revenue_by_category(self, start_date: date, end_date: date, area_id: Optional[int]) -> List:
-        """Get revenue by category (GL categories like Food Sales, Beverage Sales)
+    def _get_revenue_by_category(self, start_date: date, end_date: date, area_id: Optional[int], limit: int = 5) -> List:
+        """Get top revenue categories by category (GL categories like Food Sales, Beverage Sales)
 
         Combines:
         1. Posted journal entries by revenue account
         2. Draft DSS category breakdowns (not yet posted to GL)
+
+        Args:
+            limit: Maximum number of categories to return (default 5)
         """
         from accounting.schemas.general_dashboard import RevenueCategory
         import logging
@@ -878,8 +881,8 @@ class GeneralDashboardService:
         # Calculate total revenue
         total_revenue = sum(category_totals.values())
 
-        # Sort by amount descending
-        sorted_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)
+        # Sort by amount descending and limit to top N
+        sorted_categories = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)[:limit]
 
         # Build response
         categories = []

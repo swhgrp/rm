@@ -105,14 +105,15 @@
 
                     <!-- Account Details -->
                     <h6 class="mb-3 mt-4">Account Details</h6>
+                    <p class="text-muted small mb-3"><i class="bi bi-info-circle"></i> Full account and routing numbers are required for check printing and ACH payments.</p>
                     <div class="row mb-3">
                         <div class="col-md-6">
-                            <label for="accountNumber" class="form-label">Account Number (last 4 digits)</label>
-                            <input type="text" class="form-control" id="accountNumber" maxlength="4" placeholder="****1234">
+                            <label for="accountNumber" class="form-label">Account Number</label>
+                            <input type="text" class="form-control" id="accountNumber" maxlength="20" placeholder="Enter full account number">
                         </div>
                         <div class="col-md-6">
                             <label for="routingNumber" class="form-label">Routing Number</label>
-                            <input type="text" class="form-control" id="routingNumber" maxlength="9">
+                            <input type="text" class="form-control" id="routingNumber" maxlength="9" placeholder="9-digit routing number">
                         </div>
                     </div>
 
@@ -123,9 +124,13 @@
                                 <option value="">Select GL Account...</option>
                             </select>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-3">
                             <label for="openingBalance" class="form-label">Opening Balance</label>
                             <input type="number" class="form-control" id="openingBalance" step="0.01" value="0.00">
+                        </div>
+                        <div class="col-md-3">
+                            <label for="openingBalanceDate" class="form-label">Balance As Of</label>
+                            <input type="date" class="form-control" id="openingBalanceDate">
                         </div>
                     </div>
 
@@ -465,6 +470,7 @@ function editAccount(accountId) {
     document.getElementById('routingNumber').value = account.routing_number || '';
     document.getElementById('glAccountId').value = account.gl_account_id || '';
     document.getElementById('openingBalance').value = account.opening_balance || '0.00';
+    document.getElementById('openingBalanceDate').value = account.opening_balance_date || '';
     document.getElementById('syncMethod').value = account.sync_method || 'manual';
     document.getElementById('autoSyncEnabled').checked = account.auto_sync_enabled || false;
     document.getElementById('notes').value = account.notes || '';
@@ -485,6 +491,7 @@ async function saveAccount() {
         routing_number: document.getElementById('routingNumber').value || null,
         gl_account_id: parseInt(document.getElementById('glAccountId').value),
         opening_balance: parseFloat(document.getElementById('openingBalance').value) || 0,
+        opening_balance_date: document.getElementById('openingBalanceDate').value || null,
         sync_method: document.getElementById('syncMethod').value,
         auto_sync_enabled: document.getElementById('autoSyncEnabled').checked,
         notes: document.getElementById('notes').value || null
@@ -834,6 +841,7 @@ saveAccount = async function() {
         routing_number: document.getElementById('routingNumber').value || null,
         gl_account_id: parseInt(document.getElementById('glAccountId').value),
         opening_balance: parseFloat(document.getElementById('openingBalance').value) || 0,
+        opening_balance_date: document.getElementById('openingBalanceDate').value || null,
         sync_method: syncMethod,
         auto_sync_enabled: document.getElementById('autoSyncEnabled').checked,
         notes: document.getElementById('notes').value || null

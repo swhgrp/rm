@@ -15,6 +15,7 @@ class BankAccountBase(BaseModel):
     routing_number: Optional[str] = Field(None, max_length=20)
     gl_account_id: Optional[int] = None
     opening_balance: Optional[Decimal] = None
+    opening_balance_date: Optional[date] = None
     notes: Optional[str] = None
 
 
@@ -37,6 +38,9 @@ class BankAccountUpdate(BaseModel):
     institution_name: Optional[str] = Field(None, max_length=255)
     routing_number: Optional[str] = Field(None, max_length=20)
     gl_account_id: Optional[int] = None
+    area_id: Optional[int] = None
+    opening_balance: Optional[Decimal] = None
+    opening_balance_date: Optional[date] = None
     current_balance: Optional[Decimal] = None
     status: Optional[str] = Field(None, max_length=20)
     sync_method: Optional[str] = Field(None, max_length=20)
