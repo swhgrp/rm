@@ -196,6 +196,18 @@ def create_vendor_bill(
         if not area:
             raise HTTPException(status_code=404, detail=f"Area {bill_data.area_id} not found")
 
+    # Check for duplicate bill number for this vendor
+    existing_bill = db.query(VendorBill).filter(
+        VendorBill.bill_number == bill_data.bill_number,
+        VendorBill.vendor_id == bill_data.vendor_id,
+        VendorBill.status != BillStatus.VOID  # Allow re-entering voided bills
+    ).first()
+    if existing_bill:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Bill number '{bill_data.bill_number}' already exists for this vendor (Bill ID: {existing_bill.id})"
+        )
+
     # Validate line items if provided
     if bill_data.line_items:
         for line in bill_data.line_items:

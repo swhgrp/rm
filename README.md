@@ -9,7 +9,7 @@
 **Production URL:** https://rm.swhgrp.com
 **Last Updated:** January 15, 2026
 **Status:** ~97% Complete - All 10 Systems Production Ready ✅
-**Latest:** Accounting: Dashboard Reorganization (AP/AR side-by-side), GL View Transactions, POS Sync Catchup (Jan 15, 2026) ✅
+**Latest:** Hub: Vendor Merge & Push to Systems, Accounting: Payment Fixes, Duplicate Bill Detection (Jan 15, 2026) ✅
 
 ---
 
@@ -677,7 +677,15 @@ restaurant-system/
 - ✅ **Vendor item detail page** - Comprehensive view with pricing history and AI suggestions
 - ✅ **Auto unit cost calculation** - `case_cost / units_per_case`
 
-**🆕 NEW: Expense Items vs Vendor Items (Dec 28, 2025):**
+**🆕 NEW: Vendor Merge & Push to Systems (Jan 15, 2026):**
+- ✅ **Vendor merge** - Merge multiple vendors into one primary vendor
+- ✅ **Alias management** - Merged vendor names become aliases of primary vendor
+- ✅ **Push to Systems** - Push Hub's vendor/alias state to Inventory and Accounting
+- ✅ **Bill reassignment** - Automatically reassign bills when merging in Accounting
+- ✅ **Preview mode** - Preview what merge/push will do before executing
+- ✅ **Search filter** - Filter vendor table by name in Hub vendors page
+
+**🆕 Expense Items vs Vendor Items (Dec 28, 2025):**
 - ✅ **Clear separation** - Vendor Items = inventory tracked, Expense Items = expense-only (not counted)
 - ✅ **Expense Items page** - View/manage items mapped to expense GL accounts
 - ✅ **"Map to Expense" action** - Convert vendor items to expense items (deletes from vendor items)

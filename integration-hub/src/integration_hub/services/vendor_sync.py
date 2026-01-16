@@ -75,22 +75,39 @@ class VendorSyncService:
         updated = 0
         errors = []
 
+        # Import VendorAlias for alias matching
+        from integration_hub.models.vendor_alias import VendorAlias
+
         # Sync inventory vendors
         for inv_vendor in inventory_vendors:
             try:
                 vendor_name = inv_vendor.get("name")
+
+                # Skip inactive vendors - they were likely deactivated during a merge
+                if not inv_vendor.get("is_active", True):
+                    continue
 
                 # Try to find existing vendor by inventory ID
                 vendor = db.query(Vendor).filter(
                     Vendor.inventory_vendor_id == inv_vendor.get("id")
                 ).first()
 
-                # If not found by ID, try to match by name (case-insensitive) to detect duplicates
+                # If not found by ID, try to match by name (case-insensitive)
                 if not vendor and vendor_name:
                     from sqlalchemy import func
                     vendor = db.query(Vendor).filter(
                         func.lower(Vendor.name) == func.lower(vendor_name)
                     ).first()
+
+                # If still not found, check if name matches an alias (merged vendor)
+                if not vendor and vendor_name:
+                    from sqlalchemy import func
+                    alias = db.query(VendorAlias).filter(
+                        func.lower(VendorAlias.alias_name) == func.lower(vendor_name),
+                        VendorAlias.is_active == True
+                    ).first()
+                    if alias:
+                        vendor = db.query(Vendor).filter(Vendor.id == alias.vendor_id).first()
 
                 if vendor:
                     # Update existing vendor
@@ -136,17 +153,31 @@ class VendorSyncService:
             try:
                 vendor_name = acc_vendor.get("name")
 
+                # Skip inactive vendors - they were likely deactivated during a merge
+                if not acc_vendor.get("is_active", True):
+                    continue
+
                 # Try to find by accounting ID first
                 vendor = db.query(Vendor).filter(
                     Vendor.accounting_vendor_id == acc_vendor.get("id")
                 ).first()
 
-                # If not found by ID, try to match by name (case-insensitive) to detect duplicates
+                # If not found by ID, try to match by name (case-insensitive)
                 if not vendor and vendor_name:
                     from sqlalchemy import func
                     vendor = db.query(Vendor).filter(
                         func.lower(Vendor.name) == func.lower(vendor_name)
                     ).first()
+
+                # If still not found, check if name matches an alias (merged vendor)
+                if not vendor and vendor_name:
+                    from sqlalchemy import func
+                    alias = db.query(VendorAlias).filter(
+                        func.lower(VendorAlias.alias_name) == func.lower(vendor_name),
+                        VendorAlias.is_active == True
+                    ).first()
+                    if alias:
+                        vendor = db.query(Vendor).filter(Vendor.id == alias.vendor_id).first()
 
                 if vendor:
                     # Update existing vendor - this merges accounting data with existing inventory data
@@ -154,16 +185,19 @@ class VendorSyncService:
                     if not vendor.accounting_vendor_id:
                         vendor.accounting_vendor_id = acc_vendor.get("id")
 
-                    # Update fields from accounting (only if provided and not already set)
-                    if acc_vendor.get("tax_id") and not vendor.tax_id:
+                    # Update fields from accounting - accounting is source of truth for tax/payment/address
+                    if acc_vendor.get("tax_id"):
                         vendor.tax_id = acc_vendor.get("tax_id")
-                    if acc_vendor.get("payment_terms") and not vendor.payment_terms:
+                    if acc_vendor.get("payment_terms"):
                         vendor.payment_terms = acc_vendor.get("payment_terms")
-                    if acc_vendor.get("city") and not vendor.city:
+                    # Accounting is source of truth for address fields - always update if provided
+                    if acc_vendor.get("address"):
+                        vendor.address = acc_vendor.get("address")
+                    if acc_vendor.get("city"):
                         vendor.city = acc_vendor.get("city")
-                    if acc_vendor.get("state") and not vendor.state:
+                    if acc_vendor.get("state"):
                         vendor.state = acc_vendor.get("state")
-                    if acc_vendor.get("zip_code") and not vendor.zip_code:
+                    if acc_vendor.get("zip_code"):
                         vendor.zip_code = acc_vendor.get("zip_code")
 
                     # Update contact info if accounting has it and inventory doesn't
@@ -307,6 +341,137 @@ class VendorSyncService:
                 "success": False,
                 "error": str(e)
             }
+
+    async def delete_vendor_from_inventory(self, vendor_id: int) -> Dict:
+        """Delete a vendor from Inventory system (used during merge)"""
+        try:
+            response = await self.client.delete(
+                f"{self.inventory_api_url}/vendors/_hub/delete/{vendor_id}",
+                headers=self.hub_api_headers
+            )
+            response.raise_for_status()
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Error deleting vendor {vendor_id} from inventory: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def delete_vendor_from_accounting(self, vendor_id: int) -> Dict:
+        """Delete a vendor from Accounting system (used during merge)"""
+        try:
+            response = await self.client.delete(
+                f"{self.accounting_api_url}/vendors/_hub/delete/{vendor_id}",
+                headers=self.hub_api_headers
+            )
+            response.raise_for_status()
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"Error deleting vendor {vendor_id} from accounting: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def merge_vendor_in_inventory(self, source_id: int, target_id: int) -> Dict:
+        """Merge one vendor into another in Inventory system"""
+        try:
+            response = await self.client.post(
+                f"{self.inventory_api_url}/vendors/_hub/merge-into",
+                json={"source_vendor_id": source_id, "target_vendor_id": target_id},
+                headers=self.hub_api_headers
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Error merging vendor {source_id} into {target_id} in inventory: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def merge_vendor_in_accounting(self, source_id: int, target_id: int) -> Dict:
+        """Merge one vendor into another in Accounting system"""
+        try:
+            response = await self.client.post(
+                f"{self.accounting_api_url}/vendors/_hub/merge-into",
+                json={"source_vendor_id": source_id, "target_vendor_id": target_id},
+                headers=self.hub_api_headers
+            )
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Error merging vendor {source_id} into {target_id} in accounting: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def push_aliases_to_systems(self, db: Session) -> Dict:
+        """
+        Push Hub's alias state to Inventory and Accounting systems.
+        For each alias in Hub, find the corresponding vendor in external systems
+        and merge it into the canonical vendor.
+        """
+        from integration_hub.models.vendor_alias import VendorAlias
+        from integration_hub.models.vendor import Vendor
+
+        results = {
+            "success": True,
+            "inventory_merges": [],
+            "accounting_merges": [],
+            "errors": []
+        }
+
+        # Get all active aliases
+        aliases = db.query(VendorAlias).filter(VendorAlias.is_active == True).all()
+
+        for alias in aliases:
+            # Get the canonical vendor this alias points to
+            canonical_vendor = db.query(Vendor).filter(Vendor.id == alias.vendor_id).first()
+            if not canonical_vendor:
+                continue
+
+            # Fetch current vendors from both systems
+            inventory_vendors = await self.fetch_inventory_vendors()
+            accounting_vendors = await self.fetch_accounting_vendors()
+
+            # Find vendor in Inventory that matches the alias name
+            for inv_vendor in inventory_vendors:
+                if inv_vendor.get("name", "").lower() == alias.alias_name.lower():
+                    inv_source_id = inv_vendor.get("id")
+                    inv_target_id = canonical_vendor.inventory_vendor_id
+
+                    if inv_source_id and inv_target_id and inv_source_id != inv_target_id:
+                        result = await self.merge_vendor_in_inventory(inv_source_id, inv_target_id)
+                        if result.get("success"):
+                            results["inventory_merges"].append({
+                                "alias": alias.alias_name,
+                                "merged_into": canonical_vendor.name,
+                                "source_id": inv_source_id,
+                                "target_id": inv_target_id
+                            })
+                        else:
+                            results["errors"].append(
+                                f"Inventory: Failed to merge {alias.alias_name} - {result.get('error')}"
+                            )
+                    break
+
+            # Find vendor in Accounting that matches the alias name
+            for acc_vendor in accounting_vendors:
+                if acc_vendor.get("name", "").lower() == alias.alias_name.lower():
+                    acc_source_id = acc_vendor.get("id")
+                    acc_target_id = canonical_vendor.accounting_vendor_id
+
+                    if acc_source_id and acc_target_id and acc_source_id != acc_target_id:
+                        result = await self.merge_vendor_in_accounting(acc_source_id, acc_target_id)
+                        if result.get("success"):
+                            results["accounting_merges"].append({
+                                "alias": alias.alias_name,
+                                "merged_into": canonical_vendor.name,
+                                "source_id": acc_source_id,
+                                "target_id": acc_target_id,
+                                "bills_reassigned": result.get("bills_reassigned", 0)
+                            })
+                        else:
+                            results["errors"].append(
+                                f"Accounting: Failed to merge {alias.alias_name} - {result.get('error')}"
+                            )
+                    break
+
+        if results["errors"]:
+            results["success"] = False
+
+        return results
 
     async def close(self):
         """Close HTTP client"""

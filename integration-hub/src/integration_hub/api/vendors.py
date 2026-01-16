@@ -37,9 +37,20 @@ class VendorUpdate(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[str] = None
+    tax_id: Optional[str] = None
     payment_terms: Optional[str] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
+
+
+class VendorMergeRequest(BaseModel):
+    """Request to merge multiple vendors into one"""
+    primary_vendor_id: int  # The vendor to keep
+    merge_vendor_ids: List[int]  # Vendors to merge into primary
+    delete_from_systems: bool = True  # Whether to delete duplicates from Inventory/Accounting
 
 
 class AliasCreate(BaseModel):
@@ -115,6 +126,10 @@ async def get_vendor(vendor_id: int, db: Session = Depends(get_db)):
         'email': vendor.email,
         'phone': vendor.phone,
         'address': vendor.address,
+        'city': vendor.city,
+        'state': vendor.state,
+        'zip_code': vendor.zip_code,
+        'tax_id': vendor.tax_id,
         'payment_terms': vendor.payment_terms,
         'notes': vendor.notes,
         'is_active': vendor.is_active,
@@ -174,6 +189,14 @@ async def update_vendor(
         vendor.phone = updates.phone
     if updates.address is not None:
         vendor.address = updates.address
+    if updates.city is not None:
+        vendor.city = updates.city
+    if updates.state is not None:
+        vendor.state = updates.state
+    if updates.zip_code is not None:
+        vendor.zip_code = updates.zip_code
+    if updates.tax_id is not None:
+        vendor.tax_id = updates.tax_id
     if updates.payment_terms is not None:
         vendor.payment_terms = updates.payment_terms
     if updates.notes is not None:
@@ -298,3 +321,275 @@ async def link_invoices_by_alias(db: Session = Depends(get_db)):
     """
     service = VendorNormalizerService(db)
     return service.link_invoices_by_alias()
+
+
+# ============================================================================
+# MERGE ENDPOINTS
+# ============================================================================
+
+@router.post("/merge")
+async def merge_vendors(request: VendorMergeRequest, db: Session = Depends(get_db)):
+    """
+    Merge multiple vendors into one primary vendor.
+
+    - The primary vendor keeps its name and becomes the canonical record
+    - Merged vendors' names become aliases of the primary vendor
+    - Merged vendors' system IDs (inventory/accounting) are collected
+    - Optionally deletes the duplicate records from Inventory and Accounting
+    - All invoices linked to merged vendors get relinked to primary
+    """
+    from integration_hub.services.vendor_sync import get_vendor_sync_service
+    from integration_hub.models.hub_invoice import HubInvoice
+    import asyncio
+
+    # Validate primary vendor exists
+    primary_vendor = db.query(Vendor).filter(Vendor.id == request.primary_vendor_id).first()
+    if not primary_vendor:
+        raise HTTPException(status_code=404, detail="Primary vendor not found")
+
+    # Validate merge vendors exist
+    merge_vendors = db.query(Vendor).filter(Vendor.id.in_(request.merge_vendor_ids)).all()
+    if len(merge_vendors) != len(request.merge_vendor_ids):
+        raise HTTPException(status_code=404, detail="One or more merge vendors not found")
+
+    # Make sure primary is not in merge list
+    if request.primary_vendor_id in request.merge_vendor_ids:
+        raise HTTPException(status_code=400, detail="Primary vendor cannot be in merge list")
+
+    results = {
+        'primary_vendor': primary_vendor.name,
+        'merged_vendors': [],
+        'aliases_created': [],
+        'invoices_relinked': 0,
+        'deleted_from_inventory': [],
+        'deleted_from_accounting': [],
+        'errors': []
+    }
+
+    sync_service = get_vendor_sync_service()
+
+    for merge_vendor in merge_vendors:
+        try:
+            results['merged_vendors'].append(merge_vendor.name)
+
+            # 1. Create alias from merged vendor name (if different from primary)
+            if merge_vendor.name.lower() != primary_vendor.name.lower():
+                existing_alias = db.query(VendorAlias).filter(
+                    VendorAlias.alias_name == merge_vendor.name,
+                    VendorAlias.is_active == True
+                ).first()
+
+                if not existing_alias:
+                    new_alias = VendorAlias(
+                        alias_name=merge_vendor.name,
+                        alias_name_normalized=merge_vendor.name.lower().strip(),
+                        vendor_id=primary_vendor.id,
+                        source='merge',
+                        is_active=True
+                    )
+                    db.add(new_alias)
+                    results['aliases_created'].append(merge_vendor.name)
+
+            # 2. Transfer any existing aliases from merged vendor to primary
+            existing_aliases = db.query(VendorAlias).filter(
+                VendorAlias.vendor_id == merge_vendor.id,
+                VendorAlias.is_active == True
+            ).all()
+            for alias in existing_aliases:
+                alias.vendor_id = primary_vendor.id
+
+            # 3. Relink invoices from merged vendor to primary
+            invoices_updated = db.query(HubInvoice).filter(
+                HubInvoice.vendor_id == merge_vendor.id
+            ).update({HubInvoice.vendor_id: primary_vendor.id})
+            results['invoices_relinked'] += invoices_updated
+
+            # 4. Collect system IDs (if primary doesn't have them)
+            if merge_vendor.inventory_vendor_id and not primary_vendor.inventory_vendor_id:
+                primary_vendor.inventory_vendor_id = merge_vendor.inventory_vendor_id
+
+            if merge_vendor.accounting_vendor_id and not primary_vendor.accounting_vendor_id:
+                primary_vendor.accounting_vendor_id = merge_vendor.accounting_vendor_id
+
+            # 5. Delete from external systems if requested
+            if request.delete_from_systems:
+                # Delete from Inventory (if different ID than primary)
+                if merge_vendor.inventory_vendor_id and merge_vendor.inventory_vendor_id != primary_vendor.inventory_vendor_id:
+                    try:
+                        delete_result = await sync_service.delete_vendor_from_inventory(merge_vendor.inventory_vendor_id)
+                        if delete_result.get('success'):
+                            results['deleted_from_inventory'].append({
+                                'name': merge_vendor.name,
+                                'id': merge_vendor.inventory_vendor_id
+                            })
+                    except Exception as e:
+                        results['errors'].append(f"Failed to delete {merge_vendor.name} from Inventory: {str(e)}")
+
+                # Delete from Accounting (if different ID than primary)
+                if merge_vendor.accounting_vendor_id and merge_vendor.accounting_vendor_id != primary_vendor.accounting_vendor_id:
+                    try:
+                        delete_result = await sync_service.delete_vendor_from_accounting(merge_vendor.accounting_vendor_id)
+                        if delete_result.get('success'):
+                            results['deleted_from_accounting'].append({
+                                'name': merge_vendor.name,
+                                'id': merge_vendor.accounting_vendor_id
+                            })
+                    except Exception as e:
+                        results['errors'].append(f"Failed to delete {merge_vendor.name} from Accounting: {str(e)}")
+
+            # 6. Delete the merged vendor from Hub
+            db.delete(merge_vendor)
+
+        except Exception as e:
+            results['errors'].append(f"Error merging {merge_vendor.name}: {str(e)}")
+
+    db.commit()
+
+    return results
+
+
+@router.get("/merge/preview")
+async def preview_merge(
+    primary_id: int,
+    merge_ids: str,  # Comma-separated list of IDs
+    db: Session = Depends(get_db)
+):
+    """
+    Preview what a merge would do without making changes.
+    """
+    from integration_hub.models.hub_invoice import HubInvoice
+
+    merge_id_list = [int(x.strip()) for x in merge_ids.split(',') if x.strip()]
+
+    primary_vendor = db.query(Vendor).filter(Vendor.id == primary_id).first()
+    if not primary_vendor:
+        raise HTTPException(status_code=404, detail="Primary vendor not found")
+
+    merge_vendors = db.query(Vendor).filter(Vendor.id.in_(merge_id_list)).all()
+
+    preview = {
+        'primary_vendor': {
+            'id': primary_vendor.id,
+            'name': primary_vendor.name,
+            'inventory_id': primary_vendor.inventory_vendor_id,
+            'accounting_id': primary_vendor.accounting_vendor_id
+        },
+        'vendors_to_merge': [],
+        'total_invoices_to_relink': 0,
+        'aliases_to_create': []
+    }
+
+    for v in merge_vendors:
+        invoice_count = db.query(HubInvoice).filter(HubInvoice.vendor_id == v.id).count()
+        preview['vendors_to_merge'].append({
+            'id': v.id,
+            'name': v.name,
+            'inventory_id': v.inventory_vendor_id,
+            'accounting_id': v.accounting_vendor_id,
+            'invoices': invoice_count
+        })
+        preview['total_invoices_to_relink'] += invoice_count
+
+        if v.name.lower() != primary_vendor.name.lower():
+            preview['aliases_to_create'].append(v.name)
+
+    return preview
+
+
+# ============================================================================
+# PUSH TO SYSTEMS ENDPOINTS
+# ============================================================================
+
+@router.post("/push-to-systems")
+async def push_to_systems(db: Session = Depends(get_db)):
+    """
+    Push Hub's vendor alias state to Inventory and Accounting systems.
+
+    For each alias in Hub:
+    - Find vendors in external systems with matching names
+    - Reassign their bills/references to the canonical vendor
+    - Deactivate the duplicate vendors
+
+    This ensures external systems reflect Hub's merged vendor state.
+    """
+    from integration_hub.services.vendor_sync import get_vendor_sync_service
+
+    sync_service = get_vendor_sync_service()
+    result = await sync_service.push_aliases_to_systems(db)
+
+    return result
+
+
+@router.get("/push-to-systems/preview")
+async def preview_push_to_systems(db: Session = Depends(get_db)):
+    """
+    Preview what push-to-systems would do without making changes.
+    Shows which vendors in external systems match aliases and would be merged.
+    """
+    from integration_hub.services.vendor_sync import get_vendor_sync_service
+    from integration_hub.models.vendor_alias import VendorAlias
+
+    sync_service = get_vendor_sync_service()
+
+    # Fetch current state from both systems
+    inventory_vendors = await sync_service.fetch_inventory_vendors()
+    accounting_vendors = await sync_service.fetch_accounting_vendors()
+
+    # Get all active aliases
+    aliases = db.query(VendorAlias).filter(VendorAlias.is_active == True).all()
+
+    preview = {
+        "aliases_count": len(aliases),
+        "inventory_matches": [],
+        "accounting_matches": [],
+        "no_action_needed": []
+    }
+
+    for alias in aliases:
+        canonical_vendor = db.query(Vendor).filter(Vendor.id == alias.vendor_id).first()
+        if not canonical_vendor:
+            continue
+
+        alias_info = {
+            "alias_name": alias.alias_name,
+            "canonical_vendor": canonical_vendor.name,
+            "canonical_vendor_id": canonical_vendor.id
+        }
+
+        found_in_inventory = False
+        found_in_accounting = False
+
+        # Check Inventory
+        for inv_vendor in inventory_vendors:
+            if inv_vendor.get("name", "").lower() == alias.alias_name.lower():
+                inv_id = inv_vendor.get("id")
+                target_id = canonical_vendor.inventory_vendor_id
+                if inv_id and target_id and inv_id != target_id and inv_vendor.get("is_active", True):
+                    preview["inventory_matches"].append({
+                        **alias_info,
+                        "source_vendor_id": inv_id,
+                        "target_vendor_id": target_id,
+                        "source_name": inv_vendor.get("name")
+                    })
+                    found_in_inventory = True
+                break
+
+        # Check Accounting
+        for acc_vendor in accounting_vendors:
+            if acc_vendor.get("name", "").lower() == alias.alias_name.lower():
+                acc_id = acc_vendor.get("id")
+                target_id = canonical_vendor.accounting_vendor_id
+                if acc_id and target_id and acc_id != target_id and acc_vendor.get("is_active", True):
+                    preview["accounting_matches"].append({
+                        **alias_info,
+                        "source_vendor_id": acc_id,
+                        "target_vendor_id": target_id,
+                        "source_name": acc_vendor.get("name")
+                    })
+                    found_in_accounting = True
+                break
+
+        if not found_in_inventory and not found_in_accounting:
+            preview["no_action_needed"].append(alias.alias_name)
+
+    return preview

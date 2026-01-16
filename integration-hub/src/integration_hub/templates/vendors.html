@@ -14,6 +14,9 @@
                 <button class="btn btn-success" onclick="syncVendors(event)">
                     <i class="bi bi-arrow-repeat"></i> Sync from Systems
                 </button>
+                <button class="btn btn-outline-warning" onclick="showPushToSystemsModal()">
+                    <i class="bi bi-cloud-upload"></i> Push to Systems
+                </button>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVendorModal">
                     <i class="bi bi-plus-circle"></i> Add New Vendor
                 </button>
@@ -60,16 +63,40 @@
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-list"></i> All Vendors</span>
-            <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" id="showAliasesToggle" checked>
-                <label class="form-check-label" for="showAliasesToggle">Show Aliases</label>
+            <div class="d-flex align-items-center gap-3">
+                <button class="btn btn-warning btn-sm" id="mergeBtn" style="display: none;" onclick="showMergeModal()">
+                    <i class="bi bi-arrows-collapse"></i> Merge Selected (<span id="mergeCount">0</span>)
+                </button>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" id="showAliasesToggle" checked>
+                    <label class="form-check-label" for="showAliasesToggle">Show Aliases</label>
+                </div>
             </div>
         </div>
         <div class="card-body">
+            <!-- Search Filter -->
+            <div class="row mb-3">
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" id="vendorSearch" placeholder="Search vendors..." autocomplete="off">
+                        <button class="btn btn-outline-secondary" type="button" id="clearSearch" style="display: none;">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-8 text-end">
+                    <span class="text-muted" id="searchResultCount"></span>
+                </div>
+            </div>
+
             <div class="table-responsive">
                 <table class="table table-hover" id="vendorsTable">
                     <thead>
                         <tr>
+                            <th style="width: 30px;">
+                                <input type="checkbox" class="form-check-input" id="selectAllVendors" title="Select All">
+                            </th>
                             <th>Name</th>
                             <th>Aliases</th>
                             <th>Invoices</th>
@@ -81,7 +108,10 @@
                     </thead>
                     <tbody>
                         {% for vendor in vendors %}
-                        <tr data-vendor-id="{{ vendor.id }}">
+                        <tr data-vendor-id="{{ vendor.id }}" data-vendor-name="{{ vendor.name }}">
+                            <td>
+                                <input type="checkbox" class="form-check-input vendor-select" value="{{ vendor.id }}">
+                            </td>
                             <td><strong>{{ vendor.name }}</strong></td>
                             <td class="aliases-cell">
                                 <span class="text-muted">Loading...</span>
@@ -315,16 +345,349 @@
     </div>
 </div>
 
+<!-- Merge Vendors Modal -->
+<div class="modal fade" id="mergeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-arrows-collapse"></i> Merge Vendors</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    Select the <strong>primary vendor</strong> to keep. All other selected vendors will be merged into it:
+                    <ul class="mb-0 mt-2">
+                        <li>Their names will become aliases of the primary vendor</li>
+                        <li>Their invoices will be reassigned to the primary vendor</li>
+                        <li>Duplicates will be removed from Inventory and Accounting</li>
+                    </ul>
+                </div>
+
+                <h6>Select Primary Vendor (the one to keep):</h6>
+                <div id="mergeVendorList" class="mb-3">
+                    <!-- Populated by JS -->
+                </div>
+
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" id="deleteFromSystems" checked>
+                    <label class="form-check-label" for="deleteFromSystems">
+                        Delete duplicate vendors from Inventory and Accounting systems
+                    </label>
+                </div>
+
+                <div id="mergePreview" class="border rounded p-3 bg-light" style="display: none;">
+                    <h6><i class="bi bi-eye"></i> Merge Preview</h6>
+                    <div id="mergePreviewContent"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="executeMergeBtn" onclick="executeMerge()" disabled>
+                    <i class="bi bi-arrows-collapse"></i> Merge Vendors
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Push to Systems Modal -->
+<div class="modal fade" id="pushToSystemsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-cloud-upload"></i> Push to Systems</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    This will push Hub's merged vendor state to Inventory and Accounting:
+                    <ul class="mb-0 mt-2">
+                        <li>Vendors with names matching aliases will be merged into canonical vendors</li>
+                        <li>Bills and references will be reassigned to the canonical vendor</li>
+                        <li>Duplicate vendors will be deactivated</li>
+                    </ul>
+                </div>
+
+                <div id="pushPreviewLoading" class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <p class="mt-2 text-muted">Loading preview...</p>
+                </div>
+
+                <div id="pushPreviewContent" style="display: none;">
+                    <h6><i class="bi bi-eye"></i> Preview</h6>
+
+                    <div id="pushInventoryMatches" class="mb-3"></div>
+                    <div id="pushAccountingMatches" class="mb-3"></div>
+                    <div id="pushNoAction" class="mb-3"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" id="executePushBtn" onclick="executePushToSystems()" disabled>
+                    <i class="bi bi-cloud-upload"></i> Push to Systems
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
 let vendorSummaryData = [];
+let selectedVendorIds = [];
+let selectedPrimaryId = null;
 
 // Load vendor summary on page load
 document.addEventListener('DOMContentLoaded', function() {
     loadVendorSummary();
+    setupMergeSelection();
+    setupVendorSearch();
 });
+
+// Setup vendor search
+function setupVendorSearch() {
+    const searchInput = document.getElementById('vendorSearch');
+    const clearBtn = document.getElementById('clearSearch');
+    const resultCount = document.getElementById('searchResultCount');
+
+    searchInput.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        clearBtn.style.display = searchTerm ? 'block' : 'none';
+        filterVendors(searchTerm);
+    });
+
+    clearBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        clearBtn.style.display = 'none';
+        filterVendors('');
+        searchInput.focus();
+    });
+
+    // Allow Escape key to clear search
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            this.value = '';
+            clearBtn.style.display = 'none';
+            filterVendors('');
+        }
+    });
+}
+
+function filterVendors(searchTerm) {
+    const rows = document.querySelectorAll('#vendorsTable tbody tr');
+    const resultCount = document.getElementById('searchResultCount');
+    let visibleCount = 0;
+    let totalCount = rows.length;
+
+    rows.forEach(row => {
+        const vendorName = row.dataset.vendorName?.toLowerCase() || '';
+        const aliasesCell = row.querySelector('.aliases-cell')?.textContent?.toLowerCase() || '';
+        const contactCell = row.cells[4]?.textContent?.toLowerCase() || '';
+
+        // Search in vendor name, aliases, and contact
+        const matches = !searchTerm ||
+            vendorName.includes(searchTerm) ||
+            aliasesCell.includes(searchTerm) ||
+            contactCell.includes(searchTerm);
+
+        row.style.display = matches ? '' : 'none';
+        if (matches) visibleCount++;
+    });
+
+    // Update result count
+    if (searchTerm) {
+        resultCount.textContent = `Showing ${visibleCount} of ${totalCount} vendors`;
+    } else {
+        resultCount.textContent = '';
+    }
+
+    // Update "select all" checkbox state based on visible rows
+    updateSelectAllState();
+}
+
+function updateSelectAllState() {
+    const selectAll = document.getElementById('selectAllVendors');
+    const visibleCheckboxes = document.querySelectorAll('#vendorsTable tbody tr:not([style*="display: none"]) .vendor-select');
+    const checkedVisible = document.querySelectorAll('#vendorsTable tbody tr:not([style*="display: none"]) .vendor-select:checked');
+
+    if (visibleCheckboxes.length === 0) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+    } else if (checkedVisible.length === 0) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+    } else if (checkedVisible.length === visibleCheckboxes.length) {
+        selectAll.checked = true;
+        selectAll.indeterminate = false;
+    } else {
+        selectAll.checked = false;
+        selectAll.indeterminate = true;
+    }
+}
+
+// Setup vendor selection for merge
+function setupMergeSelection() {
+    // Select all checkbox - only selects visible rows
+    document.getElementById('selectAllVendors').addEventListener('change', function() {
+        const visibleCheckboxes = document.querySelectorAll('#vendorsTable tbody tr:not([style*="display: none"]) .vendor-select');
+        visibleCheckboxes.forEach(cb => {
+            cb.checked = this.checked;
+        });
+        updateMergeButton();
+    });
+
+    // Individual checkboxes
+    document.querySelectorAll('.vendor-select').forEach(cb => {
+        cb.addEventListener('change', function() {
+            updateMergeButton();
+            updateSelectAllState();
+        });
+    });
+}
+
+function updateMergeButton() {
+    const selected = document.querySelectorAll('.vendor-select:checked');
+    const mergeBtn = document.getElementById('mergeBtn');
+    const mergeCount = document.getElementById('mergeCount');
+
+    selectedVendorIds = Array.from(selected).map(cb => parseInt(cb.value));
+    mergeCount.textContent = selectedVendorIds.length;
+
+    if (selectedVendorIds.length >= 2) {
+        mergeBtn.style.display = 'inline-block';
+    } else {
+        mergeBtn.style.display = 'none';
+    }
+}
+
+function showMergeModal() {
+    if (selectedVendorIds.length < 2) {
+        alert('Please select at least 2 vendors to merge');
+        return;
+    }
+
+    // Build list of selected vendors
+    const listHtml = selectedVendorIds.map(id => {
+        const row = document.querySelector(`tr[data-vendor-id="${id}"]`);
+        const name = row.dataset.vendorName;
+        return `
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="primaryVendor" value="${id}"
+                       id="primary_${id}" onchange="selectPrimaryVendor(${id})">
+                <label class="form-check-label" for="primary_${id}">
+                    <strong>${escapeHtml(name)}</strong>
+                </label>
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById('mergeVendorList').innerHTML = listHtml;
+    document.getElementById('mergePreview').style.display = 'none';
+    document.getElementById('executeMergeBtn').disabled = true;
+    selectedPrimaryId = null;
+
+    new bootstrap.Modal(document.getElementById('mergeModal')).show();
+}
+
+async function selectPrimaryVendor(primaryId) {
+    selectedPrimaryId = primaryId;
+    const mergeIds = selectedVendorIds.filter(id => id !== primaryId);
+
+    // Fetch preview
+    try {
+        const response = await fetch(`/hub/api/v1/vendors/merge/preview?primary_id=${primaryId}&merge_ids=${mergeIds.join(',')}`);
+        const preview = await response.json();
+
+        let html = `
+            <p><strong>Primary Vendor:</strong> ${escapeHtml(preview.primary_vendor.name)}</p>
+            <p><strong>Vendors to Merge:</strong></p>
+            <ul>
+        `;
+
+        preview.vendors_to_merge.forEach(v => {
+            html += `<li>${escapeHtml(v.name)} (${v.invoices} invoices)</li>`;
+        });
+        html += `</ul>`;
+
+        html += `<p><strong>Total Invoices to Reassign:</strong> ${preview.total_invoices_to_relink}</p>`;
+
+        if (preview.aliases_to_create.length > 0) {
+            html += `<p><strong>Aliases to Create:</strong> ${preview.aliases_to_create.map(a => escapeHtml(a)).join(', ')}</p>`;
+        }
+
+        document.getElementById('mergePreviewContent').innerHTML = html;
+        document.getElementById('mergePreview').style.display = 'block';
+        document.getElementById('executeMergeBtn').disabled = false;
+
+    } catch (error) {
+        console.error('Error fetching merge preview:', error);
+        alert('Error loading merge preview');
+    }
+}
+
+async function executeMerge() {
+    if (!selectedPrimaryId) {
+        alert('Please select a primary vendor');
+        return;
+    }
+
+    const mergeIds = selectedVendorIds.filter(id => id !== selectedPrimaryId);
+    const deleteFromSystems = document.getElementById('deleteFromSystems').checked;
+
+    if (!confirm(`Are you sure you want to merge ${mergeIds.length} vendors into the selected primary vendor? This action cannot be undone.`)) {
+        return;
+    }
+
+    const btn = document.getElementById('executeMergeBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Merging...';
+
+    try {
+        const response = await fetch('/hub/api/v1/vendors/merge', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                primary_vendor_id: selectedPrimaryId,
+                merge_vendor_ids: mergeIds,
+                delete_from_systems: deleteFromSystems
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            let message = `Merge Complete!\n\n`;
+            message += `Primary Vendor: ${result.primary_vendor}\n`;
+            message += `Merged Vendors: ${result.merged_vendors.join(', ')}\n`;
+            message += `Aliases Created: ${result.aliases_created.length}\n`;
+            message += `Invoices Relinked: ${result.invoices_relinked}\n`;
+
+            if (result.deleted_from_inventory.length > 0) {
+                message += `\nDeleted from Inventory: ${result.deleted_from_inventory.length}`;
+            }
+            if (result.deleted_from_accounting.length > 0) {
+                message += `\nDeleted from Accounting: ${result.deleted_from_accounting.length}`;
+            }
+            if (result.errors.length > 0) {
+                message += `\n\nWarnings:\n${result.errors.join('\n')}`;
+            }
+
+            alert(message);
+            location.reload();
+        } else {
+            alert(`Error: ${result.detail || 'Merge failed'}`);
+        }
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrows-collapse"></i> Merge Vendors';
+    }
+}
 
 async function loadVendorSummary() {
     try {
@@ -776,6 +1139,20 @@ async function editVendor(vendorId) {
                                 </div>
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
+                                        <label class="form-label">City</label>
+                                        <input type="text" class="form-control" id="editCity" value="${escapeHtml(vendor.city || '')}">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">State</label>
+                                        <input type="text" class="form-control" id="editState" maxlength="2" value="${escapeHtml(vendor.state || '')}">
+                                    </div>
+                                    <div class="col-md-3 mb-3">
+                                        <label class="form-label">ZIP Code</label>
+                                        <input type="text" class="form-control" id="editZipCode" value="${escapeHtml(vendor.zip_code || '')}">
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
                                         <label class="form-label">Payment Terms</label>
                                         <select class="form-select" id="editPaymentTerms">
                                             <option value="Net 30" ${vendor.payment_terms === 'Net 30' ? 'selected' : ''}>Net 30</option>
@@ -834,6 +1211,9 @@ async function editVendor(vendorId) {
                 email: document.getElementById('editEmail').value || null,
                 phone: document.getElementById('editPhone').value || null,
                 address: document.getElementById('editAddress').value || null,
+                city: document.getElementById('editCity').value || null,
+                state: document.getElementById('editState').value || null,
+                zip_code: document.getElementById('editZipCode').value || null,
                 payment_terms: document.getElementById('editPaymentTerms').value,
                 notes: document.getElementById('editNotes').value || null,
                 is_active: document.getElementById('editIsActive').value === 'true'
@@ -875,5 +1255,159 @@ document.getElementById('showAliasesToggle').addEventListener('change', function
         cell.style.display = this.checked ? '' : 'none';
     });
 });
+
+// Push to Systems functionality
+async function showPushToSystemsModal() {
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('pushToSystemsModal'));
+    modal.show();
+
+    // Reset state
+    document.getElementById('pushPreviewLoading').style.display = 'block';
+    document.getElementById('pushPreviewContent').style.display = 'none';
+    document.getElementById('executePushBtn').disabled = true;
+
+    try {
+        const response = await fetch('/hub/api/v1/vendors/push-to-systems/preview');
+        const preview = await response.json();
+
+        // Build inventory matches HTML
+        let inventoryHtml = '';
+        if (preview.inventory_matches && preview.inventory_matches.length > 0) {
+            inventoryHtml = `
+                <div class="card border-primary mb-2">
+                    <div class="card-header bg-primary text-white">
+                        <i class="bi bi-box-seam"></i> Inventory System (${preview.inventory_matches.length} merges)
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled mb-0">
+                            ${preview.inventory_matches.map(m => `
+                                <li class="mb-1">
+                                    <i class="bi bi-arrow-right text-warning"></i>
+                                    <strong>${escapeHtml(m.alias_name)}</strong> → ${escapeHtml(m.canonical_vendor)}
+                                    <small class="text-muted">(ID ${m.source_id} → ${m.target_id})</small>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `;
+        }
+        document.getElementById('pushInventoryMatches').innerHTML = inventoryHtml;
+
+        // Build accounting matches HTML
+        let accountingHtml = '';
+        if (preview.accounting_matches && preview.accounting_matches.length > 0) {
+            accountingHtml = `
+                <div class="card border-success mb-2">
+                    <div class="card-header bg-success text-white">
+                        <i class="bi bi-calculator"></i> Accounting System (${preview.accounting_matches.length} merges)
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled mb-0">
+                            ${preview.accounting_matches.map(m => `
+                                <li class="mb-1">
+                                    <i class="bi bi-arrow-right text-warning"></i>
+                                    <strong>${escapeHtml(m.alias_name)}</strong> → ${escapeHtml(m.canonical_vendor)}
+                                    <small class="text-muted">(ID ${m.source_id} → ${m.target_id}, ${m.bills_count || 0} bills)</small>
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                </div>
+            `;
+        }
+        document.getElementById('pushAccountingMatches').innerHTML = accountingHtml;
+
+        // No action needed
+        let noActionHtml = '';
+        if (preview.no_action_needed && preview.no_action_needed.length > 0) {
+            noActionHtml = `
+                <div class="text-muted">
+                    <small><i class="bi bi-check-circle text-success"></i> ${preview.no_action_needed.length} aliases already in sync (no duplicates found)</small>
+                </div>
+            `;
+        }
+        document.getElementById('pushNoAction').innerHTML = noActionHtml;
+
+        // Show content
+        document.getElementById('pushPreviewLoading').style.display = 'none';
+        document.getElementById('pushPreviewContent').style.display = 'block';
+
+        // Enable button if there's something to do
+        const hasActions = (preview.inventory_matches?.length > 0) || (preview.accounting_matches?.length > 0);
+        document.getElementById('executePushBtn').disabled = !hasActions;
+
+        if (!hasActions) {
+            document.getElementById('pushNoAction').innerHTML = `
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle"></i> All systems are in sync! No merges needed.
+                </div>
+            `;
+        }
+
+    } catch (error) {
+        console.error('Error loading push preview:', error);
+        document.getElementById('pushPreviewLoading').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> Error loading preview: ${escapeHtml(error.message)}
+            </div>
+        `;
+    }
+}
+
+async function executePushToSystems() {
+    if (!confirm('Are you sure you want to push Hub\'s vendor state to Inventory and Accounting systems? This will merge duplicate vendors and reassign their bills.')) {
+        return;
+    }
+
+    const btn = document.getElementById('executePushBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Pushing...';
+
+    try {
+        const response = await fetch('/hub/api/v1/vendors/push-to-systems', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            let message = 'Push to Systems Complete!\n\n';
+
+            if (result.inventory_results && result.inventory_results.length > 0) {
+                message += 'Inventory:\n';
+                result.inventory_results.forEach(r => {
+                    message += `  - ${r.alias_name}: ${r.success ? 'Merged' : 'Failed - ' + r.error}\n`;
+                });
+                message += '\n';
+            }
+
+            if (result.accounting_results && result.accounting_results.length > 0) {
+                message += 'Accounting:\n';
+                result.accounting_results.forEach(r => {
+                    const billsInfo = r.bills_reassigned ? ` (${r.bills_reassigned} bills reassigned)` : '';
+                    message += `  - ${r.alias_name}: ${r.success ? 'Merged' + billsInfo : 'Failed - ' + r.error}\n`;
+                });
+            }
+
+            if (result.errors && result.errors.length > 0) {
+                message += '\nErrors:\n' + result.errors.join('\n');
+            }
+
+            alert(message);
+            bootstrap.Modal.getInstance(document.getElementById('pushToSystemsModal')).hide();
+            location.reload();
+        } else {
+            alert(`Error: ${result.detail || 'Push failed'}`);
+        }
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-cloud-upload"></i> Push to Systems';
+    }
+}
 </script>
 {% endblock %}

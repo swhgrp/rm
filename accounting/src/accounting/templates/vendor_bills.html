@@ -709,13 +709,13 @@
                     <label>Payment Method <span class="required">*</span></label>
                     <select id="paymentMethod" required>
                         <option value="">Select Method...</option>
-                        <option value="CHECK">Check</option>
-                        <option value="ACH">ACH/Bank Transfer</option>
-                        <option value="WIRE">Wire Transfer</option>
-                        <option value="CREDIT_CARD">Credit Card</option>
-                        <option value="DEBIT_CARD">Debit Card</option>
-                        <option value="CASH">Cash</option>
-                        <option value="OTHER">Other</option>
+                        <option value="check">Check</option>
+                        <option value="ach">ACH/Bank Transfer</option>
+                        <option value="wire">Wire Transfer</option>
+                        <option value="credit_card">Credit Card</option>
+                        <option value="debit_card">Debit Card</option>
+                        <option value="cash">Cash</option>
+                        <option value="other">Other</option>
                     </select>
                 </div>
 
@@ -850,8 +850,11 @@ async function loadAccounts() {
             accounts = await response.json();
             accounts.sort((a, b) => a.account_number.localeCompare(b.account_number));
 
-            // Populate bank account dropdown for payments
-            const bankAccounts = accounts.filter(a => a.account_number.startsWith('1'));  // Asset accounts
+            // Populate bank account dropdown for payments (Cash and Bank accounts only: 1000-1099)
+            const bankAccounts = accounts.filter(a => {
+                const num = parseInt(a.account_number);
+                return num >= 1000 && num < 1100;  // Cash, Banks, Safes, Checking accounts
+            });
             const bankOptions = bankAccounts.map(acc =>
                 `<option value="${acc.id}">${acc.account_number} - ${acc.account_name}</option>`
             ).join('');

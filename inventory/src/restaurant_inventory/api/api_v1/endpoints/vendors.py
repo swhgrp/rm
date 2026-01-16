@@ -100,6 +100,92 @@ def receive_vendor_from_hub(
         }
 
 
+@router.delete("/_hub/delete/{vendor_id}")
+def delete_vendor_from_hub(
+    vendor_id: int,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_hub_api_key)
+):
+    """
+    Delete a vendor from Hub during merge operation.
+    Requires X-Hub-API-Key header for authentication.
+    Only used by Hub during vendor merge to clean up duplicates.
+    """
+    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vendor not found"
+        )
+
+    # In inventory, vendors can be safely deleted as they don't have
+    # the same bill history concerns as accounting
+    # However, we should still just deactivate to preserve any references
+    vendor.is_active = False
+    db.commit()
+
+    return {
+        "success": True,
+        "message": "Vendor deactivated",
+        "deactivated": True
+    }
+
+
+@router.post("/_hub/merge-into")
+def merge_vendor_into(
+    merge_data: dict,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_hub_api_key)
+):
+    """
+    Merge one vendor into another (reassign references, then deactivate).
+    Used by Hub when pushing alias state to systems.
+
+    merge_data:
+        - source_vendor_id: The vendor to merge FROM (will be deactivated)
+        - target_vendor_id: The vendor to merge INTO (keeps references)
+    """
+    source_id = merge_data.get("source_vendor_id")
+    target_id = merge_data.get("target_vendor_id")
+
+    if not source_id or not target_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="source_vendor_id and target_vendor_id are required"
+        )
+
+    source_vendor = db.query(Vendor).filter(Vendor.id == source_id).first()
+    target_vendor = db.query(Vendor).filter(Vendor.id == target_id).first()
+
+    if not source_vendor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Source vendor {source_id} not found"
+        )
+
+    if not target_vendor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Target vendor {target_id} not found"
+        )
+
+    # Note: In inventory, vendors may be referenced by:
+    # - PurchaseOrders (if they exist)
+    # - VendorItems (vendor-specific item mappings)
+    # For now, we just deactivate since inventory doesn't have bills
+    # If there are vendor_items, they would need to be reassigned
+
+    # Deactivate the source vendor
+    source_vendor.is_active = False
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Merged {source_vendor.name} into {target_vendor.name}",
+        "source_deactivated": True
+    }
+
+
 # ============================================================================
 # AUTHENTICATED ENDPOINTS
 # ============================================================================

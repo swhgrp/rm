@@ -58,10 +58,10 @@
                     <p class="text-muted mb-0">Pay vendor bills via check, ACH, or other methods</p>
                 </div>
                 <div>
-                    <a href="/payment-history" class="btn btn-outline-secondary">
+                    <a href="/accounting/payment-history" class="btn btn-outline-secondary">
                         <i class="bi bi-clock-history"></i> Payment History
                     </a>
-                    <a href="/check-batches" class="btn btn-outline-primary">
+                    <a href="/accounting/check-batches" class="btn btn-outline-primary">
                         <i class="bi bi-receipt"></i> Check Batches
                     </a>
                 </div>
@@ -161,7 +161,7 @@
             <div class="card-body">
                 <div class="row g-3" id="paymentMethodsContainer">
                     <div class="col-md-3">
-                        <div class="card payment-method-card text-center" data-method="CHECK">
+                        <div class="card payment-method-card text-center" data-method="check">
                             <div class="card-body">
                                 <i class="bi bi-receipt method-icon text-primary"></i>
                                 <h6>Check</h6>
@@ -170,7 +170,7 @@
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card payment-method-card text-center" data-method="ACH">
+                        <div class="card payment-method-card text-center" data-method="ach">
                             <div class="card-body">
                                 <i class="bi bi-bank method-icon text-success"></i>
                                 <h6>ACH</h6>
@@ -179,7 +179,7 @@
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card payment-method-card text-center" data-method="WIRE">
+                        <div class="card payment-method-card text-center" data-method="wire">
                             <div class="card-body">
                                 <i class="bi bi-lightning-charge method-icon text-warning"></i>
                                 <h6>Wire Transfer</h6>
@@ -188,7 +188,7 @@
                         </div>
                     </div>
                     <div class="col-md-3">
-                        <div class="card payment-method-card text-center" data-method="CREDIT_CARD">
+                        <div class="card payment-method-card text-center" data-method="credit_card">
                             <div class="card-body">
                                 <i class="bi bi-credit-card method-icon text-info"></i>
                                 <h6>Credit Card</h6>
@@ -268,7 +268,7 @@
         <div class="card">
             <div class="card-body">
                 <div class="d-flex justify-content-between">
-                    <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='/vendor-bills'">
+                    <button type="button" class="btn btn-outline-secondary" onclick="window.location.href='/accounting/vendor-bills'">
                         <i class="bi bi-x-circle"></i> Cancel
                     </button>
                     <div>
@@ -576,7 +576,7 @@ document.querySelectorAll('.payment-method-card').forEach(card => {
         document.getElementById('paymentMethod').value = selectedMethod;
 
         // Show/hide method-specific fields
-        if (selectedMethod === 'CHECK') {
+        if (selectedMethod === 'check') {
             document.getElementById('checkNumberField').style.display = 'block';
             document.getElementById('referenceNumberField').style.display = 'none';
         } else {
@@ -612,7 +612,7 @@ document.getElementById('paymentForm').addEventListener('submit', async function
     };
 
     // Add method-specific fields
-    if (selectedMethod === 'CHECK') {
+    if (selectedMethod === 'check') {
         const checkNum = document.getElementById('checkNumber').value;
         if (checkNum) paymentData.check_number = parseInt(checkNum);
     } else {
@@ -637,12 +637,12 @@ document.getElementById('paymentForm').addEventListener('submit', async function
             const payment = await response.json();
             alert(`Payment created successfully! Payment #${payment.payment_number}`);
 
-            if (selectedMethod === 'CHECK') {
+            if (selectedMethod === 'check') {
                 // Redirect to check batch page
-                window.location.href = '/check-batches';
+                window.location.href = '/accounting/check-batches';
             } else {
                 // Redirect to payment history
-                window.location.href = '/payment-history';
+                window.location.href = '/accounting/payment-history';
             }
         } else {
             const error = await response.json();

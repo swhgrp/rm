@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** January 11, 2026
-**System Status:** Production (97% Complete - E-Signature Field Editor Added)
+**Last Updated:** January 15, 2026
+**System Status:** Production (97% Complete - Vendor Merge & Payment Fixes)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -38,7 +38,87 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - January 12, 2026)
+### Most Recent Work (Current Session - January 15, 2026)
+
+**INTEGRATION HUB VENDOR MERGE & ACCOUNTING PAYMENT FIXES** ✅ **PARTIAL**
+
+#### 1. **Hub Vendor Merge Feature** ✅ **API COMPLETE**
+- **New Hub API Endpoints:**
+  - `POST /hub/api/v1/vendors/merge` - Merge multiple vendors into primary
+  - `GET /hub/api/v1/vendors/merge/preview` - Preview merge without changes
+  - `POST /hub/api/v1/vendors/push-to-systems` - Push alias state to Inventory/Accounting
+  - `GET /hub/api/v1/vendors/push-to-systems/preview` - Preview what push would do
+
+- **Inventory & Accounting Merge Endpoints:**
+  - `POST /api/vendors/_hub/merge-into` - Merge vendors (reassign refs, deactivate source)
+  - `DELETE /api/vendors/_hub/delete/{vendor_id}` - Delete/deactivate vendor from Hub
+
+- **Hub Vendors Page UI:**
+  - Added "Push to Systems" modal and JavaScript functions
+  - Added search filter for vendor table
+  - Added vendor merge selection UI
+
+- **Files Modified:**
+  - `/opt/restaurant-system/integration-hub/src/integration_hub/api/vendors.py`
+  - `/opt/restaurant-system/integration-hub/src/integration_hub/services/vendor_sync.py`
+  - `/opt/restaurant-system/integration-hub/src/integration_hub/templates/vendors.html`
+  - `/opt/restaurant-system/inventory/src/restaurant_inventory/api/api_v1/endpoints/vendors.py`
+  - `/opt/restaurant-system/accounting/src/accounting/api/vendors.py`
+
+#### 2. **Duplicate Bill Detection** ✅ **FIXED**
+- **Problem:** Same bill number appearing twice for same vendor
+- **Solution:** Added duplicate detection in `create_vendor_bill` endpoint
+  - Checks for existing bill with same vendor_id + bill_number
+  - Returns 400 error if duplicate found (allows re-entering voided bills)
+- **File:** `/opt/restaurant-system/accounting/src/accounting/api/vendor_bills.py`
+
+#### 3. **Payment Method Validation Fix** ✅ **FIXED**
+- **Problem:** 422 Unprocessable Content error when recording payments
+  - Frontend was sending uppercase `'CHECK'` but enum expects lowercase `'check'`
+- **Solution:** Changed all payment method option values to lowercase in templates:
+  - `/opt/restaurant-system/accounting/src/accounting/templates/vendor_bill_detail.html`
+  - `/opt/restaurant-system/accounting/src/accounting/templates/vendor_bills.html`
+  - `/opt/restaurant-system/accounting/src/accounting/templates/customer_invoices.html`
+  - `/opt/restaurant-system/accounting/src/accounting/templates/payments.html`
+
+#### 4. **Bank Account Dropdown Filter** ✅ **FIXED**
+- **Problem:** Payment forms showing all asset accounts, not just bank accounts
+- **Solution:** Changed filter from `startsWith('1')` to `num >= 1000 && num < 1100`
+  - Only shows Cash/Bank accounts (1000-1099 range)
+
+#### 5. **Payment Redirect URLs** ✅ **FIXED**
+- **Problem:** After creating payment, redirecting to portal instead of accounting pages
+- **Solution:** Added `/accounting` prefix to all redirects in payments.html:
+  - `/check-batches` → `/accounting/check-batches`
+  - `/payment-history` → `/accounting/payment-history`
+  - `/vendor-bills` → `/accounting/vendor-bills`
+
+---
+
+### 📋 TODO FOR NEXT SESSION
+
+1. **Test Vendor Merge End-to-End**
+   - Test "Push to Systems" from Hub vendors page
+   - Verify bills are reassigned correctly in Accounting
+   - Verify vendors are deactivated (not deleted) to preserve history
+
+2. **Fix Accounting Auto-Logout Redirect**
+   - When session expires, redirects to portal login but not correctly
+   - Should redirect to `/portal/login` not just `/`
+
+3. **Replace JavaScript alerts() with Bootstrap Modals**
+   - All systems should use Bootstrap toast/modal for notifications
+   - Current `alert()` calls are jarring and inconsistent
+   - Templates to update:
+     - `payments.html`
+     - `vendor_bill_detail.html`
+     - `vendor_bills.html`
+     - `customer_invoices.html`
+     - Integration Hub templates
+
+---
+
+### Previous Session Work (January 12, 2026)
 
 **EVENTS CALDAV SYNC FIXES & SSL CERTIFICATE RENEWAL** ✅ **COMPLETE**
 

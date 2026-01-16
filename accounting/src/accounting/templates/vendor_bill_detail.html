@@ -493,13 +493,13 @@
                     <label style="display: block; color: var(--text-primary); margin-bottom: 0.5rem;">Payment Method <span style="color: #E53935;">*</span></label>
                     <select id="paymentMethod" required style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 4px;">
                         <option value="">Select Method...</option>
-                        <option value="CHECK">Check</option>
-                        <option value="ACH">ACH/Bank Transfer</option>
-                        <option value="WIRE">Wire Transfer</option>
-                        <option value="CREDIT_CARD">Credit Card</option>
-                        <option value="DEBIT_CARD">Debit Card</option>
-                        <option value="CASH">Cash</option>
-                        <option value="OTHER">Other</option>
+                        <option value="check">Check</option>
+                        <option value="ach">ACH/Bank Transfer</option>
+                        <option value="wire">Wire Transfer</option>
+                        <option value="credit_card">Credit Card</option>
+                        <option value="debit_card">Debit Card</option>
+                        <option value="cash">Cash</option>
+                        <option value="other">Other</option>
                     </select>
                 </div>
 
@@ -595,8 +595,12 @@ async function loadAccounts() {
             accounts = await response.json();
             accounts.sort((a, b) => a.account_number.localeCompare(b.account_number));
 
-            // Populate bank account dropdown (Asset accounts starting with 1)
-            const bankAccounts = accounts.filter(a => a.account_number.startsWith('1'));
+            // Populate bank account dropdown (Cash and Bank accounts only: 1000-1099)
+            // These are actual cash/bank accounts, not other assets like inventory, prepaid, etc.
+            const bankAccounts = accounts.filter(a => {
+                const num = parseInt(a.account_number);
+                return num >= 1000 && num < 1100;  // Cash, Banks, Safes, Checking accounts
+            });
             const bankOptions = bankAccounts.map(acc =>
                 `<option value="${acc.id}">${acc.account_number} - ${acc.account_name}</option>`
             ).join('');

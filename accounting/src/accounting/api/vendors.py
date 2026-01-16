@@ -116,6 +116,108 @@ def receive_vendor_from_hub(
         }
 
 
+@router.delete("/_hub/delete/{vendor_id}")
+def delete_vendor_from_hub(
+    vendor_id: int,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_hub_api_key)
+):
+    """
+    Delete a vendor from Hub during merge operation.
+    Requires X-Hub-API-Key header for authentication.
+    Only used by Hub during vendor merge to clean up duplicates.
+    """
+    from accounting.models.vendor_bill import VendorBill
+
+    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Vendor not found"
+        )
+
+    # Check if vendor has any bills - if so, don't delete, just deactivate
+    # Note: VendorBill.vendor_id is a string (external ID), so convert to string for comparison
+    bill_count = db.query(VendorBill).filter(VendorBill.vendor_id == str(vendor_id)).count()
+    if bill_count > 0:
+        # Deactivate instead of delete to preserve bill history
+        vendor.is_active = False
+        db.commit()
+        return {
+            "success": True,
+            "message": f"Vendor deactivated (has {bill_count} bills)",
+            "deactivated": True
+        }
+
+    # No bills, safe to delete
+    db.delete(vendor)
+    db.commit()
+
+    return {
+        "success": True,
+        "message": "Vendor deleted",
+        "deactivated": False
+    }
+
+
+@router.post("/_hub/merge-into")
+def merge_vendor_into(
+    merge_data: dict,
+    db: Session = Depends(get_db),
+    _: bool = Depends(verify_hub_api_key)
+):
+    """
+    Merge one vendor into another (reassign all bills, then deactivate).
+    Used by Hub when pushing alias state to systems.
+
+    merge_data:
+        - source_vendor_id: The vendor to merge FROM (will be deactivated)
+        - target_vendor_id: The vendor to merge INTO (keeps references)
+    """
+    from accounting.models.vendor_bill import VendorBill
+
+    source_id = merge_data.get("source_vendor_id")
+    target_id = merge_data.get("target_vendor_id")
+
+    if not source_id or not target_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="source_vendor_id and target_vendor_id are required"
+        )
+
+    source_vendor = db.query(Vendor).filter(Vendor.id == source_id).first()
+    target_vendor = db.query(Vendor).filter(Vendor.id == target_id).first()
+
+    if not source_vendor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Source vendor {source_id} not found"
+        )
+
+    if not target_vendor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Target vendor {target_id} not found"
+        )
+
+    # Reassign all bills from source to target
+    # VendorBill.vendor_id is a string, so convert IDs
+    bills_updated = db.query(VendorBill).filter(
+        VendorBill.vendor_id == str(source_id)
+    ).update({VendorBill.vendor_id: str(target_id)})
+
+    # Deactivate the source vendor
+    source_vendor.is_active = False
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Merged {source_vendor.name} into {target_vendor.name}",
+        "bills_reassigned": bills_updated,
+        "source_deactivated": True
+    }
+
+
 # ============================================================================
 # AUTHENTICATED ENDPOINTS
 # ============================================================================
