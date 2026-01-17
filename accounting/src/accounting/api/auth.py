@@ -246,7 +246,8 @@ async def logout_get(request: Request, db: Session = Depends(get_db)):
             session.is_active = False
             db.commit()
 
-    response = RedirectResponse(url="/accounting/login", status_code=302)
+    # Redirect to Portal login so user can re-authenticate via SSO
+    response = RedirectResponse(url="/portal/login?redirect=/accounting/", status_code=302)
     response.delete_cookie(key="accounting_session")
 
     return response

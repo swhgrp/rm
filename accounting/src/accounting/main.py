@@ -187,16 +187,17 @@ async def health_check(db: Session = Depends(get_db)):
         "auto_sync_enabled": settings.AUTO_SYNC_ENABLED
     }
 
-# Login page
+# Login page - redirect to Portal SSO
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request, db: Session = Depends(get_db)):
-    """Login page"""
+    """Login page - redirects to Portal for SSO authentication"""
     # Check if already logged in
     user = get_current_user(request, db)
     if user:
         return RedirectResponse(url="/accounting/", status_code=302)
 
-    return templates.TemplateResponse("login.html", {"request": request})
+    # Redirect to Portal login with redirect back to accounting
+    return RedirectResponse(url="/portal/login?redirect=/accounting/", status_code=302)
 
 
 # Root endpoint - Dashboard

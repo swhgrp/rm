@@ -656,6 +656,9 @@
             const bsToast = new bootstrap.Toast(toast, { delay: duration });
             bsToast.show();
         }
+
+        // Override window.alert to use Bootstrap modal
+        window.alert = showAlert;
     </script>
 
     {% block extra_scripts %}{% endblock %}
