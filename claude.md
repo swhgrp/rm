@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** January 15, 2026
-**System Status:** Production (97% Complete - Vendor Merge & Payment Fixes)
+**Last Updated:** January 18, 2026
+**System Status:** Production (97% Complete)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -38,7 +38,52 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - January 15, 2026)
+### Most Recent Work (Current Session - January 18, 2026)
+
+**INVENTORY UOM ARCHITECTURE CONSOLIDATION** ✅ **COMPLETE**
+
+Merged `item_unit_conversions` table into `master_item_count_units` to eliminate redundancy.
+
+#### 1. **Database Schema Changes** ✅
+- **Migration:** `20260117_0001_consolidate_uom.py`
+  - Added `individual_weight_oz`, `individual_volume_oz`, `notes`, `is_active` columns to `master_item_count_units`
+  - Data migration script converted existing `item_unit_conversions` to count units
+  - Deprecated `item_unit_conversions` table (kept for rollback)
+
+#### 2. **Model Updates** ✅
+- **File:** `models/master_item_count_unit.py`
+  - Added individual specs fields (weight/volume per unit)
+  - Added notes field for contextual info
+  - Added is_active for soft delete support
+
+#### 3. **UI Consolidation** ✅
+- **File:** `templates/item_detail.html`
+  - New "Units of Measure" section replaces separate Count Units + Unit Conversions
+  - Unified table showing: Unit, Conversion, Individual Size, Notes, Actions
+  - Add Unit modal with:
+    - Auto-calculation from Hub UOM data (same dimension)
+    - Cross-type conversion input for different dimensions
+    - Individual weight/volume/notes fields
+  - Edit Item modal dropdown filtering:
+    - Filters by `compatibleDimensions` from Hub vendor items
+    - Falls back to inferring dimension from current primary count unit
+    - Shows dimension notice ("Showing weight units. Based on current primary unit.")
+
+#### 4. **API Fixes** ✅
+- **File:** `api/api_v1/endpoints/items.py`
+  - Fixed secondary-to-primary unit promotion (delete + flush + update)
+  - Added `db.flush()` after delete to avoid unique constraint violations
+  - Proper handling of "already assigned" unit scenario
+
+#### 5. **Files Modified:**
+- `inventory/alembic/versions/20260117_0001_consolidate_uom.py` - Migration
+- `inventory/src/restaurant_inventory/models/master_item_count_unit.py` - Model
+- `inventory/src/restaurant_inventory/api/api_v1/endpoints/items.py` - API
+- `inventory/src/restaurant_inventory/templates/item_detail.html` - UI
+
+---
+
+### Previous Session Work (January 15, 2026)
 
 **INTEGRATION HUB VENDOR MERGE & ACCOUNTING PAYMENT FIXES** ✅ **PARTIAL**
 
@@ -95,26 +140,15 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ---
 
-### 📋 TODO FOR NEXT SESSION
+### 📋 TODO
 
-1. **Test Vendor Merge End-to-End**
-   - Test "Push to Systems" from Hub vendors page
-   - Verify bills are reassigned correctly in Accounting
-   - Verify vendors are deactivated (not deleted) to preserve history
+**See [TODO.md](TODO.md) for the consolidated task list across all systems.**
 
-2. **Fix Accounting Auto-Logout Redirect**
-   - When session expires, redirects to portal login but not correctly
-   - Should redirect to `/portal/login` not just `/`
-
-3. **Replace JavaScript alerts() with Bootstrap Modals**
-   - All systems should use Bootstrap toast/modal for notifications
-   - Current `alert()` calls are jarring and inconsistent
-   - Templates to update:
-     - `payments.html`
-     - `vendor_bill_detail.html`
-     - `vendor_bills.html`
-     - `customer_invoices.html`
-     - Integration Hub templates
+Quick summary of high-priority items:
+- ~~Inventory: UOM Architecture Consolidation~~ ✅ **DONE Jan 18**
+- Inventory: Export functionality (Excel/PDF)
+- Websites: Static site generation (stub endpoints only, no generator)
+- Accounting: Multi-year budget planning
 
 ---
 
@@ -2755,7 +2789,7 @@ Email → PDF Extract → AI Parse → Auto-Map → Ready for Review → Route t
 - ✅ Vendor management
 - ✅ Dashboard with alerts (overdue maintenance, critical work orders)
 - ✅ Multi-location support (via location_id)
-- ❌ Portal UI (Phase 7 - TODO)
+- ✅ Portal UI (Phase 7 - Complete Jan 10, 2026)
 - ❌ QR code printing/PDF export (Future)
 - ❌ Email notifications (Future)
 

@@ -1,6 +1,6 @@
 # Inventory System - Progress
 
-**Last Updated:** December 27, 2025
+**Last Updated:** January 18, 2026
 **Status:** 100%+ Complete - Production Ready
 
 ---
@@ -120,6 +120,24 @@ The Inventory System is a comprehensive multi-location inventory management plat
 
 ## Recent Milestones
 
+### January 18, 2026
+- **UOM Architecture Consolidation** ✅ **COMPLETE**:
+  - Merged `item_unit_conversions` into `master_item_count_units` model
+  - Added fields: `individual_weight_oz`, `individual_volume_oz`, `notes`, `is_active`
+  - Data migration script migrated existing conversions to count units
+  - New unified "Units of Measure" UI section on item detail page
+  - Add Unit modal with auto-calculation from Hub UOM data
+  - Edit Item modal now filters dropdown by dimension (weight/volume/count)
+  - Promoted secondary-to-primary unit conversion with proper constraint handling
+  - `item_unit_conversions` table deprecated (kept for rollback)
+
+### January 17, 2026
+- **Recipe Management Improvements**:
+  - Searchable ingredient dropdown using Tom Select (all master items, sorted A-Z)
+  - Dynamic unit dropdown based on selected item's count units
+  - Recipe costing now fetches pricing from Hub's hub_vendor_items table
+- **UOM Architecture Research**: Analyzed industry systems (see below)
+
 ### December 27, 2025
 - **Location Sync Architecture**: Inventory is now the source of truth for locations
   - Added `code`, `legal_name`, `ein` fields to Location model
@@ -187,8 +205,54 @@ The Inventory System is a comprehensive multi-location inventory management plat
 
 ## Goals for Next Phase
 
-1. Complete item detail page
+1. ~~**UOM Architecture Consolidation**~~ ✅ **DONE** - Merged into single `MasterItemCountUnit` model
 2. Export functionality (CSV/Excel/PDF)
-3. Par level alerts via email
-4. Purchase order system
-5. Continue data quality improvements
+3. Continue data quality improvements
+
+---
+
+## UOM Architecture Research (January 2026)
+
+### Industry Standard: Three Unit Types
+Most restaurant inventory systems use:
+| Unit Type | Purpose | Example |
+|-----------|---------|---------|
+| Purchase/Vendor Unit | How bought from suppliers | Case, Bag, Wheel |
+| Inventory/Count Unit | How physically counted | Each, Pound, Bottle |
+| Recipe Unit | How used in recipes | Ounce, Cup, Each |
+
+### Systems Analyzed
+
+| System | Architecture | Key Feature |
+|--------|--------------|-------------|
+| **Restaurant365** | 3 Measure Types (Weight/Volume/Each) | Primary measure type per item, UoM Equivalence for cross-type |
+| **COGS-Well** | Multi-class per item | Most flexible - allows Weight + Volume + Count units on same item |
+| **meez** | UoM Equivalency system | Explicit equivalency required (e.g., "10 lemons = 1/2 cup juice") |
+| **MarketMan** | Inventory UOM + Purchase UOM | Custom "on hand" UOM for display |
+| **Compeat** | Inventory + Purchase + Base Unit | Container-to-inventory mapping |
+| **xtraCHEF** | Invoice-driven catalog | Conversions saved per product, reused across recipes |
+| **MarginEdge** | Central conversions | One conversion applies to all uses of a product |
+
+### Recommended Consolidation
+
+Merge `MasterItemCountUnit` + `ItemUnitConversion` into single `MasterItemCountUnit`:
+
+| Field | Purpose | Example (Alfredo) | Example (Bottle) |
+|-------|---------|-------------------|------------------|
+| Primary Count Unit | Base cost unit (smallest) | oz | fl oz |
+| Conversion Factor | Always 1.0 for primary | 1.0 | 1.0 |
+| Secondary Unit 1 | Common count/purchase | lb (16 oz) | bottle (25.36 fl oz) |
+| Secondary Unit 2 | Case/bulk | case (12 lb) | case (12 btl) |
+
+**Key Principles:**
+- Primary unit = recipe costing unit (oz or fl oz)
+- Secondary units for counting and purchasing
+- Cost stored at primary unit → all calculations flow from there
+- Vendor pricing converts to primary unit on import
+
+### Sources
+- [Restaurant365 Docs](https://docs.restaurant365.com/docs/unit-of-measure-conversions)
+- [meez Help Center](https://intercom.help/getmeez/en/articles/5344988-costing-your-recipes)
+- [COGS-Well FAQs](https://cogs-well-inc.helpscoutdocs.com/article/739-what-is-a-measure-class-faq)
+- [MarginEdge Blog](https://www.marginedge.com/blog/restaurant-plate-and-menu-costing-101)
+- [Toast xtraCHEF](https://central.toasttab.com/s/article/xtraCHEF-Recipe-Costing)

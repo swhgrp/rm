@@ -4,12 +4,20 @@ Master Item Count Units model
 Defines how a master item can be counted in multiple units.
 Each item has one primary count unit and optional secondary units.
 
+This model consolidates:
+- Count units (primary + secondary units for inventory counting)
+- Unit conversions (item-specific conversions, e.g., 1 lb = 8 patties)
+
 Architecture (Location-Aware Costing):
 - Hub owns: UOM (global), Categories (global), Vendor Items (per location)
 - Inventory owns: Master Items, Count Units, Location Costs
+
+NOTE: The item_unit_conversions table is deprecated. All unit conversion
+functionality is now handled by this model's conversion_to_primary field
+combined with the individual_weight_oz/individual_volume_oz specifications.
 """
 
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, ForeignKey, UniqueConstraint, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from restaurant_inventory.db.database import Base
@@ -68,6 +76,16 @@ class MasterItemCountUnit(Base):
     # Display order for UI
     display_order = Column(Integer, default=0)
 
+    # Individual unit specifications (consolidated from ItemUnitConversion)
+    # These track physical specifications for portion-controlled items
+    # Example: Sausage patties - 2oz per patty, or 750ml bottle = 25.36 fl oz
+    individual_weight_oz = Column(Numeric(10, 4), nullable=True)  # Weight per unit in oz
+    individual_volume_oz = Column(Numeric(10, 4), nullable=True)  # Volume per unit in fl oz
+    notes = Column(Text, nullable=True)  # Contextual notes (e.g., "2oz oval patties")
+
+    # Soft delete support
+    is_active = Column(Boolean, default=True, nullable=False)
+
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -77,7 +95,8 @@ class MasterItemCountUnit(Base):
 
     def __repr__(self):
         primary = "PRIMARY" if self.is_primary else "secondary"
-        return f"<MasterItemCountUnit(id={self.id}, item={self.master_item_id}, uom={self.uom_name}, {primary}, factor={self.conversion_to_primary})>"
+        active = "" if self.is_active else " INACTIVE"
+        return f"<MasterItemCountUnit(id={self.id}, item={self.master_item_id}, uom={self.uom_name}, {primary}, factor={self.conversion_to_primary}{active})>"
 
     def convert_to_primary(self, quantity: float) -> float:
         """Convert quantity in this unit to primary unit."""

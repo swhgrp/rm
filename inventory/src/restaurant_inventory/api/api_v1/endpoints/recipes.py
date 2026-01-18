@@ -439,24 +439,103 @@ def calculate_recipe_cost(
         RecipeIngredient.recipe_id == recipe_id
     ).all()
 
+    # Fetch pricing from Hub (source of truth for vendor item costs)
+    # This matches how the items API fetches pricing for display
+    hub_pricing = {}
+    try:
+        from sqlalchemy import create_engine, text
+        import os
+        HUB_DATABASE_URL = os.getenv("HUB_DATABASE_URL", "postgresql://hub_user:hub_password@hub-db:5432/integration_hub_db")
+        hub_engine = create_engine(HUB_DATABASE_URL)
+        with hub_engine.connect() as conn:
+            # Get unit_cost from hub_vendor_items (preferred or most recent)
+            pricing_query = text("""
+                SELECT DISTINCT ON (inventory_master_item_id)
+                    inventory_master_item_id,
+                    unit_cost
+                FROM hub_vendor_items
+                WHERE inventory_master_item_id IS NOT NULL
+                  AND is_active = true
+                  AND unit_cost IS NOT NULL
+                  AND unit_cost > 0
+                ORDER BY inventory_master_item_id, is_preferred DESC, updated_at DESC
+            """)
+            results = conn.execute(pricing_query).fetchall()
+            for row in results:
+                hub_pricing[row[0]] = Decimal(str(row[1]))
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Could not fetch pricing from Hub for recipe costing: {e}")
+
     # Calculate ingredient costs
+    # Import MasterItemCountUnit for unit conversion
+    from restaurant_inventory.models.master_item_count_unit import MasterItemCountUnit
+
     ingredient_cost = Decimal('0')
     ingredient_breakdown = []
 
     for ing in ingredients:
         master_item = db.query(MasterItem).filter(MasterItem.id == ing.master_item_id).first()
-        if master_item and master_item.current_cost:
-            ing.unit_cost = master_item.current_cost
-            ing.total_cost = master_item.current_cost * ing.quantity
-            ingredient_cost += ing.total_cost
+        if not master_item:
+            continue
 
+        # Get base cost: first try Hub pricing, then fall back to current_cost
+        base_cost = hub_pricing.get(master_item.id)
+        if base_cost is None and master_item.current_cost:
+            base_cost = Decimal(str(master_item.current_cost))
+
+        if base_cost is None or base_cost <= 0:
+            # No pricing available for this item
             ingredient_breakdown.append({
                 "item_name": master_item.name,
                 "quantity": float(ing.quantity),
                 "unit": ing.unit,
-                "unit_cost": float(ing.unit_cost),
-                "total_cost": float(ing.total_cost)
+                "unit_cost": None,
+                "total_cost": None,
+                "error": "No pricing available"
             })
+            continue
+
+        unit_cost = base_cost  # Default: assume ingredient unit matches primary unit
+
+        # Find the ingredient's unit in the item's count units
+        count_units = db.query(MasterItemCountUnit).filter(
+            MasterItemCountUnit.master_item_id == master_item.id
+        ).all()
+
+        # Look for matching unit by name (case-insensitive)
+        ing_unit_lower = ing.unit.lower() if ing.unit else ''
+        matched_unit = None
+        primary_unit = None
+
+        for cu in count_units:
+            if cu.is_primary:
+                primary_unit = cu
+            if cu.uom_name and cu.uom_name.lower() == ing_unit_lower:
+                matched_unit = cu
+                break
+            if cu.uom_abbreviation and cu.uom_abbreviation.lower() == ing_unit_lower:
+                matched_unit = cu
+                break
+
+        # Apply conversion factor if needed
+        # If recipe uses a secondary unit, multiply base cost by conversion factor
+        # E.g., if base cost is $2/lb and recipe uses "Case" (40 lb), cost is $2 * 40 = $80/case
+        if matched_unit and matched_unit.conversion_to_primary:
+            conversion_factor = Decimal(str(matched_unit.conversion_to_primary))
+            unit_cost = base_cost * conversion_factor
+
+        ing.unit_cost = unit_cost
+        ing.total_cost = unit_cost * ing.quantity
+        ingredient_cost += ing.total_cost
+
+        ingredient_breakdown.append({
+            "item_name": master_item.name,
+            "quantity": float(ing.quantity),
+            "unit": ing.unit,
+            "unit_cost": float(ing.unit_cost),
+            "total_cost": float(ing.total_cost)
+        })
 
     # Calculate labor cost
     labor_cost = Decimal('0')

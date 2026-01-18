@@ -2,7 +2,7 @@
 Master Items CRUD endpoints
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, UploadFile, File, Form
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Request, UploadFile, File, Form, Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import desc, text
 from typing import List, Optional, Dict
@@ -165,25 +165,9 @@ async def get_master_items(
     except Exception as e:
         logger.warning(f"Could not fetch pricing from Hub: {e}")
 
-    # Fetch unit conversions for items that have them
-    # This allows converting base unit cost (e.g., $/oz) to count unit cost (e.g., $/can)
-    from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
-    item_conversions = {}
-    try:
-        item_ids = [item.id for item in items]
-        if item_ids:
-            conversions = db.query(ItemUnitConversion).filter(
-                ItemUnitConversion.master_item_id.in_(item_ids),
-                ItemUnitConversion.is_active == True
-            ).all()
-            for conv in conversions:
-                item_conversions[conv.master_item_id] = {
-                    'from_unit_id': conv.from_unit_id,
-                    'to_unit_id': conv.to_unit_id,
-                    'factor': float(conv.conversion_factor)
-                }
-    except Exception as e:
-        logger.warning(f"Could not fetch unit conversions: {e}")
+    # NOTE: Unit conversions for pricing are now handled via MasterItemCountUnit.conversion_to_primary
+    # The item_unit_conversions table is deprecated. Count units include conversion factors
+    # that express how the unit relates to the primary unit (e.g., 1 Case = 40 Pounds)
 
     # Add unit names and pricing info to response
     result = []
@@ -247,22 +231,14 @@ async def get_master_items(
             item_dict['count_unit_3_factor'] = float(item.count_unit_3.contains_quantity) if item.count_unit_3 and item.count_unit_3.contains_quantity else None
 
         # Get pricing from Hub vendor items (source of truth)
-        # This is the cost per master item's count unit (e.g., $/lb, $/ea)
+        # This is the cost per vendor's pricing unit
         base_price = hub_pricing.get(item.id)
 
-        # Apply unit conversion if the item has one
-        # E.g., if base price is $/oz and count unit is Can, multiply by conversion factor
-        if base_price is not None and item.id in item_conversions:
-            conv = item_conversions[item.id]
-            primary_count_unit_id = primary_count_unit.uom_id if primary_count_unit else None
-
-            # If to_unit matches primary count unit, multiply by factor
-            # E.g., conversion from oz→can with factor=16: $0.08/oz * 16 = $1.28/can
-            if conv['to_unit_id'] == primary_count_unit_id:
-                base_price = base_price * conv['factor']
-            # If from_unit matches primary count unit, divide by factor
-            elif conv['from_unit_id'] == primary_count_unit_id:
-                base_price = base_price / conv['factor']
+        # Note: Price conversions now rely on MasterItemCountUnit.conversion_to_primary
+        # The base_price from Hub is per the vendor's unit. If we need to convert to the
+        # display/count unit, we use the count unit's conversion factor.
+        # For now, we display the base price as-is - the conversion is applied during
+        # recipe costing when the ingredient's unit is matched against count units.
 
         item_dict['last_price_paid'] = base_price
         item_dict['last_price_unit'] = unit_name if base_price else None
@@ -1916,17 +1892,22 @@ async def import_master_items(
 
 
 # ============================================================================
-# Item Unit Conversions API
+# Item Unit Conversions API (DEPRECATED - Use count-units instead)
 # ============================================================================
 
-@router.get("/{item_id}/unit-conversions")
+@router.get("/{item_id}/unit-conversions", deprecated=True)
 async def get_item_unit_conversions(
+    response: Response,
     item_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
+    DEPRECATED: Use GET /{item_id}/count-units instead.
+
     Get all unit conversions for a master item.
+    This endpoint is deprecated. Unit conversions are now managed through
+    MasterItemCountUnit with conversion_to_primary field.
 
     Example response for sausage patties:
     [
@@ -1940,6 +1921,10 @@ async def get_item_unit_conversions(
         }
     ]
     """
+    # Add deprecation headers
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "2026-04-01"
+    response.headers["Link"] = f'</{item_id}/count-units>; rel="successor-version"'
     from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
 
     # Verify item exists
@@ -1976,8 +1961,9 @@ async def get_item_unit_conversions(
     return result
 
 
-@router.post("/{item_id}/unit-conversions")
+@router.post("/{item_id}/unit-conversions", deprecated=True)
 async def create_item_unit_conversion(
+    response: Response,
     item_id: int,
     from_unit_id: int,
     to_unit_id: int,
@@ -1989,7 +1975,11 @@ async def create_item_unit_conversion(
     current_user: User = Depends(require_manager_or_admin)
 ):
     """
+    DEPRECATED: Use PUT /{item_id}/count-units instead.
+
     Create a new unit conversion for a master item.
+    This endpoint is deprecated. Use count-units endpoints to add units
+    with conversion_to_primary and individual specs.
 
     Example: For 2oz sausage patties:
     - from_unit_id: Hub UoM ID for Pound
@@ -1999,6 +1989,10 @@ async def create_item_unit_conversion(
 
     Note: Unit IDs are Hub UoM IDs (source of truth), not local Inventory UoM IDs.
     """
+    # Add deprecation headers
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "2026-04-01"
+    response.headers["Link"] = f'</{item_id}/count-units>; rel="successor-version"'
     from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
     from sqlalchemy import text, create_engine
 
@@ -2112,8 +2106,9 @@ async def create_item_unit_conversion(
     }
 
 
-@router.put("/{item_id}/unit-conversions/{conversion_id}")
+@router.put("/{item_id}/unit-conversions/{conversion_id}", deprecated=True)
 async def update_item_unit_conversion(
+    response: Response,
     item_id: int,
     conversion_id: int,
     conversion_factor: float = None,
@@ -2123,7 +2118,10 @@ async def update_item_unit_conversion(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_manager_or_admin)
 ):
-    """Update an existing unit conversion."""
+    """DEPRECATED: Use PUT /{item_id}/count-units instead. Update an existing unit conversion."""
+    # Add deprecation headers
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "2026-04-01"
     from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
 
     conversion = db.query(ItemUnitConversion).filter(
@@ -2149,14 +2147,26 @@ async def update_item_unit_conversion(
     return {"success": True, "id": conversion.id}
 
 
-@router.delete("/{item_id}/unit-conversions/{conversion_id}")
+@router.delete("/{item_id}/unit-conversions/{conversion_id}", deprecated=True)
 async def delete_item_unit_conversion(
+    response: Response,
     item_id: int,
     conversion_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_manager_or_admin)
 ):
-    """Delete (deactivate) a unit conversion."""
+    """
+    Delete (deactivate) a unit conversion.
+
+    DEPRECATED: Use DELETE /{item_id}/count-units/{unit_id} instead.
+    Unit conversions have been consolidated into count units.
+    This endpoint will be removed after 2026-04-01.
+    """
+    # Add deprecation headers
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "2026-04-01"
+    response.headers["Link"] = f'</{item_id}/count-units>; rel="successor-version"'
+
     from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
 
     conversion = db.query(ItemUnitConversion).filter(
@@ -2258,7 +2268,8 @@ async def get_item_count_units(
         raise HTTPException(status_code=404, detail="Master item not found")
 
     count_units = db.query(MasterItemCountUnit).filter(
-        MasterItemCountUnit.master_item_id == item_id
+        MasterItemCountUnit.master_item_id == item_id,
+        MasterItemCountUnit.is_active == True
     ).order_by(
         MasterItemCountUnit.is_primary.desc(),
         MasterItemCountUnit.display_order
@@ -2272,7 +2283,12 @@ async def get_item_count_units(
             "uom_abbreviation": cu.uom_abbreviation,
             "is_primary": cu.is_primary,
             "conversion_to_primary": float(cu.conversion_to_primary) if cu.conversion_to_primary else 1.0,
-            "display_order": cu.display_order or 0
+            "display_order": cu.display_order or 0,
+            # New fields from UOM consolidation
+            "individual_weight_oz": float(cu.individual_weight_oz) if cu.individual_weight_oz else None,
+            "individual_volume_oz": float(cu.individual_volume_oz) if cu.individual_volume_oz else None,
+            "notes": cu.notes,
+            "is_active": cu.is_active if hasattr(cu, 'is_active') else True
         }
         for cu in count_units
     ]
@@ -2338,8 +2354,28 @@ async def update_item_count_units(
 
     changes_made = []
 
+    # Helper to find which count unit has this uom_id (if any)
+    def find_unit_by_uom_id(uom_id: int):
+        for cu in existing_units:
+            if cu.uom_id == uom_id:
+                return cu
+        return None
+
     # Handle primary count unit update
     if primary_count_unit_id is not None and primary_count_unit_id != 0:
+        # Check if this UOM is already used by another count unit for this item
+        existing_with_uom = find_unit_by_uom_id(primary_count_unit_id)
+        if existing_with_uom and existing_with_uom != primary_unit:
+            # This unit is currently assigned as a secondary unit
+            # User wants to make it primary - remove the secondary first
+            logger.info(f"Removing secondary unit {existing_with_uom.uom_name} (id={existing_with_uom.id}) to make it primary")
+            db.delete(existing_with_uom)
+            db.flush()  # Flush delete before updating to avoid unique constraint violation
+            # Also remove from our tracking list so subsequent checks don't see it
+            existing_units = [cu for cu in existing_units if cu != existing_with_uom]
+            secondary_units = [cu for cu in secondary_units if cu != existing_with_uom]
+            changes_made.append(f"Promoted {existing_with_uom.uom_name} from secondary to primary")
+
         # Fetch UOM info from Hub
         uom_info = await get_hub_uom(primary_count_unit_id)
         if not uom_info:
@@ -2379,6 +2415,21 @@ async def update_item_count_units(
                 db.delete(cu2)
                 changes_made.append("Removed count unit 2")
         else:
+            # Check if this UOM is already used - if by cu3, swap them
+            existing_with_uom = find_unit_by_uom_id(count_unit_2_id)
+            if existing_with_uom and existing_with_uom != cu2:
+                if existing_with_uom == primary_unit:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot use primary unit as secondary. Change primary unit first."
+                    )
+                # It's the other secondary (cu3) - remove it, we'll reassign this UOM to cu2
+                logger.info(f"Reassigning {existing_with_uom.uom_name} from unit 3 to unit 2")
+                db.delete(existing_with_uom)
+                db.flush()  # Flush delete before updating to avoid unique constraint violation
+                existing_units = [cu for cu in existing_units if cu != existing_with_uom]
+                secondary_units = [cu for cu in secondary_units if cu != existing_with_uom]
+
             # Fetch UOM info from Hub
             uom_info = await get_hub_uom(count_unit_2_id)
             if not uom_info:
@@ -2417,6 +2468,21 @@ async def update_item_count_units(
                 db.delete(cu3)
                 changes_made.append("Removed count unit 3")
         else:
+            # Check if this UOM is already used - if by cu2, swap them
+            existing_with_uom = find_unit_by_uom_id(count_unit_3_id)
+            if existing_with_uom and existing_with_uom != cu3:
+                if existing_with_uom == primary_unit:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Cannot use primary unit as secondary. Change primary unit first."
+                    )
+                # It's the other secondary (cu2) - remove it, we'll reassign this UOM to cu3
+                logger.info(f"Reassigning {existing_with_uom.uom_name} from unit 2 to unit 3")
+                db.delete(existing_with_uom)
+                db.flush()  # Flush delete before updating to avoid unique constraint violation
+                existing_units = [cu for cu in existing_units if cu != existing_with_uom]
+                secondary_units = [cu for cu in secondary_units if cu != existing_with_uom]
+
             uom_info = await get_hub_uom(count_unit_3_id)
             if not uom_info:
                 raise HTTPException(status_code=400, detail=f"UOM {count_unit_3_id} not found in Hub")

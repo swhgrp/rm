@@ -2,9 +2,32 @@
 
 A comprehensive web-based inventory management system built for restaurant operations, featuring multi-location tracking, location-aware costing, POS integration, recipe management, and advanced analytics.
 
-**Last Updated:** January 5, 2026
+**Last Updated:** January 18, 2026
 
 ## Recent Updates
+
+### January 18, 2026 - UOM Architecture Consolidation ✅
+
+**Major Architecture Change:** Merged `item_unit_conversions` into `master_item_count_units`
+
+**Database Changes:**
+- ✅ **New columns** on `master_item_count_units`: `individual_weight_oz`, `individual_volume_oz`, `notes`, `is_active`
+- ✅ **Migration** - Existing unit conversions migrated to count units with proper conversion factors
+- ✅ **Deprecated** - `item_unit_conversions` table (kept for rollback)
+
+**UI Consolidation:**
+- ✅ **Unified "Units of Measure" section** - Replaces separate Count Units + Unit Conversions
+- ✅ **Add Unit modal** - Auto-calculation from Hub UOM data, cross-type conversion support
+- ✅ **Edit Item dropdown filtering** - Filters by dimension (weight/volume/count) based on vendor items or primary unit
+- ✅ **Secondary-to-primary promotion** - Can now change primary count unit even if it's already a secondary
+
+**Files Modified:**
+- `alembic/versions/20260117_0001_consolidate_uom.py` - Migration with data migration
+- `models/master_item_count_unit.py` - Added individual specs and soft delete
+- `api/api_v1/endpoints/items.py` - Fixed promotion logic and constraint handling
+- `templates/item_detail.html` - Unified UI for all unit management
+
+---
 
 ### January 5, 2026 - Waste Log UoM & Transfer Enhancements 🔧
 
@@ -43,6 +66,7 @@ A comprehensive web-based inventory management system built for restaurant opera
 - ✅ **MasterItemCountUnit** - Multiple count units per item with conversion factors
   - `master_item_id` + `uom_id` + `is_primary` flag
   - `conversion_to_primary` factor for unit conversions
+  - `individual_weight_oz`, `individual_volume_oz`, `notes` (added Jan 18, 2026)
   - `convert_to_primary()` and `convert_from_primary()` methods
 - ✅ **MasterItemLocationCost** - Weighted average cost per item per location
   - `master_item_id` + `location_id` (unique together)
@@ -1040,6 +1064,6 @@ All rights reserved. Unauthorized use, distribution, or modification is prohibit
 
 ---
 
-**Last Updated:** December 27, 2025
-**Document Version:** 2.2
-**System Version:** v2.1.0 Production (Location-Aware Costing)
+**Last Updated:** January 18, 2026
+**Document Version:** 2.3
+**System Version:** v2.2.0 Production (UOM Consolidation)
