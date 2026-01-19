@@ -11,6 +11,11 @@ from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.services.invoice_parser import get_invoice_parser
 
@@ -48,7 +53,7 @@ class ParseRetryService:
             self.BASE_RETRY_DELAY_MINUTES * (2 ** attempt_number),
             self.MAX_RETRY_DELAY_MINUTES
         )
-        return datetime.utcnow() + timedelta(minutes=delay_minutes)
+        return get_now() + timedelta(minutes=delay_minutes)
 
     def get_invoices_needing_parse(self, db: Session, limit: int = 10) -> List[HubInvoice]:
         """
@@ -60,7 +65,7 @@ class ParseRetryService:
 
         Excludes invoices that have reached MAX_PARSE_ATTEMPTS.
         """
-        now = datetime.utcnow()
+        now = get_now()
 
         invoices = db.query(HubInvoice).filter(
             and_(
@@ -182,7 +187,7 @@ class ParseRetryService:
             invoice.next_parse_retry_at = next_retry
             db.commit()
 
-            delay_minutes = (next_retry - datetime.utcnow()).total_seconds() / 60
+            delay_minutes = (next_retry - get_now()).total_seconds() / 60
             logger.warning(f"Invoice {invoice_id} parse attempt {attempt} failed. Retry scheduled in {delay_minutes:.1f} minutes.")
 
             return {

@@ -3,8 +3,13 @@ Authentication API endpoints for HR system
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from typing import Optional
+
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
 
 from hr.db.database import get_db
 from hr.models.user import User
@@ -88,7 +93,7 @@ async def login(
     active_sessions[session_token] = user.id
 
     # Update last login
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = get_now()
     db.commit()
 
     # Set session cookie
@@ -148,7 +153,7 @@ async def sso_login(
     active_sessions[session_token] = user.id
 
     # Update last login
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = get_now()
     db.commit()
 
     # Redirect to HR dashboard

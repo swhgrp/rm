@@ -9,14 +9,14 @@ from enum import Enum
 
 
 class PaymentMethodEnum(str, Enum):
-    """Payment method types"""
-    CHECK = "CHECK"
-    ACH = "ACH"
-    WIRE = "WIRE"
-    CREDIT_CARD = "CREDIT_CARD"
-    DEBIT_CARD = "DEBIT_CARD"
-    CASH = "CASH"
-    OTHER = "OTHER"
+    """Payment method types - values match database enum"""
+    CHECK = "check"
+    ACH = "ach"
+    WIRE = "wire"
+    CREDIT_CARD = "credit_card"
+    DEBIT_CARD = "debit_card"
+    CASH = "cash"
+    OTHER = "other"
 
 
 class PaymentStatusEnum(str, Enum):
@@ -117,6 +117,7 @@ class PaymentResponse(PaymentBase):
     payment_number: str
     net_amount: Decimal
     status: PaymentStatusEnum
+    vendor_name: Optional[str] = None
     check_number: Optional[int] = None
     check_batch_id: Optional[int] = None
     ach_batch_id: Optional[int] = None
@@ -187,11 +188,13 @@ class CheckBatchBase(BaseModel):
     """Base check batch schema"""
     batch_date: date
     bank_account_id: int
-    starting_check_number: int
+    starting_check_number: Optional[int] = None
 
 
-class CheckBatchCreate(CheckBatchBase):
-    """Create check batch"""
+class CheckBatchCreate(BaseModel):
+    """Create check batch from existing payments"""
+    batch_date: date
+    bank_account_id: int
     payment_ids: List[int]
 
 

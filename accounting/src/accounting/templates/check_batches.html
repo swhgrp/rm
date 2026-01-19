@@ -32,7 +32,7 @@
                     <p class="text-muted mb-0">Manage and print check batches</p>
                 </div>
                 <div>
-                    <a href="/payments" class="btn btn-primary">
+                    <a href="/accounting/payments" class="btn btn-primary">
                         <i class="bi bi-plus-circle"></i> New Payment
                     </a>
                     <button class="btn btn-success" id="createBatchBtn">
@@ -158,7 +158,7 @@
             </div>
             <div class="modal-body">
                 <div id="checkPreviewContent" class="check-preview">
-                    <iframe id="checkPreviewFrame" style="width: 100%; height: 600px; border: none;"></iframe>
+                    <!-- Check preview will be rendered here -->
                 </div>
             </div>
             <div class="modal-footer">
@@ -172,7 +172,7 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
 <script>
 let batches = [];
 let bankAccounts = [];
@@ -186,7 +186,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 async function loadBankAccounts() {
     try {
-        const response = await fetch('/api/bank-accounts/');
+        const response = await fetch('/accounting/api/bank-accounts/');
         bankAccounts = await response.json();
 
         // Populate filter dropdown
@@ -221,7 +221,7 @@ async function loadBatches() {
     noMessage.style.display = 'none';
 
     try {
-        const response = await fetch('/api/payments/check-batches/');
+        const response = await fetch('/accounting/api/payments/check-batches/');
         batches = await response.json();
 
         loading.style.display = 'none';
@@ -280,7 +280,7 @@ function createBatchCard(batch) {
                 </div>
                 <div class="mb-2">
                     <small class="text-muted">Total Amount:</small>
-                    <div class="fs-5 text-success"><strong>$${batch.total_amount.toFixed(2)}</strong></div>
+                    <div class="fs-5 text-success"><strong>$${parseFloat(batch.total_amount).toFixed(2)}</strong></div>
                 </div>
             </div>
             <div class="card-footer">
@@ -294,6 +294,12 @@ function createBatchCard(batch) {
                         </button>
                     ` : ''}
                     ${batch.status === 'PRINTED' ? `
+                        <button class="btn btn-sm btn-outline-primary" onclick="previewBatch(${batch.id})">
+                            <i class="bi bi-eye"></i> Preview
+                        </button>
+                        <button class="btn btn-sm btn-primary" onclick="printBatch(${batch.id})">
+                            <i class="bi bi-printer"></i> Reprint
+                        </button>
                         <button class="btn btn-sm btn-success" onclick="completeBatch(${batch.id})">
                             <i class="bi bi-check-circle"></i> Mark Complete
                         </button>
@@ -339,7 +345,7 @@ document.getElementById('batchBankAccount').addEventListener('change', async fun
     list.innerHTML = '';
 
     try {
-        const response = await fetch(`/api/payments/?payment_method=CHECK&status=DRAFT&bank_account_id=${bankAccountId}`);
+        const response = await fetch(`/accounting/api/payments/?payment_method=check&status=DRAFT&bank_account_id=${bankAccountId}`);
         const payments = await response.json();
 
         loading.style.display = 'none';
@@ -357,7 +363,7 @@ document.getElementById('batchBankAccount').addEventListener('change', async fun
                 <label class="form-check-label w-100" for="check_${payment.id}">
                     <div class="d-flex justify-content-between">
                         <span><strong>${payment.payment_number}</strong> - ${payment.vendor_name}</span>
-                        <span class="text-success"><strong>$${payment.amount.toFixed(2)}</strong></span>
+                        <span class="text-success"><strong>$${parseFloat(payment.amount).toFixed(2)}</strong></span>
                     </div>
                     <small class="text-muted">Date: ${formatDate(payment.payment_date)}</small>
                 </label>
@@ -388,7 +394,7 @@ document.getElementById('createBatchSubmit').addEventListener('click', async fun
     }
 
     try {
-        const response = await fetch('/api/payments/check-batches/', {
+        const response = await fetch('/accounting/api/payments/check-batches/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -418,13 +424,52 @@ document.getElementById('createBatchSubmit').addEventListener('click', async fun
 async function previewBatch(batchId) {
     currentBatchId = batchId;
     const modal = new bootstrap.Modal(document.getElementById('checkPreviewModal'));
+    const content = document.getElementById('checkPreviewContent');
 
     try {
-        const response = await fetch(`/api/payments/check-batches/${batchId}/preview`);
+        const response = await fetch(`/accounting/api/payments/check-batches/${batchId}/preview`);
         if (response.ok) {
-            const blob = await response.blob();
-            const url = URL.createObjectURL(blob);
-            document.getElementById('checkPreviewFrame').src = url;
+            const data = await response.json();
+
+            // Render check preview as formatted HTML
+            let checksHtml = data.checks.map((check, index) => `
+                <div class="check-card mb-4 p-4 border rounded bg-white">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h5 class="mb-1">Check #${check.check_number}</h5>
+                            <small class="text-muted">Date: ${formatDate(check.payment_date)}</small>
+                        </div>
+                        <div class="text-end">
+                            <h4 class="text-success mb-0">$${parseFloat(check.amount).toFixed(2)}</h4>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <strong>Pay to the Order of:</strong><br>
+                        <span class="fs-5">${check.payee_name}</span>
+                    </div>
+                    ${check.memo ? `<div class="text-muted"><small>Memo: ${check.memo}</small></div>` : ''}
+                </div>
+            `).join('');
+
+            content.innerHTML = `
+                <div class="mb-4 p-3 bg-light rounded">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <strong>Batch Number:</strong><br>${data.batch_number}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Check Count:</strong><br>${data.check_count}
+                        </div>
+                        <div class="col-md-4">
+                            <strong>Total Amount:</strong><br>
+                            <span class="fs-5 text-success">$${parseFloat(data.total_amount).toFixed(2)}</span>
+                        </div>
+                    </div>
+                </div>
+                <h6 class="mb-3">Checks in this Batch:</h6>
+                ${checksHtml}
+            `;
+
             modal.show();
         } else {
             alert('Error loading preview. Please try again.');
@@ -436,12 +481,20 @@ async function previewBatch(batchId) {
 }
 
 async function printBatch(batchId) {
-    if (!confirm('Are you ready to print this check batch? This will mark all checks as PRINTED.')) {
+    // Find the batch to check its status
+    const batch = batches.find(b => b.id === batchId);
+    const isReprint = batch && batch.status === 'PRINTED';
+
+    const confirmMsg = isReprint
+        ? 'Reprint this check batch?'
+        : 'Are you ready to print this check batch? This will mark all checks as PRINTED.';
+
+    if (!confirm(confirmMsg)) {
         return;
     }
 
     try {
-        const response = await fetch(`/api/payments/check-batches/${batchId}/print`, {
+        const response = await fetch(`/accounting/api/payments/check-batches/${batchId}/print`, {
             method: 'POST'
         });
 
@@ -449,13 +502,17 @@ async function printBatch(batchId) {
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
 
-            // Open print dialog
+            // Open PDF in new tab
             const printWindow = window.open(url, '_blank');
-            printWindow.onload = function() {
-                printWindow.print();
-            };
+            if (printWindow) {
+                printWindow.onload = function() {
+                    printWindow.print();
+                };
+            }
 
-            alert('Checks sent to printer. Please verify print quality before mailing.');
+            if (!isReprint) {
+                alert('Checks sent to printer. Please verify print quality before mailing.');
+            }
             await loadBatches();
         } else {
             const error = await response.json();
@@ -473,7 +530,7 @@ async function completeBatch(batchId) {
     }
 
     try {
-        const response = await fetch(`/api/payments/check-batches/${batchId}`, {
+        const response = await fetch(`/accounting/api/payments/check-batches/${batchId}`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
@@ -502,7 +559,7 @@ async function voidBatch(batchId) {
     }
 
     try {
-        const response = await fetch(`/api/payments/check-batches/${batchId}`, {
+        const response = await fetch(`/accounting/api/payments/check-batches/${batchId}`, {
             method: 'DELETE'
         });
 
@@ -538,6 +595,12 @@ document.getElementById('printChecksBtn').addEventListener('click', function() {
 });
 
 function formatDate(dateString) {
+    // Parse YYYY-MM-DD as local date to avoid UTC timezone shift
+    if (dateString && dateString.includes('-')) {
+        const parts = dateString.split('T')[0].split('-');
+        const date = new Date(parts[0], parts[1] - 1, parts[2]);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }

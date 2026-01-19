@@ -715,7 +715,7 @@ async function loadEBITDA() {
 
 async function loadCashPosition() {
     try {
-        const response = await fetch('api/bank-accounts/', {
+        const response = await fetch('/accounting/api/bank-accounts/', {
             credentials: 'include'
         });
 

@@ -1045,6 +1045,9 @@
                 document.addEventListener('keydown', handleEscape);
             });
         };
+
+        // Override window.alert to use custom modal
+        window.alert = window.showAlert;
     </script>
 
     {% block extra_js %}{% endblock %}

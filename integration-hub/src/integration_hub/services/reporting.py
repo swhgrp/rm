@@ -16,6 +16,11 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_, cast, Float, Integer, case
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.models.hub_vendor_item import HubVendorItem
@@ -329,7 +334,7 @@ class ReportingService:
         Returns:
             Dict with price change analysis
         """
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = get_now() - timedelta(days=days)
 
         # All price changes in period
         total_changes = self.db.query(func.count(PriceHistory.id)).filter(

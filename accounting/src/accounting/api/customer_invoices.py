@@ -10,6 +10,11 @@ from typing import List, Optional
 from datetime import date, datetime
 from decimal import Decimal
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from accounting.db.database import get_db
 from accounting.models.user import User
 from accounting.models.customer import Customer
@@ -359,7 +364,7 @@ def update_invoice(
     if invoice_data.deposit_amount is not None:
         invoice.deposit_amount = invoice_data.deposit_amount
 
-    invoice.updated_at = datetime.utcnow()
+    invoice.updated_at = get_now()
 
     db.commit()
     db.refresh(invoice)
@@ -391,8 +396,8 @@ def send_invoice(
 
     # Update invoice status
     invoice.status = InvoiceStatus.SENT
-    invoice.sent_date = datetime.utcnow()
-    invoice.updated_at = datetime.utcnow()
+    invoice.sent_date = get_now()
+    invoice.updated_at = get_now()
 
     # Auto-post to GL
     try:
@@ -488,7 +493,7 @@ def record_payment(
     elif total_paid > 0:
         invoice.status = InvoiceStatus.PARTIALLY_PAID
 
-    invoice.updated_at = datetime.utcnow()
+    invoice.updated_at = get_now()
 
     # Auto-post to GL
     try:
@@ -557,7 +562,7 @@ def delete_payment(
     elif total_paid < invoice.total_amount:
         invoice.status = InvoiceStatus.PARTIALLY_PAID
 
-    invoice.updated_at = datetime.utcnow()
+    invoice.updated_at = get_now()
 
     db.delete(payment)
     db.commit()
@@ -595,7 +600,7 @@ def void_invoice(
 
     # Void the invoice
     invoice.status = InvoiceStatus.VOID
-    invoice.updated_at = datetime.utcnow()
+    invoice.updated_at = get_now()
 
     # Reverse GL entry if it exists
     if invoice.journal_entry_id:

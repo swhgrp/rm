@@ -14,6 +14,11 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.services.auto_mapper import AutoMapperService
@@ -70,7 +75,7 @@ class BatchOperationsService:
                     continue
 
                 # Approve the invoice
-                invoice.approved_at = datetime.utcnow()
+                invoice.approved_at = get_now()
                 invoice.approved_by = approved_by
 
                 # Update status if pending
@@ -231,7 +236,7 @@ class BatchOperationsService:
             'errors': []
         }
 
-        now = datetime.utcnow()
+        now = get_now()
 
         for invoice_id in invoice_ids:
             try:

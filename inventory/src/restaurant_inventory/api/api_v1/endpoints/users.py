@@ -5,9 +5,14 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 import secrets
 import logging
+
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
 
 from restaurant_inventory.core.deps import get_db, get_current_user, require_admin
 from restaurant_inventory.models.user import User
@@ -147,7 +152,7 @@ async def create_user(
         try:
             # Generate secure token
             token = secrets.token_urlsafe(32)
-            expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS)
+            expires_at = get_now() + timedelta(hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS)
 
             # Create token record
             reset_token = PasswordResetToken(

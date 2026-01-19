@@ -14,7 +14,7 @@ src_dir = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_dir))
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -39,7 +39,7 @@ def main():
     """Main automation routine"""
     logger.info("=" * 80)
     logger.info("AR Automation Started")
-    logger.info(f"Timestamp: {datetime.utcnow().isoformat()}")
+    logger.info(f"Timestamp: {datetime.now(timezone.utc).isoformat()}")
     logger.info("=" * 80)
 
     try:

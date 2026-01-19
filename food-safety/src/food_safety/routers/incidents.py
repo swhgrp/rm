@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from food_safety.database import get_db
 from food_safety.models import (
     Incident, CorrectiveAction, IncidentType, IncidentStatus,
@@ -25,7 +30,7 @@ router = APIRouter()
 
 async def generate_incident_number(db: AsyncSession) -> str:
     """Generate next incident number in format INC-YYYY-NNNN"""
-    year = datetime.utcnow().year
+    year = get_now().year
     prefix = f"INC-{year}-"
 
     # Get the highest incident number for this year
@@ -221,7 +226,7 @@ async def resolve_incident(
 
     incident.status = IncidentStatus.RESOLVED
     incident.resolved_by = data.resolved_by
-    incident.resolved_at = datetime.utcnow()
+    incident.resolved_at = get_now()
     incident.resolution_notes = data.resolution_notes
 
     await db.commit()
@@ -349,7 +354,7 @@ async def complete_corrective_action(
 
     action.status = CorrectiveActionStatus.COMPLETED
     action.completed_by = data.completed_by
-    action.completed_at = datetime.utcnow()
+    action.completed_at = get_now()
     action.completion_notes = data.completion_notes
 
     await db.commit()
@@ -378,7 +383,7 @@ async def verify_corrective_action(
 
     action.status = CorrectiveActionStatus.VERIFIED
     action.verified_by = data.verified_by
-    action.verified_at = datetime.utcnow()
+    action.verified_at = get_now()
     action.verification_notes = data.verification_notes
 
     await db.commit()

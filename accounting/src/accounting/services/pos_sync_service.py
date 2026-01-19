@@ -10,6 +10,11 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 from collections import defaultdict
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from accounting.core.clover_client import CloverAPIClient, parse_clover_order
 from accounting.models.pos import POSConfiguration, POSDailySalesCache, POSCategoryGLMapping, POSPaymentGLMapping
 from accounting.models.area import Area
@@ -72,7 +77,7 @@ class POSSyncService:
             raise ValueError(f"Unsupported POS provider: {config.provider}")
 
         # Update last sync date
-        config.last_sync_date = datetime.utcnow()
+        config.last_sync_date = get_now()
         self.db.commit()
 
         return result
@@ -242,7 +247,7 @@ class POSSyncService:
                         # Update existing record
                         for key, value in daily_summary.items():
                             setattr(existing, key, value)
-                        existing.synced_at = datetime.utcnow()
+                        existing.synced_at = get_now()
                         self.db.commit()
                         cache_entry = existing
                         total_skipped += 1
@@ -541,7 +546,7 @@ class POSSyncService:
             "discounts": discounts_dict,
             "raw_summary": {
                 "order_count": len(orders),
-                "sync_date": datetime.utcnow().isoformat(),
+                "sync_date": get_now().isoformat(),
                 "payment_tips": payment_tips_dict  # Tips by payment method
             }
         }
@@ -903,7 +908,7 @@ class POSSyncService:
                 "payment_count": len(payments),
                 "order_count": len(processed_order_ids),
                 "payout_count": len(payout_breakdown),
-                "sync_date": datetime.utcnow().isoformat(),
+                "sync_date": get_now().isoformat(),
                 "payment_tips": payment_tips_dict
             }
         }
@@ -1066,7 +1071,7 @@ class POSSyncService:
             status='draft',
             imported_from='clover_pos',
             imported_from_pos=True,
-            imported_at=datetime.utcnow(),
+            imported_at=get_now(),
             pos_sync_date=cached_sale.synced_at,
             pos_transaction_count=cached_sale.transaction_count,
             created_by=user_id,

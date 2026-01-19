@@ -1186,6 +1186,19 @@
 
     <!-- Menu Tab Switching (always available) -->
     <script>
+    // Custom notification function to replace browser alerts
+    function showNotification(message) {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
+        const modal = document.createElement('div');
+        modal.style.cssText = 'background:#fff;padding:24px;border-radius:8px;max-width:400px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.15);';
+        modal.innerHTML = `<p style="margin:0 0 16px 0;">${message}</p><button style="background:var(--accent-color, #c9a227);color:#fff;border:none;padding:8px 24px;border-radius:4px;cursor:pointer;">OK</button>`;
+        modal.querySelector('button').onclick = () => document.body.removeChild(overlay);
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+    }
+    window.alert = showNotification;
+
     function showMenu(menuId, tabElement) {
         // Hide all menu panels
         document.querySelectorAll('.menu-panel').forEach(panel => {

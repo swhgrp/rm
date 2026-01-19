@@ -11,6 +11,11 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 
@@ -68,7 +73,7 @@ class InventorySenderService:
                 # Mark as sent since it already exists in inventory
                 invoice.sent_to_inventory = True
                 invoice.inventory_invoice_id = result.get('existing_invoice_id')
-                invoice.inventory_sync_at = datetime.utcnow()
+                invoice.inventory_sync_at = get_now()
                 invoice.inventory_error = f"Duplicate: {result.get('message')}"
 
                 db.commit()
@@ -83,7 +88,7 @@ class InventorySenderService:
             # Update invoice with inventory reference
             invoice.sent_to_inventory = True
             invoice.inventory_invoice_id = result.get('invoice_id')
-            invoice.inventory_sync_at = datetime.utcnow()
+            invoice.inventory_sync_at = get_now()
             invoice.inventory_error = None
 
             db.commit()

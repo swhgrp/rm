@@ -9,6 +9,11 @@ from datetime import datetime, date
 from pydantic import BaseModel
 from decimal import Decimal
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from restaurant_inventory.core.deps import get_db, get_current_user, filter_by_user_locations, get_user_location_ids
 from restaurant_inventory.models.user import User
 from restaurant_inventory.models.count_session import CountSession, CountSessionItem, CountStatus
@@ -1003,7 +1008,7 @@ async def get_slow_moving_inventory(
     results = inventory_query.all()
 
     slow_items = []
-    cutoff_date = datetime.utcnow() - timedelta(days=days_threshold)
+    cutoff_date = get_now() - timedelta(days=days_threshold)
 
     for r in results:
         # Apply minimum value filter
@@ -1029,7 +1034,7 @@ async def get_slow_moving_inventory(
         last_txn = last_txn.order_by(InventoryTransaction.transaction_date.desc()).first()
 
         if last_txn:
-            days_since = (datetime.utcnow() - last_txn.transaction_date).days
+            days_since = (get_now() - last_txn.transaction_date).days
 
             # Only include if exceeds threshold
             if days_since < days_threshold:
@@ -1382,7 +1387,7 @@ async def get_cost_trend(
         raise HTTPException(status_code=404, detail="Item not found")
 
     # Calculate date cutoff
-    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    cutoff_date = get_now() - timedelta(days=days)
 
     # Get cost data for each location
     location_trends = []

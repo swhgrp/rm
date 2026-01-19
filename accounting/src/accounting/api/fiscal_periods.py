@@ -6,6 +6,11 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, date
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from accounting.db.database import get_db
 from accounting.models.fiscal_period import FiscalPeriod, FiscalPeriodStatus
 from accounting.models.user import User
@@ -231,7 +236,7 @@ def close_fiscal_period(
         raise HTTPException(status_code=400, detail="Cannot close a locked period")
 
     period.status = FiscalPeriodStatus.CLOSED
-    period.closed_at = datetime.utcnow()
+    period.closed_at = get_now()
     period.closed_by = user.id
 
     db.commit()

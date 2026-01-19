@@ -9,14 +9,16 @@ from datetime import date
 
 from accounting.db.database import get_db
 from accounting.models.payment import Payment, CheckBatch, ACHBatch, PaymentStatus
+from accounting.models.user import User
 from accounting.schemas.payment import (
     PaymentCreate, PaymentResponse, PaymentUpdate,
     BatchPaymentRequest, BatchPaymentResponse,
-    CheckBatchResponse, CheckPrintRequest, CheckPrintResponse,
+    CheckBatchCreate, CheckBatchResponse, CheckPrintRequest, CheckPrintResponse,
     ACHBatchResponse, ACHFileGenerateRequest, ACHFileGenerateResponse,
     PaymentVoidRequest, PaymentHistoryFilter, PaymentSummary
 )
 from accounting.services.payment_service import PaymentService
+from accounting.api.auth import require_auth
 
 router = APIRouter()
 
@@ -28,14 +30,12 @@ router = APIRouter()
 @router.post("/", response_model=PaymentResponse)
 def create_payment(
     payment: PaymentCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """Create a new payment"""
-    # TODO: Get user_id from session
-    user_id = 1
-
     service = PaymentService(db)
-    result = service.create_payment(payment, user_id)
+    result = service.create_payment(payment, current_user.id)
     return result
 
 
@@ -44,6 +44,8 @@ def list_payments(
     vendor_id: Optional[int] = None,
     area_id: Optional[int] = None,
     status: Optional[str] = None,
+    payment_method: Optional[str] = None,
+    bank_account_id: Optional[int] = None,
     start_date: Optional[date] = None,
     end_date: Optional[date] = None,
     skip: int = 0,
@@ -59,13 +61,25 @@ def list_payments(
         query = query.filter(Payment.area_id == area_id)
     if status:
         query = query.filter(Payment.status == status)
+    if payment_method:
+        query = query.filter(Payment.payment_method == payment_method.upper())
+    if bank_account_id:
+        query = query.filter(Payment.bank_account_id == bank_account_id)
     if start_date:
         query = query.filter(Payment.payment_date >= start_date)
     if end_date:
         query = query.filter(Payment.payment_date <= end_date)
 
     payments = query.order_by(Payment.payment_date.desc()).offset(skip).limit(limit).all()
-    return payments
+
+    # Build response with vendor_name included
+    result = []
+    for payment in payments:
+        payment_dict = PaymentResponse.model_validate(payment).model_dump()
+        payment_dict['vendor_name'] = payment.vendor.name if payment.vendor else None
+        result.append(payment_dict)
+
+    return result
 
 
 @router.get("/{payment_id}", response_model=PaymentResponse)
@@ -100,13 +114,12 @@ def update_payment(
 def void_payment(
     payment_id: int,
     void_request: PaymentVoidRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """Void a payment"""
-    user_id = 1  # TODO: Get from session
-
     service = PaymentService(db)
-    payment = service.void_payment(payment_id, void_request.void_reason, user_id)
+    payment = service.void_payment(payment_id, void_request.void_reason, current_user.id)
     return payment
 
 
@@ -117,13 +130,12 @@ def void_payment(
 @router.post("/batch", response_model=BatchPaymentResponse)
 def create_batch_payment(
     batch_request: BatchPaymentRequest,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """Create batch payment for multiple bills"""
-    user_id = 1  # TODO: Get from session
-
     service = PaymentService(db)
-    result = service.create_batch_payment(batch_request, user_id)
+    result = service.create_batch_payment(batch_request, current_user.id)
 
     return BatchPaymentResponse(
         batch_id=result['batch_id'],
@@ -155,6 +167,62 @@ def list_check_batches(
     return batches
 
 
+@router.post("/check-batches/", response_model=CheckBatchResponse)
+def create_check_batch(
+    batch_data: CheckBatchCreate,
+    db: Session = Depends(get_db)
+):
+    """Create a check batch from existing payments"""
+    from datetime import datetime
+
+    # Validate payments exist and are eligible
+    payments = db.query(Payment).filter(
+        Payment.id.in_(batch_data.payment_ids),
+        Payment.payment_method == 'CHECK',
+        Payment.status == 'DRAFT',
+        Payment.check_batch_id.is_(None)
+    ).all()
+
+    if len(payments) != len(batch_data.payment_ids):
+        raise HTTPException(
+            status_code=400,
+            detail="Some payments are not eligible for batching (must be CHECK method, DRAFT status, and not already in a batch)"
+        )
+
+    if not payments:
+        raise HTTPException(status_code=400, detail="No eligible payments found")
+
+    # Get next check number for this bank account
+    service = PaymentService(db)
+    starting_check_number = service._get_next_check_number(batch_data.bank_account_id)
+
+    # Create the batch
+    batch_number = f"CHK-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+
+    batch = CheckBatch(
+        batch_number=batch_number,
+        batch_date=batch_data.batch_date,
+        bank_account_id=batch_data.bank_account_id,
+        starting_check_number=starting_check_number,
+        ending_check_number=starting_check_number + len(payments) - 1,
+        check_count=len(payments),
+        total_amount=sum(p.net_amount for p in payments),
+        status='DRAFT'
+    )
+    db.add(batch)
+    db.flush()
+
+    # Assign check numbers and link payments to batch
+    for i, payment in enumerate(payments):
+        payment.check_number = starting_check_number + i
+        payment.check_batch_id = batch.id
+
+    db.commit()
+    db.refresh(batch)
+
+    return batch
+
+
 @router.get("/check-batches/{batch_id}", response_model=CheckBatchResponse)
 def get_check_batch(batch_id: int, db: Session = Depends(get_db)):
     """Get check batch by ID"""
@@ -167,15 +235,14 @@ def get_check_batch(batch_id: int, db: Session = Depends(get_db)):
 @router.post("/check-batches/{batch_id}/print")
 def print_checks(
     batch_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """Generate and return PDF for check batch"""
-    user_id = 1  # TODO: Get from session
-
     service = PaymentService(db)
 
     try:
-        pdf_path = service.print_checks(batch_id, user_id)
+        pdf_path = service.print_checks(batch_id, current_user.id)
         return FileResponse(
             pdf_path,
             media_type="application/pdf",
@@ -239,15 +306,14 @@ def list_ach_batches(
 @router.post("/ach-batches/{batch_id}/generate")
 def generate_ach_file(
     batch_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """Generate NACHA ACH file for batch"""
-    user_id = 1  # TODO: Get from session
-
     service = PaymentService(db)
 
     try:
-        ach_path = service.generate_ach_file(batch_id, user_id)
+        ach_path = service.generate_ach_file(batch_id, current_user.id)
         return FileResponse(
             ach_path,
             media_type="text/plain",

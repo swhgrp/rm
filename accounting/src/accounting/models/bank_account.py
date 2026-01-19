@@ -21,6 +21,7 @@ class BankAccount(Base):
     opening_balance = Column(Numeric(15, 2), nullable=True)
     opening_balance_date = Column(Date, nullable=True)  # Date of opening balance for JE
     current_balance = Column(Numeric(15, 2), nullable=True)
+    starting_check_number = Column(Integer, nullable=True, default=1001)  # First check number for this account
     status = Column(String(20), nullable=False, default="active", index=True)
 
     # Sync configuration

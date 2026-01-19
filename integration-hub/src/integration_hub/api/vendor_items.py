@@ -20,6 +20,11 @@ from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from integration_hub.db.database import get_db
 from integration_hub.models.hub_vendor_item import HubVendorItem, VendorItemStatus
 from integration_hub.models.vendor import Vendor
@@ -1035,11 +1040,11 @@ async def update_vendor_item(
     if "last_purchase_price" in update_data and update_data["last_purchase_price"] is not None:
         if item.last_purchase_price is not None:
             item.previous_purchase_price = item.last_purchase_price
-        item.price_updated_at = datetime.utcnow()
+        item.price_updated_at = get_now()
     elif "unit_price" in update_data and update_data["unit_price"] is not None:
         if item.unit_price is not None:
             item.last_price = item.unit_price
-        item.price_updated_at = datetime.utcnow()
+        item.price_updated_at = get_now()
 
     for field, value in update_data.items():
         setattr(item, field, value)

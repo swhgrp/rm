@@ -6,8 +6,13 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
 from sqlalchemy.exc import SQLAlchemyError
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 from decimal import Decimal
+
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
 
 from restaurant_inventory.core.deps import get_db, get_current_user, get_user_location_ids
 from restaurant_inventory.models.user import User
@@ -336,7 +341,7 @@ async def approve_transfer(
     # Update transfer
     transfer.status = TransferStatus.APPROVED
     transfer.approved_by = current_user.id
-    transfer.approved_at = datetime.now(timezone.utc)
+    transfer.approved_at = get_now()
 
     db.commit()
     db.refresh(transfer)
@@ -465,7 +470,7 @@ async def complete_transfer(
 
         # Update transfer status
         transfer.status = TransferStatus.COMPLETED
-        transfer.completed_at = datetime.now(timezone.utc)
+        transfer.completed_at = get_now()
 
         db.commit()
         db.refresh(transfer)
@@ -681,7 +686,7 @@ async def get_transfer_statistics(
     from datetime import timedelta
 
     # Calculate date threshold
-    date_threshold = datetime.now(timezone.utc) - timedelta(days=days)
+    date_threshold = get_now() - timedelta(days=days)
 
     # Build base query
     query = db.query(Transfer).filter(Transfer.created_at >= date_threshold)

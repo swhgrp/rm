@@ -11,6 +11,11 @@ from typing import Optional, Dict, List
 from datetime import datetime
 from sqlalchemy.orm import Session
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from integration_hub.models.hub_vendor_item import HubVendorItem
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
@@ -77,7 +82,7 @@ class PriceTrackerService:
         # Update vendor item
         vendor_item.last_price = old_price
         vendor_item.unit_price = new_price
-        vendor_item.price_updated_at = datetime.utcnow()
+        vendor_item.price_updated_at = get_now()
 
         logger.info(
             f"Price updated for vendor item {vendor_item.id}: "
@@ -203,7 +208,7 @@ class PriceTrackerService:
         from datetime import timedelta
         from sqlalchemy import func, and_
 
-        cutoff = datetime.utcnow() - timedelta(days=days)
+        cutoff = get_now() - timedelta(days=days)
 
         history = self.db.query(PriceHistory).join(
             HubVendorItem

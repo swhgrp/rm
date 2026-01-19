@@ -382,7 +382,7 @@ function setMultiPeriodMode() {
 
 async function loadAreas() {
     try {
-        const response = await fetch('api/areas/', {
+        const response = await fetch('/accounting/api/areas/', {
             credentials: 'include'
         });
 
@@ -591,7 +591,7 @@ async function loadTwoPeriodReport() {
         params.append('area_id', areaId);
     }
 
-    const response = await fetch(`api/reports/comparative-profit-loss?${params}`, {
+    const response = await fetch(`/accounting/api/reports/comparative-profit-loss?${params}`, {
         credentials: 'include'
     });
 

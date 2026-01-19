@@ -583,7 +583,10 @@ def calculate_recipe_cost(
     recipe.food_cost_percentage = food_cost_percentage
 
     from datetime import datetime
-    recipe.last_costed = datetime.utcnow()
+    from zoneinfo import ZoneInfo
+    _ET = ZoneInfo("America/New_York")
+    def get_now(): return datetime.now(_ET)
+    recipe.last_costed = get_now()
 
     db.commit()
 

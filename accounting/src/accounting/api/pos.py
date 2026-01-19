@@ -812,7 +812,9 @@ def import_pos_to_daily_sales(
 ):
     """Import POS cached sales data to Daily Sales Summary"""
     from accounting.models.daily_sales_summary import DailySalesSummary
-    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    _ET = ZoneInfo("America/New_York")
+    def get_now(): return datetime.now(_ET)
 
     # Get cached POS sales for this date
     cached_sale = db.query(POSDailySalesCache).filter(
@@ -863,7 +865,7 @@ def import_pos_to_daily_sales(
         status='draft',
         imported_from='clover_pos',
         imported_from_pos=True,
-        imported_at=datetime.utcnow(),
+        imported_at=get_now(),
         pos_sync_date=cached_sale.synced_at,
         pos_transaction_count=cached_sale.transaction_count,
         created_by=user.id,

@@ -13,6 +13,11 @@ from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 
 router = APIRouter()
 
@@ -96,7 +101,7 @@ def get_audit_stats(
 
     # Recent activity (last 7 days)
     from datetime import timedelta
-    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    seven_days_ago = get_now() - timedelta(days=7)
     recent_logs = db.query(func.count(AuditLog.id)).filter(
         AuditLog.timestamp >= seven_days_ago
     ).scalar()

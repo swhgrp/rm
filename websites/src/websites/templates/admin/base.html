@@ -782,6 +782,11 @@
             showToast(evt.detail.message, evt.detail.type);
         });
 
+        // Override window.alert to use toast notifications
+        window.alert = function(message) {
+            showToast(message, 'info');
+        };
+
         // Custom confirm dialog
         function showConfirm(message, title = 'Confirm Action') {
             return new Promise((resolve) => {

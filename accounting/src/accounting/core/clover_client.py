@@ -5,7 +5,7 @@ Handles communication with Clover REST API for orders and sales data
 
 import httpx
 from typing import List, Dict, Optional, Any
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -346,7 +346,7 @@ def parse_clover_payment(clover_payment: Dict) -> Dict[str, Any]:
         "status": status,
         "order_type": None,
         "raw_data": str(clover_payment),
-        "synced_at": datetime.utcnow()
+        "synced_at": datetime.now(timezone.utc)
     }
 
     return parsed
@@ -435,7 +435,7 @@ def parse_clover_order(clover_order: Dict) -> Dict[str, Any]:
         "status": status,
         "order_type": clover_order.get("orderType", {}).get("label"),
         "raw_data": str(clover_order),  # Store for debugging
-        "synced_at": datetime.utcnow()
+        "synced_at": datetime.now(timezone.utc)
     }
 
     return parsed

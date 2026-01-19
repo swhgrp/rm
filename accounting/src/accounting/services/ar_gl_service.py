@@ -12,6 +12,11 @@ from datetime import date, datetime
 from typing import Optional
 import logging
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from accounting.models.journal_entry import JournalEntry, JournalEntryLine, JournalEntryStatus
 from accounting.models.customer_invoice import CustomerInvoice, InvoicePayment
 from accounting.models.account import Account, AccountType
@@ -142,7 +147,7 @@ class ARGLService:
         )
 
         if auto_post:
-            journal_entry.posted_at = datetime.utcnow()
+            journal_entry.posted_at = get_now()
             journal_entry.approved_by = user_id
 
         self.db.add(journal_entry)
@@ -285,7 +290,7 @@ class ARGLService:
         )
 
         if auto_post:
-            journal_entry.posted_at = datetime.utcnow()
+            journal_entry.posted_at = get_now()
             journal_entry.approved_by = user_id
 
         self.db.add(journal_entry)
@@ -380,7 +385,7 @@ class ARGLService:
             location_id=original_entry.location_id,
             created_by=user_id,
             status=JournalEntryStatus.POSTED,
-            posted_at=datetime.utcnow(),
+            posted_at=get_now(),
             approved_by=user_id
         )
 

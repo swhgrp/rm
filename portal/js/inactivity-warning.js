@@ -1,17 +1,20 @@
 /**
- * Inactivity Warning System
+ * Inactivity Warning System for Portal
  * Shows a warning 2 minutes before session expires
+ * Auto-logs out user after 30 minutes of inactivity
  */
 
 (function() {
-    const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
-    const WARNING_BEFORE_MS = 2 * 60 * 1000;
+    const SESSION_TIMEOUT_MS = 30 * 60 * 1000;  // 30 minutes
+    const WARNING_BEFORE_MS = 2 * 60 * 1000;    // Show warning 2 min before
     const WARNING_TIME_MS = SESSION_TIMEOUT_MS - WARNING_BEFORE_MS;
+    const THROTTLE_MS = 1000;  // Throttle activity detection to 1 second
 
     let activityTimer = null;
     let warningTimer = null;
     let warningModal = null;
     let countdownInterval = null;
+    let lastActivityTime = Date.now();
 
     function createWarningModal() {
         const modalHtml = '<div class="modal fade" id="inactivityWarningModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">' +
@@ -35,7 +38,7 @@
         warningModal = new bootstrap.Modal(document.getElementById('inactivityWarningModal'));
 
         document.getElementById('stayLoggedInBtn').addEventListener('click', function() {
-            resetActivity();
+            resetActivity(true);  // Force reset
             warningModal.hide();
         });
     }
@@ -72,10 +75,17 @@
         clearInterval(countdownInterval);
         localStorage.clear();
         sessionStorage.clear();
-        window.location.href = '/login';
+        window.location.href = '/portal/login?reason=inactivity';
     }
 
-    function resetActivity() {
+    function resetActivity(force) {
+        // Throttle activity detection unless forced
+        const now = Date.now();
+        if (!force && (now - lastActivityTime) < THROTTLE_MS) {
+            return;
+        }
+        lastActivityTime = now;
+
         clearTimeout(activityTimer);
         clearTimeout(warningTimer);
         clearInterval(countdownInterval);
@@ -92,19 +102,23 @@
     }
 
     function setupActivityTracking() {
-        const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+        // Only track INTENTIONAL user activity (not passive like mousemove)
+        const events = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
         events.forEach(function(event) {
-            document.addEventListener(event, resetActivity, true);
+            document.addEventListener(event, function() { resetActivity(false); }, { passive: true });
         });
     }
+
+    // Expose for external use (e.g., "Stay Logged In" buttons)
+    window.resetInactivityTimer = function() { resetActivity(true); };
 
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', function() {
             setupActivityTracking();
-            resetActivity();
+            resetActivity(true);
         });
     } else {
         setupActivityTracking();
-        resetActivity();
+        resetActivity(true);
     }
 })();

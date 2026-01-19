@@ -10,6 +10,11 @@ from datetime import date, datetime
 from decimal import Decimal
 from pydantic import BaseModel
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from accounting.db.database import get_db
 from accounting.models.user import User
 from accounting.api.auth import require_auth
@@ -301,7 +306,7 @@ def update_recurring_invoice(
         template = service.calculate_totals(template)
 
     template.updated_by = current_user.id
-    template.updated_at = datetime.utcnow()
+    template.updated_at = get_now()
 
     db.commit()
     db.refresh(template)
@@ -370,7 +375,7 @@ def pause_recurring_invoice(
 
     template.status = RecurringInvoiceStatus.PAUSED
     template.updated_by = current_user.id
-    template.updated_at = datetime.utcnow()
+    template.updated_at = get_now()
 
     db.commit()
 
@@ -395,7 +400,7 @@ def resume_recurring_invoice(
 
     template.status = RecurringInvoiceStatus.ACTIVE
     template.updated_by = current_user.id
-    template.updated_at = datetime.utcnow()
+    template.updated_at = get_now()
 
     db.commit()
 
@@ -417,7 +422,7 @@ def cancel_recurring_invoice(
 
     template.status = RecurringInvoiceStatus.CANCELLED
     template.updated_by = current_user.id
-    template.updated_at = datetime.utcnow()
+    template.updated_at = get_now()
 
     db.commit()
 

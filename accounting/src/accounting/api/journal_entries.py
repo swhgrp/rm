@@ -8,6 +8,11 @@ from typing import List, Optional
 from datetime import datetime, date
 from decimal import Decimal
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from accounting.db.database import get_db
 from accounting.models.journal_entry import JournalEntry, JournalEntryLine, JournalEntryStatus
 from accounting.models.account import Account
@@ -436,7 +441,7 @@ def reverse_journal_entry(
         reference_id=entry.id,
         location_id=entry.location_id,
         status=JournalEntryStatus.POSTED,  # Auto-post reversals
-        posted_at=datetime.utcnow(),
+        posted_at=get_now(),
         posted_by=user.id
     )
     db.add(reversal_entry)
@@ -611,7 +616,7 @@ def receive_journal_entry_from_hub(
             status=JournalEntryStatus.POSTED,  # Auto-post from hub
             created_by=1,  # System user - TODO: create dedicated system user
             approved_by=1,  # System user
-            posted_at=datetime.utcnow()
+            posted_at=get_now()
         )
 
         db.add(entry)

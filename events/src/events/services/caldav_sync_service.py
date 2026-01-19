@@ -2,12 +2,17 @@
 import caldav
 from caldav.elements import dav, cdav
 from icalendar import Calendar, Event as ICalEvent
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List
 from sqlalchemy.orm import Session
 from events.models import Event, User
 from events.core.config import settings
 import logging
+
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
 
 logger = logging.getLogger(__name__)
 
@@ -381,7 +386,7 @@ class CalDAVSyncService:
                 existing_hold_uids.add(hold.caldav_uid)
 
             # Search for events in date range (past month to next year)
-            now = datetime.now(timezone.utc)
+            now = get_now()
             start_date = now - timedelta(days=30)
             end_date = now + timedelta(days=365)
 
@@ -618,7 +623,7 @@ class CalDAVSyncService:
             seen_event_uids = set()
 
             # Search for events in date range (past month to next year)
-            now = datetime.now(timezone.utc)
+            now = get_now()
             start_date = now - timedelta(days=30)
             end_date = now + timedelta(days=365)
 

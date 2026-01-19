@@ -19,6 +19,11 @@ from restaurant_inventory.core.audit import log_audit_event
 from restaurant_inventory.schemas.inventory import InventoryCreate, InventoryUpdate, InventoryResponse
 from datetime import datetime, date
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 class InventoryCountUpdate(BaseModel):
     new_quantity: float
 
@@ -254,7 +259,7 @@ async def create_inventory_record(
 
     # Set last count date
     from datetime import datetime, timezone
-    inventory.last_count_date = datetime.now(timezone.utc)
+    inventory.last_count_date = get_now()
 
     db.add(inventory)
     db.commit()
@@ -291,7 +296,7 @@ async def update_inventory_record(
     # Update last count date if quantity changed
     if "current_quantity" in update_data:
         from datetime import datetime, timezone
-        record.last_count_date = datetime.now(timezone.utc)
+        record.last_count_date = get_now()
     
     db.commit()
     db.refresh(record)
@@ -344,7 +349,7 @@ async def update_inventory_count(
 
     # Update timestamps
     from datetime import datetime, timezone
-    record.last_count_date = datetime.now(timezone.utc)
+    record.last_count_date = get_now()
 
     db.commit()
 
@@ -393,26 +398,3 @@ class InventoryTransactionResponse(BaseModel):
     reason: Optional[str] = None
     notes: Optional[str] = None
 
-
-# Temporarily disabled
-# @router.get("/transactions/item/{master_item_id}", response_model=List[InventoryTransactionResponse])
-# async def get_item_transaction_history(
-#     master_item_id: int,
-#     skip: int = 0,
-#     limit: int = 100,
-#     location_id: Optional[int] = Query(None, description="Filter by location ID"),
-#     db: Session = Depends(get_db),
-#     current_user: User = Depends(get_current_user)
-# ):
-#     """Get transaction history for a specific item"""
-#     return await get_inventory_transactions(
-#         skip=skip,
-#         limit=limit,
-#         location_id=location_id,
-#         master_item_id=master_item_id,
-#         transaction_type=None,
-#         start_date=None,
-#         end_date=None,
-#         db=db,
-#         current_user=current_user
-#     )

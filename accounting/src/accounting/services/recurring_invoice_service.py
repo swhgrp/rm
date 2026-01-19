@@ -10,6 +10,11 @@ from datetime import datetime, timedelta, date
 from decimal import Decimal
 import logging
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from accounting.models.recurring_invoice import (
     RecurringInvoice,
     RecurringInvoiceLineItem,
@@ -40,7 +45,7 @@ class RecurringInvoiceService:
         due_invoices = self.db.query(RecurringInvoice).filter(
             and_(
                 RecurringInvoice.status == RecurringInvoiceStatus.ACTIVE,
-                RecurringInvoice.next_invoice_date <= datetime.utcnow()
+                RecurringInvoice.next_invoice_date <= get_now()
             )
         ).all()
 
@@ -116,7 +121,7 @@ class RecurringInvoiceService:
 
         # Update recurring invoice
         recurring_invoice.invoices_generated += 1
-        recurring_invoice.last_generated_at = datetime.utcnow()
+        recurring_invoice.last_generated_at = get_now()
         recurring_invoice.next_invoice_date = self._calculate_next_invoice_date(recurring_invoice)
 
         # Check if we should mark as completed

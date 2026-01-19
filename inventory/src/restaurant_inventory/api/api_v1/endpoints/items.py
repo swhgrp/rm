@@ -12,7 +12,6 @@ import logging
 
 from restaurant_inventory.core.deps import get_db, get_current_user, require_manager_or_admin, verify_hub_api_key
 from restaurant_inventory.models.item import MasterItem
-from restaurant_inventory.models._deprecated.vendor_item import VendorItem  # For merge/import only
 from restaurant_inventory.models.unit_of_measure import UnitOfMeasure
 from restaurant_inventory.models.user import User
 from restaurant_inventory.schemas.item import MasterItemCreate, MasterItemUpdate, MasterItemResponse
@@ -366,7 +365,6 @@ async def merge_master_items(
     from restaurant_inventory.models.recipe import RecipeIngredient
     from restaurant_inventory.models.waste import WasteRecord
     from restaurant_inventory.models.count_session import CountSessionItem
-    from restaurant_inventory.models._deprecated.invoice import InvoiceItem
     from restaurant_inventory.models.inventory_transaction import InventoryTransaction
     from restaurant_inventory.models.item_unit_conversion import ItemUnitConversion
 
@@ -382,9 +380,7 @@ async def merge_master_items(
         raise HTTPException(status_code=400, detail="Source and target cannot be the same item")
 
     merge_stats = {
-        "vendor_items": 0,
         "waste_records": 0,
-        "invoice_items": 0,
         "inventory_records": 0,
         "count_session_items": 0,
         "recipe_ingredients": 0,
@@ -392,25 +388,14 @@ async def merge_master_items(
         "inventory_transactions": 0,
         "unit_conversions": 0
     }
+    # Note: vendor_items and invoice_items are now managed by Integration Hub
 
     try:
-        # Move vendor_items
-        vendor_items_moved = db.query(VendorItem).filter(
-            VendorItem.master_item_id == source_id
-        ).update({VendorItem.master_item_id: target_id})
-        merge_stats["vendor_items"] = vendor_items_moved
-
         # Move waste_records
         waste_moved = db.query(WasteRecord).filter(
             WasteRecord.master_item_id == source_id
         ).update({WasteRecord.master_item_id: target_id})
         merge_stats["waste_records"] = waste_moved
-
-        # Move invoice_items
-        invoice_moved = db.query(InvoiceItem).filter(
-            InvoiceItem.master_item_id == source_id
-        ).update({InvoiceItem.master_item_id: target_id})
-        merge_stats["invoice_items"] = invoice_moved
 
         # Move inventory records
         inventory_moved = db.query(Inventory).filter(
@@ -589,11 +574,10 @@ async def get_item_location_costs(
     """
     Get cost comparison by location for a master item.
 
-    Uses the MasterItemLocationCost table for weighted average costs,
-    with fallback to invoice data for legacy items.
+    Uses the MasterItemLocationCost table for weighted average costs.
+    Invoice data is now managed by Integration Hub.
     """
     from sqlalchemy import func, desc
-    from restaurant_inventory.models._deprecated.invoice import Invoice, InvoiceItem
     from restaurant_inventory.models.location import Location
     from restaurant_inventory.models.master_item_location_cost import MasterItemLocationCost, MasterItemLocationCostHistory
 
@@ -604,7 +588,7 @@ async def get_item_location_costs(
     master_item = db.query(MasterItem).filter(MasterItem.id == item_id).first()
     default_cost = float(master_item.average_cost) if master_item and master_item.average_cost else None
 
-    # First, get data from new MasterItemLocationCost table
+    # Get data from MasterItemLocationCost table
     location_costs = db.query(
         MasterItemLocationCost,
         Location.name.label('location_name')
@@ -614,28 +598,13 @@ async def get_item_location_costs(
         MasterItemLocationCost.master_item_id == item_id
     ).all()
 
-    # Get invoice count for each location (for display)
-    invoice_counts = db.query(
-        Invoice.location_id,
-        func.count(InvoiceItem.id).label('invoice_count')
-    ).join(
-        InvoiceItem, InvoiceItem.invoice_id == Invoice.id
-    ).filter(
-        InvoiceItem.master_item_id == item_id
-    ).group_by(Invoice.location_id).all()
-
-    invoice_count_map = {loc_id: count for loc_id, count in invoice_counts}
-
     if location_costs:
         # Use data from MasterItemLocationCost - show ALL locations
         for cost_record, location_name in location_costs:
-            inv_count = invoice_count_map.get(cost_record.location_id, 0)
-
-            # Determine if this location has actual invoice-based cost data
+            # Determine if this location has actual cost data
             has_location_specific_data = (
                 cost_record.last_purchase_cost is not None or
-                cost_record.last_purchase_date is not None or
-                inv_count > 0
+                cost_record.last_purchase_date is not None
             )
 
             # Use location-specific cost if available, otherwise use default
@@ -649,54 +618,13 @@ async def get_item_location_costs(
             results.append({
                 'location_id': cost_record.location_id,
                 'location_name': location_name,
-                'invoice_count': inv_count,
+                'invoice_count': 0,  # Invoice data now in Integration Hub
                 'last_price': float(cost_record.last_purchase_cost) if cost_record.last_purchase_cost else None,
                 'avg_price': avg_price,
                 'last_invoice_date': cost_record.last_purchase_date.isoformat() if cost_record.last_purchase_date else None,
                 'qty_on_hand': float(cost_record.total_qty_on_hand) if cost_record.total_qty_on_hand else 0,
                 'last_updated': cost_record.last_updated.isoformat() if cost_record.last_updated else None,
                 'is_default_cost': is_default_cost
-            })
-    else:
-        # Fallback: query invoice items for legacy data
-        location_stats = db.query(
-            Location.id.label('location_id'),
-            Location.name.label('location_name'),
-            func.count(InvoiceItem.id).label('invoice_count'),
-            func.avg(InvoiceItem.unit_price).label('avg_price'),
-            func.max(Invoice.invoice_date).label('last_invoice_date')
-        ).join(
-            Invoice, Invoice.id == InvoiceItem.invoice_id
-        ).join(
-            Location, Location.id == Invoice.location_id
-        ).filter(
-            InvoiceItem.master_item_id == item_id
-        ).group_by(
-            Location.id, Location.name
-        ).all()
-
-        for stat in location_stats:
-            # Get the most recent price for this location
-            last_item = db.query(InvoiceItem.unit_price).join(
-                Invoice, Invoice.id == InvoiceItem.invoice_id
-            ).filter(
-                InvoiceItem.master_item_id == item_id,
-                Invoice.location_id == stat.location_id
-            ).order_by(desc(Invoice.invoice_date)).first()
-
-            last_price = last_item[0] if last_item else None
-            avg_price = float(stat.avg_price) if stat.avg_price else None
-
-            results.append({
-                'location_id': stat.location_id,
-                'location_name': stat.location_name,
-                'invoice_count': stat.invoice_count,
-                'last_price': float(last_price) if last_price else None,
-                'avg_price': avg_price,
-                'last_invoice_date': stat.last_invoice_date.isoformat() if stat.last_invoice_date else None,
-                'qty_on_hand': None,
-                'last_updated': None,
-                'is_default_cost': False  # Legacy path only returns locations with invoice data
             })
 
     if not results:
@@ -812,7 +740,10 @@ async def create_master_item(
     item = MasterItem(**item_data.dict())
     if item_data.current_cost:
         from datetime import datetime
-        item.last_cost_update = datetime.utcnow()
+        from zoneinfo import ZoneInfo
+        _ET = ZoneInfo("America/New_York")
+        def get_now(): return datetime.now(_ET)
+        item.last_cost_update = get_now()
 
     db.add(item)
     db.commit()
@@ -867,7 +798,10 @@ async def update_master_item(
     update_data = item_data.dict(exclude_unset=True)
     if "current_cost" in update_data and update_data["current_cost"] is not None:
         from datetime import datetime
-        update_data["last_cost_update"] = datetime.utcnow()
+        from zoneinfo import ZoneInfo
+        _ET = ZoneInfo("America/New_York")
+        def get_now(): return datetime.now(_ET)
+        update_data["last_cost_update"] = get_now()
 
     # If primary_uom_id is being set, fetch the UoM details from Hub to cache name/abbr
     if "primary_uom_id" in update_data and update_data["primary_uom_id"] is not None:
@@ -958,7 +892,6 @@ async def delete_master_item(
     from restaurant_inventory.models.recipe import RecipeIngredient
     from restaurant_inventory.models.waste import WasteRecord
     from restaurant_inventory.models.count_session import CountSessionItem
-    from restaurant_inventory.models._deprecated.invoice import InvoiceItem
     from restaurant_inventory.models.inventory_transaction import InventoryTransaction
 
     blocking_items = []
@@ -988,10 +921,7 @@ async def delete_master_item(
     if count_count > 0:
         blocking_items.append(f"{count_count} count session item(s)")
 
-    # Check invoice items
-    invoice_count = db.query(InvoiceItem).filter(InvoiceItem.master_item_id == item_id).count()
-    if invoice_count > 0:
-        blocking_items.append(f"{invoice_count} invoice item(s)")
+    # Note: Invoice items are now managed by Integration Hub, not checked here
 
     # Check inventory transactions
     transaction_count = db.query(InventoryTransaction).filter(InventoryTransaction.master_item_id == item_id).count()

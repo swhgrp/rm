@@ -129,6 +129,18 @@ class User(Base):
     reset_token_expires = Column(DateTime, nullable=True)
 
 
+# System Settings model (from HR database)
+class SystemSettings(Base):
+    """System settings model - stores key-value configuration"""
+    __tablename__ = "system_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String(50), nullable=False, index=True)
+    key = Column(String(100), nullable=False, unique=True, index=True)
+    value = Column(String, nullable=True)
+    description = Column(String(255), nullable=True)
+
+
 # Database dependency
 def get_db():
     db = SessionLocal()
@@ -791,6 +803,88 @@ async def update_user_permissions(
     db.commit()
 
     return {"success": True, "message": "Permissions updated", "admin_changed": admin_changed}
+
+
+# ============================================================================
+# System Settings
+# ============================================================================
+
+@app.get("/system-settings", response_class=HTMLResponse)
+async def system_settings_page(
+    request: Request,
+    user: User = Depends(require_login),
+    db: Session = Depends(get_db)
+):
+    """System settings page (admin only)"""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # Get current timezone setting
+    timezone_setting = db.query(SystemSettings).filter(
+        SystemSettings.key == "system_timezone"
+    ).first()
+
+    current_timezone = timezone_setting.value if timezone_setting else "America/New_York"
+
+    return templates.TemplateResponse(
+        "system_settings.html",
+        {
+            "request": request,
+            "user": user,
+            "current_timezone": current_timezone
+        }
+    )
+
+
+@app.get("/api/system-settings/timezone")
+async def get_timezone_setting(db: Session = Depends(get_db)):
+    """Get current system timezone (public endpoint for all services)"""
+    setting = db.query(SystemSettings).filter(
+        SystemSettings.key == "system_timezone"
+    ).first()
+
+    return {"timezone": setting.value if setting else "America/New_York"}
+
+
+@app.post("/api/system-settings/timezone")
+async def update_timezone_setting(
+    request: Request,
+    user: User = Depends(require_login),
+    db: Session = Depends(get_db)
+):
+    """Update system timezone (admin only)"""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    form_data = await request.form()
+    new_timezone = form_data.get("timezone", "America/New_York")
+
+    # Validate timezone
+    try:
+        from zoneinfo import ZoneInfo
+        ZoneInfo(new_timezone)
+    except Exception:
+        raise HTTPException(status_code=400, detail=f"Invalid timezone: {new_timezone}")
+
+    # Update or create setting
+    setting = db.query(SystemSettings).filter(
+        SystemSettings.key == "system_timezone"
+    ).first()
+
+    if setting:
+        setting.value = new_timezone
+    else:
+        setting = SystemSettings(
+            category="general",
+            key="system_timezone",
+            value=new_timezone,
+            description="System-wide timezone for all services"
+        )
+        db.add(setting)
+
+    db.commit()
+
+    return {"success": True, "message": f"Timezone updated to {new_timezone}"}
 
 
 @app.get("/api/generate-token/{system}")

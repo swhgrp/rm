@@ -103,7 +103,20 @@
       "Bash(docker run:*)",
       "Bash(source:*)",
       "Bash(alembic revision:*)",
-      "Bash(openssl x509:*)"
+      "Bash(openssl x509:*)",
+      "Bash(docker port:*)",
+      "Bash(git log:*)",
+      "Bash(python:*)",
+      "Bash(sqlite3:*)",
+      "Bash(PYTHONPATH=src python3:*)",
+      "Bash(pip3 show:*)",
+      "Bash(/opt/restaurant-system/integration-hub/.venv/bin/python:*)",
+      "Bash(pip3 install:*)",
+      "Bash(git -C /opt/restaurant-system show:*)",
+      "Bash(git -C /opt/restaurant-system/files log --oneline -20)",
+      "Bash(comm:*)",
+      "Bash(md5sum:*)",
+      "Bash(alembic upgrade:*)"
     ],
     "deny": [],
     "ask": []

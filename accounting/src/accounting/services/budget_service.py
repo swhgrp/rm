@@ -6,6 +6,11 @@ from decimal import Decimal
 from typing import List, Optional, Dict
 from calendar import monthrange
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from accounting.models.budget import (
     Budget, BudgetPeriod, BudgetLine, BudgetStatus, BudgetPeriodType
 )
@@ -176,7 +181,7 @@ class BudgetService:
 
         budget.status = BudgetStatus.APPROVED
         budget.approved_by = user_id
-        budget.approved_at = datetime.utcnow()
+        budget.approved_at = get_now()
 
         # If budget period includes today, make it active
         if budget.start_date <= date.today() <= budget.end_date:

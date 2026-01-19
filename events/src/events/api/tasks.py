@@ -5,6 +5,11 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import datetime
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from events.core.database import get_db
 from events.core.deps import require_auth, require_permission, check_permission
 from events.models import Task, TaskChecklistItem, TaskStatus, User
@@ -243,7 +248,7 @@ async def update_task(
 
     # Auto-set completed_at when marking done
     if update_dict.get('status') == TaskStatus.DONE and task.status != TaskStatus.DONE:
-        update_dict['completed_at'] = datetime.utcnow()
+        update_dict['completed_at'] = get_now()
 
     # Clear completed_at if changing from done to another status
     if update_dict.get('status') and update_dict['status'] != TaskStatus.DONE:

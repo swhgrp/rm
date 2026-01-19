@@ -4,8 +4,13 @@ Audit Log Model for tracking all system changes
 
 from sqlalchemy import Column, Integer, String, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import relationship
-from datetime import datetime, timezone
+from datetime import datetime
 from restaurant_inventory.db.database import Base
+
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
 
 
 class AuditLog(Base):
@@ -13,7 +18,7 @@ class AuditLog(Base):
     __tablename__ = "audit_log"
 
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
+    timestamp = Column(DateTime(timezone=True), default=lambda: get_now(), nullable=False)
 
     # User information
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)

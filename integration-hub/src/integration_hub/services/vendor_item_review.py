@@ -17,6 +17,11 @@ from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from integration_hub.models.hub_vendor_item import HubVendorItem, VendorItemStatus
 from integration_hub.models.vendor import Vendor
 
@@ -126,9 +131,9 @@ class VendorItemReviewService:
             return {'error': f'Item is not in needs_review status (current: {item.status.value})'}
 
         item.status = VendorItemStatus.active
-        item.updated_at = datetime.utcnow()
+        item.updated_at = get_now()
         if approved_by:
-            item.notes = f"{item.notes or ''}\nApproved by {approved_by} at {datetime.utcnow().isoformat()}".strip()
+            item.notes = f"{item.notes or ''}\nApproved by {approved_by} at {get_now().isoformat()}".strip()
 
         self.db.commit()
 
@@ -152,8 +157,8 @@ class VendorItemReviewService:
             return {'error': 'Vendor item not found'}
 
         item.status = VendorItemStatus.inactive
-        item.updated_at = datetime.utcnow()
-        note = f"Rejected by {rejected_by or 'unknown'} at {datetime.utcnow().isoformat()}"
+        item.updated_at = get_now()
+        note = f"Rejected by {rejected_by or 'unknown'} at {get_now().isoformat()}"
         if reason:
             note += f": {reason}"
         item.notes = f"{item.notes or ''}\n{note}".strip()

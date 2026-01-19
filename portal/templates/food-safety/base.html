@@ -620,6 +620,9 @@
         window.showSuccess = (msg) => showToast(msg, 'success');
         window.showWarning = (msg) => showToast(msg, 'warning');
         window.showInfo = (msg) => showToast(msg, 'info');
+
+        // Override window.alert to use toast notifications
+        window.alert = (msg) => showToast(msg, 'info');
     </script>
 
     {% block extra_scripts %}{% endblock %}

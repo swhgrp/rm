@@ -15,10 +15,15 @@ Architecture:
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy import text as sql_text
+
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
 
 from openai import OpenAI
 
@@ -159,7 +164,7 @@ class EmbeddingService:
                 """),
                 {
                     "embedding": str(embedding),
-                    "now": datetime.now(timezone.utc),
+                    "now": get_now(),
                     "id": vendor_item.id
                 }
             )
@@ -227,7 +232,7 @@ class EmbeddingService:
                         """),
                         {
                             "embedding": str(embedding),
-                            "now": datetime.now(timezone.utc),
+                            "now": get_now(),
                             "id": item.id
                         }
                     )

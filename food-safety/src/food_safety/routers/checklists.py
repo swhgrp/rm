@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from food_safety.database import get_db
 from food_safety.models import (
     ChecklistTemplate, ChecklistItem, ChecklistSubmission,
@@ -324,7 +329,7 @@ async def complete_submission(
 
     # Update submission status
     submission.completed_by = data.completed_by
-    submission.completed_at = datetime.utcnow()
+    submission.completed_at = get_now()
     submission.notes = data.notes
 
     # Check if manager signoff is required

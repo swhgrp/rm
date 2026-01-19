@@ -1,12 +1,21 @@
 # Restaurant Management System - Consolidated TODO
 
-**Last Updated:** January 18, 2026
+**Last Updated:** January 19, 2026
 
 ## Priority Legend
 - P0: Critical - Blocking production use
 - P1: High - Important for daily operations
 - P2: Medium - Nice to have improvements
 - P3: Low - Future enhancements
+
+---
+
+## 🔥 Immediate Needs (Active Investigation)
+
+### P0 - Investigate Now
+- [ ] **Why can Inventory edit vendor items?** - Vendor items should be Hub-only; check if Inventory has edit UI that should be removed or redirected to Hub
+- [ ] **Check Flap Meat pricing** - Compare pricing in Hub vs Inventory; verify cost propagation is working correctly
+- [ ] **Weight-based invoice items** - Need solution for items that come in on invoice by weight (variable quantity); current system assumes fixed units
 
 ---
 
@@ -55,6 +64,7 @@
 - [ ] **Add more POS systems** - Square and Toast defined but not implemented (Clover done)
 
 #### Technical Debt
+- [x] ~~Remove deprecated models~~ ✅ **DONE Jan 19** - Removed `_deprecated/` folders (Invoice, VendorItem, VendorAlias models moved to Integration Hub)
 - [ ] Clean up deprecated `unit_of_measure` string field (marked deprecated, not removed)
 - [ ] Review and consolidate duplicate master items (ongoing data quality)
 - [ ] Items in "Uncategorized" category need proper categorization
@@ -81,7 +91,7 @@
 - [ ] **Advanced variance analysis** - Drill-down variance reports with root cause analysis
 
 #### Technical Debt
-- [ ] Migrate deprecated `datetime.utcnow()` to `datetime.now(timezone.utc)` (20+ instances)
+- [x] ~~Migrate deprecated `datetime.utcnow()` to `datetime.now(timezone.utc)`~~ ✅ **DONE Jan 19** - Fixed 99 instances across all systems
 - [ ] Review and clean up unused API endpoints if any exist
 
 #### Integration Improvements
@@ -92,7 +102,7 @@
 - [ ] Dashboard widget customization (user preferences)
 - [ ] Dark/light theme toggle (currently light only)
 - [ ] Keyboard shortcuts for common operations
-- [ ] Replace remaining JavaScript alerts() with Bootstrap modals (83 instances remain)
+- [x] ~~Replace remaining JavaScript alerts() with Bootstrap modals~~ ✅ **DONE Jan 19**
 
 ---
 
@@ -249,7 +259,7 @@
 ## Cross-System Items
 
 ### Immediate Priority
-- [ ] **Replace remaining JavaScript alerts() with Bootstrap Modals** - ~177 alert() calls remain (mostly in Files, Inventory, Portal)
+- [x] ~~**Replace remaining JavaScript alerts() with Bootstrap Modals**~~ ✅ **DONE Jan 19** - Replaced 182 alert() calls across 29 files with Bootstrap modal notifications
 
 ### Documentation Needed
 - [ ] Employee onboarding guide for managers (HR)
@@ -259,6 +269,8 @@
 ## Recently Completed (Reference)
 
 ### January 2026
+- [x] **Codebase Cleanup** (All Systems) - Jan 19: Removed deprecated files, replaced 182 JavaScript alerts with Bootstrap modals, fixed 99 datetime.utcnow() calls, removed commented code, fixed hardcoded user_id=1 security issue, added system timezone settings
+- [x] **System Settings Page** (Portal) - System-wide timezone configuration with database persistence
 - [x] **UOM Architecture Consolidation** (Inventory) - Merged `item_unit_conversions` into `master_item_count_units`, unified UI, dimension filtering
 - [x] Recipe ingredient searchable dropdown (Inventory) - Tom Select integration with all master items
 - [x] Recipe unit dropdown (Inventory) - Dynamic unit selection based on item's count units

@@ -13,6 +13,11 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, text
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 
@@ -123,7 +128,7 @@ class AccountingSenderService:
             # Update invoice with accounting reference
             invoice.sent_to_accounting = True
             invoice.accounting_je_id = result.get('journal_entry_id')  # Still track JE for reference
-            invoice.accounting_sync_at = datetime.utcnow()
+            invoice.accounting_sync_at = get_now()
             invoice.accounting_error = None
 
             db.commit()
@@ -194,7 +199,7 @@ class AccountingSenderService:
         payload = {
             "vendor_name": invoice.vendor_name,
             "bill_number": invoice.invoice_number,
-            "bill_date": invoice.invoice_date.isoformat() if invoice.invoice_date else datetime.utcnow().date().isoformat(),
+            "bill_date": invoice.invoice_date.isoformat() if invoice.invoice_date else get_now().date().isoformat(),
             "due_date": invoice.due_date.isoformat() if invoice.due_date else None,
             "total_amount": float(invoice.total_amount),
             "tax_amount": float(invoice.tax_amount) if invoice.tax_amount else 0.00,

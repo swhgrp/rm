@@ -31,11 +31,11 @@
                     <label class="form-label">Payment Method</label>
                     <select class="form-select" id="filterMethod">
                         <option value="">All Methods</option>
-                        <option value="CHECK">Check</option>
-                        <option value="ACH">ACH</option>
-                        <option value="WIRE">Wire Transfer</option>
-                        <option value="CREDIT_CARD">Credit Card</option>
-                        <option value="CASH">Cash</option>
+                        <option value="check">Check</option>
+                        <option value="ach">ACH</option>
+                        <option value="wire">Wire Transfer</option>
+                        <option value="credit_card">Credit Card</option>
+                        <option value="cash">Cash</option>
                     </select>
                 </div>
                 <div class="col-md-3">
@@ -195,7 +195,7 @@
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block extra_scripts %}
 <script>
 let payments = [];
 let currentPage = 1;
@@ -239,10 +239,11 @@ async function loadPayments() {
     if (fromDate) params.append('start_date', fromDate);
     if (toDate) params.append('end_date', toDate);
     params.append('limit', pageSize);
-    params.append('offset', (currentPage - 1) * pageSize);
+    params.append('skip', (currentPage - 1) * pageSize);
 
     try {
-        const response = await fetch(`/api/payments/?${params}`);
+        console.log('Fetching payments from: /accounting/api/payments/?' + params.toString());
+        const response = await fetch(`/accounting/api/payments/?${params}`);
         payments = await response.json();
 
         loading.style.display = 'none';
@@ -273,11 +274,11 @@ function createPaymentRow(payment) {
     const tr = document.createElement('tr');
 
     const methodIcons = {
-        'CHECK': 'receipt',
-        'ACH': 'bank',
-        'WIRE': 'lightning-charge',
-        'CREDIT_CARD': 'credit-card',
-        'CASH': 'cash-coin'
+        'check': 'receipt',
+        'ach': 'bank',
+        'wire': 'lightning-charge',
+        'credit_card': 'credit-card',
+        'cash': 'cash-coin'
     };
 
     const statusColors = {
@@ -290,7 +291,7 @@ function createPaymentRow(payment) {
         'CANCELLED': 'dark'
     };
 
-    const reference = payment.payment_method === 'CHECK'
+    const reference = payment.payment_method === 'check'
         ? `#${payment.check_number || 'N/A'}`
         : payment.reference_number || '-';
 
@@ -303,7 +304,7 @@ function createPaymentRow(payment) {
             ${payment.payment_method}
         </td>
         <td>${reference}</td>
-        <td class="text-success"><strong>$${payment.amount.toFixed(2)}</strong></td>
+        <td class="text-success"><strong>$${parseFloat(payment.amount).toFixed(2)}</strong></td>
         <td><span class="badge bg-${statusColors[payment.status] || 'secondary'}">${payment.status}</span></td>
         <td>
             <div class="btn-group btn-group-sm">
@@ -325,7 +326,7 @@ function createPaymentRow(payment) {
 function updateSummary(payments) {
     document.getElementById('totalPayments').textContent = payments.length;
 
-    const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalAmount = payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
     document.getElementById('totalAmount').textContent = `$${totalAmount.toFixed(2)}`;
 
     const pendingCount = payments.filter(p => ['DRAFT', 'SCHEDULED', 'PRINTED', 'SUBMITTED'].includes(p.status)).length;
@@ -347,7 +348,7 @@ async function viewPayment(paymentId) {
     currentPaymentId = paymentId;
 
     try {
-        const response = await fetch(`/api/payments/${paymentId}`);
+        const response = await fetch(`/accounting/api/payments/${paymentId}`);
         const payment = await response.json();
 
         const modal = new bootstrap.Modal(document.getElementById('paymentDetailModal'));
@@ -377,7 +378,7 @@ async function viewPayment(paymentId) {
                 </div>
                 <div class="col-md-6">
                     <label class="form-label text-muted">Amount</label>
-                    <div class="fs-5 text-success fw-bold">$${payment.amount.toFixed(2)}</div>
+                    <div class="fs-5 text-success fw-bold">$${parseFloat(payment.amount).toFixed(2)}</div>
                 </div>
                 ${payment.memo ? `
                     <div class="col-12">
@@ -403,8 +404,8 @@ async function viewPayment(paymentId) {
                             ${payment.applications.map(app => `
                                 <tr>
                                     <td>${app.bill_number}</td>
-                                    <td>$${app.amount_applied.toFixed(2)}</td>
-                                    <td>$${app.discount_taken.toFixed(2)}</td>
+                                    <td>$${parseFloat(app.amount_applied).toFixed(2)}</td>
+                                    <td>$${parseFloat(app.discount_taken).toFixed(2)}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -436,7 +437,7 @@ function confirmVoidPayment(paymentId) {
 
 async function voidPayment(paymentId) {
     try {
-        const response = await fetch(`/api/payments/${paymentId}/void`, {
+        const response = await fetch(`/accounting/api/payments/${paymentId}/void`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

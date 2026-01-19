@@ -11,6 +11,11 @@ from typing import Optional, List
 from datetime import datetime
 import os
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from database import get_db, engine
 from models import Base, Site, Menu, MenuCategory, MenuItem, Hours, SpecialHours, Image, Page, PageBlock, FormSubmission, ActivityLog
 from schemas import (
@@ -517,7 +522,7 @@ async def htmx_update_site(
                 changes.append(field_name)
             setattr(site, key, new_value)
 
-    site.updated_at = datetime.utcnow()
+    site.updated_at = get_now()
     db.commit()
 
     # Log activity with details
@@ -612,7 +617,7 @@ async def htmx_update_menu(
             else:
                 setattr(menu, key, value if value else None)
 
-    menu.updated_at = datetime.utcnow()
+    menu.updated_at = get_now()
     db.commit()
 
     return templates.TemplateResponse("admin/partials/toast.html", {
@@ -702,7 +707,7 @@ async def htmx_update_category(
         if hasattr(category, key) and key not in ["id", "menu_id", "created_at"]:
             setattr(category, key, value if value else None)
 
-    category.updated_at = datetime.utcnow()
+    category.updated_at = get_now()
     db.commit()
 
     return HTMLResponse(content="")  # No content needed for inline update
@@ -787,7 +792,7 @@ async def htmx_update_item(
                 setattr(item, key, value if value else None)
 
     item.dietary_flags = dietary_flags if dietary_flags else None
-    item.updated_at = datetime.utcnow()
+    item.updated_at = get_now()
     db.commit()
 
     return HTMLResponse(content="")
@@ -960,7 +965,7 @@ async def htmx_update_page(
             else:
                 setattr(page, key, value if value else None)
 
-    page.updated_at = datetime.utcnow()
+    page.updated_at = get_now()
     db.commit()
 
     return HTMLResponse(content="")
@@ -1099,7 +1104,7 @@ async def htmx_update_block(
         elif hasattr(block, key) and key not in ["id", "page_id", "created_at"]:
             setattr(block, key, value if value else None)
 
-    block.updated_at = datetime.utcnow()
+    block.updated_at = get_now()
     db.commit()
 
     return HTMLResponse(content="")
@@ -1140,7 +1145,7 @@ async def htmx_update_block_content(
         content[key] = value
 
     block.content = content
-    block.updated_at = datetime.utcnow()
+    block.updated_at = get_now()
     db.commit()
 
     # Log activity if something changed
@@ -1497,7 +1502,7 @@ async def api_generate_site(site_id: int, db: Session = Depends(get_db), user: U
     # generator = SiteGenerator(db)
     # output_dir = generator.generate_site(site_id)
 
-    site.last_generated_at = datetime.utcnow()
+    site.last_generated_at = get_now()
     db.commit()
 
     # Log activity
@@ -1525,7 +1530,7 @@ async def api_publish_site(site_id: int, db: Session = Depends(get_db), user: Us
 
     # TODO: Implement generator
     site.is_published = True
-    site.last_generated_at = datetime.utcnow()
+    site.last_generated_at = get_now()
     db.commit()
 
     # Log activity

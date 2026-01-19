@@ -1,8 +1,13 @@
 """Task service"""
-from datetime import timedelta
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from events.models import Task, TaskChecklistItem, TaskStatus
 from uuid import UUID
+
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
 
 
 class TaskService:
@@ -103,7 +108,7 @@ class TaskService:
 
         item.is_done = done
         if done:
-            item.done_at = datetime.utcnow()
+            item.done_at = get_now()
             item.done_by = user_id
         else:
             item.done_at = None

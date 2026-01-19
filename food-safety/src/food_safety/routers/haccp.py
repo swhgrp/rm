@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from food_safety.database import get_db
 from food_safety.models import HACCPPlan, CriticalControlPoint, Location
 from food_safety.schemas import (
@@ -141,7 +146,7 @@ async def approve_plan(
         raise HTTPException(status_code=404, detail="HACCP plan not found")
 
     plan.approved_by = data.approved_by
-    plan.approved_at = datetime.utcnow()
+    plan.approved_at = get_now()
 
     await db.commit()
     await db.refresh(plan)

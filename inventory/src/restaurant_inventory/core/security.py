@@ -2,11 +2,16 @@
 Security utilities for authentication and authorization
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any, Union, Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from restaurant_inventory.core.config import settings
+
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -19,9 +24,9 @@ def create_access_token(
 ) -> str:
     """Create JWT access token"""
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = get_now() + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=30)  # 30 minutes default
+        expire = get_now() + timedelta(minutes=30)  # 30 minutes default
 
     to_encode = {"exp": expire, "sub": str(subject)}
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)

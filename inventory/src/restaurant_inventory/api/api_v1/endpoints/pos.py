@@ -8,6 +8,11 @@ from sqlalchemy import func, distinct
 from typing import List, Optional
 from datetime import datetime, date
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from restaurant_inventory.core.deps import get_db, get_current_user, require_manager_or_admin
 from restaurant_inventory.models.user import User
 from restaurant_inventory.models.pos_sale import POSConfiguration, POSSale, POSSaleItem, POSItemMapping
@@ -134,7 +139,7 @@ async def update_pos_configuration(
     for field, value in update_data.items():
         setattr(config, field, value)
 
-    config.updated_at = datetime.utcnow()
+    config.updated_at = get_now()
     db.commit()
     db.refresh(config)
 

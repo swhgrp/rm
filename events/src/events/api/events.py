@@ -6,6 +6,11 @@ from datetime import datetime, timedelta
 from uuid import UUID
 import logging
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from events.core.database import get_db
 from events.core.deps import require_auth, require_role, require_permission, check_permission, get_current_user
 from events.models import Event, EventStatus, Venue, Client, Task, TaskStatus, User
@@ -52,7 +57,7 @@ async def get_dashboard_stats(
     # Count overdue tasks
     overdue_tasks = db.query(func.count(Task.id)).filter(
         Task.status.in_([TaskStatus.TODO, TaskStatus.IN_PROGRESS]),
-        Task.due_at < datetime.utcnow()
+        Task.due_at < get_now()
     ).scalar() or 0
 
     return {
@@ -273,10 +278,6 @@ async def get_event(
         )
 
     # TODO: Filter financials based on user role
-    # event_data = EventResponse.from_orm(event).dict()
-    # event_data = auth_service.filter_financials(current_user, event_data)
-    # return event_data
-
     return event
 
 

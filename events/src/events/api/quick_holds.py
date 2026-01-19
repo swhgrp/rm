@@ -2,9 +2,14 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import datetime
 from uuid import UUID
 import logging
+
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
 
 from events.core.database import get_db
 from events.core.deps import require_auth
@@ -232,7 +237,7 @@ async def convert_to_event(
     # Mark quick hold as converted
     hold.status = QuickHoldStatus.CONVERTED
     hold.converted_to_event_id = event.id
-    hold.converted_at = datetime.now(timezone.utc)
+    hold.converted_at = get_now()
 
     db.commit()
     db.refresh(event)

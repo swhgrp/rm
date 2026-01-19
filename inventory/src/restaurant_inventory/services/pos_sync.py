@@ -8,6 +8,11 @@ from typing import List, Dict, Optional, Tuple
 from datetime import datetime, date
 import logging
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from restaurant_inventory.models.pos_sale import (
     POSConfiguration,
     POSSale,
@@ -225,7 +230,7 @@ class POSSyncService:
                     errors.append(error_msg)
 
             # Update last sync date in configuration
-            config.last_sync_date = datetime.utcnow()
+            config.last_sync_date = get_now()
             self.db.commit()
 
         except Exception as e:

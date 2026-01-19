@@ -11,6 +11,11 @@ from fastapi.responses import JSONResponse, FileResponse
 from sqlalchemy.orm import Session
 import json
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from hr.db.database import get_db
 from hr.models.employee import Employee
 from hr.models.document import Document
@@ -139,7 +144,7 @@ async def send_for_signature(
             status="sent",
             signer_email=employee.email,
             signer_name=f"{employee.first_name} {employee.last_name}",
-            sent_at=datetime.utcnow(),
+            sent_at=get_now(),
             created_by=current_user.id,
             request_metadata={
                 "subject": subject,
@@ -310,7 +315,7 @@ async def check_signature_status(
         is_complete = sig_request.get("is_complete", False)
         if is_complete and request.status != "signed":
             request.status = "signed"
-            request.signed_at = datetime.utcnow()
+            request.signed_at = get_now()
             db.commit()
 
         return {
@@ -379,7 +384,7 @@ async def handle_webhook(
             return JSONResponse(content="OK", status_code=200)
 
         # Update status based on event
-        now = datetime.utcnow()
+        now = get_now()
 
         if event_type == "signature_request_sent":
             sig_request.status = "sent"
@@ -671,7 +676,7 @@ def update_template_fields(
 
     # Update fields
     template.signature_fields = fields_data.get("fields", [])
-    template.updated_at = datetime.utcnow()
+    template.updated_at = get_now()
     db.commit()
     db.refresh(template)
 

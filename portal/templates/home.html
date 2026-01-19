@@ -403,8 +403,12 @@
             </a>
             {% if user.is_admin %}
             <a href="/portal/settings" class="btn-settings">
+                <i class="bi bi-people"></i>
+                <span class="btn-text">Users</span>
+            </a>
+            <a href="/portal/system-settings" class="btn-settings">
                 <i class="bi bi-gear"></i>
-                <span class="btn-text">Settings</span>
+                <span class="btn-text">System</span>
             </a>
             {% endif %}
             <a href="/portal/logout" class="btn-logout">
@@ -562,6 +566,19 @@
                 card.classList.remove('loading');
             });
         });
+
+        // Custom notification function to replace browser alerts
+        function showNotification(message) {
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
+            const modal = document.createElement('div');
+            modal.style.cssText = 'background:#fff;padding:24px;border-radius:8px;max-width:400px;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.15);';
+            modal.innerHTML = `<p style="margin:0 0 16px 0;white-space:pre-line;">${message}</p><button style="background:#455A64;color:#fff;border:none;padding:8px 24px;border-radius:4px;cursor:pointer;">OK</button>`;
+            modal.querySelector('button').onclick = () => document.body.removeChild(overlay);
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+        }
+        window.alert = showNotification;
 
         async function accessSystem(systemKey, systemUrl) {
             // Get the card element - use event passed explicitly, not implicit global

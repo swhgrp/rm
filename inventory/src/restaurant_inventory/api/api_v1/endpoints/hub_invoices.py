@@ -14,6 +14,11 @@ from datetime import date, datetime
 from decimal import Decimal
 import logging
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from restaurant_inventory.core.deps import get_db, get_current_user
 from restaurant_inventory.models import User, VendorItem, MasterItem
 from restaurant_inventory.models.master_item_location_cost import MasterItemLocationCost
@@ -244,7 +249,7 @@ def receive_invoice_from_hub(
                 old_price = vendor_item.unit_price
                 vendor_item.unit_price = Decimal(str(unit_price))
                 vendor_item.last_price = Decimal(str(unit_price))
-                vendor_item.price_updated_at = datetime.utcnow()
+                vendor_item.price_updated_at = get_now()
 
                 # Update master item's location cost if linked
                 if vendor_item.master_item_id and location_id:
@@ -255,14 +260,14 @@ def receive_invoice_from_hub(
 
                     if location_cost:
                         location_cost.current_cost = Decimal(str(unit_price))
-                        location_cost.last_updated = datetime.utcnow()
+                        location_cost.last_updated = get_now()
                     else:
                         # Create location cost record
                         location_cost = MasterItemLocationCost(
                             master_item_id=vendor_item.master_item_id,
                             location_id=location_id,
                             current_cost=Decimal(str(unit_price)),
-                            last_updated=datetime.utcnow()
+                            last_updated=get_now()
                         )
                         db.add(location_cost)
 

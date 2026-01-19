@@ -8,6 +8,11 @@ from typing import List, Dict, Optional, Any
 from datetime import datetime, date, timedelta
 import logging
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 logger = logging.getLogger(__name__)
 
 
@@ -260,7 +265,7 @@ def parse_clover_payment(clover_payment: Dict) -> Dict[str, Any]:
         "status": status,
         "order_type": None,
         "raw_data": str(clover_payment),
-        "synced_at": datetime.utcnow()
+        "synced_at": get_now()
     }
 
     return parsed
@@ -352,7 +357,7 @@ def parse_clover_order(clover_order: Dict) -> Dict[str, Any]:
         "status": status,
         "order_type": clover_order.get("orderType", {}).get("label"),
         "raw_data": str(clover_order),  # Store for debugging
-        "synced_at": datetime.utcnow()
+        "synced_at": get_now()
     }
 
     return parsed

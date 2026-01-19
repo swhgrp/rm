@@ -2,13 +2,18 @@
 Authentication endpoints
 """
 
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta, datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from pydantic import BaseModel
+
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
 
 from restaurant_inventory.core.config import settings
 from restaurant_inventory.core.security import verify_password, create_access_token, get_password_hash
@@ -60,7 +65,7 @@ async def login(
     )
     
     # Update last login
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = get_now()
     db.commit()
 
     # Log audit event
@@ -145,7 +150,7 @@ async def sso_login(
     )
 
     # Update last login
-    user.last_login = datetime.now(timezone.utc)
+    user.last_login = get_now()
     db.commit()
 
     # Log audit event
@@ -307,7 +312,7 @@ async def verify_setup_token(
         )
 
     # Check if token is expired
-    if datetime.now(timezone.utc) > reset_token.expires_at:
+    if get_now() > reset_token.expires_at:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This invitation link has expired. Please contact your administrator for a new invitation."
@@ -353,7 +358,7 @@ async def setup_password(
         )
 
     # Check if token is expired
-    if datetime.now(timezone.utc) > reset_token.expires_at:
+    if get_now() > reset_token.expires_at:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This invitation link has expired. Please contact your administrator for a new invitation."
@@ -381,7 +386,7 @@ async def setup_password(
 
     # Mark token as used
     reset_token.is_used = True
-    reset_token.used_at = datetime.now(timezone.utc)
+    reset_token.used_at = get_now()
 
     db.commit()
 

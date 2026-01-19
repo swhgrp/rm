@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from food_safety.database import get_db
 from food_safety.models import (
     Inspection, InspectionViolation, CorrectiveAction,
@@ -196,7 +201,7 @@ async def mark_violation_corrected(
         raise HTTPException(status_code=404, detail="Violation not found")
 
     violation.is_corrected = True
-    violation.corrected_at = datetime.utcnow()
+    violation.corrected_at = get_now()
 
     await db.commit()
     await db.refresh(violation)

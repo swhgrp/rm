@@ -5,8 +5,13 @@ Count Session CRUD endpoints with workflow management
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session, joinedload
 from typing import List
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
+
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
 
 from restaurant_inventory.core.deps import get_db, get_current_user, require_manager_or_admin, filter_by_user_locations
 from restaurant_inventory.models.count_session import CountSession, CountSessionItem, CountStatus
@@ -156,7 +161,7 @@ async def update_count_session_item(
     # Update counted quantity
     if item_data.counted_quantity is not None:
         count_item.counted_quantity = item_data.counted_quantity
-        count_item.counted_at = datetime.now(timezone.utc)
+        count_item.counted_at = get_now()
         count_item.counted_by = current_user.id
 
         # Calculate variance
@@ -263,7 +268,7 @@ async def complete_count_session(
 
     session.status = CountStatus.COMPLETED
     session.completed_by = current_user.id
-    session.completed_at = datetime.now(timezone.utc)
+    session.completed_at = get_now()
 
     db.commit()
 
@@ -329,7 +334,7 @@ async def approve_count_session(
                     new_qty = float(final_quantity)
 
                     inventory_record.current_quantity = final_quantity
-                    inventory_record.last_count_date = datetime.now(timezone.utc)
+                    inventory_record.last_count_date = get_now()
                     if inventory_record.unit_cost:
                         inventory_record.total_value = inventory_record.unit_cost * final_quantity
 
@@ -354,7 +359,7 @@ async def approve_count_session(
                         master_item_id=item.master_item_id,
                         current_quantity=final_quantity,
                         unit_cost=master_item.current_cost,
-                        last_count_date=datetime.now(timezone.utc)
+                        last_count_date=get_now()
                     )
                     if inventory_record.unit_cost:
                         inventory_record.total_value = inventory_record.unit_cost * final_quantity
@@ -375,7 +380,7 @@ async def approve_count_session(
     # Mark session as approved and locked
     session.status = CountStatus.APPROVED
     session.approved_by = current_user.id
-    session.approved_at = datetime.now(timezone.utc)
+    session.approved_at = get_now()
     session.locked = True
 
     db.commit()
@@ -693,13 +698,13 @@ async def mark_storage_area_finished(
             session_id=session_id,
             storage_area_id=storage_area_id,
             is_finished=True,
-            finished_at=datetime.now(timezone.utc),
+            finished_at=get_now(),
             finished_by=current_user.id
         )
         db.add(area_status)
     else:
         area_status.is_finished = True
-        area_status.finished_at = datetime.now(timezone.utc)
+        area_status.finished_at = get_now()
         area_status.finished_by = current_user.id
 
     db.commit()

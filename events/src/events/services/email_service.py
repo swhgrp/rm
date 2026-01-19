@@ -10,6 +10,11 @@ from events.models import Email, EmailStatus
 from datetime import datetime
 import logging
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 logger = logging.getLogger(__name__)
 
 
@@ -72,7 +77,7 @@ class EmailService:
         try:
             self._send_smtp(to_list, cc_list or [], subject, body_html)
             email.status = EmailStatus.SENT
-            email.sent_at = datetime.utcnow()
+            email.sent_at = get_now()
         except Exception as e:
             logger.error(f"Failed to send email {email.id}: {e}")
             email.status = EmailStatus.FAILED

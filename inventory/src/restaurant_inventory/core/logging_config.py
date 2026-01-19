@@ -4,8 +4,13 @@ Structured logging configuration for production monitoring
 import logging
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict
+
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
 
 class JSONFormatter(logging.Formatter):
     """
@@ -15,7 +20,7 @@ class JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
         """Format log record as JSON"""
         log_data: Dict[str, Any] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": get_now().isoformat(),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

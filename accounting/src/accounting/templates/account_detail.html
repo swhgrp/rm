@@ -372,7 +372,7 @@ function displayTransactions(data) {
 
         return `
             <tr>
-                <td>${new Date(txn.entry_date).toLocaleDateString()}</td>
+                <td>${formatDateLocal(txn.entry_date)}</td>
                 <td><a href="/accounting/journal-entries" style="color: var(--accent-primary);">${txn.entry_number}</a></td>
                 <td>${txn.description}</td>
                 <td class="number">${debit > 0 ? formatCurrency(debit) : '-'}</td>
@@ -406,7 +406,7 @@ function updateSummary(data) {
     // Last activity
     if (data.transactions.length > 0) {
         const lastTxn = data.transactions[data.transactions.length - 1];
-        document.getElementById('lastActivity').textContent = new Date(lastTxn.entry_date).toLocaleDateString();
+        document.getElementById('lastActivity').textContent = formatDateLocal(lastTxn.entry_date);
     }
 
     // Render balance chart
@@ -434,7 +434,7 @@ function renderBalanceChart(data) {
 
     // Add transaction points
     data.transactions.forEach(txn => {
-        labels.push(new Date(txn.entry_date).toLocaleDateString());
+        labels.push(formatDateLocal(txn.entry_date));
         balances.push(parseFloat(txn.balance));
     });
 
@@ -533,6 +533,14 @@ function renderBalanceChart(data) {
 
 function formatCurrency(amount) {
     return '$' + Number(amount).toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+}
+
+// Format date without timezone conversion issues
+function formatDateLocal(dateString) {
+    // Parse YYYY-MM-DD as local date, not UTC
+    const parts = dateString.split('-');
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
+    return date.toLocaleDateString();
 }
 
 function getStatusBadge(status) {

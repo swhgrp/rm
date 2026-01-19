@@ -7,6 +7,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from food_safety.database import get_db
 from food_safety.models import (
     TemperatureLog, TemperatureThreshold, TemperatureAlertStatus,
@@ -417,7 +422,7 @@ async def acknowledge_alert(
 
     log.alert_status = TemperatureAlertStatus.ACKNOWLEDGED
     log.alert_acknowledged_by = data.acknowledged_by
-    log.alert_acknowledged_at = datetime.utcnow()
+    log.alert_acknowledged_at = get_now()
     log.alert_notes = data.notes
     if data.corrective_action:
         log.corrective_action = data.corrective_action
@@ -461,7 +466,7 @@ async def get_equipment_temperature_history(
     db: AsyncSession = Depends(get_db)
 ):
     """Get temperature history for specific equipment"""
-    start_date = datetime.utcnow() - timedelta(days=days)
+    start_date = get_now() - timedelta(days=days)
 
     query = select(TemperatureLog).where(
         and_(

@@ -10,6 +10,11 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal
 import logging
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from accounting.models.customer_invoice import CustomerInvoice, InvoiceStatus
 from accounting.models.customer import Customer
 from accounting.models.payment_reminder import PaymentReminder
@@ -151,7 +156,7 @@ class PaymentReminderService:
                 recent = [r for r in reminders if r.reminder_number == i]
                 if recent:
                     last_sent = recent[0].sent_at
-                    if (datetime.utcnow() - last_sent).days < 1:
+                    if (get_now() - last_sent).days < 1:
                         logger.debug(f"Skipping reminder {i} for invoice {invoice.id} - recently sent")
                         return None
 
@@ -278,7 +283,7 @@ class PaymentReminderService:
             reminder = PaymentReminder(
                 invoice_id=invoice.id,
                 reminder_number=reminder_number,
-                sent_at=datetime.utcnow(),
+                sent_at=get_now(),
                 sent_to=to_email,
                 days_overdue=days_overdue,
                 amount_due=balance_due,
@@ -310,7 +315,7 @@ class PaymentReminderService:
                 reminder = PaymentReminder(
                     invoice_id=invoice.id,
                     reminder_number=reminder_number,
-                    sent_at=datetime.utcnow(),
+                    sent_at=get_now(),
                     sent_to=to_email,
                     days_overdue=days_overdue,
                     amount_due=balance_due,

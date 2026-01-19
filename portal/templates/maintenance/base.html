@@ -691,6 +691,9 @@
         window.showWarning = (msg) => showToast(msg, 'warning');
         window.showInfo = (msg) => showToast(msg, 'info');
 
+        // Override window.alert to use toast notifications
+        window.alert = (msg) => showToast(msg, 'info');
+
         // Styled confirm dialog
         window.showConfirm = function(message, title = 'Confirm') {
             return new Promise((resolve) => {

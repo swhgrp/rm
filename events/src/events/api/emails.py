@@ -5,6 +5,11 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timedelta
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from events.core.database import get_db
 from events.core.deps import require_auth
 from events.models.document import Email, EmailStatus
@@ -51,7 +56,7 @@ async def list_emails(
             )
 
     # Filter by date range
-    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    cutoff_date = get_now() - timedelta(days=days)
     query = query.filter(Email.created_at >= cutoff_date)
 
     # Order by most recent first
@@ -135,7 +140,7 @@ async def get_email_stats(
     """
     from sqlalchemy import func
 
-    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    cutoff_date = get_now() - timedelta(days=days)
 
     # Query email counts by status
     stats = db.query(

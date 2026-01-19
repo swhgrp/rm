@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 from sqlalchemy.orm import selectinload
 
+from zoneinfo import ZoneInfo
+
+_ET = ZoneInfo("America/New_York")
+def get_now(): return datetime.now(_ET)
+
 from maintenance.database import get_db
 from maintenance.models import (
     WorkOrder, WorkOrderComment, WorkOrderPart,
@@ -259,7 +264,7 @@ async def log_completed_work(
         root_cause=data.root_cause,
         actual_cost=data.actual_cost,
         labor_hours=data.labor_hours,
-        reported_date=datetime.utcnow(),
+        reported_date=get_now(),
         completed_date=datetime.combine(data.completed_date, datetime.min.time())
     )
 
@@ -291,9 +296,9 @@ async def update_work_order(
     if "status" in update_data:
         new_status = update_data["status"]
         if new_status == WorkOrderStatus.IN_PROGRESS and not work_order.started_date:
-            work_order.started_date = datetime.utcnow()
+            work_order.started_date = get_now()
         elif new_status == WorkOrderStatus.COMPLETED and not work_order.completed_date:
-            work_order.completed_date = datetime.utcnow()
+            work_order.completed_date = get_now()
 
     for field, value in update_data.items():
         setattr(work_order, field, value)
@@ -319,7 +324,7 @@ async def start_work_order(work_order_id: int, db: AsyncSession = Depends(get_db
         raise HTTPException(status_code=400, detail="Work order cannot be started")
 
     work_order.status = WorkOrderStatus.IN_PROGRESS
-    work_order.started_date = datetime.utcnow()
+    work_order.started_date = get_now()
 
     await db.commit()
     await db.refresh(work_order)
@@ -349,7 +354,7 @@ async def complete_work_order(
         raise HTTPException(status_code=400, detail="Work order already closed")
 
     work_order.status = WorkOrderStatus.COMPLETED
-    work_order.completed_date = datetime.utcnow()
+    work_order.completed_date = get_now()
     if resolution_notes:
         work_order.resolution_notes = resolution_notes
     if root_cause:

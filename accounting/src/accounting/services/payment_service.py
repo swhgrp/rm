@@ -1,6 +1,7 @@
 """
 Payment service layer - orchestrates payment creation, processing, and management
 """
+import os
 import logging
 from decimal import Decimal
 from datetime import date, datetime
@@ -267,10 +268,23 @@ class PaymentService:
                         'discount': app.discount_applied
                     })
 
+            # Build payee address
+            payee_address = {}
+            if vendor:
+                payee_address = {
+                    'address_line1': vendor.address_line1 or '',
+                    'address_line2': vendor.address_line2 or '',
+                    'city': vendor.city or '',
+                    'state': vendor.state or '',
+                    'zip_code': vendor.zip_code or '',
+                    'country': vendor.country or ''
+                }
+
             check_data = {
                 'check_number': payment.check_number,
                 'payment_date': payment.payment_date,
                 'payee_name': vendor.name if vendor else '',
+                'payee_address': payee_address,
                 'amount': payment.net_amount,
                 'memo': payment.memo or ', '.join([inv['invoice_number'] for inv in invoices[:3]]),
                 'bank_account_name': bank_account.account_name,
@@ -472,9 +486,10 @@ class PaymentService:
         if last_check:
             return last_check.check_number + 1
         else:
-            # Get starting check number from bank account settings
+            # Get starting check number from bank account settings (if field exists)
             bank_account = self.db.query(BankAccount).filter(BankAccount.id == bank_account_id).first()
-            return bank_account.starting_check_number if bank_account and bank_account.starting_check_number else 1001
+            starting_num = getattr(bank_account, 'starting_check_number', None) if bank_account else None
+            return starting_num if starting_num else 1001
 
     def _register_check_number(self, bank_account_id: int, check_number: int, payment_id: int):
         """Register check number in registry"""

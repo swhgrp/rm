@@ -986,6 +986,22 @@
         </footer>
     </div>
 
+    <!-- Notification Modal (for alerts) -->
+    <div id="notificationModal" class="modal fade" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="notificationTitle">Inventory System</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="notificationMessage"></div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Confirm Modal -->
     <div id="confirmModal" class="modal fade" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
@@ -1252,6 +1268,17 @@
                 }
             });
         })();
+
+        // Custom notification function to replace browser alert()
+        function showNotification(message, title = 'Inventory System') {
+            document.getElementById('notificationTitle').textContent = title;
+            document.getElementById('notificationMessage').textContent = message;
+            const modal = new bootstrap.Modal(document.getElementById('notificationModal'));
+            modal.show();
+        }
+
+        // Override window.alert to use Bootstrap modal
+        window.alert = showNotification;
 
         // Custom confirm function to replace browser confirm()
         function showConfirm(message, title = 'Confirm Action') {
