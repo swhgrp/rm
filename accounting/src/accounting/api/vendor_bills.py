@@ -625,6 +625,7 @@ def void_bill(
     Void a bill
     - Can void bills in any status except already VOID
     - Cannot void bills with payments (must delete payments first)
+    - Reverses the associated journal entry if one exists
     """
     bill = db.query(VendorBill).filter(VendorBill.id == bill_id).first()
     if not bill:
@@ -644,9 +645,21 @@ def void_bill(
             detail=f"Cannot void bill with {payment_count} payment(s). Delete payments first."
         )
 
+    # Mark the journal entry as REVERSED if one exists
+    # Note: We just mark as REVERSED rather than creating a reversing entry.
+    # REVERSED status excludes the entry from dashboard/report calculations.
+    # Creating a reversing entry would offset ALL entries for those accounts
+    # in the period, not just this specific entry.
+    if bill.journal_entry_id:
+        journal_entry = db.query(JournalEntry).filter(JournalEntry.id == bill.journal_entry_id).first()
+        if journal_entry and journal_entry.status == JournalEntryStatus.POSTED:
+            journal_entry.status = JournalEntryStatus.REVERSED
+
     bill.status = BillStatus.VOID
+    void_note = f"\nVoided by {current_user.email} on {date.today()}"
     if notes:
-        bill.notes = (bill.notes or "") + f"\nVoided: {notes}"
+        void_note += f": {notes}"
+    bill.notes = (bill.notes or "") + void_note
 
     db.commit()
     db.refresh(bill)

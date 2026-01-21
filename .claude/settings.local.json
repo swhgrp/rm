@@ -116,7 +116,9 @@
       "Bash(git -C /opt/restaurant-system/files log --oneline -20)",
       "Bash(comm:*)",
       "Bash(md5sum:*)",
-      "Bash(alembic upgrade:*)"
+      "Bash(alembic upgrade:*)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)"
     ],
     "deny": [],
     "ask": []

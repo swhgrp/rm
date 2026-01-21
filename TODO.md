@@ -1,6 +1,6 @@
 # Restaurant Management System - Consolidated TODO
 
-**Last Updated:** January 19, 2026
+**Last Updated:** January 21, 2026
 
 ## Priority Legend
 - P0: Critical - Blocking production use
@@ -269,6 +269,10 @@
 ## Recently Completed (Reference)
 
 ### January 2026
+- [x] **Invoice Upload AI Parsing** (Hub) - Jan 21: Replaced manual upload form with AI-powered PDF parsing (same as email invoices). Uploads now show review page with parsed data and inline PDF viewer
+- [x] **Check Printing Fixes** (Accounting) - Jan 21: Fixed NoneType decode error in ReportLab PDF generation, added PATCH endpoint for check batches, Bootstrap modals for confirmations, default status filter to Draft
+- [x] **Void Bill Journal Entry Handling** (Accounting) - Jan 21: Voiding a bill now marks its journal entry as REVERSED (excludes from reports) instead of creating a reversing entry that could offset other transactions
+- [x] **Duplicate Invoice Prevention** (Hub) - Jan 21: Added vendor+invoice number duplicate check on invoice upload to prevent accidental duplicates
 - [x] **Codebase Cleanup** (All Systems) - Jan 19: Removed deprecated files, replaced 182 JavaScript alerts with Bootstrap modals, fixed 99 datetime.utcnow() calls, removed commented code, fixed hardcoded user_id=1 security issue, added system timezone settings
 - [x] **System Settings Page** (Portal) - System-wide timezone configuration with database persistence
 - [x] **UOM Architecture Consolidation** (Inventory) - Merged `item_unit_conversions` into `master_item_count_units`, unified UI, dimension filtering

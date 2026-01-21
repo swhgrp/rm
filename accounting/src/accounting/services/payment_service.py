@@ -244,10 +244,10 @@ class PaymentService:
         }
 
         bank_info = {
-            'bank_name': bank_account.institution_name,
+            'bank_name': bank_account.institution_name or '',
             'bank_address': '',
-            'routing_number': bank_account.routing_number,
-            'account_number': bank_account.account_number
+            'routing_number': bank_account.routing_number or '',
+            'account_number': bank_account.account_number or ''
         }
 
         # Prepare check data
@@ -281,13 +281,13 @@ class PaymentService:
                 }
 
             check_data = {
-                'check_number': payment.check_number,
+                'check_number': payment.check_number or '',
                 'payment_date': payment.payment_date,
-                'payee_name': vendor.name if vendor else '',
+                'payee_name': (vendor.name if vendor else '') or '',
                 'payee_address': payee_address,
                 'amount': payment.net_amount,
-                'memo': payment.memo or ', '.join([inv['invoice_number'] for inv in invoices[:3]]),
-                'bank_account_name': bank_account.account_name,
+                'memo': payment.memo or ', '.join([inv['invoice_number'] or '' for inv in invoices[:3]]),
+                'bank_account_name': bank_account.account_name or '',
                 'invoices': invoices
             }
             checks_data.append(check_data)

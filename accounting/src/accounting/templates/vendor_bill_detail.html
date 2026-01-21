@@ -753,7 +753,8 @@ function renderActionButtons(bill) {
         `);
     }
 
-    if (status === 'draft' || status === 'pending_approval') {
+    // Allow voiding for any status except already void or paid
+    if (status !== 'void' && status !== 'paid') {
         buttonsHtml.push(`
             <button class="btn btn-danger" onclick="voidBill()">
                 <i class="bi bi-slash-circle"></i> Void

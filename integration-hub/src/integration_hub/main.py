@@ -353,41 +353,285 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
 
 @app.post("/invoices/upload")
 async def upload_invoice(
+    request: Request,
     file: UploadFile = File(...),
-    vendor_name: str = Form(...),
-    invoice_number: str = Form(...),
-    invoice_date: str = Form(...),
-    total_amount: float = Form(...),
     db: Session = Depends(get_db)
 ):
-    """Upload an invoice PDF and create hub invoice record"""
+    """
+    Upload an invoice PDF, parse it with AI, and show review page.
 
-    # Save PDF file - use /app/uploads inside container (mounted from host)
+    New flow: Upload PDF -> AI parses it -> Show review page with parsed data and PDF viewer
+    User can review/correct the parsed data before saving.
+    """
+    import uuid
+    from integration_hub.services.invoice_parser import get_invoice_parser
+
+    # Save PDF file with unique name to avoid collisions
     pdf_dir = Path("/app/uploads")
     pdf_dir.mkdir(exist_ok=True)
 
-    file_path = pdf_dir / f"{invoice_number}_{file.filename}"
+    # Generate unique filename to avoid collisions during parsing
+    unique_id = str(uuid.uuid4())[:8]
+    safe_filename = file.filename.replace(" ", "_")
+    file_path = pdf_dir / f"upload_{unique_id}_{safe_filename}"
+
     with open(file_path, "wb") as buffer:
         content = await file.read()
         buffer.write(content)
 
+    # Parse the PDF with AI
+    parser = get_invoice_parser()
+    parse_result = parser.parse_invoice_pdf(str(file_path))
+
+    # Get locations from inventory database for location dropdown
+    from sqlalchemy import create_engine, text
+    inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
+                                 'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+    locations = []
+    try:
+        engine = create_engine(inventory_db_url)
+        with engine.connect() as conn:
+            results = conn.execute(
+                text("SELECT id, name FROM locations WHERE is_active = true ORDER BY name")
+            ).fetchall()
+            locations = [{"id": row[0], "name": row[1]} for row in results]
+    except Exception as e:
+        logger.error(f"Error fetching locations: {str(e)}")
+
+    # Get vendors from hub database for vendor dropdown
+    vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
+
+    # Prepare parsed data for the review page
+    parsed_data = {}
+    if parse_result.get("success"):
+        parsed_data = parse_result.get("data", {})
+
+        # Try to match vendor and location
+        if parsed_data.get('vendor_name'):
+            matched_vendor = parser.match_vendor(parsed_data['vendor_name'], db)
+            if matched_vendor:
+                parsed_data['matched_vendor_id'] = matched_vendor.id
+
+        if parsed_data.get('location_name'):
+            location_match = parser.match_location(parsed_data['location_name'])
+            if location_match:
+                parsed_data['matched_location_id'] = location_match[0]
+                parsed_data['matched_location_name'] = location_match[1]
+
+    return templates.TemplateResponse("invoice_upload_review.html", {
+        "request": request,
+        "pdf_path": str(file_path),
+        "pdf_filename": file.filename,
+        "parse_success": parse_result.get("success", False),
+        "parse_error": parse_result.get("error") or parse_result.get("message"),
+        "parsed_data": parsed_data,
+        "line_items": parsed_data.get("line_items", []),
+        "vendors": vendors,
+        "locations": locations
+    })
+
+
+@app.post("/invoices/upload/save")
+async def save_uploaded_invoice(
+    request: Request,
+    pdf_path: str = Form(...),
+    vendor_id: Optional[str] = Form(None),  # String to handle "new" value
+    new_vendor_name: Optional[str] = Form(None),
+    invoice_number: str = Form(...),
+    invoice_date: str = Form(...),
+    due_date: Optional[str] = Form(None),
+    total_amount: float = Form(...),
+    tax_amount: Optional[float] = Form(None),
+    location_id: Optional[str] = Form(None),  # String to handle empty values
+    is_statement: bool = Form(False),
+    line_items_json: str = Form("[]"),
+    db: Session = Depends(get_db)
+):
+    """
+    Save the reviewed uploaded invoice after user has verified/corrected the parsed data.
+    Creates the invoice record and all line items.
+    """
+    import json
+    from datetime import datetime
+
+    # Parse line items from JSON
+    try:
+        line_items = json.loads(line_items_json)
+    except json.JSONDecodeError:
+        line_items = []
+
+    # Convert vendor_id and location_id to integers if they're valid numbers
+    vendor_id_int = None
+    if vendor_id and vendor_id not in ('', 'new'):
+        try:
+            vendor_id_int = int(vendor_id)
+        except ValueError:
+            pass
+
+    location_id_int = None
+    if location_id and location_id != '':
+        try:
+            location_id_int = int(location_id)
+        except ValueError:
+            pass
+
+    # Handle vendor - either existing or create new
+    vendor_name = None
+    if vendor_id == 'new' or (new_vendor_name and new_vendor_name.strip()):
+        # Create new vendor
+        vendor_name = new_vendor_name.strip() if new_vendor_name else "Unknown Vendor"
+        new_vendor = Vendor(name=vendor_name, is_active=True)
+        db.add(new_vendor)
+        db.commit()
+        db.refresh(new_vendor)
+        vendor_id_int = new_vendor.id
+    elif vendor_id_int:
+        vendor = db.query(Vendor).filter(Vendor.id == vendor_id_int).first()
+        if vendor:
+            vendor_name = vendor.name
+
+    # Get location name if location_id provided
+    location_name = None
+    if location_id_int:
+        from sqlalchemy import create_engine, text
+        inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
+                                     'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+        try:
+            engine = create_engine(inventory_db_url)
+            with engine.connect() as conn:
+                result = conn.execute(
+                    text("SELECT name FROM locations WHERE id = :id"),
+                    {"id": location_id_int}
+                ).fetchone()
+                if result:
+                    location_name = result[0]
+        except Exception as e:
+            logger.error(f"Error fetching location name: {str(e)}")
+
+    # Parse dates
+    parsed_invoice_date = None
+    parsed_due_date = None
+    try:
+        if invoice_date:
+            parsed_invoice_date = datetime.strptime(invoice_date, '%Y-%m-%d').date()
+    except ValueError:
+        pass
+    try:
+        if due_date:
+            parsed_due_date = datetime.strptime(due_date, '%Y-%m-%d').date()
+    except ValueError:
+        pass
+
+    # Rename the PDF file with the invoice number for better organization
+    from pathlib import Path
+    old_path = Path(pdf_path)
+    if old_path.exists():
+        new_filename = f"{invoice_number}_{old_path.name.split('_', 2)[-1]}" if '_' in old_path.name else f"{invoice_number}_{old_path.name}"
+        new_path = old_path.parent / new_filename
+        try:
+            old_path.rename(new_path)
+            pdf_path = str(new_path)
+        except Exception as e:
+            logger.error(f"Error renaming PDF file: {str(e)}")
+
     # Create invoice record
     invoice = HubInvoice(
-        vendor_name=vendor_name,
+        vendor_id=vendor_id_int,
+        vendor_name=vendor_name or "Unknown Vendor",
         invoice_number=invoice_number,
-        invoice_date=invoice_date,
+        invoice_date=parsed_invoice_date,
+        due_date=parsed_due_date,
         total_amount=total_amount,
+        tax_amount=tax_amount,
+        location_id=location_id_int,
+        location_name=location_name,
         source='upload',
-        pdf_path=str(file_path),
-        status='pending'
+        pdf_path=pdf_path,
+        is_statement=is_statement,
+        status='mapping' if line_items else 'pending'
     )
 
     db.add(invoice)
     db.commit()
     db.refresh(invoice)
 
-    # Redirect with /hub prefix since that's what the browser sees (nginx strips it internally)
+    # Create line items
+    for i, item in enumerate(line_items):
+        # Handle pack_size - convert to int or None
+        pack_size_val = item.get('pack_size', '')
+        if isinstance(pack_size_val, str):
+            pack_size_val = None  # pack_size is stored as string in form, convert to None for DB
+
+        # Ensure numeric fields have proper values
+        quantity_val = item.get('quantity', 0)
+        if quantity_val == '' or quantity_val is None:
+            quantity_val = 0
+
+        unit_price_val = item.get('unit_price', 0)
+        if unit_price_val == '' or unit_price_val is None:
+            unit_price_val = 0
+
+        line_total_val = item.get('line_total', 0)
+        if line_total_val == '' or line_total_val is None:
+            line_total_val = 0
+
+        invoice_item = HubInvoiceItem(
+            invoice_id=invoice.id,
+            line_number=item.get('line_number', i + 1),
+            item_description=item.get('description', '') or '',
+            item_code=item.get('item_code', '') or '',
+            quantity=float(quantity_val),
+            unit_of_measure=item.get('unit', '') or '',
+            pack_size=pack_size_val,
+            unit_price=float(unit_price_val),
+            total_amount=float(line_total_val)
+        )
+        db.add(invoice_item)
+
+    db.commit()
+
+    # Run auto-mapping on line items if we have items and a vendor
+    if line_items and vendor_id_int:
+        try:
+            from integration_hub.services.auto_mapper import get_auto_mapper
+            mapper = get_auto_mapper(db)
+            mapper.map_invoice_items(invoice.id)
+        except Exception as e:
+            logger.error(f"Error auto-mapping items: {str(e)}")
+
+    # Update status based on mapping results
+    items = db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice.id).all()
+    if items:
+        unmapped_count = sum(1 for item in items if not item.is_mapped)
+        if unmapped_count == 0:
+            invoice.status = 'ready'
+        else:
+            invoice.status = 'mapping'
+        db.commit()
+
+    # Redirect to the invoice detail page
     return RedirectResponse(url=f"/hub/invoices/{invoice.id}", status_code=303)
+
+
+@app.get("/api/invoices/upload/pdf")
+async def get_uploaded_pdf(pdf_path: str = Query(...)):
+    """Serve an uploaded PDF file for preview during the review process"""
+    from fastapi.responses import FileResponse
+
+    path = Path(pdf_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="PDF not found")
+
+    # Security check - only allow files from uploads directory
+    if not str(path).startswith("/app/uploads"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return FileResponse(
+        path=str(path),
+        media_type="application/pdf",
+        filename=path.name,
+        content_disposition_type="inline"  # Display in browser instead of downloading
+    )
 
 
 def _parse_invoice_background(invoice_id: int):
@@ -2068,6 +2312,15 @@ async def send_invoice_to_systems(invoice_id: int, db: Session = Depends(get_db)
     # Don't send statements to systems
     if invoice.is_statement:
         raise HTTPException(status_code=400, detail="Statements cannot be sent to inventory or accounting systems")
+
+    # Check if already fully sent (prevent duplicate submissions from double-clicks)
+    if invoice.sent_to_inventory and invoice.sent_to_accounting:
+        return {
+            "success": True,
+            "inventory_sent": True,
+            "accounting_sent": True,
+            "message": "Invoice already sent to all systems"
+        }
 
     if invoice.status not in ['ready', 'partial', 'error']:
         raise HTTPException(status_code=400, detail=f"Invoice status '{invoice.status}' cannot be sent")

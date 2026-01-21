@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+
+{% block title %}Review Uploaded Invoice - Integration Hub{% endblock %}
+
+{% block head %}
+<style>
+    .review-container {
+        display: flex;
+        gap: 20px;
+        height: calc(100vh - 140px);
+    }
+    .pdf-viewer-container {
+        flex: 1;
+        min-width: 400px;
+        display: flex;
+        flex-direction: column;
+    }
+    .form-container {
+        flex: 1;
+        min-width: 400px;
+        overflow-y: auto;
+        padding-right: 10px;
+    }
+    .pdf-viewer {
+        flex: 1;
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        background: white;
+    }
+    .pdf-viewer iframe {
+        width: 100%;
+        height: 100%;
+        border: none;
+        border-radius: 8px;
+    }
+    .line-items-table {
+        font-size: 0.85rem;
+    }
+    .line-items-table input {
+        font-size: 0.85rem;
+        padding: 0.25rem 0.5rem;
+    }
+    .line-items-table th {
+        white-space: nowrap;
+    }
+    .parse-error {
+        background-color: #fff3cd;
+        border: 1px solid #ffc107;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    .parse-success {
+        background-color: #d4edda;
+        border: 1px solid #28a745;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+    .btn-remove-item {
+        padding: 0.15rem 0.4rem;
+        font-size: 0.75rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="page-header mb-3">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1><i class="bi bi-file-earmark-check"></i> Review Uploaded Invoice</h1>
+                <p class="text-muted mb-0">{{ pdf_filename }}</p>
+            </div>
+            <div>
+                <a href="/hub/invoices" class="btn btn-secondary">
+                    <i class="bi bi-x-lg"></i> Cancel
+                </a>
+            </div>
+        </div>
+    </div>
+
+    {% if parse_success %}
+    <div class="parse-success">
+        <i class="bi bi-check-circle-fill text-success"></i>
+        <strong>Invoice parsed successfully!</strong> Please review the extracted data below and make any corrections before saving.
+    </div>
+    {% else %}
+    <div class="parse-error">
+        <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+        <strong>Parsing issue:</strong> {{ parse_error or "Could not extract all data from the invoice. Please fill in the details manually." }}
+    </div>
+    {% endif %}
+
+    <div class="review-container">
+        <!-- PDF Viewer -->
+        <div class="pdf-viewer-container">
+            <div class="card h-100">
+                <div class="card-header">
+                    <i class="bi bi-file-pdf"></i> Invoice PDF
+                </div>
+                <div class="pdf-viewer">
+                    <iframe src="/hub/api/invoices/upload/pdf?pdf_path={{ pdf_path | urlencode }}"></iframe>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form -->
+        <div class="form-container">
+            <form id="reviewForm" method="post" action="/hub/invoices/upload/save">
+                <input type="hidden" name="pdf_path" value="{{ pdf_path }}">
+                <input type="hidden" name="line_items_json" id="lineItemsJson" value="[]">
+
+                <!-- Invoice Details Card -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <i class="bi bi-info-circle"></i> Invoice Details
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Vendor <span class="text-danger">*</span></label>
+                                <select class="form-select" id="vendorSelect" name="vendor_id" onchange="toggleNewVendorInput()">
+                                    <option value="">-- Select Vendor --</option>
+                                    {% for vendor in vendors %}
+                                    <option value="{{ vendor.id }}" {% if parsed_data.matched_vendor_id == vendor.id %}selected{% endif %}>
+                                        {{ vendor.name }}
+                                    </option>
+                                    {% endfor %}
+                                    <option value="new">+ Add New Vendor</option>
+                                </select>
+                                <input type="text" class="form-control mt-2" id="newVendorName" name="new_vendor_name"
+                                       placeholder="Enter new vendor name" style="display: none;">
+                                {% if parsed_data.vendor_name and not parsed_data.matched_vendor_id %}
+                                <small class="text-warning mt-1 d-block">
+                                    <i class="bi bi-exclamation-triangle"></i> Parsed vendor: "{{ parsed_data.vendor_name }}" - not found in system
+                                </small>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Location</label>
+                                <select class="form-select" id="locationSelect" name="location_id">
+                                    <option value="">-- Select Location --</option>
+                                    {% for loc in locations %}
+                                    <option value="{{ loc.id }}" {% if parsed_data.matched_location_id == loc.id %}selected{% endif %}>
+                                        {{ loc.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                                {% if parsed_data.location_name and not parsed_data.matched_location_id %}
+                                <small class="text-warning mt-1 d-block">
+                                    <i class="bi bi-exclamation-triangle"></i> Parsed location: "{{ parsed_data.location_name }}" - not matched
+                                </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Invoice Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="invoice_number" required
+                                       value="{{ parsed_data.invoice_number or '' }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Invoice Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" name="invoice_date" required
+                                       value="{{ parsed_data.invoice_date or '' }}">
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Due Date</label>
+                                <input type="date" class="form-control" name="due_date"
+                                       value="{{ parsed_data.due_date or '' }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" name="is_statement" id="isStatement"
+                                           {% if parsed_data.is_statement %}checked{% endif %}>
+                                    <label class="form-check-label" for="isStatement">
+                                        This is a Statement (not an invoice)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Subtotal</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" class="form-control" id="subtotal" readonly
+                                           value="{{ (parsed_data.total_amount or 0) - (parsed_data.tax_amount or 0) }}">
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Tax Amount</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" class="form-control" name="tax_amount" id="taxAmount"
+                                           value="{{ parsed_data.tax_amount or 0 }}" onchange="updateSubtotal()">
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Total Amount <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">$</span>
+                                    <input type="number" step="0.01" class="form-control" name="total_amount" id="totalAmount" required
+                                           value="{{ parsed_data.total_amount or 0 }}" onchange="updateSubtotal()">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Line Items Card -->
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-list-ol"></i> Line Items (<span id="itemCount">{{ line_items|length }}</span>)</span>
+                        <button type="button" class="btn btn-sm btn-success" onclick="addLineItem()">
+                            <i class="bi bi-plus"></i> Add Item
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover line-items-table mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width: 40px;">#</th>
+                                        <th style="width: 100px;">Item Code</th>
+                                        <th>Description</th>
+                                        <th style="width: 70px;">Qty</th>
+                                        <th style="width: 70px;">Unit</th>
+                                        <th style="width: 100px;">Pack Size</th>
+                                        <th style="width: 90px;">Unit Price</th>
+                                        <th style="width: 90px;">Total</th>
+                                        <th style="width: 40px;"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="lineItemsBody">
+                                    {% for item in line_items %}
+                                    <tr data-index="{{ loop.index0 }}">
+                                        <td>{{ loop.index }}</td>
+                                        <td><input type="text" class="form-control form-control-sm item-code" value="{{ item.item_code or '' }}"></td>
+                                        <td><input type="text" class="form-control form-control-sm item-description" value="{{ item.description or '' }}"></td>
+                                        <td><input type="number" step="0.01" class="form-control form-control-sm item-qty" value="{{ item.quantity or 0 }}" onchange="calculateLineTotal(this)"></td>
+                                        <td><input type="text" class="form-control form-control-sm item-unit" value="{{ item.unit or '' }}"></td>
+                                        <td><input type="text" class="form-control form-control-sm item-pack" value="{{ item.pack_size or '' }}"></td>
+                                        <td><input type="number" step="0.01" class="form-control form-control-sm item-price" value="{{ item.unit_price or 0 }}" onchange="calculateLineTotal(this)"></td>
+                                        <td><input type="number" step="0.01" class="form-control form-control-sm item-total" value="{{ item.line_total or 0 }}" readonly></td>
+                                        <td><button type="button" class="btn btn-outline-danger btn-remove-item" onclick="removeLineItem(this)"><i class="bi bi-x"></i></button></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% if not line_items %}
+                        <div class="text-center text-muted py-4" id="noItemsMessage">
+                            <i class="bi bi-inbox"></i> No line items parsed. Click "Add Item" to add items manually.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="d-flex justify-content-end gap-2 mb-4">
+                    <a href="/hub/invoices" class="btn btn-secondary">
+                        <i class="bi bi-x-lg"></i> Cancel
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-lg"></i> Save Invoice
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Toggle new vendor input field
+function toggleNewVendorInput() {
+    const vendorSelect = document.getElementById('vendorSelect');
+    const newVendorInput = document.getElementById('newVendorName');
+
+    if (vendorSelect.value === 'new') {
+        newVendorInput.style.display = 'block';
+        newVendorInput.required = true;
+        // Pre-fill with parsed vendor name if available
+        {% if parsed_data.vendor_name and not parsed_data.matched_vendor_id %}
+        if (!newVendorInput.value) {
+            newVendorInput.value = "{{ parsed_data.vendor_name }}";
+        }
+        {% endif %}
+    } else {
+        newVendorInput.style.display = 'none';
+        newVendorInput.required = false;
+        newVendorInput.value = '';
+    }
+}
+
+// Update subtotal when total or tax changes
+function updateSubtotal() {
+    const total = parseFloat(document.getElementById('totalAmount').value) || 0;
+    const tax = parseFloat(document.getElementById('taxAmount').value) || 0;
+    document.getElementById('subtotal').value = (total - tax).toFixed(2);
+}
+
+// Calculate line total when qty or price changes
+function calculateLineTotal(input) {
+    const row = input.closest('tr');
+    const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+    const price = parseFloat(row.querySelector('.item-price').value) || 0;
+    row.querySelector('.item-total').value = (qty * price).toFixed(2);
+}
+
+// Add new line item row
+function addLineItem() {
+    const tbody = document.getElementById('lineItemsBody');
+    const rowCount = tbody.querySelectorAll('tr').length;
+    const newIndex = rowCount;
+
+    // Hide "no items" message if present
+    const noItemsMsg = document.getElementById('noItemsMessage');
+    if (noItemsMsg) noItemsMsg.style.display = 'none';
+
+    const newRow = document.createElement('tr');
+    newRow.setAttribute('data-index', newIndex);
+    newRow.innerHTML = `
+        <td>${rowCount + 1}</td>
+        <td><input type="text" class="form-control form-control-sm item-code" value=""></td>
+        <td><input type="text" class="form-control form-control-sm item-description" value=""></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm item-qty" value="0" onchange="calculateLineTotal(this)"></td>
+        <td><input type="text" class="form-control form-control-sm item-unit" value=""></td>
+        <td><input type="text" class="form-control form-control-sm item-pack" value=""></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm item-price" value="0" onchange="calculateLineTotal(this)"></td>
+        <td><input type="number" step="0.01" class="form-control form-control-sm item-total" value="0" readonly></td>
+        <td><button type="button" class="btn btn-outline-danger btn-remove-item" onclick="removeLineItem(this)"><i class="bi bi-x"></i></button></td>
+    `;
+    tbody.appendChild(newRow);
+    updateItemCount();
+}
+
+// Remove line item row
+function removeLineItem(button) {
+    const row = button.closest('tr');
+    row.remove();
+    renumberRows();
+    updateItemCount();
+}
+
+// Renumber rows after deletion
+function renumberRows() {
+    const rows = document.querySelectorAll('#lineItemsBody tr');
+    rows.forEach((row, index) => {
+        row.setAttribute('data-index', index);
+        row.cells[0].textContent = index + 1;
+    });
+}
+
+// Update item count display
+function updateItemCount() {
+    const count = document.querySelectorAll('#lineItemsBody tr').length;
+    document.getElementById('itemCount').textContent = count;
+}
+
+// Collect line items into JSON before form submission
+function collectLineItems() {
+    const rows = document.querySelectorAll('#lineItemsBody tr');
+    const items = [];
+
+    rows.forEach((row, index) => {
+        items.push({
+            line_number: index + 1,
+            item_code: row.querySelector('.item-code').value,
+            description: row.querySelector('.item-description').value,
+            quantity: parseFloat(row.querySelector('.item-qty').value) || 0,
+            unit: row.querySelector('.item-unit').value,
+            pack_size: row.querySelector('.item-pack').value,
+            unit_price: parseFloat(row.querySelector('.item-price').value) || 0,
+            line_total: parseFloat(row.querySelector('.item-total').value) || 0
+        });
+    });
+
+    document.getElementById('lineItemsJson').value = JSON.stringify(items);
+}
+
+// Form validation and submission
+document.getElementById('reviewForm').addEventListener('submit', function(e) {
+    const vendorSelect = document.getElementById('vendorSelect');
+    const newVendorName = document.getElementById('newVendorName');
+
+    // Validate vendor selection
+    if (!vendorSelect.value) {
+        e.preventDefault();
+        alert('Please select a vendor');
+        vendorSelect.focus();
+        return false;
+    }
+
+    if (vendorSelect.value === 'new' && !newVendorName.value.trim()) {
+        e.preventDefault();
+        alert('Please enter a vendor name');
+        newVendorName.focus();
+        return false;
+    }
+
+    // Collect line items before submission
+    collectLineItems();
+
+    return true;
+});
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateSubtotal();
+});
+</script>
+{% endblock %}

@@ -232,6 +232,40 @@ def get_check_batch(batch_id: int, db: Session = Depends(get_db)):
     return batch
 
 
+@router.patch("/check-batches/{batch_id}", response_model=CheckBatchResponse)
+def update_check_batch(
+    batch_id: int,
+    status: str = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """Update check batch status"""
+    batch = db.query(CheckBatch).filter(CheckBatch.id == batch_id).first()
+    if not batch:
+        raise HTTPException(status_code=404, detail="Check batch not found")
+
+    if status:
+        valid_statuses = ['DRAFT', 'PRINTED', 'COMPLETED', 'VOIDED']
+        if status not in valid_statuses:
+            raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+
+        # Validate status transitions
+        if status == 'COMPLETED' and batch.status not in ['PRINTED']:
+            raise HTTPException(status_code=400, detail="Can only mark PRINTED batches as COMPLETED")
+
+        batch.status = status
+
+        # If marking as completed, update all payments in the batch to CLEARED
+        if status == 'COMPLETED':
+            payments = db.query(Payment).filter(Payment.check_batch_id == batch_id).all()
+            for payment in payments:
+                payment.status = PaymentStatus.CLEARED
+
+    db.commit()
+    db.refresh(batch)
+    return batch
+
+
 @router.post("/check-batches/{batch_id}/print")
 def print_checks(
     batch_id: int,

@@ -587,10 +587,19 @@ async function saveInvoiceEdit() {
     }
 }
 
+let isSending = false;  // Prevent double-click
+
 async function sendInvoice() {
+    // Prevent double-click
+    if (isSending) {
+        return;
+    }
+
     if (!await showConfirm('Send this invoice to the appropriate system(s)?')) {
         return;
     }
+
+    isSending = true;
 
     const button = document.querySelector('button[onclick="sendInvoice()"]');
     if (button) {
@@ -613,6 +622,7 @@ async function sendInvoice() {
             location.reload();
         } else {
             await showAlert(`Error sending invoice:\n${result.errors ? result.errors.join('\n') : 'Unknown error'}`, 'Error');
+            isSending = false;
             if (button) {
                 button.disabled = false;
                 button.innerHTML = '<i class="bi bi-send"></i> Send Invoice';
@@ -620,6 +630,7 @@ async function sendInvoice() {
         }
     } catch (error) {
         await showAlert(`Error sending invoice: ${error.message}`, 'Error');
+        isSending = false;
         if (button) {
             button.disabled = false;
             button.innerHTML = '<i class="bi bi-send"></i> Send Invoice';
