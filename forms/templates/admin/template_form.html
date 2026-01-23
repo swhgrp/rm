@@ -1,0 +1,244 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{% if template %}Edit Template{% else %}New Template{% endif %}{% endblock %}
+
+{% block nav_templates %}active{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>
+            <i class="bi bi-file-earmark-plus"></i>
+            {% if template %}Edit Template: {{ template.name }}{% else %}New Form Template{% endif %}
+        </h2>
+    </div>
+    <div class="col-auto">
+        <a href="/forms/templates" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Templates
+        </a>
+    </div>
+</div>
+
+<form id="templateForm" method="post" action="/forms/api/templates{% if template %}/{{ template.id }}{% endif %}">
+    <div class="row">
+        <!-- Basic Info -->
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="bi bi-info-circle"></i> Basic Information</h2>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="form-group">
+                                <label for="name">Template Name *</label>
+                                <input type="text" id="name" name="name" class="form-control" required
+                                    value="{{ template.name if template else '' }}"
+                                    placeholder="e.g., First Report of Injury">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label for="slug">Slug (URL-friendly name)</label>
+                                <input type="text" id="slug" name="slug" class="form-control"
+                                    value="{{ template.slug if template else '' }}"
+                                    placeholder="e.g., first-report-of-injury">
+                                <small class="text-muted">Auto-generated if left blank</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="description">Description</label>
+                        <textarea id="description" name="description" class="form-control" rows="3"
+                            placeholder="Brief description of the form's purpose">{{ template.description if template else '' }}</textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="category">Category *</label>
+                                <select id="category" name="category" class="form-control" required>
+                                    <option value="">Select Category</option>
+                                    {% for cat in categories %}
+                                    <option value="{{ cat.value }}" {% if template and template.category == cat.value %}selected{% endif %}>
+                                        {{ cat.label }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="version">Version</label>
+                                <input type="number" id="version" name="version" class="form-control" min="1"
+                                    value="{{ template.version if template else 1 }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- JSON Schema -->
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="bi bi-code-square"></i> Form Schema (JSON Schema)</h2>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="schema">JSON Schema *</label>
+                        <textarea id="schema" name="schema" class="form-control font-monospace" rows="15" required
+                            placeholder='{"type": "object", "properties": {...}}'
+                            style="font-family: monospace; font-size: 13px;">{% if template and template.schema %}{{ template.schema | tojson(indent=2) }}{% else %}{
+  "type": "object",
+  "required": [],
+  "properties": {
+
+  }
+}{% endif %}</textarea>
+                        <small class="text-muted">
+                            Define form fields using <a href="https://json-schema.org/" target="_blank">JSON Schema</a> format
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- UI Schema -->
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="bi bi-palette"></i> UI Schema (Optional)</h2>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="ui_schema">UI Schema</label>
+                        <textarea id="ui_schema" name="ui_schema" class="form-control font-monospace" rows="8"
+                            placeholder='{"field_name": {"ui:widget": "textarea"}}'
+                            style="font-family: monospace; font-size: 13px;">{% if template and template.ui_schema %}{{ template.ui_schema | tojson(indent=2) }}{% else %}{}{% endif %}</textarea>
+                        <small class="text-muted">
+                            Customize field widgets and layout using <a href="https://rjsf-team.github.io/react-jsonschema-form/" target="_blank">react-jsonschema-form</a> UI schema
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Options -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="bi bi-gear"></i> Options</h2>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <div class="form-check">
+                            <input type="checkbox" id="is_active" name="is_active" class="form-check-input"
+                                {% if not template or template.is_active %}checked{% endif %}>
+                            <label for="is_active" class="form-check-label">Active</label>
+                        </div>
+                        <small class="text-muted">Only active templates can be used for new submissions</small>
+                    </div>
+
+                    <hr>
+
+                    <div class="form-group">
+                        <div class="form-check">
+                            <input type="checkbox" id="requires_signature" name="requires_signature" class="form-check-input"
+                                {% if template and template.requires_signature %}checked{% endif %}>
+                            <label for="requires_signature" class="form-check-label">Requires Signature</label>
+                        </div>
+                        <small class="text-muted">Forms must be signed before submission</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h2><i class="bi bi-diagram-3"></i> Workflow (Optional)</h2>
+                </div>
+                <div class="card-body">
+                    <div class="form-group">
+                        <label for="workflow_config">Workflow Configuration</label>
+                        <textarea id="workflow_config" name="workflow_config" class="form-control font-monospace" rows="6"
+                            placeholder='{"steps": [...]}'
+                            style="font-family: monospace; font-size: 12px;">{% if template and template.workflow_config %}{{ template.workflow_config | tojson(indent=2) }}{% else %}{}{% endif %}</textarea>
+                        <small class="text-muted">Define approval workflow steps</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-check-lg"></i> {% if template %}Update Template{% else %}Create Template{% endif %}
+                    </button>
+                    {% if template %}
+                    <a href="/forms/templates/{{ template.id }}" class="btn btn-secondary w-100 mt-2">
+                        <i class="bi bi-x-lg"></i> Cancel
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.getElementById('templateForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const form = e.target;
+    const isEdit = {% if template %}true{% else %}false{% endif %};
+    const templateId = '{{ template.id if template else "" }}';
+
+    // Build form data
+    const data = {
+        name: document.getElementById('name').value,
+        slug: document.getElementById('slug').value || null,
+        description: document.getElementById('description').value || null,
+        category: document.getElementById('category').value,
+        version: parseInt(document.getElementById('version').value) || 1,
+        is_active: document.getElementById('is_active').checked,
+        requires_signature: document.getElementById('requires_signature').checked,
+        schema: JSON.parse(document.getElementById('schema').value),
+        ui_schema: JSON.parse(document.getElementById('ui_schema').value || '{}'),
+        workflow_config: JSON.parse(document.getElementById('workflow_config').value || '{}')
+    };
+
+    try {
+        const url = isEdit ? `/forms/api/templates/${templateId}` : '/forms/api/templates';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            window.location.href = `/forms/templates/${result.id}`;
+        } else {
+            const error = await response.json();
+            showNotification(error.detail || 'Failed to save template', 'Error');
+        }
+    } catch (err) {
+        showNotification('Invalid JSON in schema fields: ' + err.message, 'Error');
+    }
+});
+
+// Auto-generate slug from name
+document.getElementById('name').addEventListener('input', function(e) {
+    const slugField = document.getElementById('slug');
+    if (!slugField.value) {
+        slugField.value = e.target.value
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '');
+    }
+});
+</script>
+{% endblock %}

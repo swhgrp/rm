@@ -1,0 +1,166 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ template.name }}{% endblock %}
+
+{% block nav_templates %}active{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2>
+            <i class="bi bi-file-earmark-text"></i> {{ template.name }}
+            {% if template.is_active %}
+                <span class="badge bg-success">Active</span>
+            {% else %}
+                <span class="badge bg-secondary">Inactive</span>
+            {% endif %}
+        </h2>
+    </div>
+    <div class="col-auto">
+        <a href="/forms/templates" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+        <a href="/forms/templates/{{ template.id }}/edit" class="btn btn-primary">
+            <i class="bi bi-pencil"></i> Edit
+        </a>
+        <a href="/forms/new?template={{ template.slug }}" class="btn btn-success">
+            <i class="bi bi-plus-lg"></i> New Submission
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- Basic Info -->
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="bi bi-info-circle"></i> Template Information</h2>
+            </div>
+            <div class="card-body">
+                <table class="table table-borderless">
+                    <tr>
+                        <th style="width: 150px;">Name</th>
+                        <td>{{ template.name }}</td>
+                    </tr>
+                    <tr>
+                        <th>Slug</th>
+                        <td><code>{{ template.slug }}</code></td>
+                    </tr>
+                    <tr>
+                        <th>Category</th>
+                        <td>
+                            {% if template.category == 'hr_employment' %}
+                                <span class="badge bg-primary">HR & Employment</span>
+                            {% elif template.category == 'safety_compliance' %}
+                                <span class="badge bg-warning">Safety & Compliance</span>
+                            {% elif template.category == 'operations' %}
+                                <span class="badge bg-info">Operations</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ template.category }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Description</th>
+                        <td>{{ template.description or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Version</th>
+                        <td>v{{ template.version }}</td>
+                    </tr>
+                    <tr>
+                        <th>Signature</th>
+                        <td>
+                            {% if template.requires_signature %}
+                                <i class="bi bi-check-circle text-success"></i> Required
+                            {% else %}
+                                <span class="text-muted">Not required</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Created</th>
+                        <td>{{ template.created_at.strftime('%b %d, %Y %H:%M') if template.created_at else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <th>Updated</th>
+                        <td>{{ template.updated_at.strftime('%b %d, %Y %H:%M') if template.updated_at else '-' }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- JSON Schema -->
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="bi bi-code-square"></i> Form Schema</h2>
+            </div>
+            <div class="card-body">
+                <pre style="background: var(--bg-tertiary); padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px;"><code>{{ template.schema | tojson(indent=2) if template.schema else '{}' }}</code></pre>
+            </div>
+        </div>
+
+        <!-- UI Schema -->
+        {% if template.ui_schema %}
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="bi bi-palette"></i> UI Schema</h2>
+            </div>
+            <div class="card-body">
+                <pre style="background: var(--bg-tertiary); padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px;"><code>{{ template.ui_schema | tojson(indent=2) }}</code></pre>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Workflow Config -->
+        {% if template.workflow_config %}
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="bi bi-diagram-3"></i> Workflow Configuration</h2>
+            </div>
+            <div class="card-body">
+                <pre style="background: var(--bg-tertiary); padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px;"><code>{{ template.workflow_config | tojson(indent=2) }}</code></pre>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="col-md-4">
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="bi bi-lightning"></i> Quick Actions</h2>
+            </div>
+            <div class="card-body">
+                <a href="/forms/new?template={{ template.slug }}" class="btn btn-success w-100 mb-2">
+                    <i class="bi bi-plus-lg"></i> Create New Submission
+                </a>
+                <a href="/forms/submissions?template_id={{ template.id }}" class="btn btn-outline-primary w-100 mb-2">
+                    <i class="bi bi-list"></i> View Submissions
+                </a>
+                <a href="/forms/templates/{{ template.id }}/edit" class="btn btn-outline-secondary w-100">
+                    <i class="bi bi-pencil"></i> Edit Template
+                </a>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="bi bi-toggle-on"></i> Status</h2>
+            </div>
+            <div class="card-body">
+                {% if template.is_active %}
+                <div class="alert alert-success mb-0">
+                    <i class="bi bi-check-circle"></i> This template is <strong>active</strong> and can be used for new submissions.
+                </div>
+                {% else %}
+                <div class="alert alert-warning mb-0">
+                    <i class="bi bi-exclamation-triangle"></i> This template is <strong>inactive</strong>. Activate it to allow new submissions.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

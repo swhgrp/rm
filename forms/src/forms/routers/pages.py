@@ -223,3 +223,142 @@ async def templates_list_page(
         "user": user,
         "templates": form_templates
     })
+
+
+@router.get("/templates/new", response_class=HTMLResponse)
+async def template_new_page(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Create new form template page."""
+    user = await get_user_from_request(request)
+    if not user:
+        return RedirectResponse(url="/portal/login?next=/forms/templates/new", status_code=302)
+
+    # Check if user is admin
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    return templates.TemplateResponse("admin/template_form.html", {
+        "request": request,
+        "user": user,
+        "template": None,  # New template
+        "categories": [
+            {"value": "hr_employment", "label": "HR & Employment"},
+            {"value": "safety_compliance", "label": "Safety & Compliance"},
+            {"value": "operations", "label": "Operations"}
+        ]
+    })
+
+
+@router.get("/templates/{template_id}", response_class=HTMLResponse)
+async def template_detail_page(
+    request: Request,
+    template_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """View form template details page."""
+    user = await get_user_from_request(request)
+    if not user:
+        return RedirectResponse(url=f"/portal/login?next=/forms/templates/{template_id}", status_code=302)
+
+    from uuid import UUID
+    try:
+        uuid_id = UUID(template_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    result = await db.execute(
+        select(FormTemplate).where(FormTemplate.id == uuid_id)
+    )
+    template = result.scalar_one_or_none()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    return templates.TemplateResponse("admin/template_detail.html", {
+        "request": request,
+        "user": user,
+        "template": {
+            "id": str(template.id),
+            "name": template.name,
+            "slug": template.slug,
+            "category": template.category.value if template.category else None,
+            "description": template.description,
+            "is_active": template.is_active,
+            "requires_signature": template.requires_signature,
+            "version": template.version,
+            "schema": template.schema,
+            "ui_schema": template.ui_schema,
+            "workflow_config": template.workflow_config,
+            "created_at": template.created_at,
+            "updated_at": template.updated_at
+        }
+    })
+
+
+@router.get("/templates/{template_id}/edit", response_class=HTMLResponse)
+async def template_edit_page(
+    request: Request,
+    template_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Edit form template page."""
+    user = await get_user_from_request(request)
+    if not user:
+        return RedirectResponse(url=f"/portal/login?next=/forms/templates/{template_id}/edit", status_code=302)
+
+    # Check if user is admin
+    if not user.get("is_admin"):
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    from uuid import UUID
+    try:
+        uuid_id = UUID(template_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    result = await db.execute(
+        select(FormTemplate).where(FormTemplate.id == uuid_id)
+    )
+    template = result.scalar_one_or_none()
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    return templates.TemplateResponse("admin/template_form.html", {
+        "request": request,
+        "user": user,
+        "template": {
+            "id": str(template.id),
+            "name": template.name,
+            "slug": template.slug,
+            "category": template.category.value if template.category else None,
+            "description": template.description,
+            "is_active": template.is_active,
+            "requires_signature": template.requires_signature,
+            "version": template.version,
+            "schema": template.schema,
+            "ui_schema": template.ui_schema,
+            "workflow_config": template.workflow_config
+        },
+        "categories": [
+            {"value": "hr_employment", "label": "HR & Employment"},
+            {"value": "safety_compliance", "label": "Safety & Compliance"},
+            {"value": "operations", "label": "Operations"}
+        ]
+    })
+
+
+@router.get("/reports", response_class=HTMLResponse)
+async def reports_page(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Reports page."""
+    user = await get_user_from_request(request)
+    if not user:
+        return RedirectResponse(url="/portal/login?next=/forms/reports", status_code=302)
+
+    return templates.TemplateResponse("admin/reports.html", {
+        "request": request,
+        "user": user
+    })
