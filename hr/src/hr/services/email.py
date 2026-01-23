@@ -371,3 +371,196 @@ def send_termination_notification(
 ) -> bool:
     """Convenience function to send termination notification"""
     return EmailService.send_termination_email(employee_data, processed_by, position_info, attachment_path)
+
+
+class FormNotificationService:
+    """Service for sending form completion notifications"""
+
+    @staticmethod
+    def send_corrective_action_email(
+        employee_name: str,
+        employee_number: str,
+        reference_number: str,
+        disciplinary_level: str,
+        subject: str,
+        incident_date: str,
+        incident_description: str,
+        location_name: str,
+        supervisor_name: str,
+        completed_by: str
+    ) -> bool:
+        """
+        Send notification email when corrective action is completed.
+
+        Args:
+            employee_name: Full name of the employee
+            employee_number: Employee number
+            reference_number: CA reference number (e.g., CA-2026-0001)
+            disciplinary_level: Level of disciplinary action
+            subject: Subject/reason for corrective action
+            incident_date: Date of incident
+            incident_description: Description of the incident
+            location_name: Location where employee works
+            supervisor_name: Name of supervisor who issued the action
+            completed_by: Name of user who completed the form
+        """
+        config = EmailService.get_smtp_config()
+
+        subject_line = f"Corrective Action Completed: {employee_name} - {reference_number}"
+
+        # Format disciplinary level for display
+        level_display = disciplinary_level.replace("_", " ").title() if disciplinary_level else "N/A"
+        subject_display = subject.replace("_", " ").title() if subject else "N/A"
+
+        text_content = f"""
+Corrective Action Form Completed
+
+REFERENCE INFORMATION
+-------------------
+Reference Number: {reference_number}
+Location: {location_name}
+
+EMPLOYEE INFORMATION
+-------------------
+Employee Name: {employee_name}
+Employee Number: {employee_number}
+
+DISCIPLINARY ACTION
+-------------------
+Disciplinary Level: {level_display}
+Subject: {subject_display}
+Incident Date: {incident_date}
+
+INCIDENT DESCRIPTION
+-------------------
+{incident_description}
+
+---
+Supervisor: {supervisor_name}
+Completed by: {completed_by}
+Date/Time: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
+"""
+
+        html_content = text_content.replace('\n', '<br>')
+        html_content = f"<html><body><pre>{html_content}</pre></body></html>"
+
+        return EmailService.send_email(
+            to_email=config['hr_recipient'],
+            subject=subject_line,
+            html_content=html_content,
+            text_content=text_content
+        )
+
+    @staticmethod
+    def send_injury_report_email(
+        employee_name: str,
+        employee_number: str,
+        reference_number: str,
+        accident_date: str,
+        injury_type: str,
+        body_part: str,
+        accident_description: str,
+        location_name: str,
+        completed_by: str
+    ) -> bool:
+        """
+        Send notification email when injury report is completed.
+
+        Args:
+            employee_name: Full name of the employee
+            employee_number: Employee number
+            reference_number: Injury reference number (e.g., INJ-2026-0001)
+            accident_date: Date of accident/injury
+            injury_type: Type of injury
+            body_part: Body part affected
+            accident_description: Description of the accident
+            location_name: Location where accident occurred
+            completed_by: Name of user who completed the form
+        """
+        config = EmailService.get_smtp_config()
+
+        subject_line = f"Injury Report Completed: {employee_name} - {reference_number}"
+
+        # Format injury type and body part for display
+        injury_display = injury_type.replace("_", " ").title() if injury_type else "N/A"
+        body_part_display = body_part.replace("_", " ").title() if body_part else "N/A"
+
+        text_content = f"""
+First Report of Injury Completed
+
+REFERENCE INFORMATION
+-------------------
+Reference Number: {reference_number}
+Location: {location_name}
+
+EMPLOYEE INFORMATION
+-------------------
+Employee Name: {employee_name}
+Employee Number: {employee_number}
+
+INJURY DETAILS
+-------------------
+Date of Injury: {accident_date}
+Type of Injury: {injury_display}
+Body Part Affected: {body_part_display}
+
+ACCIDENT DESCRIPTION
+-------------------
+{accident_description}
+
+---
+Completed by: {completed_by}
+Date/Time: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
+
+IMPORTANT: Please review this injury report and ensure all required workers' compensation procedures are followed.
+"""
+
+        html_content = text_content.replace('\n', '<br>')
+        html_content = f"<html><body><pre>{html_content}</pre></body></html>"
+
+        return EmailService.send_email(
+            to_email=config['hr_recipient'],
+            subject=subject_line,
+            html_content=html_content,
+            text_content=text_content
+        )
+
+
+# Convenience functions for form notifications
+def send_corrective_action_notification(
+    employee_name: str,
+    employee_number: str,
+    reference_number: str,
+    disciplinary_level: str,
+    subject: str,
+    incident_date: str,
+    incident_description: str,
+    location_name: str,
+    supervisor_name: str,
+    completed_by: str
+) -> bool:
+    """Convenience function to send corrective action notification"""
+    return FormNotificationService.send_corrective_action_email(
+        employee_name, employee_number, reference_number,
+        disciplinary_level, subject, incident_date, incident_description,
+        location_name, supervisor_name, completed_by
+    )
+
+
+def send_injury_report_notification(
+    employee_name: str,
+    employee_number: str,
+    reference_number: str,
+    accident_date: str,
+    injury_type: str,
+    body_part: str,
+    accident_description: str,
+    location_name: str,
+    completed_by: str
+) -> bool:
+    """Convenience function to send injury report notification"""
+    return FormNotificationService.send_injury_report_email(
+        employee_name, employee_number, reference_number,
+        accident_date, injury_type, body_part, accident_description,
+        location_name, completed_by
+    )

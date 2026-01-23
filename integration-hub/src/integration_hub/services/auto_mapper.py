@@ -337,6 +337,69 @@ class AutoMapperService:
 
         return None
 
+    def match_by_learned_mapping(
+        self,
+        item_code: str,
+        item_description: str,
+        vendor_id: int
+    ) -> Optional[Dict]:
+        """
+        Check if this item has a user-approved learned mapping.
+        Uses learned_sku_mappings table (populated when users manually map items).
+
+        Matching strategy (in order of priority):
+        1. Match by vendor + item_code (most reliable)
+        2. Match by vendor + item_description (case-insensitive, for OCR variations)
+
+        Returns vendor item dict if found, None otherwise
+        """
+        if not vendor_id:
+            return None
+
+        # First try matching by vendor + item_code
+        if item_code:
+            result = self.db.execute(
+                sql_text("""
+                    SELECT vendor_item_id
+                    FROM learned_sku_mappings
+                    WHERE vendor_id = :vendor_id
+                    AND item_code = :item_code
+                    LIMIT 1
+                """),
+                {"vendor_id": vendor_id, "item_code": item_code}
+            ).fetchone()
+
+            if result:
+                vendor_item_id = result[0]
+                # Look up the vendor item
+                for vi in self.fetch_vendor_items():
+                    if vi['id'] == vendor_item_id:
+                        logger.debug(f"Learned mapping found by item_code: '{item_code}' → vendor item {vendor_item_id}")
+                        return vi
+
+        # Then try matching by vendor + description (case-insensitive)
+        if item_description:
+            result = self.db.execute(
+                sql_text("""
+                    SELECT vendor_item_id
+                    FROM learned_sku_mappings
+                    WHERE vendor_id = :vendor_id
+                    AND LOWER(item_description) = LOWER(:description)
+                    LIMIT 1
+                """),
+                {"vendor_id": vendor_id, "description": item_description}
+            ).fetchone()
+
+            if result:
+                vendor_item_id = result[0]
+                # Look up the vendor item
+                for vi in self.fetch_vendor_items():
+                    if vi['id'] == vendor_item_id:
+                        logger.debug(f"Learned mapping found by description: '{item_description[:30]}' → vendor item {vendor_item_id}")
+                        return vi
+
+        return None
+
     def match_by_expense_mapping(self, item_description: str, item_code: str = None) -> Optional[Dict]:
         """
         Check if this item is mapped as an expense item.
@@ -480,11 +543,10 @@ class AutoMapperService:
         """
         Attempt to automatically map a single item
 
-        Location-aware matching strategy:
-        1. First try SKU match with vendor + location
-        2. Then try SKU match with vendor only (cross-location)
-        3. Then try fuzzy name match (location-aware)
-        4. Finally try expense mapping
+        Matching strategy (in order of priority):
+        1. SKU match - exact match against vendor_items.vendor_sku
+        2. Learned mapping - user-approved mappings from previous manual mappings
+        3. Expense mapping - expense items from invoice_item_mapping_deprecated
 
         Args:
             item: The invoice item to map
@@ -504,12 +566,11 @@ class AutoMapperService:
                 result['is_cross_location'] = (location_id and vendor_item.get('location_id') != location_id)
                 return result
 
-        # 2. Try fuzzy name match (location-aware)
-        if vendor_id and item.item_description:
-            fuzzy_result = self.match_by_fuzzy_name(item.item_description, vendor_id, location_id, min_similarity=0.65)
-            if fuzzy_result:
-                vendor_item, score = fuzzy_result
-                result = self._build_mapping_result(vendor_item, 'fuzzy_name_match', confidence=score)
+        # 2. Try learned mapping (user-approved mappings from manual mapping)
+        if vendor_id:
+            vendor_item = self.match_by_learned_mapping(item.item_code, item.item_description, vendor_id)
+            if vendor_item:
+                result = self._build_mapping_result(vendor_item, 'learned_mapping', confidence=1.0)
                 result['matched_location_id'] = vendor_item.get('location_id')
                 result['is_cross_location'] = (location_id and vendor_item.get('location_id') != location_id)
                 return result
@@ -656,6 +717,108 @@ class AutoMapperService:
             logger.info(f"Auto-mapping complete for invoice {invoice_id}: {stats['mapped_count']} mapped, {stats['unmapped_count']} unmapped, {stats['cross_location_count']} cross-location")
 
         return stats
+
+    def get_fuzzy_suggestions(
+        self,
+        item_description: str,
+        vendor_id: int,
+        location_id: int = None,
+        max_suggestions: int = 5,
+        min_similarity: float = 0.5
+    ) -> List[Dict]:
+        """
+        Get fuzzy match suggestions for an unmapped item.
+        These are NOT auto-applied - shown to user for manual approval.
+
+        Args:
+            item_description: The invoice item description
+            vendor_id: Hub vendor ID
+            location_id: Optional location ID for location-specific ranking
+            max_suggestions: Maximum number of suggestions to return
+            min_similarity: Minimum similarity threshold (0.0-1.0)
+
+        Returns:
+            List of suggestion dicts with vendor_item info and similarity score
+        """
+        if not item_description or not vendor_id:
+            return []
+
+        vendor_items = self.fetch_vendor_items()
+        suggestions = []
+
+        for vi in vendor_items:
+            # Only match within the same vendor
+            if vi.get('vendor_id') != vendor_id:
+                continue
+
+            vendor_product_name = vi.get('vendor_product_name')
+            if not vendor_product_name:
+                continue
+
+            score = calculate_similarity(item_description, vendor_product_name)
+
+            if score >= min_similarity:
+                suggestions.append({
+                    'vendor_item_id': vi['id'],
+                    'vendor_sku': vi.get('vendor_sku'),
+                    'vendor_product_name': vendor_product_name,
+                    'category': vi.get('category'),
+                    'location_id': vi.get('location_id'),
+                    'similarity_score': round(score, 2),
+                    'is_same_location': vi.get('location_id') == location_id
+                })
+
+        # Sort by similarity score (descending), prefer same location
+        suggestions.sort(key=lambda x: (x['similarity_score'], x['is_same_location']), reverse=True)
+
+        return suggestions[:max_suggestions]
+
+    def save_learned_mapping(
+        self,
+        vendor_id: int,
+        item_code: str,
+        item_description: str,
+        vendor_item_id: int,
+        created_by: int = None
+    ) -> bool:
+        """
+        Save a user-approved mapping to learned_sku_mappings table.
+        Called when a user manually maps an item.
+
+        Args:
+            vendor_id: Hub vendor ID
+            item_code: Invoice item code (may differ from vendor SKU)
+            item_description: Invoice item description
+            vendor_item_id: The vendor item ID to map to
+            created_by: User ID who created this mapping
+
+        Returns:
+            True if saved successfully, False otherwise
+        """
+        try:
+            # Use upsert to handle duplicates
+            self.db.execute(
+                sql_text("""
+                    INSERT INTO learned_sku_mappings
+                    (vendor_id, item_code, item_description, vendor_item_id, created_by)
+                    VALUES (:vendor_id, :item_code, :item_description, :vendor_item_id, :created_by)
+                    ON CONFLICT (vendor_id, item_code, item_description)
+                    DO UPDATE SET vendor_item_id = :vendor_item_id, created_by = :created_by
+                """),
+                {
+                    "vendor_id": vendor_id,
+                    "item_code": item_code,
+                    "item_description": item_description,
+                    "vendor_item_id": vendor_item_id,
+                    "created_by": created_by
+                }
+            )
+            self.db.commit()
+            logger.info(f"Saved learned mapping: vendor={vendor_id}, code={item_code}, desc='{item_description[:30]}' → vendor_item={vendor_item_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Error saving learned mapping: {str(e)}")
+            return False
 
 
 def get_auto_mapper(db: Session) -> AutoMapperService:

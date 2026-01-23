@@ -1,17 +1,25 @@
-# Food Safety & Compliance Service
+# Safety & Compliance Service
 
-A FastAPI microservice for managing food safety compliance, temperature monitoring, daily checklists, incident tracking, and health inspections.
+A FastAPI microservice for managing safety compliance, temperature monitoring, daily checklists, incident tracking, and health inspections.
 
 ## Overview
 
-This service provides comprehensive food safety management including:
+This service provides comprehensive safety and compliance management including:
 - **Temperature Logging** - Manual and automated equipment temperature monitoring with threshold alerts
-- **Daily Checklists** - Customizable food safety checklists by location, type, and shift
-- **Incident Management** - Track food safety incidents with auto-generated incident numbers (INC-YYYY-NNNN)
+- **Daily Checklists** - Customizable safety checklists by location, type, and shift
+- **Incident Management** - Track food safety AND general workplace safety incidents with auto-generated incident numbers (INC-YYYY-NNNN)
 - **Inspection Records** - Health inspection tracking with corrective actions
 - **HACCP Plans** - Critical control point management per location
 - **Reports & Exports** - Comprehensive compliance reports with CSV/PDF export
 - **User Permissions** - Role-based access control (users from HR, permissions managed here)
+
+## Incident Categories
+
+The system supports multiple incident categories:
+- **Food Safety** - Temperature violations, contamination, allergen issues, pest sightings, etc.
+- **Workplace Safety** - Slip & fall, burns, cuts, chemical exposure, workplace injuries
+- **Security** - Security incidents, property damage, vehicle incidents
+- **General** - Other incidents not fitting above categories
 
 ## Architecture
 

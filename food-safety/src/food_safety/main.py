@@ -1,4 +1,4 @@
-"""Main FastAPI application for Food Safety & Compliance Service"""
+"""Main FastAPI application for Safety & Compliance Service"""
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -23,17 +23,17 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler"""
-    logger.info("Starting Food Safety & Compliance Service...")
+    logger.info("Starting Safety & Compliance Service...")
     # Initialize database tables if needed
     await init_db()
-    logger.info("Food Safety & Compliance Service started successfully")
+    logger.info("Safety & Compliance Service started successfully")
     yield
-    logger.info("Shutting down Food Safety & Compliance Service...")
+    logger.info("Shutting down Safety & Compliance Service...")
 
 
 app = FastAPI(
-    title="Food Safety & Compliance Service",
-    description="Service for managing food safety compliance, temperature monitoring, checklists, and inspections",
+    title="Safety & Compliance Service",
+    description="Service for managing safety compliance, temperature monitoring, checklists, inspections, and incident reporting",
     version="1.0.0",
     lifespan=lifespan,
     root_path="/food-safety",
@@ -74,14 +74,14 @@ app.include_router(reports.router, prefix="/reports", tags=["Reports"])
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "food-safety"}
+    return {"status": "healthy", "service": "safety-compliance"}
 
 
 @app.get("/")
 async def root():
     """Root endpoint"""
     return {
-        "service": "Food Safety & Compliance Service",
+        "service": "Safety & Compliance Service",
         "version": "1.0.0",
         "docs": "/food-safety/docs"
     }

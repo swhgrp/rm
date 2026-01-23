@@ -270,6 +270,35 @@
     </div>
 </div>
 
+<!-- HR Forms Section -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h2><i class="bi bi-clipboard-check"></i> HR Forms</h2>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="createCorrectiveAction()">
+                <i class="bi bi-exclamation-triangle"></i> New Corrective Action
+            </button>
+            <button class="btn btn-primary" onclick="createInjuryReport()">
+                <i class="bi bi-bandaid"></i> New Injury Report
+            </button>
+        </div>
+    </div>
+
+    <div style="padding: 20px;">
+        <!-- Corrective Actions -->
+        <h4 style="margin-bottom: 15px; color: var(--text-primary);"><i class="bi bi-exclamation-triangle"></i> Corrective Actions</h4>
+        <div id="correctiveActionsContainer" style="margin-bottom: 30px;">
+            <p style="text-align: center; color: var(--text-secondary);"><i class="bi bi-hourglass-split"></i> Loading...</p>
+        </div>
+
+        <!-- Injury Reports -->
+        <h4 style="margin-bottom: 15px; color: var(--text-primary);"><i class="bi bi-bandaid"></i> First Report of Injury</h4>
+        <div id="injuryReportsContainer">
+            <p style="text-align: center; color: var(--text-secondary);"><i class="bi bi-hourglass-split"></i> Loading...</p>
+        </div>
+    </div>
+</div>
+
 <!-- Document Preview Modal -->
 <div id="previewModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 1001; align-items: center; justify-content: center;">
     <div style="background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 6px; max-width: 90vw; width: 1200px; max-height: 90vh; display: flex; flex-direction: column;">
@@ -429,6 +458,8 @@ async function loadEmployee() {
         populateEmployee(employee);
         loadDocuments(employeeId);
         loadSignatureRequests(employeeId);
+        loadCorrectiveActions(employeeId);
+        loadInjuryReports(employeeId);
     } catch (error) {
         console.error('Error loading employee:', error);
         showAlert('Error loading employee', 'error');
@@ -1137,6 +1168,224 @@ document.getElementById('esignModal').addEventListener('click', (e) => {
         closeEsignModal();
     }
 });
+
+// ============ HR Forms Functions ============
+
+function createCorrectiveAction() {
+    window.location = `/hr/forms/corrective-action/${currentEmployeeId}`;
+}
+
+function createInjuryReport() {
+    window.location = `/hr/forms/injury-report/${currentEmployeeId}`;
+}
+
+async function loadCorrectiveActions(employeeId) {
+    try {
+        const response = await fetch(`/hr/api/forms/corrective-actions/employee/${employeeId}`, {
+            credentials: 'include'
+        });
+        const actions = await response.json();
+        renderCorrectiveActions(actions);
+    } catch (error) {
+        console.error('Error loading corrective actions:', error);
+        document.getElementById('correctiveActionsContainer').innerHTML = `
+            <p style="text-align: center; color: #E53935;">Error loading corrective actions</p>
+        `;
+    }
+}
+
+function renderCorrectiveActions(actions) {
+    const container = document.getElementById('correctiveActionsContainer');
+
+    if (actions.length === 0) {
+        container.innerHTML = `
+            <p style="text-align: center; color: var(--text-secondary);">No corrective actions on file</p>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--border-primary);">
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Reference #</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Date</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Level</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Subject</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Status</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${actions.map(action => `
+                        <tr style="border-bottom: 1px solid var(--border-primary);">
+                            <td style="padding: 12px; color: var(--text-primary); font-weight: 600;">${action.reference_number}</td>
+                            <td style="padding: 12px; color: var(--text-primary);">${action.date_of_action ? new Date(action.date_of_action).toLocaleDateString() : '-'}</td>
+                            <td style="padding: 12px; color: var(--text-primary);">${formatDisciplinaryLevel(action.disciplinary_level)}</td>
+                            <td style="padding: 12px; color: var(--text-primary);">${formatSubject(action.subject)}</td>
+                            <td style="padding: 12px;">
+                                <span style="padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; ${getFormStatusStyle(action.status)}">
+                                    ${formatFormStatus(action.status)}
+                                </span>
+                            </td>
+                            <td style="padding: 12px;">
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;"
+                                            onclick="window.location='/hr/forms/corrective-action/${currentEmployeeId}/${action.id}'">
+                                        <i class="bi bi-eye"></i> View/Edit
+                                    </button>
+                                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 13px;"
+                                            onclick="printCorrectiveAction(${action.id})">
+                                        <i class="bi bi-printer"></i> Print
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+async function loadInjuryReports(employeeId) {
+    try {
+        const response = await fetch(`/hr/api/forms/injury-reports/employee/${employeeId}`, {
+            credentials: 'include'
+        });
+        const reports = await response.json();
+        renderInjuryReports(reports);
+    } catch (error) {
+        console.error('Error loading injury reports:', error);
+        document.getElementById('injuryReportsContainer').innerHTML = `
+            <p style="text-align: center; color: #E53935;">Error loading injury reports</p>
+        `;
+    }
+}
+
+function renderInjuryReports(reports) {
+    const container = document.getElementById('injuryReportsContainer');
+
+    if (reports.length === 0) {
+        container.innerHTML = `
+            <p style="text-align: center; color: var(--text-secondary);">No injury reports on file</p>
+        `;
+        return;
+    }
+
+    container.innerHTML = `
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 2px solid var(--border-primary);">
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Reference #</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Date of Injury</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Body Part</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Type</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Status</th>
+                        <th style="padding: 12px; text-align: left; color: var(--text-secondary); font-weight: 600;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${reports.map(report => `
+                        <tr style="border-bottom: 1px solid var(--border-primary);">
+                            <td style="padding: 12px; color: var(--text-primary); font-weight: 600;">${report.reference_number}</td>
+                            <td style="padding: 12px; color: var(--text-primary);">${report.date_of_injury ? new Date(report.date_of_injury).toLocaleDateString() : '-'}</td>
+                            <td style="padding: 12px; color: var(--text-primary);">${formatBodyPart(report.body_part_affected)}</td>
+                            <td style="padding: 12px; color: var(--text-primary);">${formatInjuryType(report.injury_type)}</td>
+                            <td style="padding: 12px;">
+                                <span style="padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; ${getFormStatusStyle(report.status)}">
+                                    ${formatFormStatus(report.status)}
+                                </span>
+                            </td>
+                            <td style="padding: 12px;">
+                                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                                    <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;"
+                                            onclick="window.location='/hr/forms/injury-report/${currentEmployeeId}/${report.id}'">
+                                        <i class="bi bi-eye"></i> View/Edit
+                                    </button>
+                                    <button class="btn btn-primary" style="padding: 6px 12px; font-size: 13px;"
+                                            onclick="printInjuryReport(${report.id})">
+                                        <i class="bi bi-printer"></i> Print
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function getFormStatusStyle(status) {
+    switch(status) {
+        case 'completed':
+            return 'background: #238636; color: #ffffff;';
+        case 'pending_employee_signature':
+            return 'background: #d29922; color: #ffffff;';
+        case 'pending_supervisor_signature':
+            return 'background: #388bfd; color: #ffffff;';
+        case 'employee_refused':
+            return 'background: #da3633; color: #ffffff;';
+        case 'draft':
+        default:
+            return 'background: var(--bg-tertiary); color: var(--text-secondary);';
+    }
+}
+
+function formatFormStatus(status) {
+    const statusMap = {
+        'draft': 'Draft',
+        'pending_employee_signature': 'Awaiting Employee',
+        'pending_supervisor_signature': 'Awaiting Supervisor',
+        'employee_refused': 'Employee Refused',
+        'completed': 'Completed'
+    };
+    return statusMap[status] || status;
+}
+
+function formatDisciplinaryLevel(level) {
+    const levelMap = {
+        'verbal_warning': 'Verbal Warning',
+        'written_warning': 'Written Warning',
+        'final_warning': 'Final Warning',
+        'suspension': 'Suspension',
+        'termination': 'Termination'
+    };
+    return levelMap[level] || level;
+}
+
+function formatSubject(subject) {
+    const subjectMap = {
+        'attendance': 'Attendance',
+        'performance': 'Performance',
+        'conduct': 'Conduct',
+        'policy_violation': 'Policy Violation',
+        'safety': 'Safety',
+        'other': 'Other'
+    };
+    return subjectMap[subject] || subject;
+}
+
+function formatBodyPart(bodyPart) {
+    if (!bodyPart) return '-';
+    return bodyPart.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function formatInjuryType(injuryType) {
+    if (!injuryType) return '-';
+    return injuryType.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function printCorrectiveAction(actionId) {
+    window.open(`/hr/forms/corrective-action/${currentEmployeeId}/${actionId}?print=true`, '_blank');
+}
+
+function printInjuryReport(reportId) {
+    window.open(`/hr/forms/injury-report/${currentEmployeeId}/${reportId}?print=true`, '_blank');
+}
 
 // Load employee and templates on page load
 loadEmployee();

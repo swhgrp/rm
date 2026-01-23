@@ -118,7 +118,8 @@
       "Bash(md5sum:*)",
       "Bash(alembic upgrade:*)",
       "Bash(pip show:*)",
-      "Bash(pip install:*)"
+      "Bash(pip install:*)",
+      "Bash(git -C /opt/restaurant-system status)"
     ],
     "deny": [],
     "ask": []

@@ -188,7 +188,7 @@
                             </td>
                             <td>
                                 <button class="btn btn-sm btn-primary"
-                                        onclick="openMapModal('{{ item.item_description|replace("'", "\\'") }}', {{ item.occurrence_count }})">
+                                        onclick="openMapModal('{{ item.item_description|replace("'", "\\'") }}', {{ item.occurrence_count }}, {{ item.first_item_id or 'null' }})">
                                     <i class="bi bi-link-45deg"></i> Map
                                 </button>
                             </td>
@@ -267,6 +267,19 @@
                                 <label class="btn btn-outline-success" for="modeNew">
                                     <i class="bi bi-plus-circle"></i> Create New
                                 </label>
+                            </div>
+                        </div>
+
+                        <!-- Suggestions panel (populated via AJAX) -->
+                        <div id="suggestionsPanel" class="mb-3" style="display: none;">
+                            <div class="card border-warning">
+                                <div class="card-header bg-warning bg-opacity-25 py-2">
+                                    <i class="bi bi-lightbulb"></i> <strong>Suggested Matches</strong>
+                                    <small class="text-muted ms-2">(based on description similarity)</small>
+                                </div>
+                                <div class="card-body p-2" id="suggestionsList">
+                                    <!-- Suggestions will be populated here -->
+                                </div>
                             </div>
                         </div>
 
@@ -1000,7 +1013,7 @@ function filterSelect(searchTerm, selectId) {
     selectElement.style.pointerEvents = 'auto';
 }
 
-function openMapModal(description, occurrenceCount) {
+function openMapModal(description, occurrenceCount, itemId) {
     isBulkMode = false;
     selectedItems = [];
 
@@ -1036,7 +1049,82 @@ function openMapModal(description, occurrenceCount) {
     // Re-setup listeners to ensure they work
     setupSearchListeners();
 
+    // Hide suggestions panel initially
+    document.getElementById('suggestionsPanel').style.display = 'none';
+
+    // Fetch suggestions if we have an item ID
+    if (itemId) {
+        fetchSuggestions(itemId);
+    }
+
     mapModal.show();
+}
+
+async function fetchSuggestions(itemId) {
+    const suggestionsPanel = document.getElementById('suggestionsPanel');
+    const suggestionsList = document.getElementById('suggestionsList');
+
+    try {
+        const response = await fetch(`/hub/api/items/${itemId}/suggestions`);
+        if (!response.ok) {
+            console.error('Failed to fetch suggestions:', response.status);
+            return;
+        }
+
+        const data = await response.json();
+        if (!data.suggestions || data.suggestions.length === 0) {
+            suggestionsPanel.style.display = 'none';
+            return;
+        }
+
+        // Build suggestions HTML
+        let html = '<div class="list-group list-group-flush">';
+        data.suggestions.forEach((s, idx) => {
+            const scorePercent = Math.round(s.similarity_score * 100);
+            const badgeClass = scorePercent >= 70 ? 'bg-success' : scorePercent >= 50 ? 'bg-warning' : 'bg-secondary';
+            html += `
+                <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2"
+                        onclick="selectSuggestion(${s.vendor_item_id})">
+                    <div>
+                        <strong>${s.vendor_product_name}</strong>
+                        ${s.vendor_sku ? `<code class="ms-2">[${s.vendor_sku}]</code>` : ''}
+                        ${s.category ? `<span class="badge bg-info ms-2">${s.category}</span>` : ''}
+                    </div>
+                    <span class="badge ${badgeClass}">${scorePercent}% match</span>
+                </button>
+            `;
+        });
+        html += '</div>';
+
+        suggestionsList.innerHTML = html;
+        suggestionsPanel.style.display = 'block';
+
+    } catch (error) {
+        console.error('Error fetching suggestions:', error);
+        suggestionsPanel.style.display = 'none';
+    }
+}
+
+function selectSuggestion(vendorItemId) {
+    // Find the option in the inventory item select and select it
+    const select = document.getElementById('inventoryItemId');
+    for (let i = 0; i < select.options.length; i++) {
+        if (select.options[i].value == vendorItemId) {
+            select.selectedIndex = i;
+            select.dispatchEvent(new Event('change'));
+
+            // Show the category info
+            const category = select.options[i].dataset.category;
+            if (category) {
+                document.getElementById('selectedCategory').textContent = category;
+                document.getElementById('selectedItemInfo').style.display = 'block';
+            }
+
+            // Hide suggestions panel after selection
+            document.getElementById('suggestionsPanel').style.display = 'none';
+            break;
+        }
+    }
 }
 
 async function saveMapping() {

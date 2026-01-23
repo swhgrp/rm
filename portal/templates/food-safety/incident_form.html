@@ -1,6 +1,6 @@
 {% extends "food-safety/base.html" %}
 
-{% block title %}Report Incident - Food Safety - SW Hospitality Group{% endblock %}
+{% block title %}Report Incident - Safety & Compliance - SW Hospitality Group{% endblock %}
 
 {% block nav_new_incident %}active{% endblock %}
 
@@ -173,8 +173,8 @@
 
 {% block content %}
     <div class="page-header">
-        <h2 class="page-title">Report Food Safety Incident</h2>
-        <p class="page-subtitle">Document a new food safety incident for investigation</p>
+        <h2 class="page-title">Report Incident</h2>
+        <p class="page-subtitle">Document a new safety or compliance incident for investigation</p>
     </div>
 
     <div class="alert alert-success" id="successAlert">
@@ -197,17 +197,22 @@
                     </select>
                 </div>
                 <div class="form-group">
+                    <label for="category">Category <span class="required">*</span></label>
+                    <select id="category" required onchange="updateIncidentTypes()">
+                        <option value="">Select category...</option>
+                        <option value="food_safety">Food Safety</option>
+                        <option value="workplace_safety">Workplace Safety</option>
+                        <option value="security">Security</option>
+                        <option value="general">General</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row">
+                <div class="form-group">
                     <label for="incident_type">Incident Type <span class="required">*</span></label>
                     <select id="incident_type" required>
-                        <option value="">Select type...</option>
-                        <option value="contamination">Contamination</option>
-                        <option value="temperature_abuse">Temperature Abuse</option>
-                        <option value="pest">Pest Sighting</option>
-                        <option value="allergen">Allergen Issue</option>
-                        <option value="foreign_object">Foreign Object</option>
-                        <option value="illness">Foodborne Illness</option>
-                        <option value="injury">Employee Injury</option>
-                        <option value="other">Other</option>
+                        <option value="">Select category first...</option>
                     </select>
                 </div>
             </div>
@@ -299,6 +304,58 @@
     const API_BASE = '/food-safety';
     let locations = [];
 
+    // Incident types by category
+    const incidentTypes = {
+        food_safety: [
+            { value: 'temperature_violation', label: 'Temperature Violation' },
+            { value: 'contamination', label: 'Contamination' },
+            { value: 'foreign_object', label: 'Foreign Object' },
+            { value: 'pest_sighting', label: 'Pest Sighting' },
+            { value: 'allergen_issue', label: 'Allergen Issue' },
+            { value: 'cross_contamination', label: 'Cross Contamination' },
+            { value: 'improper_storage', label: 'Improper Storage' },
+            { value: 'hygiene_violation', label: 'Hygiene Violation' },
+            { value: 'employee_illness', label: 'Employee Illness (Foodborne)' },
+            { value: 'customer_complaint', label: 'Customer Complaint (Food)' },
+            { value: 'equipment_failure', label: 'Equipment Failure' }
+        ],
+        workplace_safety: [
+            { value: 'workplace_injury', label: 'Workplace Injury' },
+            { value: 'slip_fall', label: 'Slip & Fall' },
+            { value: 'burn', label: 'Burn' },
+            { value: 'cut_laceration', label: 'Cut / Laceration' },
+            { value: 'chemical_exposure', label: 'Chemical Exposure' },
+            { value: 'fire_hazard', label: 'Fire Hazard' },
+            { value: 'electrical_hazard', label: 'Electrical Hazard' },
+            { value: 'near_miss', label: 'Near Miss' },
+            { value: 'customer_injury', label: 'Customer Injury' }
+        ],
+        security: [
+            { value: 'security_incident', label: 'Security Incident' },
+            { value: 'property_damage', label: 'Property Damage' },
+            { value: 'vehicle_incident', label: 'Vehicle Incident' }
+        ],
+        general: [
+            { value: 'other', label: 'Other' }
+        ]
+    };
+
+    function updateIncidentTypes() {
+        const category = document.getElementById('category').value;
+        const typeSelect = document.getElementById('incident_type');
+
+        if (!category) {
+            typeSelect.innerHTML = '<option value="">Select category first...</option>';
+            return;
+        }
+
+        const types = incidentTypes[category] || [];
+        typeSelect.innerHTML = '<option value="">Select type...</option>';
+        types.forEach(type => {
+            typeSelect.innerHTML += `<option value="${type.value}">${escapeHtml(type.label)}</option>`;
+        });
+    }
+
     async function loadLocations() {
         try {
             const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
@@ -345,6 +402,7 @@
         const data = {
             title: document.getElementById('title').value,
             location_id: locationId,
+            category: document.getElementById('category').value,
             incident_type: document.getElementById('incident_type').value,
             incident_date: document.getElementById('incident_date').value,
             severity: severity.value,

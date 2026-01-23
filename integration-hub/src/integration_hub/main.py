@@ -325,15 +325,27 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
         # Get all inventory_item_ids (which are Hub vendor_item_ids) for mapped items
         vendor_item_ids = [item.inventory_item_id for item in items if item.inventory_item_id]
         if vendor_item_ids:
-            # Query Hub's hub_vendor_items table
+            # Query Hub's hub_vendor_items table with size_unit eagerly loaded
             from integration_hub.models.hub_vendor_item import HubVendorItem
-            hub_items = db.query(HubVendorItem).filter(HubVendorItem.id.in_(vendor_item_ids)).all()
+            from sqlalchemy.orm import joinedload
+            hub_items = db.query(HubVendorItem).options(
+                joinedload(HubVendorItem.size_unit),
+                joinedload(HubVendorItem.container)
+            ).filter(HubVendorItem.id.in_(vendor_item_ids)).all()
             for vi in hub_items:
+                # Build size display string like "355 ml can"
+                size_display = vi.size_display  # Uses the model's property
+                size_unit_symbol = vi.size_unit.symbol if vi.size_unit else None
+                container_name = vi.container.name if vi.container else None
                 vendor_item_info[vi.id] = {
                     "pack_size": vi.pack_size,
                     "conversion_factor": float(vi.units_per_case) if vi.units_per_case else 1.0,
                     "purchase_unit": vi.purchase_unit_name,
-                    "purchase_unit_abbr": vi.purchase_unit_abbr
+                    "purchase_unit_abbr": vi.purchase_unit_abbr,
+                    "size_display": size_display,  # e.g., "355 ml can"
+                    "size_unit_symbol": size_unit_symbol,  # e.g., "ml"
+                    "container": container_name,  # e.g., "can"
+                    "size_quantity": float(vi.size_quantity) if vi.size_quantity else None
                 }
     except Exception as e:
         import logging
@@ -1081,7 +1093,7 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
     logger = logging.getLogger(__name__)
 
     # Get unique item descriptions with aggregated data
-    # Query returns: (item_description, item_code, count, list of invoice numbers, list of vendors, list of invoice ids, inventory_item_id)
+    # Query returns: (item_description, item_code, count, list of invoice numbers, list of vendors, list of invoice ids, inventory_item_id, first_item_id)
     unique_items_query = db.query(
         HubInvoiceItem.item_description,
         HubInvoiceItem.item_code,
@@ -1089,7 +1101,8 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
         func.array_agg(distinct(HubInvoice.invoice_number)).label('invoice_numbers'),
         func.array_agg(distinct(HubInvoice.vendor_name)).label('vendor_names'),
         func.array_agg(distinct(HubInvoice.id)).label('invoice_ids'),
-        func.max(HubInvoiceItem.inventory_item_id).label('inventory_item_id')  # Track if SKU matched in inventory
+        func.max(HubInvoiceItem.inventory_item_id).label('inventory_item_id'),  # Track if SKU matched in inventory
+        func.min(HubInvoiceItem.id).label('first_item_id')  # First item ID for suggestions lookup
     ).join(HubInvoice).filter(
         HubInvoiceItem.is_mapped == False
     ).group_by(
@@ -1132,7 +1145,7 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
 
     # Format results for template with suspicious code detection
     unique_items = []
-    for desc, item_code, count, invoice_nums, vendors, invoice_ids, inv_item_id in unique_items_query:
+    for desc, item_code, count, invoice_nums, vendors, invoice_ids, inv_item_id, first_item_id in unique_items_query:
         # Determine if code is suspicious
         code_status = 'none'  # no code
         is_suspicious = False
@@ -1181,7 +1194,8 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
             'is_suspicious': is_suspicious,
             'suspicious_reasons': suspicious_reasons,
             'has_partial_match': has_partial_match,
-            'inventory_item_id': inv_item_id
+            'inventory_item_id': inv_item_id,
+            'first_item_id': first_item_id  # For suggestions lookup
         })
 
     # Fetch GL accounts from Accounting API
@@ -1734,6 +1748,40 @@ async def convert_vendor_item_to_expense(vendor_item_id: int, request: Request, 
 # ITEM MAPPING APIs
 # ============================================================================
 
+@app.get("/api/items/{item_id}/suggestions")
+async def get_item_suggestions(item_id: int, db: Session = Depends(get_db)):
+    """
+    Get fuzzy match suggestions for an unmapped invoice item.
+    Returns potential vendor item matches based on description similarity.
+    These suggestions are NOT auto-applied - they're for user review.
+    """
+    from integration_hub.services.auto_mapper import get_auto_mapper
+
+    item = db.query(HubInvoiceItem).filter(HubInvoiceItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == item.invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    mapper = get_auto_mapper(db)
+    suggestions = mapper.get_fuzzy_suggestions(
+        item_description=item.item_description,
+        vendor_id=invoice.vendor_id,
+        location_id=invoice.location_id,
+        max_suggestions=5,
+        min_similarity=0.4
+    )
+
+    return {
+        "item_id": item_id,
+        "item_code": item.item_code,
+        "item_description": item.item_description,
+        "suggestions": suggestions
+    }
+
+
 @app.post("/api/invoices/{invoice_id}/auto-map")
 async def auto_map_invoice_items(invoice_id: int, db: Session = Depends(get_db)):
     """
@@ -1794,6 +1842,9 @@ async def map_item(
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
 
+    # Get invoice for vendor_id (needed for learned mapping)
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == item.invoice_id).first()
+
     # Update mapping
     item.inventory_item_id = inventory_item_id
     item.inventory_category = inventory_category
@@ -1804,6 +1855,22 @@ async def map_item(
     item.mapping_method = 'manual'
 
     db.commit()
+
+    # Save learned mapping for future auto-mapping (if mapping to a vendor item)
+    if inventory_item_id and invoice and invoice.vendor_id:
+        try:
+            from integration_hub.services.auto_mapper import get_auto_mapper
+            mapper = get_auto_mapper(db)
+            mapper.save_learned_mapping(
+                vendor_id=invoice.vendor_id,
+                item_code=item.item_code,
+                item_description=item.item_description,
+                vendor_item_id=inventory_item_id
+            )
+        except Exception as e:
+            # Log but don't fail the mapping operation
+            import logging
+            logging.getLogger(__name__).warning(f"Failed to save learned mapping: {str(e)}")
 
     # Check if invoice is now fully mapped
     invoice = db.query(HubInvoice).filter(HubInvoice.id == item.invoice_id).first()

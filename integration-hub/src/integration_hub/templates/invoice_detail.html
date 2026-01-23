@@ -291,9 +291,9 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if vi_info.get('purchase_unit') %}
-                                    {{ vi_info.purchase_unit }}
-                                {% elif item.unit_of_measure and not has_vendor_info %}
+                                {% if vi_info.get('size_display') %}
+                                    {{ vi_info.size_display }}
+                                {% elif item.unit_of_measure %}
                                     {{ item.unit_of_measure }}
                                 {% else %}
                                     <span class="text-muted">-</span>
@@ -352,11 +352,8 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% set is_expense_item = item.inventory_category == 'Uncategorized' or (not item.inventory_category and not item.inventory_item_id and item.gl_cogs_account) %}
-                                {% if item.is_mapped and (has_vendor_info or is_expense_item) %}
+                                {% if item.is_mapped %}
                                 <span class="text-success"><i class="bi bi-check-circle"></i> Mapped</span>
-                                {% elif item.is_mapped and not has_vendor_info and not is_expense_item %}
-                                <span class="text-warning" data-bs-toggle="tooltip" title="Vendor item needs purchase unit configuration in Inventory"><i class="bi bi-exclamation-triangle"></i> Incomplete</span>
                                 {% else %}
                                 <span class="text-danger"><i class="bi bi-exclamation-circle"></i> Unmapped</span>
                                 {% endif %}

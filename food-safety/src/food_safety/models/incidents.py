@@ -1,4 +1,4 @@
-"""Incident tracking models for Food Safety Service"""
+"""Incident tracking models for Safety & Compliance Service"""
 from datetime import datetime, date
 from enum import Enum as PyEnum
 from sqlalchemy import (
@@ -10,7 +10,8 @@ from food_safety.database import Base
 
 
 class IncidentType(str, PyEnum):
-    """Types of food safety incidents"""
+    """Types of safety incidents"""
+    # Food Safety Incidents
     TEMPERATURE_VIOLATION = "temperature_violation"
     CONTAMINATION = "contamination"
     FOREIGN_OBJECT = "foreign_object"
@@ -22,11 +23,32 @@ class IncidentType(str, PyEnum):
     CROSS_CONTAMINATION = "cross_contamination"
     IMPROPER_STORAGE = "improper_storage"
     HYGIENE_VIOLATION = "hygiene_violation"
+    # General Workplace Safety Incidents
+    WORKPLACE_INJURY = "workplace_injury"
+    SLIP_FALL = "slip_fall"
+    BURN = "burn"
+    CUT_LACERATION = "cut_laceration"
+    CHEMICAL_EXPOSURE = "chemical_exposure"
+    FIRE_HAZARD = "fire_hazard"
+    ELECTRICAL_HAZARD = "electrical_hazard"
+    PROPERTY_DAMAGE = "property_damage"
+    NEAR_MISS = "near_miss"
+    SECURITY_INCIDENT = "security_incident"
+    CUSTOMER_INJURY = "customer_injury"
+    VEHICLE_INCIDENT = "vehicle_incident"
     OTHER = "other"
 
 
+class IncidentCategory(str, PyEnum):
+    """Category of incidents"""
+    FOOD_SAFETY = "food_safety"
+    WORKPLACE_SAFETY = "workplace_safety"
+    SECURITY = "security"
+    GENERAL = "general"
+
+
 class IncidentStatus(str, PyEnum):
-    """Status of food safety incidents"""
+    """Status of safety incidents"""
     OPEN = "open"
     INVESTIGATING = "investigating"
     ACTION_REQUIRED = "action_required"
@@ -43,7 +65,7 @@ class CorrectiveActionStatus(str, PyEnum):
 
 
 class Incident(Base):
-    """Food safety incident records"""
+    """Safety incident records"""
     __tablename__ = "incidents"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -54,6 +76,7 @@ class Incident(Base):
     location_id = Column(Integer, ForeignKey("locations.id"), nullable=False, index=True)
 
     # Incident details
+    category = Column(Enum(IncidentCategory), default=IncidentCategory.FOOD_SAFETY, nullable=False, index=True)
     incident_type = Column(Enum(IncidentType), nullable=False)
     title = Column(String(300), nullable=False)
     description = Column(Text, nullable=False)
