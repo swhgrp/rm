@@ -76,7 +76,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # Include routers
 from forms.routers import templates as templates_router
-from forms.routers import submissions, signatures, workflows, attachments, dashboard, reports, pages
+from forms.routers import submissions, signatures, workflows, attachments, dashboard, reports, pages, settings
 
 # API routers
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
@@ -86,6 +86,7 @@ app.include_router(signatures.router, prefix="/api/signatures", tags=["Signature
 app.include_router(workflows.router, prefix="/api/workflows", tags=["Workflows"])
 app.include_router(attachments.router, prefix="/api/attachments", tags=["Attachments"])
 app.include_router(reports.router, prefix="/api/reports", tags=["Reports"])
+app.include_router(settings.router, tags=["Settings"])
 
 # HTML page routes (must be last to not conflict with API routes)
 app.include_router(pages.router, tags=["Pages"])

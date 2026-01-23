@@ -12,7 +12,7 @@ from pathlib import Path
 from forms.database import get_db
 from forms.auth import get_current_user_optional, verify_portal_session
 from forms.models import (
-    FormSubmission, FormTemplate, SignatureRequest
+    FormSubmission, FormTemplate, SignatureRequest, Category, UserPermission
 )
 
 logger = logging.getLogger(__name__)
@@ -361,4 +361,94 @@ async def reports_page(
     return templates.TemplateResponse("admin/reports.html", {
         "request": request,
         "user": user
+    })
+
+
+@router.get("/settings", response_class=HTMLResponse)
+async def settings_page(
+    request: Request,
+    db: AsyncSession = Depends(get_db)
+):
+    """Settings page - admin only."""
+    user = await get_user_from_request(request)
+    if not user:
+        return RedirectResponse(url="/portal/login?next=/forms/settings", status_code=302)
+
+    # Check if user is admin or has manage_users permission
+    if not user.get("is_admin"):
+        # Check custom permissions
+        perm_result = await db.execute(
+            select(UserPermission).where(UserPermission.employee_id == user.get("id"))
+        )
+        perm = perm_result.scalar_one_or_none()
+        if not perm or not (perm.can_manage_users or perm.can_manage_categories):
+            raise HTTPException(status_code=403, detail="Admin access required")
+
+    # Get all categories
+    cat_result = await db.execute(
+        select(Category).order_by(Category.sort_order, Category.name)
+    )
+    categories = [
+        {
+            "id": str(c.id),
+            "name": c.name,
+            "slug": c.slug,
+            "description": c.description,
+            "color": c.color,
+            "icon": c.icon,
+            "is_active": c.is_active
+        }
+        for c in cat_result.scalars().all()
+    ]
+
+    # Get users with custom permissions
+    perm_result = await db.execute(select(UserPermission))
+    permissions = perm_result.scalars().all()
+
+    # Fetch user details from HR for each permission
+    import httpx
+    users = []
+    for perm in permissions:
+        user_info = {
+            "employee_id": perm.employee_id,
+            "name": f"Employee #{perm.employee_id}",
+            "email": None,
+            "initials": "?",
+            "is_admin": False,
+            "permissions": {
+                "can_create_templates": perm.can_create_templates,
+                "can_edit_templates": perm.can_edit_templates,
+                "can_delete_templates": perm.can_delete_templates,
+                "can_view_all_submissions": perm.can_view_all_submissions,
+                "can_delete_submissions": perm.can_delete_submissions,
+                "can_export_submissions": perm.can_export_submissions,
+                "can_manage_categories": perm.can_manage_categories,
+                "can_manage_users": perm.can_manage_users
+            }
+        }
+
+        # Try to get employee details from HR
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"http://hr-service:8000/api/employees/{perm.employee_id}",
+                    timeout=2.0
+                )
+                if response.status_code == 200:
+                    emp = response.json()
+                    first = emp.get("first_name", "")
+                    last = emp.get("last_name", "")
+                    user_info["name"] = f"{first} {last}".strip()
+                    user_info["email"] = emp.get("email")
+                    user_info["initials"] = (first[:1] + last[:1]).upper() if first and last else "?"
+        except Exception:
+            pass
+
+        users.append(user_info)
+
+    return templates.TemplateResponse("admin/settings.html", {
+        "request": request,
+        "user": user,
+        "categories": categories,
+        "users": users
     })

@@ -281,3 +281,50 @@ class SignatureRequest(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_by = Column(Integer)
+
+
+class Category(Base):
+    """Form categories - configurable by admin"""
+    __tablename__ = "categories"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(100), nullable=False, unique=True)
+    slug = Column(String(50), nullable=False, unique=True)
+    description = Column(Text)
+    color = Column(String(20), default='#455A64')  # For UI display
+    icon = Column(String(50), default='bi-folder')  # Bootstrap icon class
+    sort_order = Column(Integer, default=0)
+    is_active = Column(Boolean, default=True, nullable=False)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+
+class UserPermission(Base):
+    """User-specific permissions for Forms system"""
+    __tablename__ = "user_permissions"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    employee_id = Column(Integer, nullable=False, unique=True, index=True)
+
+    # Template permissions
+    can_create_templates = Column(Boolean, default=False, nullable=False)
+    can_edit_templates = Column(Boolean, default=False, nullable=False)
+    can_delete_templates = Column(Boolean, default=False, nullable=False)
+
+    # Submission permissions
+    can_view_all_submissions = Column(Boolean, default=False, nullable=False)  # vs only their own
+    can_delete_submissions = Column(Boolean, default=False, nullable=False)
+    can_export_submissions = Column(Boolean, default=True, nullable=False)
+
+    # Admin permissions
+    can_manage_categories = Column(Boolean, default=False, nullable=False)
+    can_manage_users = Column(Boolean, default=False, nullable=False)
+    can_view_audit_logs = Column(Boolean, default=False, nullable=False)
+
+    # Location restrictions (null = all locations)
+    allowed_locations = Column(JSONB)  # Array of location IDs, null means all
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    updated_by = Column(Integer)
