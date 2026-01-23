@@ -155,7 +155,7 @@
             align-items: center;
             cursor: pointer;
             user-select: none;
-            padding: 12px 20px;
+            padding: 12px 15px 12px 20px;
             color: rgba(255, 255, 255, 0.85);
             font-size: 14px;
             transition: all 0.2s;
@@ -175,8 +175,10 @@
 
         .sidebar-nav .menu-toggle .arrow {
             transition: transform 0.2s;
-            font-size: 10px;
-            margin-left: 5px;
+            font-size: 12px;
+            flex-shrink: 0;
+            margin-right: 0;
+            width: auto;
         }
 
         .sidebar-nav .menu-toggle.expanded .arrow {
@@ -836,14 +838,15 @@
             <li>
                 <div class="menu-toggle" onclick="toggleSettingsMenu()">
                     <span><i class="bi bi-gear"></i> Settings</span>
-                    <span class="arrow">▸</span>
+                    <i class="bi bi-chevron-right arrow"></i>
                 </div>
                 <ul class="submenu" id="settingsSubmenu">
                     <li><a href="/hr/locations" class="{% block nav_locations %}{% endblock %}"><i class="bi bi-geo-alt"></i> Locations</a></li>
                     <li><a href="/hr/departments" class="{% block nav_departments %}{% endblock %}"><i class="bi bi-diagram-3"></i> Departments</a></li>
                     <li><a href="/hr/positions" class="{% block nav_positions %}{% endblock %}"><i class="bi bi-briefcase"></i> Positions</a></li>
                     <li><a href="/hr/users" class="{% block nav_users %}{% endblock %}"><i class="bi bi-person-gear"></i> Users</a></li>
-                    <li><a href="/hr/audit" class="{% block nav_audit %}{% endblock %}"><i class="bi bi-shield-lock"></i> Audit Log</a></li>
+                    <li><a href="/hr/roles" class="{% block nav_roles %}{% endblock %}"><i class="bi bi-shield-lock"></i> Roles & Permissions</a></li>
+                    <li><a href="/hr/audit" class="{% block nav_audit %}{% endblock %}"><i class="bi bi-journal-text"></i> Audit Log</a></li>
                     <li><a href="/hr/settings" class="{% block nav_settings %}{% endblock %}"><i class="bi bi-envelope"></i> Email Settings</a></li>
                 </ul>
             </li>

@@ -10,12 +10,14 @@ from datetime import date, datetime
 import os
 import shutil
 
+from fastapi import Request
 from hr.db.database import get_db
 from hr.models.document import Document
 from hr.models.employee import Employee as EmployeeModel
 from hr.models.user import User
 from hr.schemas.document import Document as DocumentSchema, DocumentUpdate, DocumentWithEmployee
 from hr.api.auth import require_auth
+from hr.core.audit import log_sensitive_access
 
 router = APIRouter()
 
@@ -44,6 +46,7 @@ def update_document_status(document: Document):
 @router.post("/employees/{employee_id}/documents", status_code=201)
 async def upload_document(
     employee_id: int,
+    request: Request,
     file: UploadFile = File(...),
     document_type: str = Form(...),
     expiration_date: Optional[str] = Form(None),
@@ -121,6 +124,19 @@ async def upload_document(
     db.add(document)
     db.commit()
     db.refresh(document)
+
+    # Audit log: Document uploaded
+    log_sensitive_access(
+        db=db,
+        entity_type="document",
+        entity_id=document.id,
+        action="create",
+        user_id=current_user.id,
+        username=current_user.username,
+        field_name=document_type,
+        request=request,
+        notes=f"Uploaded {document_type} for {employee.first_name} {employee.last_name}"
+    )
 
     return document
 
@@ -249,6 +265,7 @@ def get_document(
 @router.get("/{document_id}/download")
 def download_document(
     document_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_auth)
 ):
@@ -268,6 +285,22 @@ def download_document(
 
     if not os.path.exists(document.file_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
+
+    # Audit log: Document downloaded/viewed
+    employee = db.query(EmployeeModel).filter(EmployeeModel.id == document.employee_id).first()
+    employee_name = f"{employee.first_name} {employee.last_name}" if employee else f"Employee #{document.employee_id}"
+
+    log_sensitive_access(
+        db=db,
+        entity_type="document",
+        entity_id=document.id,
+        action="view",
+        user_id=current_user.id,
+        username=current_user.username,
+        field_name=document.document_type,
+        request=request,
+        notes=f"Downloaded {document.document_type} for {employee_name}"
+    )
 
     return FileResponse(
         document.file_path,
@@ -305,6 +338,7 @@ def update_document(
 @router.delete("/{document_id}")
 def delete_document(
     document_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_auth)
 ):
@@ -313,6 +347,12 @@ def delete_document(
     document = db.query(Document).filter(Document.id == document_id).first()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    # Get employee info for audit log before deletion
+    employee = db.query(EmployeeModel).filter(EmployeeModel.id == document.employee_id).first()
+    employee_name = f"{employee.first_name} {employee.last_name}" if employee else f"Employee #{document.employee_id}"
+    doc_type = document.document_type
+    doc_id = document.id
 
     # Delete file from disk
     if os.path.exists(document.file_path):
@@ -324,5 +364,18 @@ def delete_document(
     # Delete database record
     db.delete(document)
     db.commit()
+
+    # Audit log: Document deleted
+    log_sensitive_access(
+        db=db,
+        entity_type="document",
+        entity_id=doc_id,
+        action="delete",
+        user_id=current_user.id,
+        username=current_user.username,
+        field_name=doc_type,
+        request=request,
+        notes=f"Deleted {doc_type} for {employee_name}"
+    )
 
     return {"message": "Document deleted successfully"}

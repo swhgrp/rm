@@ -1,0 +1,1070 @@
+{% extends "base.html" %}
+
+{% block title %}Corrective Action Form - HR Management{% endblock %}
+{% block nav_employees %}active{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<div style="margin-bottom: 20px; color: var(--text-secondary);">
+    <a href="/hr/" style="color: var(--accent-primary);">Dashboard</a> /
+    <a href="/hr/employees" style="color: var(--accent-primary);">Employees</a> /
+    <a href="/hr/employees/{{ employee_id }}" style="color: var(--accent-primary);" id="employeeLink">Employee</a> /
+    <span>Corrective Action</span>
+</div>
+
+<!-- Alert Container -->
+<div id="alertContainer"></div>
+
+<!-- Form Header -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h2><i class="bi bi-exclamation-triangle"></i> Employee Corrective Action Notice</h2>
+        <div style="display: flex; gap: 10px;">
+            <span class="badge" id="statusBadge" style="padding: 8px 16px; font-size: 14px;">Draft</span>
+        </div>
+    </div>
+</div>
+
+<!-- Employee Info Card -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3><i class="bi bi-person"></i> Employee Information</h3>
+    </div>
+    <div style="padding: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+            <div>
+                <label style="color: var(--text-secondary); font-size: 13px;">Employee Name</label>
+                <div id="employeeName" style="font-weight: 600;">Loading...</div>
+            </div>
+            <div>
+                <label style="color: var(--text-secondary); font-size: 13px;">Location <span style="color: #E53935;">*</span></label>
+                <select id="locationId" class="form-control" required>
+                    <option value="">Select Location...</option>
+                </select>
+            </div>
+            <div>
+                <label style="color: var(--text-secondary); font-size: 13px;">Date Presented</label>
+                <input type="date" id="incidentDate" class="form-control" value="{{ today }}" required>
+            </div>
+            <div>
+                <label style="color: var(--text-secondary); font-size: 13px;">Supervisor</label>
+                <div id="supervisorName">{{ current_user.full_name or current_user.username }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Disciplinary Level -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3><i class="bi bi-list-check"></i> Disciplinary Level <span style="color: #E53935;">*</span></h3>
+    </div>
+    <div style="padding: 20px;">
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+            <label class="radio-card">
+                <input type="radio" name="disciplinaryLevel" value="verbal" required>
+                <div class="radio-content">
+                    <strong>Verbal Correction</strong>
+                    <span style="color: var(--text-muted); font-size: 13px;">To document the conversation</span>
+                </div>
+            </label>
+            <label class="radio-card">
+                <input type="radio" name="disciplinaryLevel" value="written">
+                <div class="radio-content">
+                    <strong>Written Warning</strong>
+                    <span style="color: var(--text-muted); font-size: 13px;">State nature of offense, method of correction, and action to be taken if repeated</span>
+                </div>
+            </label>
+            <label class="radio-card">
+                <input type="radio" name="disciplinaryLevel" value="final_written">
+                <div class="radio-content">
+                    <strong>Final Written Warning</strong>
+                    <div id="finalWarningOptions" style="margin-top: 10px; display: none;">
+                        <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <input type="radio" name="finalWarningType" value="without_decision_making_leave">
+                            Without decision-making leave
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <input type="radio" name="finalWarningType" value="with_decision_making_leave">
+                            With decision-making leave (Attach memo of instructions)
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="radio" name="finalWarningType" value="with_unpaid_suspension">
+                            With unpaid suspension
+                        </label>
+                    </div>
+                </div>
+            </label>
+        </div>
+    </div>
+</div>
+
+<!-- Subject -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3><i class="bi bi-tag"></i> Subject <span style="color: #E53935;">*</span></h3>
+    </div>
+    <div style="padding: 20px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+            <label class="checkbox-card">
+                <input type="radio" name="subject" value="policy_violation" required>
+                <span>Policy/Procedure Violation</span>
+            </label>
+            <label class="checkbox-card">
+                <input type="radio" name="subject" value="performance">
+                <span>Performance Transgression</span>
+            </label>
+            <label class="checkbox-card">
+                <input type="radio" name="subject" value="behavior_conduct">
+                <span>Behavior/Conduct Infraction</span>
+            </label>
+            <label class="checkbox-card">
+                <input type="radio" name="subject" value="attendance">
+                <span>Absenteeism and Tardiness</span>
+            </label>
+        </div>
+    </div>
+</div>
+
+<!-- Prior Notification -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3><i class="bi bi-clock-history"></i> Prior Notification</h3>
+    </div>
+    <div style="padding: 20px;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="text-align: left; padding: 10px; border-bottom: 2px solid var(--border-primary);">Level of Discipline</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 2px solid var(--border-primary);">Date</th>
+                    <th style="text-align: left; padding: 10px; border-bottom: 2px solid var(--border-primary);">Subject</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-primary);">Verbal</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-primary);">
+                        <input type="date" id="priorVerbalDate" class="form-control" style="max-width: 180px;">
+                    </td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-primary);">
+                        <input type="text" id="priorVerbalSubject" class="form-control" placeholder="Subject">
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-primary);">Written</td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-primary);">
+                        <input type="date" id="priorWrittenDate" class="form-control" style="max-width: 180px;">
+                    </td>
+                    <td style="padding: 10px; border-bottom: 1px solid var(--border-primary);">
+                        <input type="text" id="priorWrittenSubject" class="form-control" placeholder="Subject">
+                    </td>
+                </tr>
+                <tr>
+                    <td style="padding: 10px;">Final Written</td>
+                    <td style="padding: 10px;">
+                        <input type="date" id="priorFinalDate" class="form-control" style="max-width: 180px;">
+                    </td>
+                    <td style="padding: 10px;">
+                        <input type="text" id="priorFinalSubject" class="form-control" placeholder="Subject">
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Incident Description -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3><i class="bi bi-file-text"></i> Incident Description and Supporting Details <span style="color: #E53935;">*</span></h3>
+    </div>
+    <div style="padding: 20px;">
+        <p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 14px;">
+            Include the following information: Time, Place, Date of Occurrence, and Persons Present as well as Organizational Impact.
+        </p>
+        <textarea id="incidentDescription" class="form-control" rows="8" required
+                  placeholder="Describe the incident in detail..."></textarea>
+    </div>
+</div>
+
+<!-- Performance Improvement Plan -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3><i class="bi bi-graph-up-arrow"></i> Performance Improvement Plan</h3>
+    </div>
+    <div style="padding: 20px;">
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label style="font-weight: 500; margin-bottom: 8px; display: block;">1. Measurable/Tangible Improvement Goals:</label>
+            <textarea id="improvementGoals" class="form-control" rows="3"
+                      placeholder="List specific, measurable goals..."></textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label style="font-weight: 500; margin-bottom: 8px; display: block;">2. Training or Special Direction to Be Provided:</label>
+            <textarea id="trainingProvided" class="form-control" rows="3"
+                      placeholder="Describe any training or direction..."></textarea>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label style="font-weight: 500; margin-bottom: 8px; display: block;">3. Interim Performance Evaluation Necessary?</label>
+            <div style="display: flex; gap: 20px;">
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="radio" name="interimEval" value="yes"> Yes
+                </label>
+                <label style="display: flex; align-items: center; gap: 8px;">
+                    <input type="radio" name="interimEval" value="no" checked> No
+                </label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label style="font-weight: 500; margin-bottom: 8px; display: block;">4. Personal Improvement Plan Input and Suggestions:</label>
+            <textarea id="personalInput" class="form-control" rows="3"
+                      placeholder="Employee's input and suggestions..."></textarea>
+        </div>
+    </div>
+</div>
+
+<!-- Outcomes and Consequences -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3><i class="bi bi-signpost-split"></i> Outcomes and Consequences</h3>
+    </div>
+    <div style="padding: 20px;">
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label style="font-weight: 500; margin-bottom: 8px; display: block; color: #43A047;">Positive:</label>
+            <textarea id="positiveOutcome" class="form-control" rows="2">If you meet the company's and your own performance goals, no further disciplinary action will be taken regarding this issue.</textarea>
+        </div>
+
+        <div class="form-group">
+            <label style="font-weight: 500; margin-bottom: 8px; display: block; color: #E53935;">Negative:</label>
+            <textarea id="negativeOutcome" class="form-control" rows="2"
+                      placeholder="Describe consequences if goals are not met..."></textarea>
+        </div>
+
+        <p style="color: var(--text-secondary); margin-top: 15px; font-size: 14px; font-style: italic;">
+            A copy of this document will be placed in your personnel file.
+        </p>
+    </div>
+</div>
+
+<!-- Scheduled Review Date -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3><i class="bi bi-calendar-event"></i> Scheduled Review Date</h3>
+    </div>
+    <div style="padding: 20px;">
+        <input type="date" id="reviewDate" class="form-control" style="max-width: 250px;">
+    </div>
+</div>
+
+<!-- Employee Comments (shown after employee receives form) -->
+<div class="card" style="margin-bottom: 20px;" id="employeeCommentsSection">
+    <div class="card-header">
+        <h3><i class="bi bi-chat-left-text"></i> Employee Comments and/or Rebuttal</h3>
+    </div>
+    <div style="padding: 20px;">
+        <textarea id="employeeComments" class="form-control" rows="4"
+                  placeholder="Employee may add comments or rebuttal here..."></textarea>
+    </div>
+</div>
+
+<!-- Employee Acknowledgement -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3><i class="bi bi-shield-check"></i> Employee Acknowledgement</h3>
+    </div>
+    <div style="padding: 20px;">
+        <div style="background: var(--bg-tertiary); padding: 20px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; line-height: 1.6;">
+            <p>I understand that the Company is an "at-will" employer, meaning that my employment has no specified term and that the employment relationship may be terminated any time at the will of either party on notice to the other. I also realize that the Company is opting to provide me with corrective action measures, and can terminate such corrective measures at any time, solely at its own discretion, and that the use of progressive discipline will not change my at-will employment status.</p>
+            <p style="margin-top: 15px;">I have received a copy of this notification. It has been discussed with me, and I have been advised to take time to consider it before I sign it. I have freely chosen to agree to it, and I accept full responsibility for my actions. <strong><em>I understand that no exceptions will be made under any circumstances and that this is my last chance.</em></strong> By signing this, I commit to follow the Company's standards of performance and conduct.</p>
+        </div>
+    </div>
+</div>
+
+<!-- Signatures Section -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">
+        <h3><i class="bi bi-pen"></i> Signatures</h3>
+    </div>
+    <div style="padding: 20px;">
+        <!-- Employee Signature -->
+        <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border-primary);">
+            <h4 style="margin-bottom: 15px;">Employee Signature</h4>
+            <div id="employeeSignatureArea">
+                <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 300px;">
+                        <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">Sign below:</label>
+                        <div style="border: 2px solid var(--border-primary); border-radius: 8px; background: #fff;">
+                            <canvas id="employeeSignaturePad" width="400" height="150" style="width: 100%; touch-action: none;"></canvas>
+                        </div>
+                        <button type="button" class="btn btn-secondary" style="margin-top: 10px;" onclick="clearEmployeeSignature()">
+                            <i class="bi bi-eraser"></i> Clear
+                        </button>
+                    </div>
+                    <div style="flex: 1; min-width: 200px;">
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">Type your full name to confirm:</label>
+                            <input type="text" id="employeeTypedName" class="form-control" placeholder="Full Legal Name">
+                        </div>
+                        <div id="employeeSignatureDate" style="color: var(--text-secondary); font-size: 14px;"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="employeeSignatureDisplay" style="display: none;">
+                <div style="display: flex; gap: 20px; align-items: center;">
+                    <img id="employeeSignatureImg" style="max-width: 300px; border: 1px solid var(--border-primary); border-radius: 4px;">
+                    <div>
+                        <div id="employeeSignedName" style="font-weight: 600;"></div>
+                        <div id="employeeSignedDate" style="color: var(--text-secondary); font-size: 14px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Supervisor Signature -->
+        <div style="margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border-primary);">
+            <h4 style="margin-bottom: 15px;">Supervisor's Signature <span style="color: #E53935;">*</span></h4>
+            <div id="supervisorSignatureArea">
+                <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 300px;">
+                        <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">Sign below:</label>
+                        <div style="border: 2px solid var(--border-primary); border-radius: 8px; background: #fff;">
+                            <canvas id="supervisorSignaturePad" width="400" height="150" style="width: 100%; touch-action: none;"></canvas>
+                        </div>
+                        <button type="button" class="btn btn-secondary" style="margin-top: 10px;" onclick="clearSupervisorSignature()">
+                            <i class="bi bi-eraser"></i> Clear
+                        </button>
+                    </div>
+                    <div style="flex: 1; min-width: 200px;">
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">Type your full name to confirm:</label>
+                            <input type="text" id="supervisorTypedName" class="form-control" placeholder="Full Legal Name">
+                        </div>
+                        <div id="supervisorSignatureDate" style="color: var(--text-secondary); font-size: 14px;"></div>
+                    </div>
+                </div>
+            </div>
+            <div id="supervisorSignatureDisplay" style="display: none;">
+                <div style="display: flex; gap: 20px; align-items: center;">
+                    <img id="supervisorSignatureImg" style="max-width: 300px; border: 1px solid var(--border-primary); border-radius: 4px;">
+                    <div>
+                        <div id="supervisorSignedName" style="font-weight: 600;"></div>
+                        <div id="supervisorSignedDate" style="color: var(--text-secondary); font-size: 14px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Witness (if employee refuses) -->
+        <div id="witnessSection" style="display: none;">
+            <h4 style="margin-bottom: 15px; color: #E53935;"><i class="bi bi-exclamation-circle"></i> Witness (Employee Refused to Sign)</h4>
+            <div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 300px;">
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">Witness Name:</label>
+                        <input type="text" id="witnessName" class="form-control" placeholder="Witness Full Name">
+                    </div>
+                    <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">Witness Signature:</label>
+                    <div style="border: 2px solid var(--border-primary); border-radius: 8px; background: #fff;">
+                        <canvas id="witnessSignaturePad" width="400" height="150" style="width: 100%; touch-action: none;"></canvas>
+                    </div>
+                    <button type="button" class="btn btn-secondary" style="margin-top: 10px;" onclick="clearWitnessSignature()">
+                        <i class="bi bi-eraser"></i> Clear
+                    </button>
+                </div>
+                <div style="flex: 1; min-width: 200px;">
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">Time in Conference:</label>
+                        <input type="text" id="conferenceTime" class="form-control" placeholder="e.g., 2:30 PM - 3:00 PM">
+                    </div>
+                    <div class="form-group">
+                        <label style="display: block; margin-bottom: 8px; color: var(--text-secondary);">Type witness name to confirm:</label>
+                        <input type="text" id="witnessTypedName" class="form-control" placeholder="Full Legal Name">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action Buttons -->
+<div class="card" style="margin-bottom: 40px;">
+    <div style="padding: 20px; display: flex; gap: 15px; flex-wrap: wrap; justify-content: space-between;">
+        <div style="display: flex; gap: 10px;">
+            <a href="/hr/employees/{{ employee_id }}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Employee
+            </a>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary" onclick="saveDraft()" id="saveDraftBtn">
+                <i class="bi bi-save"></i> Save Draft
+            </button>
+            <button type="button" class="btn btn-secondary" onclick="printForm()">
+                <i class="bi bi-printer"></i> Print
+            </button>
+            <button type="button" class="btn btn-warning" onclick="markEmployeeRefused()" id="refuseBtn" style="display: none;">
+                <i class="bi bi-x-circle"></i> Employee Refuses to Sign
+            </button>
+            <button type="button" class="btn btn-primary" onclick="submitSignature()" id="submitSignatureBtn">
+                <i class="bi bi-check-lg"></i> Submit Signature
+            </button>
+        </div>
+    </div>
+</div>
+
+<style>
+    .radio-card {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .radio-card:hover {
+        border-color: var(--accent-primary);
+        background: var(--bg-tertiary);
+    }
+    .radio-card input[type="radio"]:checked + .radio-content {
+        color: var(--accent-primary);
+    }
+    .radio-card:has(input:checked) {
+        border-color: var(--accent-primary);
+        background: rgba(69, 90, 100, 0.05);
+    }
+    .radio-content {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .checkbox-card {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 12px 15px;
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .checkbox-card:hover {
+        border-color: var(--accent-primary);
+        background: var(--bg-tertiary);
+    }
+    .checkbox-card:has(input:checked) {
+        border-color: var(--accent-primary);
+        background: rgba(69, 90, 100, 0.05);
+    }
+    .form-control {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background: var(--bg-secondary);
+    }
+    .form-control:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+    }
+    .badge {
+        border-radius: 20px;
+    }
+
+    /* Mobile Responsive Styles */
+    @media (max-width: 768px) {
+        .card-header {
+            flex-direction: column;
+            align-items: flex-start !important;
+            gap: 10px;
+        }
+        .card-header h2, .card-header h3 {
+            font-size: 1.1rem;
+        }
+        .card-header > div {
+            width: 100%;
+            flex-wrap: wrap;
+        }
+        .card-header .btn {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        /* Form controls */
+        .form-control, select, input, textarea {
+            font-size: 16px !important; /* Prevents iOS zoom on focus */
+        }
+
+        /* Grid layouts stack on mobile */
+        div[style*="grid-template-columns"] {
+            grid-template-columns: 1fr !important;
+        }
+
+        /* Signature sections */
+        div[style*="min-width: 300px"],
+        div[style*="min-width: 200px"] {
+            min-width: 100% !important;
+            flex: none !important;
+        }
+
+        /* Signature canvas */
+        canvas {
+            height: 120px;
+        }
+
+        /* Radio cards */
+        .radio-card {
+            padding: 12px;
+        }
+        .radio-card .radio-content {
+            font-size: 14px;
+        }
+
+        /* Checkbox grids */
+        div[style*="display: grid"][style*="gap: 10px"] {
+            grid-template-columns: 1fr 1fr !important;
+        }
+
+        /* Date inputs */
+        input[type="date"] {
+            max-width: 100% !important;
+            width: 100%;
+        }
+
+        /* Flex wrapping */
+        div[style*="display: flex"][style*="gap: 20px"] {
+            flex-direction: column;
+            gap: 15px !important;
+        }
+
+        /* Acknowledgement text */
+        div[style*="line-height: 1.6"] {
+            font-size: 13px !important;
+            padding: 15px !important;
+        }
+
+        /* Action buttons */
+        div[style*="gap: 10px"] .btn {
+            padding: 10px 15px;
+            font-size: 14px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .card {
+            margin-bottom: 15px;
+        }
+        .card-header {
+            padding: 12px 15px;
+        }
+        div[style*="padding: 20px"] {
+            padding: 15px !important;
+        }
+
+        /* Even smaller checkbox grid on very small screens */
+        div[style*="display: grid"][style*="gap: 10px"] {
+            grid-template-columns: 1fr !important;
+        }
+
+        /* Stack signature display */
+        #employeeSignatureDisplay > div,
+        #supervisorSignatureDisplay > div {
+            flex-direction: column;
+            align-items: flex-start !important;
+        }
+        #employeeSignatureDisplay img,
+        #supervisorSignatureDisplay img {
+            max-width: 100% !important;
+        }
+    }
+
+    @media print {
+        .sidebar, .card-header button, .btn, #alertContainer {
+            display: none !important;
+        }
+        .card {
+            break-inside: avoid;
+            border: 1px solid #ccc !important;
+        }
+        body {
+            background: white;
+        }
+        .main-wrapper {
+            margin-left: 0 !important;
+        }
+    }
+</style>
+
+<!-- Signature Pad Library -->
+<script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
+
+<script>
+const employeeId = {{ employee_id }};
+const actionId = {{ action_id if action_id else 'null' }};
+let formStatus = 'draft';
+
+// Initialize signature pads
+let employeeSignaturePad, supervisorSignaturePad, witnessSignaturePad;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize signature pads
+    const employeeCanvas = document.getElementById('employeeSignaturePad');
+    const supervisorCanvas = document.getElementById('supervisorSignaturePad');
+    const witnessCanvas = document.getElementById('witnessSignaturePad');
+
+    employeeSignaturePad = new SignaturePad(employeeCanvas, {
+        backgroundColor: 'rgb(255, 255, 255)',
+        penColor: 'rgb(0, 0, 0)'
+    });
+
+    supervisorSignaturePad = new SignaturePad(supervisorCanvas, {
+        backgroundColor: 'rgb(255, 255, 255)',
+        penColor: 'rgb(0, 0, 0)'
+    });
+
+    witnessSignaturePad = new SignaturePad(witnessCanvas, {
+        backgroundColor: 'rgb(255, 255, 255)',
+        penColor: 'rgb(0, 0, 0)'
+    });
+
+    // Resize canvas for proper drawing
+    resizeCanvas(employeeCanvas, employeeSignaturePad);
+    resizeCanvas(supervisorCanvas, supervisorSignaturePad);
+    resizeCanvas(witnessCanvas, witnessSignaturePad);
+
+    window.addEventListener('resize', function() {
+        resizeCanvas(employeeCanvas, employeeSignaturePad);
+        resizeCanvas(supervisorCanvas, supervisorSignaturePad);
+        resizeCanvas(witnessCanvas, witnessSignaturePad);
+    });
+
+    // Load data
+    loadEmployee();
+    loadLocations();
+
+    if (actionId) {
+        loadCorrectiveAction();
+    }
+
+    // Toggle final warning options
+    document.querySelectorAll('input[name="disciplinaryLevel"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            document.getElementById('finalWarningOptions').style.display =
+                this.value === 'final_written' ? 'block' : 'none';
+        });
+    });
+});
+
+function resizeCanvas(canvas, signaturePad) {
+    const ratio = Math.max(window.devicePixelRatio || 1, 1);
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * ratio;
+    canvas.height = rect.height * ratio;
+    canvas.getContext('2d').scale(ratio, ratio);
+    signaturePad.clear();
+}
+
+function clearEmployeeSignature() {
+    employeeSignaturePad.clear();
+}
+
+function clearSupervisorSignature() {
+    supervisorSignaturePad.clear();
+}
+
+function clearWitnessSignature() {
+    witnessSignaturePad.clear();
+}
+
+async function loadEmployee() {
+    try {
+        const response = await fetch(`/hr/api/employees/${employeeId}`, { credentials: 'include' });
+        if (response.ok) {
+            const employee = await response.json();
+            document.getElementById('employeeName').textContent = `${employee.first_name} ${employee.last_name}`;
+            document.getElementById('employeeLink').textContent = `${employee.first_name} ${employee.last_name}`;
+        }
+    } catch (error) {
+        console.error('Error loading employee:', error);
+    }
+}
+
+async function loadLocations() {
+    try {
+        // Try to get all locations first (for admins), then fall back to user's accessible locations
+        let response = await fetch('/hr/api/locations/all', { credentials: 'include' });
+        if (!response.ok) {
+            response = await fetch('/hr/api/locations', { credentials: 'include' });
+        }
+        if (response.ok) {
+            const locations = await response.json();
+            const select = document.getElementById('locationId');
+            locations.forEach(loc => {
+                const option = document.createElement('option');
+                option.value = loc.id;
+                option.textContent = loc.name;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading locations:', error);
+    }
+}
+
+async function loadCorrectiveAction() {
+    try {
+        const response = await fetch(`/hr/api/forms/corrective-actions/${actionId}`, { credentials: 'include' });
+        if (response.ok) {
+            const data = await response.json();
+            populateForm(data);
+        }
+    } catch (error) {
+        console.error('Error loading corrective action:', error);
+    }
+}
+
+function populateForm(data) {
+    formStatus = data.status;
+    updateStatusBadge(data.status);
+
+    document.getElementById('locationId').value = data.location_id || '';
+    document.getElementById('incidentDate').value = data.incident_date || '';
+
+    // Disciplinary level
+    const levelRadio = document.querySelector(`input[name="disciplinaryLevel"][value="${data.disciplinary_level}"]`);
+    if (levelRadio) levelRadio.checked = true;
+
+    if (data.disciplinary_level === 'final_written') {
+        document.getElementById('finalWarningOptions').style.display = 'block';
+        const finalType = document.querySelector(`input[name="finalWarningType"][value="${data.final_warning_type}"]`);
+        if (finalType) finalType.checked = true;
+    }
+
+    // Subject
+    const subjectRadio = document.querySelector(`input[name="subject"][value="${data.subject}"]`);
+    if (subjectRadio) subjectRadio.checked = true;
+
+    // Prior notifications
+    if (data.prior_notifications) {
+        data.prior_notifications.forEach(n => {
+            if (n.level === 'verbal') {
+                document.getElementById('priorVerbalDate').value = n.date || '';
+                document.getElementById('priorVerbalSubject').value = n.subject || '';
+            } else if (n.level === 'written') {
+                document.getElementById('priorWrittenDate').value = n.date || '';
+                document.getElementById('priorWrittenSubject').value = n.subject || '';
+            } else if (n.level === 'final_written') {
+                document.getElementById('priorFinalDate').value = n.date || '';
+                document.getElementById('priorFinalSubject').value = n.subject || '';
+            }
+        });
+    }
+
+    document.getElementById('incidentDescription').value = data.incident_description || '';
+    document.getElementById('improvementGoals').value = data.improvement_goals || '';
+    document.getElementById('trainingProvided').value = data.training_provided || '';
+    document.getElementById('personalInput').value = data.personal_improvement_input || '';
+    document.getElementById('positiveOutcome').value = data.positive_outcome || '';
+    document.getElementById('negativeOutcome').value = data.negative_outcome || '';
+    document.getElementById('reviewDate').value = data.scheduled_review_date || '';
+    document.getElementById('employeeComments').value = data.employee_comments || '';
+
+    if (data.interim_evaluation_needed) {
+        document.querySelector('input[name="interimEval"][value="yes"]').checked = true;
+    }
+
+    // Handle signatures display
+    if (data.employee_signature) {
+        document.getElementById('employeeSignatureArea').style.display = 'none';
+        document.getElementById('employeeSignatureDisplay').style.display = 'block';
+        document.getElementById('employeeSignedName').textContent = data.employee_typed_name;
+        document.getElementById('employeeSignedDate').textContent = `Signed: ${new Date(data.employee_signature_date).toLocaleString()}`;
+    }
+
+    if (data.supervisor_signature) {
+        document.getElementById('supervisorSignatureArea').style.display = 'none';
+        document.getElementById('supervisorSignatureDisplay').style.display = 'block';
+        document.getElementById('supervisorSignedName').textContent = data.supervisor_typed_name;
+        document.getElementById('supervisorSignedDate').textContent = `Signed: ${new Date(data.supervisor_signature_date).toLocaleString()}`;
+    }
+
+    // Show witness section if employee refused
+    if (data.status === 'employee_refused' || data.witness_signature) {
+        document.getElementById('witnessSection').style.display = 'block';
+        document.getElementById('refuseBtn').style.display = 'none';
+    }
+
+    // Update buttons based on status
+    updateButtonsForStatus(data.status);
+}
+
+function updateStatusBadge(status) {
+    const badge = document.getElementById('statusBadge');
+    const statusMap = {
+        'draft': { text: 'Draft', color: '#78909C' },
+        'pending_employee_signature': { text: 'Pending Employee Signature', color: '#FB8C00' },
+        'pending_supervisor_signature': { text: 'Pending Supervisor Signature', color: '#1E88E5' },
+        'employee_refused': { text: 'Employee Refused', color: '#E53935' },
+        'completed': { text: 'Completed', color: '#43A047' }
+    };
+    const info = statusMap[status] || { text: status, color: '#78909C' };
+    badge.textContent = info.text;
+    badge.style.backgroundColor = info.color;
+    badge.style.color = '#fff';
+}
+
+function updateButtonsForStatus(status) {
+    const saveDraftBtn = document.getElementById('saveDraftBtn');
+    const refuseBtn = document.getElementById('refuseBtn');
+    const submitBtn = document.getElementById('submitSignatureBtn');
+
+    if (status === 'completed') {
+        saveDraftBtn.style.display = 'none';
+        refuseBtn.style.display = 'none';
+        submitBtn.style.display = 'none';
+    } else if (status === 'pending_employee_signature') {
+        refuseBtn.style.display = 'inline-flex';
+        submitBtn.textContent = ' Submit Employee Signature';
+    } else if (status === 'pending_supervisor_signature' || status === 'employee_refused') {
+        refuseBtn.style.display = 'none';
+        submitBtn.textContent = ' Submit Supervisor Signature';
+    }
+}
+
+function getFormData() {
+    const priorNotifications = [];
+    const verbalDate = document.getElementById('priorVerbalDate').value;
+    const verbalSubject = document.getElementById('priorVerbalSubject').value;
+    if (verbalDate || verbalSubject) {
+        priorNotifications.push({ level: 'verbal', date: verbalDate, subject: verbalSubject });
+    }
+    const writtenDate = document.getElementById('priorWrittenDate').value;
+    const writtenSubject = document.getElementById('priorWrittenSubject').value;
+    if (writtenDate || writtenSubject) {
+        priorNotifications.push({ level: 'written', date: writtenDate, subject: writtenSubject });
+    }
+    const finalDate = document.getElementById('priorFinalDate').value;
+    const finalSubject = document.getElementById('priorFinalSubject').value;
+    if (finalDate || finalSubject) {
+        priorNotifications.push({ level: 'final_written', date: finalDate, subject: finalSubject });
+    }
+
+    const disciplinaryLevel = document.querySelector('input[name="disciplinaryLevel"]:checked')?.value;
+    const finalWarningType = disciplinaryLevel === 'final_written'
+        ? document.querySelector('input[name="finalWarningType"]:checked')?.value
+        : null;
+
+    return {
+        employee_id: employeeId,
+        location_id: parseInt(document.getElementById('locationId').value) || null,
+        disciplinary_level: disciplinaryLevel,
+        final_warning_type: finalWarningType,
+        subject: document.querySelector('input[name="subject"]:checked')?.value,
+        prior_notifications: priorNotifications.length > 0 ? priorNotifications : null,
+        incident_description: document.getElementById('incidentDescription').value,
+        incident_date: document.getElementById('incidentDate').value,
+        improvement_goals: document.getElementById('improvementGoals').value || null,
+        training_provided: document.getElementById('trainingProvided').value || null,
+        interim_evaluation_needed: document.querySelector('input[name="interimEval"]:checked')?.value === 'yes',
+        personal_improvement_input: document.getElementById('personalInput').value || null,
+        positive_outcome: document.getElementById('positiveOutcome').value || null,
+        negative_outcome: document.getElementById('negativeOutcome').value || null,
+        scheduled_review_date: document.getElementById('reviewDate').value || null,
+        employee_comments: document.getElementById('employeeComments').value || null
+    };
+}
+
+async function saveDraft() {
+    const data = getFormData();
+
+    // Validate required fields
+    if (!data.location_id || !data.disciplinary_level || !data.subject || !data.incident_description || !data.incident_date) {
+        showAlert('Please fill in all required fields', 'error');
+        return;
+    }
+
+    try {
+        let response;
+        if (actionId) {
+            response = await fetch(`/hr/api/forms/corrective-actions/${actionId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(data)
+            });
+        } else {
+            response = await fetch('/hr/api/forms/corrective-actions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(data)
+            });
+        }
+
+        if (response.ok) {
+            const result = await response.json();
+            showAlert('Draft saved successfully', 'success');
+            if (!actionId && result.id) {
+                window.location.href = `/hr/forms/corrective-action/${employeeId}/${result.id}`;
+            }
+        } else {
+            const error = await response.json();
+            showAlert('Error: ' + (error.detail || 'Failed to save'), 'error');
+        }
+    } catch (error) {
+        console.error('Error saving:', error);
+        showAlert('Error saving draft', 'error');
+    }
+}
+
+async function submitSignature() {
+    if (formStatus === 'draft' || formStatus === 'pending_employee_signature') {
+        // Employee signature
+        if (employeeSignaturePad.isEmpty()) {
+            showAlert('Please provide employee signature', 'error');
+            return;
+        }
+        const typedName = document.getElementById('employeeTypedName').value.trim();
+        if (!typedName) {
+            showAlert('Please type the employee name to confirm signature', 'error');
+            return;
+        }
+
+        // First save if draft
+        if (formStatus === 'draft') {
+            await saveDraft();
+            if (!actionId) return; // Wait for redirect
+
+            // Send for signature
+            await fetch(`/hr/api/forms/corrective-actions/${actionId}/send-for-signature`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+        }
+
+        // Submit employee signature
+        const signatureData = employeeSignaturePad.toDataURL('image/png');
+        const response = await fetch(`/hr/api/forms/corrective-actions/${actionId}/employee-sign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ signature: signatureData, typed_name: typedName })
+        });
+
+        if (response.ok) {
+            showAlert('Employee signature recorded', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            const error = await response.json();
+            showAlert('Error: ' + (error.detail || 'Failed to submit signature'), 'error');
+        }
+    } else if (formStatus === 'pending_supervisor_signature' || formStatus === 'employee_refused') {
+        // Supervisor/Witness signature
+        if (formStatus === 'employee_refused') {
+            // Need witness signature
+            if (witnessSignaturePad.isEmpty()) {
+                showAlert('Please provide witness signature', 'error');
+                return;
+            }
+            const witnessName = document.getElementById('witnessName').value.trim();
+            const witnessTypedName = document.getElementById('witnessTypedName').value.trim();
+            const conferenceTime = document.getElementById('conferenceTime').value.trim();
+
+            if (!witnessName || !witnessTypedName) {
+                showAlert('Please provide witness name', 'error');
+                return;
+            }
+
+            const witnessSignatureData = witnessSignaturePad.toDataURL('image/png');
+            const witnessResponse = await fetch(`/hr/api/forms/corrective-actions/${actionId}/witness-sign?witness_name=${encodeURIComponent(witnessName)}&conference_time=${encodeURIComponent(conferenceTime)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ signature: witnessSignatureData, typed_name: witnessTypedName })
+            });
+
+            if (!witnessResponse.ok) {
+                const error = await witnessResponse.json();
+                showAlert('Error: ' + (error.detail || 'Failed to submit witness signature'), 'error');
+                return;
+            }
+        }
+
+        // Supervisor signature
+        if (supervisorSignaturePad.isEmpty()) {
+            showAlert('Please provide supervisor signature', 'error');
+            return;
+        }
+        const supervisorTypedName = document.getElementById('supervisorTypedName').value.trim();
+        if (!supervisorTypedName) {
+            showAlert('Please type supervisor name to confirm signature', 'error');
+            return;
+        }
+
+        const supervisorSignatureData = supervisorSignaturePad.toDataURL('image/png');
+        const response = await fetch(`/hr/api/forms/corrective-actions/${actionId}/supervisor-sign`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ signature: supervisorSignatureData, typed_name: supervisorTypedName })
+        });
+
+        if (response.ok) {
+            showAlert('Form completed successfully', 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            const error = await response.json();
+            showAlert('Error: ' + (error.detail || 'Failed to submit signature'), 'error');
+        }
+    }
+}
+
+async function markEmployeeRefused() {
+    if (!confirm('Are you sure the employee refuses to sign? A witness will be required.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hr/api/forms/corrective-actions/${actionId}/employee-refuse`, {
+            method: 'POST',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            showAlert('Employee refusal recorded. Please have a witness sign.', 'success');
+            document.getElementById('witnessSection').style.display = 'block';
+            document.getElementById('refuseBtn').style.display = 'none';
+            formStatus = 'employee_refused';
+            updateStatusBadge('employee_refused');
+        } else {
+            const error = await response.json();
+            showAlert('Error: ' + (error.detail || 'Failed to record refusal'), 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        showAlert('Error recording refusal', 'error');
+    }
+}
+
+function printForm() {
+    window.print();
+}
+
+function showAlert(message, type) {
+    const alertContainer = document.getElementById('alertContainer');
+    const bgColor = type === 'error' ? '#da3633' : '#238636';
+
+    alertContainer.innerHTML = `
+        <div style="background: ${bgColor}; color: #ffffff; padding: 15px 20px; border-radius: 6px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+            <span><i class="bi bi-${type === 'error' ? 'exclamation-circle' : 'check-circle'}"></i> ${message}</span>
+            <button onclick="this.parentElement.remove()" style="background: none; border: none; color: #ffffff; font-size: 20px; cursor: pointer;">&times;</button>
+        </div>
+    `;
+
+    setTimeout(() => alertContainer.innerHTML = '', 5000);
+}
+</script>
+{% endblock %}

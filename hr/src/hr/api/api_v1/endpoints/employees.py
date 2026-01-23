@@ -210,6 +210,14 @@ def get_employee(
         )
 
     # Audit log: Employee viewed (sensitive fields accessed)
+    # Determine which sensitive fields are present on this employee record
+    from hr.core.audit import SENSITIVE_FIELDS
+
+    viewed_fields = []
+    for field in SENSITIVE_FIELDS:
+        if hasattr(employee, field) and getattr(employee, field):
+            viewed_fields.append(field)
+
     try:
         log_employee_view(
             db=db,
@@ -217,7 +225,8 @@ def get_employee(
             user_id=current_user.id,
             username=current_user.username,
             request=request,
-            viewed_sensitive_fields=True
+            viewed_sensitive_fields=True,
+            sensitive_fields_accessed=viewed_fields if viewed_fields else None
         )
     except Exception as e:
         # Log error but don't fail the request

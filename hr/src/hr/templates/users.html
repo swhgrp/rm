@@ -40,53 +40,55 @@
             <span class="close" onclick="closeUserModal()">&times;</span>
         </div>
         <form id="userForm">
-            <input type="hidden" id="userId">
+            <div class="modal-body">
+                <input type="hidden" id="userId">
 
-            <div class="form-group">
-                <label for="username">Username *</label>
-                <input type="text" id="username" required minlength="3">
-            </div>
+                <div class="form-group">
+                    <label for="username">Username *</label>
+                    <input type="text" id="username" required minlength="3">
+                </div>
 
-            <div class="form-group">
-                <label for="email">Email *</label>
-                <input type="email" id="email" required>
-            </div>
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" required>
+                </div>
 
-            <div class="form-group">
-                <label for="full_name">Full Name *</label>
-                <input type="text" id="full_name" required>
-            </div>
+                <div class="form-group">
+                    <label for="full_name">Full Name *</label>
+                    <input type="text" id="full_name" required>
+                </div>
 
-            <div class="form-group" id="passwordGroup">
-                <label for="password">Password *</label>
-                <input type="password" id="password" minlength="6">
-                <small style="color: #b0b0b0;">Minimum 6 characters</small>
-            </div>
+                <div class="form-group" id="passwordGroup">
+                    <label for="password">Password *</label>
+                    <input type="password" id="password" minlength="6">
+                    <small>Minimum 6 characters</small>
+                </div>
 
-            <div class="form-group">
-                <label for="role_id">Role *</label>
-                <select id="role_id" required>
-                    <option value="">Select Role</option>
-                </select>
-            </div>
+                <div class="form-group">
+                    <label for="role_id">Role *</label>
+                    <select id="role_id" required>
+                        <option value="">Select Role</option>
+                    </select>
+                </div>
 
-            <div class="form-group">
-                <label for="location_ids">Assigned Locations</label>
-                <div id="locationCheckboxContainer" style="max-height: 150px; overflow-y: auto; border: 1px solid #30363d; border-radius: 6px; padding: 0.75rem; background: #0d1117;">
-                    <p style="color: #8b949e; font-size: 12px; margin-bottom: 0.5rem;">
-                        <em>Leave all unchecked to grant access to ALL locations</em>
-                    </p>
-                    <div id="locationCheckboxes">
-                        <!-- Checkboxes will be populated here -->
+                <div class="form-group">
+                    <label for="location_ids">Assigned Locations</label>
+                    <div id="locationCheckboxContainer">
+                        <p class="location-hint">
+                            <em>Leave all unchecked to grant access to ALL locations</em>
+                        </p>
+                        <div id="locationCheckboxes">
+                            <!-- Checkboxes will be populated here -->
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="is_active" checked>
-                    Active
-                </label>
+                <div class="form-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="is_active" checked>
+                        Active
+                    </label>
+                </div>
             </div>
 
             <div class="modal-footer">
@@ -618,108 +620,153 @@ initializePage();
 
 {% block extra_styles %}
 <style>
+    /* Modal body padding */
+    .modal-body {
+        padding: 20px 24px;
+    }
+
     .form-group {
-        margin-bottom: 1rem;
+        margin-bottom: 1.25rem;
     }
     .form-group label {
         display: block;
         margin-bottom: 0.5rem;
-        color: #e0e0e0;
+        color: var(--text-secondary);
+        font-size: 14px;
+        font-weight: 500;
     }
     .form-group input[type="text"],
     .form-group input[type="email"],
-    .form-group input[type="password"] {
+    .form-group input[type="password"],
+    .form-group select {
         width: 100%;
-        padding: 0.5rem;
-        border: 1px solid #555;
-        border-radius: 4px;
-        background: #1a1a1a;
-        color: #e0e0e0;
+        padding: 10px 12px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: 14px;
     }
-    .modal {
-        display: none;
-        position: fixed;
-        z-index: 1000;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0,0,0,0.7);
-        overflow-y: auto;
+    .form-group input:focus,
+    .form-group select:focus {
+        outline: none;
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2);
     }
-    .modal-content {
-        background: #2d2d2d;
-        margin: 2rem auto;
-        padding: 0;
-        border: 1px solid #404040;
-        border-radius: 8px;
-        width: 90%;
-        max-width: 600px;
-        max-height: calc(100vh - 4rem);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+    .form-group small {
+        display: block;
+        margin-top: 6px;
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    /* Checkbox group styling */
+    .form-group.checkbox-group label {
         display: flex;
-        flex-direction: column;
-    }
-    .modal-header {
-        padding: 1.5rem;
-        border-bottom: 1px solid #404040;
-        display: flex;
-        justify-content: space-between;
         align-items: center;
-        flex-shrink: 0;
-    }
-    .modal-header h3 {
-        margin: 0;
-        color: #fff;
-    }
-    .modal-body {
-        padding: 1.5rem;
-        overflow-y: auto;
-        flex: 1;
-    }
-    #userForm {
-        padding: 1.5rem;
-        overflow-y: auto;
-        flex: 1;
-    }
-    .modal-footer {
-        padding: 1rem 1.5rem;
-        border-top: 1px solid #404040;
-        text-align: right;
-        flex-shrink: 0;
-    }
-    .modal-footer button {
-        margin-left: 0.5rem;
-    }
-    .close {
-        color: #aaa;
-        font-size: 28px;
-        font-weight: bold;
+        gap: 8px;
         cursor: pointer;
+        color: var(--text-primary);
     }
-    .close:hover {
-        color: #fff;
+    .form-group.checkbox-group input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        accent-color: var(--accent-primary);
     }
+
+    /* Location checkbox container */
+    #locationCheckboxContainer {
+        max-height: 150px;
+        overflow-y: auto;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        padding: 12px;
+        background: var(--bg-primary);
+    }
+    .location-hint {
+        color: var(--text-muted);
+        font-size: 12px;
+        margin-bottom: 10px;
+    }
+    #locationCheckboxes label {
+        color: var(--text-primary) !important;
+    }
+    #locationCheckboxes input[type="checkbox"] {
+        accent-color: var(--accent-primary);
+    }
+
+    /* Modal footer */
+    #userModal .modal-footer {
+        padding: 16px 24px;
+        border-top: 1px solid var(--border-primary);
+        background: var(--bg-tertiary);
+    }
+
+    /* Table improvements */
+    #usersTable {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    #usersTable th {
+        text-align: left;
+        padding: 12px 15px;
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
+        font-weight: 600;
+        font-size: 13px;
+        border-bottom: 2px solid var(--border-primary);
+    }
+    #usersTable td {
+        padding: 12px 15px;
+        border-bottom: 1px solid var(--border-primary);
+        color: var(--text-primary);
+        vertical-align: middle;
+    }
+    #usersTable tr:hover {
+        background: var(--bg-tertiary);
+    }
+    #usersTable td strong {
+        color: var(--text-primary);
+    }
+
+    /* Action buttons in table */
+    #usersTable .btn-sm {
+        padding: 5px 10px;
+        font-size: 12px;
+        margin-right: 5px;
+        margin-bottom: 3px;
+    }
+
+    /* Status badges */
     .status-badge {
-        padding: 0.25rem 0.5rem;
-        border-radius: 4px;
-        font-size: 0.85rem;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        display: inline-block;
     }
     .status-active {
-        background: #27ae60;
-        color: white;
+        background: #238636;
+        color: #ffffff;
     }
     .status-inactive {
-        background: #666;
-        color: white;
+        background: var(--bg-tertiary);
+        color: var(--text-secondary);
     }
     .status-warning {
-        background: #f39c12;
-        color: white;
+        background: #d29922;
+        color: #ffffff;
     }
     .status-info {
-        background: #3498db;
-        color: white;
+        background: #388bfd;
+        color: #ffffff;
+    }
+
+    /* Password reset modal specific styles */
+    #passwordResetModal .form-group input {
+        background: var(--bg-primary);
+        border-color: var(--border-primary);
+        color: var(--text-primary);
     }
 </style>
 {% endblock %}

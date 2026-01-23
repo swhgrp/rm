@@ -15,6 +15,11 @@ from hr.models.role_permission import RolePermission
 from hr.models.user_role import UserRole
 from hr.models.settings import SystemSettings
 from hr.models.esignature import SignatureRequest, SignatureTemplate
+from hr.models.hr_forms import (
+    CorrectiveAction, FirstReportOfInjury,
+    DisciplinaryLevel, FinalWarningType, CorrectiveActionSubject,
+    FormStatus, InjuryBodyPart, InjuryType
+)
 
 __all__ = [
     "Employee",
@@ -32,5 +37,13 @@ __all__ = [
     "UserRole",
     "SystemSettings",
     "SignatureRequest",
-    "SignatureTemplate"
+    "SignatureTemplate",
+    "CorrectiveAction",
+    "FirstReportOfInjury",
+    "DisciplinaryLevel",
+    "FinalWarningType",
+    "CorrectiveActionSubject",
+    "FormStatus",
+    "InjuryBodyPart",
+    "InjuryType"
 ]

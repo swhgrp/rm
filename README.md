@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** January 22, 2026
-**Status:** ~98% Complete - All 11 Systems Production Ready ✅
-**Latest:** Forms Service with Digital Signatures & Workflow Engine (Jan 22, 2026) ✅
+**Last Updated:** January 23, 2026
+**Status:** ~98% Complete - All 10 Systems Production Ready ✅
+**Latest:** HR Forms (Corrective Action, Injury Reports) & Enhanced Audit Logging (Jan 23, 2026) ✅
 
 ---
 
@@ -31,8 +31,8 @@
 
 The SW Hospitality Group Restaurant Management System is a comprehensive microservices platform handling all aspects of restaurant operations including inventory management, human resources, accounting, event planning, and third-party integrations.
 
-### Key Statistics (Verified Jan 22, 2026)
-- **11 microservices** running in production (including Maintenance, Food Safety & Forms)
+### Key Statistics (Verified Jan 23, 2026)
+- **10 microservices** running in production (including Maintenance & Food Safety)
 - **490+ Python files** across all systems
 - **170+ HTML templates** for user interfaces
 - **160+ database models** with full relationships
@@ -182,20 +182,6 @@ restaurant-system/
 │   ├── requirements.txt
 │   └── README.md       # Food safety documentation
 │
-├── forms/              # Digital Forms & Signatures (NEW - Jan 2026) 🌟
-│   ├── src/            # FastAPI application code (20+ Python files)
-│   │   └── forms/
-│   │       ├── models.py     # SQLAlchemy models (11 tables)
-│   │       ├── schemas.py    # Pydantic schemas
-│   │       ├── routers/      # API routers (8 modules)
-│   │       └── services/     # PDF, workflow, notifications
-│   ├── alembic/        # Database migrations
-│   ├── templates/      # Jinja2 admin templates
-│   ├── form_schemas/   # JSON schema form definitions
-│   ├── Dockerfile
-│   ├── docker-compose.yml  # Standalone deployment
-│   └── requirements.txt
-│
 ├── shared/             # Shared Infrastructure
 │   ├── nginx/          # Reverse proxy configuration
 │   │   └── conf.d/     # Site configurations
@@ -241,7 +227,6 @@ restaurant-system/
 │  /websites/     → websites-app:8000    (Website CMS)         │
 │  /maintenance/  → maintenance-service:8000 (Equipment)       │
 │  /food-safety/  → food-safety-service:8000 (Food Safety)     │
-│  /forms/        → forms-app:8000         (Digital Forms)     │
 │  /onlyoffice/   → onlyoffice:80        (Document Editing)    │
 └──────────────────────────────────────────────────────────────┘
          │           │           │           │
@@ -450,7 +435,7 @@ restaurant-system/
 - **URL:** https://rm.swhgrp.com/hr/
 - **Database:** hr_db (PostgreSQL 15)
 - **Technology:** FastAPI, SQLAlchemy, Redis, APScheduler
-- **Files:** 56 Python files, 14 templates
+- **Files:** 60+ Python files, 17 templates
 
 **Note:** This is an employee information management system. It does NOT include scheduling, time tracking, or payroll features.
 
@@ -461,14 +446,25 @@ restaurant-system/
 - ✅ Emergency contacts (encrypted)
 - ✅ Employee document storage with expiration tracking
 - ✅ Role-based access control (Admin, Manager, Employee)
-- ✅ Audit logging for data access
 - ✅ Email settings management
-- ✅ **E-Signature Templates** - Visual field editor for PDF signature placement (NEW Jan 2026) 🌟
+- ✅ **E-Signature Templates** - Visual field editor for PDF signature placement
   - PDF.js integration for document preview
   - Click-to-place signature, initials, date, and text fields
   - Drag, resize, and delete field boxes
   - Multi-page navigation with zoom controls (50%-200%)
   - Dropbox Sign webhook integration
+- ✅ **HR Forms** (NEW Jan 2026) 🌟
+  - **Corrective Action Form** - Document disciplinary actions with digital signatures
+  - **First Report of Injury** - OSHA-compliant injury reporting with witness signatures
+  - Signature pad integration for employee and supervisor signatures
+  - Past incident history tracking
+  - Form printing and PDF generation
+- ✅ **Enhanced Audit Logging** (NEW Jan 2026) 🌟
+  - Detailed field-level tracking (e.g., "Viewed: Street Address, Phone Number, Date Of Birth")
+  - Document access logging (ID Copy, Social Security Card, Certifications)
+  - Human-readable field names (snake_case → Title Case)
+  - IP address and user agent tracking
+  - Audit log UI with filtering by action, entity type, and user
 - ❌ Shift scheduling - NOT IMPLEMENTED
 - ❌ Time clock (clock in/out) - NOT IMPLEMENTED
 - ❌ Timesheet workflow - NOT IMPLEMENTED
@@ -960,104 +956,6 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 
 ---
 
-### 10. Forms System ✅ **Production Ready (NEW - Jan 2026)** 🌟
-**Digital forms, e-signatures, workflow routing, and compliance documentation**
-
-- **URL:** https://rm.swhgrp.com/forms/
-- **Database:** forms (PostgreSQL 15)
-- **Technology:** FastAPI, async SQLAlchemy, WeasyPrint (PDF), signature_pad.js, react-jsonschema-form
-- **Files:** 20+ Python files, 8 admin templates
-- **Status:** Production ready with full feature set ✅
-
-**Features:**
-
-**Form Template Management:**
-- ✅ JSON Schema-based form definitions
-- ✅ Form categories (HR & Employment, Safety & Compliance, Operations)
-- ✅ Version control for form templates
-- ✅ Template activation/deactivation
-- ✅ Configurable signature requirements
-- ✅ Workflow routing configuration
-
-**Form Submissions:**
-- ✅ Dynamic form rendering from JSON schemas
-- ✅ Draft save and resume
-- ✅ Form validation
-- ✅ Status workflow (Draft → Submitted → Pending Signature → Pending Review → Approved/Rejected)
-- ✅ Reference number generation
-- ✅ Location-aware submissions
-- ✅ Submission history and audit trail
-
-**Digital Signatures:**
-- ✅ Signature capture with signature_pad.js
-- ✅ Multiple signature types (Employee, Manager, Witness, HR Representative)
-- ✅ Signature methods (Drawn, Typed, Uploaded)
-- ✅ Signature request workflow
-- ✅ Signature expiration tracking
-- ✅ IP address and timestamp logging
-- ✅ Email notifications for signature requests
-
-**Workflow Engine:**
-- ✅ Multi-step approval workflows
-- ✅ Role-based routing (Manager, HR, Admin)
-- ✅ Escalation rules with deadlines
-- ✅ Parallel and sequential approval paths
-- ✅ Auto-assignment based on location/department
-- ✅ Workflow instance tracking
-
-**PDF Generation:**
-- ✅ WeasyPrint PDF rendering
-- ✅ Print-ready form layouts
-- ✅ Embedded signatures in PDFs
-- ✅ Download and email delivery
-
-**File Attachments:**
-- ✅ Document upload support
-- ✅ Multiple attachments per submission
-- ✅ File type validation
-
-**Background Services:**
-- ✅ APScheduler for automated tasks
-- ✅ Workflow escalation checks
-- ✅ Signature expiration monitoring
-- ✅ Daily digest emails
-- ✅ Draft cleanup (auto-delete old drafts)
-- ✅ Retention policy enforcement
-
-**Dashboard & Admin UI:**
-- ✅ Dashboard with form metrics
-- ✅ Action items (pending signatures/reviews)
-- ✅ Recent submissions list
-- ✅ Submissions list with filtering
-- ✅ Template management interface
-- ✅ Portal SSO integration
-
-**API Endpoints:**
-- `/forms/health` - Health check
-- `/forms/api/dashboard` - Dashboard stats
-- `/forms/api/templates` - Template CRUD
-- `/forms/api/submissions` - Submission management
-- `/forms/api/signatures` - Signature handling
-- `/forms/api/workflows` - Workflow management
-- `/forms/api/attachments` - File attachments
-- `/forms/api/reports` - Reporting
-
-**Database Tables (11 tables):**
-- `form_templates` - Form definitions with JSON schema
-- `form_submissions` - Submitted form data
-- `signatures` - Digital signature records
-- `signature_requests` - Pending signature tracking
-- `workflow_steps` - Workflow configuration
-- `workflow_instances` - Active workflow tracking
-- `form_attachments` - File attachments
-- `audit_logs` - Complete audit trail
-
-**Access:**
-- Web UI: https://rm.swhgrp.com/forms/
-- API Docs: https://rm.swhgrp.com/forms/docs
-
----
-
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -1097,7 +995,6 @@ docker compose exec hr-app alembic upgrade head
 docker compose exec accounting-app alembic upgrade head
 docker compose exec events-app alembic upgrade head
 docker compose exec integration-hub-app alembic upgrade head
-docker compose exec forms-app alembic upgrade head
 ```
 
 5. **Load initial data:**

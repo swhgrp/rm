@@ -4,11 +4,11 @@
 
 The HR System is an employee information management platform that serves as the central employee database for the entire restaurant management system. It provides employee profile management, organizational structure tracking, document storage, and user authentication data to the Portal.
 
-## Status: ~95% Production Ready ✅ (Updated Jan 5, 2026)
+## Status: ~95% Production Ready ✅ (Updated Jan 23, 2026)
 
 **Note:** This is an employee information management system. It does NOT include scheduling, time tracking, or payroll features.
 
-### ⚠️ Known Issues (Jan 5, 2026)
+### ⚠️ Known Issues (Jan 23, 2026)
 - Uses in-memory dict for sessions instead of Redis (should migrate for production scale)
 
 ## Purpose
@@ -72,7 +72,11 @@ The HR System is an employee information management platform that serves as the 
 
 **Security & Compliance:**
 - ✅ Field-level encryption for sensitive data (SSN, emergency contacts)
-- ✅ Audit logging for all employee data access and modifications
+- ✅ **Enhanced Audit Logging** (NEW Jan 2026) 🌟
+  - Field-level tracking with human-readable names (e.g., "Viewed: Street Address, Phone Number")
+  - Document access logging (ID Copy, Social Security Card, Certifications, etc.)
+  - IP address and user agent tracking
+  - Filterable audit log UI by action, entity type, and user
 - ✅ Audit trail UI for compliance tracking
 - ✅ Role-based permissions with granular access control
 - ✅ Session management with timeout warnings
@@ -124,12 +128,25 @@ The HR System is an employee information management platform that serves as the 
 - ❌ Pay stub printing - Not implemented
 - Note: Basic employee roster available via UI
 
+**HR Forms (NEW Jan 2026):** 🌟
+- ✅ **Corrective Action Form** - Document disciplinary actions with digital signatures
+  - Disciplinary levels (Verbal, Written, Final, Suspension, Termination)
+  - Subject categories (Policy Violation, Attendance, Performance, Safety, etc.)
+  - Past incident history tracking
+  - Employee and supervisor signature capture
+  - Signature pad integration
+- ✅ **First Report of Injury** - OSHA-compliant injury reporting
+  - Detailed injury documentation (type, body part, nature)
+  - Witness information with signature
+  - Treatment tracking (first aid, medical facility, etc.)
+  - Employee and supervisor signature capture
+- ✅ Form printing and PDF generation
+
 **Other Features:**
 - ❌ New hire onboarding workflows - Not implemented
 - ❌ Exit interviews - Not implemented
 - ❌ Equipment tracking - Not implemented
 - ❌ Goal setting and tracking - Not implemented
-- ❌ Disciplinary actions tracking - Not implemented
 - ❌ Training and certifications - Not implemented (can upload as documents)
 
 ## Architecture
@@ -149,6 +166,9 @@ The HR System is an employee information management platform that serves as the 
 - `hr_document` - Employee document storage
 - `hr_auditlog` - Audit trail for data access and modifications
 - `hr_emailsettings` - SMTP configuration
+- `hr_corrective_actions` - Corrective action forms (NEW Jan 2026)
+- `hr_past_incidents` - Past incident history for corrective actions
+- `hr_injury_reports` - First report of injury forms (NEW Jan 2026)
 
 **Not Implemented:**
 - ❌ Scheduling tables (shifts, schedules, availability)

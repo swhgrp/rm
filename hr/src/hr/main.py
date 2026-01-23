@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime, timedelta
 from hr.api.api_v1.endpoints import positions, employees, documents, roles, locations, departments, audit
-from hr.api.api_v1.endpoints import settings, esignature
+from hr.api.api_v1.endpoints import settings, esignature, hr_forms
 from hr.api.auth_helpers import require_login, require_admin
 from hr.api import auth, users
 from hr.db.database import get_db
@@ -38,6 +38,7 @@ app.include_router(departments.router, prefix="/api/departments", tags=["departm
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(esignature.router, prefix="/api/esignature", tags=["esignature"])
+app.include_router(hr_forms.router, prefix="/api/forms", tags=["hr-forms"])
 
 # Setup templates
 templates_dir = os.path.join(os.path.dirname(__file__), "templates")
@@ -216,11 +217,69 @@ async def api_root():
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request, user: User = Depends(require_admin)):
     """System Settings page (protected)"""
-    return templates.TemplateResponse("settings.html", {"request": request})
+    return templates.TemplateResponse("settings.html", {"request": request, "current_user": user})
+
+
+@app.get("/roles", response_class=HTMLResponse)
+async def roles_page(request: Request, user: User = Depends(require_admin)):
+    """Roles & Permissions management page (Admin only)"""
+    return templates.TemplateResponse("roles.html", {"request": request, "current_user": user})
 
 
 @app.get("/esignature/templates", response_class=HTMLResponse)
 async def esignature_templates_page(request: Request, user: User = Depends(require_login)):
     """E-Signature Templates management page (protected)"""
     return templates.TemplateResponse("esignature_templates.html", {"request": request, "current_user": user})
+
+
+@app.get("/forms/corrective-action/{employee_id}", response_class=HTMLResponse)
+async def new_corrective_action_page(request: Request, employee_id: int, user: User = Depends(require_login)):
+    """New corrective action form page (protected)"""
+    from datetime import date
+    return templates.TemplateResponse("corrective_action_form.html", {
+        "request": request,
+        "current_user": user,
+        "employee_id": employee_id,
+        "action_id": None,
+        "today": date.today().isoformat()
+    })
+
+
+@app.get("/forms/corrective-action/{employee_id}/{action_id}", response_class=HTMLResponse)
+async def edit_corrective_action_page(request: Request, employee_id: int, action_id: int, user: User = Depends(require_login)):
+    """Edit corrective action form page (protected)"""
+    from datetime import date
+    return templates.TemplateResponse("corrective_action_form.html", {
+        "request": request,
+        "current_user": user,
+        "employee_id": employee_id,
+        "action_id": action_id,
+        "today": date.today().isoformat()
+    })
+
+
+@app.get("/forms/injury-report/{employee_id}", response_class=HTMLResponse)
+async def new_injury_report_page(request: Request, employee_id: int, user: User = Depends(require_login)):
+    """New first report of injury form page (protected)"""
+    from datetime import date
+    return templates.TemplateResponse("injury_report_form.html", {
+        "request": request,
+        "current_user": user,
+        "employee_id": employee_id,
+        "report_id": None,
+        "today": date.today().isoformat()
+    })
+
+
+@app.get("/forms/injury-report/{employee_id}/{report_id}", response_class=HTMLResponse)
+async def edit_injury_report_page(request: Request, employee_id: int, report_id: int, user: User = Depends(require_login)):
+    """Edit first report of injury form page (protected)"""
+    from datetime import date
+    return templates.TemplateResponse("injury_report_form.html", {
+        "request": request,
+        "current_user": user,
+        "employee_id": employee_id,
+        "report_id": report_id,
+        "today": date.today().isoformat()
+    })
 

@@ -34,7 +34,7 @@ def list_roles(
     return roles
 
 
-@router.get("/{role_id}", response_model=RoleWithPermissions)
+@router.get("/{role_id}")
 def get_role(
     role_id: int,
     db: Session = Depends(get_db),
@@ -55,13 +55,29 @@ def get_role(
     ).all()
 
     permission_ids = [rp.permission_id for rp in role_perms]
-    permissions = db.query(Permission).filter(Permission.id.in_(permission_ids)).all()
+    permissions = []
+    if permission_ids:
+        permissions = db.query(Permission).filter(Permission.id.in_(permission_ids)).all()
 
-    # Convert to response format
-    role_data = RoleWithPermissions.model_validate(role)
-    role_data.permissions = [PermissionResponse.model_validate(p) for p in permissions]
-
-    return role_data
+    # Build response manually to avoid relationship conflict with model_validate
+    return {
+        "id": role.id,
+        "name": role.name,
+        "description": role.description,
+        "is_active": role.is_active,
+        "created_at": role.created_at,
+        "updated_at": role.updated_at,
+        "permissions": [
+            {
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "resource": p.resource,
+                "action": p.action,
+                "created_at": p.created_at
+            } for p in permissions
+        ]
+    }
 
 
 @router.post("/", response_model=RoleResponse, status_code=status.HTTP_201_CREATED)
@@ -191,6 +207,59 @@ def list_all_permissions(
     """List all available permissions (Admin only)"""
     permissions = db.query(Permission).all()
     return permissions
+
+
+@router.put("/{role_id}/permissions")
+def update_role_permissions(
+    role_id: int,
+    permission_ids: List[int],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Update permissions for a role (Admin only) - replaces all permissions"""
+    role = db.query(Role).filter(Role.id == role_id).first()
+
+    if not role:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Role not found"
+        )
+
+    # Validate all permission IDs exist
+    if permission_ids:
+        existing_perms = db.query(Permission).filter(Permission.id.in_(permission_ids)).all()
+        if len(existing_perms) != len(permission_ids):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="One or more permission IDs are invalid"
+            )
+
+    # Remove all existing permissions for this role
+    db.query(RolePermission).filter(RolePermission.role_id == role_id).delete()
+
+    # Add new permissions
+    for perm_id in permission_ids:
+        role_perm = RolePermission(
+            role_id=role_id,
+            permission_id=perm_id
+        )
+        db.add(role_perm)
+
+    db.commit()
+
+    # Return updated role with permissions
+    role_perms = db.query(RolePermission).filter(RolePermission.role_id == role_id).all()
+    perm_ids = [rp.permission_id for rp in role_perms]
+    permissions = db.query(Permission).filter(Permission.id.in_(perm_ids)).all() if perm_ids else []
+
+    return {
+        "id": role.id,
+        "name": role.name,
+        "description": role.description,
+        "is_active": role.is_active,
+        "permission_count": len(permissions),
+        "permission_ids": perm_ids
+    }
 
 
 @router.post("/assign", response_model=UserRoleResponse)
