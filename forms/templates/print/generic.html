@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>{{ metadata.reference_number or 'Form' }}</title>
+    <link rel="stylesheet" href="base.css">
+</head>
+<body>
+    <div class="header">
+        <div class="company-name">{{ company_name }}</div>
+        <h1>{{ metadata.form_name or 'Form Submission' }}</h1>
+        <div class="reference">Reference: {{ metadata.reference_number or 'N/A' }}</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Submission Details</div>
+        <div class="field-row">
+            <div class="field-label">Location:</div>
+            <div class="field-value">{{ metadata.location_name or data.location or 'N/A' }}</div>
+        </div>
+        <div class="field-row">
+            <div class="field-label">Submitted By:</div>
+            <div class="field-value">{{ metadata.submitted_by or 'N/A' }}</div>
+        </div>
+        <div class="field-row">
+            <div class="field-label">Submitted At:</div>
+            <div class="field-value">{{ metadata.submitted_at or 'N/A' }}</div>
+        </div>
+        <div class="field-row">
+            <div class="field-label">Status:</div>
+            <div class="field-value">{{ metadata.status or 'N/A' }}</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Form Data</div>
+        {% for key, value in data.items() %}
+        <div class="field-row">
+            <div class="field-label">{{ key | replace('_', ' ') | title }}:</div>
+            <div class="field-value{% if value is string and value|length > 100 %} multiline{% endif %}">
+                {% if value is mapping %}
+                    {{ value | tojson }}
+                {% elif value is iterable and value is not string %}
+                    {{ value | join(', ') }}
+                {% elif value is none %}
+                    -
+                {% else %}
+                    {{ value }}
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if signatures and signatures|length > 0 %}
+    <div class="section signature-block">
+        <div class="section-title">Signatures</div>
+        {% for sig in signatures %}
+        <div class="signature-line">
+            <div>
+                <div class="signature-box">
+                    {% if sig.signature_data and sig.signature_data.startswith('data:') %}
+                    <img src="{{ sig.signature_data }}" alt="Signature">
+                    {% elif sig.signature_data %}
+                    <span style="font-family: cursive; font-size: 14pt;">{{ sig.signature_data }}</span>
+                    {% endif %}
+                </div>
+                <div class="signature-label">
+                    {{ sig.signature_type | replace('_', ' ') | title }}
+                    {% if sig.employee_name %} - {{ sig.employee_name }}{% endif %}
+                </div>
+            </div>
+            <div>
+                <div class="signature-date">{{ sig.signed_at.strftime('%m/%d/%Y') if sig.signed_at else '' }}</div>
+                <div class="signature-label">Date</div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        Generated: {{ generated_at }} | {{ company_name }} Forms System
+    </div>
+</body>
+</html>

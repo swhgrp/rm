@@ -1,0 +1,194 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1><i class="bi bi-speedometer2"></i> Dashboard</h1>
+    </div>
+</div>
+
+<!-- Action Items Alert -->
+{% if action_items and action_items|length > 0 %}
+<div class="alert alert-warning" role="alert">
+    <i class="bi bi-exclamation-triangle"></i>
+    You have <strong>{{ action_items|length }}</strong> items requiring your attention.
+    <a href="#actionItems" class="alert-link">View items</a>
+</div>
+{% endif %}
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-bg-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Drafts</h6>
+                        <h2 class="card-title mb-0">{{ metrics.open_forms.draft or 0 }}</h2>
+                    </div>
+                    <div class="fs-1 opacity-50">
+                        <i class="bi bi-file-earmark"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Pending Signature</h6>
+                        <h2 class="card-title mb-0">{{ metrics.open_forms.pending_signature or 0 }}</h2>
+                    </div>
+                    <div class="fs-1 opacity-50">
+                        <i class="bi bi-pen"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Pending Review</h6>
+                        <h2 class="card-title mb-0">{{ metrics.open_forms.pending_review or 0 }}</h2>
+                    </div>
+                    <div class="fs-1 opacity-50">
+                        <i class="bi bi-hourglass-split"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-bg-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h6 class="card-subtitle mb-2 opacity-75">Submitted</h6>
+                        <h2 class="card-title mb-0">{{ metrics.open_forms.submitted or 0 }}</h2>
+                    </div>
+                    <div class="fs-1 opacity-50">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Action Items -->
+    <div class="col-md-6 mb-4" id="actionItems">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-bell"></i> My Action Items
+            </div>
+            <div class="card-body">
+                {% if metrics.my_action_items and metrics.my_action_items|length > 0 %}
+                <div class="list-group list-group-flush">
+                    {% for item in metrics.my_action_items %}
+                    <a href="/forms/submissions/{{ item.id }}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ item.template_name or 'Form' }}</h6>
+                            <small class="text-muted">{{ item.reference_number }}</small>
+                        </div>
+                        <small class="text-muted">
+                            {% if item.status == 'pending_signature' %}
+                                <span class="badge bg-warning">Signature Required</span>
+                            {% elif item.status == 'pending_review' %}
+                                <span class="badge bg-info">Review Required</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ item.status }}</span>
+                            {% endif %}
+                        </small>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">
+                    <i class="bi bi-check-circle fs-1 d-block mb-2"></i>
+                    No pending action items
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Submissions -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <i class="bi bi-clock-history"></i> Recent Submissions
+            </div>
+            <div class="card-body">
+                {% if metrics.recent_submissions and metrics.recent_submissions|length > 0 %}
+                <div class="list-group list-group-flush">
+                    {% for sub in metrics.recent_submissions %}
+                    <a href="/forms/submissions/{{ sub.id }}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ sub.template_name or 'Form' }}</h6>
+                            <small class="text-muted">{{ sub.reference_number }}</small>
+                        </div>
+                        <small class="text-muted">
+                            {{ sub.created_at.strftime('%b %d, %Y') if sub.created_at else '' }}
+                            -
+                            {% if sub.status == 'draft' %}
+                                <span class="badge bg-secondary">Draft</span>
+                            {% elif sub.status == 'submitted' %}
+                                <span class="badge bg-success">Submitted</span>
+                            {% elif sub.status == 'approved' %}
+                                <span class="badge bg-success">Approved</span>
+                            {% elif sub.status == 'rejected' %}
+                                <span class="badge bg-danger">Rejected</span>
+                            {% else %}
+                                <span class="badge bg-info">{{ sub.status }}</span>
+                            {% endif %}
+                        </small>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">
+                    <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                    No recent submissions
+                </p>
+                {% endif %}
+            </div>
+            <div class="card-footer">
+                <a href="/forms/submissions" class="btn btn-sm btn-outline-primary">View All Submissions</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alerts -->
+{% if metrics.alerts and metrics.alerts|length > 0 %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-exclamation-triangle"></i> Alerts
+            </div>
+            <div class="card-body">
+                {% for alert in metrics.alerts %}
+                <div class="alert alert-{{ alert.type or 'warning' }}" role="alert">
+                    <i class="bi bi-{% if alert.type == 'info' %}info-circle{% else %}exclamation-triangle{% endif %}"></i>
+                    {{ alert.message }}
+                    {% if alert.count %}
+                    <span class="badge bg-{{ alert.type or 'warning' }}">{{ alert.count }}</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}

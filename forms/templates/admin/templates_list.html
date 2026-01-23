@@ -1,0 +1,95 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Form Templates{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h1><i class="bi bi-file-earmark-text"></i> Form Templates</h1>
+    </div>
+    <div class="col-auto">
+        <a href="/forms/templates/new" class="btn btn-primary">
+            <i class="bi bi-plus-lg"></i> New Template
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Version</th>
+                        <th>Signature</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for template in templates %}
+                    <tr>
+                        <td>
+                            <a href="/forms/templates/{{ template.id }}">
+                                <strong>{{ template.name }}</strong>
+                            </a>
+                            {% if template.description %}
+                            <br><small class="text-muted">{{ template.description[:50] }}{% if template.description|length > 50 %}...{% endif %}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if template.category == 'hr_employment' %}
+                                <span class="badge bg-primary">HR & Employment</span>
+                            {% elif template.category == 'safety_compliance' %}
+                                <span class="badge bg-warning text-dark">Safety & Compliance</span>
+                            {% elif template.category == 'operations' %}
+                                <span class="badge bg-info text-dark">Operations</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{{ template.category }}</span>
+                            {% endif %}
+                        </td>
+                        <td>v{{ template.version }}</td>
+                        <td>
+                            {% if template.requires_signature %}
+                                <i class="bi bi-check-circle text-success"></i> Required
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if template.is_active %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="/forms/templates/{{ template.id }}" class="btn btn-outline-primary" title="View">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="/forms/templates/{{ template.id }}/edit" class="btn btn-outline-secondary" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="/forms/new?template={{ template.slug }}" class="btn btn-outline-success" title="Create Submission">
+                                    <i class="bi bi-plus"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="bi bi-file-earmark-text fs-1 d-block mb-2"></i>
+                            No templates found
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

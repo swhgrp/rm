@@ -122,6 +122,7 @@ class User(Base):
     can_access_mail = Column(Boolean, default=False)
     can_access_maintenance = Column(Boolean, default=True)
     can_access_food_safety = Column(Boolean, default=True)
+    can_access_forms = Column(Boolean, default=True)
     accounting_role_id = Column(Integer, nullable=True)
 
     # Password reset tokens
@@ -427,6 +428,15 @@ async def home(request: Request, db: Session = Depends(get_db)):
             "url": "/portal/food-safety/",
             "icon": "🛡️",
             "system_key": "food_safety"
+        })
+
+    if getattr(user, 'can_access_forms', False) or user.is_admin:
+        systems.append({
+            "name": "Forms",
+            "description": "Digital forms, signatures, and workflow management",
+            "url": "/forms/",
+            "icon": "📝",
+            "system_key": "forms"
         })
 
     # Websites - always show for admins

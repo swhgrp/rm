@@ -369,6 +369,50 @@ services:
     restart: unless-stopped
     networks:
     - restaurant-network
+  forms-db:
+    image: postgres:15
+    container_name: forms-db
+    environment:
+      POSTGRES_USER: forms
+      POSTGRES_PASSWORD: forms
+      POSTGRES_DB: forms
+      TZ: America/New_York
+    volumes:
+    - forms_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U forms -d forms
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+    - restaurant-network
+  forms-app:
+    build: ./forms
+    container_name: forms-app
+    volumes:
+    - ./forms/src:/app/src
+    - ./forms/templates:/app/templates
+    - ./forms/static:/app/static
+    - ./forms/form_schemas:/app/form_schemas
+    environment:
+    - TZ=America/New_York
+    - DATABASE_URL=postgresql+asyncpg://forms:forms@forms-db:5432/forms
+    - DATABASE_URL_SYNC=postgresql://forms:forms@forms-db:5432/forms
+    - SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
+    - PORTAL_SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
+    - PORTAL_SERVICE_URL=http://portal-app:8000
+    - HR_SERVICE_URL=http://hr-app:8000
+    - FILES_SERVICE_URL=http://files-app:8000
+    - BASE_URL=https://rm.swhgrp.com
+    depends_on:
+      forms-db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+    - restaurant-network
   nginx:
     image: nginx:alpine
     container_name: nginx-proxy
@@ -393,6 +437,7 @@ services:
     - files-app
     - onlyoffice
     - websites-app
+    - forms-app
     restart: unless-stopped
     networks:
     - restaurant-network
@@ -436,6 +481,8 @@ volumes:
     name: restaurant-onlyoffice_logs
   websites_data:
     name: restaurant-websites_data
+  forms_data:
+    name: restaurant-forms_data
 networks:
   restaurant-network:
     name: restaurant-network

@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  forms-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: forms-app
+    restart: unless-stopped
+    ports:
+      - "8007:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://forms:forms@forms-db:5432/forms
+      - DATABASE_URL_SYNC=postgresql://forms:forms@forms-db:5432/forms
+      - DEBUG=false
+      - SERVICE_NAME=forms-service
+      - PYTHONPATH=/app
+      - PORTAL_SECRET_KEY=${PORTAL_SECRET_KEY}
+      - BASE_URL=${BASE_URL:-https://rm.swhgrp.com}
+    depends_on:
+      forms-db:
+        condition: service_healthy
+    networks:
+      - restaurant-network
+    volumes:
+      - ./src:/app/src:ro
+      - ./templates:/app/templates:ro
+      - ./static:/app/static:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  forms-db:
+    image: postgres:15-alpine
+    container_name: forms-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=forms
+      - POSTGRES_PASSWORD=forms
+      - POSTGRES_DB=forms
+    volumes:
+      - forms_postgres_data:/var/lib/postgresql/data
+    networks:
+      - restaurant-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forms"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  restaurant-network:
+    external: true
+
+volumes:
+  forms_postgres_data:
