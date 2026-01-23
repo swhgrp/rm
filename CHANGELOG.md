@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-01-23] - Check Batch View Details & MICR Line Fix
+
+### Summary
+Fixed two issues with check batches: View Details button returning 403 error on completed batches, and MICR line printing fields in wrong order (not following banking standard).
+
+### Fixed - Accounting System
+- **View Details 403 Error:**
+  - `viewBatch()` was navigating to non-existent `/check-batches/${id}` route
+  - Changed to call existing `previewBatch()` function which opens modal with batch details
+  - File: `accounting/src/accounting/templates/check_batches.html`
+
+- **MICR Line Field Order:**
+  - Was printing: Check Number, Routing, Account (`C2018C A267084131A 716209785C`)
+  - Now prints: Routing, Account, Check Number (`A267084131A 716209785C C2018C`)
+  - Follows standard banking MICR format per ANSI X9.27
+  - File: `accounting/src/accounting/services/check_printer.py`
+
+---
+
 ## [2026-01-06] - DSS Deposit Calculation & Discount Breakdown
 
 ### Summary

@@ -655,7 +655,8 @@ async function voidBatch(batchId) {
 }
 
 function viewBatch(batchId) {
-    window.location.href = `/check-batches/${batchId}`;
+    // Use the existing preview modal to show batch details
+    previewBatch(batchId);
 }
 
 // Apply filters

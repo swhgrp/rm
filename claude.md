@@ -38,7 +38,28 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - January 18, 2026)
+### Most Recent Work (Current Session - January 23, 2026)
+
+**ACCOUNTING CHECK BATCH FIXES** ✅ **COMPLETE**
+
+#### 1. **View Details 403 Error Fix** ✅
+- **Problem:** Clicking "View Details" on completed check batches returned 403 Forbidden
+  - `viewBatch()` function was navigating to `/check-batches/${batchId}` (missing `/accounting` prefix)
+  - Even with correct prefix, no route handler existed for individual batch detail pages
+- **Solution:** Changed `viewBatch()` to call existing `previewBatch()` function
+  - Now opens the preview modal showing batch details (same as draft batch preview)
+- **File:** `accounting/src/accounting/templates/check_batches.html`
+
+#### 2. **MICR Line Format Fix** ✅
+- **Problem:** Check MICR line had incorrect field order
+  - Was printing: Check Number, Routing Number, Account Number (`C2018C A267084131A 716209785C`)
+  - Should be: Routing Number, Account Number, Check Number (per banking standard)
+- **Solution:** Corrected MICR format to: `A267084131A 716209785C C2018C`
+- **File:** `accounting/src/accounting/services/check_printer.py`
+
+---
+
+### Previous Session Work (January 18, 2026)
 
 **INVENTORY UOM ARCHITECTURE CONSOLIDATION** ✅ **COMPLETE**
 

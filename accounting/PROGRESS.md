@@ -94,6 +94,14 @@ The Accounting System is the most complex system in the platform with 157 Python
 
 ## Recent Milestones
 
+### January 23, 2026
+- **Check Batch View Details Fix**:
+  - Fixed 403 error when clicking "View Details" on completed batches
+  - Now uses existing preview modal to display batch details
+- **MICR Line Format Correction**:
+  - Fixed check printing MICR line field order to follow banking standard
+  - Now prints: Routing Number, Account Number, Check Number (per ANSI X9.27)
+
 ### January 15, 2026
 - **Dashboard Reorganization**:
   - AP Aging and AR Aging now side-by-side for easy comparison

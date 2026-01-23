@@ -287,7 +287,7 @@ class CheckPrinter:
         """Draw MICR line at bottom of check
 
         Uses MICR E-13B font for blank check stock.
-        Format: On-Us check_number On-Us  Transit routing Transit  account On-Us
+        Standard MICR format (left to right): Transit routing Transit  account On-Us  On-Us check_number On-Us
         """
         c = self.pdf
 
@@ -303,8 +303,8 @@ class CheckPrinter:
         transit = 'A'
         on_us = 'C'
 
-        # Format: Ccheck_numberC Arouting_numberA accountC
-        micr_text = f"{on_us}{check_num}{on_us} {transit}{routing}{transit} {account}{on_us}"
+        # Standard MICR format: Arouting_numberA accountC Ccheck_numberC
+        micr_text = f"{transit}{routing}{transit} {account}{on_us} {on_us}{check_num}{on_us}"
 
         # Try to use MICR font, fall back to Courier if not available
         if _register_micr_font():
