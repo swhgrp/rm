@@ -2,10 +2,12 @@
 
 {% block title %}Dashboard{% endblock %}
 
+{% block nav_dashboard %}active{% endblock %}
+
 {% block content %}
 <div class="row mb-4">
     <div class="col">
-        <h1><i class="bi bi-speedometer2"></i> Dashboard</h1>
+        <h2><i class="bi bi-speedometer2"></i> Forms Dashboard</h2>
     </div>
 </div>
 
@@ -21,63 +23,31 @@
 <!-- Summary Cards -->
 <div class="row mb-4">
     <div class="col-md-3">
-        <div class="card text-bg-primary">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-subtitle mb-2 opacity-75">Drafts</h6>
-                        <h2 class="card-title mb-0">{{ metrics.open_forms.draft or 0 }}</h2>
-                    </div>
-                    <div class="fs-1 opacity-50">
-                        <i class="bi bi-file-earmark"></i>
-                    </div>
-                </div>
-            </div>
+        <div class="stat-card bg-primary">
+            <h6>Drafts</h6>
+            <h2>{{ metrics.open_forms.draft or 0 }}</h2>
+            <i class="bi bi-file-earmark stat-icon"></i>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-bg-warning">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-subtitle mb-2 opacity-75">Pending Signature</h6>
-                        <h2 class="card-title mb-0">{{ metrics.open_forms.pending_signature or 0 }}</h2>
-                    </div>
-                    <div class="fs-1 opacity-50">
-                        <i class="bi bi-pen"></i>
-                    </div>
-                </div>
-            </div>
+        <div class="stat-card bg-warning">
+            <h6>Pending Signature</h6>
+            <h2>{{ metrics.open_forms.pending_signature or 0 }}</h2>
+            <i class="bi bi-pen stat-icon"></i>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-bg-info">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-subtitle mb-2 opacity-75">Pending Review</h6>
-                        <h2 class="card-title mb-0">{{ metrics.open_forms.pending_review or 0 }}</h2>
-                    </div>
-                    <div class="fs-1 opacity-50">
-                        <i class="bi bi-hourglass-split"></i>
-                    </div>
-                </div>
-            </div>
+        <div class="stat-card bg-info">
+            <h6>Pending Review</h6>
+            <h2>{{ metrics.open_forms.pending_review or 0 }}</h2>
+            <i class="bi bi-hourglass-split stat-icon"></i>
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card text-bg-success">
-            <div class="card-body">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <h6 class="card-subtitle mb-2 opacity-75">Submitted</h6>
-                        <h2 class="card-title mb-0">{{ metrics.open_forms.submitted or 0 }}</h2>
-                    </div>
-                    <div class="fs-1 opacity-50">
-                        <i class="bi bi-check-circle"></i>
-                    </div>
-                </div>
-            </div>
+        <div class="stat-card bg-success">
+            <h6>Submitted</h6>
+            <h2>{{ metrics.open_forms.submitted or 0 }}</h2>
+            <i class="bi bi-check-circle stat-icon"></i>
         </div>
     </div>
 </div>
@@ -87,7 +57,7 @@
     <div class="col-md-6 mb-4" id="actionItems">
         <div class="card h-100">
             <div class="card-header">
-                <i class="bi bi-bell"></i> My Action Items
+                <h2><i class="bi bi-bell"></i> My Action Items</h2>
             </div>
             <div class="card-body">
                 {% if metrics.my_action_items and metrics.my_action_items|length > 0 %}
@@ -98,7 +68,7 @@
                             <h6 class="mb-1">{{ item.template_name or 'Form' }}</h6>
                             <small class="text-muted">{{ item.reference_number }}</small>
                         </div>
-                        <small class="text-muted">
+                        <small>
                             {% if item.status == 'pending_signature' %}
                                 <span class="badge bg-warning">Signature Required</span>
                             {% elif item.status == 'pending_review' %}
@@ -124,7 +94,7 @@
     <div class="col-md-6 mb-4">
         <div class="card h-100">
             <div class="card-header">
-                <i class="bi bi-clock-history"></i> Recent Submissions
+                <h2><i class="bi bi-clock-history"></i> Recent Submissions</h2>
             </div>
             <div class="card-body">
                 {% if metrics.recent_submissions and metrics.recent_submissions|length > 0 %}
@@ -135,7 +105,7 @@
                             <h6 class="mb-1">{{ sub.template_name or 'Form' }}</h6>
                             <small class="text-muted">{{ sub.reference_number }}</small>
                         </div>
-                        <small class="text-muted">
+                        <small>
                             {{ sub.created_at.strftime('%b %d, %Y') if sub.created_at else '' }}
                             -
                             {% if sub.status == 'draft' %}
@@ -160,7 +130,7 @@
                 </p>
                 {% endif %}
             </div>
-            <div class="card-footer">
+            <div class="card-footer" style="background: var(--bg-tertiary); border-top: 1px solid var(--border-primary);">
                 <a href="/forms/submissions" class="btn btn-sm btn-outline-primary">View All Submissions</a>
             </div>
         </div>
@@ -173,7 +143,7 @@
     <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <i class="bi bi-exclamation-triangle"></i> Alerts
+                <h2><i class="bi bi-exclamation-triangle"></i> Alerts</h2>
             </div>
             <div class="card-body">
                 {% for alert in metrics.alerts %}
