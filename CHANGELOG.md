@@ -1,5 +1,45 @@
 # Changelog
 
+## [2026-01-25] - Integration Hub & Inventory Bug Fixes
+
+### Summary
+Fixed critical bugs in vendor item creation and master item count unit updates. Added vendor-specific parsing rules system for invoice processing.
+
+### Fixed - Integration Hub
+- **Vendor Item Creation 500 Error:**
+  - Database had NOT NULL constraint on `units_per_case` but model defined `nullable=True`
+  - Fixed by altering database constraint to allow NULL values
+  - Also fixed `purchase_unit_id` constraint mismatch
+  - Added comprehensive error handling with proper JSON error responses
+  - Improved frontend error handling for non-JSON 500 responses
+  - Files: `integration-hub/src/integration_hub/api/vendor_items.py`, `templates/unmapped_items.html`
+
+### Fixed - Inventory System
+- **Count Units Update 500 Error:**
+  - Code referenced non-existent `hub_uom_id` column on `MasterItemCountUnit` model
+  - `uom_id` field already stores the Hub UOM ID
+  - Removed invalid `hub_uom_id` references from PUT endpoint
+  - File: `inventory/src/restaurant_inventory/api/api_v1/endpoints/items.py`
+
+### Added - Integration Hub
+- **Vendor Parsing Rules System:**
+  - New model: `VendorParsingRule` for vendor-specific invoice parsing configuration
+  - AI prompt customization per vendor with custom instructions
+  - Column identification rules (quantity column, item code column, price column)
+  - Pack size format hints for complex vendor formats (e.g., "NxM UNIT")
+  - CRUD API endpoints for managing rules
+  - Settings page UI for creating/editing/deleting rules
+  - Integration with invoice parser for rule-aware AI parsing
+  - Files:
+    - `integration-hub/src/integration_hub/models/vendor_parsing_rule.py` (NEW)
+    - `integration-hub/src/integration_hub/api/settings.py` (updated)
+    - `integration-hub/src/integration_hub/templates/settings.html` (updated)
+    - `integration-hub/src/integration_hub/services/invoice_parser.py` (updated)
+  - Migrations:
+    - `integration-hub/alembic/versions/20260125_0002_add_vendor_parsing_rules.py`
+
+---
+
 ## [2026-01-23] - Check Batch View Details & MICR Line Fix
 
 ### Summary

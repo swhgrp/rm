@@ -247,3 +247,189 @@ def get_scheduler_status():
             "running": False,
             "error": str(e)
         }
+
+
+# ============================================================================
+# VENDOR PARSING RULES
+# ============================================================================
+
+class VendorParsingRuleCreate(BaseModel):
+    """Model for creating/updating a vendor parsing rule"""
+    vendor_id: int
+    quantity_column: Optional[str] = None
+    item_code_column: Optional[str] = None
+    price_column: Optional[str] = None
+    pack_size_format: Optional[str] = None
+    date_format: Optional[str] = None
+    ai_instructions: Optional[str] = None
+    post_parse_rules: Optional[str] = None
+    notes: Optional[str] = None
+    is_active: bool = True
+
+
+@router.get("/vendor-parsing-rules")
+def get_vendor_parsing_rules(
+    vendor_id: Optional[int] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all vendor parsing rules or filter by vendor_id.
+    Returns rules with vendor name for display.
+    """
+    from integration_hub.models.vendor_parsing_rule import VendorParsingRule
+    from integration_hub.models.vendor import Vendor
+
+    query = db.query(VendorParsingRule).join(Vendor)
+
+    if vendor_id:
+        query = query.filter(VendorParsingRule.vendor_id == vendor_id)
+
+    rules = query.order_by(Vendor.name).all()
+
+    return [rule.to_dict() for rule in rules]
+
+
+@router.get("/vendor-parsing-rules/{rule_id}")
+def get_vendor_parsing_rule(
+    rule_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get a single vendor parsing rule by ID"""
+    from integration_hub.models.vendor_parsing_rule import VendorParsingRule
+
+    rule = db.query(VendorParsingRule).filter(VendorParsingRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Parsing rule not found")
+
+    return rule.to_dict()
+
+
+@router.post("/vendor-parsing-rules")
+def create_vendor_parsing_rule(
+    rule_data: VendorParsingRuleCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new vendor parsing rule.
+    Only one rule is allowed per vendor.
+    """
+    from integration_hub.models.vendor_parsing_rule import VendorParsingRule
+    from integration_hub.models.vendor import Vendor
+
+    # Verify vendor exists
+    vendor = db.query(Vendor).filter(Vendor.id == rule_data.vendor_id).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    # Check if rule already exists for this vendor
+    existing = db.query(VendorParsingRule).filter(
+        VendorParsingRule.vendor_id == rule_data.vendor_id
+    ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A parsing rule already exists for vendor '{vendor.name}'. Use PUT to update."
+        )
+
+    # Create new rule
+    rule = VendorParsingRule(
+        vendor_id=rule_data.vendor_id,
+        quantity_column=rule_data.quantity_column,
+        item_code_column=rule_data.item_code_column,
+        price_column=rule_data.price_column,
+        pack_size_format=rule_data.pack_size_format,
+        date_format=rule_data.date_format,
+        ai_instructions=rule_data.ai_instructions,
+        post_parse_rules=rule_data.post_parse_rules,
+        notes=rule_data.notes,
+        is_active=rule_data.is_active
+    )
+
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+
+    logger.info(f"Created parsing rule for vendor {vendor.name} (ID: {rule.id})")
+
+    return rule.to_dict()
+
+
+@router.put("/vendor-parsing-rules/{rule_id}")
+def update_vendor_parsing_rule(
+    rule_id: int,
+    rule_data: VendorParsingRuleCreate,
+    db: Session = Depends(get_db)
+):
+    """Update an existing vendor parsing rule"""
+    from integration_hub.models.vendor_parsing_rule import VendorParsingRule
+
+    rule = db.query(VendorParsingRule).filter(VendorParsingRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Parsing rule not found")
+
+    # Update fields
+    rule.quantity_column = rule_data.quantity_column
+    rule.item_code_column = rule_data.item_code_column
+    rule.price_column = rule_data.price_column
+    rule.pack_size_format = rule_data.pack_size_format
+    rule.date_format = rule_data.date_format
+    rule.ai_instructions = rule_data.ai_instructions
+    rule.post_parse_rules = rule_data.post_parse_rules
+    rule.notes = rule_data.notes
+    rule.is_active = rule_data.is_active
+
+    db.commit()
+    db.refresh(rule)
+
+    logger.info(f"Updated parsing rule {rule_id} for vendor {rule.vendor.name}")
+
+    return rule.to_dict()
+
+
+@router.delete("/vendor-parsing-rules/{rule_id}")
+def delete_vendor_parsing_rule(
+    rule_id: int,
+    db: Session = Depends(get_db)
+):
+    """Delete a vendor parsing rule"""
+    from integration_hub.models.vendor_parsing_rule import VendorParsingRule
+
+    rule = db.query(VendorParsingRule).filter(VendorParsingRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Parsing rule not found")
+
+    vendor_name = rule.vendor.name if rule.vendor else "Unknown"
+    db.delete(rule)
+    db.commit()
+
+    logger.info(f"Deleted parsing rule {rule_id} for vendor {vendor_name}")
+
+    return {"success": True, "message": f"Parsing rule for {vendor_name} deleted"}
+
+
+@router.get("/vendors-without-rules")
+def get_vendors_without_parsing_rules(db: Session = Depends(get_db)):
+    """
+    Get list of vendors that don't have parsing rules configured.
+    Useful for the UI to show which vendors need rules.
+    """
+    from integration_hub.models.vendor import Vendor
+    from integration_hub.models.vendor_parsing_rule import VendorParsingRule
+    from sqlalchemy import not_, exists
+
+    # Subquery to find vendors with rules
+    has_rule = db.query(VendorParsingRule.vendor_id).filter(
+        VendorParsingRule.vendor_id == Vendor.id
+    ).exists()
+
+    # Get vendors without rules
+    vendors = db.query(Vendor).filter(
+        Vendor.is_active == True,
+        ~has_rule
+    ).order_by(Vendor.name).all()
+
+    return [
+        {"id": v.id, "name": v.name}
+        for v in vendors
+    ]

@@ -1,7 +1,7 @@
 # Integration Hub - Progress
 
-**Last Updated:** December 27, 2025
-**Status:** Location-Aware Costing Complete (80%)
+**Last Updated:** January 25, 2026
+**Status:** Location-Aware Costing Complete (85%)
 
 ---
 
@@ -166,6 +166,35 @@ Hub (Source of Truth)                    Inventory (Costing)
 ---
 
 ## Recent Milestones
+
+### January 25, 2026
+- **Vendor Item Creation Fix**:
+  - Fixed 500 error when creating vendor items from unmapped invoice items
+  - Root cause: Database had NOT NULL constraint on `units_per_case` but model defined `nullable=True`
+  - Fixed by altering database constraint to allow NULL values
+  - Also fixed `purchase_unit_id` constraint mismatch
+  - Added comprehensive error handling in `create_vendor_item` endpoint
+  - Improved frontend error handling for non-JSON 500 responses
+
+- **Vendor Parsing Rules System** ✅ **NEW FEATURE**:
+  - New model: `VendorParsingRule` for vendor-specific invoice parsing configuration
+  - AI prompt customization per vendor with custom instructions
+  - Column identification rules (quantity column, item code column, price column)
+  - Pack size format hints for complex vendor formats (e.g., "NxM UNIT")
+  - CRUD API endpoints for managing rules:
+    - `GET /api/settings/vendor-parsing-rules` - List all rules
+    - `POST /api/settings/vendor-parsing-rules` - Create rule
+    - `PUT /api/settings/vendor-parsing-rules/{id}` - Update rule
+    - `DELETE /api/settings/vendor-parsing-rules/{id}` - Delete rule
+    - `GET /api/settings/vendors-without-rules` - Vendors needing rules
+  - Settings page UI for creating/editing/deleting rules
+  - Integration with invoice parser for rule-aware AI parsing
+  - Files:
+    - `models/vendor_parsing_rule.py` (NEW)
+    - `api/settings.py` (updated)
+    - `templates/settings.html` (updated)
+    - `services/invoice_parser.py` (updated)
+  - Migration: `20260125_0002_add_vendor_parsing_rules.py`
 
 ### December 27, 2025 (Afternoon)
 - **Invoice Processing Updates Complete**:

@@ -97,13 +97,15 @@
 
     .fc .fc-event {
         border: none;
-        padding: 2px 4px;
+        padding: 2px 6px;
         font-size: 12px;
         cursor: pointer;
+        border-radius: 3px;
+        color: #1a1a1a !important; /* Dark text for readability */
     }
 
     .fc .fc-event:hover {
-        opacity: 0.9;
+        opacity: 0.85;
     }
 
     /* Hide the default FullCalendar dot */
@@ -111,10 +113,20 @@
         display: none;
     }
 
-    /* Event colors are now set dynamically by venue color */
-    /* Status indicator will show as a border or badge */
+    /* Event colors: venue color as background tint, status as left border */
     .fc-event {
         position: relative;
+        background-color: rgba(200, 200, 200, 0.2); /* Default fallback */
+    }
+
+    /* Event title styling for better visibility */
+    .fc-event-title {
+        font-weight: 500;
+    }
+
+    .fc-event-time {
+        font-weight: 600;
+        opacity: 0.8;
     }
 
     .fc-event .status-indicator {
@@ -877,16 +889,38 @@
                 const props = info.event.extendedProps;
                 const venueId = props.venue_id || props.location_id; // Support both events and calendar items
 
-                // Apply venue color to TEXT only (not background)
-                if (venueId && venueColorMap[venueId]) {
-                    // Set text color to venue color
-                    info.el.style.color = venueColorMap[venueId];
-                    info.el.style.backgroundColor = 'transparent';
-                } else if (venueId) {
-                    console.warn(`Event "${info.event.title}" has venue_id ${venueId} but no color found in map`);
+                // Helper function to convert hex to rgba with transparency
+                function hexToRgba(hex, alpha) {
+                    if (!hex) return null;
+                    const r = parseInt(hex.slice(1, 3), 16);
+                    const g = parseInt(hex.slice(3, 5), 16);
+                    const b = parseInt(hex.slice(5, 7), 16);
+                    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
                 }
 
-                // Add status-based left border for events
+                // Force dark text color for all events (FullCalendar overrides CSS)
+                info.el.style.color = '#1a1a1a';
+                info.el.style.setProperty('color', '#1a1a1a', 'important');
+
+                // Apply venue color as BACKGROUND TINT (with transparency) for better visibility
+                if (venueId && venueColorMap[venueId]) {
+                    const venueColor = venueColorMap[venueId];
+                    // Use venue color as light background tint
+                    info.el.style.backgroundColor = hexToRgba(venueColor, 0.15);
+                    // Use venue color as left border for clear identification
+                    info.el.style.borderLeft = `4px solid ${venueColor}`;
+                } else if (venueId) {
+                    console.warn(`Event "${info.event.title}" has venue_id ${venueId} but no color found in map`);
+                    // Default styling for events without venue color
+                    info.el.style.backgroundColor = 'rgba(100, 100, 100, 0.1)';
+                    info.el.style.borderLeft = '4px solid #8b949e';
+                } else {
+                    // No venue assigned
+                    info.el.style.backgroundColor = 'rgba(100, 100, 100, 0.1)';
+                    info.el.style.borderLeft = '4px solid #8b949e';
+                }
+
+                // Add status indicator dot for events
                 if (props.type === 'event' && props.status) {
                     const statusColorMap = {
                         'DRAFT': '#6e7681',
@@ -901,15 +935,19 @@
                     const status = props.status.value || props.status;
                     const statusColor = statusColorMap[status];
                     if (statusColor) {
-                        info.el.style.borderLeft = `3px solid ${statusColor}`;
+                        // Add a small status dot indicator
+                        const dot = document.createElement('span');
+                        dot.className = 'status-indicator status-' + status;
+                        dot.style.backgroundColor = statusColor;
+                        info.el.appendChild(dot);
                     }
                 } else if (props.type === 'calendar_item') {
-                    // For calendar items, add a dashed left border to distinguish from events
-                    info.el.style.borderLeft = '3px dashed #8b949e';
+                    // For calendar items, use dashed left border
+                    info.el.style.borderLeftStyle = 'dashed';
                 } else if (props.type === 'quick_hold') {
-                    // Quick holds have their own styling via backgroundColor/borderColor
-                    // Add a dotted border to indicate it's a hold (not a real event)
-                    info.el.style.borderLeft = '3px dotted #FFA500';
+                    // Quick holds have dotted border and italic text
+                    info.el.style.borderLeft = '4px dotted #FFA500';
+                    info.el.style.backgroundColor = 'rgba(255, 165, 0, 0.1)';
                     info.el.style.fontStyle = 'italic';
                 }
             }
@@ -1017,6 +1055,7 @@
                     title: event.title,
                     start: event.start_at,
                     end: event.end_at,
+                    textColor: '#1a1a1a',  // Force dark text
                     extendedProps: {
                         type: 'event',
                         status: event.status,
@@ -1033,6 +1072,7 @@
                 title: item.title,
                 start: item.start_at,
                 end: item.end_at,
+                textColor: '#1a1a1a',  // Force dark text
                 extendedProps: {
                     type: 'calendar_item',
                     item_type: item.item_type,

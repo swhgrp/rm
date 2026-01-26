@@ -18,6 +18,9 @@
                     </div>
                 </div>
                 <div class="col-md-6 text-end">
+                    <button class="btn btn-outline-warning me-2" id="mergeBtn" onclick="showMergeModal()" style="display: none;">
+                        <i class="bi bi-arrows-collapse"></i> Merge Selected (<span id="selectedCount">0</span>)
+                    </button>
                     <button class="btn btn-primary" onclick="showAddModal()">
                         <i class="bi bi-plus-circle"></i> Add Client
                     </button>
@@ -42,6 +45,9 @@
                 <table class="table table-hover mb-0">
                     <thead>
                         <tr>
+                            <th style="width: 40px;">
+                                <input type="checkbox" class="form-check-input" id="selectAllClients" onchange="toggleSelectAll(this)">
+                            </th>
                             <th>Name</th>
                             <th>Email</th>
                             <th>Phone</th>
@@ -52,7 +58,7 @@
                     </thead>
                     <tbody id="clientsTableBody">
                         <tr>
-                            <td colspan="6" class="text-center py-4">
+                            <td colspan="7" class="text-center py-4">
                                 <div class="spinner-border spinner-border-sm" role="status">
                                     <span class="visually-hidden">Loading...</span>
                                 </div>
@@ -165,6 +171,49 @@
     </div>
 </div>
 
+<!-- Merge Clients Modal -->
+<div class="modal fade" id="mergeModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning text-dark">
+                <h5 class="modal-title">
+                    <i class="bi bi-arrows-collapse"></i> Merge Clients
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    Select the <strong>primary client</strong> to keep. All events from other selected clients will be reassigned to the primary client, and the other clients will be deleted.
+                </div>
+
+                <h6 class="mb-3">Select Primary Client:</h6>
+                <div id="mergeClientsList">
+                    <!-- Populated by JavaScript -->
+                </div>
+
+                <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" id="mergeNotes" checked>
+                    <label class="form-check-label" for="mergeNotes">
+                        Combine notes from all clients
+                    </label>
+                </div>
+
+                <div class="alert alert-warning mt-3 mb-0">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    <strong>Warning:</strong> This action cannot be undone. The non-primary clients will be permanently deleted.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning" onclick="performMerge()">
+                    <i class="bi bi-arrows-collapse"></i> Merge Clients
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <style>
 .clients-container {
     max-width: 1400px;
@@ -234,11 +283,65 @@
     color: var(--text-muted);
     padding: 2rem;
 }
+
+/* Merge client selection */
+.merge-client-option {
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.merge-client-option:hover {
+    border-color: var(--primary-color);
+    background-color: rgba(var(--primary-rgb, 13, 110, 253), 0.05);
+}
+
+.merge-client-option.selected {
+    border-color: #ffc107;
+    background-color: rgba(255, 193, 7, 0.1);
+}
+
+.merge-client-option .form-check-input:checked {
+    background-color: #ffc107;
+    border-color: #ffc107;
+}
+
+.merge-client-option .client-info {
+    margin-left: 0.5rem;
+}
+
+.merge-client-option .client-name {
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.merge-client-option .client-details {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+.merge-client-option .event-count {
+    font-size: 0.75rem;
+    margin-top: 0.25rem;
+}
+
+/* Checkbox styling in table */
+.form-check-input {
+    cursor: pointer;
+}
+
+tr.selected-for-merge {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+}
 </style>
 
 <script>
 let allClients = [];
 let currentClientId = null;
+let selectedClients = new Set();
 
 document.addEventListener('DOMContentLoaded', function() {
     loadClients();
@@ -295,7 +398,7 @@ function renderClients(clients) {
     if (clients.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="text-center py-4 text-muted">
+                <td colspan="7" class="text-center py-4 text-muted">
                     <i class="bi bi-inbox"></i> No clients found
                 </td>
             </tr>
@@ -304,7 +407,13 @@ function renderClients(clients) {
     }
 
     tbody.innerHTML = clients.map(client => `
-        <tr>
+        <tr id="row-${client.id}" class="${selectedClients.has(client.id) ? 'selected-for-merge' : ''}">
+            <td>
+                <input type="checkbox" class="form-check-input client-checkbox"
+                       data-client-id="${client.id}"
+                       ${selectedClients.has(client.id) ? 'checked' : ''}
+                       onchange="toggleClientSelection('${client.id}')">
+            </td>
             <td>
                 <div class="client-name">${escapeHtml(client.name)}</div>
             </td>
@@ -331,6 +440,179 @@ function renderClients(clients) {
             </td>
         </tr>
     `).join('');
+
+    updateMergeButton();
+}
+
+function toggleClientSelection(clientId) {
+    if (selectedClients.has(clientId)) {
+        selectedClients.delete(clientId);
+        document.getElementById(`row-${clientId}`)?.classList.remove('selected-for-merge');
+    } else {
+        selectedClients.add(clientId);
+        document.getElementById(`row-${clientId}`)?.classList.add('selected-for-merge');
+    }
+    updateMergeButton();
+    updateSelectAllCheckbox();
+}
+
+function toggleSelectAll(checkbox) {
+    const checkboxes = document.querySelectorAll('.client-checkbox');
+    checkboxes.forEach(cb => {
+        const clientId = cb.dataset.clientId;
+        if (checkbox.checked) {
+            selectedClients.add(clientId);
+            document.getElementById(`row-${clientId}`)?.classList.add('selected-for-merge');
+        } else {
+            selectedClients.delete(clientId);
+            document.getElementById(`row-${clientId}`)?.classList.remove('selected-for-merge');
+        }
+        cb.checked = checkbox.checked;
+    });
+    updateMergeButton();
+}
+
+function updateSelectAllCheckbox() {
+    const checkboxes = document.querySelectorAll('.client-checkbox');
+    const selectAll = document.getElementById('selectAllClients');
+    if (checkboxes.length === 0) {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+    } else if (selectedClients.size === checkboxes.length) {
+        selectAll.checked = true;
+        selectAll.indeterminate = false;
+    } else if (selectedClients.size > 0) {
+        selectAll.checked = false;
+        selectAll.indeterminate = true;
+    } else {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+    }
+}
+
+function updateMergeButton() {
+    const mergeBtn = document.getElementById('mergeBtn');
+    const count = selectedClients.size;
+    document.getElementById('selectedCount').textContent = count;
+
+    if (count >= 2) {
+        mergeBtn.style.display = 'inline-block';
+    } else {
+        mergeBtn.style.display = 'none';
+    }
+}
+
+function showMergeModal() {
+    if (selectedClients.size < 2) {
+        showAlert('Please select at least 2 clients to merge', 'Warning');
+        return;
+    }
+
+    // Get selected client details
+    const selectedClientData = allClients.filter(c => selectedClients.has(c.id));
+
+    // Build the merge options list
+    const listContainer = document.getElementById('mergeClientsList');
+    listContainer.innerHTML = selectedClientData.map((client, index) => `
+        <div class="merge-client-option ${index === 0 ? 'selected' : ''}" onclick="selectPrimaryClient('${client.id}')">
+            <div class="form-check">
+                <input class="form-check-input" type="radio" name="primaryClient"
+                       id="primary-${client.id}" value="${client.id}" ${index === 0 ? 'checked' : ''}>
+                <label class="form-check-label client-info" for="primary-${client.id}">
+                    <div class="client-name">${escapeHtml(client.name)}</div>
+                    <div class="client-details">
+                        ${escapeHtml(client.email)}
+                        ${client.phone ? ` | ${escapeHtml(client.phone)}` : ''}
+                        ${client.org ? ` | ${escapeHtml(client.org)}` : ''}
+                    </div>
+                    <div class="event-count">
+                        <span class="badge ${client.event_count > 0 ? 'bg-primary' : 'bg-secondary'}">
+                            ${client.event_count} event${client.event_count !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                </label>
+            </div>
+        </div>
+    `).join('');
+
+    new bootstrap.Modal(document.getElementById('mergeModal')).show();
+}
+
+function selectPrimaryClient(clientId) {
+    // Update radio button
+    document.querySelector(`#primary-${clientId}`).checked = true;
+
+    // Update visual selection
+    document.querySelectorAll('.merge-client-option').forEach(el => {
+        el.classList.remove('selected');
+    });
+    document.querySelector(`#primary-${clientId}`).closest('.merge-client-option').classList.add('selected');
+}
+
+async function performMerge() {
+    const primaryId = document.querySelector('input[name="primaryClient"]:checked')?.value;
+    if (!primaryId) {
+        await showAlert('Please select a primary client', 'Warning');
+        return;
+    }
+
+    const secondaryIds = Array.from(selectedClients).filter(id => id !== primaryId);
+    const mergeNotes = document.getElementById('mergeNotes').checked;
+
+    // Get names for confirmation
+    const primaryClient = allClients.find(c => c.id === primaryId);
+    const secondaryClients = allClients.filter(c => secondaryIds.includes(c.id));
+    const secondaryNames = secondaryClients.map(c => c.name).join(', ');
+
+    const confirmed = await showConfirm(
+        `Are you sure you want to merge these clients?\n\n` +
+        `Primary (keep): ${primaryClient.name}\n` +
+        `Merge into primary: ${secondaryNames}\n\n` +
+        `All events from the secondary clients will be reassigned to "${primaryClient.name}", ` +
+        `and the secondary clients will be permanently deleted.`,
+        'Confirm Merge'
+    );
+
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch('api/clients/merge', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                primary_client_id: primaryId,
+                secondary_client_ids: secondaryIds,
+                merge_notes: mergeNotes
+            }),
+            credentials: 'same-origin'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to merge clients');
+        }
+
+        const result = await response.json();
+
+        // Close modal and reset selection
+        bootstrap.Modal.getInstance(document.getElementById('mergeModal')).hide();
+        selectedClients.clear();
+        document.getElementById('selectAllClients').checked = false;
+
+        // Reload clients
+        await loadClients();
+
+        await showAlert(
+            `Successfully merged ${secondaryClients.length + 1} clients into "${result.name}". ` +
+            `The client now has ${result.event_count} event(s).`,
+            'Merge Complete'
+        );
+    } catch (error) {
+        console.error('Error merging clients:', error);
+        await showAlert(error.message, 'Error');
+    }
 }
 
 function showAddModal() {

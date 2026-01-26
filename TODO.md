@@ -1,6 +1,6 @@
 # Restaurant Management System - Consolidated TODO
 
-**Last Updated:** January 21, 2026
+**Last Updated:** January 25, 2026
 
 ## Priority Legend
 - P0: Critical - Blocking production use
@@ -269,6 +269,11 @@
 ## Recently Completed (Reference)
 
 ### January 2026
+- [x] **Vendor Item Creation Fix** (Hub) - Jan 25: Fixed 500 error when creating vendor items - database constraint mismatch for `units_per_case` and `purchase_unit_id` columns
+- [x] **Count Units Update Fix** (Inventory) - Jan 25: Fixed 500 error when updating master item count units - removed invalid `hub_uom_id` references
+- [x] **Vendor Parsing Rules** (Hub) - Jan 25: Added vendor-specific invoice parsing rules system with AI prompt customization, column identification, and pack size format hints
+- [x] **Check Batch View Details Fix** (Accounting) - Jan 23: Fixed 403 error on View Details button for completed check batches
+- [x] **MICR Line Format Fix** (Accounting) - Jan 23: Corrected MICR line field order to banking standard (Routing, Account, Check Number)
 - [x] **Invoice Upload AI Parsing** (Hub) - Jan 21: Replaced manual upload form with AI-powered PDF parsing (same as email invoices). Uploads now show review page with parsed data and inline PDF viewer
 - [x] **Check Printing Fixes** (Accounting) - Jan 21: Fixed NoneType decode error in ReportLab PDF generation, added PATCH endpoint for check batches, Bootstrap modals for confirmations, default status filter to Draft
 - [x] **Void Bill Journal Entry Handling** (Accounting) - Jan 21: Voiding a bill now marks its journal entry as REVERSED (excludes from reports) instead of creating a reversing entry that could offset other transactions

@@ -3,14 +3,20 @@ Invoice Status Service
 
 Centralized logic for determining and updating invoice status based on mapping state.
 This ensures consistent status transitions across all operations.
+
+UOM Validation:
+- Invoice cannot reach 'ready' status if any mapped vendor item has incomplete UOM
+- Required UOM fields: size_quantity, size_unit_id, container_id, units_per_case
 """
 
 import logging
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, and_
 
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
+from integration_hub.models.hub_vendor_item import HubVendorItem
+from integration_hub.services.vendor_item_review import check_uom_completeness
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +29,47 @@ def get_unmapped_count(invoice_id: int, db: Session) -> int:
     ).count()
 
 
+def get_items_with_incomplete_uom(invoice_id: int, db: Session) -> list:
+    """
+    Get mapped invoice items where the linked vendor item has incomplete UOM.
+
+    Returns list of dicts with item info for display in error messages.
+    """
+    # Get all mapped items for this invoice
+    mapped_items = db.query(HubInvoiceItem).filter(
+        HubInvoiceItem.invoice_id == invoice_id,
+        HubInvoiceItem.is_mapped == True,
+        HubInvoiceItem.inventory_item_id.isnot(None)
+    ).all()
+
+    incomplete_items = []
+
+    for item in mapped_items:
+        # Get the linked vendor item
+        vendor_item = db.query(HubVendorItem).filter(
+            HubVendorItem.id == item.inventory_item_id
+        ).first()
+
+        if vendor_item:
+            uom_check = check_uom_completeness(vendor_item)
+            if not uom_check['is_complete']:
+                incomplete_items.append({
+                    'invoice_item_id': item.id,
+                    'item_description': item.item_description,
+                    'item_code': item.item_code,
+                    'vendor_item_id': vendor_item.id,
+                    'vendor_product_name': vendor_item.vendor_product_name,
+                    'missing_fields': uom_check['missing_fields']
+                })
+
+    return incomplete_items
+
+
+def get_incomplete_uom_count(invoice_id: int, db: Session) -> int:
+    """Get count of mapped items with incomplete UOM for an invoice"""
+    return len(get_items_with_incomplete_uom(invoice_id, db))
+
+
 def get_total_items_count(invoice_id: int, db: Session) -> int:
     """Get total count of items for an invoice"""
     return db.query(HubInvoiceItem).filter(
@@ -32,12 +79,13 @@ def get_total_items_count(invoice_id: int, db: Session) -> int:
 
 def update_invoice_status(invoice: HubInvoice, db: Session) -> str:
     """
-    Update invoice status based on current mapping state.
+    Update invoice status based on current mapping state and UOM completeness.
 
     Status transitions:
     - If already sent/partial/statement: don't change
     - If has unmapped items: set to 'mapping'
-    - If all items mapped: set to 'ready'
+    - If all items mapped BUT some have incomplete UOM: stay at 'mapping'
+    - If all items mapped AND all have complete UOM: set to 'ready'
     - If no items: keep as 'pending'
 
     Args:
@@ -70,37 +118,61 @@ def update_invoice_status(invoice: HubInvoice, db: Session) -> str:
             invoice.status = 'mapping'
             logger.info(f"Invoice {invoice.id}: {unmapped_count} unmapped items, status changed from '{old_status}' to 'mapping'")
     else:
-        # All items mapped - status should be 'ready'
-        if invoice.status != 'ready':
-            old_status = invoice.status
-            invoice.status = 'ready'
-            logger.info(f"Invoice {invoice.id}: All {total_items} items mapped, status changed from '{old_status}' to 'ready'")
+        # All items mapped - check UOM completeness before setting to 'ready'
+        incomplete_uom_count = get_incomplete_uom_count(invoice.id, db)
+
+        if incomplete_uom_count > 0:
+            # Has items with incomplete UOM - cannot go to 'ready'
+            if invoice.status != 'mapping':
+                old_status = invoice.status
+                invoice.status = 'mapping'
+                logger.info(f"Invoice {invoice.id}: {incomplete_uom_count} items with incomplete UOM, status changed from '{old_status}' to 'mapping'")
+            else:
+                logger.debug(f"Invoice {invoice.id}: {incomplete_uom_count} items with incomplete UOM, staying at 'mapping'")
+        else:
+            # All items mapped AND all have complete UOM - status should be 'ready'
+            if invoice.status != 'ready':
+                old_status = invoice.status
+                invoice.status = 'ready'
+                logger.info(f"Invoice {invoice.id}: All {total_items} items mapped with complete UOM, status changed from '{old_status}' to 'ready'")
 
     return invoice.status
 
 
-def can_set_status_ready(invoice_id: int, db: Session) -> tuple[bool, str]:
+def can_set_status_ready(invoice_id: int, db: Session) -> tuple[bool, str, list]:
     """
     Check if an invoice can be set to 'ready' status.
+
+    Checks:
+    1. Invoice has items
+    2. All items are mapped
+    3. All mapped vendor items have complete UOM
 
     Args:
         invoice_id: The invoice ID to check
         db: Database session
 
     Returns:
-        Tuple of (can_set_ready, reason)
+        Tuple of (can_set_ready, reason, blocking_items)
+        - blocking_items: list of items with issues (unmapped or incomplete UOM)
     """
     total_items = get_total_items_count(invoice_id, db)
 
     if total_items == 0:
-        return False, "Invoice has no items"
+        return False, "Invoice has no items", []
 
     unmapped_count = get_unmapped_count(invoice_id, db)
 
     if unmapped_count > 0:
-        return False, f"Invoice has {unmapped_count} unmapped items"
+        return False, f"Invoice has {unmapped_count} unmapped items", []
 
-    return True, "All items mapped"
+    # Check UOM completeness
+    incomplete_items = get_items_with_incomplete_uom(invoice_id, db)
+
+    if incomplete_items:
+        return False, f"Invoice has {len(incomplete_items)} items with incomplete UOM", incomplete_items
+
+    return True, "All items mapped with complete UOM", []
 
 
 def recalculate_invoice_status(invoice_id: int, db: Session) -> str:

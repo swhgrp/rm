@@ -11,6 +11,7 @@ class IntakeClientData(BaseModel):
     email: EmailStr
     phone: Optional[str] = None
     org: Optional[str] = None
+    preferred_contact: Optional[str] = None  # email, phone, or no_preference
 
 
 class IntakeEventData(BaseModel):
@@ -20,6 +21,7 @@ class IntakeEventData(BaseModel):
     date: str  # Date string from form
     start_at: datetime
     end_at: datetime
+    is_multi_day: Optional[bool] = False  # Whether event spans multiple days
     guest_count: Optional[int] = None
     venue_id: Optional[UUID] = None  # Venue ID from venues table
     location: Optional[str] = None  # Deprecated - use venue_id instead

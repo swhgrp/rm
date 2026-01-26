@@ -204,6 +204,171 @@
             min-height: 100px;
         }
 
+        /* Toggle Pills - Modern selectable buttons */
+        .toggle-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+            justify-content: center;
+        }
+
+        .toggle-pills-group {
+            width: 100%;
+            margin-bottom: 15px;
+        }
+
+        .toggle-pills-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .toggle-pills-group-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .toggle-pills-group .toggle-pills {
+            margin-top: 0;
+        }
+
+        .toggle-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 18px;
+            background-color: var(--bg-tertiary);
+            border: 2px solid var(--border-primary);
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            user-select: none;
+        }
+
+        .toggle-pill:hover {
+            border-color: var(--accent-primary);
+            background-color: var(--bg-elevated);
+            color: var(--text-primary);
+        }
+
+        .toggle-pill.selected {
+            background-color: var(--accent-primary);
+            border-color: var(--accent-primary);
+            color: white;
+        }
+
+        .toggle-pill.selected:hover {
+            background-color: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        .toggle-pill i {
+            font-size: 16px;
+            opacity: 0;
+            transform: scale(0);
+            transition: all 0.2s ease;
+            margin-right: -8px;
+        }
+
+        .toggle-pill.selected i {
+            opacity: 1;
+            transform: scale(1);
+            margin-right: 0;
+        }
+
+        .toggle-pill input[type="checkbox"] {
+            display: none;
+        }
+
+        /* Multi-day toggle switch */
+        .switch-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 10px;
+        }
+
+        .switch {
+            position: relative;
+            width: 50px;
+            height: 26px;
+            flex-shrink: 0;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .switch-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--border-secondary);
+            transition: 0.3s;
+            border-radius: 26px;
+        }
+
+        .switch-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .switch input:checked + .switch-slider {
+            background-color: var(--accent-primary);
+        }
+
+        .switch input:checked + .switch-slider:before {
+            transform: translateX(24px);
+        }
+
+        .switch-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        /* Conditional field visibility */
+        .conditional-field {
+            display: none;
+            animation: slideDown 0.3s ease;
+        }
+
+        .conditional-field.show {
+            display: block;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Legacy checkbox support */
         .checkbox-group {
             display: flex;
             flex-wrap: wrap;
@@ -429,12 +594,25 @@
                 padding: 20px 15px;
             }
 
+            .toggle-pills {
+                gap: 8px;
+            }
+
+            .toggle-pill {
+                padding: 8px 14px;
+                font-size: 13px;
+            }
+
             .checkbox-group {
                 gap: 10px;
             }
 
             .checkbox-item {
                 padding: 8px 12px;
+            }
+
+            .switch-container {
+                margin-top: 15px !important;
             }
         }
     </style>
@@ -496,10 +674,18 @@
                         </div>
                     </div>
 
-                    <div class="form-row">
+                    <div class="form-row two-cols">
                         <div class="form-group">
                             <label for="company">Company/Organization</label>
                             <input type="text" id="company" name="company" placeholder="Optional">
+                        </div>
+                        <div class="form-group">
+                            <label for="preferredContact">Preferred Contact Method</label>
+                            <select id="preferredContact" name="preferredContact">
+                                <option value="no_preference">No Preference</option>
+                                <option value="email">Email</option>
+                                <option value="phone">Phone</option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -536,20 +722,33 @@
 
                     <div class="form-row two-cols">
                         <div class="form-group">
-                            <label for="eventDate">Event Date & Time <span class="required">*</span></label>
-                            <input type="datetime-local" id="eventDate" name="eventDate" required>
+                            <label for="eventStartDate">Event Start <span class="required">*</span></label>
+                            <input type="datetime-local" id="eventStartDate" name="eventStartDate" required>
                         </div>
                         <div class="form-group">
-                            <label for="attendeeCount">Expected Attendees <span class="required">*</span></label>
-                            <input type="number" id="attendeeCount" name="attendeeCount" min="1" required>
+                            <label for="eventEndDate">Event End <span class="required">*</span></label>
+                            <input type="datetime-local" id="eventEndDate" name="eventEndDate" required>
                         </div>
                     </div>
 
-                    <div class="form-row">
+                    <div class="form-row two-cols">
                         <div class="form-group">
-                            <label for="duration">Estimated Duration (hours)</label>
-                            <input type="number" id="duration" name="duration" min="1" step="0.5"
-                                   placeholder="e.g., 4">
+                            <label for="attendeeCount">Expected Attendees <span class="required">*</span></label>
+                            <input type="number" id="attendeeCount" name="attendeeCount" min="1" required
+                                   placeholder="e.g., 90">
+                        </div>
+                        <div class="form-group">
+                            <div class="switch-container" style="margin-top: 28px;">
+                                <label class="switch">
+                                    <input type="checkbox" id="multiDayEvent" name="multiDayEvent">
+                                    <span class="switch-slider"></span>
+                                </label>
+                                <span class="switch-label">Multi-day event</span>
+                            </div>
+                            <p class="help-text" style="margin-top: 8px;">
+                                <i class="bi bi-info-circle"></i>
+                                Enable for events spanning multiple days
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -563,9 +762,9 @@
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Meal Type</label>
-                            <div class="checkbox-group" id="mealTypesContainer">
-                                <!-- Will be populated dynamically -->
+                            <label>Meal Type <span style="font-weight: 400; color: var(--text-muted); font-size: 13px;">(select all that apply)</span></label>
+                            <div id="mealTypesContainer">
+                                <!-- Will be populated dynamically with grouped pills -->
                             </div>
                         </div>
                     </div>
@@ -580,8 +779,8 @@
 
                     <div class="form-row">
                         <div class="form-group">
-                            <label>Beverage Service</label>
-                            <div class="checkbox-group" id="beverageServicesContainer">
+                            <label>Beverage Service <span style="font-weight: 400; color: var(--text-muted); font-size: 13px;">(select all that apply)</span></label>
+                            <div class="toggle-pills" id="beverageServicesContainer">
                                 <!-- Will be populated dynamically -->
                             </div>
                         </div>
@@ -662,6 +861,56 @@
             }
         });
 
+        // Event date handling
+        const eventStartInput = document.getElementById('eventStartDate');
+        const eventEndInput = document.getElementById('eventEndDate');
+        const multiDayToggle = document.getElementById('multiDayEvent');
+
+        // When start date changes, auto-set end date to 4 hours later (same day)
+        eventStartInput.addEventListener('change', function() {
+            const startDate = new Date(this.value);
+            if (!isNaN(startDate.getTime())) {
+                // Default to 4 hours after start
+                const endDate = new Date(startDate.getTime() + 4 * 60 * 60 * 1000);
+                // Format for datetime-local input
+                const endFormatted = endDate.toISOString().slice(0, 16);
+                eventEndInput.value = endFormatted;
+            }
+        });
+
+        // Validate that end date is after start date
+        eventEndInput.addEventListener('change', function() {
+            const startDate = new Date(eventStartInput.value);
+            const endDate = new Date(this.value);
+
+            if (startDate && endDate && endDate <= startDate) {
+                alert('End date/time must be after start date/time');
+                // Reset to 4 hours after start
+                const newEnd = new Date(startDate.getTime() + 4 * 60 * 60 * 1000);
+                this.value = newEnd.toISOString().slice(0, 16);
+            }
+
+            // Auto-detect multi-day events
+            if (startDate && endDate) {
+                const startDay = startDate.toDateString();
+                const endDay = endDate.toDateString();
+                if (startDay !== endDay && !multiDayToggle.checked) {
+                    multiDayToggle.checked = true;
+                }
+            }
+        });
+
+        // Multi-day toggle visual feedback
+        multiDayToggle.addEventListener('change', function() {
+            // Visual cue that multi-day mode is enabled
+            const helpText = this.closest('.form-group').querySelector('.help-text');
+            if (this.checked) {
+                helpText.innerHTML = '<i class="bi bi-calendar-range"></i> Multi-day event enabled - set your end date accordingly';
+            } else {
+                helpText.innerHTML = '<i class="bi bi-info-circle"></i> Enable for events spanning multiple days';
+            }
+        });
+
         // Load all settings on page load
         async function loadAllSettings() {
             await Promise.all([
@@ -694,31 +943,20 @@
             }
         }
 
-        let venuesMap = {}; // Store venue data for lookup
-
         async function loadLocations() {
             const locationSelect = document.getElementById('location');
             try {
-                // Load locations from the locations table
-                const locationsResponse = await fetch('/events/public/locations');
-                // Load venues from the venues table (for venue_id mapping)
-                const venuesResponse = await fetch('/events/api/events/venues/actual');
+                // Load venues from public endpoint (returns id, name, address)
+                const response = await fetch('/events/public/venues');
 
-                if (locationsResponse.ok && venuesResponse.ok) {
-                    const locations = await locationsResponse.json();
-                    const venues = await venuesResponse.json();
-
-                    // Build a map of location name -> venue_id
-                    venues.forEach(venue => {
-                        venuesMap[venue.name] = venue.id;
-                    });
+                if (response.ok) {
+                    const venues = await response.json();
 
                     locationSelect.innerHTML = '<option value="">Select location (optional)...</option>';
-                    locations.forEach(location => {
+                    venues.forEach(venue => {
                         const option = document.createElement('option');
-                        // Store the venue ID in the value
-                        option.value = venuesMap[location.name] || '';
-                        option.textContent = location.name;
+                        option.value = venue.id;
+                        option.textContent = venue.name;
                         locationSelect.appendChild(option);
                     });
                 } else {
@@ -737,22 +975,75 @@
                 if (response.ok) {
                     const mealTypes = await response.json();
                     mealTypesContainer.innerHTML = '';
-                    mealTypes.forEach(mealType => {
+
+                    // Define logical groupings
+                    const mealTimes = ['Breakfast', 'Brunch', 'Lunch', 'Dinner', 'Cocktail Reception'];
+                    const serviceStyles = ['Buffet', 'Plated Service', 'Stations'];
+
+                    // Separate into groups
+                    const timeGroup = mealTypes.filter(m => mealTimes.includes(m.name));
+                    const styleGroup = mealTypes.filter(m => serviceStyles.includes(m.name));
+                    const otherGroup = mealTypes.filter(m => !mealTimes.includes(m.name) && !serviceStyles.includes(m.name));
+
+                    // Helper to create pill
+                    function createPill(mealType) {
                         const id = `meal_${mealType.id}`;
-                        const div = document.createElement('div');
-                        div.className = 'checkbox-item';
-                        div.innerHTML = `
+                        const pill = document.createElement('div');
+                        pill.className = 'toggle-pill';
+                        pill.innerHTML = `
                             <input type="checkbox" id="${id}" name="mealTypes" value="${mealType.name}">
-                            <label for="${id}">${mealType.name}</label>
+                            <i class="bi bi-check2"></i>
+                            <span>${mealType.name}</span>
                         `;
-                        mealTypesContainer.appendChild(div);
-                    });
+                        pill.addEventListener('click', function(e) {
+                            const checkbox = this.querySelector('input[type="checkbox"]');
+                            checkbox.checked = !checkbox.checked;
+                            this.classList.toggle('selected', checkbox.checked);
+                        });
+                        return pill;
+                    }
+
+                    // Create Meal Time group
+                    if (timeGroup.length > 0) {
+                        const group1 = document.createElement('div');
+                        group1.className = 'toggle-pills-group';
+                        group1.innerHTML = '<div class="toggle-pills-group-label">Meal Time</div>';
+                        const pills1 = document.createElement('div');
+                        pills1.className = 'toggle-pills';
+                        timeGroup.forEach(m => pills1.appendChild(createPill(m)));
+                        group1.appendChild(pills1);
+                        mealTypesContainer.appendChild(group1);
+                    }
+
+                    // Create Service Style group
+                    if (styleGroup.length > 0) {
+                        const group2 = document.createElement('div');
+                        group2.className = 'toggle-pills-group';
+                        group2.innerHTML = '<div class="toggle-pills-group-label">Service Style</div>';
+                        const pills2 = document.createElement('div');
+                        pills2.className = 'toggle-pills';
+                        styleGroup.forEach(m => pills2.appendChild(createPill(m)));
+                        group2.appendChild(pills2);
+                        mealTypesContainer.appendChild(group2);
+                    }
+
+                    // Add any other meal types not in our predefined groups
+                    if (otherGroup.length > 0) {
+                        const group3 = document.createElement('div');
+                        group3.className = 'toggle-pills-group';
+                        group3.innerHTML = '<div class="toggle-pills-group-label">Other</div>';
+                        const pills3 = document.createElement('div');
+                        pills3.className = 'toggle-pills';
+                        otherGroup.forEach(m => pills3.appendChild(createPill(m)));
+                        group3.appendChild(pills3);
+                        mealTypesContainer.appendChild(group3);
+                    }
                 } else {
-                    mealTypesContainer.innerHTML = '<p style="color: #8b949e;">Failed to load meal types</p>';
+                    mealTypesContainer.innerHTML = '<p style="color: var(--text-muted);">Failed to load meal types</p>';
                 }
             } catch (error) {
                 console.error('Failed to load meal types:', error);
-                mealTypesContainer.innerHTML = '<p style="color: #8b949e;">Failed to load meal types</p>';
+                mealTypesContainer.innerHTML = '<p style="color: var(--text-muted);">Failed to load meal types</p>';
             }
         }
 
@@ -765,20 +1056,27 @@
                     beverageContainer.innerHTML = '';
                     beverages.forEach(beverage => {
                         const id = `bev_${beverage.id}`;
-                        const div = document.createElement('div');
-                        div.className = 'checkbox-item';
-                        div.innerHTML = `
+                        const pill = document.createElement('div');
+                        pill.className = 'toggle-pill';
+                        pill.innerHTML = `
                             <input type="checkbox" id="${id}" name="beverages" value="${beverage.name}">
-                            <label for="${id}">${beverage.name}</label>
+                            <i class="bi bi-check2"></i>
+                            <span>${beverage.name}</span>
                         `;
-                        beverageContainer.appendChild(div);
+                        // Toggle selected state on click
+                        pill.addEventListener('click', function(e) {
+                            const checkbox = this.querySelector('input[type="checkbox"]');
+                            checkbox.checked = !checkbox.checked;
+                            this.classList.toggle('selected', checkbox.checked);
+                        });
+                        beverageContainer.appendChild(pill);
                     });
                 } else {
-                    beverageContainer.innerHTML = '<p style="color: #8b949e;">Failed to load beverage services</p>';
+                    beverageContainer.innerHTML = '<p style="color: var(--text-muted);">Failed to load beverage services</p>';
                 }
             } catch (error) {
                 console.error('Failed to load beverage services:', error);
-                beverageContainer.innerHTML = '<p style="color: #8b949e;">Failed to load beverage services</p>';
+                beverageContainer.innerHTML = '<p style="color: var(--text-muted);">Failed to load beverage services</p>';
             }
         }
 
@@ -798,14 +1096,16 @@
             loadingIndicator.classList.add('show');
 
             // Collect form data
-            const eventDateValue = document.getElementById('eventDate').value;
-            const startAt = new Date(eventDateValue);
-            const durationHours = parseFloat(document.getElementById('duration').value) || 4; // Default 4 hours
-            const endAt = new Date(startAt.getTime() + durationHours * 60 * 60 * 1000);
+            const eventStartValue = document.getElementById('eventStartDate').value;
+            const eventEndValue = document.getElementById('eventEndDate').value;
+            const startAt = new Date(eventStartValue);
+            const endAt = new Date(eventEndValue);
+            const isMultiDay = document.getElementById('multiDayEvent').checked;
 
             const budgetPerPersonValue = document.getElementById('budgetPerPerson').value;
             const guestCount = parseInt(document.getElementById('attendeeCount').value);
-            const venueIdValue = document.getElementById('location').value; // This is now venue_id
+            const venueIdValue = document.getElementById('location').value;
+            const preferredContact = document.getElementById('preferredContact').value;
 
             // Calculate total budget estimate from per-person budget and guest count
             let budgetEstimate = null;
@@ -820,23 +1120,26 @@
                     name: document.getElementById('fullName').value,
                     email: document.getElementById('email').value,
                     phone: document.getElementById('phone').value,
-                    org: document.getElementById('company').value || null
+                    org: document.getElementById('company').value || null,
+                    preferred_contact: preferredContact
                 },
                 event: {
                     title: document.getElementById('eventTitle').value,
                     event_type: document.getElementById('eventType').value,
-                    date: eventDateValue,
+                    date: eventStartValue,
                     start_at: startAt.toISOString(),
                     end_at: endAt.toISOString(),
+                    is_multi_day: isMultiDay,
                     guest_count: guestCount,
-                    venue_id: venueIdValue || null, // Send venue_id instead of location text
+                    venue_id: venueIdValue || null,
                     menu_json: {
                         preferences: collectCheckboxValues('mealTypes'),
                         dietary_restrictions: document.getElementById('dietaryRestrictions').value || null,
                         beverages: collectCheckboxValues('beverages')
                     },
                     requirements_json: {
-                        special_requirements: document.getElementById('specialRequirements').value || null
+                        special_requirements: document.getElementById('specialRequirements').value || null,
+                        preferred_contact_method: preferredContact
                     },
                     budget_estimate: budgetEstimate
                 }

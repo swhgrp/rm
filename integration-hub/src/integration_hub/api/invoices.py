@@ -514,3 +514,83 @@ async def get_invoice_items(
 
 # Need Integer for the SQL cast
 from sqlalchemy import Integer
+
+
+# ============================================================================
+# RE-PARSE WITH VENDOR RULES
+# ============================================================================
+
+@router.post("/{invoice_id}/reparse-with-vendor-rules")
+async def reparse_invoice_with_vendor_rules(
+    invoice_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Re-parse an invoice using vendor-specific parsing rules.
+
+    This endpoint:
+    1. Looks up the vendor-specific parsing rules for the invoice's vendor
+    2. Re-parses the invoice PDF with vendor-specific AI instructions
+    3. Updates the invoice items with the newly parsed data
+
+    The invoice must already have a matched vendor with parsing rules configured.
+
+    Returns the result of the re-parse operation.
+    """
+    from integration_hub.services.invoice_parser import get_invoice_parser
+
+    parser = get_invoice_parser()
+    result = parser.reparse_with_vendor_rules(invoice_id, db)
+
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+
+    return result
+
+
+@router.get("/{invoice_id}/vendor-rules-status")
+async def get_invoice_vendor_rules_status(
+    invoice_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Check if an invoice's vendor has parsing rules available.
+
+    Returns:
+        - has_rules: Whether the vendor has parsing rules
+        - vendor_id: The vendor ID (if matched)
+        - vendor_name: The vendor name
+        - rule_summary: Brief summary of the rules if available
+    """
+    from integration_hub.models.vendor_parsing_rule import VendorParsingRule
+
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    result = {
+        "invoice_id": invoice_id,
+        "vendor_id": invoice.vendor_id,
+        "vendor_name": invoice.vendor_name,
+        "has_rules": False,
+        "rule_summary": None
+    }
+
+    if invoice.vendor_id:
+        rule = db.query(VendorParsingRule).filter(
+            VendorParsingRule.vendor_id == invoice.vendor_id,
+            VendorParsingRule.is_active == True
+        ).first()
+
+        if rule:
+            result["has_rules"] = True
+            summary_parts = []
+            if rule.quantity_column:
+                summary_parts.append(f"Qty: {rule.quantity_column}")
+            if rule.item_code_column:
+                summary_parts.append(f"SKU: {rule.item_code_column}")
+            if rule.ai_instructions:
+                summary_parts.append("Custom AI instructions")
+            result["rule_summary"] = ", ".join(summary_parts) if summary_parts else "Rules configured"
+
+    return result

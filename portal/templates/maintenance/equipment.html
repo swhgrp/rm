@@ -264,6 +264,88 @@
         cursor: not-allowed;
     }
 
+    /* Fix Actions column header alignment */
+    th:last-child {
+        text-align: center;
+    }
+
+    .actions-cell {
+        justify-content: center;
+    }
+
+    /* History Modal */
+    .history-modal .modal {
+        max-width: 700px;
+    }
+
+    .history-list {
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .history-item {
+        padding: 12px 15px;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        gap: 15px;
+        align-items: flex-start;
+    }
+
+    .history-item:last-child {
+        border-bottom: none;
+    }
+
+    .history-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 16px;
+    }
+
+    .history-icon.created { background-color: var(--success-bg); color: var(--success); }
+    .history-icon.status_change { background-color: var(--info-bg); color: var(--info); }
+    .history-icon.updated { background-color: var(--warning-bg); color: var(--warning); }
+    .history-icon.maintenance { background-color: #e8daef; color: #8e44ad; }
+    .history-icon.work_order { background-color: var(--success-bg); color: var(--success); }
+    .history-icon.work_order_cancelled { background-color: var(--error-bg); color: var(--error); }
+
+    .history-content {
+        flex: 1;
+    }
+
+    .history-title {
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 4px;
+    }
+
+    .history-detail {
+        font-size: 13px;
+        color: var(--text-secondary);
+    }
+
+    .history-time {
+        font-size: 12px;
+        color: var(--text-muted);
+        white-space: nowrap;
+    }
+
+    .history-empty {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--text-muted);
+    }
+
+    .history-empty i {
+        font-size: 48px;
+        margin-bottom: 15px;
+        opacity: 0.5;
+    }
+
     /* Modal styles */
     .modal-overlay {
         display: none;
@@ -539,6 +621,23 @@
             <div class="modal-footer">
                 <button class="btn-secondary" onclick="closeModal()">Cancel</button>
                 <button class="btn-primary" onclick="saveEquipment()">Save Equipment</button>
+            </div>
+        </div>
+    </div>
+    <!-- Equipment History Modal -->
+    <div class="modal-overlay history-modal" id="historyModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="historyModalTitle">Equipment History</h3>
+                <button class="modal-close" onclick="closeHistoryModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="history-list" id="historyList">
+                    <div class="loading"><div class="spinner"></div></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeHistoryModal()">Close</button>
             </div>
         </div>
     </div>
@@ -880,9 +979,126 @@
         }
     }
 
-    function viewHistory(id) {
-        // TODO: Implement history view modal
-        showInfo('Equipment history view coming soon');
+    async function viewHistory(id) {
+        const equipment = allEquipment.find(e => e.id === id);
+        const modalTitle = document.getElementById('historyModalTitle');
+        modalTitle.textContent = equipment ? `History: ${equipment.name}` : 'Equipment History';
+
+        const historyList = document.getElementById('historyList');
+        historyList.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+        document.getElementById('historyModal').classList.add('active');
+
+        try {
+            const response = await fetch(`${API_BASE}/equipment/${id}/history`);
+            if (!response.ok) {
+                throw new Error('Failed to load history');
+            }
+
+            const history = await response.json();
+
+            if (history.length === 0) {
+                historyList.innerHTML = `
+                    <div class="history-empty">
+                        <i class="bi bi-clock-history"></i>
+                        <p>No history records found</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const changeTypeIcons = {
+                'created': 'bi-plus-circle',
+                'status_change': 'bi-arrow-repeat',
+                'updated': 'bi-pencil',
+                'maintenance': 'bi-wrench',
+                'work_order': 'bi-check-circle',
+                'work_order_cancelled': 'bi-x-circle'
+            };
+
+            const changeTypeLabels = {
+                'created': 'Created',
+                'status_change': 'Status Changed',
+                'updated': 'Updated',
+                'maintenance': 'Maintenance',
+                'work_order': 'Work Order Completed',
+                'work_order_cancelled': 'Work Order Cancelled'
+            };
+
+            historyList.innerHTML = history.map(h => {
+                const icon = changeTypeIcons[h.change_type] || 'bi-clock';
+                const label = changeTypeLabels[h.change_type] || h.change_type;
+                const date = new Date(h.created_at);
+                const timeAgo = formatTimeAgo(date);
+
+                let detail = '';
+                if (h.change_type === 'status_change' && h.old_value && h.new_value) {
+                    detail = `${formatStatus(h.old_value)} → ${formatStatus(h.new_value)}`;
+                } else if (h.notes) {
+                    detail = h.notes;
+                } else if (h.new_value) {
+                    detail = h.new_value;
+                }
+
+                return `
+                    <div class="history-item">
+                        <div class="history-icon ${h.change_type}">
+                            <i class="bi ${icon}"></i>
+                        </div>
+                        <div class="history-content">
+                            <div class="history-title">${label}</div>
+                            ${detail ? `<div class="history-detail">${escapeHtml(detail)}</div>` : ''}
+                        </div>
+                        <div class="history-time" title="${date.toLocaleString()}">${timeAgo}</div>
+                    </div>
+                `;
+            }).join('');
+
+        } catch (error) {
+            console.error('Error loading history:', error);
+            historyList.innerHTML = `
+                <div class="history-empty">
+                    <i class="bi bi-exclamation-circle"></i>
+                    <p>Error loading history</p>
+                </div>
+            `;
+        }
+    }
+
+    function closeHistoryModal() {
+        document.getElementById('historyModal').classList.remove('active');
+    }
+
+    function formatStatus(status) {
+        const labels = {
+            'OPERATIONAL': 'Operational',
+            'NEEDS_MAINTENANCE': 'Needs Maintenance',
+            'UNDER_REPAIR': 'Under Repair',
+            'OUT_OF_SERVICE': 'Out of Service',
+            'RETIRED': 'Retired'
+        };
+        return labels[status] || status;
+    }
+
+    function formatTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffSec = Math.floor(diffMs / 1000);
+        const diffMin = Math.floor(diffSec / 60);
+        const diffHour = Math.floor(diffMin / 60);
+        const diffDay = Math.floor(diffHour / 24);
+
+        if (diffDay > 30) {
+            return date.toLocaleDateString();
+        } else if (diffDay > 0) {
+            return `${diffDay}d ago`;
+        } else if (diffHour > 0) {
+            return `${diffHour}h ago`;
+        } else if (diffMin > 0) {
+            return `${diffMin}m ago`;
+        } else {
+            return 'Just now';
+        }
     }
 
     function escapeHtml(text) {

@@ -1,7 +1,7 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** January 18, 2026
-**System Status:** Production (97% Complete)
+**Last Updated:** January 25, 2026
+**System Status:** Production (98% Complete)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
 
@@ -38,23 +38,56 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - January 23, 2026)
+### Most Recent Work (Current Session - January 25, 2026)
+
+**INTEGRATION HUB & INVENTORY BUG FIXES** ✅ **COMPLETE**
+
+#### 1. **Vendor Item Creation Fix** ✅
+- **Problem:** 500 error when creating vendor items from unmapped invoice items
+  - Error: "null value in column 'units_per_case' violates not-null constraint"
+  - Database schema had NOT NULL constraint but model defined `nullable=True`
+- **Solution:**
+  - Fixed database constraint to allow NULL: `ALTER TABLE hub_vendor_items ALTER COLUMN units_per_case DROP NOT NULL`
+  - Also fixed `purchase_unit_id` constraint mismatch
+  - Added comprehensive error handling in `create_vendor_item` endpoint
+  - Improved frontend error handling for non-JSON 500 responses
+- **Files Modified:**
+  - `integration-hub/src/integration_hub/api/vendor_items.py` - Error handling, validation
+  - `integration-hub/src/integration_hub/templates/unmapped_items.html` - Error display
+
+#### 2. **Inventory Count Units Update Fix** ✅
+- **Problem:** 500 error when updating master item count units
+  - Error: `TypeError: 'hub_uom_id' is an invalid keyword argument for MasterItemCountUnit`
+  - Code referenced non-existent `hub_uom_id` column
+- **Solution:** Removed invalid `hub_uom_id` references from count-units endpoint
+  - The `uom_id` field already stores the Hub UOM ID
+- **File:** `inventory/src/restaurant_inventory/api/api_v1/endpoints/items.py`
+
+#### 3. **Vendor Parsing Rules System** ✅ (Previous Session)
+- **Feature:** Vendor-specific invoice parsing configuration
+  - AI prompt customization per vendor
+  - Column identification rules (quantity, item code, price)
+  - Pack size format hints
+- **Files:**
+  - `integration-hub/src/integration_hub/models/vendor_parsing_rule.py` - New model
+  - `integration-hub/src/integration_hub/api/settings.py` - CRUD endpoints
+  - `integration-hub/src/integration_hub/templates/settings.html` - UI
+  - `integration-hub/src/integration_hub/services/invoice_parser.py` - Rule integration
+
+---
+
+### Previous Session Work (January 23, 2026)
 
 **ACCOUNTING CHECK BATCH FIXES** ✅ **COMPLETE**
 
 #### 1. **View Details 403 Error Fix** ✅
 - **Problem:** Clicking "View Details" on completed check batches returned 403 Forbidden
-  - `viewBatch()` function was navigating to `/check-batches/${batchId}` (missing `/accounting` prefix)
-  - Even with correct prefix, no route handler existed for individual batch detail pages
 - **Solution:** Changed `viewBatch()` to call existing `previewBatch()` function
-  - Now opens the preview modal showing batch details (same as draft batch preview)
 - **File:** `accounting/src/accounting/templates/check_batches.html`
 
 #### 2. **MICR Line Format Fix** ✅
 - **Problem:** Check MICR line had incorrect field order
-  - Was printing: Check Number, Routing Number, Account Number (`C2018C A267084131A 716209785C`)
-  - Should be: Routing Number, Account Number, Check Number (per banking standard)
-- **Solution:** Corrected MICR format to: `A267084131A 716209785C C2018C`
+- **Solution:** Corrected MICR format to: `A267084131A 716209785C C2018C` (Routing, Account, Check)
 - **File:** `accounting/src/accounting/services/check_printer.py`
 
 ---

@@ -4,12 +4,20 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Optional
 from uuid import UUID
+from pydantic import BaseModel
 import logging
 
 from events.core.database import get_db
 from events.core.deps import require_auth, require_permission
 from events.models import Client, Event, User
 from events.schemas.client import ClientCreate, ClientUpdate, ClientResponse
+
+
+class MergeClientsRequest(BaseModel):
+    """Request body for merging clients"""
+    primary_client_id: UUID
+    secondary_client_ids: List[UUID]
+    merge_notes: bool = True  # Whether to combine notes from all clients
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -258,3 +266,130 @@ async def get_client_events(
         }
         for event in events
     ]
+
+
+@router.post("/merge", response_model=ClientResponse)
+async def merge_clients(
+    merge_request: MergeClientsRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """
+    Merge multiple clients into a primary client
+
+    - Reassigns all events from secondary clients to the primary client
+    - Optionally combines notes from all clients
+    - Deletes secondary clients after merge
+    """
+    primary_id = merge_request.primary_client_id
+    secondary_ids = merge_request.secondary_client_ids
+
+    # Validate primary client exists
+    primary_client = db.query(Client).filter(Client.id == primary_id).first()
+    if not primary_client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Primary client not found"
+        )
+
+    # Validate secondary clients exist
+    secondary_clients = db.query(Client).filter(Client.id.in_(secondary_ids)).all()
+    if len(secondary_clients) != len(secondary_ids):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="One or more secondary clients not found"
+        )
+
+    # Ensure primary is not in secondary list
+    if primary_id in secondary_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Primary client cannot be in the secondary clients list"
+        )
+
+    try:
+        merged_info = []
+        total_events_reassigned = 0
+
+        for secondary in secondary_clients:
+            # Count events being reassigned
+            events_count = db.query(func.count(Event.id)).filter(
+                Event.client_id == secondary.id
+            ).scalar()
+            total_events_reassigned += events_count
+
+            # Reassign all events from secondary to primary
+            db.query(Event).filter(Event.client_id == secondary.id).update(
+                {Event.client_id: primary_id}
+            )
+
+            # Collect info for merged notes
+            merged_info.append({
+                'name': secondary.name,
+                'email': secondary.email,
+                'phone': secondary.phone,
+                'org': secondary.org,
+                'notes': secondary.notes,
+                'events_count': events_count
+            })
+
+            logger.info(f"Reassigned {events_count} events from client {secondary.email} to {primary_client.email}")
+
+        # Merge notes if requested
+        if merge_request.merge_notes:
+            notes_parts = []
+            if primary_client.notes:
+                notes_parts.append(primary_client.notes)
+
+            for info in merged_info:
+                merge_note = f"\n--- Merged from {info['name']} ({info['email']}) ---"
+                if info['phone']:
+                    merge_note += f"\nPhone: {info['phone']}"
+                if info['org']:
+                    merge_note += f"\nOrg: {info['org']}"
+                if info['notes']:
+                    merge_note += f"\nNotes: {info['notes']}"
+                notes_parts.append(merge_note)
+
+            if notes_parts:
+                primary_client.notes = '\n'.join(notes_parts)
+
+        # Delete secondary clients
+        for secondary in secondary_clients:
+            secondary_name = secondary.name
+            secondary_email = secondary.email
+            db.delete(secondary)
+            logger.info(f"Deleted merged client: {secondary_name} ({secondary_email})")
+
+        db.commit()
+        db.refresh(primary_client)
+
+        logger.info(
+            f"Merged {len(secondary_clients)} client(s) into {primary_client.name} ({primary_client.email}), "
+            f"reassigned {total_events_reassigned} event(s) - by user {current_user.email}"
+        )
+
+        # Get updated event count
+        event_count = db.query(func.count(Event.id)).filter(
+            Event.client_id == primary_client.id
+        ).scalar()
+
+        return {
+            "id": primary_client.id,
+            "name": primary_client.name,
+            "email": primary_client.email,
+            "phone": primary_client.phone,
+            "org": primary_client.org,
+            "notes": primary_client.notes,
+            "created_at": primary_client.created_at,
+            "updated_at": primary_client.updated_at,
+            "event_count": event_count or 0
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Error merging clients: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to merge clients: {str(e)}"
+        )

@@ -28,7 +28,8 @@ def get_now(): return datetime.now(_ET)
 from integration_hub.db.database import get_db
 from integration_hub.models.hub_vendor_item import HubVendorItem, VendorItemStatus
 from integration_hub.models.vendor import Vendor
-from integration_hub.services.vendor_item_review import VendorItemReviewService
+from integration_hub.models.unit_of_measure import UnitOfMeasure
+from integration_hub.services.vendor_item_review import VendorItemReviewService, check_uom_completeness
 
 logger = logging.getLogger(__name__)
 
@@ -248,6 +249,10 @@ class VendorItemResponse(BaseModel):
     inventory_vendor_item_id: Optional[int] = None
     synced_to_inventory: bool = False
 
+    # UOM completeness (for validation warnings)
+    uom_complete: Optional[bool] = None
+    uom_missing_fields: Optional[List[str]] = None
+
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -350,6 +355,7 @@ async def list_vendor_items(
     # Build response
     result_items = []
     for item in items:
+        uom_check = check_uom_completeness(item)
         result_items.append(VendorItemResponse(
             id=item.id,
             vendor_id=item.vendor_id,
@@ -394,6 +400,9 @@ async def list_vendor_items(
             notes=item.notes,
             inventory_vendor_item_id=item.inventory_vendor_item_id,
             synced_to_inventory=item.synced_to_inventory,
+            # UOM completeness
+            uom_complete=uom_check['is_complete'],
+            uom_missing_fields=uom_check['missing_fields'],
             created_at=item.created_at,
             updated_at=item.updated_at
         ))
@@ -414,79 +423,123 @@ async def create_vendor_item(
     """
     Create a new vendor item in Hub database.
     """
-    # Verify vendor exists
-    vendor = db.query(Vendor).filter(Vendor.id == item_data.vendor_id).first()
-    if not vendor:
-        raise HTTPException(status_code=404, detail="Vendor not found")
+    from sqlalchemy.exc import IntegrityError
 
-    # Create the vendor item
-    item = HubVendorItem(
-        vendor_id=item_data.vendor_id,
-        inventory_master_item_id=item_data.inventory_master_item_id,
-        inventory_master_item_name=item_data.inventory_master_item_name,
-        vendor_sku=item_data.vendor_sku,
-        vendor_product_name=item_data.vendor_product_name,
-        vendor_description=item_data.vendor_description,
-        purchase_unit_id=item_data.purchase_unit_id,
-        purchase_unit_name=item_data.purchase_unit_name,
-        purchase_unit_abbr=item_data.purchase_unit_abbr,
-        pack_size=item_data.pack_size,
-        conversion_factor=item_data.conversion_factor,
-        conversion_unit_id=item_data.conversion_unit_id,
-        unit_price=item_data.unit_price,
-        category=item_data.category,
-        gl_asset_account=item_data.gl_asset_account,
-        gl_cogs_account=item_data.gl_cogs_account,
-        gl_waste_account=item_data.gl_waste_account,
-        is_active=item_data.is_active,
-        is_preferred=item_data.is_preferred,
-        notes=item_data.notes
-    )
+    try:
+        # Verify vendor exists
+        vendor = db.query(Vendor).filter(Vendor.id == item_data.vendor_id).first()
+        if not vendor:
+            raise HTTPException(status_code=404, detail="Vendor not found")
 
-    db.add(item)
-    db.commit()
-    db.refresh(item)
+        # Verify purchase unit exists if provided
+        if item_data.purchase_unit_id:
+            purchase_unit = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == item_data.purchase_unit_id).first()
+            if not purchase_unit:
+                raise HTTPException(status_code=400, detail=f"Purchase unit with ID {item_data.purchase_unit_id} not found")
 
-    logger.info(f"Created vendor item {item.id}: {item.vendor_product_name}")
+        # Check for duplicate (vendor_id + vendor_sku + location_id)
+        if item_data.vendor_sku:
+            existing = db.query(HubVendorItem).filter(
+                HubVendorItem.vendor_id == item_data.vendor_id,
+                HubVendorItem.vendor_sku == item_data.vendor_sku,
+                HubVendorItem.location_id == None  # New items don't have location_id set
+            ).first()
+            if existing:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"A vendor item with SKU '{item_data.vendor_sku}' already exists for this vendor"
+                )
 
-    # Sync to Inventory
-    sync_result = await sync_vendor_item_to_inventory(item, vendor, action="sync")
-    if sync_result:
-        item.synced_to_inventory = True
-        if sync_result.get("inventory_vendor_item_id"):
-            item.inventory_vendor_item_id = sync_result["inventory_vendor_item_id"]
-        db.commit()
-        db.refresh(item)
+        # Create the vendor item
+        item = HubVendorItem(
+            vendor_id=item_data.vendor_id,
+            inventory_master_item_id=item_data.inventory_master_item_id,
+            inventory_master_item_name=item_data.inventory_master_item_name,
+            vendor_sku=item_data.vendor_sku,
+            vendor_product_name=item_data.vendor_product_name,
+            vendor_description=item_data.vendor_description,
+            purchase_unit_id=item_data.purchase_unit_id,
+            purchase_unit_name=item_data.purchase_unit_name,
+            purchase_unit_abbr=item_data.purchase_unit_abbr,
+            pack_size=item_data.pack_size,
+            conversion_factor=item_data.conversion_factor,
+            conversion_unit_id=item_data.conversion_unit_id,
+            unit_price=item_data.unit_price,
+            category=item_data.category,
+            gl_asset_account=item_data.gl_asset_account,
+            gl_cogs_account=item_data.gl_cogs_account,
+            gl_waste_account=item_data.gl_waste_account,
+            is_active=item_data.is_active,
+            is_preferred=item_data.is_preferred,
+            notes=item_data.notes
+        )
 
-    return VendorItemResponse(
-        id=item.id,
-        vendor_id=item.vendor_id,
-        vendor_name=vendor.name,
-        inventory_vendor_id=vendor.inventory_vendor_id if vendor else None,
-        inventory_master_item_id=item.inventory_master_item_id,
-        inventory_master_item_name=item.inventory_master_item_name,
-        vendor_sku=item.vendor_sku,
-        vendor_product_name=item.vendor_product_name,
-        vendor_description=item.vendor_description,
-        purchase_unit_id=item.purchase_unit_id,
-        purchase_unit_name=item.purchase_unit_name,
-        purchase_unit_abbr=item.purchase_unit_abbr,
-        pack_size=item.pack_size,
-        conversion_factor=float(item.conversion_factor) if item.conversion_factor else 1.0,
-        conversion_unit_id=item.conversion_unit_id,
-        unit_price=float(item.unit_price) if item.unit_price else None,
-        last_price=float(item.last_price) if item.last_price else None,
-        category=item.category,
-        gl_asset_account=item.gl_asset_account,
-        gl_cogs_account=item.gl_cogs_account,
-        gl_waste_account=item.gl_waste_account,
-        is_active=item.is_active,
-        is_preferred=item.is_preferred,
-        inventory_vendor_item_id=item.inventory_vendor_item_id,
-        synced_to_inventory=item.synced_to_inventory,
-        created_at=item.created_at,
-        updated_at=item.updated_at
-    )
+        try:
+            db.add(item)
+            db.commit()
+            db.refresh(item)
+        except IntegrityError as e:
+            db.rollback()
+            error_msg = str(e.orig) if hasattr(e, 'orig') else str(e)
+            logger.error(f"IntegrityError creating vendor item: {error_msg}")
+            if 'uq_vendor_item_location' in error_msg or 'duplicate' in error_msg.lower():
+                raise HTTPException(
+                    status_code=400,
+                    detail="A vendor item with this SKU already exists for this vendor"
+                )
+            elif 'foreign key' in error_msg.lower():
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid reference: purchase unit or other linked record not found"
+                )
+            raise HTTPException(status_code=400, detail=f"Database error: {error_msg}")
+
+        logger.info(f"Created vendor item {item.id}: {item.vendor_product_name}")
+
+        # Sync to Inventory
+        sync_result = await sync_vendor_item_to_inventory(item, vendor, action="sync")
+        if sync_result:
+            item.synced_to_inventory = True
+            if sync_result.get("inventory_vendor_item_id"):
+                item.inventory_vendor_item_id = sync_result["inventory_vendor_item_id"]
+            db.commit()
+            db.refresh(item)
+
+        return VendorItemResponse(
+            id=item.id,
+            vendor_id=item.vendor_id,
+            vendor_name=vendor.name,
+            inventory_vendor_id=vendor.inventory_vendor_id if vendor else None,
+            inventory_master_item_id=item.inventory_master_item_id,
+            inventory_master_item_name=item.inventory_master_item_name,
+            vendor_sku=item.vendor_sku,
+            vendor_product_name=item.vendor_product_name,
+            vendor_description=item.vendor_description,
+            purchase_unit_id=item.purchase_unit_id,
+            purchase_unit_name=item.purchase_unit_name,
+            purchase_unit_abbr=item.purchase_unit_abbr,
+            pack_size=item.pack_size,
+            conversion_factor=float(item.conversion_factor) if item.conversion_factor else 1.0,
+            conversion_unit_id=item.conversion_unit_id,
+            unit_price=float(item.unit_price) if item.unit_price else None,
+            last_price=float(item.last_price) if item.last_price else None,
+            category=item.category,
+            gl_asset_account=item.gl_asset_account,
+            gl_cogs_account=item.gl_cogs_account,
+            gl_waste_account=item.gl_waste_account,
+            is_active=item.is_active,
+            is_preferred=item.is_preferred,
+            inventory_vendor_item_id=item.inventory_vendor_item_id,
+            synced_to_inventory=item.synced_to_inventory,
+            created_at=item.created_at,
+            updated_at=item.updated_at
+        )
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions as-is
+    except Exception as e:
+        logger.error(f"Unexpected error creating vendor item: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error creating vendor item: {str(e)}")
 
 
 @router.get("/master-items")
@@ -964,6 +1017,8 @@ async def get_vendor_item(
     if not item:
         raise HTTPException(status_code=404, detail="Vendor item not found")
 
+    uom_check = check_uom_completeness(item)
+
     return VendorItemResponse(
         id=item.id,
         vendor_id=item.vendor_id,
@@ -1009,6 +1064,9 @@ async def get_vendor_item(
         notes=item.notes,
         inventory_vendor_item_id=item.inventory_vendor_item_id,
         synced_to_inventory=item.synced_to_inventory if item.synced_to_inventory is not None else False,
+        # UOM completeness
+        uom_complete=uom_check['is_complete'],
+        uom_missing_fields=uom_check['missing_fields'],
         created_at=item.created_at,
         updated_at=item.updated_at
     )
@@ -1032,6 +1090,9 @@ async def update_vendor_item(
 
     if not item:
         raise HTTPException(status_code=404, detail="Vendor item not found")
+
+    # Save original status for auto-approval check
+    original_status = item.status
 
     # Update fields
     update_data = item_data.dict(exclude_unset=True)
@@ -1062,6 +1123,15 @@ async def update_vendor_item(
         item.container = db.query(Container).filter(Container.id == item.container_id).first()
 
     logger.info(f"Updated vendor item {item.id}")
+
+    # Auto-approve if item was needs_review and UOM is now complete
+    if original_status == VendorItemStatus.needs_review:
+        uom_check = check_uom_completeness(item)
+        if uom_check['is_complete']:
+            item.status = VendorItemStatus.active
+            db.commit()
+            db.refresh(item)
+            logger.info(f"Auto-approved vendor item {item.id} - UOM is now complete")
 
     # Sync size_unit (primary UoM) to master item if updated and item is mapped
     # For VOLUME items: use Fluid Ounce (id=15) as primary for POS liquor tracking
@@ -1970,6 +2040,89 @@ async def get_containers(db: Session = Depends(get_db)):
         }
         for c in containers
     ]
+
+
+# ============================================================================
+# INVOICE HISTORY ENDPOINT
+# ============================================================================
+
+@router.get("/{vendor_item_id}/invoice-history")
+async def get_vendor_item_invoice_history(
+    vendor_item_id: int,
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_db)
+):
+    """
+    Get invoice history for a vendor item.
+
+    Returns all invoices where this vendor item appeared, with details for
+    verification purposes (invoice number, date, quantity, price, item code).
+
+    Matches by vendor + item_code OR vendor + item_description.
+    """
+    from sqlalchemy import text
+
+    # Get vendor item
+    item = db.query(HubVendorItem).filter(HubVendorItem.id == vendor_item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Vendor item not found")
+
+    # Query invoices that contain this vendor item
+    query = text("""
+        SELECT
+            i.id as invoice_id,
+            i.invoice_number,
+            i.invoice_date,
+            i.location_id,
+            ii.quantity,
+            ii.unit_price,
+            ii.item_code,
+            ii.item_description,
+            ii.total_amount
+        FROM hub_invoice_items ii
+        JOIN hub_invoices i ON ii.invoice_id = i.id
+        WHERE i.vendor_id = :vendor_id
+          AND (
+            (ii.item_code IS NOT NULL AND ii.item_code = :vendor_sku)
+            OR (ii.item_description = :vendor_product_name)
+          )
+        ORDER BY i.invoice_date DESC, i.id DESC
+        LIMIT :limit
+    """)
+
+    try:
+        results = db.execute(query, {
+            "vendor_id": item.vendor_id,
+            "vendor_sku": item.vendor_sku,
+            "vendor_product_name": item.vendor_product_name,
+            "limit": limit
+        }).fetchall()
+
+        invoices = []
+        for row in results:
+            invoices.append({
+                "invoice_id": row[0],
+                "invoice_number": row[1],
+                "invoice_date": row[2].isoformat() if row[2] else None,
+                "location_id": row[3],
+                "quantity": float(row[4]) if row[4] else None,
+                "unit_price": float(row[5]) if row[5] else None,
+                "item_code": row[6],
+                "item_description": row[7],
+                "total_amount": float(row[8]) if row[8] else None
+            })
+
+        return {
+            "vendor_item_id": vendor_item_id,
+            "product_name": item.vendor_product_name,
+            "vendor_sku": item.vendor_sku,
+            "invoices": invoices,
+            "count": len(invoices)
+        }
+
+    except Exception as e:
+        logger.error(f"Error fetching invoice history for vendor item {vendor_item_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching invoice history: {str(e)}")
 
 
 @router.get("/master-item/{master_item_id}/compatible-dimensions")

@@ -28,6 +28,41 @@ from integration_hub.models.vendor import Vendor
 logger = logging.getLogger(__name__)
 
 
+def check_uom_completeness(item: HubVendorItem) -> Dict:
+    """
+    Check if a vendor item has complete UOM (Unit of Measure) data.
+
+    Required fields for complete UOM:
+    - size_quantity: > 0
+    - size_unit_id: set (valid reference)
+    - container_id: set (valid reference)
+    - units_per_case: > 0
+
+    Returns:
+        Dict with:
+        - is_complete: bool
+        - missing_fields: list of field names that are missing/invalid
+    """
+    missing_fields = []
+
+    if not item.size_quantity or float(item.size_quantity) <= 0:
+        missing_fields.append('size_quantity')
+
+    if not item.size_unit_id:
+        missing_fields.append('size_unit_id')
+
+    if not item.container_id:
+        missing_fields.append('container_id')
+
+    if not item.units_per_case or item.units_per_case <= 0:
+        missing_fields.append('units_per_case')
+
+    return {
+        'is_complete': len(missing_fields) == 0,
+        'missing_fields': missing_fields
+    }
+
+
 class VendorItemReviewService:
     """
     Service for managing vendor item review workflow.
@@ -115,13 +150,14 @@ class VendorItemReviewService:
         Approve a vendor item for use in costing.
 
         Changes status from needs_review to active.
+        Requires complete UOM data (size_quantity, size_unit_id, container_id, units_per_case).
 
         Args:
             item_id: The vendor item ID
             approved_by: Username of person approving
 
         Returns:
-            Updated item dict
+            Updated item dict, or error dict if validation fails
         """
         item = self.db.query(HubVendorItem).filter(HubVendorItem.id == item_id).first()
         if not item:
@@ -129,6 +165,16 @@ class VendorItemReviewService:
 
         if item.status != VendorItemStatus.needs_review:
             return {'error': f'Item is not in needs_review status (current: {item.status.value})'}
+
+        # Validate UOM completeness before approval
+        uom_check = check_uom_completeness(item)
+        if not uom_check['is_complete']:
+            missing = ', '.join(uom_check['missing_fields'])
+            return {
+                'error': f'Cannot approve: Missing required UOM fields ({missing})',
+                'missing_fields': uom_check['missing_fields'],
+                'uom_incomplete': True
+            }
 
         item.status = VendorItemStatus.active
         item.updated_at = get_now()
@@ -328,6 +374,7 @@ class VendorItemReviewService:
 
     def _item_to_dict(self, item: HubVendorItem) -> Dict:
         """Convert vendor item to dict"""
+        uom_check = check_uom_completeness(item)
         return {
             'id': item.id,
             'vendor_id': item.vendor_id,
@@ -348,7 +395,10 @@ class VendorItemReviewService:
             'gl_cogs_account': item.gl_cogs_account,
             'created_at': item.created_at.isoformat() if item.created_at else None,
             'updated_at': item.updated_at.isoformat() if item.updated_at else None,
-            'notes': item.notes
+            'notes': item.notes,
+            # UOM completeness info
+            'uom_complete': uom_check['is_complete'],
+            'uom_missing_fields': uom_check['missing_fields']
         }
 
 

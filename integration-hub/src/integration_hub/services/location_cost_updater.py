@@ -29,6 +29,7 @@ from integration_hub.models.hub_vendor_item import HubVendorItem
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.models.size_unit import SizeUnit
+from integration_hub.services.vendor_item_review import check_uom_completeness
 
 logger = logging.getLogger(__name__)
 
@@ -129,6 +130,7 @@ class LocationCostUpdaterService:
             'costs_updated': 0,
             'costs_created': 0,
             'skipped_no_master_item': 0,
+            'skipped_incomplete_uom': 0,
             'errors': []
         }
 
@@ -136,7 +138,10 @@ class LocationCostUpdaterService:
             try:
                 result = self._update_item_cost(item, invoice, location_id)
                 if result.get('skipped'):
-                    stats['skipped_no_master_item'] += 1
+                    if result.get('reason') == 'incomplete_uom':
+                        stats['skipped_incomplete_uom'] += 1
+                    else:
+                        stats['skipped_no_master_item'] += 1
                 elif result.get('created'):
                     stats['costs_created'] += 1
                     stats['items_processed'] += 1
@@ -148,9 +153,13 @@ class LocationCostUpdaterService:
                 logger.error(error_msg)
                 stats['errors'].append(error_msg)
 
-        logger.info(f"Location cost update for invoice {invoice_id}: "
-                   f"{stats['costs_updated']} updated, {stats['costs_created']} created, "
-                   f"{stats['skipped_no_master_item']} skipped")
+        log_parts = [f"Location cost update for invoice {invoice_id}:",
+                     f"{stats['costs_updated']} updated, {stats['costs_created']} created"]
+        if stats['skipped_no_master_item'] > 0:
+            log_parts.append(f"{stats['skipped_no_master_item']} skipped (no master item)")
+        if stats['skipped_incomplete_uom'] > 0:
+            log_parts.append(f"{stats['skipped_incomplete_uom']} skipped (incomplete UOM)")
+        logger.info(" ".join(log_parts))
 
         return stats
 
@@ -179,6 +188,16 @@ class LocationCostUpdaterService:
         master_item_id = vendor_item.inventory_master_item_id
         if not master_item_id:
             return {'skipped': True, 'reason': 'no_master_item_id'}
+
+        # Safety check: Verify vendor item has complete UOM before updating costs
+        # This prevents incorrect cost calculations due to missing size/unit data
+        uom_check = check_uom_completeness(vendor_item)
+        if not uom_check['is_complete']:
+            logger.warning(
+                f"Skipping cost update for vendor item {vendor_item.id} ({vendor_item.vendor_product_name}): "
+                f"incomplete UOM - missing fields: {', '.join(uom_check['missing_fields'])}"
+            )
+            return {'skipped': True, 'reason': 'incomplete_uom', 'missing_fields': uom_check['missing_fields']}
 
         # Calculate cost per primary unit (lb for weight, bottle/each for count/volume)
         # Use units_per_case (Backbar-style) or fall back to deprecated pack_to_primary_factor

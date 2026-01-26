@@ -9,12 +9,14 @@ from sqlalchemy.orm import selectinload
 import httpx
 
 from maintenance.database import get_db
-from maintenance.models import Equipment, EquipmentCategory, EquipmentHistory, EquipmentStatus
+from maintenance.models import Equipment, EquipmentCategory, EquipmentHistory, EquipmentStatus, WorkOrder, WorkOrderStatus
 from maintenance.schemas import (
     EquipmentCreate, EquipmentUpdate, EquipmentResponse,
     EquipmentListResponse, EquipmentDetailResponse,
     EquipmentHistoryResponse
 )
+from pydantic import BaseModel
+from datetime import datetime as dt
 from maintenance.config import settings
 
 logger = logging.getLogger(__name__)
@@ -216,29 +218,94 @@ async def delete_equipment(equipment_id: int, db: AsyncSession = Depends(get_db)
     logger.info(f"Retired equipment: {equipment.name} (ID: {equipment.id})")
 
 
-@router.get("/{equipment_id}/history", response_model=List[EquipmentHistoryResponse])
+class CombinedHistoryItem(BaseModel):
+    """Combined history item for equipment history + work orders"""
+    id: int
+    equipment_id: int
+    changed_by: int | None = None
+    changed_by_name: str | None = None
+    change_type: str
+    old_value: str | None = None
+    new_value: str | None = None
+    notes: str | None = None
+    created_at: dt
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/{equipment_id}/history", response_model=List[CombinedHistoryItem])
 async def get_equipment_history(
     equipment_id: int,
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get equipment history"""
+    """Get equipment history including completed work orders"""
     # Verify equipment exists
     eq_query = select(Equipment.id).where(Equipment.id == equipment_id)
     result = await db.execute(eq_query)
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Equipment not found")
 
-    query = (
+    # Get equipment history records
+    history_query = (
         select(EquipmentHistory)
         .where(EquipmentHistory.equipment_id == equipment_id)
-        .order_by(EquipmentHistory.created_at.desc())
-        .offset(skip)
-        .limit(limit)
     )
-    result = await db.execute(query)
-    return result.scalars().all()
+    history_result = await db.execute(history_query)
+    history_records = history_result.scalars().all()
+
+    # Get completed work orders for this equipment
+    wo_query = (
+        select(WorkOrder)
+        .where(
+            WorkOrder.equipment_id == equipment_id,
+            WorkOrder.status.in_([WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED])
+        )
+    )
+    wo_result = await db.execute(wo_query)
+    work_orders = wo_result.scalars().all()
+
+    logger.info(f"Equipment {equipment_id}: Found {len(history_records)} history records and {len(work_orders)} work orders")
+
+    # Combine and format results
+    combined = []
+
+    # Add history records
+    for h in history_records:
+        combined.append(CombinedHistoryItem(
+            id=h.id,
+            equipment_id=h.equipment_id,
+            changed_by=h.changed_by,
+            change_type=h.change_type,
+            old_value=h.old_value,
+            new_value=h.new_value,
+            notes=h.notes,
+            created_at=h.created_at
+        ))
+
+    # Add work orders as history items
+    for wo in work_orders:
+        change_type = "work_order_cancelled" if wo.status == WorkOrderStatus.CANCELLED else "work_order"
+        notes = wo.title
+        if wo.resolution_notes:
+            notes = f"{wo.title}: {wo.resolution_notes}"
+
+        combined.append(CombinedHistoryItem(
+            id=wo.id + 100000,  # Offset to avoid ID collision
+            equipment_id=equipment_id,
+            changed_by=wo.assigned_to,
+            change_type=change_type,
+            old_value=None,
+            new_value=wo.status.value if wo.status else None,
+            notes=notes,
+            created_at=wo.completed_date or wo.created_at
+        ))
+
+    # Sort by created_at descending and apply pagination
+    combined.sort(key=lambda x: x.created_at, reverse=True)
+    return combined[skip:skip + limit]
 
 
 @router.get("/location/{location_id}/count")

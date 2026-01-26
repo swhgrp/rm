@@ -18,6 +18,7 @@ from pdf2image import convert_from_path
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.models.vendor import Vendor
+from integration_hub.models.vendor_parsing_rule import VendorParsingRule
 from sqlalchemy.orm import Session
 from sqlalchemy import text as sql_text, func
 
@@ -335,68 +336,35 @@ class InvoiceParser:
 
         self.client = OpenAI(api_key=self.api_key)
 
-    def parse_invoice_pdf(self, pdf_path: str) -> Dict:
+    def get_vendor_parsing_rules(self, vendor_id: int, db: Session) -> Optional[VendorParsingRule]:
         """
-        Parse invoice PDF using OpenAI GPT-4o Vision
+        Get vendor-specific parsing rules if they exist.
 
-        Converts PDF to images and uses vision model to extract structured data.
+        Args:
+            vendor_id: The vendor ID to look up rules for
+            db: Database session
 
         Returns:
-            Dict with structure: {
-                "success": bool,
-                "data": {...parsed invoice data...},
-                "confidence_score": float,
-                "message": str
-            }
+            VendorParsingRule or None if no rules exist
         """
-        try:
-            # Convert ALL pages of PDF to images
-            logger.info(f"Converting PDF to images: {pdf_path}")
-            images = convert_from_path(pdf_path, dpi=200)
+        return db.query(VendorParsingRule).filter(
+            VendorParsingRule.vendor_id == vendor_id,
+            VendorParsingRule.is_active == True
+        ).first()
 
-            if not images:
-                return {
-                    "success": False,
-                    "error": "Failed to convert PDF to image",
-                    "message": "PDF conversion failed"
-                }
+    def _build_ai_system_prompt(self, vendor_rules: Optional[VendorParsingRule] = None) -> str:
+        """
+        Build the AI system prompt for invoice parsing.
 
-            # Convert all pages to base64 for multi-page support
-            from io import BytesIO
-            image_data = []
-            for i, img in enumerate(images):
-                buffered = BytesIO()
-                img.save(buffered, format="PNG")
-                img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-                image_data.append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/png;base64,{img_base64}",
-                        "detail": "high"
-                    }
-                })
+        If vendor-specific rules exist, append them to the base prompt.
 
-            logger.info(f"Converted {len(images)} pages from PDF")
+        Args:
+            vendor_rules: Optional vendor-specific parsing rules
 
-            # Use GPT-4o Vision for image-based parsing
-            logger.info("Calling GPT-4o Vision API for invoice parsing")
-
-            # Build user message content with text prompt + all page images
-            page_type = "multi-page" if len(images) > 1 else "single-page"
-            user_content = [
-                {
-                    "type": "text",
-                    "text": f"Parse this restaurant supply invoice ({page_type} document with {len(images)} page(s)). Extract vendor, location, invoice details, and ALL line items from ALL pages. Make sure to capture the final totals (subtotal, tax, and total amount) which are typically on the last page."
-                }
-            ]
-            user_content.extend(image_data)
-
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """You are an expert at parsing restaurant supply invoices, including multi-page invoices.
+        Returns:
+            Complete system prompt string
+        """
+        base_prompt = """You are an expert at parsing restaurant supply invoices, including multi-page invoices.
                         You will receive one or more images representing all pages of an invoice.
                         You must extract structured data from ALL pages.
                         Return ONLY a valid JSON object with this exact structure:
@@ -462,7 +430,114 @@ class InvoiceParser:
                         - For pack_size, look for packaging info in item description or separate column
                         - If any field is not visible/present, use null
                         - Be extremely precise with numbers (quantities, prices, totals)
-                        - Return ONLY valid JSON, no explanations or markdown"""
+                        - Return ONLY valid JSON, no explanations or markdown
+
+                        *** CRITICAL - QUANTITY COLUMN SELECTION ***
+                        - Many food service invoices (Gordon Food Service, Sysco, US Foods) have MULTIPLE quantity columns:
+                          * "Qty Ord" or "Ordered" = quantity originally ordered (may differ from shipped)
+                          * "Qty Ship" or "Shipped" or "Ship" = quantity ACTUALLY SHIPPED - USE THIS ONE
+                          * "Pack Size" or "Size" = packaging info like "2x5 LB" meaning 2 bags of 5lb - THIS IS NOT QUANTITY
+                        - ALWAYS use the SHIPPED quantity (Qty Ship), NOT the ordered quantity or pack size
+                        - Pack size values like "2x5 LB", "6x1 GAL", "4x3 LB" describe PACKAGING, not quantity
+                          * "2x5 LB" = 2 bags of 5 pounds each per case
+                          * "6x1 GAL" = 6 one-gallon containers per case
+                        - The quantity field should be the NUMBER OF CASES/UNITS shipped, usually a small integer (1-10)"""
+
+        # If vendor-specific rules exist, append them
+        if vendor_rules and vendor_rules.ai_instructions:
+            vendor_instructions = f"""
+
+                        *** VENDOR-SPECIFIC INSTRUCTIONS ***
+                        The following rules are specific to this vendor's invoice format:
+
+                        {vendor_rules.ai_instructions}"""
+            base_prompt += vendor_instructions
+
+            # Add column-specific hints if provided
+            column_hints = []
+            if vendor_rules.quantity_column:
+                column_hints.append(f"- Use the \"{vendor_rules.quantity_column}\" column for quantity")
+            if vendor_rules.item_code_column:
+                column_hints.append(f"- Use the \"{vendor_rules.item_code_column}\" column for item code/SKU")
+            if vendor_rules.price_column:
+                column_hints.append(f"- Use the \"{vendor_rules.price_column}\" column for unit price")
+            if vendor_rules.pack_size_format:
+                column_hints.append(f"- Pack size format is \"{vendor_rules.pack_size_format}\" (e.g., packaging info, NOT quantity)")
+
+            if column_hints:
+                base_prompt += "\n\n                        Column mappings:\n                        " + "\n                        ".join(column_hints)
+
+        return base_prompt
+
+    def parse_invoice_pdf(self, pdf_path: str, vendor_rules: Optional[VendorParsingRule] = None) -> Dict:
+        """
+        Parse invoice PDF using OpenAI GPT-4o Vision
+
+        Converts PDF to images and uses vision model to extract structured data.
+
+        Args:
+            pdf_path: Path to the PDF file
+            vendor_rules: Optional vendor-specific parsing rules to customize the AI prompt
+
+        Returns:
+            Dict with structure: {
+                "success": bool,
+                "data": {...parsed invoice data...},
+                "confidence_score": float,
+                "message": str
+            }
+        """
+        try:
+            # Convert ALL pages of PDF to images
+            logger.info(f"Converting PDF to images: {pdf_path}")
+            images = convert_from_path(pdf_path, dpi=200)
+
+            if not images:
+                return {
+                    "success": False,
+                    "error": "Failed to convert PDF to image",
+                    "message": "PDF conversion failed"
+                }
+
+            # Convert all pages to base64 for multi-page support
+            from io import BytesIO
+            image_data = []
+            for i, img in enumerate(images):
+                buffered = BytesIO()
+                img.save(buffered, format="PNG")
+                img_base64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+                image_data.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{img_base64}",
+                        "detail": "high"
+                    }
+                })
+
+            logger.info(f"Converted {len(images)} pages from PDF")
+
+            # Use GPT-4o Vision for image-based parsing
+            logger.info("Calling GPT-4o Vision API for invoice parsing")
+
+            # Build user message content with text prompt + all page images
+            page_type = "multi-page" if len(images) > 1 else "single-page"
+            user_content = [
+                {
+                    "type": "text",
+                    "text": f"Parse this restaurant supply invoice ({page_type} document with {len(images)} page(s)). Extract vendor, location, invoice details, and ALL line items from ALL pages. Make sure to capture the final totals (subtotal, tax, and total amount) which are typically on the last page."
+                }
+            ]
+            user_content.extend(image_data)
+
+            # Build AI system prompt - with vendor rules if provided
+            system_prompt = self._build_ai_system_prompt(vendor_rules)
+
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt
                     },
                     {
                         "role": "user",
@@ -1310,8 +1385,15 @@ class InvoiceParser:
         db.commit()
 
         try:
-            # Parse with AI
-            parse_result = self.parse_invoice_pdf(invoice.pdf_path)
+            # Check if invoice already has a vendor - if so, use vendor-specific parsing rules
+            vendor_rules = None
+            if invoice.vendor_id:
+                vendor_rules = self.get_vendor_parsing_rules(invoice.vendor_id, db)
+                if vendor_rules:
+                    logger.info(f"Using vendor parsing rules for vendor_id={invoice.vendor_id} during re-parse")
+
+            # Parse with AI (with vendor rules if available)
+            parse_result = self.parse_invoice_pdf(invoice.pdf_path, vendor_rules=vendor_rules)
 
             if not parse_result["success"]:
                 invoice.status = 'pending'
@@ -1540,6 +1622,150 @@ class InvoiceParser:
             return {
                 "success": False,
                 "message": f"Error parsing invoice: {str(e)}"
+            }
+
+    def reparse_with_vendor_rules(self, invoice_id: int, db: Session) -> Dict:
+        """
+        Re-parse an invoice using vendor-specific parsing rules.
+
+        This method:
+        1. Gets the invoice and its matched vendor
+        2. Looks up vendor-specific parsing rules
+        3. Re-parses the PDF with those rules included in the AI prompt
+        4. Updates the invoice items with the new parsed data
+
+        Args:
+            invoice_id: ID of the invoice to re-parse
+            db: Database session
+
+        Returns:
+            Dict with success status and details
+        """
+        # Get invoice
+        invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+        if not invoice:
+            return {"success": False, "message": "Invoice not found"}
+
+        if not invoice.pdf_path:
+            return {"success": False, "message": "Invoice has no PDF file"}
+
+        if not invoice.vendor_id:
+            return {"success": False, "message": "Invoice has no matched vendor. Match vendor first before using vendor rules."}
+
+        # Get vendor parsing rules
+        vendor_rules = self.get_vendor_parsing_rules(invoice.vendor_id, db)
+        if not vendor_rules:
+            return {"success": False, "message": f"No parsing rules found for vendor ID {invoice.vendor_id}. Create rules first in Settings > Vendor Parsing Rules."}
+
+        # Log that we're using vendor rules
+        logger.info(f"Re-parsing invoice {invoice_id} with vendor rules for vendor_id={invoice.vendor_id}")
+        if vendor_rules.ai_instructions:
+            logger.info(f"Using AI instructions: {vendor_rules.ai_instructions[:100]}...")
+
+        # Delete existing items for re-parsing
+        existing_count = db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).count()
+        if existing_count > 0:
+            db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).delete()
+            logger.info(f"Deleted {existing_count} existing items for re-parse")
+
+        # Update status
+        invoice.status = 'mapping'
+        db.commit()
+
+        try:
+            # Re-parse with vendor rules
+            parse_result = self.parse_invoice_pdf(invoice.pdf_path, vendor_rules=vendor_rules)
+
+            if not parse_result["success"]:
+                invoice.status = 'pending'
+                db.commit()
+                return parse_result
+
+            parsed_data = parse_result["data"]
+            confidence_score = parse_result["confidence_score"]
+
+            # Update invoice with new parsed data
+            invoice.raw_data = parsed_data
+
+            # Create new invoice items
+            unmapped_count = 0
+            line_items = parsed_data.get('line_items', [])
+
+            for item_data in line_items:
+                quantity = float(item_data.get('quantity') or 0)
+                unit_price = float(item_data.get('unit_price') or 0)
+                line_total = float(item_data.get('line_total') or 0)
+
+                # Fallback: Calculate line_total if incorrect
+                calculated_total = quantity * unit_price
+                if line_total == 0 or line_total == unit_price or abs(line_total - calculated_total) > 0.02:
+                    line_total = calculated_total
+
+                # Normalize description
+                raw_description = item_data.get('description') or 'Unknown'
+                normalized_description = to_title_case(raw_description)
+
+                # Parse pack_size
+                pack_size_raw = item_data.get('pack_size')
+                pack_size_int = None
+                if pack_size_raw:
+                    import re
+                    match = re.search(r'(\d+)(?:\s*[-x/]\s*\d+)?', str(pack_size_raw))
+                    if match:
+                        pack_size_int = int(match.group(1))
+
+                invoice_item = HubInvoiceItem(
+                    invoice_id=invoice_id,
+                    line_number=item_data.get('line_number'),
+                    item_description=normalized_description,
+                    item_code=item_data.get('item_code'),
+                    quantity=quantity,
+                    unit_of_measure=item_data.get('unit'),
+                    pack_size=pack_size_int,
+                    unit_price=unit_price,
+                    total_amount=line_total,
+                    is_mapped=False
+                )
+                db.add(invoice_item)
+                unmapped_count += 1
+
+            invoice.status = 'mapping'
+            db.commit()
+
+            # Run post-processing fixes
+            upc_fix_stats = self._fix_upc_as_item_code(invoice_id, db)
+            ocr_correction_stats = self._validate_and_correct_item_codes(invoice_id, db)
+            self._normalize_item_descriptions(invoice_id, db)
+            desc_fix_stats = self._fix_ocr_by_description(invoice_id, db)
+
+            # Auto-map items
+            mapping_stats = {'mapped_count': 0, 'unmapped_count': unmapped_count}
+            try:
+                from integration_hub.services.auto_mapper import get_auto_mapper
+                mapper = get_auto_mapper(db)
+                mapping_stats = mapper.map_invoice_items(invoice_id)
+            except Exception as e:
+                logger.error(f"Error auto-mapping items: {str(e)}")
+
+            return {
+                "success": True,
+                "message": f"Invoice re-parsed with vendor rules. {len(line_items)} items, auto-mapped: {mapping_stats.get('mapped_count', 0)}",
+                "invoice_id": invoice_id,
+                "confidence_score": confidence_score,
+                "items_parsed": len(line_items),
+                "items_mapped": mapping_stats.get('mapped_count', 0),
+                "items_unmapped": mapping_stats.get('unmapped_count', 0),
+                "used_vendor_rules": True,
+                "vendor_rule_id": vendor_rules.id,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in reparse_with_vendor_rules: {str(e)}", exc_info=True)
+            invoice.status = 'pending'
+            db.commit()
+            return {
+                "success": False,
+                "message": f"Error re-parsing invoice: {str(e)}"
             }
 
 

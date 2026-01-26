@@ -1183,8 +1183,15 @@ async function saveMapping() {
                 });
 
                 if (!createResponse.ok) {
-                    const error = await createResponse.json();
-                    await showAlert(`Failed to create vendor item: ${error.detail || 'Unknown error'}`, 'Error');
+                    let errorMsg = 'Unknown error';
+                    try {
+                        const error = await createResponse.json();
+                        errorMsg = error.detail || JSON.stringify(error);
+                    } catch (e) {
+                        // Response wasn't JSON, try to get text
+                        errorMsg = await createResponse.text().catch(() => `HTTP ${createResponse.status}`);
+                    }
+                    await showAlert(`Failed to create vendor item: ${errorMsg}`, 'Error');
                     return;
                 }
 

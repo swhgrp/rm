@@ -2314,17 +2314,14 @@ async def update_item_count_units(
         if primary_unit:
             # Update existing primary count unit
             primary_unit.uom_id = primary_count_unit_id
-            primary_unit.hub_uom_id = primary_count_unit_id
             primary_unit.uom_name = uom_info.get("name")
             primary_unit.uom_abbreviation = uom_info.get("abbreviation")
-            primary_unit.uom_size = None  # Clear size info since it's now just "Bottle"
             changes_made.append(f"Updated primary count unit: {uom_info.get('name')}")
         else:
             # Create new primary count unit
             primary_unit = MasterItemCountUnit(
                 master_item_id=item_id,
                 uom_id=primary_count_unit_id,
-                hub_uom_id=primary_count_unit_id,
                 uom_name=uom_info.get("name"),
                 uom_abbreviation=uom_info.get("abbreviation"),
                 is_primary=True,

@@ -215,7 +215,7 @@
     </div>
 
     <!-- Deduplication Settings Card -->
-    <div class="card">
+    <div class="card" style="margin-bottom: 30px;">
         <div class="card-header">
             <h2><i class="bi bi-shield-check"></i> Deduplication</h2>
             <small style="color: var(--text-secondary);">Configure invoice deduplication settings</small>
@@ -249,6 +249,138 @@
                 </button>
             </div>
         </form>
+    </div>
+
+    <!-- Vendor Parsing Rules Card -->
+    <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h2><i class="bi bi-file-earmark-ruled"></i> Vendor Parsing Rules</h2>
+                <small style="color: var(--text-secondary);">Configure vendor-specific invoice parsing rules</small>
+            </div>
+            <button type="button" class="btn btn-primary btn-sm" onclick="showAddRuleModal()">
+                <i class="bi bi-plus-lg"></i> Add Rule
+            </button>
+        </div>
+
+        <div style="padding: 25px;">
+            <p style="color: var(--text-secondary); margin-bottom: 20px;">
+                Define rules for how invoices from each vendor should be parsed. Rules help the AI parser
+                correctly interpret vendor-specific formats (quantity columns, pack sizes, item codes).
+            </p>
+
+            <!-- Rules Table -->
+            <div id="parsingRulesContainer">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="parsingRulesTable">
+                        <thead>
+                            <tr>
+                                <th>Vendor</th>
+                                <th>Quantity Column</th>
+                                <th>Pack Size Format</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="parsingRulesBody">
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: var(--text-secondary);">
+                                    Loading rules...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Parsing Rule Modal -->
+<div class="modal fade" id="parsingRuleModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="parsingRuleModalTitle">Add Parsing Rule</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="parsingRuleForm">
+                <div class="modal-body">
+                    <input type="hidden" id="ruleId" value="">
+
+                    <!-- Vendor Selection -->
+                    <div class="mb-3">
+                        <label for="ruleVendorId" class="form-label">Vendor <span class="text-danger">*</span></label>
+                        <select id="ruleVendorId" class="form-select" required>
+                            <option value="">Select a vendor...</option>
+                        </select>
+                    </div>
+
+                    <div class="row">
+                        <!-- Quantity Column -->
+                        <div class="col-md-6 mb-3">
+                            <label for="ruleQuantityColumn" class="form-label">Quantity Column</label>
+                            <input type="text" id="ruleQuantityColumn" class="form-control"
+                                   placeholder="e.g., Qty Ship, Shipped">
+                            <small class="text-muted">Column name to use for quantity (not "Qty Ord" or pack size)</small>
+                        </div>
+
+                        <!-- Item Code Column -->
+                        <div class="col-md-6 mb-3">
+                            <label for="ruleItemCodeColumn" class="form-label">Item Code Column</label>
+                            <input type="text" id="ruleItemCodeColumn" class="form-control"
+                                   placeholder="e.g., Item Code, ITEM#">
+                            <small class="text-muted">Column name for SKU/item code (not UPC)</small>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <!-- Price Column -->
+                        <div class="col-md-6 mb-3">
+                            <label for="rulePriceColumn" class="form-label">Price Column</label>
+                            <input type="text" id="rulePriceColumn" class="form-control"
+                                   placeholder="e.g., Unit Price, Price">
+                            <small class="text-muted">Column name for unit/case price</small>
+                        </div>
+
+                        <!-- Pack Size Format -->
+                        <div class="col-md-6 mb-3">
+                            <label for="rulePackSizeFormat" class="form-label">Pack Size Format</label>
+                            <input type="text" id="rulePackSizeFormat" class="form-control"
+                                   placeholder="e.g., NxM UNIT">
+                            <small class="text-muted">Format pattern: "2x5 LB" = 2 bags of 5lb</small>
+                        </div>
+                    </div>
+
+                    <!-- AI Instructions -->
+                    <div class="mb-3">
+                        <label for="ruleAiInstructions" class="form-label">AI Parsing Instructions</label>
+                        <textarea id="ruleAiInstructions" class="form-control" rows="4"
+                                  placeholder="Additional instructions for the AI parser..."></textarea>
+                        <small class="text-muted">Extra instructions to help the AI correctly parse this vendor's invoices</small>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mb-3">
+                        <label for="ruleNotes" class="form-label">Notes</label>
+                        <textarea id="ruleNotes" class="form-control" rows="2"
+                                  placeholder="Internal notes about this vendor's invoice format..."></textarea>
+                    </div>
+
+                    <!-- Active Status -->
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="ruleIsActive" checked>
+                        <label class="form-check-label" for="ruleIsActive">Active</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Save Rule
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -481,5 +613,239 @@ function showAlert(message, type) {
 
 // Load settings on page load
 loadSettings();
+
+// ============================================================================
+// VENDOR PARSING RULES
+// ============================================================================
+
+let parsingRuleModal = null;
+let vendorsWithoutRules = [];
+
+// Initialize modal when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    parsingRuleModal = new bootstrap.Modal(document.getElementById('parsingRuleModal'));
+    loadParsingRules();
+});
+
+// Load all parsing rules
+async function loadParsingRules() {
+    try {
+        const response = await fetch('/hub/api/settings/vendor-parsing-rules', {
+            credentials: 'include'
+        });
+        const rules = await response.json();
+
+        const tbody = document.getElementById('parsingRulesBody');
+
+        if (rules.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; color: var(--text-secondary);">
+                        No parsing rules configured. Click "Add Rule" to create one.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        tbody.innerHTML = rules.map(rule => `
+            <tr>
+                <td>
+                    <strong>${rule.vendor_name || 'Unknown'}</strong>
+                </td>
+                <td>
+                    <code>${rule.quantity_column || '-'}</code>
+                </td>
+                <td>
+                    <code>${rule.pack_size_format || '-'}</code>
+                </td>
+                <td>
+                    ${rule.is_active
+                        ? '<span class="badge bg-success">Active</span>'
+                        : '<span class="badge bg-secondary">Inactive</span>'}
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="editParsingRule(${rule.id})" title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="deleteParsingRule(${rule.id}, '${rule.vendor_name}')" title="Delete">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+    } catch (error) {
+        console.error('Error loading parsing rules:', error);
+        document.getElementById('parsingRulesBody').innerHTML = `
+            <tr>
+                <td colspan="5" style="text-align: center; color: #E53935;">
+                    Error loading rules: ${error.message}
+                </td>
+            </tr>
+        `;
+    }
+}
+
+// Load vendors without rules (for add dropdown)
+async function loadVendorsForSelect(currentVendorId = null) {
+    try {
+        // Get vendors without rules
+        const response = await fetch('/hub/api/settings/vendors-without-rules', {
+            credentials: 'include'
+        });
+        vendorsWithoutRules = await response.json();
+
+        const select = document.getElementById('ruleVendorId');
+        select.innerHTML = '<option value="">Select a vendor...</option>';
+
+        // If editing, add the current vendor first
+        if (currentVendorId) {
+            // Fetch all rules to get the vendor name
+            const rulesResp = await fetch(`/hub/api/settings/vendor-parsing-rules/${currentVendorId}`, {
+                credentials: 'include'
+            });
+            if (rulesResp.ok) {
+                // This is a rule ID, not vendor ID - need to handle differently
+            }
+        }
+
+        vendorsWithoutRules.forEach(vendor => {
+            const option = document.createElement('option');
+            option.value = vendor.id;
+            option.textContent = vendor.name;
+            select.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error('Error loading vendors:', error);
+    }
+}
+
+// Show add rule modal
+async function showAddRuleModal() {
+    document.getElementById('parsingRuleModalTitle').textContent = 'Add Parsing Rule';
+    document.getElementById('ruleId').value = '';
+    document.getElementById('parsingRuleForm').reset();
+    document.getElementById('ruleIsActive').checked = true;
+    document.getElementById('ruleVendorId').disabled = false;
+
+    await loadVendorsForSelect();
+    parsingRuleModal.show();
+}
+
+// Edit existing rule
+async function editParsingRule(ruleId) {
+    try {
+        const response = await fetch(`/hub/api/settings/vendor-parsing-rules/${ruleId}`, {
+            credentials: 'include'
+        });
+
+        if (!response.ok) {
+            throw new Error('Rule not found');
+        }
+
+        const rule = await response.json();
+
+        document.getElementById('parsingRuleModalTitle').textContent = 'Edit Parsing Rule';
+        document.getElementById('ruleId').value = rule.id;
+
+        // Load vendors and add current vendor
+        await loadVendorsForSelect();
+        const select = document.getElementById('ruleVendorId');
+
+        // Add current vendor as first option
+        const currentOption = document.createElement('option');
+        currentOption.value = rule.vendor_id;
+        currentOption.textContent = rule.vendor_name;
+        currentOption.selected = true;
+        select.insertBefore(currentOption, select.firstChild.nextSibling);
+
+        select.value = rule.vendor_id;
+        select.disabled = true; // Can't change vendor when editing
+
+        document.getElementById('ruleQuantityColumn').value = rule.quantity_column || '';
+        document.getElementById('ruleItemCodeColumn').value = rule.item_code_column || '';
+        document.getElementById('rulePriceColumn').value = rule.price_column || '';
+        document.getElementById('rulePackSizeFormat').value = rule.pack_size_format || '';
+        document.getElementById('ruleAiInstructions').value = rule.ai_instructions || '';
+        document.getElementById('ruleNotes').value = rule.notes || '';
+        document.getElementById('ruleIsActive').checked = rule.is_active;
+
+        parsingRuleModal.show();
+
+    } catch (error) {
+        showAlert('Error loading rule: ' + error.message, 'error');
+    }
+}
+
+// Delete rule
+async function deleteParsingRule(ruleId, vendorName) {
+    if (!confirm(`Delete parsing rule for "${vendorName}"?`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hub/api/settings/vendor-parsing-rules/${ruleId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
+
+        if (response.ok) {
+            showAlert(`Parsing rule for "${vendorName}" deleted.`, 'success');
+            loadParsingRules();
+        } else {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete');
+        }
+
+    } catch (error) {
+        showAlert('Error deleting rule: ' + error.message, 'error');
+    }
+}
+
+// Save rule (create or update)
+document.getElementById('parsingRuleForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const ruleId = document.getElementById('ruleId').value;
+    const isEdit = !!ruleId;
+
+    const ruleData = {
+        vendor_id: parseInt(document.getElementById('ruleVendorId').value),
+        quantity_column: document.getElementById('ruleQuantityColumn').value || null,
+        item_code_column: document.getElementById('ruleItemCodeColumn').value || null,
+        price_column: document.getElementById('rulePriceColumn').value || null,
+        pack_size_format: document.getElementById('rulePackSizeFormat').value || null,
+        ai_instructions: document.getElementById('ruleAiInstructions').value || null,
+        notes: document.getElementById('ruleNotes').value || null,
+        is_active: document.getElementById('ruleIsActive').checked
+    };
+
+    try {
+        const url = isEdit
+            ? `/hub/api/settings/vendor-parsing-rules/${ruleId}`
+            : '/hub/api/settings/vendor-parsing-rules';
+
+        const response = await fetch(url, {
+            method: isEdit ? 'PUT' : 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(ruleData)
+        });
+
+        if (response.ok) {
+            parsingRuleModal.hide();
+            showAlert(`Parsing rule ${isEdit ? 'updated' : 'created'} successfully!`, 'success');
+            loadParsingRules();
+        } else {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to save');
+        }
+
+    } catch (error) {
+        showAlert('Error saving rule: ' + error.message, 'error');
+    }
+});
 </script>
 {% endblock %}

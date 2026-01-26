@@ -16,9 +16,11 @@ from sqlalchemy.orm import Session
 
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
+from integration_hub.models.hub_vendor_item import HubVendorItem
 from integration_hub.services.inventory_sender import InventorySenderService
 from integration_hub.services.accounting_sender import AccountingSenderService
 from integration_hub.services.location_cost_updater import LocationCostUpdaterService
+from integration_hub.services.vendor_item_review import check_uom_completeness
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +78,7 @@ class AutoSendService:
         ).all()
 
         # Validate invoice is ready
-        validation_result = self._validate_invoice_ready(invoice, items)
+        validation_result = self._validate_invoice_ready(invoice, items, db)
         if not validation_result["ready"]:
             return {
                 "success": False,
@@ -84,7 +86,8 @@ class AutoSendService:
                 "accounting_sent": False,
                 "inventory_id": None,
                 "journal_entry_id": None,
-                "errors": validation_result["errors"]
+                "errors": validation_result["errors"],
+                "incomplete_uom_items": validation_result.get("incomplete_uom_items", [])
             }
 
         logger.info(f"Auto-sending invoice {invoice.invoice_number} (ID: {invoice_id})")
@@ -259,7 +262,7 @@ class AutoSendService:
             logger.error(f"Failed to send invoice {invoice.invoice_number} to accounting: {str(e)}")
             raise
 
-    def _validate_invoice_ready(self, invoice: HubInvoice, items: list) -> Dict:
+    def _validate_invoice_ready(self, invoice: HubInvoice, items: list, db: Session) -> Dict:
         """
         Validate that invoice is ready to send
 
@@ -267,16 +270,19 @@ class AutoSendService:
         - Invoice status is 'ready'
         - All items are mapped
         - All items have GL accounts
+        - All mapped vendor items have complete UOM
         - Not already sent
 
         Args:
             invoice: HubInvoice instance
             items: List of HubInvoiceItem instances
+            db: Database session
 
         Returns:
-            Dict with "ready" bool and "errors" list
+            Dict with "ready" bool, "errors" list, and "incomplete_uom_items" list
         """
         errors = []
+        incomplete_uom_items = []
 
         # Check if already sent
         if invoice.sent_to_inventory and invoice.sent_to_accounting:
@@ -312,9 +318,32 @@ class AutoSendService:
         if items_without_gl:
             errors.append(f"{len(items_without_gl)} items are missing GL account mappings")
 
+        # Check all mapped vendor items have complete UOM
+        # Required for accurate inventory costing
+        for item in items:
+            if item.is_mapped and item.inventory_item_id:
+                vendor_item = db.query(HubVendorItem).filter(
+                    HubVendorItem.id == item.inventory_item_id
+                ).first()
+
+                if vendor_item:
+                    uom_check = check_uom_completeness(vendor_item)
+                    if not uom_check['is_complete']:
+                        incomplete_uom_items.append({
+                            'invoice_item_id': item.id,
+                            'item_description': item.item_description,
+                            'vendor_item_id': vendor_item.id,
+                            'vendor_product_name': vendor_item.vendor_product_name,
+                            'missing_fields': uom_check['missing_fields']
+                        })
+
+        if incomplete_uom_items:
+            errors.append(f"{len(incomplete_uom_items)} items have incomplete UOM (missing size/unit/container data)")
+
         return {
             "ready": len(errors) == 0,
-            "errors": errors
+            "errors": errors,
+            "incomplete_uom_items": incomplete_uom_items
         }
 
     async def retry_failed_send(self, invoice_id: int, db: Session, retry_system: str = 'both') -> Dict:

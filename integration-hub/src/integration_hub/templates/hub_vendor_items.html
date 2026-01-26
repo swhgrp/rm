@@ -446,6 +446,9 @@ async function loadVendorItems() {
 
         renderVendorItems(items);
         updatePagination();
+        // Initialize Bootstrap tooltips for UOM warnings
+        const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        tooltips.forEach(el => new bootstrap.Tooltip(el));
     } catch (error) {
         console.error('Error loading vendor items:', error);
         tbody.innerHTML = `
@@ -516,6 +519,7 @@ function generateRowHtml(item) {
 
     // Format purchasing UoM
     let purchasingUom = '-';
+    let uomWarning = '';
     if (item.units_per_case) {
         const upc = parseFloat(item.units_per_case);
         const sizeQty = parseFloat(item.size_quantity) || 0;
@@ -530,6 +534,14 @@ function generateRowHtml(item) {
         }
     } else if (item.pack_size) {
         purchasingUom = item.pack_size;
+    }
+
+    // Add warning icon if UOM is incomplete
+    if (item.uom_complete === false) {
+        const missingFields = (item.uom_missing_fields || []).join(', ');
+        uomWarning = `<i class="bi bi-exclamation-triangle-fill text-warning ms-1"
+            title="Incomplete UOM - missing: ${missingFields}"
+            data-bs-toggle="tooltip"></i>`;
     }
 
     // Format avg cost
@@ -569,14 +581,14 @@ function generateRowHtml(item) {
             </td>
             <td><small>${item.vendor_name || 'Unknown'}</small></td>
             <td>
-                <a href="vendor-item-detail?id=${item.id}" class="text-decoration-none">
+                <a href="vendor-item-detail?id=${item.id}" class="text-decoration-none" title="${escapeHtml(productName)}">
                     <strong>${escapeHtml(displayName)}</strong>
                 </a>
             </td>
             <td>${item.vendor_sku ? `<code>${escapeHtml(item.vendor_sku)}</code>` : '<span class="text-muted">-</span>'}</td>
             <td>${item.category ? `<small>${escapeHtml(item.category)}</small>` : '<span class="text-muted">-</span>'}</td>
-            <td>${displayMasterItem ? `<small>${escapeHtml(displayMasterItem)}</small>` : '<span class="text-muted">-</span>'}</td>
-            <td><small>${purchasingUom}</small></td>
+            <td>${masterItemName ? `<small title="${escapeHtml(masterItemName)}">${escapeHtml(displayMasterItem)}</small>` : '<span class="text-muted">-</span>'}</td>
+            <td><small>${purchasingUom}${uomWarning}</small></td>
             <td class="text-end" style="padding-right: 1rem;"><small>${avgCost}</small></td>
         </tr>
     `;
