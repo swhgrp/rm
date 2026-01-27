@@ -965,7 +965,8 @@
                 document.getElementById('confirmMessage').textContent = message;
 
                 const modalElement = document.getElementById('confirmModal');
-                const modal = new bootstrap.Modal(modalElement);
+                // Use getOrCreateInstance to avoid creating multiple modal instances
+                const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
                 let resolved = false;
 
                 const okBtn = document.getElementById('confirmOkBtn');
@@ -973,11 +974,23 @@
                 okBtn.disabled = false;
                 cancelBtn.disabled = false;
 
+                // Clean up any stale backdrops before showing
+                document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+
                 okBtn.onclick = function(e) {
                     if (!resolved) {
                         resolved = true;
                         modal.hide();
-                        setTimeout(() => resolve(true), 100);
+                        setTimeout(() => {
+                            // Ensure backdrop is cleaned up
+                            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                            document.body.classList.remove('modal-open');
+                            document.body.style.overflow = '';
+                            resolve(true);
+                        }, 150);
                     }
                 };
 
@@ -985,15 +998,27 @@
                     if (!resolved) {
                         resolved = true;
                         modal.hide();
-                        setTimeout(() => resolve(false), 100);
+                        setTimeout(() => {
+                            // Ensure backdrop is cleaned up
+                            document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                            document.body.classList.remove('modal-open');
+                            document.body.style.overflow = '';
+                            resolve(false);
+                        }, 150);
                     }
                 };
 
                 modalElement.addEventListener('hidden.bs.modal', function handler() {
                     modalElement.removeEventListener('hidden.bs.modal', handler);
+                    // Ensure backdrop is cleaned up when modal is hidden by any means
+                    setTimeout(() => {
+                        document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+                        document.body.classList.remove('modal-open');
+                        document.body.style.overflow = '';
+                    }, 50);
                     if (!resolved) {
                         resolved = true;
-                        setTimeout(() => resolve(false), 100);
+                        setTimeout(() => resolve(false), 150);
                     }
                 }, { once: true });
 

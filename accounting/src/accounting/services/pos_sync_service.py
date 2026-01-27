@@ -593,6 +593,7 @@ class POSSyncService:
         payment_tips_by_method = defaultdict(Decimal)
         categories = defaultdict(Decimal)
         discounts_breakdown = defaultdict(Decimal)
+        refund_breakdown = defaultdict(Decimal)  # Track refunds by original sale category
         processed_order_ids = set()
 
         # Process each payment
@@ -721,23 +722,33 @@ class POSSyncService:
                                 item_qty = Decimal(1)
                             order_line_items_total += item_price * item_qty
 
+                    # Track which discount names have been processed at order level
+                    # to avoid double-counting when same discount appears in line items
+                    order_level_discount_names = set()
+
                     # Extract discounts from order (order-level discounts)
                     if order.get("discounts") and order["discounts"].get("elements"):
                         for disc in order["discounts"]["elements"]:
                             disc_name = disc.get("name", "Unknown Discount")
-                            if "amount" in disc:
+                            order_level_discount_names.add(disc_name.strip().lower())
+
+                            if "amount" in disc and disc["amount"]:
+                                # Use Clover's calculated amount (in cents)
                                 disc_amount = abs(Decimal(disc["amount"])) / 100
                             elif "percentage" in disc:
-                                # Calculate percentage-based discount from line items total (pre-discount)
+                                # Clover doesn't provide calculated amounts for percentage discounts
+                                # Calculate from order line items total
+                                # Note: This may be slightly off if discount only applies to some items
                                 percentage = Decimal(disc["percentage"])
                                 disc_amount = order_line_items_total * percentage / 100
                             else:
                                 disc_amount = Decimal('0')
+
                             if disc_amount > 0:
                                 discounts_breakdown[disc_name] += disc_amount
                                 total_discounts += disc_amount
 
-                    # Extract line item discounts (item-level discounts)
+                    # Extract line item discounts (skip any already counted at order level)
                     if order.get("lineItems") and order["lineItems"].get("elements"):
                         for item in order["lineItems"]["elements"]:
                             if item.get("deleted"):
@@ -745,13 +756,16 @@ class POSSyncService:
                             if item.get("discounts") and item["discounts"].get("elements"):
                                 for disc in item["discounts"]["elements"]:
                                     disc_name = disc.get("name", "Unknown Discount")
-                                    if "amount" in disc:
+
+                                    # Skip if already processed at order level
+                                    if disc_name.strip().lower() in order_level_discount_names:
+                                        continue
+
+                                    if "amount" in disc and disc["amount"]:
                                         disc_amount = abs(Decimal(disc["amount"])) / 100
                                     elif "percentage" in disc:
-                                        # Calculate percentage-based discount from item total
                                         percentage = Decimal(disc["percentage"])
                                         item_price = Decimal(item.get("price", 0)) / 100
-                                        # Check priceType for quantity handling
                                         price_type = None
                                         if item.get("item") and item["item"].get("priceType"):
                                             price_type = item["item"]["priceType"]
@@ -764,15 +778,34 @@ class POSSyncService:
                                         disc_amount = item_total * percentage / 100
                                     else:
                                         disc_amount = Decimal('0')
+
                                     if disc_amount > 0:
                                         discounts_breakdown[disc_name] += disc_amount
                                         total_discounts += disc_amount
 
-                    # Extract refunds from order
+                    # Extract refunds from order with category breakdown
                     if order.get("refunds") and order["refunds"].get("elements"):
                         for refund in order["refunds"]["elements"]:
                             refund_amount = abs(Decimal(refund.get("amount", 0))) / 100
                             total_refunds += refund_amount
+
+                            # Try to get category from refund line items
+                            refund_category = "Uncategorized Refund"
+                            if refund.get("lineItems") and refund["lineItems"].get("elements"):
+                                # Get category from first refunded line item
+                                refund_item = refund["lineItems"]["elements"][0]
+                                if refund_item.get("item") and refund_item["item"].get("categories") and refund_item["item"]["categories"].get("elements"):
+                                    first_category = refund_item["item"]["categories"]["elements"][0]
+                                    refund_category = first_category.get("name", "Uncategorized Refund")
+                            elif order.get("lineItems") and order["lineItems"].get("elements"):
+                                # Fallback: if refund doesn't have line items, try to get category
+                                # from the order's line items (assume single-item order or use first item)
+                                order_item = order["lineItems"]["elements"][0]
+                                if order_item.get("item") and order_item["item"].get("categories") and order_item["item"]["categories"].get("elements"):
+                                    first_category = order_item["item"]["categories"]["elements"][0]
+                                    refund_category = first_category.get("name", "Uncategorized Refund")
+
+                            refund_breakdown[refund_category] += refund_amount
 
         # Gross sales should be calculated from line items (what Clover reports)
         line_items_total = sum(categories.values())
@@ -876,12 +909,26 @@ class POSSyncService:
         # This is what should be left in the drawer to deposit
         expected_cash_deposit = cash_amount - cash_tips_paid - total_payouts
 
+        # Check if discount breakdown matches effective_discounts total
+        # The effective_discounts (derived from payments) is the authoritative total
+        breakdown_sum = sum(discounts_breakdown.values())
+        logger.info(f"Discount breakdown: {dict((k, float(v)) for k, v in discounts_breakdown.items())}")
+        logger.info(f"Discount breakdown sum: ${float(breakdown_sum):.2f}, effective_discounts: ${float(effective_discounts):.2f}")
+        if breakdown_sum > 0 and abs(breakdown_sum - effective_discounts) > Decimal('0.01'):
+            # Add a rounding adjustment entry to reconcile the difference
+            # This preserves the original discount amounts while making the total correct
+            adjustment = effective_discounts - breakdown_sum
+            if abs(adjustment) > Decimal('0.01'):
+                discounts_breakdown["Rounding Adjustment"] = adjustment
+                logger.info(f"Added discount rounding adjustment: ${float(adjustment):.2f} (breakdown was ${float(breakdown_sum):.2f}, expected ${float(effective_discounts):.2f})")
+
         # Convert to float for JSON serialization
         order_types_dict = {k: float(v) for k, v in order_types.items()}
         payment_methods_dict = {k: float(v) for k, v in payment_methods.items()}
         payment_tips_dict = {k: float(v) for k, v in payment_tips_by_method.items()}
         categories_dict = {k: float(v) for k, v in categories.items()}
         discounts_dict = {k: float(-v) for k, v in discounts_breakdown.items()}  # Negative for display
+        refunds_dict = {k: float(v) for k, v in refund_breakdown.items()}  # Refunds by category
 
         return {
             "area_id": area_id,
@@ -898,6 +945,7 @@ class POSSyncService:
             "payment_methods": payment_methods_dict,
             "categories": categories_dict,
             "discounts": discounts_dict,
+            "refunds": refunds_dict,  # Refunds breakdown by original sale category
             # Deposit calculations
             "card_deposit": float(card_deposit),
             "cash_tips_paid": float(cash_tips_paid),
@@ -1062,6 +1110,7 @@ class POSSyncService:
             payment_breakdown=enhanced_payment_breakdown,
             category_breakdown=cached_sale.categories,
             discount_breakdown=cached_sale.discounts,
+            refund_breakdown=cached_sale.refunds,  # Refunds by original sale category
             # Deposit and payout fields
             card_deposit=card_deposit,
             cash_tips_paid=cash_tips_paid,

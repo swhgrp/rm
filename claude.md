@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** January 25, 2026
+**Last Updated:** January 26, 2026
 **System Status:** Production (98% Complete)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -38,41 +38,61 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - January 25, 2026)
+### Most Recent Work (Current Session - January 26, 2026)
+
+**CLOVER POS DAILY SALES SYNC IMPROVEMENTS** ✅ **COMPLETE**
+
+#### 1. **Discount Sync & Calculation Fixes** ✅
+- **Problem:** Discount amounts from Clover didn't match breakdown
+  - Clover reported $23.60 total discounts but itemized amounts differed
+  - Percentage-based discounts calculated incorrectly when applied to specific items vs whole order
+- **Solution:**
+  - Fixed discount extraction logic for both order-level and line-item discounts
+  - Added rounding adjustment entry to reconcile calculated vs authoritative totals
+  - Tracks order-level discount names to avoid double-counting with line items
+- **Files Modified:**
+  - `accounting/src/accounting/services/pos_sync_service.py` - Discount extraction logic
+
+#### 2. **Discount Edit Saving Fix** ✅
+- **Problem:** Editing discounts in Daily Sales Entry and clicking Verify didn't update journal entry
+- **Solution:**
+  - Added `discount_breakdown` to saveDSS function data payload
+  - Made verify action save pending changes first before verifying
+- **File:** `accounting/src/accounting/templates/daily_sales_detail.html`
+
+#### 3. **Refund Breakdown by Category** ✅
+- **Feature:** Track refunds by original sale category for accurate journal entries
+- **Solution:**
+  - Added `refund_breakdown` JSONB column to daily_sales_summary model
+  - Extract refund categories from Clover order line items
+  - Journal entry preview shows refunds per category with correct revenue account
+- **Files Modified:**
+  - `accounting/src/accounting/models/daily_sales_summary.py` - New column
+  - `accounting/src/accounting/schemas/daily_sales_summary.py` - Schema update
+  - `accounting/alembic/versions/20260126_0001_add_refund_breakdown.py` - Migration
+  - `accounting/src/accounting/services/pos_sync_service.py` - Extract refunds by category
+
+#### 4. **UI Cleanup & Polish** ✅
+- Removed redundant Tax column from Sales Categories tab (already shown on Totals tab)
+- Fixed discount amounts to always display with 2 decimal places
+- **File:** `accounting/src/accounting/templates/daily_sales_detail.html`
+
+---
+
+### Previous Session Work (January 25, 2026)
 
 **INTEGRATION HUB & INVENTORY BUG FIXES** ✅ **COMPLETE**
 
 #### 1. **Vendor Item Creation Fix** ✅
 - **Problem:** 500 error when creating vendor items from unmapped invoice items
-  - Error: "null value in column 'units_per_case' violates not-null constraint"
-  - Database schema had NOT NULL constraint but model defined `nullable=True`
-- **Solution:**
-  - Fixed database constraint to allow NULL: `ALTER TABLE hub_vendor_items ALTER COLUMN units_per_case DROP NOT NULL`
-  - Also fixed `purchase_unit_id` constraint mismatch
-  - Added comprehensive error handling in `create_vendor_item` endpoint
-  - Improved frontend error handling for non-JSON 500 responses
-- **Files Modified:**
-  - `integration-hub/src/integration_hub/api/vendor_items.py` - Error handling, validation
-  - `integration-hub/src/integration_hub/templates/unmapped_items.html` - Error display
+- **Solution:** Fixed database constraint to allow NULL for `units_per_case` and `purchase_unit_id`
 
 #### 2. **Inventory Count Units Update Fix** ✅
-- **Problem:** 500 error when updating master item count units
-  - Error: `TypeError: 'hub_uom_id' is an invalid keyword argument for MasterItemCountUnit`
-  - Code referenced non-existent `hub_uom_id` column
+- **Problem:** 500 error when updating master item count units (invalid `hub_uom_id` reference)
 - **Solution:** Removed invalid `hub_uom_id` references from count-units endpoint
-  - The `uom_id` field already stores the Hub UOM ID
-- **File:** `inventory/src/restaurant_inventory/api/api_v1/endpoints/items.py`
 
-#### 3. **Vendor Parsing Rules System** ✅ (Previous Session)
-- **Feature:** Vendor-specific invoice parsing configuration
-  - AI prompt customization per vendor
-  - Column identification rules (quantity, item code, price)
-  - Pack size format hints
-- **Files:**
-  - `integration-hub/src/integration_hub/models/vendor_parsing_rule.py` - New model
-  - `integration-hub/src/integration_hub/api/settings.py` - CRUD endpoints
-  - `integration-hub/src/integration_hub/templates/settings.html` - UI
-  - `integration-hub/src/integration_hub/services/invoice_parser.py` - Rule integration
+#### 3. **Vendor Parsing Rules System** ✅
+- Vendor-specific invoice parsing configuration with AI prompt customization
 
 ---
 

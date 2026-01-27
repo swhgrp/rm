@@ -64,6 +64,7 @@ class POSDailySalesCache(Base):
     payment_methods = Column(JSONB)  # {"credit_card": 1800.00, "cash": 500.50}
     categories = Column(JSONB)  # {"Food": 1500.00, "Beverages": 800.50}
     discounts = Column(JSONB)  # {"Employee Discount": 50.00, "Happy Hour": 100.00}
+    refunds = Column(JSONB)  # {"Merchandise": 25.00, "Food": 10.00} - refunds by category
 
     # Deposit calculation fields
     card_deposit = Column(Numeric(12, 2))  # Card payments (amount + tips - card refunds)

@@ -317,8 +317,8 @@ def create_journal_entry(
     """
     require_permission(user, 'journal_entries:create')
 
-    # Validate fiscal period is open
-    validate_fiscal_period(db, entry.entry_date)
+    # Note: Fiscal period validation is done when posting, not when creating drafts
+    # This allows users to prepare entries before fiscal periods are set up
 
     # Validate all accounts exist
     for line in entry.lines:
@@ -361,7 +361,7 @@ def create_journal_entry(
     db.refresh(new_entry)
 
     # Return with account details
-    return get_journal_entry(new_entry.id, db)
+    return get_journal_entry(new_entry.id, db, user)
 
 
 @router.post("/{entry_id}/post")

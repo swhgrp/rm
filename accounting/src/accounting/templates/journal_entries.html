@@ -280,6 +280,20 @@
             <option value="REVERSED">Reversed</option>
         </select>
 
+        <label for="referenceTypeFilter">Type:</label>
+        <select id="referenceTypeFilter" onchange="loadEntries()">
+            <option value="">All Types</option>
+            <option value="INVOICE">Invoice</option>
+            <option value="PAYMENT">Payment</option>
+            <option value="ADJUSTMENT">Adjustment</option>
+            <option value="ACCRUAL">Accrual</option>
+            <option value="DEPRECIATION">Depreciation</option>
+            <option value="PAYROLL">Payroll</option>
+            <option value="SALE">Sales/DSS</option>
+            <option value="VENDOR_BILL">Vendor Bill</option>
+            <option value="REVERSAL">Reversal</option>
+        </select>
+
         <label for="locationFilter">Location:</label>
         <select id="locationFilter" onchange="loadEntries()">
             <option value="">All Locations</option>
@@ -300,17 +314,17 @@
                 <tr>
                     <th>Entry Number</th>
                     <th>Date</th>
+                    <th>Type</th>
                     <th>Description</th>
                     <th>Location(s)</th>
                     <th>Status</th>
                     <th>Total Amount</th>
-                    <th>Created</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td colspan="7" style="text-align: center; padding: 2rem;">Loading...</td>
+                    <td colspan="8" style="text-align: center; padding: 2rem;">Loading...</td>
                 </tr>
             </tbody>
         </table>
@@ -336,6 +350,7 @@
                         <option value="ADJUSTMENT">Adjustment</option>
                         <option value="ACCRUAL">Accrual</option>
                         <option value="DEPRECIATION">Depreciation</option>
+                        <option value="PAYROLL">Payroll</option>
                     </select>
                 </div>
             </div>
@@ -459,13 +474,19 @@ async function loadEntries() {
     try {
         let url = '/accounting/api/journal-entries/?limit=100';
 
-        // Check for source filter from URL
+        // Check for source filter from URL or dropdown
         const urlParams = new URLSearchParams(window.location.search);
         const sourceFilter = urlParams.get('source');
+        const referenceTypeFilter = document.getElementById('referenceTypeFilter').value;
+
         if (sourceFilter) {
             url += `&reference_type=${sourceFilter}`;
             // Update page title based on source
             updatePageTitle(sourceFilter);
+            // Sync dropdown with URL param
+            document.getElementById('referenceTypeFilter').value = sourceFilter.toUpperCase();
+        } else if (referenceTypeFilter) {
+            url += `&reference_type=${referenceTypeFilter}`;
         }
 
         const status = document.getElementById('statusFilter').value;
@@ -537,15 +558,19 @@ function renderEntriesTable() {
         );
         const creditBadge = isCreditMemo ? '<span class="badge-credit">CREDIT</span>' : '';
 
+        // Format reference type for display
+        const refType = entry.reference_type || '-';
+        const refTypeDisplay = refType === '-' ? '-' : refType.replace(/_/g, ' ');
+
         return `
             <tr onclick="viewEntry(${entry.id})" style="cursor: pointer;">
                 <td>${entry.entry_number}${creditBadge}</td>
                 <td>${formatDate(entry.entry_date)}</td>
+                <td>${refTypeDisplay}</td>
                 <td>${entry.description}</td>
                 <td>${locationDisplay}</td>
                 <td><span class="badge status-${entry.status.toLowerCase()}">${entry.status}</span></td>
                 <td>$${totalAmount.toFixed(2)}</td>
-                <td>${formatDate(entry.created_at)}</td>
                 <td onclick="event.stopPropagation()">
                     ${entry.status === 'DRAFT' ? `
                         <button class="btn btn-success btn-sm" onclick="postEntry(${entry.id})">Post</button>
@@ -615,8 +640,8 @@ function addLineItem() {
             </select>
         </td>
         <td>
-            <select class="line-area" data-line="${lineId}">
-                <option value="">Corporate/Unassigned</option>
+            <select class="line-area" data-line="${lineId}" required>
+                <option value="">Select Location...</option>
                 ${areaOptions}
             </select>
         </td>
@@ -695,8 +720,23 @@ function updateBalance() {
     }
 }
 
+let isSubmitting = false;
+
 async function handleSubmit(event) {
     event.preventDefault();
+
+    // Prevent double submission
+    if (isSubmitting) {
+        return;
+    }
+    isSubmitting = true;
+
+    // Disable submit button
+    const submitBtn = document.querySelector('#journalEntryForm button[type="submit"]');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+    }
 
     // Collect line items
     const lines = [];
@@ -773,6 +813,14 @@ async function handleSubmit(event) {
     } catch (error) {
         console.error('Error creating journal entry:', error);
         showMessage('An error occurred', 'error');
+    } finally {
+        // Re-enable submit button
+        isSubmitting = false;
+        const submitBtn = document.querySelector('#journalEntryForm button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save as Draft';
+        }
     }
 }
 
@@ -916,8 +964,8 @@ async function correctEntry(entryId) {
                 </select>
             </td>
             <td>
-                <select class="line-area" data-line="${lineId}">
-                    <option value="">Corporate/Unassigned</option>
+                <select class="line-area" data-line="${lineId}" required>
+                    <option value="">Select Location...</option>
                     ${areaOptions}
                 </select>
             </td>

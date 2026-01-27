@@ -209,12 +209,10 @@
                         <table class="table table-sm">
                             <thead>
                                 <tr>
-                                    <th style="width: 30%;">Category</th>
-                                    <th style="width: 20%;">GL Account</th>
-                                    <th style="width: 15%; text-align: right;">Amount</th>
-                                    <th style="width: 15%; text-align: right;">Tax</th>
-                                    <th style="width: 15%; text-align: right;">Total</th>
-                                    <th style="width: 5%;"></th>
+                                    <th style="width: 35%;">Category</th>
+                                    <th style="width: 35%;">GL Account</th>
+                                    <th style="width: 20%; text-align: right;">Amount</th>
+                                    <th style="width: 10%;"></th>
                                 </tr>
                             </thead>
                             <tbody id="categoryLines">
@@ -224,8 +222,6 @@
                                 <tr style="font-weight: bold; background-color: #f8f9fa;">
                                     <td colspan="2" style="text-align: right;">TOTAL:</td>
                                     <td style="text-align: right;" id="categoryAmountTotal">$0.00</td>
-                                    <td style="text-align: right;" id="categoryTaxTotal">$0.00</td>
-                                    <td style="text-align: right;" id="categoryGrandTotal">$0.00</td>
                                     <td></td>
                                 </tr>
                             </tfoot>
@@ -748,14 +744,6 @@ function renderCategoryLines() {
                        onchange="updateCategoryLine(${index}, 'net_amount', parseFloat(this.value) || 0)">
             </td>
             <td>
-                <input type="number" step="0.01" class="form-control form-control-sm text-end"
-                       value="${line.tax_amount || 0}"
-                       onchange="updateCategoryLine(${index}, 'tax_amount', parseFloat(this.value) || 0)">
-            </td>
-            <td class="text-end" style="padding-top: 8px;">
-                ${formatCurrency((parseFloat(line.net_amount) || 0) + (parseFloat(line.tax_amount) || 0))}
-            </td>
-            <td>
                 <button class="btn btn-sm btn-outline-danger" onclick="removeCategoryLine(${index})">
                     <i class="bi bi-trash"></i>
                 </button>
@@ -794,16 +782,12 @@ function removeCategoryLine(index) {
 
 function calculateCategoryTotals() {
     let totalAmount = 0;
-    let totalTax = 0;
 
     categoryLines.forEach(line => {
         totalAmount += parseFloat(line.net_amount) || 0;
-        totalTax += parseFloat(line.tax_amount) || 0;
     });
 
     document.getElementById('categoryAmountTotal').textContent = formatCurrency(totalAmount);
-    document.getElementById('categoryTaxTotal').textContent = formatCurrency(totalTax);
-    document.getElementById('categoryGrandTotal').textContent = formatCurrency(totalAmount + totalTax);
 
     // Update gross sales
     document.getElementById('grossSales').value = totalAmount.toFixed(2);
@@ -825,10 +809,45 @@ function renderPaymentLines() {
     const tbody = document.getElementById('paymentLines');
     tbody.innerHTML = '';
 
+    // Get cash tips paid from DSS (tips paid out to employees from cash drawer)
+    const cashTipsPaid = dss ? (parseFloat(dss.cash_tips_paid) || 0) : 0;
+
+    // Find the cash payment line's deposit account for the tips paid line
+    let cashDepositAccountId = null;
+    paymentLines.forEach(line => {
+        const paymentType = (line.payment_type || '').toUpperCase();
+        if (paymentType === 'CASH') {
+            cashDepositAccountId = line.deposit_account_id;
+        }
+    });
+
+    // Get refunds amount for card deposit calculation
+    const refundsAmount = parseFloat(document.getElementById('refunds')?.value) || 0;
+
+    // Calculate total payouts
+    let totalPayouts = 0;
+    payoutLines.forEach(line => {
+        totalPayouts += parseFloat(line.amount) || 0;
+    });
+
     paymentLines.forEach((line, index) => {
         const tr = document.createElement('tr');
 
         const assetAccounts = accounts.filter(a => a.account_type === 'ASSET');
+
+        // Calculate actual deposit amount based on payment type
+        const paymentType = (line.payment_type || '').toUpperCase();
+        const amount = parseFloat(line.amount) || 0;
+        const tips = parseFloat(line.tips) || 0;
+        let totalDeposit = amount + tips;
+
+        if (paymentType === 'CASH') {
+            // Cash deposit = amount - tips paid to employees - payouts
+            totalDeposit = amount - cashTipsPaid - totalPayouts;
+        } else if (paymentType === 'CARD' || paymentType === 'CREDIT CARD' || paymentType === 'DEBIT CARD') {
+            // Card deposit = amount + tips - refunds (processor handles refunds)
+            totalDeposit = amount + tips - refundsAmount;
+        }
 
         tr.innerHTML = `
             <td>
@@ -858,8 +877,8 @@ function renderPaymentLines() {
                        value="${line.tips || 0}"
                        onchange="updatePaymentLine(${index}, 'tips', parseFloat(this.value) || 0)">
             </td>
-            <td class="text-end" style="padding-top: 8px;">
-                ${formatCurrency((parseFloat(line.amount) || 0) + (parseFloat(line.tips) || 0))}
+            <td class="text-end ${totalDeposit < 0 ? 'text-danger' : ''}" style="padding-top: 8px;">
+                ${formatCurrency(totalDeposit)}
             </td>
             <td>
                 <button class="btn btn-sm btn-outline-danger" onclick="removePaymentLine(${index})">
@@ -870,6 +889,33 @@ function renderPaymentLines() {
 
         tbody.appendChild(tr);
     });
+
+    // Show warning if net cash deposit is negative (need funds from safe)
+    if (cashTipsPaid > 0) {
+        let cashAmount = 0;
+        paymentLines.forEach(line => {
+            const paymentType = (line.payment_type || '').toUpperCase();
+            if (paymentType === 'CASH') {
+                cashAmount = parseFloat(line.amount) || 0;
+            }
+        });
+
+        const netCashDeposit = cashAmount - cashTipsPaid - totalPayouts;
+        if (netCashDeposit < 0) {
+            const warningTr = document.createElement('tr');
+            warningTr.className = 'safe-funds-warning';
+            warningTr.innerHTML = `
+                <td colspan="6">
+                    <div class="alert alert-warning mb-0 py-2">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        <strong>Safe Funds Required:</strong> Tips paid ($${cashTipsPaid.toFixed(2)}) exceed cash received.
+                        ${formatCurrency(Math.abs(netCashDeposit))} needs to come from the safe to cover tip payouts.
+                    </div>
+                </td>
+            `;
+            tbody.appendChild(warningTr);
+        }
+    }
 
     // Add datalist for payment type suggestions
     if (!document.getElementById('paymentTypeList')) {
@@ -901,15 +947,37 @@ function removePaymentLine(index) {
 function calculatePaymentTotals() {
     let totalAmount = 0;
     let totalTips = 0;
+    let totalDeposit = 0;
+
+    // Get adjustments for deposit calculations
+    const cashTipsPaid = dss ? (parseFloat(dss.cash_tips_paid) || 0) : 0;
+    const refundsAmount = parseFloat(document.getElementById('refunds')?.value) || 0;
+    let totalPayouts = 0;
+    payoutLines.forEach(line => {
+        totalPayouts += parseFloat(line.amount) || 0;
+    });
 
     paymentLines.forEach(line => {
-        totalAmount += parseFloat(line.amount) || 0;
-        totalTips += parseFloat(line.tips) || 0;
+        const amount = parseFloat(line.amount) || 0;
+        const tips = parseFloat(line.tips) || 0;
+        const paymentType = (line.payment_type || '').toUpperCase();
+
+        totalAmount += amount;
+        totalTips += tips;
+
+        // Calculate net deposit based on payment type
+        if (paymentType === 'CASH') {
+            totalDeposit += amount - cashTipsPaid - totalPayouts;
+        } else if (paymentType === 'CARD' || paymentType === 'CREDIT CARD' || paymentType === 'DEBIT CARD') {
+            totalDeposit += amount + tips - refundsAmount;
+        } else {
+            totalDeposit += amount + tips;
+        }
     });
 
     document.getElementById('paymentAmountTotal').textContent = formatCurrency(totalAmount);
     document.getElementById('paymentTipsTotal').textContent = formatCurrency(totalTips);
-    document.getElementById('paymentGrandTotal').textContent = formatCurrency(totalAmount + totalTips);
+    document.getElementById('paymentGrandTotal').textContent = formatCurrency(totalDeposit);
 
     // Update tips field
     document.getElementById('tips').value = totalTips.toFixed(2);
@@ -970,7 +1038,7 @@ function renderDiscountLines(preserveStoredDiscounts = false) {
             </td>
             <td>
                 <input type="number" step="0.01" class="form-control form-control-sm text-end"
-                       value="${line.amount}"
+                       value="${(parseFloat(line.amount) || 0).toFixed(2)}"
                        onchange="updateDiscountLine(${index}, 'amount', parseFloat(this.value) || 0)">
             </td>
             <td>
@@ -1211,27 +1279,61 @@ function generateJournalEntryPreview() {
     const discounts = parseFloat(document.getElementById('discounts').value) || 0;
 
     // DEBIT: Cash/Bank accounts (from payment lines)
-    // NOTE: Tips are excluded because they are paid out daily and don't hit the GL
+    // For CASH: debit expected_cash_deposit (cash - tips paid - payouts)
+    // For CARD: debit card_deposit (amount + tips - refunds, since processor handles refunds)
     let totalDebits = 0;
-    paymentLines.forEach(payment => {
-        const amount = parseFloat(payment.amount) || 0;
-        // Don't include tips in the journal entry - they're paid out daily
+    let totalCredits = 0;
 
-        if (amount > 0) {
+    // Get cash tips paid and payouts for calculating actual cash deposit
+    const cashTipsPaid = dss ? (parseFloat(dss.cash_tips_paid) || 0) : 0;
+    let totalPayouts = 0;
+    payoutLines.forEach(line => {
+        totalPayouts += parseFloat(line.amount) || 0;
+    });
+
+    // Get refunds - these reduce the card deposit (refunds are processed through card processor)
+    const refunds = parseFloat(document.getElementById('refunds')?.value) || 0;
+
+    paymentLines.forEach(payment => {
+        const paymentType = (payment.payment_type || '').toUpperCase();
+        const amount = parseFloat(payment.amount) || 0;
+        const paymentTips = parseFloat(payment.tips) || 0;
+
+        let depositAmount = 0;
+        let description = '';
+
+        if (paymentType === 'CASH') {
+            // Cash deposit = cash amount - tips paid to employees - payouts
+            depositAmount = amount - cashTipsPaid - totalPayouts;
+            description = 'Cash deposits (net of tips paid)';
+        } else if (paymentType === 'CARD' || paymentType === 'CREDIT CARD' || paymentType === 'DEBIT CARD') {
+            // Card deposit = amount + tips - refunds (processor handles refunds)
+            depositAmount = amount + paymentTips - refunds;
+            description = `${payment.payment_type} deposits (incl. tips, net of refunds)`;
+        } else {
+            // Other payment types - just use amount
+            depositAmount = amount;
+            description = `${payment.payment_type} deposits`;
+        }
+
+        if (depositAmount !== 0) {
             const account = accounts.find(a => a.id === payment.deposit_account_id);
             lines.push({
                 line: lineNum++,
                 account: account ? `${account.account_number} - ${account.account_name}` : 'Not Mapped',
-                description: `${payment.payment_type} deposits`,
-                debit: amount,
-                credit: 0
+                description: description,
+                debit: depositAmount > 0 ? depositAmount : 0,
+                credit: depositAmount < 0 ? Math.abs(depositAmount) : 0
             });
-            totalDebits += amount;
+            if (depositAmount > 0) {
+                totalDebits += depositAmount;
+            } else {
+                totalCredits += Math.abs(depositAmount);
+            }
         }
     });
 
     // CREDIT: Revenue accounts (from category lines)
-    let totalCredits = 0;
     categoryLines.forEach(category => {
         const amount = parseFloat(category.net_amount) || 0;
         if (amount > 0) {
@@ -1263,19 +1365,61 @@ function generateJournalEntryPreview() {
         }
     });
 
-    // DEBIT: Refunds (Sales Returns & Allowances)
-    const refunds = parseFloat(document.getElementById('refunds')?.value) || 0;
+    // DEBIT: Refunds by category (credit back the original sale category)
+    // Note: refunds already declared above for card deposit calculation
     if (refunds > 0) {
-        // Find Sales Returns & Allowances account (account 4900)
-        const refundAccount = accounts.find(a => a.account_name.includes('Returns') || a.account_name.includes('Allowances'));
-        lines.push({
-            line: lineNum++,
-            account: refundAccount ? `${refundAccount.account_number} - ${refundAccount.account_name}` : '4900 - Sales Returns & Allowances',
-            description: 'Sales refunds',
-            debit: refunds,
-            credit: 0
-        });
-        totalDebits += refunds;
+        // Check if we have refund breakdown by category (from Clover import)
+        const refundBreakdown = dss ? dss.refund_breakdown : null;
+
+        if (refundBreakdown && Object.keys(refundBreakdown).length > 0) {
+            // Use refund breakdown - debit the correct revenue account for each category
+            for (const [categoryName, refundAmount] of Object.entries(refundBreakdown)) {
+                if (refundAmount > 0) {
+                    // Find the category line to get its revenue account
+                    const categoryLine = categoryLines.find(c =>
+                        c.category && c.category.toUpperCase() === categoryName.toUpperCase()
+                    );
+                    let refundAccount = null;
+                    let accountDisplay = '';
+
+                    if (categoryLine && categoryLine.revenue_account_id) {
+                        refundAccount = accounts.find(a => a.id === categoryLine.revenue_account_id);
+                    }
+
+                    if (refundAccount) {
+                        accountDisplay = `${refundAccount.account_number} - ${refundAccount.account_name}`;
+                    } else {
+                        // Fallback to generic refund account
+                        const genericRefundAccount = accounts.find(a =>
+                            a.account_name.includes('Returns') || a.account_name.includes('Allowances')
+                        );
+                        accountDisplay = genericRefundAccount
+                            ? `${genericRefundAccount.account_number} - ${genericRefundAccount.account_name}`
+                            : '4900 - Sales Returns & Allowances';
+                    }
+
+                    lines.push({
+                        line: lineNum++,
+                        account: accountDisplay,
+                        description: `Refund - ${categoryName}`,
+                        debit: refundAmount,
+                        credit: 0
+                    });
+                    totalDebits += refundAmount;
+                }
+            }
+        } else {
+            // Fallback: no breakdown available, use generic refund account
+            const refundAccount = accounts.find(a => a.account_name.includes('Returns') || a.account_name.includes('Allowances'));
+            lines.push({
+                line: lineNum++,
+                account: refundAccount ? `${refundAccount.account_number} - ${refundAccount.account_name}` : '4900 - Sales Returns & Allowances',
+                description: 'Sales refunds',
+                debit: refunds,
+                credit: 0
+            });
+            totalDebits += refunds;
+        }
     }
 
     // CREDIT: Sales Tax Payable
@@ -1584,6 +1728,15 @@ async function saveDSS() {
             return;
         }
 
+        // Build discount breakdown from discountLines
+        const discountBreakdown = {};
+        discountLines.forEach(line => {
+            if (line.discount_name && line.amount) {
+                // Store as negative values (matching how they're stored in the database)
+                discountBreakdown[line.discount_name] = -Math.abs(parseFloat(line.amount) || 0);
+            }
+        });
+
         const data = {
             business_date: businessDate,
             area_id: areaId,
@@ -1596,6 +1749,7 @@ async function saveDSS() {
             tips: parseFloat(document.getElementById('tips').value) || 0,
             total_collected: parseFloat(document.getElementById('totalCollected').value) || 0,
             notes: document.getElementById('notes').value || null,
+            discount_breakdown: discountBreakdown,
             line_items: categoryLines.map(line => ({
                 category: line.category,
                 revenue_account_id: line.revenue_account_id,
@@ -1657,6 +1811,9 @@ async function verifyDSS() {
     }
 
     try {
+        // Save any pending changes first (including discount edits)
+        await saveDSS();
+
         const response = await fetch(`/accounting/api/daily-sales/${dss.id}/verify`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1723,17 +1880,46 @@ async function postDSS() {
         let totalDebits = 0;
         let totalCredits = 0;
 
-        // Sum payment debits (exclude tips - they're paid out daily)
+        // Get cash tips paid and payouts for calculating actual deposits
+        const cashTipsPaid = dss ? (parseFloat(dss.cash_tips_paid) || 0) : 0;
+        let totalPayouts = 0;
+        payoutLines.forEach(line => {
+            totalPayouts += parseFloat(line.amount) || 0;
+        });
+
+        // Get refunds - these reduce card deposits (processor handles refunds)
+        const refunds = parseFloat(document.getElementById('refunds')?.value) || 0;
+
+        // Sum payment debits using actual deposit amounts
         paymentLines.forEach(payment => {
+            const paymentType = (payment.payment_type || '').toUpperCase();
             const amount = parseFloat(payment.amount) || 0;
-            // Don't include tips - they're paid out daily and don't hit the GL
-            totalDebits += amount;
+            const paymentTips = parseFloat(payment.tips) || 0;
+
+            if (paymentType === 'CASH') {
+                // Cash deposit = amount - tips paid - payouts
+                const cashDeposit = amount - cashTipsPaid - totalPayouts;
+                if (cashDeposit > 0) {
+                    totalDebits += cashDeposit;
+                } else if (cashDeposit < 0) {
+                    totalCredits += Math.abs(cashDeposit);
+                }
+            } else if (paymentType === 'CARD' || paymentType === 'CREDIT CARD' || paymentType === 'DEBIT CARD') {
+                // Card deposit = amount + tips - refunds (processor handles refunds)
+                totalDebits += amount + paymentTips - refunds;
+            } else {
+                totalDebits += amount;
+            }
         });
 
         // Sum discount debits
         discountLines.forEach(discount => {
             totalDebits += parseFloat(discount.amount) || 0;
         });
+
+        // Add refunds debit (Sales Returns & Allowances)
+        // Note: refunds already declared above for card deposit calculation
+        totalDebits += refunds;
 
         // Sum category credits
         categoryLines.forEach(category => {
@@ -1951,6 +2137,36 @@ function selectVarianceAccount(accountId, accountText) {
 
 .cursor-pointer {
     cursor: pointer;
+}
+
+/* Tips Paid system-generated row styling */
+.tips-paid-row {
+    background-color: rgba(13, 110, 253, 0.1) !important;
+    border-left: 3px solid #0d6efd;
+}
+
+.tips-paid-row td {
+    font-style: italic;
+}
+
+/* Refunds (Card) system-generated row styling */
+.refunds-card-row {
+    background-color: rgba(255, 193, 7, 0.1) !important;
+    border-left: 3px solid #ffc107;
+}
+
+.refunds-card-row td {
+    font-style: italic;
+}
+
+.safe-funds-warning td {
+    padding: 0 !important;
+    border: none !important;
+}
+
+.safe-funds-warning .alert {
+    border-radius: 0;
+    margin-top: -1px;
 }
 </style>
 {% endblock %}

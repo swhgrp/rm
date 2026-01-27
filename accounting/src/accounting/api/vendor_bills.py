@@ -14,6 +14,7 @@ from accounting.models.vendor_bill import VendorBill, VendorBillLine, BillPaymen
 from accounting.models.journal_entry import JournalEntry, JournalEntryLine, JournalEntryStatus
 from accounting.models.account import Account
 from accounting.models.area import Area
+from accounting.models.fiscal_period import FiscalPeriod, FiscalPeriodStatus
 from accounting.schemas.vendor_bill import (
     VendorBillCreate,
     VendorBillUpdate,
@@ -33,6 +34,34 @@ router = APIRouter(prefix="/api/vendor-bills", tags=["vendor_bills"])
 
 # Accounts Payable account ID (2100 - Account Payable)
 AP_ACCOUNT_ID = 17
+
+
+def validate_fiscal_period(db: Session, entry_date: date, action: str = "create bill"):
+    """Validate that a fiscal period exists and is open for the given date"""
+    period = db.query(FiscalPeriod).filter(
+        FiscalPeriod.start_date <= entry_date,
+        FiscalPeriod.end_date >= entry_date
+    ).first()
+
+    if not period:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No fiscal period found for date {entry_date}. Please create fiscal periods before attempting to {action}."
+        )
+
+    if period.status == FiscalPeriodStatus.CLOSED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Fiscal period {period.period_name} is closed. Cannot {action}."
+        )
+
+    if period.status == FiscalPeriodStatus.LOCKED:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Fiscal period {period.period_name} is locked. Cannot {action}."
+        )
+
+    return period
 
 
 def create_bill_journal_entry(bill: VendorBill, db: Session) -> JournalEntry:
@@ -195,6 +224,9 @@ def create_vendor_bill(
         area = db.query(Area).filter(Area.id == bill_data.area_id).first()
         if not area:
             raise HTTPException(status_code=404, detail=f"Area {bill_data.area_id} not found")
+
+    # Note: Fiscal period validation is done when approving, not when creating drafts
+    # This allows users to enter bills before fiscal periods are set up
 
     # Check for duplicate bill number for this vendor
     existing_bill = db.query(VendorBill).filter(
@@ -569,6 +601,9 @@ def approve_bill(
         raise HTTPException(status_code=400, detail=f"Bill must be PENDING_APPROVAL to approve/reject")
 
     if approval_data.approve:
+        # Validate fiscal period is open for the bill date before creating journal entry
+        validate_fiscal_period(db, bill.bill_date, "approve bill")
+
         # Approve bill
         bill.status = BillStatus.APPROVED
         bill.approved_by = current_user.id
@@ -706,6 +741,9 @@ def create_bill_payment(
     bank_account = db.query(Account).filter(Account.id == payment_data.bank_account_id).first()
     if not bank_account:
         raise HTTPException(status_code=404, detail=f"Bank account {payment_data.bank_account_id} not found")
+
+    # Validate fiscal period is open for the payment date
+    validate_fiscal_period(db, payment_data.payment_date, "record payment")
 
     # Create payment record
     payment = BillPayment(

@@ -79,6 +79,7 @@ class DailySalesSummaryBase(BaseModel):
     payment_breakdown: Optional[Dict[str, Any]] = None
     category_breakdown: Optional[Dict[str, Any]] = None
     discount_breakdown: Optional[Dict[str, Any]] = None
+    refund_breakdown: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
     imported_from: Optional[str] = None
     imported_from_pos: Optional[bool] = False
@@ -109,6 +110,7 @@ class DailySalesSummaryUpdate(BaseModel):
     payment_breakdown: Optional[Dict[str, Any]] = None
     category_breakdown: Optional[Dict[str, Any]] = None
     discount_breakdown: Optional[Dict[str, Any]] = None
+    refund_breakdown: Optional[Dict[str, Any]] = None
     notes: Optional[str] = None
     line_items: Optional[List[SalesLineItemCreate]] = None
     payments: Optional[List[SalesPaymentCreate]] = None

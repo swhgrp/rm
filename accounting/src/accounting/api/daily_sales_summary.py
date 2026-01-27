@@ -78,6 +78,11 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
     lines = []
     line_number = 1
 
+    # Get adjustments for deposit calculations
+    cash_tips_paid = dss.cash_tips_paid or Decimal("0.00")
+    cash_payouts = dss.cash_payouts or Decimal("0.00")
+    total_refunds = dss.refunds or Decimal("0.00")
+
     # DEBIT: Payment methods (Cash, Credit Card, etc.) - Asset accounts
     if dss.payments:
         for payment in dss.payments:
@@ -93,18 +98,31 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
                         detail=f"No deposit account specified for payment type: {payment.payment_type}"
                     )
 
-                # Tips are excluded from journal entry because they are paid out daily
-                # Only the payment amount (not tips) goes to the deposit account
-                lines.append(JournalEntryLine(
-                    journal_entry_id=je.id,
-                    line_number=line_number,
-                    account_id=account_id,
-                    area_id=dss.area_id,
-                    description=f"{payment.payment_type} deposits",
-                    debit_amount=payment.amount,  # Exclude tips - they're paid out daily
-                    credit_amount=Decimal("0.00")
-                ))
-                line_number += 1
+                # Calculate actual deposit amount based on payment type
+                payment_type_upper = payment.payment_type.upper()
+                if payment_type_upper == 'CASH':
+                    # Cash deposit = amount - tips paid to employees - payouts
+                    deposit_amount = payment.amount - cash_tips_paid - cash_payouts
+                    description = "Cash deposits (net of tips paid)"
+                elif payment_type_upper in ('CARD', 'CREDIT CARD', 'DEBIT CARD'):
+                    # Card deposit = amount + tips - refunds (processor handles refunds)
+                    deposit_amount = payment.amount + (payment.tips or Decimal("0.00")) - total_refunds
+                    description = f"{payment.payment_type} deposits (incl. tips, net of refunds)"
+                else:
+                    deposit_amount = payment.amount
+                    description = f"{payment.payment_type} deposits"
+
+                if deposit_amount != 0:
+                    lines.append(JournalEntryLine(
+                        journal_entry_id=je.id,
+                        line_number=line_number,
+                        account_id=account_id,
+                        area_id=dss.area_id,
+                        description=description,
+                        debit_amount=deposit_amount if deposit_amount > 0 else Decimal("0.00"),
+                        credit_amount=abs(deposit_amount) if deposit_amount < 0 else Decimal("0.00")
+                    ))
+                    line_number += 1
     elif dss.payment_breakdown:
         # Use JSONB breakdown if no detailed payment records
         for payment_type, amount in dss.payment_breakdown.items():
@@ -119,16 +137,32 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
                         detail=f"No deposit account specified for payment type: {payment_type}"
                     )
 
-                lines.append(JournalEntryLine(
-                    journal_entry_id=je.id,
-                    line_number=line_number,
-                    account_id=account_id,
-                    area_id=dss.area_id,
-                    description=f"{payment_type} deposits",
-                    debit_amount=Decimal(str(amount)),
-                    credit_amount=Decimal("0.00")
-                ))
-                line_number += 1
+                # Calculate actual deposit amount based on payment type
+                payment_type_upper = payment_type.upper()
+                base_amount = Decimal(str(amount))
+                if payment_type_upper == 'CASH':
+                    # Cash deposit = amount - tips paid to employees - payouts
+                    deposit_amount = base_amount - cash_tips_paid - cash_payouts
+                    description = "Cash deposits (net of tips paid)"
+                elif payment_type_upper in ('CARD', 'CREDIT CARD', 'DEBIT CARD'):
+                    # Card deposit = amount - refunds (tips not in breakdown, refunds processed by card processor)
+                    deposit_amount = base_amount - total_refunds
+                    description = f"{payment_type} deposits (net of refunds)"
+                else:
+                    deposit_amount = base_amount
+                    description = f"{payment_type} deposits"
+
+                if deposit_amount != 0:
+                    lines.append(JournalEntryLine(
+                        journal_entry_id=je.id,
+                        line_number=line_number,
+                        account_id=account_id,
+                        area_id=dss.area_id,
+                        description=description,
+                        debit_amount=deposit_amount if deposit_amount > 0 else Decimal("0.00"),
+                        credit_amount=abs(deposit_amount) if deposit_amount < 0 else Decimal("0.00")
+                    ))
+                    line_number += 1
 
     # CREDIT: Revenue by category
     if dss.line_items:
@@ -278,37 +312,80 @@ def create_sales_journal_entry(dss: DailySalesSummary, db: Session, post_request
                 ))
                 line_number += 1
 
-    # DEBIT: Refunds (contra-revenue account - Sales Returns & Allowances)
+    # DEBIT: Refunds by category (debit the original sale category's revenue account)
     if dss.refunds and dss.refunds > 0:
-        # Find or create Sales Returns & Allowances account (contra-revenue)
-        refund_account = db.query(Account).filter(
-            Account.account_type == "REVENUE",
-            Account.account_name.ilike("%return%")
-        ).first()
+        refund_added = False
 
-        if not refund_account:
-            # Try to find any contra-revenue account
+        # Check if we have refund breakdown by category
+        if dss.refund_breakdown and isinstance(dss.refund_breakdown, dict):
+            # Build a lookup from category name to revenue account
+            category_account_map = {}
+            if dss.line_items:
+                for line_item in dss.line_items:
+                    if line_item.category and line_item.revenue_account_id:
+                        category_account_map[line_item.category.upper()] = line_item.revenue_account_id
+
+            for category_name, refund_amount in dss.refund_breakdown.items():
+                if refund_amount and Decimal(str(refund_amount)) > 0:
+                    # Try to find the revenue account for this category
+                    account_id = category_account_map.get(category_name.upper())
+
+                    if not account_id:
+                        # Fallback: find a generic refund account
+                        refund_account = db.query(Account).filter(
+                            Account.account_type == "REVENUE",
+                            Account.account_name.ilike("%return%")
+                        ).first()
+                        if not refund_account:
+                            refund_account = db.query(Account).filter(
+                                Account.account_type == "REVENUE",
+                                Account.account_name.ilike("%allowance%")
+                            ).first()
+                        if refund_account:
+                            account_id = refund_account.id
+
+                    if account_id:
+                        lines.append(JournalEntryLine(
+                            journal_entry_id=je.id,
+                            line_number=line_number,
+                            account_id=account_id,
+                            area_id=dss.area_id,
+                            description=f"Refund - {category_name}",
+                            debit_amount=Decimal(str(refund_amount)),
+                            credit_amount=Decimal("0.00")
+                        ))
+                        line_number += 1
+                        refund_added = True
+
+        # Fallback: no breakdown or couldn't process - use generic refund account
+        if not refund_added:
             refund_account = db.query(Account).filter(
                 Account.account_type == "REVENUE",
-                Account.account_name.ilike("%allowance%")
+                Account.account_name.ilike("%return%")
             ).first()
 
-        if not refund_account:
-            raise HTTPException(
-                status_code=400,
-                detail="No Sales Returns & Allowances account found. Please create a contra-revenue account."
-            )
+            if not refund_account:
+                refund_account = db.query(Account).filter(
+                    Account.account_type == "REVENUE",
+                    Account.account_name.ilike("%allowance%")
+                ).first()
 
-        lines.append(JournalEntryLine(
-            journal_entry_id=je.id,
-            line_number=line_number,
-            account_id=refund_account.id,
-            area_id=dss.area_id,
-            description="Sales refunds",
-            debit_amount=dss.refunds,
-            credit_amount=Decimal("0.00")
-        ))
-        line_number += 1
+            if not refund_account:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No Sales Returns & Allowances account found. Please create a contra-revenue account."
+                )
+
+            lines.append(JournalEntryLine(
+                journal_entry_id=je.id,
+                line_number=line_number,
+                account_id=refund_account.id,
+                area_id=dss.area_id,
+                description="Sales refunds",
+                debit_amount=dss.refunds,
+                credit_amount=Decimal("0.00")
+            ))
+            line_number += 1
 
     # Add all lines to JE
     je.lines = lines

@@ -579,9 +579,13 @@ async function handleCreateYear(event) {
 
     const year = parseInt(document.getElementById('createYear').value);
 
-    if (!await showConfirm(`Create all 12 monthly periods for year ${year}?`, 'Create Annual Periods')) {
+    // Use native confirm to avoid z-index conflicts with custom modal
+    if (!confirm(`Create all 12 monthly periods for year ${year}?`)) {
         return;
     }
+
+    // Close the modal
+    closeCreateYearModal();
 
     try {
         const response = await fetch(`/accounting/api/fiscal-periods/create-year/${year}`, {
@@ -591,7 +595,6 @@ async function handleCreateYear(event) {
         if (response.ok) {
             const result = await response.json();
             showMessage(result.message, 'success');
-            closeCreateYearModal();
             await loadPeriods();
         } else {
             const error = await response.json();

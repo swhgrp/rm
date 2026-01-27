@@ -1,6 +1,6 @@
 # Restaurant Management System - Consolidated TODO
 
-**Last Updated:** January 25, 2026
+**Last Updated:** January 26, 2026
 
 ## Priority Legend
 - P0: Critical - Blocking production use
@@ -13,9 +13,52 @@
 ## 🔥 Immediate Needs (Active Investigation)
 
 ### P0 - Investigate Now
+- [ ] **Rework Inventory Master Items UOM display** - Current UOM presentation is confusing; need clearer UI for primary count unit vs purchase unit vs cost unit relationships
 - [ ] **Why can Inventory edit vendor items?** - Vendor items should be Hub-only; check if Inventory has edit UI that should be removed or redirected to Hub
 - [ ] **Check Flap Meat pricing** - Compare pricing in Hub vs Inventory; verify cost propagation is working correctly
 - [ ] **Weight-based invoice items** - Need solution for items that come in on invoice by weight (variable quantity); current system assumes fixed units
+
+---
+
+## 🔒 Security Audit Findings (Jan 25, 2026)
+
+Full report: `SECURITY_AUDIT_REPORT.md`
+
+### P0 - Critical Security (Immediate)
+- [ ] **Rotate exposed OpenAI API key** - Key exposed in integration-hub/.env file
+- [ ] **Remove hardcoded database credentials** - Found in integration-hub/main.py (dblink queries), accounting_sender.py, database.py defaults
+- [ ] **Encrypt Plaid/Clover API tokens** - Stored plaintext in accounting/models/bank_account.py and pos.py
+- [ ] **Add auth to Accounting accounts endpoints** - GET /api/accounts/ has no authentication (accounting/api/accounts.py:54-103)
+- [ ] **Fix session cookie security** - Set secure=True in portal/main.py:84
+- [ ] **Enable SSL verification** - Disabled in files/api/onlyoffice.py:259 (verify=False)
+- [ ] **Fix path traversal in file operations** - String replacement vulnerability in files/api/filemanager.py:971,1093
+- [ ] **Remove weak secret key defaults** - portal/config.py and events/core/security.py have placeholder defaults
+
+### P1 - High Security
+- [ ] **Add auth to Inventory update endpoint** - inventory/api/inventory.py:270-304 missing authorization
+- [ ] **Add auth to check batch preview** - accounting/api/payments.py:289-316 no auth
+- [ ] **Add location-based access on HR delete** - hr/endpoints/employees.py:399-421 admin can delete any employee
+- [ ] **Protect internal employee endpoint** - hr/endpoints/employees.py:835-862 marked "no auth required"
+- [ ] **Fix weak password sync auth** - events/api/auth.py:151-176 uses simple string comparison
+- [ ] **Add auth to Hub settings API** - integration-hub/api/settings.py:44-436 exposes email credentials
+- [ ] **Fix mass assignment vulnerability** - inventory/api/inventory.py uses setattr without field whitelist
+- [ ] **Remove bare except clauses** - integration-hub/services/email_monitor.py:233,309 and accounting/services/csv_parser.py:243,260,284
+- [ ] **Fix command injection in CalDAV sync** - events/services/caldav_sync_service.py:285-286
+- [ ] **Encrypt email password storage** - integration-hub/services/email_monitor.py:56 stores plaintext
+- [ ] **Fix exception info disclosure** - Multiple endpoints expose internal errors to clients
+- [ ] **Fix race condition in email processing** - integration-hub/services/email_monitor.py:289-294
+
+### P2 - Medium Security
+- [ ] **Enable hCaptcha on public intake form** - Disabled in events/api/public.py:42
+- [ ] **Add rate limiting on public endpoints** - events/api/public.py, files/api/shares.py
+- [ ] **Remove debug endpoint** - portal/main.py:474-495 exposes user info
+- [ ] **Add CSRF protection** - portal/main.py:743-805 missing CSRF tokens
+- [ ] **Fix CORS wildcard** - files/core/config.py:26 allows all origins
+- [ ] **Fix division by zero risks** - inventory/models/master_item_count_unit.py:101-109, inventory/api/items.py:2161
+- [ ] **Add null checks after DB queries** - Multiple files assume .first() returns non-None
+- [ ] **Strengthen password validation** - inventory/api/auth.py:375-380 only requires 8 chars
+- [ ] **Fix health check info disclosure** - accounting/main.py:172-188 exposes system config
+- [ ] **Add file upload validation** - accounting/api/bank_accounts.py missing type/size checks
 
 ---
 
@@ -269,6 +312,10 @@
 ## Recently Completed (Reference)
 
 ### January 2026
+- [x] **Clover POS Discount Sync Fix** (Accounting) - Jan 26: Fixed discount calculation for percentage-based discounts, added rounding adjustment for variances, prevented double-counting of order vs line-item discounts
+- [x] **Discount Edit Saving Fix** (Accounting) - Jan 26: Fixed discount edits not saving to journal entries - added discount_breakdown to save payload and made verify save first
+- [x] **Refund Breakdown by Category** (Accounting) - Jan 26: Track refunds by original sale category for accurate journal entries - new refund_breakdown JSONB column
+- [x] **Daily Sales UI Cleanup** (Accounting) - Jan 26: Removed redundant Tax column from Sales Categories tab, fixed discount amounts to always show 2 decimal places
 - [x] **Vendor Item Creation Fix** (Hub) - Jan 25: Fixed 500 error when creating vendor items - database constraint mismatch for `units_per_case` and `purchase_unit_id` columns
 - [x] **Count Units Update Fix** (Inventory) - Jan 25: Fixed 500 error when updating master item count units - removed invalid `hub_uom_id` references
 - [x] **Vendor Parsing Rules** (Hub) - Jan 25: Added vendor-specific invoice parsing rules system with AI prompt customization, column identification, and pack size format hints

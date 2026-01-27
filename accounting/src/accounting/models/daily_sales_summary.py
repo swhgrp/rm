@@ -37,6 +37,9 @@ class DailySalesSummary(Base):
     discount_breakdown = Column(JSONB, nullable=True)
     # Example: {"employee_discount": 50.00, "happy_hour": 100.00}
 
+    refund_breakdown = Column(JSONB, nullable=True)
+    # Example: {"Merchandise": 25.00, "Food": 10.00} - refunds by original sale category
+
     # Deposit fields - for reconciliation
     card_deposit = Column(Numeric(15, 2), nullable=True)  # Card payments (amount + tips - refunds)
     cash_tips_paid = Column(Numeric(15, 2), nullable=True, server_default="0.00")  # Cash tips paid out to employees
