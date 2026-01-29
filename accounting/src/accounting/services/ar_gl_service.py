@@ -29,7 +29,8 @@ class ARGLService:
     """Service to automate GL posting for AR transactions"""
 
     # Standard AR account codes - these should be configured per business
-    AR_ACCOUNT_NUMBER = "1200"  # Accounts Receivable
+    AR_ACCOUNT_NUMBER = "1210"  # Account Receivable
+    SALES_TAX_PAYABLE_ACCOUNT_NUMBER = "2300"  # Sales Tax Payable
     CUSTOMER_DEPOSITS_ACCOUNT_NUMBER = "2100"  # Customer Deposits (liability)
 
     def __init__(self, db: Session):
@@ -42,9 +43,9 @@ class ARGLService:
         ).first()
 
         if not account:
-            # Try to find by account type
+            # Try to find by name
             account = self.db.query(Account).filter(
-                Account.account_type == AccountType.ACCOUNTS_RECEIVABLE
+                Account.account_name.ilike("%account receivable%")
             ).first()
 
         if not account:
@@ -138,7 +139,7 @@ class ARGLService:
         journal_entry = JournalEntry(
             entry_number=entry_number,
             entry_date=invoice.invoice_date,
-            description=f"Customer Invoice {invoice.invoice_number} - {invoice.customer.name if invoice.customer else 'Unknown'}",
+            description=f"Customer Invoice {invoice.invoice_number} - {invoice.customer.customer_name if invoice.customer else 'Unknown'}",
             reference_type="CUSTOMER_INVOICE",
             reference_id=invoice.id,
             location_id=invoice.area_id,
@@ -183,7 +184,7 @@ class ARGLService:
         if invoice.tax_amount > 0:
             # Find Sales Tax Payable account
             tax_account = self.db.query(Account).filter(
-                Account.account_number == "2150"  # Standard sales tax payable account
+                Account.account_number == self.SALES_TAX_PAYABLE_ACCOUNT_NUMBER
             ).first()
 
             if not tax_account:

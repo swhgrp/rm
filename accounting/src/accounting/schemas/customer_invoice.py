@@ -111,6 +111,8 @@ class CustomerInvoiceCreate(CustomerInvoiceBase):
 
 
 class CustomerInvoiceUpdate(BaseModel):
+    customer_id: Optional[int] = None
+    area_id: Optional[int] = None
     invoice_number: Optional[str] = None
     invoice_date: Optional[date] = None
     due_date: Optional[date] = None
@@ -118,13 +120,17 @@ class CustomerInvoiceUpdate(BaseModel):
     event_type: Optional[str] = None
     event_location: Optional[str] = None
     guest_count: Optional[int] = Field(None, ge=0)
+    is_tax_exempt: Optional[bool] = None
+    tax_rate: Optional[Decimal] = Field(None, ge=0, le=100)
     deposit_amount: Optional[Decimal] = Field(None, ge=0)
     notes: Optional[str] = None
+    lines: Optional[List[CustomerInvoiceLineCreate]] = None
 
 
 class CustomerInvoiceRead(CustomerInvoiceBase):
     id: int
     status: InvoiceStatus
+    customer_name: Optional[str] = None
     subtotal: Decimal
     discount_amount: Decimal
     tax_amount: Decimal

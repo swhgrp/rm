@@ -334,7 +334,7 @@ class InvoiceParser:
         if not self.api_key or self.api_key == "your-openai-key-here":
             raise ValueError("OpenAI API key not configured. Set OPENAI_API_KEY environment variable")
 
-        self.client = OpenAI(api_key=self.api_key)
+        self.client = OpenAI(api_key=self.api_key, timeout=120.0)  # 2 minute timeout
 
     def get_vendor_parsing_rules(self, vendor_id: int, db: Session) -> Optional[VendorParsingRule]:
         """
@@ -364,8 +364,13 @@ class InvoiceParser:
         Returns:
             Complete system prompt string
         """
-        base_prompt = """You are an expert at parsing restaurant supply invoices, including multi-page invoices.
-                        You will receive one or more images representing all pages of an invoice.
+        base_prompt = """You are an expert at parsing invoices and receipts for restaurant supply purchases.
+                        This includes:
+                        - Traditional wholesale invoices (Sysco, US Foods, Gordon Food Service)
+                        - Retail warehouse receipts (BJ's Wholesale, Costco, Sam's Club, Restaurant Depot)
+                        - Online order receipts (Amazon, WebstaurantStore)
+
+                        You will receive one or more images representing all pages of a document.
                         You must extract structured data from ALL pages.
                         Return ONLY a valid JSON object with this exact structure:
                         {
@@ -394,18 +399,29 @@ class InvoiceParser:
                         }
 
                         CRITICAL INSTRUCTIONS:
-                        - FOR MULTI-PAGE INVOICES: Combine line items from ALL pages into a single list
+                        - FOR MULTI-PAGE DOCUMENTS: Combine line items from ALL pages into a single list
                         - is_statement: Set to true if the document title contains words like "Statement", "Account Statement", "Monthly Statement"
                           Statements are summary documents showing account activity/balance, not individual invoices for specific deliveries
                           Look for the word "Statement" prominently displayed at the top of the document
-                        - vendor_name: The company at the TOP of the invoice (letterhead/logo area) who SENT the invoice
-                          Example: "Gold Coast Linen Service", "SYSCO", "US Foods"
-                          Look for company name near logo, top-left, or "From:" section
-                        - location_name: The DELIVERY/SHIP TO location (customer receiving goods)
-                          Look for "Ship To:", "Deliver To:", "Location:", or customer name
-                          Example: "SW GRILL", "Seaside Grill", "The Nest Eatery"
-                        - vendor_account_number: The account/customer number on the invoice
-                        - Extract ALL line items from ALL pages of the invoice with precise quantities and prices
+                        - vendor_name: The company/store name (BJ's Wholesale Club, Costco, Sysco, etc.)
+                          For retail receipts, this is the store name at the top
+                          For invoices, look for company name near logo, top-left, or "From:" section
+                        - location_name: The DELIVERY/SHIP TO location OR the member/customer name
+                          For retail receipts, this may be the member name or business name on the account
+                          Look for "Ship To:", "Deliver To:", "Member:", or customer name
+                        - invoice_number: Use receipt number, transaction number, or order number if no invoice number
+                        - invoice_date: Transaction date, order date, or purchase date
+                        - vendor_account_number: Member number, account number, or customer ID
+                        - Extract ALL line items from ALL pages with precise quantities and prices
+
+                        *** RETAIL RECEIPT HANDLING (BJ's, Costco, Sam's Club) ***
+                        - These are point-of-sale receipts, not traditional invoices
+                        - Look for item descriptions, quantities, and prices in receipt format
+                        - Item codes may be UPC barcodes or internal SKU numbers
+                        - Quantity is usually shown as "Qty: X" or just a number before the item
+                        - Unit is typically "EA" (each) unless weight-based (then "LB")
+                        - Tax may be shown as a separate line or included in total
+                        - Total is at the bottom, often after payment method details
 
                         *** EXTREMELY IMPORTANT - TOTALS FROM LAST PAGE ONLY ***
                         - Multi-page invoices often show "Page Total" or "Page Subtotal" on early pages
@@ -532,23 +548,69 @@ class InvoiceParser:
             # Build AI system prompt - with vendor rules if provided
             system_prompt = self._build_ai_system_prompt(vendor_rules)
 
-            response = self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": system_prompt
-                    },
-                    {
-                        "role": "user",
-                        "content": user_content
-                    }
-                ],
-                max_tokens=8192,  # Increased for multi-page invoices
-                temperature=0.1
-            )
+            # Retry logic for transient API failures
+            max_retries = 2
+            result_text = None
+            last_error = None
 
-            result_text = response.choices[0].message.content
+            for attempt in range(max_retries + 1):
+                try:
+                    logger.info(f"OpenAI API call attempt {attempt + 1}/{max_retries + 1}")
+                    response = self.client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": system_prompt
+                            },
+                            {
+                                "role": "user",
+                                "content": user_content
+                            }
+                        ],
+                        max_tokens=8192,  # Increased for multi-page invoices
+                        temperature=0.1
+                    )
+
+                    result_text = response.choices[0].message.content
+
+                    # Check for content filter or refusal
+                    if response.choices[0].finish_reason == 'content_filter':
+                        logger.error("OpenAI content filter triggered")
+                        return {
+                            "success": False,
+                            "error": "AI content filter blocked the response - document may contain restricted content",
+                            "message": "Failed to parse invoice due to content restrictions"
+                        }
+
+                    # Check for empty response - retry if we have attempts left
+                    if not result_text:
+                        logger.warning(f"OpenAI returned empty response on attempt {attempt + 1}. Finish reason: {response.choices[0].finish_reason}")
+                        if attempt < max_retries:
+                            import time
+                            time.sleep(2)  # Wait before retry
+                            continue
+                        else:
+                            return {
+                                "success": False,
+                                "error": "AI returned empty response after retries - the invoice image may not be readable",
+                                "message": "Failed to parse invoice - try a clearer scan"
+                            }
+
+                    # Success - break out of retry loop
+                    break
+
+                except Exception as api_error:
+                    last_error = api_error
+                    logger.warning(f"OpenAI API error on attempt {attempt + 1}: {str(api_error)}")
+                    if attempt < max_retries:
+                        import time
+                        time.sleep(2)  # Wait before retry
+                        continue
+                    else:
+                        raise  # Re-raise on final attempt
+
+            logger.info(f"Raw AI response (first 500 chars): {result_text[:500]}...")
 
             # Parse JSON from response
             # Extract JSON from markdown code blocks if present
@@ -557,7 +619,16 @@ class InvoiceParser:
             elif "```" in result_text:
                 result_text = result_text.split("```")[1].split("```")[0]
 
-            parsed_data = json.loads(result_text.strip())
+            result_text = result_text.strip()
+            if not result_text:
+                logger.error("AI response contained no JSON data after extraction")
+                return {
+                    "success": False,
+                    "error": "AI response contained no parseable data",
+                    "message": "Failed to extract invoice data"
+                }
+
+            parsed_data = json.loads(result_text)
 
             # Calculate confidence score based on how many fields were found
             total_fields = 7  # vendor, invoice_number, invoice_date, due_date, subtotal, tax, total

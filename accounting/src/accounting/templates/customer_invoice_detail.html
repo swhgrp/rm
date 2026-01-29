@@ -1,0 +1,1083 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice Details - Restaurant Accounting{% endblock %}
+{% block nav_customer_invoices %}active{% endblock %}
+
+{% block extra_head %}
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<style>
+    .detail-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    .detail-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid var(--border-primary);
+    }
+
+    .detail-title h1 {
+        font-size: 1.5rem;
+        color: var(--text-primary);
+        margin-bottom: 0.25rem;
+    }
+
+    .detail-title .invoice-number {
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+    }
+
+    .detail-actions {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    .back-button {
+        color: var(--accent-primary);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .back-button:hover {
+        text-decoration: underline;
+    }
+
+    /* Status Badge */
+    .status-badge {
+        display: inline-block;
+        padding: 0.375rem 0.75rem;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        margin-left: 1rem;
+    }
+
+    .status-draft { background: #6e7681; color: white; }
+    .status-sent { background: #1f6feb; color: white; }
+    .status-partially_paid { background: #F57C00; color: white; }
+    .status-paid { background: #388E3C; color: white; }
+    .status-overdue { background: #C62828; color: white; }
+    .status-void { background: #C62828; color: white; }
+
+    /* Card Layout */
+    .detail-grid {
+        display: grid;
+        grid-template-columns: 1fr 400px;
+        gap: 0.75rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .detail-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+        padding: 0.75rem;
+    }
+
+    .detail-card h2 {
+        color: var(--text-primary);
+        font-size: 0.95rem;
+        margin-bottom: 0.5rem;
+        padding-bottom: 0.4rem;
+        border-bottom: 1px solid var(--border-primary);
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        font-weight: 600;
+    }
+
+    .detail-card h2 i {
+        font-size: 0.9rem;
+    }
+
+    .detail-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.35rem 0;
+        border-bottom: 1px solid var(--bg-tertiary);
+        font-size: 0.9rem;
+    }
+
+    .detail-row label {
+        color: var(--text-secondary);
+        font-weight: 500;
+        font-size: 0.85rem;
+    }
+
+    .detail-row:last-child {
+        border-bottom: none;
+    }
+
+    .detail-row .value {
+        color: var(--text-primary);
+        text-align: right;
+    }
+
+    .detail-row.total {
+        font-size: 1.25rem;
+        font-weight: 700;
+        padding-top: 1rem;
+        margin-top: 0.5rem;
+        border-top: 2px solid var(--border-primary);
+    }
+
+    .detail-row.total .value {
+        color: var(--accent-primary);
+    }
+
+    .detail-row.balance .value {
+        color: #E53935;
+        font-weight: 600;
+    }
+
+    /* Line Items Table */
+    .line-items-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 1rem;
+    }
+
+    .line-items-table th {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        padding: 0.75rem;
+        text-align: left;
+        font-weight: 600;
+        border-bottom: 2px solid var(--border-primary);
+    }
+
+    .line-items-table th:last-child,
+    .line-items-table td:last-child {
+        text-align: right;
+    }
+
+    .line-items-table td {
+        padding: 0.5rem 0.75rem;
+        color: var(--text-primary);
+        border-bottom: 1px solid var(--bg-tertiary);
+    }
+
+    .line-items-table tr:hover {
+        background: var(--bg-primary);
+    }
+
+    .account-code {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .line-total {
+        font-weight: 600;
+    }
+
+    /* Payment History */
+    .payment-item {
+        background: var(--bg-primary);
+        padding: 0.75rem;
+        border-radius: 4px;
+        border: 1px solid var(--border-primary);
+        margin-bottom: 0.75rem;
+    }
+
+    .payment-item:last-child {
+        margin-bottom: 0;
+    }
+
+    .payment-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+    }
+
+    .payment-amount {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #388E3C;
+    }
+
+    .payment-method-badge {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        padding: 0.2rem 0.6rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 500;
+    }
+
+    .payment-details {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+        line-height: 1.4;
+    }
+
+    .payment-details div {
+        margin-bottom: 0.15rem;
+    }
+
+    .payment-details strong {
+        color: var(--text-primary);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 2rem 1rem;
+        color: var(--text-secondary);
+    }
+
+    .empty-state i {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+        opacity: 0.5;
+    }
+
+    .notes-content {
+        color: var(--text-primary);
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+
+    /* Loading State */
+    .loading {
+        text-align: center;
+        padding: 3rem;
+        color: var(--text-secondary);
+    }
+
+    .loading i {
+        font-size: 2rem;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .error-state {
+        background: #C62828;
+        color: white;
+        padding: 1rem;
+        border-radius: 6px;
+        margin-bottom: 2rem;
+    }
+
+    @media (max-width: 768px) {
+        .detail-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .detail-header {
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .detail-actions {
+            width: 100%;
+        }
+
+        .detail-actions button {
+            flex: 1;
+        }
+    }
+
+    /* Print Styles */
+    @media print {
+        .sidebar, .header, .nav, .back-button, .detail-actions, .modal {
+            display: none !important;
+        }
+
+        body {
+            background: white;
+        }
+
+        .main-content {
+            margin-left: 0 !important;
+            padding: 0 !important;
+        }
+
+        .detail-container {
+            max-width: 100%;
+        }
+
+        .detail-card {
+            box-shadow: none;
+            border: 1px solid #ddd;
+            break-inside: avoid;
+        }
+
+        .detail-header {
+            border-bottom: 2px solid #333;
+        }
+
+        .line-items-table {
+            page-break-inside: avoid;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="detail-container">
+    <a href="/accounting/customer-invoices" class="back-button">
+        <i class="bi bi-arrow-left"></i> Back to Invoices
+    </a>
+
+    <div id="loadingState" class="loading">
+        <i class="bi bi-arrow-clockwise"></i>
+        <p>Loading invoice details...</p>
+    </div>
+
+    <div id="errorState" class="error-state" style="display: none;"></div>
+
+    <div id="invoiceContent" style="display: none;">
+        <!-- Header -->
+        <div class="detail-header">
+            <div class="detail-title">
+                <h1>
+                    <span id="customerName">-</span>
+                    <span class="status-badge" id="statusBadge">-</span>
+                </h1>
+                <div class="invoice-number">
+                    Invoice #<span id="invoiceNumber">-</span> |
+                    Due <span id="dueDateHeader">-</span>
+                </div>
+            </div>
+            <div class="detail-actions" id="actionButtons">
+                <!-- Action buttons inserted by JS -->
+            </div>
+        </div>
+
+        <!-- Main Content Grid -->
+        <div class="detail-grid">
+            <!-- Left Column: Line Items, Notes, Audit Trail -->
+            <div>
+                <!-- Line Items -->
+                <div class="detail-card">
+                    <h2><i class="bi bi-list-ul"></i> Line Items</h2>
+                    <div id="lineItemsContent">
+                        <div class="empty-state">
+                            <i class="bi bi-inbox"></i>
+                            <p>No line items</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Notes -->
+                <div class="detail-card" id="notesCard" style="display: none; margin-top: 1rem;">
+                    <h2><i class="bi bi-sticky"></i> Notes</h2>
+                    <div class="notes-content" id="notesContent">-</div>
+                </div>
+
+                <!-- Event Details -->
+                <div class="detail-card" id="eventCard" style="display: none; margin-top: 1rem;">
+                    <h2><i class="bi bi-calendar-event"></i> Event Details</h2>
+                    <div class="detail-row" id="eventDateRow" style="display: none;">
+                        <label>Event Date:</label>
+                        <span class="value" id="eventDate">-</span>
+                    </div>
+                    <div class="detail-row" id="eventTypeRow" style="display: none;">
+                        <label>Event Type:</label>
+                        <span class="value" id="eventType">-</span>
+                    </div>
+                    <div class="detail-row" id="eventLocationRow" style="display: none;">
+                        <label>Location:</label>
+                        <span class="value" id="eventLocation">-</span>
+                    </div>
+                    <div class="detail-row" id="guestCountRow" style="display: none;">
+                        <label>Guest Count:</label>
+                        <span class="value" id="guestCount">-</span>
+                    </div>
+                </div>
+
+                <!-- Audit Trail -->
+                <div class="detail-card" style="margin-top: 1rem;">
+                    <h2><i class="bi bi-info-circle"></i> Audit Trail</h2>
+                    <div class="detail-row">
+                        <label>Created By:</label>
+                        <span class="value" id="createdBy">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <label>Created Date:</label>
+                        <span class="value" id="createdDate">-</span>
+                    </div>
+                    <div class="detail-row" id="sentDateRow" style="display: none;">
+                        <label>Sent Date:</label>
+                        <span class="value" id="sentDate">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column: Invoice Summary & Payment History -->
+            <div>
+                <!-- Invoice Summary -->
+                <div class="detail-card">
+                    <h2><i class="bi bi-receipt"></i> Invoice Summary</h2>
+                    <div class="detail-row">
+                        <label>Invoice Date:</label>
+                        <span class="value" id="invoiceDate">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <label>Due Date:</label>
+                        <span class="value" id="dueDate">-</span>
+                    </div>
+                    <div class="detail-row" id="locationRow" style="display: none;">
+                        <label>Location:</label>
+                        <span class="value" id="locationName">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <label>Subtotal:</label>
+                        <span class="value" id="subtotal">$0.00</span>
+                    </div>
+                    <div class="detail-row" id="discountRow" style="display: none;">
+                        <label>Discount:</label>
+                        <span class="value" id="discountAmount">-$0.00</span>
+                    </div>
+                    <div class="detail-row" id="taxRow">
+                        <label>Tax:</label>
+                        <span class="value" id="taxAmount">$0.00</span>
+                    </div>
+                    <div class="detail-row total">
+                        <label>Total Amount:</label>
+                        <span class="value" id="totalAmount">$0.00</span>
+                    </div>
+                    <div class="detail-row" id="depositRow" style="display: none;">
+                        <label>Deposits:</label>
+                        <span class="value" id="depositAmount">-$0.00</span>
+                    </div>
+                    <div class="detail-row">
+                        <label>Amount Paid:</label>
+                        <span class="value" id="paidAmount">$0.00</span>
+                    </div>
+                    <div class="detail-row balance">
+                        <label>Balance Due:</label>
+                        <span class="value" id="balanceDue">$0.00</span>
+                    </div>
+                </div>
+
+                <!-- Payment History -->
+                <div class="detail-card" style="margin-top: 1rem;">
+                    <h2><i class="bi bi-cash-stack"></i> Payment History</h2>
+                    <div id="paymentHistoryContent">
+                        <div class="empty-state">
+                            <i class="bi bi-cash"></i>
+                            <p>No payments recorded</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div id="paymentModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 2000; align-items: center; justify-content: center;">
+    <div class="modal-content" style="background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 8px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; border-bottom: 1px solid var(--border-primary);">
+            <h3 style="margin: 0; color: var(--text-primary);"><i class="bi bi-cash-coin"></i> Record Payment</h3>
+            <button class="modal-close" onclick="closePaymentModal()" style="background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer; padding: 0; width: 2rem; height: 2rem;">
+                <i class="bi bi-x"></i>
+            </button>
+        </div>
+        <div class="modal-body" style="padding: 1.5rem;">
+            <!-- Invoice Summary -->
+            <div style="background: var(--bg-primary); padding: 1rem; border-radius: 6px; border: 1px solid var(--border-primary); margin-bottom: 1.5rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <label style="color: var(--text-secondary);">Customer:</label>
+                    <span id="payCustomerName" style="color: var(--text-primary);">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <label style="color: var(--text-secondary);">Invoice:</label>
+                    <span id="payInvoiceNumber" style="color: var(--text-primary);">-</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <label style="color: var(--text-secondary);">Total Amount:</label>
+                    <span id="payTotalAmount" style="color: var(--text-primary);">$0.00</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem;">
+                    <label style="color: var(--text-secondary);">Already Paid:</label>
+                    <span id="payPaidAmount" style="color: var(--text-primary);">$0.00</span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <label style="color: var(--text-secondary); font-weight: 600;">Balance Due:</label>
+                    <span id="payBalanceDue" style="color: var(--text-primary); font-weight: 600;">$0.00</span>
+                </div>
+            </div>
+
+            <!-- Payment Form -->
+            <form id="paymentForm" onsubmit="handlePaymentSubmit(event)">
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; color: var(--text-primary); margin-bottom: 0.5rem;">Payment Date <span style="color: #E53935;">*</span></label>
+                    <input type="date" id="paymentDate" required style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 4px;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; color: var(--text-primary); margin-bottom: 0.5rem;">Payment Amount <span style="color: #E53935;">*</span></label>
+                    <input type="number" id="paymentAmount" step="0.01" min="0.01" required placeholder="0.00" style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 4px;">
+                    <small style="color: var(--text-secondary); display: block; margin-top: 0.25rem;">
+                        Maximum: <span id="payMaxAmount">$0.00</span>
+                    </small>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; color: var(--text-primary); margin-bottom: 0.5rem;">Payment Method <span style="color: #E53935;">*</span></label>
+                    <select id="paymentMethod" required style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 4px;">
+                        <option value="">Select Method...</option>
+                        <option value="check">Check</option>
+                        <option value="ach">ACH/Bank Transfer</option>
+                        <option value="wire">Wire Transfer</option>
+                        <option value="credit_card">Credit Card</option>
+                        <option value="cash">Cash</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; color: var(--text-primary); margin-bottom: 0.5rem;">Bank Account <span style="color: #E53935;">*</span></label>
+                    <select id="paymentBankAccount" required style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 4px;">
+                        <option value="">Select Bank Account...</option>
+                    </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; color: var(--text-primary); margin-bottom: 0.5rem;">Reference Number</label>
+                    <input type="text" id="paymentReference" placeholder="Check #, Confirmation #, etc." style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 4px;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label style="display: block; color: var(--text-primary); margin-bottom: 0.5rem;">Notes</label>
+                    <textarea id="paymentNotes" rows="3" placeholder="Payment notes" style="width: 100%; padding: 0.5rem; background: var(--bg-primary); border: 1px solid var(--border-primary); color: var(--text-primary); border-radius: 4px;"></textarea>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 0.5rem; padding: 1.5rem; border-top: 1px solid var(--border-primary);">
+            <button type="button" class="btn btn-secondary" onclick="closePaymentModal()">Cancel</button>
+            <button type="submit" form="paymentForm" class="btn btn-success">
+                <i class="bi bi-check-circle"></i> Record Payment
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let invoiceData = null;
+let customerData = null;
+let accounts = [];
+const invoiceId = {{ invoice_id }};
+
+// Format currency
+function formatCurrency(amount) {
+    return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD'
+    }).format(amount || 0);
+}
+
+// Format date
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const parts = dateStr.split('T')[0].split('-');
+    if (parts.length === 3) {
+        const year = parseInt(parts[0]);
+        const month = parseInt(parts[1]) - 1;
+        const day = parseInt(parts[2]);
+        const date = new Date(year, month, day);
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+    const date = new Date(dateStr + 'T12:00:00');
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+// Format datetime
+function formatDateTime(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr);
+    return date.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+}
+
+// Format payment method
+function formatPaymentMethod(method) {
+    const methods = {
+        'check': 'Check', 'CHECK': 'Check',
+        'ach': 'ACH', 'ACH': 'ACH',
+        'wire': 'Wire', 'WIRE': 'Wire',
+        'credit_card': 'Credit Card', 'CREDIT_CARD': 'Credit Card',
+        'cash': 'Cash', 'CASH': 'Cash',
+        'other': 'Other', 'OTHER': 'Other'
+    };
+    return methods[method] || method;
+}
+
+// Load accounts for payment dropdown
+async function loadAccounts() {
+    try {
+        const response = await fetch('/accounting/api/accounts/?limit=1000');
+        if (response.ok) {
+            accounts = await response.json();
+            accounts.sort((a, b) => a.account_number.localeCompare(b.account_number));
+
+            const bankAccounts = accounts.filter(a => {
+                const num = parseInt(a.account_number);
+                return num >= 1000 && num < 1100;
+            });
+            const bankOptions = bankAccounts.map(acc =>
+                `<option value="${acc.id}">${acc.account_number} - ${acc.account_name}</option>`
+            ).join('');
+
+            const paymentBankAccount = document.getElementById('paymentBankAccount');
+            if (paymentBankAccount) {
+                paymentBankAccount.innerHTML = '<option value="">Select Bank Account...</option>' + bankOptions;
+            }
+        }
+    } catch (error) {
+        console.error('Error loading accounts:', error);
+    }
+}
+
+// Load invoice details
+async function loadInvoiceDetails() {
+    try {
+        document.getElementById('loadingState').style.display = 'block';
+        document.getElementById('errorState').style.display = 'none';
+        document.getElementById('invoiceContent').style.display = 'none';
+
+        const response = await fetch(`/accounting/api/customer-invoices/${invoiceId}`);
+        if (!response.ok) {
+            throw new Error(`Failed to load invoice: ${response.statusText}`);
+        }
+
+        invoiceData = await response.json();
+
+        // Fetch customer details
+        try {
+            const customerResponse = await fetch(`/accounting/api/customers/${invoiceData.customer_id}`);
+            if (customerResponse.ok) {
+                customerData = await customerResponse.json();
+            }
+        } catch (e) {
+            console.error('Error loading customer:', e);
+        }
+
+        displayInvoiceDetails(invoiceData);
+
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('invoiceContent').style.display = 'block';
+    } catch (error) {
+        console.error('Error loading invoice:', error);
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('errorState').textContent = error.message;
+        document.getElementById('errorState').style.display = 'block';
+    }
+}
+
+// Display invoice details
+function displayInvoiceDetails(invoice) {
+    // Header
+    const customerName = customerData ? customerData.customer_name : `Customer #${invoice.customer_id}`;
+    document.getElementById('customerName').textContent = customerName;
+    document.getElementById('invoiceNumber').textContent = invoice.invoice_number;
+    document.getElementById('dueDateHeader').textContent = formatDate(invoice.due_date);
+
+    // Status badge
+    const statusBadge = document.getElementById('statusBadge');
+    statusBadge.textContent = invoice.status.replace('_', ' ');
+    statusBadge.className = 'status-badge status-' + invoice.status;
+
+    // Action buttons
+    renderActionButtons(invoice);
+
+    // Summary
+    document.getElementById('invoiceDate').textContent = formatDate(invoice.invoice_date);
+    document.getElementById('dueDate').textContent = formatDate(invoice.due_date);
+    document.getElementById('subtotal').textContent = formatCurrency(invoice.subtotal);
+    document.getElementById('taxAmount').textContent = formatCurrency(invoice.tax_amount);
+    document.getElementById('totalAmount').textContent = formatCurrency(invoice.total_amount);
+    document.getElementById('paidAmount').textContent = formatCurrency(invoice.paid_amount);
+    document.getElementById('balanceDue').textContent = formatCurrency(invoice.balance_due);
+
+    // Discount (show if > 0)
+    if (parseFloat(invoice.discount_amount) > 0) {
+        document.getElementById('discountRow').style.display = 'flex';
+        document.getElementById('discountAmount').textContent = '-' + formatCurrency(invoice.discount_amount);
+    }
+
+    // Deposit (show if > 0)
+    if (parseFloat(invoice.deposit_amount) > 0) {
+        document.getElementById('depositRow').style.display = 'flex';
+        document.getElementById('depositAmount').textContent = '-' + formatCurrency(invoice.deposit_amount);
+    }
+
+    // Location
+    if (invoice.area_id && customerData && customerData.area) {
+        document.getElementById('locationRow').style.display = 'flex';
+        document.getElementById('locationName').textContent = customerData.area;
+    }
+
+    // Event details
+    const hasEvent = invoice.event_date || invoice.event_type || invoice.event_location || invoice.guest_count;
+    if (hasEvent) {
+        document.getElementById('eventCard').style.display = 'block';
+        if (invoice.event_date) {
+            document.getElementById('eventDateRow').style.display = 'flex';
+            document.getElementById('eventDate').textContent = formatDate(invoice.event_date);
+        }
+        if (invoice.event_type) {
+            document.getElementById('eventTypeRow').style.display = 'flex';
+            document.getElementById('eventType').textContent = invoice.event_type;
+        }
+        if (invoice.event_location) {
+            document.getElementById('eventLocationRow').style.display = 'flex';
+            document.getElementById('eventLocation').textContent = invoice.event_location;
+        }
+        if (invoice.guest_count) {
+            document.getElementById('guestCountRow').style.display = 'flex';
+            document.getElementById('guestCount').textContent = invoice.guest_count;
+        }
+    }
+
+    // Line items
+    if (invoice.line_items && invoice.line_items.length > 0) {
+        renderLineItems(invoice.line_items);
+    }
+
+    // Payment history
+    if (invoice.payments && invoice.payments.length > 0) {
+        renderPaymentHistory(invoice.payments);
+    }
+
+    // Notes
+    if (invoice.notes) {
+        document.getElementById('notesCard').style.display = 'block';
+        document.getElementById('notesContent').textContent = invoice.notes;
+    }
+
+    // Audit trail
+    document.getElementById('createdDate').textContent = formatDateTime(invoice.created_at);
+
+    // Sent date
+    if (invoice.sent_date) {
+        document.getElementById('sentDateRow').style.display = 'flex';
+        document.getElementById('sentDate').textContent = formatDateTime(invoice.sent_date);
+    }
+}
+
+// Render action buttons based on status
+function renderActionButtons(invoice) {
+    const buttonsHtml = [];
+    const status = invoice.status.toLowerCase();
+
+    // Print and PDF buttons always available
+    buttonsHtml.push(`
+        <button class="btn btn-secondary" onclick="window.print()">
+            <i class="bi bi-printer"></i> Print
+        </button>
+    `);
+    buttonsHtml.push(`
+        <button class="btn btn-secondary" onclick="downloadPDF()">
+            <i class="bi bi-file-earmark-pdf"></i> Download PDF
+        </button>
+    `);
+
+    if (status === 'draft') {
+        buttonsHtml.push(`
+            <button class="btn btn-primary" onclick="editInvoice()">
+                <i class="bi bi-pencil"></i> Edit
+            </button>
+            <button class="btn btn-success" onclick="postInvoice()">
+                <i class="bi bi-journal-check"></i> Post
+            </button>
+            <button class="btn btn-danger" onclick="deleteInvoice()">
+                <i class="bi bi-trash"></i> Delete
+            </button>
+        `);
+    }
+
+    if (status === 'sent' || status === 'partially_paid' || status === 'overdue') {
+        buttonsHtml.push(`
+            <button class="btn btn-info" onclick="emailInvoice()">
+                <i class="bi bi-envelope"></i> Email
+            </button>
+            <button class="btn btn-success" onclick="showPaymentModal()">
+                <i class="bi bi-cash-coin"></i> Record Payment
+            </button>
+        `);
+    }
+
+    if (status !== 'void' && status !== 'paid' && status !== 'draft') {
+        buttonsHtml.push(`
+            <button class="btn btn-danger" onclick="voidInvoice()">
+                <i class="bi bi-slash-circle"></i> Void
+            </button>
+        `);
+    }
+
+    if (status === 'void') {
+        buttonsHtml.push(`
+            <button class="btn btn-danger" onclick="deleteInvoice()">
+                <i class="bi bi-trash"></i> Delete
+            </button>
+        `);
+    }
+
+    document.getElementById('actionButtons').innerHTML = buttonsHtml.join('');
+}
+
+// Render line items table
+function renderLineItems(lineItems) {
+    const tableHtml = `
+        <table class="line-items-table">
+            <thead>
+                <tr>
+                    <th>Account</th>
+                    <th>Description</th>
+                    <th style="text-align: right;">Qty</th>
+                    <th style="text-align: right;">Unit Price</th>
+                    <th style="text-align: right;">Discount</th>
+                    <th style="text-align: right;">Tax</th>
+                    <th style="text-align: right;">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${lineItems.map(line => {
+                    const amount = parseFloat(line.amount || 0);
+                    const discount = parseFloat(line.discount_amount || 0);
+                    const tax = parseFloat(line.tax_amount || 0);
+                    const lineTotal = amount - discount + tax;
+                    return `
+                    <tr>
+                        <td>
+                            ${line.account_id ? `<div>${line.account_id}</div>` : '-'}
+                        </td>
+                        <td>${line.description || '-'}</td>
+                        <td style="text-align: right;">${line.quantity || 1}</td>
+                        <td style="text-align: right;">${formatCurrency(line.unit_price)}</td>
+                        <td style="text-align: right;">${discount > 0 ? '-' + formatCurrency(discount) : '-'}</td>
+                        <td style="text-align: right;">${formatCurrency(tax)}</td>
+                        <td style="text-align: right;" class="line-total">${formatCurrency(lineTotal)}</td>
+                    </tr>
+                    `;
+                }).join('')}
+            </tbody>
+        </table>
+    `;
+    document.getElementById('lineItemsContent').innerHTML = tableHtml;
+}
+
+// Render payment history
+function renderPaymentHistory(payments) {
+    const paymentsHtml = payments.map(payment => `
+        <div class="payment-item">
+            <div class="payment-header">
+                <span class="payment-amount">${formatCurrency(payment.amount)}</span>
+                <span class="payment-method-badge">${formatPaymentMethod(payment.payment_method)}</span>
+            </div>
+            <div class="payment-details">
+                <div><strong>Date:</strong> ${formatDate(payment.payment_date)}</div>
+                ${payment.reference_number ? `<div><strong>Reference:</strong> ${payment.reference_number}</div>` : ''}
+                ${payment.notes ? `<div><strong>Notes:</strong> ${payment.notes}</div>` : ''}
+            </div>
+        </div>
+    `).join('');
+    document.getElementById('paymentHistoryContent').innerHTML = paymentsHtml;
+}
+
+// Download PDF
+function downloadPDF() {
+    window.open(`/accounting/api/customer-invoices/${invoiceId}/pdf`, '_blank');
+}
+
+// Post invoice (finalize and post to General Ledger)
+async function postInvoice() {
+    const confirmed = await showConfirm('Post this invoice? This will finalize it and post to the General Ledger.', 'Post Invoice');
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/accounting/api/customer-invoices/${invoiceId}/send`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to post invoice');
+        }
+
+        showNotification('Invoice posted to GL', 'Success');
+        loadInvoiceDetails();
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+// Email invoice to customer
+async function emailInvoice() {
+    const confirmed = await showConfirm('Email this invoice to the customer?', 'Email Invoice');
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/accounting/api/customer-invoices/${invoiceId}/email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to email invoice');
+        }
+
+        const result = await response.json();
+        showNotification(`Invoice emailed to ${result.sent_to}`, 'Success');
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+// Void invoice
+async function voidInvoice() {
+    const confirmed = await showConfirm('Void this invoice? This action cannot be undone.', 'Void Invoice');
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/accounting/api/customer-invoices/${invoiceId}/void`, {
+            method: 'POST'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to void invoice');
+        }
+
+        showNotification('Invoice voided', 'Invoice Voided');
+        loadInvoiceDetails();
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+// Edit invoice - redirect to invoices page in edit mode
+function editInvoice() {
+    window.location.href = `/accounting/customer-invoices?edit=${invoiceId}`;
+}
+
+// Delete invoice
+async function deleteInvoice() {
+    const confirmed = await showConfirm('Delete this invoice? This action cannot be undone.', 'Delete Invoice');
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/accounting/api/customer-invoices/${invoiceId}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to delete invoice');
+        }
+
+        showNotification('Invoice deleted', 'Deleted');
+        // Redirect back to invoice list
+        setTimeout(() => {
+            window.location.href = '/accounting/customer-invoices';
+        }, 1000);
+    } catch (error) {
+        console.error('Error:', error);
+        showNotification('Error: ' + error.message, 'Error');
+    }
+}
+
+// Payment modal
+function showPaymentModal() {
+    const customerName = customerData ? customerData.customer_name : `Customer #${invoiceData.customer_id}`;
+    document.getElementById('payCustomerName').textContent = customerName;
+    document.getElementById('payInvoiceNumber').textContent = invoiceData.invoice_number;
+    document.getElementById('payTotalAmount').textContent = formatCurrency(invoiceData.total_amount);
+    document.getElementById('payPaidAmount').textContent = formatCurrency(invoiceData.paid_amount);
+    document.getElementById('payBalanceDue').textContent = formatCurrency(invoiceData.balance_due);
+    document.getElementById('payMaxAmount').textContent = formatCurrency(invoiceData.balance_due);
+
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('paymentDate').value = today;
+
+    document.getElementById('paymentAmount').max = invoiceData.balance_due;
+    document.getElementById('paymentAmount').value = invoiceData.balance_due;
+
+    document.getElementById('paymentModal').style.display = 'flex';
+}
+
+function closePaymentModal() {
+    document.getElementById('paymentModal').style.display = 'none';
+    document.getElementById('paymentForm').reset();
+}
+
+async function handlePaymentSubmit(event) {
+    event.preventDefault();
+
+    const amount = parseFloat(document.getElementById('paymentAmount').value);
+    const maxAmount = invoiceData ? invoiceData.balance_due : 0;
+
+    if (amount <= 0) {
+        showNotification('Payment amount must be greater than zero', 'Invalid Amount');
+        return;
+    }
+
+    if (amount > maxAmount) {
+        showNotification(`Payment amount cannot exceed balance due (${formatCurrency(maxAmount)})`, 'Invalid Amount');
+        return;
+    }
+
+    const paymentData = {
+        payment_date: document.getElementById('paymentDate').value,
+        amount: amount,
+        payment_method: document.getElementById('paymentMethod').value,
+        reference_number: document.getElementById('paymentReference').value || null,
+        bank_account_id: parseInt(document.getElementById('paymentBankAccount').value),
+        notes: document.getElementById('paymentNotes').value || null
+    };
+
+    try {
+        const response = await fetch(`/accounting/api/customer-invoices/${invoiceId}/payments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(paymentData)
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to record payment');
+        }
+
+        showNotification(`Payment of ${formatCurrency(amount)} recorded successfully`, 'Payment Recorded');
+        closePaymentModal();
+        loadInvoiceDetails();
+    } catch (error) {
+        console.error('Error recording payment:', error);
+        showNotification('Error recording payment: ' + error.message, 'Error');
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadAccounts();
+    loadInvoiceDetails();
+});
+</script>
+{% endblock %}

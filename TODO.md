@@ -1,6 +1,6 @@
 # Restaurant Management System - Consolidated TODO
 
-**Last Updated:** January 26, 2026
+**Last Updated:** January 29, 2026
 
 ## Priority Legend
 - P0: Critical - Blocking production use
@@ -312,6 +312,7 @@ Full report: `SECURITY_AUDIT_REPORT.md`
 ## Recently Completed (Reference)
 
 ### January 2026
+- [x] **Customer Invoice System Overhaul** (Accounting) - Jan 29: Fixed invoice creation 422 errors (field name mismatches), added detail/print page, professional PDF with location branding, draft editing with line item replacement, draft/void deletion, Post vs Email separation, AR GL service account number fixes, customer name in API response, Bootstrap confirm dialogs
 - [x] **Clover POS Discount Sync Fix** (Accounting) - Jan 26: Fixed discount calculation for percentage-based discounts, added rounding adjustment for variances, prevented double-counting of order vs line-item discounts
 - [x] **Discount Edit Saving Fix** (Accounting) - Jan 26: Fixed discount edits not saving to journal entries - added discount_breakdown to save payload and made verify save first
 - [x] **Refund Breakdown by Category** (Accounting) - Jan 26: Track refunds by original sale category for accurate journal entries - new refund_breakdown JSONB column

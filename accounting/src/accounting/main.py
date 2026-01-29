@@ -391,6 +391,20 @@ async def customer_invoices_page(
     })
 
 
+@app.get("/customer-invoices/{invoice_id}", response_class=HTMLResponse)
+async def customer_invoice_detail_page(
+    invoice_id: int,
+    request: Request,
+    user: User = Depends(require_auth)
+):
+    """Customer Invoice Detail page"""
+    return templates.TemplateResponse("customer_invoice_detail.html", {
+        "request": request,
+        "current_user": user,
+        "invoice_id": invoice_id
+    })
+
+
 @app.get("/recurring-invoices", response_class=HTMLResponse)
 async def recurring_invoices_page(
     request: Request,

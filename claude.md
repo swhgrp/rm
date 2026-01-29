@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** January 26, 2026
+**Last Updated:** January 29, 2026
 **System Status:** Production (98% Complete)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -38,7 +38,67 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - January 26, 2026)
+### Most Recent Work (Current Session - January 29, 2026)
+
+**CUSTOMER INVOICE SYSTEM IMPROVEMENTS** ✅ **COMPLETE**
+
+#### 1. **Invoice Creation Bug Fixes** ✅
+- **Problem:** Creating invoices returned 422 errors and showed `[object Object]` in error dialog
+- **Solution:** Fixed field name mismatches between frontend and Pydantic schema:
+  - `line_items` → `lines`, `discount_percent` → `discount_percentage`, `tax_exempt` → `is_tax_exempt`
+  - Fixed error display to parse FastAPI 422 validation error arrays
+  - Fixed invoice number field showing "undefined" (`data.next_invoice_number` → `data.next_number`)
+  - Fixed browser form validation errors on hidden tabs (changed Save as Draft from `type="submit"` to `type="button"`)
+- **File:** `accounting/src/accounting/templates/customer_invoices.html`
+
+#### 2. **Invoice Detail Page** ✅
+- **Feature:** New detail page at `/customer-invoices/{id}` with full invoice view, print support, and PDF download
+- **Template:** `accounting/src/accounting/templates/customer_invoice_detail.html` (NEW)
+- **Route:** Added in `accounting/src/accounting/main.py`
+- **Features:** Two-column layout, line items table, invoice summary, payment history, event details, audit trail
+- **Print:** `@media print` CSS hides navigation/buttons, `window.print()` for browser print
+
+#### 3. **Professional PDF Invoice** ✅
+- **Problem:** PDF showed "SW Hospitality Group" instead of selected location (e.g., "The Links Grill")
+- **Solution:** Rewrote PDF service with location branding and professional styling
+  - Navy blue brand colors, bordered invoice details box, alternating row backgrounds
+  - Location name/address/phone/email from Area model
+- **Files:** `accounting/src/accounting/services/invoice_pdf_service.py`, `accounting/src/accounting/api/customer_invoices.py`
+
+#### 4. **Draft Invoice Edit & Delete** ✅
+- **Feature:** Full edit capability for draft invoices with line item replacement
+- **Backend:** Expanded `CustomerInvoiceUpdate` schema with `customer_id`, `area_id`, `is_tax_exempt`, `tax_rate`, `lines`; PUT endpoint deletes and recreates line items with total recalculation
+- **Frontend:** Edit button fetches invoice data and populates form; Save uses PUT when editing
+- **Delete:** Draft and void invoices can be permanently deleted (not just voided)
+- **Files:** `accounting/src/accounting/schemas/customer_invoice.py`, `accounting/src/accounting/api/customer_invoices.py`, `accounting/src/accounting/templates/customer_invoices.html`, `accounting/src/accounting/templates/customer_invoice_detail.html`
+
+#### 5. **Post vs Email Separation** ✅
+- **Problem:** "Send" button was ambiguous - it posted to GL, not emailed to customer
+- **Solution:** Separated into two distinct actions:
+  - **Post** (draft → sent): Finalizes invoice and posts journal entry to GL
+  - **Email** (sent invoices): Sends PDF to customer email, can be used multiple times
+- **Files:** Both template files updated with new button labels and functions
+
+#### 6. **AR GL Service Fixes** ✅
+- **Problem:** GL posting failed with "ACCOUNTS_RECEIVABLE" error and "Customer has no attribute 'name'"
+- **Solution:**
+  - Fixed account numbers: AR `1200` → `1210`, Sales Tax Payable `2150` → `2300`
+  - Removed reference to non-existent `AccountType.ACCOUNTS_RECEIVABLE` enum
+  - Fixed `invoice.customer.name` → `invoice.customer.customer_name`
+- **File:** `accounting/src/accounting/services/ar_gl_service.py`
+
+#### 7. **Customer Name in API Response** ✅
+- **Problem:** Invoice list showed "undefined" for customer name
+- **Solution:** Added `customer_name` property to `CustomerInvoice` ORM model and field to `CustomerInvoiceRead` Pydantic schema
+- **Files:** `accounting/src/accounting/models/customer_invoice.py`, `accounting/src/accounting/schemas/customer_invoice.py`
+
+#### 8. **Bootstrap Confirm Dialogs** ✅
+- Replaced all browser `confirm()` calls with `showConfirm()` Bootstrap modals on invoice detail page
+- Matches the rest of the system's UI pattern
+
+---
+
+### Previous Session Work (January 26, 2026)
 
 **CLOVER POS DAILY SALES SYNC IMPROVEMENTS** ✅ **COMPLETE**
 

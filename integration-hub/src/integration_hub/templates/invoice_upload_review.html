@@ -80,7 +80,22 @@
         </div>
     </div>
 
-    {% if parse_success %}
+    {% if duplicate_warning %}
+    <div class="parse-error" style="background-color: #ffcdd2; border-color: #e53935;">
+        <i class="bi bi-exclamation-octagon-fill text-danger"></i>
+        <strong>Duplicate Invoice Detected!</strong><br>
+        An invoice with this number already exists for this vendor.<br>
+        <small>
+            Existing invoice ID: {{ duplicate_warning.existing_invoice_id }}
+            {% if duplicate_warning.existing_invoice_date %} | Date: {{ duplicate_warning.existing_invoice_date }}{% endif %}
+            {% if duplicate_warning.existing_total %} | Total: ${{ "%.2f"|format(duplicate_warning.existing_total) }}{% endif %}
+        </small><br><br>
+        <a href="/hub/invoices/{{ duplicate_warning.existing_invoice_id }}" class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-eye"></i> View Existing Invoice
+        </a>
+        <span class="text-muted ms-2">Change the invoice number below if this is a different invoice.</span>
+    </div>
+    {% elif parse_success %}
     <div class="parse-success">
         <i class="bi bi-check-circle-fill text-success"></i>
         <strong>Invoice parsed successfully!</strong> Please review the extracted data below and make any corrections before saving.

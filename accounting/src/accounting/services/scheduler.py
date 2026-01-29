@@ -117,8 +117,9 @@ def should_sync_now(config: POSConfiguration, db: Session = None) -> bool:
     """
     Determine if a POS configuration should be synced now.
 
-    Checks if we're within a reasonable window of the configured sync_time.
-    Also checks if yesterday's business date has already been synced.
+    Syncs if:
+    1. We're within the configured sync window (30 min after sync_time), OR
+    2. Yesterday's DSS doesn't exist (catch-up mechanism)
 
     Args:
         config: POSConfiguration object
@@ -128,7 +129,26 @@ def should_sync_now(config: POSConfiguration, db: Session = None) -> bool:
         True if sync should happen now, False otherwise
     """
     now = datetime.now()
+    yesterday = (now - timedelta(days=1)).date()
 
+    # First, check if yesterday's DSS already exists - if so, no need to sync
+    if db:
+        from accounting.models.daily_sales_summary import DailySalesSummary
+        existing_dss = db.query(DailySalesSummary).filter(
+            DailySalesSummary.area_id == config.area_id,
+            DailySalesSummary.business_date == yesterday,
+            DailySalesSummary.imported_from_pos == True  # Only check POS entries, not manual
+        ).first()
+
+        if existing_dss:
+            logger.debug(f"Area {config.area_id} already has DSS for {yesterday}, skipping auto-sync")
+            return False
+
+        # If yesterday's DSS doesn't exist, sync regardless of time window (catch-up)
+        logger.info(f"Area {config.area_id} missing DSS for {yesterday}, triggering catch-up sync")
+        return True
+
+    # Fallback when no db session: use time window logic
     # Parse sync_time (format: "HH:MM")
     try:
         sync_hour, sync_minute = map(int, config.sync_time.split(':'))
@@ -139,7 +159,6 @@ def should_sync_now(config: POSConfiguration, db: Session = None) -> bool:
         logger.warning(f"Invalid sync_time '{config.sync_time}' for area {config.area_id}, using default 03:00")
 
     # Check if we're within 30 minutes of the configured sync time
-    # This gives a window for the scheduler which runs every 10 minutes
     current_time = now.time()
 
     # Convert times to minutes since midnight for comparison
@@ -154,32 +173,13 @@ def should_sync_now(config: POSConfiguration, db: Session = None) -> bool:
     if time_diff > 30:
         return False
 
-    # Check if yesterday's data has already been synced by looking for a DSS entry
-    # This is more accurate than just checking last_sync_date timestamp
-    yesterday = (now - timedelta(days=1)).date()
-
-    if db:
-        from accounting.models.daily_sales_summary import DailySalesSummary
-        existing_dss = db.query(DailySalesSummary).filter(
-            DailySalesSummary.area_id == config.area_id,
-            DailySalesSummary.business_date == yesterday,
-            DailySalesSummary.entry_type == 'pos'  # Only check POS entries, not manual
-        ).first()
-
-        if existing_dss:
-            logger.debug(f"Area {config.area_id} already has DSS for {yesterday}, skipping auto-sync")
+    # Check if we already synced within the sync window today
+    if config.last_sync_date:
+        last_sync = config.last_sync_date
+        sync_time_today = datetime.combine(now.date(), configured_sync_time)
+        if last_sync >= sync_time_today:
+            logger.debug(f"Area {config.area_id} already synced after {sync_time_today}")
             return False
-    else:
-        # Fallback to old behavior if no db session provided
-        # Check if we already synced within the sync window today
-        if config.last_sync_date:
-            last_sync = config.last_sync_date
-            # Only skip if last sync was AFTER the sync time today
-            # This allows manual syncs before the sync window to not block scheduled syncs
-            sync_time_today = datetime.combine(now.date(), configured_sync_time)
-            if last_sync >= sync_time_today:
-                logger.debug(f"Area {config.area_id} already synced after {sync_time_today}")
-                return False
 
     logger.info(f"Area {config.area_id} is due for sync (sync_time={config.sync_time}, now={current_time}, target_date={yesterday})")
     return True

@@ -860,6 +860,38 @@ def receive_vendor_bill_from_hub(
         # Use canonical vendor name if resolved via alias
         canonical_vendor_name = vendor.vendor_name if vendor else bill_data["vendor_name"]
 
+        # Check for duplicate bill from Hub (by hub_invoice_id or bill_number + vendor)
+        hub_invoice_id = bill_data.get("hub_invoice_id")
+        if hub_invoice_id:
+            existing_hub_bill = db.query(VendorBill).filter(
+                VendorBill.reference_number == f"HUB-{hub_invoice_id}",
+                VendorBill.status != BillStatus.VOID
+            ).first()
+            if existing_hub_bill:
+                return {
+                    "success": True,
+                    "bill_id": existing_hub_bill.id,
+                    "journal_entry_id": existing_hub_bill.journal_entry_id,
+                    "message": f"Vendor bill already exists (Bill ID: {existing_hub_bill.id})",
+                    "duplicate": True
+                }
+
+        # Check for duplicate bill number for this vendor
+        if vendor:
+            existing_bill = db.query(VendorBill).filter(
+                VendorBill.bill_number == bill_data["bill_number"],
+                VendorBill.vendor_id == vendor.id,
+                VendorBill.status != BillStatus.VOID
+            ).first()
+            if existing_bill:
+                return {
+                    "success": True,
+                    "bill_id": existing_bill.id,
+                    "journal_entry_id": existing_bill.journal_entry_id,
+                    "message": f"Vendor bill '{bill_data['bill_number']}' already exists for this vendor (Bill ID: {existing_bill.id})",
+                    "duplicate": True
+                }
+
         # Create vendor bill
         bill_date = datetime.strptime(bill_data["bill_date"], "%Y-%m-%d").date()
         # Default due date to vendor's payment terms, or 30 days if not set

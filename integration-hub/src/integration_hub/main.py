@@ -17,9 +17,10 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-from integration_hub.db.database import get_db, engine, Base
+from integration_hub.db.database import get_db, engine, Base, SessionLocal
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
+from integration_hub.models.upload_job import UploadJob, UploadJobStatus
 from integration_hub.models.item_gl_mapping import ItemGLMapping, CategoryGLMapping
 from integration_hub.models.vendor import Vendor
 from integration_hub.models.hub_vendor_item import HubVendorItem
@@ -363,27 +364,141 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
     })
 
 
+def _process_upload_job(job_id: str):
+    """
+    Background task to parse invoice PDF without blocking the API response.
+    Updates job status as it progresses through parsing stages.
+    """
+    from integration_hub.services.invoice_parser import get_invoice_parser
+    from sqlalchemy import create_engine, text
+    from datetime import datetime, timezone
+
+    db = SessionLocal()
+    try:
+        # Get the job
+        job = db.query(UploadJob).filter(UploadJob.job_id == job_id).first()
+        if not job:
+            logger.error(f"Upload job not found: {job_id}")
+            return
+
+        # Mark as processing
+        job.status = UploadJobStatus.PROCESSING.value
+        job.started_at = datetime.now(timezone.utc)
+        job.progress_message = "Starting PDF processing..."
+        job.progress_percent = 5
+        db.commit()
+
+        # Parse the PDF with AI
+        parser = get_invoice_parser()
+
+        # Update progress - converting PDF and calling AI
+        job.progress_message = "Converting PDF and analyzing with AI (this may take 30-60 seconds)..."
+        job.progress_percent = 20
+        db.commit()
+
+        parse_result = parser.parse_invoice_pdf(str(job.pdf_path))
+
+        # Update progress - AI parsing complete
+        job.progress_message = "AI parsing complete, matching vendor..."
+        job.progress_percent = 80
+        db.commit()
+
+        # Prepare parsed data
+        parsed_data = {}
+        if parse_result.get("success"):
+            parsed_data = parse_result.get("data", {})
+
+            # Try to match vendor
+            if parsed_data.get('vendor_name'):
+                matched_vendor = parser.match_vendor(parsed_data['vendor_name'], db)
+                if matched_vendor:
+                    parsed_data['matched_vendor_id'] = matched_vendor.id
+
+            # Try to match location
+            if parsed_data.get('location_name'):
+                location_match = parser.match_location(parsed_data['location_name'])
+                if location_match:
+                    parsed_data['matched_location_id'] = location_match[0]
+                    parsed_data['matched_location_name'] = location_match[1]
+
+        # Get locations for the review page
+        job.progress_message = "Loading locations and vendors..."
+        job.progress_percent = 90
+        db.commit()
+
+        inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
+                                     'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+        locations = []
+        try:
+            inv_engine = create_engine(inventory_db_url)
+            with inv_engine.connect() as conn:
+                results = conn.execute(
+                    text("SELECT id, name FROM locations WHERE is_active = true ORDER BY name")
+                ).fetchall()
+                locations = [{"id": row[0], "name": row[1]} for row in results]
+        except Exception as e:
+            logger.error(f"Error fetching locations: {str(e)}")
+
+        # Get vendors
+        vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
+        vendor_list = [{"id": v.id, "name": v.name} for v in vendors]
+
+        # Store complete result
+        job.parsed_data = {
+            "success": parse_result.get("success", False),
+            "error": parse_result.get("error") or parse_result.get("message"),
+            "data": parsed_data,
+            "line_items": parsed_data.get("line_items", []),
+            "locations": locations,
+            "vendors": vendor_list
+        }
+        job.status = UploadJobStatus.COMPLETED.value
+        job.progress_message = "Complete"
+        job.progress_percent = 100
+        job.completed_at = datetime.now(timezone.utc)
+        db.commit()
+
+        logger.info(f"Upload job {job_id} completed successfully")
+
+    except Exception as e:
+        logger.error(f"Error processing upload job {job_id}: {str(e)}", exc_info=True)
+        # Mark job as failed
+        try:
+            job = db.query(UploadJob).filter(UploadJob.job_id == job_id).first()
+            if job:
+                job.status = UploadJobStatus.FAILED.value
+                job.error_message = str(e)
+                job.progress_message = "Processing failed"
+                job.completed_at = datetime.now(timezone.utc)
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
+
+
 @app.post("/invoices/upload")
 async def upload_invoice(
     request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: Session = Depends(get_db)
 ):
     """
-    Upload an invoice PDF, parse it with AI, and show review page.
+    Upload an invoice PDF and start async parsing.
 
-    New flow: Upload PDF -> AI parses it -> Show review page with parsed data and PDF viewer
-    User can review/correct the parsed data before saving.
+    Returns immediately with a job ID. Frontend polls for status until complete,
+    then redirects to review page.
     """
     import uuid
-    from integration_hub.services.invoice_parser import get_invoice_parser
 
     # Save PDF file with unique name to avoid collisions
     pdf_dir = Path("/app/uploads")
     pdf_dir.mkdir(exist_ok=True)
 
-    # Generate unique filename to avoid collisions during parsing
-    unique_id = str(uuid.uuid4())[:8]
+    # Generate unique job ID and filename
+    job_id = str(uuid.uuid4())
+    unique_id = job_id[:8]
     safe_filename = file.filename.replace(" ", "_")
     file_path = pdf_dir / f"upload_{unique_id}_{safe_filename}"
 
@@ -391,55 +506,106 @@ async def upload_invoice(
         content = await file.read()
         buffer.write(content)
 
-    # Parse the PDF with AI
-    parser = get_invoice_parser()
-    parse_result = parser.parse_invoice_pdf(str(file_path))
+    # Create upload job record
+    job = UploadJob(
+        job_id=job_id,
+        original_filename=file.filename,
+        pdf_path=str(file_path),
+        status=UploadJobStatus.PENDING.value,
+        progress_message="Upload received, queuing for processing...",
+        progress_percent=0
+    )
+    db.add(job)
+    db.commit()
 
-    # Get locations from inventory database for location dropdown
-    from sqlalchemy import create_engine, text
-    inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
-                                 'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
-    locations = []
-    try:
-        engine = create_engine(inventory_db_url)
-        with engine.connect() as conn:
-            results = conn.execute(
-                text("SELECT id, name FROM locations WHERE is_active = true ORDER BY name")
-            ).fetchall()
-            locations = [{"id": row[0], "name": row[1]} for row in results]
-    except Exception as e:
-        logger.error(f"Error fetching locations: {str(e)}")
+    # Start background processing
+    background_tasks.add_task(_process_upload_job, job_id)
 
-    # Get vendors from hub database for vendor dropdown
+    # Redirect to processing page
+    return RedirectResponse(
+        url=f"/hub/invoices/upload/processing?job_id={job_id}",
+        status_code=303
+    )
+
+
+@app.get("/invoices/upload/processing")
+async def upload_processing_page(
+    request: Request,
+    job_id: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    """Show the processing status page while invoice is being parsed."""
+    job = db.query(UploadJob).filter(UploadJob.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Upload job not found")
+
+    return templates.TemplateResponse("invoice_upload_processing.html", {
+        "request": request,
+        "job_id": job_id,
+        "filename": job.original_filename
+    })
+
+
+@app.get("/api/upload-jobs/{job_id}/status")
+async def get_upload_job_status(
+    job_id: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Get the current status of an upload job.
+    Frontend polls this endpoint until status is 'completed' or 'failed'.
+    """
+    job = db.query(UploadJob).filter(UploadJob.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Upload job not found")
+
+    return {
+        "job_id": job.job_id,
+        "status": job.status,
+        "progress_message": job.progress_message,
+        "progress_percent": job.progress_percent,
+        "error_message": job.error_message
+    }
+
+
+@app.get("/invoices/upload/review")
+async def upload_review_page(
+    request: Request,
+    job_id: str = Query(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Show the review page with parsed invoice data.
+    This is where users are redirected after async parsing completes.
+    """
+    job = db.query(UploadJob).filter(UploadJob.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Upload job not found")
+
+    if job.status != UploadJobStatus.COMPLETED.value:
+        # Not ready yet, redirect back to processing page
+        return RedirectResponse(
+            url=f"/hub/invoices/upload/processing?job_id={job_id}",
+            status_code=303
+        )
+
+    # Get the parsed data from the job
+    result = job.parsed_data or {}
+    parsed_data = result.get("data", {})
+
+    # Fetch fresh vendor list (in case new vendors were added)
     vendors = db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all()
-
-    # Prepare parsed data for the review page
-    parsed_data = {}
-    if parse_result.get("success"):
-        parsed_data = parse_result.get("data", {})
-
-        # Try to match vendor and location
-        if parsed_data.get('vendor_name'):
-            matched_vendor = parser.match_vendor(parsed_data['vendor_name'], db)
-            if matched_vendor:
-                parsed_data['matched_vendor_id'] = matched_vendor.id
-
-        if parsed_data.get('location_name'):
-            location_match = parser.match_location(parsed_data['location_name'])
-            if location_match:
-                parsed_data['matched_location_id'] = location_match[0]
-                parsed_data['matched_location_name'] = location_match[1]
 
     return templates.TemplateResponse("invoice_upload_review.html", {
         "request": request,
-        "pdf_path": str(file_path),
-        "pdf_filename": file.filename,
-        "parse_success": parse_result.get("success", False),
-        "parse_error": parse_result.get("error") or parse_result.get("message"),
+        "pdf_path": job.pdf_path,
+        "pdf_filename": job.original_filename,
+        "parse_success": result.get("success", False),
+        "parse_error": result.get("error"),
         "parsed_data": parsed_data,
-        "line_items": parsed_data.get("line_items", []),
+        "line_items": result.get("line_items", []),
         "vendors": vendors,
-        "locations": locations
+        "locations": result.get("locations", [])
     })
 
 
@@ -533,6 +699,49 @@ async def save_uploaded_invoice(
             parsed_due_date = datetime.strptime(due_date, '%Y-%m-%d').date()
     except ValueError:
         pass
+
+    # Check for duplicate invoice BEFORE saving
+    from integration_hub.services.duplicate_detection import normalize_invoice_number
+    from pathlib import Path
+    normalized_inv_num = normalize_invoice_number(invoice_number)
+
+    if normalized_inv_num and vendor_id_int:
+        # Check for existing invoice with same vendor + invoice number
+        existing = db.query(HubInvoice).filter(
+            HubInvoice.vendor_id == vendor_id_int
+        ).all()
+
+        for inv in existing:
+            if normalize_invoice_number(inv.invoice_number) == normalized_inv_num:
+                # Check if same document type (statement vs invoice)
+                inv_is_statement = inv.status == 'statement' or inv.is_statement
+                if inv_is_statement == is_statement:
+                    # This is a duplicate
+                    return templates.TemplateResponse("invoice_upload_review.html", {
+                        "request": request,
+                        "pdf_path": pdf_path,
+                        "pdf_filename": Path(pdf_path).name,
+                        "parse_success": True,
+                        "parse_error": f"Duplicate invoice detected: Invoice #{invoice_number} for this vendor already exists (Invoice ID: {inv.id}, uploaded on {inv.created_at.strftime('%Y-%m-%d') if inv.created_at else 'unknown'})",
+                        "parsed_data": {
+                            "invoice_number": invoice_number,
+                            "invoice_date": invoice_date,
+                            "due_date": due_date,
+                            "total_amount": total_amount,
+                            "tax_amount": tax_amount,
+                            "matched_vendor_id": vendor_id_int,
+                            "matched_location_id": location_id_int,
+                            "is_statement": is_statement
+                        },
+                        "line_items": line_items,
+                        "vendors": db.query(Vendor).filter(Vendor.is_active == True).order_by(Vendor.name).all(),
+                        "locations": [],
+                        "duplicate_warning": {
+                            "existing_invoice_id": inv.id,
+                            "existing_invoice_date": inv.invoice_date.isoformat() if inv.invoice_date else None,
+                            "existing_total": float(inv.total_amount) if inv.total_amount else None
+                        }
+                    }, status_code=409)
 
     # Rename the PDF file with the invoice number for better organization
     from pathlib import Path

@@ -90,6 +90,11 @@ class CustomerInvoice(Base):
     journal_entry = relationship("JournalEntry", foreign_keys=[journal_entry_id])
 
     @property
+    def customer_name(self):
+        """Get the customer name from the relationship"""
+        return self.customer.customer_name if self.customer else None
+
+    @property
     def balance_due(self):
         """Calculate remaining balance after deposits and payments"""
         return self.total_amount - self.deposit_amount - self.paid_amount

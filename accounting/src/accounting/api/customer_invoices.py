@@ -344,7 +344,17 @@ def update_invoice(
         if existing:
             raise HTTPException(status_code=400, detail="Invoice number already exists")
 
-    # Update fields
+    # Update header fields
+    if invoice_data.customer_id is not None:
+        customer = db.query(Customer).filter(Customer.id == invoice_data.customer_id).first()
+        if not customer:
+            raise HTTPException(status_code=404, detail="Customer not found")
+        invoice.customer_id = invoice_data.customer_id
+    else:
+        customer = db.query(Customer).filter(Customer.id == invoice.customer_id).first()
+
+    if invoice_data.area_id is not None:
+        invoice.area_id = invoice_data.area_id
     if invoice_data.invoice_number:
         invoice.invoice_number = invoice_data.invoice_number
     if invoice_data.invoice_date:
@@ -363,6 +373,58 @@ def update_invoice(
         invoice.notes = invoice_data.notes
     if invoice_data.deposit_amount is not None:
         invoice.deposit_amount = invoice_data.deposit_amount
+    if invoice_data.is_tax_exempt is not None:
+        invoice.is_tax_exempt = invoice_data.is_tax_exempt
+    if invoice_data.tax_rate is not None:
+        invoice.tax_rate = invoice_data.tax_rate
+
+    # Update line items if provided
+    if invoice_data.lines is not None:
+        # Delete existing line items
+        db.query(CustomerInvoiceLine).filter(
+            CustomerInvoiceLine.invoice_id == invoice_id
+        ).delete()
+
+        # Recalculate totals from new lines
+        subtotal = Decimal("0")
+        total_discount = Decimal("0")
+        total_tax = Decimal("0")
+
+        for line_data in invoice_data.lines:
+            line_amount = line_data.quantity * line_data.unit_price
+            line_discount = Decimal("0")
+            line_tax = Decimal("0")
+
+            if line_data.discount_percentage and line_data.discount_percentage > 0:
+                line_discount = line_amount * (line_data.discount_percentage / Decimal("100"))
+
+            line_net = line_amount - line_discount
+            subtotal += line_amount
+            total_discount += line_discount
+
+            if line_data.is_taxable and not invoice.is_tax_exempt:
+                tax_rate = invoice.tax_rate or (customer.tax_rate if customer else Decimal("0")) or Decimal("0")
+                line_tax = line_net * (tax_rate / Decimal("100"))
+                total_tax += line_tax
+
+            line = CustomerInvoiceLine(
+                invoice_id=invoice.id,
+                account_id=line_data.account_id,
+                description=line_data.description,
+                quantity=line_data.quantity,
+                unit_price=line_data.unit_price,
+                amount=line_amount,
+                discount_percentage=line_data.discount_percentage,
+                discount_amount=line_discount,
+                is_taxable=line_data.is_taxable,
+                tax_amount=line_tax
+            )
+            db.add(line)
+
+        invoice.subtotal = subtotal
+        invoice.discount_amount = total_discount
+        invoice.tax_amount = total_tax
+        invoice.total_amount = subtotal - total_discount + total_tax
 
     invoice.updated_at = get_now()
 
@@ -664,13 +726,20 @@ def generate_invoice_pdf(
         CustomerInvoiceLine.invoice_id == invoice_id
     ).order_by(CustomerInvoiceLine.line_number).all()
 
+    # Get area/location if set
+    area = None
+    if invoice.area_id:
+        from accounting.models.area import Area
+        area = db.query(Area).filter(Area.id == invoice.area_id).first()
+
     try:
         # Generate PDF
         pdf_service = InvoicePDFService()
         pdf_buffer = pdf_service.generate_invoice_pdf(
             invoice=invoice,
             customer=customer,
-            line_items=line_items
+            line_items=line_items,
+            area=area
         )
 
         # Return as streaming response with proper headers
@@ -743,13 +812,20 @@ def email_invoice(
         CustomerInvoiceLine.invoice_id == invoice_id
     ).order_by(CustomerInvoiceLine.line_number).all()
 
+    # Get area/location if set
+    area = None
+    if invoice.area_id:
+        from accounting.models.area import Area
+        area = db.query(Area).filter(Area.id == invoice.area_id).first()
+
     try:
         # Generate PDF
         pdf_service = InvoicePDFService()
         pdf_buffer = pdf_service.generate_invoice_pdf(
             invoice=invoice,
             customer=customer,
-            line_items=line_items
+            line_items=line_items,
+            area=area
         )
 
         # Send email
@@ -799,14 +875,14 @@ def delete_invoice(
     db: Session = Depends(get_db),
     user: User = Depends(require_auth)
 ):
-    """Delete an invoice (only if DRAFT and no payments)"""
+    """Delete an invoice (only if DRAFT or VOID and no payments)"""
 
     invoice = db.query(CustomerInvoice).filter(CustomerInvoice.id == invoice_id).first()
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    if invoice.status != InvoiceStatus.DRAFT:
-        raise HTTPException(status_code=400, detail="Can only delete draft invoices")
+    if invoice.status not in (InvoiceStatus.DRAFT, InvoiceStatus.VOID):
+        raise HTTPException(status_code=400, detail="Can only delete draft or void invoices")
 
     # Delete line items first
     db.query(CustomerInvoiceLine).filter(CustomerInvoiceLine.invoice_id == invoice_id).delete()

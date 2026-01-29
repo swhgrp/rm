@@ -1,5 +1,74 @@
 # Changelog
 
+## [2026-01-29] - Customer Invoice System Improvements
+
+### Summary
+Comprehensive overhaul of the customer invoicing workflow including bug fixes, new detail/print page, professional PDF generation, draft editing, GL posting fixes, and UI improvements.
+
+### Fixed - Accounting System
+- **Invoice Creation 422 Errors:**
+  - Fixed field name mismatches between frontend JS and Pydantic schema (`line_items`→`lines`, `discount_percent`→`discount_percentage`, `tax_exempt`→`is_tax_exempt`)
+  - Fixed error display to properly parse FastAPI 422 validation error arrays (was showing `[object Object]`)
+  - Fixed invoice number field showing "undefined" (`data.next_invoice_number`→`data.next_number`)
+  - Fixed browser form validation errors on hidden tabs (Save as Draft button type change)
+  - Files: `templates/customer_invoices.html`
+
+- **AR GL Posting Errors:**
+  - Fixed AR account number lookup (`1200`→`1210` to match actual chart of accounts)
+  - Fixed Sales Tax Payable account number (`2150`→`2300`)
+  - Removed reference to non-existent `AccountType.ACCOUNTS_RECEIVABLE` enum value
+  - Fixed `invoice.customer.name`→`invoice.customer.customer_name` (Customer model attribute)
+  - File: `services/ar_gl_service.py`
+
+- **Customer Name "undefined" in Invoice List:**
+  - Added `customer_name` property to `CustomerInvoice` ORM model
+  - Added `customer_name` field to `CustomerInvoiceRead` Pydantic schema
+  - Files: `models/customer_invoice.py`, `schemas/customer_invoice.py`
+
+- **PDF Invoice Location Branding:**
+  - PDF showed "SW Hospitality Group" instead of selected location
+  - Updated PDF endpoint to load Area data and pass to service
+  - Files: `services/invoice_pdf_service.py`, `api/customer_invoices.py`
+
+### Added - Accounting System
+- **Invoice Detail Page:**
+  - New route `/customer-invoices/{id}` with full invoice view
+  - Two-column layout: line items, event details, notes, audit trail (left); invoice summary, payment history (right)
+  - Print support with `@media print` CSS and browser print button
+  - Download PDF button
+  - Status-based action buttons (Edit, Post, Delete, Email, Record Payment, Void)
+  - Files: `templates/customer_invoice_detail.html` (NEW), `main.py`
+
+- **Professional PDF Invoice Redesign:**
+  - Navy blue brand colors, dark header rows, alternating row backgrounds
+  - Location-specific branding (name, address, phone, email from Area model)
+  - Bordered invoice details box, Balance Due highlighted with accent color
+  - File: `services/invoice_pdf_service.py`
+
+- **Draft Invoice Editing:**
+  - Full edit capability: fetches invoice data, populates form, saves via PUT
+  - Backend handles line item replacement (delete + recreate) with total recalculation
+  - Edit button on both list page and detail page
+  - Files: `schemas/customer_invoice.py`, `api/customer_invoices.py`, `templates/customer_invoices.html`, `templates/customer_invoice_detail.html`
+
+- **Draft & Void Invoice Deletion:**
+  - Permanent delete for draft and void invoices (instead of only void action)
+  - Delete button on list page and detail page with Bootstrap confirmation modal
+  - Files: `api/customer_invoices.py`, `templates/customer_invoices.html`, `templates/customer_invoice_detail.html`
+
+### Changed - Accounting System
+- **Send → Post + Email Separation:**
+  - "Send" button renamed to "Post" — finalizes invoice and posts journal entry to GL
+  - New "Email" button on posted invoices — sends PDF to customer email (can be used multiple times)
+  - Files: `templates/customer_invoice_detail.html`, `templates/customer_invoices.html`
+
+- **Bootstrap Confirm Dialogs:**
+  - Replaced all browser `confirm()` calls with `showConfirm()` Bootstrap modals on detail page
+  - Consistent with rest of system UI
+  - File: `templates/customer_invoice_detail.html`
+
+---
+
 ## [2026-01-25] - Integration Hub & Inventory Bug Fixes
 
 ### Summary

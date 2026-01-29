@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Processing Invoice - Integration Hub{% endblock %}
+
+{% block head %}
+<style>
+    .processing-container {
+        max-width: 600px;
+        margin: 80px auto;
+        text-align: center;
+    }
+    .processing-card {
+        padding: 40px;
+    }
+    .spinner-container {
+        margin: 30px 0;
+    }
+    .spinner-border {
+        width: 4rem;
+        height: 4rem;
+        border-width: 0.4rem;
+    }
+    .progress {
+        height: 24px;
+        border-radius: 12px;
+        background-color: var(--bg-elevated);
+    }
+    .progress-bar {
+        background-color: var(--accent-primary);
+        transition: width 0.3s ease;
+        border-radius: 12px;
+    }
+    .status-message {
+        font-size: 1.1rem;
+        color: var(--text-secondary);
+        margin-top: 20px;
+        min-height: 28px;
+    }
+    .filename {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+        margin-top: 10px;
+        word-break: break-all;
+    }
+    .error-container {
+        display: none;
+        margin-top: 30px;
+        padding: 20px;
+        background-color: #FFEBEE;
+        border: 1px solid #E53935;
+        border-radius: 8px;
+        text-align: left;
+    }
+    .error-container h5 {
+        color: #C62828;
+        margin-bottom: 10px;
+    }
+    .error-message {
+        color: #B71C1C;
+        font-family: monospace;
+        font-size: 0.85rem;
+        white-space: pre-wrap;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="processing-container">
+    <div class="card processing-card">
+        <div class="card-body">
+            <h2><i class="bi bi-file-earmark-pdf text-danger"></i> Processing Invoice</h2>
+            <p class="filename">{{ filename }}</p>
+
+            <div class="spinner-container" id="spinnerContainer">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Processing...</span>
+                </div>
+            </div>
+
+            <div class="progress mb-3">
+                <div class="progress-bar" role="progressbar" id="progressBar"
+                     style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                </div>
+            </div>
+
+            <p class="status-message" id="statusMessage">Initializing...</p>
+
+            <div class="error-container" id="errorContainer">
+                <h5><i class="bi bi-exclamation-triangle"></i> Processing Failed</h5>
+                <p class="error-message" id="errorMessage"></p>
+                <div class="mt-3">
+                    <a href="/hub/invoices" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Invoices
+                    </a>
+                    <button class="btn btn-primary" onclick="retryUpload()">
+                        <i class="bi bi-arrow-clockwise"></i> Try Again
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const JOB_ID = "{{ job_id }}";
+const POLL_INTERVAL = 1000; // Poll every second
+let pollCount = 0;
+const MAX_POLLS = 300; // 5 minutes max
+
+function updateProgress(percent, message) {
+    const progressBar = document.getElementById('progressBar');
+    const statusMessage = document.getElementById('statusMessage');
+
+    progressBar.style.width = percent + '%';
+    progressBar.setAttribute('aria-valuenow', percent);
+
+    if (message) {
+        statusMessage.textContent = message;
+    }
+}
+
+function showError(message) {
+    document.getElementById('spinnerContainer').style.display = 'none';
+    document.getElementById('errorContainer').style.display = 'block';
+    document.getElementById('errorMessage').textContent = message || 'An unknown error occurred during processing.';
+}
+
+function retryUpload() {
+    // Go to invoices page with upload form
+    window.location.href = '/hub/invoices';
+}
+
+async function pollStatus() {
+    pollCount++;
+
+    if (pollCount > MAX_POLLS) {
+        showError('Processing timed out. The invoice may still be processing in the background.');
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hub/api/upload-jobs/${JOB_ID}/status`);
+
+        if (!response.ok) {
+            if (response.status === 404) {
+                showError('Upload job not found. Please try uploading again.');
+                return;
+            }
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        updateProgress(data.progress_percent || 0, data.progress_message);
+
+        if (data.status === 'completed') {
+            updateProgress(100, 'Complete! Redirecting to review page...');
+            // Redirect to review page
+            setTimeout(() => {
+                window.location.href = `/hub/invoices/upload/review?job_id=${JOB_ID}`;
+            }, 500);
+            return;
+        }
+
+        if (data.status === 'failed') {
+            showError(data.error_message);
+            return;
+        }
+
+        // Continue polling for pending/processing status
+        setTimeout(pollStatus, POLL_INTERVAL);
+
+    } catch (error) {
+        console.error('Error polling status:', error);
+        // On network error, keep trying a few more times
+        if (pollCount < 10) {
+            setTimeout(pollStatus, POLL_INTERVAL * 2);
+        } else {
+            showError('Lost connection to server. Please check your network and try again.');
+        }
+    }
+}
+
+// Start polling when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    updateProgress(5, 'Upload received, starting processing...');
+    pollStatus();
+});
+</script>
+{% endblock %}

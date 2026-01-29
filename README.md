@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** January 26, 2026
+**Last Updated:** January 29, 2026
 **Status:** ~98% Complete - All 10 Systems Production Ready ✅
-**Latest:** Clover POS Discount Sync & Refund Tracking Improvements (Jan 26, 2026) ✅
+**Latest:** Customer Invoice System Overhaul - Detail Page, PDF Branding, Edit/Delete, GL Posting Fixes (Jan 29, 2026) ✅
 
 ---
 
@@ -523,16 +523,21 @@ restaurant-system/
 - ✅ 1099 tracking
 - ✅ Check printing
 
-**Accounts Receivable (AR):** *(95% Complete - Automation Features Added!* ✨🚀*)*
+**Accounts Receivable (AR):** *(97% Complete - Full Invoice Workflow!* ✨🚀*)*
 - ✅ Customer management with credit limits
 - ✅ Invoice creation with event integration
+- ✅ **Invoice detail page** with print support and PDF download 🆕
+- ✅ **Draft invoice editing** with full line item replacement 🆕
+- ✅ **Draft/void invoice deletion** 🆕
+- ✅ **Post vs Email separation** - Post finalizes to GL, Email sends to customer 🆕
+- ✅ **Professional PDF invoices** with location branding (ReportLab) 🌟
+- ✅ **Auto GL posting** - Journal entries created on invoice post (DR: AR, CR: Revenue) 🌟
 - ✅ **Credit limit enforcement** (prevents over-limit invoicing) 🌟
-- ✅ **PDF invoice generation** with ReportLab 🌟
 - ✅ **Email invoice delivery** with SMTP configuration 🌟
 - ✅ **Customer statements** with aging and transaction detail 🌟
-- ✅ **Recurring invoices** - Automated billing from templates (weekly, monthly, quarterly, annually) 🆕🔥
-- ✅ **Payment reminders** - Automated 3-tier reminder system for overdue invoices 🆕🔥
-- ✅ **AR automation script** - Daily cron job for invoice generation and reminder processing 🆕
+- ✅ **Recurring invoices** - Automated billing from templates (weekly, monthly, quarterly, annually) 🔥
+- ✅ **Payment reminders** - Automated 3-tier reminder system for overdue invoices 🔥
+- ✅ **AR automation script** - Daily cron job for invoice generation and reminder processing
 - ✅ Payment receipt and tracking
 - ✅ AR aging reports (30/60/90+ days)
 - ✅ Collections tracking

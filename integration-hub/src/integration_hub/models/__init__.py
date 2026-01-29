@@ -29,6 +29,7 @@ from integration_hub.models.price_history import PriceHistory
 from integration_hub.models.system_setting import SystemSetting
 from integration_hub.models.size_unit import SizeUnit
 from integration_hub.models.container import Container
+from integration_hub.models.upload_job import UploadJob, UploadJobStatus
 
 __all__ = [
     # UOM
@@ -55,4 +56,7 @@ __all__ = [
     # Backbar-style sizing
     'SizeUnit',
     'Container',
+    # Upload Jobs
+    'UploadJob',
+    'UploadJobStatus',
 ]

@@ -10,8 +10,9 @@ from events.core.database import get_db
 from events.core.config import settings
 from events.models import (
     Client, Event, EventTemplate, EventStatus, Venue,
-    Location, EventType, MealType, BeverageService
+    Location, EventType, MealType, BeverageService, User
 )
+from events.models.user import UserLocation
 from events.schemas.intake import PublicIntakeRequest, PublicIntakeResponse
 from events.schemas.settings import (
     LocationResponse, EventTypeResponse,
@@ -125,14 +126,29 @@ async def public_beo_intake(
             tasks = task_service.generate_tasks_from_template(db, event, template)
             logger.info(f"Generated {len(tasks)} tasks for event {event.id}")
 
-        # Sync to CalDAV for admin user if enabled
-        if settings.CALDAV_ENABLED:
+        # Sync to CalDAV for all users assigned to this venue
+        if settings.CALDAV_ENABLED and event.venue_id:
             try:
                 from events.services.caldav_sync_service import CalDAVSyncService
                 caldav_service = CalDAVSyncService()
-                # Sync to admin user 'andy' - new events should appear in admin calendar
-                caldav_service.sync_event_to_caldav(event, 'andy')
-                logger.info(f"Event {event.id} synced to CalDAV for admin")
+
+                # Get all users who have access to this event's venue
+                user_venue_assignments = db.query(UserLocation).filter(
+                    UserLocation.venue_id == event.venue_id
+                ).all()
+
+                synced_count = 0
+                for assignment in user_venue_assignments:
+                    user = db.query(User).filter(User.id == assignment.user_id).first()
+                    if user and user.is_active:
+                        try:
+                            caldav_service.sync_event_to_caldav(event, user.email)
+                            synced_count += 1
+                            logger.info(f"Event {event.id} synced to CalDAV for user {user.email}")
+                        except Exception as e:
+                            logger.error(f"Failed to sync event {event.id} to CalDAV for {user.email}: {e}")
+
+                logger.info(f"Event {event.id} synced to CalDAV for {synced_count} users")
             except Exception as e:
                 logger.error(f"Failed to sync event {event.id} to CalDAV: {e}")
                 # Don't fail the whole request if CalDAV sync fails
