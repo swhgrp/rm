@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** January 29, 2026
+**Last Updated:** February 4, 2026
 **System Status:** Production (98% Complete)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -38,63 +38,75 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - January 29, 2026)
+### Most Recent Work (Current Session - February 4, 2026)
+
+**CROSS-SYSTEM BUG FIXES & UI IMPROVEMENTS** ✅ **COMPLETE**
+
+#### 1. **Event Description Duplication Fix** ✅
+- **Problem:** CalDAV sync feedback loop caused event descriptions to duplicate exponentially
+  - Push to CalDAV appended metadata (Type, Guests, Status, Client) to description
+  - Pull from CalDAV (every 15 min) wrote enriched description back to DB
+  - Next push re-appended metadata, causing duplication
+- **Solution:**
+  - Stopped pulling description from CalDAV back to DB (web app is source of truth)
+  - Added safety stripping of previously-appended metadata on push (split on `\n---`)
+- **File:** `events/src/events/services/caldav_sync_service.py` (lines 63-76, 695-703)
+
+#### 2. **Menu & Catering Tab Theme Fix** ✅
+- **Problem:** Menu & Catering page used hardcoded GitHub dark theme colors instead of slate light theme
+- **Solution:** Replaced all hardcoded hex colors with CSS variables:
+  - `#0d1117` → `var(--bg-secondary)`, `#161b22` → `var(--bg-tertiary)`, `#30363d` → `var(--border-primary)`
+  - `#8b949e` → `var(--text-muted)`, `#e6edf3`/`#c9d1d9` → `var(--text-primary)`
+  - Fixed both static HTML and dynamically-generated JS (`addMenuSection()`, `addMenuItem()`, `updateSectionLabel()`)
+- **File:** `events/src/events/templates/admin/event_detail.html`
+
+#### 3. **Session Auto-Logout Fix (Keepalive)** ✅
+- **Problem:** Users logged out after 30 minutes even with activity (absolute timeout, not idle-based)
+- **Solution:** Added `/api/auth/keepalive` endpoints to 4 systems:
+  - Events (`events/src/events/api/auth.py`) - refreshes in-memory session dict
+  - Accounting (`accounting/src/accounting/api/auth.py`) - extends DB session `expires_at`
+  - HR (`hr/src/hr/api/auth.py`) - refreshes cookie max_age
+  - Files (`files/src/files/api/auth.py`) - issues fresh JWT token
+- Updated `inactivity-warning.js` to ping keepalive every 5 minutes (both Portal and local system)
+- Copied updated JS to all 8 system locations (events, accounting, hr, files, inventory, integration-hub, portal, shared)
+
+#### 4. **BEO PDF Timezone Fix** ✅
+- **Problem:** BEO PDF showed times 4 hours ahead (UTC instead of Eastern Time)
+- **Solution:**
+  - Added `_to_et()` function and Jinja2 `to_et` filter in `pdf_service.py`
+  - Applied `|to_et` filter to all time fields in BEO template
+  - Changed `datetime.now()` to `datetime.now(_ET)` for "Generated" timestamp
+- **Files:** `events/src/events/services/pdf_service.py`, `events/src/events/templates/pdf/beo_template.html`
+
+#### 5. **Sidebar Tablet Responsiveness** ✅
+- **Problem:** Sidebar collapsed on iPhone (≤768px) but not on tablet - breakpoint too small
+- **Solution:** Updated all 5 systems to match Websites system's tablet-friendly implementation:
+  - Changed breakpoint from `768px` to `991.98px` (Bootstrap's lg breakpoint)
+  - Added mobile header bar (56px fixed) with hamburger button and system name
+  - Added close button (X) inside sidebar brand area
+  - Improved JS: body overflow lock, resize listener, Escape key support
+  - Uses `.show` class consistently (replaces inconsistent `.active`/`.collapsed`)
+- **Systems updated:**
+  - `events/src/events/templates/base.html`
+  - `accounting/src/accounting/templates/base.html`
+  - `hr/src/hr/templates/base.html`
+  - `inventory/src/restaurant_inventory/templates/base.html`
+  - `integration-hub/src/integration_hub/templates/base.html`
+
+---
+
+### Previous Session Work (January 29, 2026)
 
 **CUSTOMER INVOICE SYSTEM IMPROVEMENTS** ✅ **COMPLETE**
 
-#### 1. **Invoice Creation Bug Fixes** ✅
-- **Problem:** Creating invoices returned 422 errors and showed `[object Object]` in error dialog
-- **Solution:** Fixed field name mismatches between frontend and Pydantic schema:
-  - `line_items` → `lines`, `discount_percent` → `discount_percentage`, `tax_exempt` → `is_tax_exempt`
-  - Fixed error display to parse FastAPI 422 validation error arrays
-  - Fixed invoice number field showing "undefined" (`data.next_invoice_number` → `data.next_number`)
-  - Fixed browser form validation errors on hidden tabs (changed Save as Draft from `type="submit"` to `type="button"`)
-- **File:** `accounting/src/accounting/templates/customer_invoices.html`
-
-#### 2. **Invoice Detail Page** ✅
-- **Feature:** New detail page at `/customer-invoices/{id}` with full invoice view, print support, and PDF download
-- **Template:** `accounting/src/accounting/templates/customer_invoice_detail.html` (NEW)
-- **Route:** Added in `accounting/src/accounting/main.py`
-- **Features:** Two-column layout, line items table, invoice summary, payment history, event details, audit trail
-- **Print:** `@media print` CSS hides navigation/buttons, `window.print()` for browser print
-
-#### 3. **Professional PDF Invoice** ✅
-- **Problem:** PDF showed "SW Hospitality Group" instead of selected location (e.g., "The Links Grill")
-- **Solution:** Rewrote PDF service with location branding and professional styling
-  - Navy blue brand colors, bordered invoice details box, alternating row backgrounds
-  - Location name/address/phone/email from Area model
-- **Files:** `accounting/src/accounting/services/invoice_pdf_service.py`, `accounting/src/accounting/api/customer_invoices.py`
-
-#### 4. **Draft Invoice Edit & Delete** ✅
-- **Feature:** Full edit capability for draft invoices with line item replacement
-- **Backend:** Expanded `CustomerInvoiceUpdate` schema with `customer_id`, `area_id`, `is_tax_exempt`, `tax_rate`, `lines`; PUT endpoint deletes and recreates line items with total recalculation
-- **Frontend:** Edit button fetches invoice data and populates form; Save uses PUT when editing
-- **Delete:** Draft and void invoices can be permanently deleted (not just voided)
-- **Files:** `accounting/src/accounting/schemas/customer_invoice.py`, `accounting/src/accounting/api/customer_invoices.py`, `accounting/src/accounting/templates/customer_invoices.html`, `accounting/src/accounting/templates/customer_invoice_detail.html`
-
-#### 5. **Post vs Email Separation** ✅
-- **Problem:** "Send" button was ambiguous - it posted to GL, not emailed to customer
-- **Solution:** Separated into two distinct actions:
-  - **Post** (draft → sent): Finalizes invoice and posts journal entry to GL
-  - **Email** (sent invoices): Sends PDF to customer email, can be used multiple times
-- **Files:** Both template files updated with new button labels and functions
-
-#### 6. **AR GL Service Fixes** ✅
-- **Problem:** GL posting failed with "ACCOUNTS_RECEIVABLE" error and "Customer has no attribute 'name'"
-- **Solution:**
-  - Fixed account numbers: AR `1200` → `1210`, Sales Tax Payable `2150` → `2300`
-  - Removed reference to non-existent `AccountType.ACCOUNTS_RECEIVABLE` enum
-  - Fixed `invoice.customer.name` → `invoice.customer.customer_name`
-- **File:** `accounting/src/accounting/services/ar_gl_service.py`
-
-#### 7. **Customer Name in API Response** ✅
-- **Problem:** Invoice list showed "undefined" for customer name
-- **Solution:** Added `customer_name` property to `CustomerInvoice` ORM model and field to `CustomerInvoiceRead` Pydantic schema
-- **Files:** `accounting/src/accounting/models/customer_invoice.py`, `accounting/src/accounting/schemas/customer_invoice.py`
-
-#### 8. **Bootstrap Confirm Dialogs** ✅
-- Replaced all browser `confirm()` calls with `showConfirm()` Bootstrap modals on invoice detail page
-- Matches the rest of the system's UI pattern
+- Invoice creation 422 error fixes (field name mismatches, error display, form validation)
+- New invoice detail page at `/customer-invoices/{id}` with print and PDF download
+- Professional PDF invoice with location branding (name, address, phone, email from Area)
+- Draft invoice edit/delete capability with line item replacement
+- Post vs Email button separation (Post = finalize + GL; Email = send PDF)
+- AR GL service fixes (account numbers, enum, attribute names)
+- Customer name in API response (ORM property + schema field)
+- Bootstrap confirm dialogs on detail page
 
 ---
 

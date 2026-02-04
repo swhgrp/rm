@@ -170,6 +170,29 @@ async def sso_login(
     return redirect_response
 
 
+@router.get("/keepalive")
+async def keepalive(request: Request, response: Response, db: Session = Depends(get_db)):
+    """
+    Keep the HR session alive.
+    Called periodically by the frontend when user is active to extend the session.
+    """
+    session_token = request.cookies.get("hr_session")
+
+    if not session_token or session_token not in active_sessions:
+        raise HTTPException(status_code=401, detail="Session expired")
+
+    # Refresh cookie max_age (session is in-memory dict, no expiration to update)
+    response.set_cookie(
+        key="hr_session",
+        value=session_token,
+        httponly=True,
+        max_age=1800,
+        samesite="lax"
+    )
+
+    return {"status": "ok", "session_extended": True}
+
+
 @router.post("/logout")
 async def logout(request: Request, response: Response):
     """Logout from HR system"""

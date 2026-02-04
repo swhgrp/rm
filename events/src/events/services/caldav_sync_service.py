@@ -64,11 +64,15 @@ class CalDAVSyncService:
             description_parts = []
 
             # Event description/notes first (main content)
+            # Strip any previously-appended metadata (everything after "---" separator)
+            # to prevent duplication if the description was corrupted by a prior pull cycle
             if event.description:
-                description_parts.append(event.description)
+                clean_description = event.description.split('\n---')[0].strip()
+                if clean_description:
+                    description_parts.append(clean_description)
 
-            # Separator if we have description and more details
-            if event.description and (event.guest_count or event.client or event.event_type):
+            # Separator if we have user-entered description and more details to append
+            if description_parts and (event.guest_count or event.client or event.event_type):
                 description_parts.append("\n---")
 
             # Event details section
@@ -692,9 +696,11 @@ class CalDAVSyncService:
                                     if cal_summary and event.title != cal_summary:
                                         event.title = cal_summary
                                         changed = True
-                                    if cal_description != event.description:
-                                        event.description = cal_description
-                                        changed = True
+                                    # NOTE: We do NOT sync description from CalDAV back to database.
+                                    # The web app is the source of truth for event description.
+                                    # The CalDAV description is an enriched version that includes
+                                    # metadata (type, guests, status, client info), so pulling it
+                                    # back would cause duplication on the next push cycle.
                                     if start_dt and event.start_at != start_dt:
                                         event.start_at = start_dt
                                         changed = True

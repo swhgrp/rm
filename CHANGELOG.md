@@ -1,5 +1,70 @@
 # Changelog
 
+## [2026-02-04] - Cross-System Bug Fixes & Mobile Tablet Support
+
+### Summary
+Fixed event description duplication from CalDAV sync, themed Menu & Catering tab to match slate light design, added keepalive endpoints for sliding session timeouts, fixed BEO PDF timezone (UTC→ET), and made sidebar collapsible on tablets across all systems.
+
+### Fixed - Events System
+- **CalDAV Description Duplication:**
+  - Push/pull sync loop caused descriptions to duplicate exponentially
+  - Stopped pulling description from CalDAV back to DB (web app is source of truth)
+  - Added safety stripping of previously-appended metadata on push
+  - File: `events/src/events/services/caldav_sync_service.py`
+
+- **Menu & Catering Dark Theme Colors:**
+  - Replaced hardcoded GitHub dark colors (#0d1117, #161b22, #30363d, etc.) with CSS variables
+  - Fixed both static HTML and dynamically-generated JS functions
+  - File: `events/src/events/templates/admin/event_detail.html`
+
+- **BEO PDF Wrong Times (UTC→ET):**
+  - Added `to_et` Jinja2 filter converting UTC datetimes to America/New_York
+  - Applied to all time fields in BEO template
+  - Changed "Generated" timestamp to use Eastern Time
+  - Files: `events/src/events/services/pdf_service.py`, `events/src/events/templates/pdf/beo_template.html`
+
+### Fixed - All Systems (Events, Accounting, HR, Files, Inventory, Integration Hub, Portal)
+- **Session Auto-Logout After 30 Minutes:**
+  - Users were logged out even with active use (absolute timeout, not idle-based)
+  - Added `/api/auth/keepalive` endpoints to Events, Accounting, HR, and Files
+  - Updated `inactivity-warning.js` to ping keepalive every 5 minutes
+  - Backend sessions now extend on each keepalive ping (sliding window timeout)
+  - Files: `*/api/auth.py` (4 systems), `*/static/js/inactivity-warning.js` (8 locations)
+
+### Changed - All Systems (Events, Accounting, HR, Inventory, Integration Hub)
+- **Sidebar Collapsible on Tablets:**
+  - Changed mobile breakpoint from `768px` to `991.98px` (Bootstrap lg breakpoint)
+  - Added mobile header bar (56px) with hamburger button and system name
+  - Added close button (X) inside sidebar brand area
+  - Improved JS: body overflow lock, resize listener, Escape key close, auto-close on link click
+  - Consistent `.show` class replaces inconsistent `.active`/`.collapsed` toggling
+  - Files: `*/templates/base.html` (5 systems)
+
+### Files Modified
+- `events/src/events/services/caldav_sync_service.py`
+- `events/src/events/templates/admin/event_detail.html`
+- `events/src/events/services/pdf_service.py`
+- `events/src/events/templates/pdf/beo_template.html`
+- `events/src/events/templates/base.html`
+- `events/src/events/api/auth.py`
+- `events/src/events/static/js/inactivity-warning.js`
+- `accounting/src/accounting/templates/base.html`
+- `accounting/src/accounting/api/auth.py`
+- `accounting/src/accounting/static/js/inactivity-warning.js`
+- `hr/src/hr/templates/base.html`
+- `hr/src/hr/api/auth.py`
+- `hr/src/hr/static/js/inactivity-warning.js`
+- `inventory/src/restaurant_inventory/templates/base.html`
+- `inventory/src/restaurant_inventory/static/js/inactivity-warning.js`
+- `integration-hub/src/integration_hub/templates/base.html`
+- `integration-hub/src/integration_hub/static/js/inactivity-warning.js`
+- `files/src/files/api/auth.py`
+- `files/src/files/static/js/inactivity-warning.js`
+- `portal/js/inactivity-warning.js`
+- `shared/static/js/inactivity-warning.js`
+
+---
+
 ## [2026-01-29] - Customer Invoice System Improvements
 
 ### Summary

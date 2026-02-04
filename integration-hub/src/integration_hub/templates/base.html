@@ -58,6 +58,7 @@
            ===================================================== */
 
         :root {
+            --sidebar-width: 200px;
             --bg-primary: #ECEFF1;
             --bg-secondary: #FFFFFF;
             --bg-tertiary: #F5F5F5;
@@ -88,24 +89,59 @@
             padding: 0;
         }
 
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background-color: #455A64;
+            border-bottom: none;
+            z-index: 1001;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(69, 90, 100, 0.3);
+        }
+
+        .mobile-header .brand {
+            color: #FFFFFF;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .hamburger-btn {
+            background: none;
+            border: none;
+            color: #FFFFFF;
+            font-size: 1.5rem;
+            padding: 0.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hamburger-btn:hover {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
         /* ========== SIDEBAR NAVIGATION ========== */
         .sidebar {
             position: fixed;
             top: 0;
             left: 0;
             height: 100vh;
-            width: 200px;
+            width: var(--sidebar-width);
             background-color: #455A64;
             padding-top: 20px;
             z-index: 1000;
             overflow-y: auto;
             border-right: none;
-            transition: transform 0.3s ease-in-out;
+            transition: transform 0.3s ease;
             box-shadow: 2px 0 8px rgba(69, 90, 100, 0.25);
-        }
-
-        .sidebar.collapsed {
-            transform: translateX(-200px);
         }
 
         .sidebar-brand {
@@ -116,6 +152,24 @@
             font-weight: 600;
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             margin-bottom: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .sidebar-close {
+            display: none;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.25rem;
+        }
+
+        .sidebar-close:hover {
+            color: #FFFFFF;
         }
 
         .sidebar-brand img {
@@ -162,7 +216,7 @@
 
         /* Main content area */
         .main-wrapper {
-            margin-left: 200px;
+            margin-left: var(--sidebar-width);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -315,72 +369,59 @@
             color: var(--accent-primary);
         }
 
-        /* Mobile menu toggle button */
-        .mobile-menu-toggle {
-            display: none;
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            z-index: 1100;
-            background-color: #455A64;
-            color: #FFFFFF;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            padding: 8px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 20px;
-        }
-
-        .mobile-menu-toggle:hover {
-            background-color: #37474F;
-        }
-
+        /* Sidebar Overlay (mobile) */
         .sidebar-overlay {
             display: none;
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
             z-index: 999;
         }
 
-        /* Responsive design */
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-200px);
+        .sidebar-overlay.show {
+            display: block;
+        }
+
+        /* Mobile & Tablet responsive design */
+        @media (max-width: 991.98px) {
+            .mobile-header {
+                display: flex;
             }
 
-            .sidebar.active {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.show {
                 transform: translateX(0);
             }
 
-            .sidebar-overlay.active {
+            .sidebar-close {
                 display: block;
+                position: absolute;
+                right: 10px;
+                top: 50%;
+                transform: translateY(-50%);
             }
 
             .main-wrapper {
                 margin-left: 0;
             }
 
-            .mobile-menu-toggle {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
             .top-navbar {
                 padding: 10px 10px;
+                margin-top: 56px;
             }
 
             .page-title {
                 font-size: 14px;
-                margin-left: 48px;
             }
 
             .content-area {
-                padding: 70px 15px 15px 15px !important;
+                padding: 15px !important;
             }
         }
 
@@ -425,18 +466,25 @@
     {% block extra_styles %}{% endblock %}
 </head>
 <body>
-    <!-- Mobile menu toggle button -->
-    <button class="mobile-menu-toggle" onclick="toggleSidebar()">
-        <i class="bi bi-list"></i>
-    </button>
+    <!-- Mobile Header -->
+    <header class="mobile-header">
+        <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
+            <i class="bi bi-list"></i>
+        </button>
+        <span class="brand">Integration Hub</span>
+        <div style="width: 44px;"></div>
+    </header>
 
     <!-- Sidebar Overlay -->
-    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar-overlay" onclick="closeSidebar()"></div>
 
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-brand">
             <img src="/hub/static/images/sw-logo.png" alt="SW Logo">
+            <button class="sidebar-close" onclick="closeSidebar()" aria-label="Close menu">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
         <ul class="sidebar-nav">
             <li><a href="/portal/" title="Return to Portal"><i class="bi bi-house-door"></i> Portal Home</a></li>
@@ -506,12 +554,43 @@
             });
         });
 
+        // Mobile sidebar toggle functions
         function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.querySelector('.sidebar-overlay');
-            sidebar.classList.toggle('active');
-            overlay.classList.toggle('active');
+            document.querySelector('.sidebar').classList.toggle('show');
+            document.querySelector('.sidebar-overlay').classList.toggle('show');
+            document.body.style.overflow = document.querySelector('.sidebar').classList.contains('show') ? 'hidden' : '';
         }
+
+        function closeSidebar() {
+            document.querySelector('.sidebar').classList.remove('show');
+            document.querySelector('.sidebar-overlay').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        // Close sidebar on window resize if desktop
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 992) {
+                closeSidebar();
+            }
+        });
+
+        // Close sidebar on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSidebar();
+            }
+        });
+
+        // Close sidebar on link click for mobile/tablet
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.sidebar-nav a').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 991) {
+                        closeSidebar();
+                    }
+                });
+            });
+        });
 
         // Auto-logout after 30 minutes of inactivity
         (function() {

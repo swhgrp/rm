@@ -4,9 +4,21 @@ from weasyprint import HTML, CSS
 from jinja2 import Environment, FileSystemLoader
 from typing import Dict, Any
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import logging
 
 logger = logging.getLogger(__name__)
+
+_ET = ZoneInfo("America/New_York")
+
+
+def _to_et(dt):
+    """Convert a datetime to Eastern Time for display"""
+    if dt is None:
+        return None
+    if dt.tzinfo is not None:
+        return dt.astimezone(_ET)
+    return dt
 
 
 class PDFService:
@@ -18,6 +30,8 @@ class PDFService:
         self.jinja_env = Environment(
             loader=FileSystemLoader(os.path.join(base_dir, "templates", "pdf"))
         )
+        # Add timezone conversion filter for templates
+        self.jinja_env.filters['to_et'] = _to_et
 
     def generate_beo_pdf(
         self,
@@ -44,7 +58,7 @@ class PDFService:
                 'event': event,
                 'client': client,
                 'venue': venue,
-                'now': datetime.now()
+                'now': datetime.now(_ET)
             }
 
             # Render HTML template
@@ -88,7 +102,7 @@ class PDFService:
             variables = {
                 'event': event,
                 'tasks': tasks or [],
-                'now': datetime.now()
+                'now': datetime.now(_ET)
             }
 
             # For now, use the BEO template

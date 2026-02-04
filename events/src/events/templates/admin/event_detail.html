@@ -539,7 +539,7 @@
 
     <!-- Menu & Catering Tab -->
     <div id="tab-menu" class="tab-content">
-        <h3 style="color: #c9d1d9; font-size: 18px; margin-bottom: 15px;">Menu & Catering</h3>
+        <h3 style="color: var(--text-primary); font-size: 18px; margin-bottom: 15px;">Menu & Catering</h3>
 
         <div id="menuContent">
             <!-- Service Style -->
@@ -571,7 +571,7 @@
                 <div id="menuSections">
                     <!-- Sections will be added here dynamically -->
                 </div>
-                <div id="menuEmptyState" style="color: #8b949e; font-style: italic; text-align: center; padding: 20px;">
+                <div id="menuEmptyState" style="color: var(--text-muted); font-style: italic; text-align: center; padding: 20px;">
                     No menu sections yet. Click "Add Section" to start building your menu.
                 </div>
             </div>
@@ -581,7 +581,7 @@
                 <div class="info-card-title"><i class="bi bi-cup-straw"></i> Beverage Service</div>
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 10px;">
                     <div>
-                        <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Bar Type</label>
+                        <label style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 4px;">Bar Type</label>
                         <select id="menuBarType" class="form-control-custom" style="width: 100%; padding: 8px 12px;">
                             <option value="">No bar service</option>
                             <option value="open">Open Bar</option>
@@ -592,12 +592,12 @@
                         </select>
                     </div>
                     <div>
-                        <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Service Hours</label>
+                        <label style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 4px;">Service Hours</label>
                         <input type="text" id="menuBarHours" class="form-control-custom" placeholder="e.g., 6pm - 10pm" style="width: 100%; padding: 8px 12px;">
                     </div>
                 </div>
                 <div style="margin-top: 15px;">
-                    <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Beverage Details</label>
+                    <label style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 4px;">Beverage Details</label>
                     <textarea id="menuBeverageDetails" class="form-control-custom" rows="2" placeholder="Specific drinks, brands, signature cocktails, etc." style="width: 100%; padding: 8px 12px;"></textarea>
                 </div>
             </div>
@@ -606,37 +606,37 @@
             <div class="info-card" style="margin-bottom: 20px; border-left-color: #f0883e;">
                 <div class="info-card-title"><i class="bi bi-heart-pulse"></i> Dietary & Special Requests</div>
                 <div style="margin-top: 10px;">
-                    <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Dietary Accommodations</label>
+                    <label style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 4px;">Dietary Accommodations</label>
                     <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;" id="dietaryTags">
-                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                        <label style="display: flex; align-items: center; gap: 5px; color: var(--text-primary); cursor: pointer;">
                             <input type="checkbox" id="diet_vegetarian" style="width: 16px; height: 16px;"> Vegetarian
                         </label>
-                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                        <label style="display: flex; align-items: center; gap: 5px; color: var(--text-primary); cursor: pointer;">
                             <input type="checkbox" id="diet_vegan" style="width: 16px; height: 16px;"> Vegan
                         </label>
-                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                        <label style="display: flex; align-items: center; gap: 5px; color: var(--text-primary); cursor: pointer;">
                             <input type="checkbox" id="diet_gluten_free" style="width: 16px; height: 16px;"> Gluten-Free
                         </label>
-                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                        <label style="display: flex; align-items: center; gap: 5px; color: var(--text-primary); cursor: pointer;">
                             <input type="checkbox" id="diet_dairy_free" style="width: 16px; height: 16px;"> Dairy-Free
                         </label>
-                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                        <label style="display: flex; align-items: center; gap: 5px; color: var(--text-primary); cursor: pointer;">
                             <input type="checkbox" id="diet_nut_free" style="width: 16px; height: 16px;"> Nut-Free
                         </label>
-                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                        <label style="display: flex; align-items: center; gap: 5px; color: var(--text-primary); cursor: pointer;">
                             <input type="checkbox" id="diet_kosher" style="width: 16px; height: 16px;"> Kosher
                         </label>
-                        <label style="display: flex; align-items: center; gap: 5px; color: #c9d1d9; cursor: pointer;">
+                        <label style="display: flex; align-items: center; gap: 5px; color: var(--text-primary); cursor: pointer;">
                             <input type="checkbox" id="diet_halal" style="width: 16px; height: 16px;"> Halal
                         </label>
                     </div>
-                    <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Special Requests / Allergies</label>
+                    <label style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 4px;">Special Requests / Allergies</label>
                     <textarea id="menuSpecialRequests" class="form-control-custom" rows="2" placeholder="Specific allergies, guest preferences, timing notes, etc." style="width: 100%; padding: 8px 12px;"></textarea>
                 </div>
             </div>
 
             <!-- Equipment/Rentals -->
-            <div class="info-card" style="margin-bottom: 20px; border-left-color: #8b949e;">
+            <div class="info-card" style="margin-bottom: 20px; border-left-color: var(--text-muted);">
                 <div class="info-card-title"><i class="bi bi-box-seam"></i> Equipment & Rentals</div>
                 <div style="margin-top: 10px;">
                     <textarea id="menuEquipment" class="form-control-custom" rows="2" placeholder="Chafing dishes, linens, china, tables, chairs, etc." style="width: 100%; padding: 8px 12px;"></textarea>
@@ -1219,13 +1219,13 @@
         ).join('');
 
         const html = `
-            <div class="menu-section" id="menuSection${sectionId}" style="background: #0d1117; border: 1px solid #30363d; border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
-                <div class="section-header" onclick="toggleMenuSection(${sectionId})" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: #161b22; cursor: pointer; user-select: none;">
+            <div class="menu-section" id="menuSection${sectionId}" style="background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
+                <div class="section-header" onclick="toggleMenuSection(${sectionId})" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: var(--bg-tertiary); cursor: pointer; user-select: none;">
                     <div style="display: flex; align-items: center; gap: 10px;">
-                        <i class="bi bi-chevron-down section-toggle-icon" id="sectionIcon${sectionId}" style="transition: transform 0.2s; transform: rotate(-90deg);"></i>
-                        <span class="section-header-label" id="sectionLabel${sectionId}" style="color: #8b949e;">New Section</span>
+                        <i class="bi bi-chevron-down section-toggle-icon" id="sectionIcon${sectionId}" style="transition: transform 0.2s; transform: rotate(-90deg); color: var(--text-muted);"></i>
+                        <span class="section-header-label" id="sectionLabel${sectionId}" style="color: var(--text-muted);">New Section</span>
                     </div>
-                    <button type="button" onclick="event.stopPropagation(); removeMenuSection(${sectionId})" style="background: transparent; border: 1px solid #f85149; color: #f85149; border-radius: 4px; padding: 4px 8px; cursor: pointer;">
+                    <button type="button" onclick="event.stopPropagation(); removeMenuSection(${sectionId})" style="background: transparent; border: 1px solid #d32f2f; color: #d32f2f; border-radius: 4px; padding: 4px 8px; cursor: pointer;">
                         <i class="bi bi-trash"></i>
                     </button>
                 </div>
@@ -1288,16 +1288,16 @@
 
         if (sectionName && typeName && typeName !== 'Section Type') {
             label.textContent = `${typeName}: ${sectionName}${itemText}`;
-            label.style.color = '#e6edf3';
+            label.style.color = 'var(--text-primary)';
         } else if (sectionName) {
             label.textContent = `${sectionName}${itemText}`;
-            label.style.color = '#e6edf3';
+            label.style.color = 'var(--text-primary)';
         } else if (typeName && typeName !== 'Section Type') {
             label.textContent = `${typeName}${itemText}`;
-            label.style.color = '#e6edf3';
+            label.style.color = 'var(--text-primary)';
         } else {
             label.textContent = 'New Section';
-            label.style.color = '#8b949e';
+            label.style.color = 'var(--text-muted)';
         }
     }
 
@@ -1319,7 +1319,7 @@
         const itemId = menuItemCounter++;
 
         const html = `
-            <div class="menu-item-row" id="menuItem${itemId}" data-section-id="${sectionId}" style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; padding: 8px; background: #161b22; border-radius: 4px;">
+            <div class="menu-item-row" id="menuItem${itemId}" data-section-id="${sectionId}" style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 8px; padding: 8px; background: var(--bg-tertiary); border-radius: 4px;">
                 <div style="flex: 2;">
                     <input type="text" class="form-control-custom item-name" placeholder="Item name" value="${data?.name || ''}" style="width: 100%; padding: 6px 10px; margin-bottom: 4px;">
                     <input type="text" class="form-control-custom item-description" placeholder="Description (optional)" value="${data?.description || ''}" style="width: 100%; padding: 6px 10px; font-size: 13px;">
@@ -1329,11 +1329,11 @@
                 </div>
                 <div style="width: 90px;">
                     <div style="display: flex; align-items: center;">
-                        <span style="color: #8b949e; padding: 0 5px;">$</span>
+                        <span style="color: var(--text-muted); padding: 0 5px;">$</span>
                         <input type="number" class="form-control-custom item-price" placeholder="Price" value="${data?.price || ''}" step="0.01" min="0" style="width: 100%; padding: 6px 10px; font-size: 13px;">
                     </div>
                 </div>
-                <button type="button" onclick="removeMenuItem(${itemId}, ${sectionId})" style="background: transparent; border: none; color: #f85149; cursor: pointer; padding: 6px;">
+                <button type="button" onclick="removeMenuItem(${itemId}, ${sectionId})" style="background: transparent; border: none; color: #d32f2f; cursor: pointer; padding: 6px;">
                     <i class="bi bi-x-lg"></i>
                 </button>
             </div>

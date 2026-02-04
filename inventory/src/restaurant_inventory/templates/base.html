@@ -75,6 +75,7 @@
            ===================================================== */
 
         :root {
+            --sidebar-width: 200px;
             /* Background colors - more contrast */
             --bg-primary: #ECEFF1;
             --bg-secondary: #FFFFFF;
@@ -119,58 +120,89 @@
             padding: 0;
         }
 
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background-color: #455A64;
+            border-bottom: none;
+            z-index: 1001;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(69, 90, 100, 0.3);
+        }
+
+        .mobile-header .brand {
+            color: #FFFFFF;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .hamburger-btn {
+            background: none;
+            border: none;
+            color: #FFFFFF;
+            font-size: 1.5rem;
+            padding: 0.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hamburger-btn:hover {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* Sidebar Overlay (mobile) */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .sidebar-overlay.show {
+            display: block;
+        }
+
         /* Sidebar styles */
         .sidebar {
             position: fixed;
             top: 0;
             left: 0;
             height: 100vh;
-            width: 200px;
+            width: var(--sidebar-width);
             background-color: #455A64;
             padding-top: 20px;
             z-index: 1000;
             overflow-y: auto;
             border-right: none;
-            transition: transform 0.3s ease-in-out;
+            transition: transform 0.3s ease;
             box-shadow: 2px 0 8px rgba(69, 90, 100, 0.25);
         }
 
-        .sidebar.collapsed {
-            transform: translateX(-200px);
-        }
-
-        .sidebar-toggle {
+        .sidebar-close {
             display: none;
-            position: fixed;
-            top: 15px;
-            left: 15px;
-            z-index: 1001;
-            background-color: #455A64;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: #FFFFFF;
-            padding: 8px 12px;
-            border-radius: 4px;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 1.25rem;
             cursor: pointer;
+            padding: 0.25rem;
         }
 
-        .sidebar-toggle:hover {
-            background-color: #37474F;
+        .sidebar-close:hover {
             color: #FFFFFF;
-        }
-
-        .sidebar-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-        }
-
-        .sidebar-overlay.active {
-            display: block;
         }
 
         .sidebar-brand {
@@ -181,6 +213,10 @@
             font-weight: 600;
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             margin-bottom: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
         }
 
         .sidebar-brand img {
@@ -295,7 +331,7 @@
 
         /* Main content area */
         .main-wrapper {
-            margin-left: 200px;
+            margin-left: var(--sidebar-width);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -654,18 +690,26 @@
             background: var(--border-secondary);
         }
 
-        /* Mobile responsive styles */
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-200px);
+        /* Mobile & Tablet responsive styles */
+        @media (max-width: 991.98px) {
+            .mobile-header {
+                display: flex;
             }
 
-            .sidebar.active {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.show {
                 transform: translateX(0);
             }
 
-            .sidebar-toggle {
+            .sidebar-close {
                 display: block;
+                position: absolute;
+                right: 10px;
+                top: 50%;
+                transform: translateY(-50%);
             }
 
             .main-wrapper {
@@ -673,8 +717,8 @@
             }
 
             .top-navbar {
-                padding-left: 60px;
-                padding-right: 10px;
+                padding: 10px;
+                margin-top: 56px;
             }
 
             /* Make page title smaller on mobile */
@@ -873,18 +917,25 @@
     {% block extra_styles %}{% endblock %}
 </head>
 <body>
-    <!-- Mobile Sidebar Toggle -->
-    <button class="sidebar-toggle" onclick="toggleSidebar()">
-        <i class="bi bi-list"></i>
-    </button>
+    <!-- Mobile Header -->
+    <header class="mobile-header">
+        <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
+            <i class="bi bi-list"></i>
+        </button>
+        <span class="brand">Inventory</span>
+        <div style="width: 44px;"></div>
+    </header>
 
     <!-- Sidebar Overlay -->
-    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <div class="sidebar-overlay" onclick="closeSidebar()"></div>
 
     <!-- Sidebar Navigation -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-brand">
             <img src="/inventory/static/images/sw-logo.png?v=5" alt="SW Logo">
+            <button class="sidebar-close" onclick="closeSidebar()" aria-label="Close menu">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
         <ul class="sidebar-nav">
             <li><a href="/portal/" title="Return to Portal"><i class="bi bi-house-door"></i> Portal Home</a></li>
@@ -1030,13 +1081,32 @@
 
     <!-- Sidebar Toggle Script -->
     <script>
+        // Mobile sidebar toggle functions
         function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.querySelector('.sidebar-overlay');
-
-            sidebar.classList.toggle('active');
-            overlay.classList.toggle('active');
+            document.querySelector('.sidebar').classList.toggle('show');
+            document.querySelector('.sidebar-overlay').classList.toggle('show');
+            document.body.style.overflow = document.querySelector('.sidebar').classList.contains('show') ? 'hidden' : '';
         }
+
+        function closeSidebar() {
+            document.querySelector('.sidebar').classList.remove('show');
+            document.querySelector('.sidebar-overlay').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        // Close sidebar on window resize if desktop
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 992) {
+                closeSidebar();
+            }
+        });
+
+        // Close sidebar on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSidebar();
+            }
+        });
 
         // Toggle submenu sections
         function toggleSection(sectionId, event) {
@@ -1148,19 +1218,15 @@
                 }
             });
 
-            // Close sidebar when clicking on a link (mobile only)
+            // Close sidebar when clicking on a link (mobile/tablet)
             // But NOT when clicking on section toggle links
-            if (window.innerWidth <= 768) {
-                const sidebarLinks = document.querySelectorAll('.sidebar-nav a:not(.nav-section-toggle)');
-                sidebarLinks.forEach(link => {
-                    link.addEventListener('click', function() {
-                        const sidebar = document.getElementById('sidebar');
-                        const overlay = document.querySelector('.sidebar-overlay');
-                        sidebar.classList.remove('active');
-                        overlay.classList.remove('active');
-                    });
+            document.querySelectorAll('.sidebar-nav a:not(.nav-section-toggle)').forEach(link => {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 991) {
+                        closeSidebar();
+                    }
                 });
-            }
+            });
         });
 
         // Auto-logout after 30 minutes of inactivity AND token refresh for active users

@@ -24,6 +24,7 @@
            ===================================================== */
 
         :root {
+            --sidebar-width: 200px;
             /* Background colors - light grey */
             --bg-primary: #ECEFF1;
             --bg-secondary: #FFFFFF;
@@ -75,24 +76,89 @@
             padding: 0;
         }
 
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background-color: #455A64;
+            border-bottom: none;
+            z-index: 1001;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(69, 90, 100, 0.3);
+        }
+
+        .mobile-header .brand {
+            color: #FFFFFF;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .hamburger-btn {
+            background: none;
+            border: none;
+            color: #FFFFFF;
+            font-size: 1.5rem;
+            padding: 0.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hamburger-btn:hover {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* Sidebar Overlay (mobile) */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .sidebar-overlay.show {
+            display: block;
+        }
+
         /* ========== SIDEBAR NAVIGATION ========== */
         .sidebar {
             position: fixed;
             top: 0;
             left: 0;
             height: 100vh;
-            width: 200px;
+            width: var(--sidebar-width);
             background-color: #455A64;
             padding-top: 20px;
             z-index: 1000;
             overflow-y: auto;
             border-right: none;
-            transition: transform 0.3s ease-in-out;
+            transition: transform 0.3s ease;
             box-shadow: 2px 0 8px rgba(69, 90, 100, 0.25);
         }
 
-        .sidebar.collapsed {
-            transform: translateX(-200px);
+        .sidebar-close {
+            display: none;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.25rem;
+        }
+
+        .sidebar-close:hover {
+            color: #FFFFFF;
         }
 
         .sidebar-brand {
@@ -103,6 +169,10 @@
             font-weight: 600;
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             margin-bottom: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
         }
 
         .sidebar-brand img {
@@ -219,7 +289,7 @@
 
         /* Main content area */
         .main-wrapper {
-            margin-left: 200px;
+            margin-left: var(--sidebar-width);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
@@ -500,43 +570,7 @@
             color: var(--text-muted) !important;
         }
 
-        /* Mobile Menu Toggle Button */
-        .mobile-menu-toggle {
-            display: none;
-            position: fixed;
-            top: 12px;
-            left: 12px;
-            z-index: 1001;
-            background-color: #455A64;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: #FFFFFF;
-            padding: 6px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 22px;
-            line-height: 1;
-        }
-
-        .mobile-menu-toggle:hover {
-            background-color: #37474F;
-            color: #FFFFFF;
-        }
-
-        /* Mobile Overlay */
-        .mobile-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-        }
-
-        .mobile-overlay.active {
-            display: block;
-        }
+        /* Mobile elements - old toggle button no longer needed, using mobile-header instead */
 
         /* Card header */
         .card-header {
@@ -559,42 +593,43 @@
             border-top-color: var(--border-primary);
         }
 
-        /* Mobile responsiveness */
-        @media (max-width: 768px) {
+        /* Mobile & Tablet responsiveness */
+        @media (max-width: 991.98px) {
+            .mobile-header {
+                display: flex;
+            }
+
             .main-wrapper {
                 margin-left: 0;
             }
 
             .sidebar {
-                transform: translateX(-200px);
-                box-shadow: 2px 0 8px rgba(0,0,0,0.3);
+                transform: translateX(-100%);
             }
 
-            .sidebar.active {
+            .sidebar.show {
                 transform: translateX(0);
             }
 
-            .mobile-menu-toggle {
-                display: flex;
-                align-items: center;
-                justify-content: center;
+            .sidebar-close {
+                display: block;
+                position: absolute;
+                right: 10px;
+                top: 50%;
+                transform: translateY(-50%);
             }
 
             .top-navbar {
                 padding: 10px 10px;
+                margin-top: 56px;
             }
 
             .page-title {
-                font-size: 13px;
-                margin-left: 48px;
-            }
-
-            .page-title i {
-                display: none;
+                font-size: 14px;
             }
 
             .content-area {
-                padding: 70px 15px 15px 15px !important;
+                padding: 15px !important;
             }
 
             .content-area > .card:first-child {
@@ -741,10 +776,25 @@
     {% block extra_head %}{% endblock %}
 </head>
 <body>
+    <!-- Mobile Header -->
+    <header class="mobile-header">
+        <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
+            <i class="bi bi-list"></i>
+        </button>
+        <span class="brand">Accounting</span>
+        <div style="width: 44px;"></div>
+    </header>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" onclick="closeSidebar()"></div>
+
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-brand">
             <img src="/inventory/static/images/sw-logo.png" alt="SW Logo">
+            <button class="sidebar-close" onclick="closeSidebar()" aria-label="Close menu">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
         <ul class="sidebar-nav">
             <li><a href="/" title="Return to Portal"><i class="bi bi-house-door"></i> Portal Home</a></li>
@@ -853,14 +903,6 @@
             {% endif %}
         </ul>
     </div>
-
-    <!-- Mobile Overlay -->
-    <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileMenu()"></div>
-
-    <!-- Mobile Menu Toggle Button -->
-    <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileMenu()">
-        <i class="bi bi-list"></i>
-    </button>
 
     <!-- Main wrapper -->
     <div class="main-wrapper">
@@ -1052,39 +1094,42 @@
             }
         }
 
-        function toggleMobileMenu() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('mobileOverlay');
-            const toggleBtn = document.getElementById('mobileMenuToggle');
-
-            sidebar.classList.toggle('active');
-            overlay.classList.toggle('active');
-
-            const icon = toggleBtn.querySelector('i');
-            if (sidebar.classList.contains('active')) {
-                icon.className = 'bi bi-x';
-            } else {
-                icon.className = 'bi bi-list';
-            }
+        // Mobile sidebar toggle functions
+        function toggleSidebar() {
+            document.querySelector('.sidebar').classList.toggle('show');
+            document.querySelector('.sidebar-overlay').classList.toggle('show');
+            document.body.style.overflow = document.querySelector('.sidebar').classList.contains('show') ? 'hidden' : '';
         }
+
+        function closeSidebar() {
+            document.querySelector('.sidebar').classList.remove('show');
+            document.querySelector('.sidebar-overlay').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        // Close sidebar on window resize if desktop
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 992) {
+                closeSidebar();
+            }
+        });
+
+        // Close sidebar on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSidebar();
+            }
+        });
 
         document.addEventListener('DOMContentLoaded', function() {
             const currentPath = window.location.pathname;
 
+            // Close sidebar when clicking submenu links on mobile/tablet
             document.querySelectorAll('.submenu a').forEach(link => {
                 link.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    if (window.innerWidth <= 768) {
-                        const sidebar = document.getElementById('sidebar');
-                        const overlay = document.getElementById('mobileOverlay');
-                        const toggleBtn = document.getElementById('mobileMenuToggle');
-
-                        if (sidebar.classList.contains('active')) {
-                            sidebar.classList.remove('active');
-                            overlay.classList.remove('active');
-                            const icon = toggleBtn.querySelector('i');
-                            icon.className = 'bi bi-list';
-                        }
+                    if (window.innerWidth <= 991) {
+                        closeSidebar();
                     }
                 });
             });

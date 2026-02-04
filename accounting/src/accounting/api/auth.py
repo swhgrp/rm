@@ -216,6 +216,42 @@ async def sso_login(
     return redirect_response
 
 
+@router.get("/keepalive")
+async def keepalive(request: Request, response: Response, db: Session = Depends(get_db)):
+    """
+    Keep the Accounting session alive.
+    Called periodically by the frontend when user is active to extend the session.
+    """
+    session_token = request.cookies.get("accounting_session")
+
+    if not session_token:
+        raise HTTPException(status_code=401, detail="Session expired")
+
+    session = db.query(UserSession).filter(
+        UserSession.session_id == session_token,
+        UserSession.is_active == True,
+        UserSession.expires_at > get_now()
+    ).first()
+
+    if not session:
+        raise HTTPException(status_code=401, detail="Session expired")
+
+    # Extend session expiration
+    session.expires_at = get_now() + timedelta(minutes=30)
+    db.commit()
+
+    # Refresh cookie max_age
+    response.set_cookie(
+        key="accounting_session",
+        value=session_token,
+        httponly=True,
+        max_age=1800,
+        samesite="lax"
+    )
+
+    return {"status": "ok", "session_extended": True}
+
+
 @router.post("/logout")
 async def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     """Logout from accounting system"""

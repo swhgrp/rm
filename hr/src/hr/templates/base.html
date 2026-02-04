@@ -53,6 +53,7 @@
            ===================================================== */
 
         :root {
+            --sidebar-width: 200px;
             --bg-primary: #ECEFF1;
             --bg-secondary: #FFFFFF;
             --bg-tertiary: #F5F5F5;
@@ -81,19 +82,58 @@
             color: var(--text-primary);
         }
 
+        /* Mobile Header */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 56px;
+            background-color: #455A64;
+            border-bottom: none;
+            z-index: 1001;
+            padding: 0 1rem;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 8px rgba(69, 90, 100, 0.3);
+        }
+
+        .mobile-header .brand {
+            color: #FFFFFF;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .hamburger-btn {
+            background: none;
+            border: none;
+            color: #FFFFFF;
+            font-size: 1.5rem;
+            padding: 0.5rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hamburger-btn:hover {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
         /* ========== SIDEBAR NAVIGATION ========== */
         .sidebar {
             position: fixed;
             top: 0;
             left: 0;
             height: 100vh;
-            width: 200px;
+            width: var(--sidebar-width);
             background-color: #455A64;
             padding-top: 20px;
             z-index: 1000;
             overflow-y: auto;
             border-right: none;
-            transition: transform 0.3s ease-in-out;
+            transition: transform 0.3s ease;
             box-shadow: 2px 0 8px rgba(69, 90, 100, 0.25);
         }
 
@@ -105,6 +145,24 @@
             font-weight: 600;
             border-bottom: 1px solid rgba(255, 255, 255, 0.2);
             margin-bottom: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        .sidebar-close {
+            display: none;
+            background: none;
+            border: none;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.25rem;
+        }
+
+        .sidebar-close:hover {
+            color: #FFFFFF;
         }
 
         .sidebar-brand img {
@@ -226,48 +284,26 @@
             padding-left: 42px;
         }
 
-        /* Mobile Toggle Button */
-        .sidebar-toggle {
-            display: none;
-            position: fixed;
-            top: 15px;
-            left: 15px;
-            z-index: 1001;
-            background-color: #455A64;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: #FFFFFF;
-            padding: 8px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 20px;
-        }
-
-        .sidebar-toggle:hover {
-            background-color: #37474F;
-            color: #FFFFFF;
-        }
-
-        /* Mobile Overlay */
+        /* Sidebar Overlay (mobile) */
         .sidebar-overlay {
             display: none;
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
             z-index: 999;
         }
 
-        .sidebar-overlay.active {
+        .sidebar-overlay.show {
             display: block;
         }
 
         /* ========== MAIN CONTENT AREA ========== */
         .main-wrapper {
-            margin-left: 200px;
+            margin-left: var(--sidebar-width);
             min-height: 100vh;
-            transition: margin-left 0.3s ease-in-out;
         }
 
         /* Top Navbar */
@@ -603,18 +639,26 @@
             color: #fff;
         }
 
-        /* ========== MOBILE RESPONSIVE ========== */
-        @media (max-width: 768px) {
-            .sidebar {
-                transform: translateX(-200px);
+        /* ========== MOBILE & TABLET RESPONSIVE ========== */
+        @media (max-width: 991.98px) {
+            .mobile-header {
+                display: flex;
             }
 
-            .sidebar.active {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.show {
                 transform: translateX(0);
             }
 
-            .sidebar-toggle {
+            .sidebar-close {
                 display: block;
+                position: absolute;
+                right: 10px;
+                top: 50%;
+                transform: translateY(-50%);
             }
 
             .main-wrapper {
@@ -622,17 +666,15 @@
             }
 
             .top-navbar {
-                padding-left: 60px;
-                padding-right: 10px;
-                justify-content: flex-end !important;
+                padding: 10px 10px;
+                margin-top: 56px;
             }
 
-            /* Hide page title on mobile to save space */
-            .top-navbar h1 {
-                display: none;
+            .page-title {
+                font-size: 14px;
             }
 
-            /* Position user menu to far right on mobile */
+            /* Position user menu to far right */
             .user-menu-top {
                 display: flex !important;
                 margin-left: auto !important;
@@ -654,7 +696,7 @@
                 display: none;
             }
 
-            /* Content area padding to avoid menu overlap */
+            /* Content area padding */
             .content-area {
                 padding: 15px !important;
             }
@@ -814,18 +856,25 @@
     </style>
 </head>
 <body>
-    <!-- Mobile Sidebar Toggle -->
-    <button class="sidebar-toggle" onclick="toggleSidebar()">
-        <i class="bi bi-list"></i>
-    </button>
+    <!-- Mobile Header -->
+    <header class="mobile-header">
+        <button class="hamburger-btn" onclick="toggleSidebar()" aria-label="Toggle menu">
+            <i class="bi bi-list"></i>
+        </button>
+        <span class="brand">HR System</span>
+        <div style="width: 44px;"></div>
+    </header>
 
-    <!-- Sidebar Overlay (mobile) -->
-    <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" onclick="closeSidebar()"></div>
 
     <!-- Sidebar Navigation -->
     <div class="sidebar" id="sidebar">
         <div class="sidebar-brand">
             <img src="/hr/static/images/sw-logo.png" alt="SW Hospitality Group">
+            <button class="sidebar-close" onclick="closeSidebar()" aria-label="Close menu">
+                <i class="bi bi-x-lg"></i>
+            </button>
         </div>
         <ul class="sidebar-nav">
             <li><a href="/" title="Return to Portal"><i class="bi bi-house-door"></i> Portal Home</a></li>
@@ -925,16 +974,32 @@
     </div>
 
     <script>
-        // Toggle Sidebar (Mobile)
+        // Mobile sidebar toggle functions
         function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.querySelector('.sidebar-overlay');
-
-            sidebar.classList.toggle('active');
-            overlay.classList.toggle('active');
+            document.querySelector('.sidebar').classList.toggle('show');
+            document.querySelector('.sidebar-overlay').classList.toggle('show');
+            document.body.style.overflow = document.querySelector('.sidebar').classList.contains('show') ? 'hidden' : '';
         }
 
-        // Bootstrap will handle the dropdown toggle automatically
+        function closeSidebar() {
+            document.querySelector('.sidebar').classList.remove('show');
+            document.querySelector('.sidebar-overlay').classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        // Close sidebar on window resize if desktop
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 992) {
+                closeSidebar();
+            }
+        });
+
+        // Close sidebar on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSidebar();
+            }
+        });
 
         // Toggle Settings Submenu
         function toggleSettingsMenu() {
@@ -959,18 +1024,14 @@
                 }
             }
 
-            // Close sidebar on mobile when clicking links
-            if (window.innerWidth <= 768) {
-                const sidebarLinks = document.querySelectorAll('.sidebar-nav a');
-                sidebarLinks.forEach(link => {
-                    link.addEventListener('click', function() {
-                        const sidebar = document.getElementById('sidebar');
-                        const overlay = document.querySelector('.sidebar-overlay');
-                        sidebar.classList.remove('active');
-                        overlay.classList.remove('active');
-                    });
+            // Close sidebar on mobile/tablet when clicking links
+            document.querySelectorAll('.sidebar-nav a').forEach(link => {
+                link.addEventListener('click', function() {
+                    if (window.innerWidth <= 991) {
+                        closeSidebar();
+                    }
                 });
-            }
+            });
         });
     </script>
 

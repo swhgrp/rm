@@ -244,11 +244,11 @@
                     {% endif %}
                     <div class="field-row">
                         <span class="field-label">Event Date:</span>
-                        <span class="field-value">{{ event.start_at.strftime('%A, %B %d, %Y') }}</span>
+                        <span class="field-value">{{ (event.start_at|to_et).strftime('%A, %B %d, %Y') }}</span>
                     </div>
                     <div class="field-row">
                         <span class="field-label">Event Time:</span>
-                        <span class="field-value">{{ event.start_at.strftime('%I:%M %p') }}{% if event.end_at %} - {{ event.end_at.strftime('%I:%M %p') }}{% endif %}</span>
+                        <span class="field-value">{{ (event.start_at|to_et).strftime('%I:%M %p') }}{% if event.end_at %} - {{ (event.end_at|to_et).strftime('%I:%M %p') }}{% endif %}</span>
                     </div>
                     <div class="field-row">
                         <span class="field-label">Expected Guests:</span>
@@ -327,7 +327,7 @@
                     {% if event.setup_start_at %}
                     <div class="field-row">
                         <span class="field-label">Setup Time:</span>
-                        <span class="field-value">{{ event.setup_start_at.strftime('%I:%M %p') }}</span>
+                        <span class="field-value">{{ (event.setup_start_at|to_et).strftime('%I:%M %p') }}</span>
                     </div>
                     {% endif %}
                 </div>
@@ -347,12 +347,12 @@
                     {% else %}
                     {% if event.setup_start_at %}
                     <div class="timeline-row">
-                        <span class="timeline-time">{{ event.setup_start_at.strftime('%I:%M %p') }}</span>
+                        <span class="timeline-time">{{ (event.setup_start_at|to_et).strftime('%I:%M %p') }}</span>
                         <span class="timeline-desc">Staff Arrival / Setup Begins</span>
                     </div>
                     {% endif %}
                     <div class="timeline-row">
-                        <span class="timeline-time">{{ event.start_at.strftime('%I:%M %p') }}</span>
+                        <span class="timeline-time">{{ (event.start_at|to_et).strftime('%I:%M %p') }}</span>
                         <span class="timeline-desc">Event Begins / Guest Arrival</span>
                     </div>
                     {% if event.menu_json and event.menu_json.service_time %}
@@ -363,13 +363,13 @@
                     {% endif %}
                     {% if event.end_at %}
                     <div class="timeline-row">
-                        <span class="timeline-time">{{ event.end_at.strftime('%I:%M %p') }}</span>
+                        <span class="timeline-time">{{ (event.end_at|to_et).strftime('%I:%M %p') }}</span>
                         <span class="timeline-desc">Event Ends</span>
                     </div>
                     {% endif %}
                     {% if event.teardown_end_at %}
                     <div class="timeline-row">
-                        <span class="timeline-time">{{ event.teardown_end_at.strftime('%I:%M %p') }}</span>
+                        <span class="timeline-time">{{ (event.teardown_end_at|to_et).strftime('%I:%M %p') }}</span>
                         <span class="timeline-desc">Teardown Complete</span>
                     </div>
                     {% endif %}

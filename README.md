@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** January 29, 2026
+**Last Updated:** February 4, 2026
 **Status:** ~98% Complete - All 10 Systems Production Ready ✅
-**Latest:** Customer Invoice System Overhaul - Detail Page, PDF Branding, Edit/Delete, GL Posting Fixes (Jan 29, 2026) ✅
+**Latest:** Cross-system fixes - CalDAV sync, session keepalive, BEO timezone, tablet sidebar (Feb 4, 2026) ✅
 
 ---
 
@@ -316,7 +316,7 @@ restaurant-system/
 
 **Core Authentication:**
 - ✅ JWT token authentication with secure HTTP-only cookies
-- ✅ Session management (30-min timeout with auto-refresh)
+- ✅ Session management (30-min idle timeout with keepalive auto-refresh)
 - ✅ Permission-based system access control (9 systems)
 - ✅ Admin user management interface
 - ✅ Single sign-on (SSO) token generation (5-min tokens)
