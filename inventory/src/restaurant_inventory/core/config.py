@@ -22,10 +22,7 @@ class Settings:
     API_V1_PREFIX: str = "/api/v1"
     
     # Database
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL", 
-        "postgresql://inventory_user:inventory_pass@db:5432/inventory_db"
-    )
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "")
     
     # Redis
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://redis:6379")

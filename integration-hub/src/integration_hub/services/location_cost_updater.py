@@ -83,10 +83,9 @@ class LocationCostUpdaterService:
 
     def __init__(self, db: Session):
         self.db = db
-        self.inventory_db_url = os.getenv(
-            'INVENTORY_DATABASE_URL',
-            'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
-        )
+        self.inventory_db_url = os.getenv('INVENTORY_DATABASE_URL')
+        if not self.inventory_db_url:
+            raise ValueError("INVENTORY_DATABASE_URL environment variable is required")
 
     def _get_inventory_engine(self):
         """Get SQLAlchemy engine for Inventory database"""
@@ -636,10 +635,9 @@ class LocationCostUpdaterService:
         logger.info(f"Fixing location costs for {len(master_item_costs)} master items")
 
         # Connect to inventory database
-        inventory_db_url = os.getenv(
-            "INVENTORY_DATABASE_URL",
-            "postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db"
-        )
+        inventory_db_url = os.getenv("INVENTORY_DATABASE_URL")
+        if not inventory_db_url:
+            raise ValueError("INVENTORY_DATABASE_URL environment variable is required")
         engine = create_engine(inventory_db_url)
 
         with engine.connect() as conn:

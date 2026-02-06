@@ -1,6 +1,6 @@
 # Claude Memory - SW Hospitality Group Restaurant Management System
 
-**Last Updated:** February 4, 2026
+**Last Updated:** February 6, 2026
 **System Status:** Production (98% Complete)
 **Production URL:** https://rm.swhgrp.com
 **Server IP:** 172.233.172.92
@@ -38,7 +38,47 @@ When fixing issues, **always implement the permanent/architectural solution**, n
 
 ## 🎯 CURRENT CONTEXT - WHERE WE ARE
 
-### Most Recent Work (Current Session - February 4, 2026)
+### Most Recent Work (Current Session - February 6, 2026)
+
+**SECURITY AUDIT REMEDIATION & INVOICE MANAGEMENT** ✅ **COMPLETE**
+
+#### 1. **OpenAI API Key Rotation** ✅
+- **Problem:** OpenAI API key was exposed in .env files committed to repo
+- **Solution:** Rotated key, updated in `integration-hub/.env` and `inventory/.env`, deleted old keys from OpenAI dashboard
+- **Files:** `integration-hub/.env`, `inventory/.env`
+
+#### 2. **Hardcoded Database Credentials Removal** ✅
+- **Problem:** Database connection strings were hardcoded as defaults in multiple files
+- **Solution:** Removed all hardcoded defaults - now require environment variables:
+  - `integration-hub/db/database.py` - requires DATABASE_URL env var
+  - `integration-hub/services/accounting_sender.py` - requires ACCOUNTING_DATABASE_URL env var
+  - `integration-hub/services/invoice_parser.py` - requires INVENTORY_DATABASE_URL env var (2 places)
+  - `integration-hub/services/location_cost_updater.py` - requires INVENTORY_DATABASE_URL env var (2 places)
+  - `integration-hub/main.py` - added `get_inventory_dblink_connstr()` helper, updated 6 dblink calls
+  - `inventory/core/config.py` - requires DATABASE_URL env var
+  - `inventory/api/items.py` and `recipes.py` - use config instead of hardcoded
+  - `portal/config.py` - requires HR_DATABASE_URL env var
+- **Also fixed:** DATABASE_URL in `inventory/.env` (was using `db` instead of `inventory-db`)
+
+#### 3. **Integration Hub Invoice Line Item Management** ✅
+- **Added endpoints:**
+  - POST `/api/invoices/{id}/items` - Add new line items to invoices
+  - DELETE `/api/invoices/{id}/items/{item_id}` - Delete line items
+  - POST `/api/invoices/{id}/recalculate-totals` - Recalculate totals from items
+  - POST `/api/invoices/{id}/recalculate-status` - Recalculate invoice status
+- **Fixed:** Mark-as-statement endpoint now recalculates status when unmarking
+- **Fixed:** Error message display to handle both `detail` and `errors` response formats
+- **UI:** Added "Add Item" modal and delete buttons on invoice detail page
+- **Files:** `integration-hub/main.py`, `integration-hub/templates/invoice_detail.html`, `integration-hub/templates/invoices.html`
+
+#### 4. **Portal SSO Token Fixes** ✅
+- **Problem:** Hub SSO was returning 401 for valid tokens
+- **Solution:** Restarted Hub after credential changes to pick up correct PORTAL_SECRET_KEY
+- **File:** `integration-hub/api/auth.py` (cleaned up debug code)
+
+---
+
+### Previous Session Work (February 4, 2026)
 
 **CROSS-SYSTEM BUG FIXES & UI IMPROVEMENTS** ✅ **COMPLETE**
 

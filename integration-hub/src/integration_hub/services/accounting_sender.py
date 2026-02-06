@@ -42,10 +42,9 @@ class AccountingSenderService:
 
         # Create connection to accounting database for account lookups
         import os
-        self.accounting_db_url = os.getenv(
-            "ACCOUNTING_DATABASE_URL",
-            "postgresql://accounting_user:Acc0unt1ng_Pr0d_2024!@accounting-db:5432/accounting_db"
-        )
+        self.accounting_db_url = os.getenv("ACCOUNTING_DATABASE_URL")
+        if not self.accounting_db_url:
+            raise ValueError("ACCOUNTING_DATABASE_URL environment variable is required")
         self.accounting_engine = create_engine(self.accounting_db_url)
 
         # Cache for account number -> ID mappings

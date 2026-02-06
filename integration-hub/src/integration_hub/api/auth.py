@@ -6,7 +6,6 @@ import logging
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import RedirectResponse
 from integration_hub.core.portal_sso import validate_portal_token
-from jose import jwt
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 logger = logging.getLogger(__name__)
@@ -18,12 +17,6 @@ PORTAL_URL = os.getenv("PORTAL_URL", "https://rm.swhgrp.com/portal")
 @router.get("/sso-login")
 async def sso_login(token: str):
     """SSO login from Portal"""
-    # Debug: decode token without verification to see what system it claims
-    try:
-        unverified = jwt.get_unverified_claims(token)
-        logger.info(f"SSO login attempt - token claims: system={unverified.get('system')}, sub={unverified.get('sub')}")
-    except Exception as e:
-        logger.warning(f"Could not decode token for debug: {e}")
 
     # Validate Portal token
     portal_user = validate_portal_token(token, "hub")
@@ -41,3 +34,13 @@ async def sso_login(token: str):
     # Integration Hub doesn't require authentication, so just redirect to home
     # In the future, we could store session for audit logging
     return RedirectResponse(url="/hub/", status_code=303)
+
+
+@router.get("/keepalive")
+async def keepalive():
+    """
+    Keep the session alive.
+    Called periodically by the frontend inactivity-warning.js when user is active.
+    Hub doesn't manage its own sessions, so just return OK to prevent 404 errors.
+    """
+    return {"status": "ok", "session_extended": True}

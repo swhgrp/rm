@@ -1,6 +1,6 @@
 # Restaurant Management System - Consolidated TODO
 
-**Last Updated:** January 29, 2026
+**Last Updated:** February 6, 2026
 
 ## Priority Legend
 - P0: Critical - Blocking production use
@@ -25,8 +25,8 @@
 Full report: `SECURITY_AUDIT_REPORT.md`
 
 ### P0 - Critical Security (Immediate)
-- [ ] **Rotate exposed OpenAI API key** - Key exposed in integration-hub/.env file
-- [ ] **Remove hardcoded database credentials** - Found in integration-hub/main.py (dblink queries), accounting_sender.py, database.py defaults
+- [x] **Rotate exposed OpenAI API key** - ✅ DONE Feb 6 - Rotated key, deleted old keys from OpenAI dashboard
+- [x] **Remove hardcoded database credentials** - ✅ DONE Feb 6 - Removed hardcoded defaults from dblink calls, database.py, accounting_sender.py, invoice_parser.py, location_cost_updater.py, portal config.py, inventory config.py. All DB URLs now require env vars.
 - [ ] **Encrypt Plaid/Clover API tokens** - Stored plaintext in accounting/models/bank_account.py and pos.py
 - [ ] **Add auth to Accounting accounts endpoints** - GET /api/accounts/ has no authentication (accounting/api/accounts.py:54-103)
 - [ ] **Fix session cookie security** - Set secure=True in portal/main.py:84

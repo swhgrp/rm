@@ -111,6 +111,13 @@ class CalDAVSyncService:
                 ical_event.add('description', '\n'.join(description_parts))
             ical_event.add('status', self._map_status_to_ical(event.status))
 
+            # Add LAST-MODIFIED timestamp from database updated_at
+            # This enables bidirectional sync to determine which change is newer
+            if event.updated_at:
+                ical_event.add('last-modified', event.updated_at)
+            else:
+                ical_event.add('last-modified', event.created_at or get_now())
+
             # Add categories based on event type
             ical_event.add('categories', [event.event_type])
 
@@ -669,6 +676,35 @@ class CalDAVSyncService:
                                     cal_description = str(component.get('description', '')) or None
                                     cal_location = str(component.get('location', '')) or None
 
+                                    # Bidirectional sync: only apply CalDAV changes if they are NEWER
+                                    # than the database record. This prevents stale CalDAV data from
+                                    # overwriting recent web UI changes.
+                                    cal_last_modified = component.get('last-modified')
+
+                                    # Get database updated_at timestamp
+                                    db_updated_at = event.updated_at
+                                    if db_updated_at and db_updated_at.tzinfo is None:
+                                        db_updated_at = db_updated_at.replace(tzinfo=timezone.utc)
+
+                                    # Parse CalDAV last-modified timestamp
+                                    cal_modified_dt = None
+                                    if cal_last_modified:
+                                        cal_modified_dt = cal_last_modified.dt
+                                        if not isinstance(cal_modified_dt, datetime):
+                                            cal_modified_dt = datetime.combine(cal_modified_dt, datetime.min.time()).replace(tzinfo=timezone.utc)
+                                        elif cal_modified_dt.tzinfo is None:
+                                            cal_modified_dt = cal_modified_dt.replace(tzinfo=timezone.utc)
+
+                                    # Skip if database is newer than CalDAV (with 2 second buffer for sync delay)
+                                    if db_updated_at and cal_modified_dt:
+                                        if db_updated_at > cal_modified_dt + timedelta(seconds=2):
+                                            logger.debug(f"Skipping CalDAV changes for {event.title}: DB is newer (DB: {db_updated_at}, CalDAV: {cal_modified_dt})")
+                                            continue
+                                    elif db_updated_at and not cal_modified_dt:
+                                        # CalDAV has no LAST-MODIFIED - this is stale data, skip it
+                                        logger.debug(f"Skipping CalDAV changes for {event.title}: CalDAV has no LAST-MODIFIED timestamp")
+                                        continue
+
                                     dtstart = component.get('dtstart')
                                     dtend = component.get('dtend')
 
@@ -691,36 +727,33 @@ class CalDAVSyncService:
                                     else:
                                         end_dt = None
 
-                                    # Check if any fields changed
+                                    # Check if any fields changed and apply updates
                                     changed = False
                                     if cal_summary and event.title != cal_summary:
+                                        logger.info(f"CalDAV sync: updating title from '{event.title}' to '{cal_summary}'")
                                         event.title = cal_summary
                                         changed = True
-                                    # NOTE: We do NOT sync description from CalDAV back to database.
-                                    # The web app is the source of truth for event description.
-                                    # The CalDAV description is an enriched version that includes
-                                    # metadata (type, guests, status, client info), so pulling it
-                                    # back would cause duplication on the next push cycle.
                                     if start_dt and event.start_at != start_dt:
+                                        logger.info(f"CalDAV sync: updating start_at from '{event.start_at}' to '{start_dt}'")
                                         event.start_at = start_dt
                                         changed = True
                                     if end_dt and event.end_at != end_dt:
+                                        logger.info(f"CalDAV sync: updating end_at from '{event.end_at}' to '{end_dt}'")
                                         event.end_at = end_dt
                                         changed = True
 
+                                    # NOTE: We do NOT sync description from CalDAV back to database.
+                                    # The CalDAV description is an enriched version that includes
+                                    # metadata (type, guests, status, client info), so pulling it
+                                    # back would cause duplication on the next push cycle.
+
                                     # NOTE: We do NOT sync status from CalDAV back to database.
                                     # The web app is the source of truth for event status.
-                                    # If someone marks an event as cancelled on their phone,
-                                    # it should not affect the master event record.
-                                    # cal_status = str(component.get('status', '')).upper()
-                                    # if cal_status == 'CANCELLED':
-                                    #     event.status = 'CANCELED'
-                                    #     changed = True
 
                                     if changed:
                                         results['updated'] += 1
                                         results['details'].append(f"Updated: {event.title}")
-                                        logger.info(f"Updated Event {event.id} from CalDAV changes")
+                                        logger.info(f"Updated Event {event.id} from CalDAV changes (CalDAV modified: {cal_modified_dt})")
 
                         except Exception as e:
                             logger.error(f"Error processing CalDAV event: {e}")

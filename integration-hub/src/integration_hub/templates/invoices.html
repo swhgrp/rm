@@ -658,7 +658,15 @@ async function sendInvoiceFromList(invoiceId, invoiceNumber) {
             await showAlert('Invoice sent successfully!', 'Success');
             location.reload();
         } else {
-            const errorMsg = result.errors ? result.errors.join('\n') : 'Unknown error';
+            // Handle both FastAPI HTTPException format (detail) and custom format (errors array)
+            let errorMsg = 'Unknown error';
+            if (result.detail) {
+                errorMsg = result.detail;
+            } else if (result.errors && result.errors.length > 0) {
+                errorMsg = result.errors.join('\n');
+            } else if (result.message) {
+                errorMsg = result.message;
+            }
             await showAlert(`Error sending invoice:\n${errorMsg}`, 'Error');
             // Re-enable button on error
             sendingInvoices.delete(invoiceId);

@@ -2,10 +2,9 @@
 import os
 
 # HR Database connection (for user authentication)
-HR_DATABASE_URL = os.getenv(
-    "HR_DATABASE_URL",
-    "postgresql://hr_user:hr_password@hr-db:5432/hr_db"
-)
+HR_DATABASE_URL = os.getenv("HR_DATABASE_URL")
+if not HR_DATABASE_URL:
+    raise ValueError("HR_DATABASE_URL environment variable is required")
 
 # Session secret key
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")

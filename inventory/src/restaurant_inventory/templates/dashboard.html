@@ -347,7 +347,7 @@ function renderRecentInvoices(invoices) {
         const invoiceNum = invoice.invoice_number || 'Invoice #' + invoice.id;
 
         html += `
-            <a href="/hub-invoices/${invoice.id}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+            <a href="/inventory/hub-invoices/${invoice.id}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                 <div>
                     <div><strong>${vendorName}</strong> - ${invoiceNum}</div>
                     <small class="text-muted">${invoice.location_name || ''} - ${date}</small>

@@ -49,7 +49,7 @@ services:
     - ./inventory/.env
     environment:
     - TZ=America/New_York
-    - DATABASE_URL=postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db
+    # DATABASE_URL now comes from .env file
     - REDIS_URL=redis://inventory-redis:6379
     - DEBUG=true
     - SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
@@ -140,7 +140,7 @@ services:
     - ./integration-hub/.env
     environment:
     - TZ=America/New_York
-    - DATABASE_URL=postgresql://hub_user:hub_password@hub-db:5432/integration_hub_db
+    # DATABASE_URL, INVENTORY_DATABASE_URL, ACCOUNTING_DATABASE_URL now come from .env file
     - INVENTORY_API_URL=http://inventory-app:8000/api
     - ACCOUNTING_API_URL=http://accounting-app:8000/api
     - PORTAL_SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=

@@ -51,6 +51,22 @@ Base.metadata.create_all(bind=engine)
 INVENTORY_API_URL = os.getenv("INVENTORY_API_URL", "http://inventory-app:8000/api")
 ACCOUNTING_API_URL = os.getenv("ACCOUNTING_API_URL", "http://accounting-app:8000/api")
 
+# Database connection strings for cross-database queries (dblink)
+INVENTORY_DATABASE_URL = os.getenv("INVENTORY_DATABASE_URL")
+
+def get_inventory_dblink_connstr() -> str:
+    """
+    Get the dblink connection string for inventory database.
+    Parses the DATABASE_URL and converts to dblink format.
+    """
+    if not INVENTORY_DATABASE_URL:
+        raise ValueError("INVENTORY_DATABASE_URL environment variable is required for cross-database queries")
+
+    # Parse postgresql://user:password@host:port/dbname
+    from urllib.parse import urlparse
+    parsed = urlparse(INVENTORY_DATABASE_URL)
+    return f"dbname={parsed.path[1:]} user={parsed.username} password={parsed.password} host={parsed.hostname}"
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Integration Hub",
@@ -1238,6 +1254,194 @@ async def bulk_update_invoice_items(
         raise HTTPException(status_code=500, detail=f"Error updating items: {str(e)}")
 
 
+@app.post("/api/invoices/{invoice_id}/items")
+async def add_invoice_item(
+    invoice_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Add a new line item to an invoice.
+    Also recalculates invoice totals and status.
+    """
+    import logging
+    from decimal import Decimal
+    from sqlalchemy import func
+    logger = logging.getLogger(__name__)
+
+    body = await request.json()
+
+    # Get invoice
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Don't allow adding items to sent invoices
+    if invoice.status == 'sent':
+        raise HTTPException(status_code=400, detail="Cannot add items to sent invoices")
+
+    try:
+        # Get next line number
+        max_line = db.query(func.max(HubInvoiceItem.line_number)).filter(
+            HubInvoiceItem.invoice_id == invoice_id
+        ).scalar() or 0
+
+        # Create new item
+        quantity = Decimal(str(body.get('quantity', 1)))
+        unit_price = Decimal(str(body.get('unit_price', 0)))
+        total_amount = quantity * unit_price
+
+        new_item = HubInvoiceItem(
+            invoice_id=invoice_id,
+            line_number=max_line + 1,
+            item_code=body.get('item_code'),
+            item_description=body.get('item_description', 'New Item'),
+            quantity=quantity,
+            unit_of_measure=body.get('unit_of_measure'),
+            pack_size=body.get('pack_size'),
+            unit_price=unit_price,
+            total_amount=total_amount,
+            is_mapped=False
+        )
+        db.add(new_item)
+        db.flush()
+
+        # Recalculate invoice totals
+        recalculate_invoice_totals(invoice, db)
+
+        # Update invoice status
+        from integration_hub.services.invoice_status import update_invoice_status
+        update_invoice_status(invoice, db)
+
+        db.commit()
+
+        logger.info(f"Added new item to invoice {invoice_id}: {new_item.item_description}")
+
+        return {
+            "success": True,
+            "item_id": new_item.id,
+            "message": "Item added successfully"
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error adding item to invoice {invoice_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error adding item: {str(e)}")
+
+
+@app.delete("/api/invoices/{invoice_id}/items/{item_id}")
+async def delete_invoice_item(
+    invoice_id: int,
+    item_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a line item from an invoice.
+    Also recalculates invoice totals and status.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # Get invoice
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Don't allow deleting items from sent invoices
+    if invoice.status == 'sent':
+        raise HTTPException(status_code=400, detail="Cannot delete items from sent invoices")
+
+    # Get item
+    item = db.query(HubInvoiceItem).filter(
+        HubInvoiceItem.id == item_id,
+        HubInvoiceItem.invoice_id == invoice_id
+    ).first()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+
+    try:
+        description = item.item_description
+        db.delete(item)
+
+        # Recalculate invoice totals
+        recalculate_invoice_totals(invoice, db)
+
+        # Update invoice status
+        from integration_hub.services.invoice_status import update_invoice_status
+        update_invoice_status(invoice, db)
+
+        db.commit()
+
+        logger.info(f"Deleted item from invoice {invoice_id}: {description}")
+
+        return {
+            "success": True,
+            "message": "Item deleted successfully"
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting item from invoice {invoice_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error deleting item: {str(e)}")
+
+
+def recalculate_invoice_totals(invoice: HubInvoice, db: Session):
+    """
+    Recalculate invoice subtotal, tax, and total from line items.
+    """
+    from decimal import Decimal
+
+    items = db.query(HubInvoiceItem).filter(
+        HubInvoiceItem.invoice_id == invoice.id
+    ).all()
+
+    subtotal = sum(Decimal(str(item.total_amount or 0)) for item in items)
+
+    # Keep existing tax amount (don't recalculate)
+    tax = Decimal(str(invoice.tax_amount or 0))
+
+    invoice.total_amount = subtotal + tax
+
+
+@app.post("/api/invoices/{invoice_id}/recalculate-totals")
+async def recalculate_invoice_totals_endpoint(
+    invoice_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Recalculate invoice totals from line items.
+    Useful for fixing invoices with incorrect totals.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    old_total = float(invoice.total_amount or 0)
+
+    try:
+        recalculate_invoice_totals(invoice, db)
+        db.commit()
+
+        new_total = float(invoice.total_amount or 0)
+        logger.info(f"Invoice {invoice_id} totals recalculated: ${old_total} -> ${new_total}")
+
+        return {
+            "success": True,
+            "old_total": old_total,
+            "new_total": new_total,
+            "message": f"Totals recalculated: ${old_total:.2f} -> ${new_total:.2f}"
+        }
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error recalculating totals for invoice {invoice_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error recalculating totals: {str(e)}")
+
+
 @app.post("/api/invoices/{invoice_id}/mark-statement")
 async def mark_invoice_as_statement(
     invoice_id: int,
@@ -1267,8 +1471,9 @@ async def mark_invoice_as_statement(
         if is_statement:
             invoice.status = 'statement'
         else:
-            # Reset to pending if unmarking
-            invoice.status = 'pending'
+            # Recalculate status based on current mapping state
+            from integration_hub.services.invoice_status import update_invoice_status
+            update_invoice_status(invoice, db)
 
         db.commit()
 
@@ -1286,6 +1491,36 @@ async def mark_invoice_as_statement(
         db.rollback()
         logger.error(f"Error marking invoice {invoice_id} as statement: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error updating invoice: {str(e)}")
+
+
+@app.post("/api/invoices/{invoice_id}/recalculate-status")
+async def recalculate_invoice_status_endpoint(
+    invoice_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Recalculate invoice status based on current mapping state.
+    Useful for fixing invoices stuck in wrong status.
+    """
+    import logging
+    from integration_hub.services.invoice_status import recalculate_invoice_status
+    logger = logging.getLogger(__name__)
+
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    old_status = invoice.status
+    new_status = recalculate_invoice_status(invoice_id, db)
+
+    logger.info(f"Invoice {invoice_id} status recalculated: {old_status} -> {new_status}")
+
+    return {
+        "success": True,
+        "old_status": old_status,
+        "new_status": new_status,
+        "message": f"Status updated from '{old_status}' to '{new_status}'"
+    }
 
 
 # ============================================================================
@@ -1342,9 +1577,10 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
     # Get list of vendor SKUs from inventory for checking if code exists there
     inventory_skus = set()
     try:
-        sku_results = db.execute(sql_text("""
+        inv_connstr = get_inventory_dblink_connstr()
+        sku_results = db.execute(sql_text(f"""
             SELECT vendor_sku FROM dblink(
-                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                '{inv_connstr}',
                 'SELECT vendor_sku FROM vendor_items WHERE vendor_sku IS NOT NULL'
             ) AS t(vendor_sku VARCHAR)
         """)).fetchall()
@@ -1457,13 +1693,14 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
     # This allows mapping by item code even when vendor item isn't in inventory system
     from sqlalchemy import text as sql_text
     try:
-        verified_codes = db.execute(sql_text("""
+        inv_connstr = get_inventory_dblink_connstr()
+        verified_codes = db.execute(sql_text(f"""
             SELECT icm.item_code, icm.canonical_description
             FROM item_code_mapping icm
             WHERE icm.is_verified = true
             AND icm.item_code NOT IN (
                 SELECT vendor_sku FROM dblink(
-                    'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                    '{inv_connstr}',
                     'SELECT vendor_sku FROM vendor_items WHERE vendor_sku IS NOT NULL'
                 ) AS t(vendor_sku VARCHAR)
             )
@@ -2366,10 +2603,11 @@ async def list_category_mappings(request: Request, db: Session = Depends(get_db)
     inventory_categories_count = 0
     try:
         from sqlalchemy import text as sql_text
-        inv_result = db.execute(sql_text("""
+        inv_connstr = get_inventory_dblink_connstr()
+        inv_result = db.execute(sql_text(f"""
             SELECT name, parent_name
             FROM dblink(
-                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                '{inv_connstr}',
                 'SELECT c.name, p.name as parent_name
                  FROM categories c
                  LEFT JOIN categories p ON c.parent_id = p.id
@@ -2490,10 +2728,11 @@ async def sync_categories_from_inventory(db: Session = Depends(get_db)):
 
     try:
         # Fetch categories from Inventory database (with hierarchy)
-        inventory_categories = db.execute(sql_text("""
+        inv_connstr = get_inventory_dblink_connstr()
+        inventory_categories = db.execute(sql_text(f"""
             SELECT name, parent_name, description
             FROM dblink(
-                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                '{inv_connstr}',
                 'SELECT c.name, p.name as parent_name, c.description
                  FROM categories c
                  LEFT JOIN categories p ON c.parent_id = p.id
@@ -3050,9 +3289,10 @@ async def item_codes_page(
     # Get count of verified vendor items from Inventory system
     inventory_items_count = 0
     try:
-        inv_result = db.execute(sql_text("""
+        inv_connstr = get_inventory_dblink_connstr()
+        inv_result = db.execute(sql_text(f"""
             SELECT COUNT(*) FROM dblink(
-                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                '{inv_connstr}',
                 'SELECT id FROM vendor_items WHERE vendor_sku IS NOT NULL'
             ) AS t(id INTEGER)
         """)).scalar()
@@ -3413,10 +3653,11 @@ async def sync_item_codes_from_inventory(db: Session = Depends(get_db)):
 
     try:
         # Fetch vendor items from Inventory database
-        vendor_items = db.execute(sql_text("""
+        inv_connstr = get_inventory_dblink_connstr()
+        vendor_items = db.execute(sql_text(f"""
             SELECT vendor_sku, vendor_product_name, vendor_id
             FROM dblink(
-                'dbname=inventory_db user=inventory_user password=inventory_pass host=inventory-db',
+                '{inv_connstr}',
                 'SELECT vendor_sku, vendor_product_name, vendor_id FROM vendor_items WHERE vendor_sku IS NOT NULL AND vendor_product_name IS NOT NULL'
             ) AS t(vendor_sku VARCHAR, vendor_product_name VARCHAR, vendor_id INTEGER)
         """)).fetchall()

@@ -20,10 +20,7 @@ from restaurant_inventory.core.audit import log_audit_event, create_change_dict
 logger = logging.getLogger(__name__)
 
 # Hub database URL for fetching vendor items (source of truth)
-HUB_DATABASE_URL = os.getenv(
-    "HUB_DATABASE_URL",
-    "postgresql://hub_user:hub_password@hub-db:5432/integration_hub_db"
-)
+HUB_DATABASE_URL = os.getenv("HUB_DATABASE_URL")
 
 router = APIRouter()
 

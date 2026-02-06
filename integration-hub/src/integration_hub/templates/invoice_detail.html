@@ -102,7 +102,14 @@
                                 </tr>
                                 <tr>
                                     <th>Total Amount:</th>
-                                    <td><strong>${{ "{:,.2f}".format(invoice.total_amount) }}</strong></td>
+                                    <td>
+                                        <strong>${{ "{:,.2f}".format(invoice.total_amount) }}</strong>
+                                        {% if invoice.status != 'sent' %}
+                                        <button class="btn btn-sm btn-link p-0 ms-2" onclick="recalculateTotals()" title="Recalculate totals from line items">
+                                            <i class="bi bi-arrow-clockwise"></i>
+                                        </button>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 <tr>
                                     <th>Source:</th>
@@ -214,6 +221,11 @@
                         <i class="bi bi-arrow-repeat"></i> Retry Accounting Only
                     </button>
                     {% endif %}
+                    {% elif invoice.status in ['pending', 'mapping'] and not invoice.is_statement %}
+                    {# Show recalculate button for stuck invoices #}
+                    <button class="btn btn-outline-secondary btn-sm w-100" onclick="recalculateStatus()">
+                        <i class="bi bi-arrow-clockwise"></i> Recalculate Status
+                    </button>
                     {% endif %}
 
                     {% if invoice.inventory_error or invoice.accounting_error %}
@@ -239,9 +251,16 @@
     <div class="card mt-4">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-list-ul"></i> Line Items ({{ items|length }})</span>
-            <button class="btn btn-sm btn-outline-primary" onclick="toggleEditMode()">
-                <i class="bi bi-pencil"></i> <span id="editModeBtn">Edit Items</span>
-            </button>
+            <div>
+                {% if invoice.status != 'sent' %}
+                <button class="btn btn-sm btn-outline-success me-2" onclick="showAddItemModal()">
+                    <i class="bi bi-plus-lg"></i> Add Item
+                </button>
+                {% endif %}
+                <button class="btn btn-sm btn-outline-primary" onclick="toggleEditMode()">
+                    <i class="bi bi-pencil"></i> <span id="editModeBtn">Edit Items</span>
+                </button>
+            </div>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -260,6 +279,7 @@
                             <th>GL Asset</th>
                             <th>GL COGS</th>
                             <th>Status</th>
+                            {% if invoice.status != 'sent' %}<th></th>{% endif %}
                         </tr>
                     </thead>
                     <tbody>
@@ -363,6 +383,13 @@
                                 <span class="text-danger"><i class="bi bi-exclamation-circle"></i> Unmapped</span>
                                 {% endif %}
                             </td>
+                            {% if invoice.status != 'sent' %}
+                            <td>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteItem({{ item.id }}, '{{ item.item_description|e }}')" title="Delete item">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </td>
+                            {% endif %}
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -453,6 +480,56 @@
         </div>
     </div>
 </div>
+
+<!-- Add Item Modal -->
+<div class="modal fade" id="addItemModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Line Item</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Description <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="add_item_description" required>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Item Code</label>
+                        <input type="text" class="form-control" id="add_item_code">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Unit of Measure</label>
+                        <input type="text" class="form-control" id="add_item_uom" placeholder="e.g., EA, CS, LB">
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Quantity <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="add_item_qty" value="1" min="0" step="any" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Unit Price <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="add_item_price" value="0" min="0" step="0.01" required>
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">Pack Size</label>
+                        <input type="number" class="form-control" id="add_item_pack_size" min="1" step="1">
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Total</label>
+                    <input type="text" class="form-control" id="add_item_total" readonly>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" onclick="addItem()">Add Item</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -460,6 +537,128 @@
 function showEditModal() {
     const modal = new bootstrap.Modal(document.getElementById('editInvoiceModal'));
     modal.show();
+}
+
+function showAddItemModal() {
+    // Reset form
+    document.getElementById('add_item_description').value = '';
+    document.getElementById('add_item_code').value = '';
+    document.getElementById('add_item_uom').value = '';
+    document.getElementById('add_item_qty').value = '1';
+    document.getElementById('add_item_price').value = '0';
+    document.getElementById('add_item_pack_size').value = '';
+    document.getElementById('add_item_total').value = '$0.00';
+
+    const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
+    modal.show();
+}
+
+// Update total when qty or price changes
+document.addEventListener('DOMContentLoaded', function() {
+    const qtyInput = document.getElementById('add_item_qty');
+    const priceInput = document.getElementById('add_item_price');
+    const totalInput = document.getElementById('add_item_total');
+
+    function updateTotal() {
+        const qty = parseFloat(qtyInput.value) || 0;
+        const price = parseFloat(priceInput.value) || 0;
+        totalInput.value = '$' + (qty * price).toFixed(2);
+    }
+
+    if (qtyInput && priceInput) {
+        qtyInput.addEventListener('input', updateTotal);
+        priceInput.addEventListener('input', updateTotal);
+    }
+});
+
+async function addItem() {
+    const description = document.getElementById('add_item_description').value.trim();
+    if (!description) {
+        await showAlert('Description is required', 'Validation Error');
+        return;
+    }
+
+    const data = {
+        item_description: description,
+        item_code: document.getElementById('add_item_code').value.trim() || null,
+        unit_of_measure: document.getElementById('add_item_uom').value.trim() || null,
+        quantity: parseFloat(document.getElementById('add_item_qty').value) || 1,
+        unit_price: parseFloat(document.getElementById('add_item_price').value) || 0,
+        pack_size: parseInt(document.getElementById('add_item_pack_size').value) || null
+    };
+
+    try {
+        const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/items`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            await showAlert('Item added successfully!', 'Success');
+            location.reload();
+        } else {
+            await showAlert(`Error adding item: ${result.detail || 'Unknown error'}`, 'Error');
+        }
+    } catch (error) {
+        await showAlert(`Error adding item: ${error.message}`, 'Error');
+    }
+}
+
+async function recalculateTotals() {
+    if (!await showConfirm('Recalculate invoice totals from line items?\n\nThis will update the subtotal and total to match the sum of all line items.')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/recalculate-totals`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            await showAlert(result.message, 'Success');
+            location.reload();
+        } else {
+            await showAlert(`Error: ${result.detail || 'Unknown error'}`, 'Error');
+        }
+    } catch (error) {
+        await showAlert(`Error: ${error.message}`, 'Error');
+    }
+}
+
+async function deleteItem(itemId, description) {
+    if (!await showConfirm(`Delete item "${description}"?\n\nThis will also recalculate the invoice totals.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/items/${itemId}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            await showAlert('Item deleted successfully!', 'Success');
+            location.reload();
+        } else {
+            await showAlert(`Error deleting item: ${result.detail || 'Unknown error'}`, 'Error');
+        }
+    } catch (error) {
+        await showAlert(`Error deleting item: ${error.message}`, 'Error');
+    }
 }
 
 async function reparseInvoice() {
@@ -623,7 +822,16 @@ async function sendInvoice() {
             await showAlert('Invoice sent successfully!', 'Success');
             location.reload();
         } else {
-            await showAlert(`Error sending invoice:\n${result.errors ? result.errors.join('\n') : 'Unknown error'}`, 'Error');
+            // Handle both FastAPI HTTPException format (detail) and custom format (errors array)
+            let errorMessage = 'Unknown error';
+            if (result.detail) {
+                errorMessage = result.detail;
+            } else if (result.errors && result.errors.length > 0) {
+                errorMessage = result.errors.join('\n');
+            } else if (result.message) {
+                errorMessage = result.message;
+            }
+            await showAlert(`Error sending invoice:\n${errorMessage}`, 'Error');
             isSending = false;
             if (button) {
                 button.disabled = false;
@@ -665,7 +873,16 @@ async function retryInvoice(system) {
             await showAlert('Retry successful!', 'Success');
             location.reload();
         } else {
-            await showAlert(`Error retrying:\n${result.errors ? result.errors.join('\n') : 'Unknown error'}`, 'Error');
+            // Handle both FastAPI HTTPException format (detail) and custom format (errors array)
+            let errorMessage = 'Unknown error';
+            if (result.detail) {
+                errorMessage = result.detail;
+            } else if (result.errors && result.errors.length > 0) {
+                errorMessage = result.errors.join('\n');
+            } else if (result.message) {
+                errorMessage = result.message;
+            }
+            await showAlert(`Error retrying:\n${errorMessage}`, 'Error');
             if (button) {
                 button.disabled = false;
                 button.innerHTML = '<i class="bi bi-arrow-repeat"></i> Retry';
@@ -676,6 +893,43 @@ async function retryInvoice(system) {
         if (button) {
             button.disabled = false;
             button.innerHTML = '<i class="bi bi-arrow-repeat"></i> Retry';
+        }
+    }
+}
+
+async function recalculateStatus() {
+    const button = document.querySelector('button[onclick="recalculateStatus()"]');
+    if (button) {
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Recalculating...';
+    }
+
+    try {
+        const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/recalculate-status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            await showAlert(`Status updated: ${result.old_status} -> ${result.new_status}`, 'Success');
+            location.reload();
+        } else {
+            let errorMessage = result.detail || result.message || 'Unknown error';
+            await showAlert(`Error: ${errorMessage}`, 'Error');
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Recalculate Status';
+            }
+        }
+    } catch (error) {
+        await showAlert(`Error: ${error.message}`, 'Error');
+        if (button) {
+            button.disabled = false;
+            button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Recalculate Status';
         }
     }
 }

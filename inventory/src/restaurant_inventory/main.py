@@ -281,6 +281,11 @@ async def hub_invoices_page(request: Request):
     """Hub Invoices page - view invoices from Integration Hub"""
     return templates.TemplateResponse("hub_invoices.html", {"request": request})
 
+@app.get("/hub-invoices/{invoice_id}", response_class=HTMLResponse)
+async def hub_invoice_detail_page(request: Request, invoice_id: int):
+    """Hub Invoice detail page - view single invoice from Integration Hub"""
+    return templates.TemplateResponse("hub_invoice_detail.html", {"request": request, "invoice_id": invoice_id})
+
 @app.get("/storage-areas", response_class=HTMLResponse)
 async def storage_areas_page(request: Request):
     """Storage areas management page"""

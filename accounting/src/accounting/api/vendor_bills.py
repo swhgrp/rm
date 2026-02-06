@@ -880,7 +880,7 @@ def receive_vendor_bill_from_hub(
         if vendor:
             existing_bill = db.query(VendorBill).filter(
                 VendorBill.bill_number == bill_data["bill_number"],
-                VendorBill.vendor_id == vendor.id,
+                VendorBill.vendor_id == str(vendor.id),
                 VendorBill.status != BillStatus.VOID
             ).first()
             if existing_bill:
@@ -915,7 +915,7 @@ def receive_vendor_bill_from_hub(
 
         bill = VendorBill(
             vendor_name=canonical_vendor_name,  # Use canonical name
-            vendor_id=vendor.id if vendor else None,
+            vendor_id=str(vendor.id) if vendor else None,
             bill_number=bill_data["bill_number"],
             bill_date=bill_date,
             due_date=due_date,

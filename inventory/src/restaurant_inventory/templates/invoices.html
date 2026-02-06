@@ -82,7 +82,7 @@ async function loadInvoices() {
             const badgeClass = statusBadges[inv.status] || 'bg-secondary';
 
             return `
-                <tr>
+                <tr style="cursor: pointer;" onclick="window.location.href='/inventory/hub-invoices/${inv.id}'">
                     <td><strong>${inv.invoice_number || 'N/A'}</strong></td>
                     <td>${inv.vendor_name || 'Unknown'}</td>
                     <td>${inv.location_name || '-'}</td>

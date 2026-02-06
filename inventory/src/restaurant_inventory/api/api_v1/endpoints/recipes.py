@@ -445,7 +445,10 @@ def calculate_recipe_cost(
     try:
         from sqlalchemy import create_engine, text
         import os
-        HUB_DATABASE_URL = os.getenv("HUB_DATABASE_URL", "postgresql://hub_user:hub_password@hub-db:5432/integration_hub_db")
+        HUB_DATABASE_URL = os.getenv("HUB_DATABASE_URL")
+        if not HUB_DATABASE_URL:
+            logger.warning("HUB_DATABASE_URL not set, cannot fetch pricing")
+            raise ValueError("HUB_DATABASE_URL not configured")
         hub_engine = create_engine(HUB_DATABASE_URL)
         with hub_engine.connect() as conn:
             # Get unit_cost from hub_vendor_items (preferred or most recent)

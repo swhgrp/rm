@@ -289,8 +289,9 @@ class AutoSendService:
             errors.append("Invoice already sent to both systems")
 
         # Check status
-        if invoice.status not in ['ready', 'partial']:
-            errors.append(f"Invoice status is '{invoice.status}', must be 'ready' or 'partial'")
+        # Allow 'ready', 'partial' (for initial send), and 'error' (for retry)
+        if invoice.status not in ['ready', 'partial', 'error']:
+            errors.append(f"Invoice status is '{invoice.status}', must be 'ready', 'partial', or 'error'")
 
         # Check location is set (required for proper routing)
         if not invoice.location_id:

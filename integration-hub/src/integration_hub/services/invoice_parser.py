@@ -747,8 +747,10 @@ class InvoiceParser:
         import os
         from sqlalchemy import create_engine, text
 
-        inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
-                                     'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+        inventory_db_url = os.getenv('INVENTORY_DATABASE_URL')
+        if not inventory_db_url:
+            logger.warning("INVENTORY_DATABASE_URL not set, cannot match location")
+            return None
 
         try:
             engine = create_engine(inventory_db_url)
@@ -953,8 +955,10 @@ class InvoiceParser:
             vendor_name = invoice_vendor[0]
 
             # Get inventory items for vendors matching this name
-            inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
-                'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+            inventory_db_url = os.getenv('INVENTORY_DATABASE_URL')
+            if not inventory_db_url:
+                logger.warning("INVENTORY_DATABASE_URL not set, cannot fix UOMs")
+                return {"fixed": 0, "fixes": []}
             engine = create_engine(inventory_db_url)
 
             # Extract base vendor name for matching (e.g., "Gordon Food Service" from "Gordon Food Service Inc.")
