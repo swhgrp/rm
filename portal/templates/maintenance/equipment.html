@@ -179,18 +179,28 @@
     }
 
     .actions-cell {
-        display: flex;
-        gap: 8px;
+        white-space: nowrap;
+    }
+
+    .actions-cell .actions-wrap {
+        display: inline-flex;
+        gap: 6px;
     }
 
     .btn-icon {
-        padding: 6px 10px;
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
         border: 1px solid var(--border-primary);
         border-radius: 4px;
         background-color: var(--bg-secondary);
         color: var(--text-secondary);
         cursor: pointer;
         font-size: 14px;
+        flex-shrink: 0;
         transition: all 0.2s ease;
     }
 
@@ -266,11 +276,7 @@
 
     /* Fix Actions column header alignment */
     th:last-child {
-        text-align: center;
-    }
-
-    .actions-cell {
-        justify-content: center;
+        text-align: left;
     }
 
     /* History Modal */
@@ -332,6 +338,31 @@
         font-size: 12px;
         color: var(--text-muted);
         white-space: nowrap;
+    }
+
+    .history-docs {
+        margin-top: 6px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .history-doc-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 12px;
+        color: var(--accent-primary);
+        text-decoration: none;
+        padding: 3px 8px;
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+        background-color: var(--bg-tertiary);
+    }
+
+    .history-doc-link:hover {
+        background-color: var(--bg-elevated);
+        border-color: var(--accent-primary);
     }
 
     .history-empty {
@@ -730,7 +761,7 @@
         }
     }
 
-    function filterEquipment() {
+    function filterEquipment(resetPage = true) {
         const search = document.getElementById('searchInput').value.toLowerCase();
         const category = document.getElementById('categoryFilter').value;
         const status = document.getElementById('statusFilter').value;
@@ -750,7 +781,9 @@
             return matchesSearch && matchesCategory && matchesStatus && matchesLocation && matchesOwnership;
         });
 
-        currentPage = 1;
+        if (resetPage) {
+            currentPage = 1;
+        }
         renderEquipment(filtered);
     }
 
@@ -811,12 +844,14 @@
                     <td><span class="badge badge-${e.status}">${statusLabels[e.status] || e.status}</span></td>
                     <td>${nextMaint}</td>
                     <td class="actions-cell">
-                        <button class="btn-icon" onclick="editEquipment(${e.id})" title="Edit">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        <button class="btn-icon" onclick="viewHistory(${e.id})" title="History">
-                            <i class="bi bi-clock-history"></i>
-                        </button>
+                        <div class="actions-wrap">
+                            <button class="btn-icon" onclick="editEquipment(${e.id})" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn-icon" onclick="viewHistory(${e.id})" title="History">
+                                <i class="bi bi-clock-history"></i>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -858,12 +893,12 @@
 
     function goToPage(page) {
         currentPage = page;
-        filterEquipment();
+        filterEquipment(false);
     }
 
     function changePage(page) {
         currentPage = page;
-        filterEquipment();
+        filterEquipment(false);
     }
 
     function openAddModal() {
@@ -1034,10 +1069,23 @@
                 let detail = '';
                 if (h.change_type === 'status_change' && h.old_value && h.new_value) {
                     detail = `${formatStatus(h.old_value)} → ${formatStatus(h.new_value)}`;
+                } else if (h.change_type === 'maintenance') {
+                    const completedDate = h.new_value ? new Date(h.new_value + 'T00:00:00').toLocaleDateString() : '';
+                    detail = h.notes || 'Maintenance performed';
+                    if (completedDate) detail += ` (${completedDate})`;
                 } else if (h.notes) {
                     detail = h.notes;
                 } else if (h.new_value) {
                     detail = h.new_value;
+                }
+
+                let docsHtml = '';
+                if (h.documents && h.documents.length > 0) {
+                    docsHtml = `<div class="history-docs">${h.documents.map(doc =>
+                        `<a class="history-doc-link" href="${API_BASE}/schedules/documents/${doc.id}/download" target="_blank">
+                            <i class="bi bi-file-earmark"></i> ${escapeHtml(doc.file_name)}
+                        </a>`
+                    ).join('')}</div>`;
                 }
 
                 return `
@@ -1048,6 +1096,7 @@
                         <div class="history-content">
                             <div class="history-title">${label}</div>
                             ${detail ? `<div class="history-detail">${escapeHtml(detail)}</div>` : ''}
+                            ${docsHtml}
                         </div>
                         <div class="history-time" title="${date.toLocaleString()}">${timeAgo}</div>
                     </div>

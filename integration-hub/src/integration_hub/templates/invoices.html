@@ -168,6 +168,8 @@
                             <td>
                                 {% if invoice.status == 'pending' %}
                                 <span class="badge badge-pending">Pending</span>
+                                {% elif invoice.status == 'pending_csv' %}
+                                <span class="badge bg-info">CSV Pending</span>
                                 {% elif invoice.status == 'mapping' %}
                                 <span class="badge badge-pending">Mapping</span>
                                 {% elif invoice.status == 'ready' and invoice.location_id %}
@@ -209,7 +211,11 @@
                                     <i class="bi bi-eye"></i> View
                                 </a>
                                 {% if not invoice.is_statement %}
-                                    {% if invoice.status == 'ready' and invoice.location_id %}
+                                    {% if invoice.status == 'pending_csv' %}
+                                    <button class="btn btn-sm btn-info me-1" onclick="parseCsvInvoice({{ invoice.id }})">
+                                        <i class="bi bi-filetype-csv"></i> Parse CSV
+                                    </button>
+                                    {% elif invoice.status == 'ready' and invoice.location_id %}
                                     <button class="btn btn-sm btn-success me-1" onclick="sendInvoiceFromList({{ invoice.id }}, '{{ invoice.invoice_number }}')">
                                         <i class="bi bi-send"></i> Send
                                     </button>
@@ -332,7 +338,7 @@ function updateTabCounts() {
         const hasErrors = row.getAttribute('data-has-errors') === 'true';
 
         // Count based on actual status - simpler and matches database
-        if (status === 'pending' || status === 'mapping') {
+        if (status === 'pending' || status === 'pending_csv' || status === 'mapping') {
             counts.pending++;
         } else if (status === 'ready') {
             counts.ready++;
@@ -377,7 +383,7 @@ function filterTable() {
         // Tab filtering logic - match by actual status
         let matchesTab = true;
         if (currentTabFilter === 'pending') {
-            matchesTab = (status === 'pending' || status === 'mapping');
+            matchesTab = (status === 'pending' || status === 'pending_csv' || status === 'mapping');
         } else if (currentTabFilter === 'ready') {
             matchesTab = (status === 'ready');
         } else if (currentTabFilter === 'sent') {
@@ -477,7 +483,7 @@ function changePage(direction) {
         // Tab filtering logic - match by actual status
         let matchesTab = true;
         if (currentTabFilter === 'pending') {
-            matchesTab = (status === 'pending' || status === 'mapping');
+            matchesTab = (status === 'pending' || status === 'pending_csv' || status === 'mapping');
         } else if (currentTabFilter === 'ready') {
             matchesTab = (status === 'ready');
         } else if (currentTabFilter === 'sent') {
@@ -682,6 +688,51 @@ async function sendInvoiceFromList(invoiceId, invoiceNumber) {
         if (sendBtn) {
             sendBtn.disabled = false;
             sendBtn.innerHTML = '<i class="bi bi-send"></i> Send';
+        }
+    }
+}
+
+// Parse CSV invoice
+async function parseCsvInvoice(invoiceId) {
+    const parseBtn = document.querySelector(`button[onclick*="parseCsvInvoice(${invoiceId})"]`);
+    if (parseBtn) {
+        parseBtn.disabled = true;
+        parseBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Parsing...';
+    }
+
+    try {
+        const response = await fetch(`/api/v1/invoices/${invoiceId}/parse-csv`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+            let msg = result.message;
+            if (result.invoices && result.invoices.length > 0) {
+                msg += '\n\nInvoices created:';
+                result.invoices.forEach(inv => {
+                    msg += `\n- ${inv.invoice_number} (${inv.vendor}) - ${inv.location}: $${inv.total.toFixed(2)}`;
+                });
+            }
+            await showAlert(msg, 'CSV Parsed Successfully');
+            location.reload();
+        } else {
+            const errorMsg = result.detail || result.message || 'Unknown error';
+            await showAlert(`Error parsing CSV:\n${errorMsg}`, 'Error');
+            if (parseBtn) {
+                parseBtn.disabled = false;
+                parseBtn.innerHTML = '<i class="bi bi-filetype-csv"></i> Parse CSV';
+            }
+        }
+    } catch (error) {
+        await showAlert(`Error parsing CSV: ${error.message}`, 'Error');
+        if (parseBtn) {
+            parseBtn.disabled = false;
+            parseBtn.innerHTML = '<i class="bi bi-filetype-csv"></i> Parse CSV';
         }
     }
 }

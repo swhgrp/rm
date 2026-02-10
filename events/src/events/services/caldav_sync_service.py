@@ -107,6 +107,50 @@ class CalDAVSyncService:
             if event.venue and event.venue.address:
                 description_parts.append(f"\nAddress: {event.venue.address}")
 
+            # Menu items if available
+            if event.menu_json:
+                menu = event.menu_json
+                menu_lines = []
+
+                # Service style
+                if menu.get('service_style'):
+                    menu_lines.append(f"Service: {menu['service_style'].title()}")
+
+                # Menu sections with items
+                if menu.get('sections'):
+                    for section in menu['sections']:
+                        section_name = section.get('name', '')
+                        items = section.get('items', [])
+                        if items:
+                            menu_lines.append(f"\n{section_name}:")
+                            for item in items:
+                                item_name = item.get('name', '')
+                                qty = item.get('quantity', '')
+                                if item_name:
+                                    if qty:
+                                        menu_lines.append(f"  • {item_name} ({qty})")
+                                    else:
+                                        menu_lines.append(f"  • {item_name}")
+
+                # Bar info
+                if menu.get('bar_type'):
+                    bar_type = menu['bar_type'].replace('_', ' ').title()
+                    menu_lines.append(f"\nBar: {bar_type}")
+                    if menu.get('bar_hours'):
+                        menu_lines.append(f"Bar Hours: {menu['bar_hours']}")
+
+                # Beverage details
+                if menu.get('beverage_details'):
+                    menu_lines.append(f"Beverages: {menu['beverage_details']}")
+
+                # Special requests
+                if menu.get('special_requests'):
+                    menu_lines.append(f"\nSpecial Requests: {menu['special_requests']}")
+
+                if menu_lines:
+                    description_parts.append("\n--- Menu ---")
+                    description_parts.extend(menu_lines)
+
             if description_parts:
                 ical_event.add('description', '\n'.join(description_parts))
             ical_event.add('status', self._map_status_to_ical(event.status))

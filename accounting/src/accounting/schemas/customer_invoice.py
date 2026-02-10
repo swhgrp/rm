@@ -138,7 +138,8 @@ class CustomerInvoiceRead(CustomerInvoiceBase):
     paid_amount: Decimal
     balance_due: Decimal
 
-    created_by: int
+    created_by: Optional[int] = None
+    created_by_name: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
@@ -148,6 +149,41 @@ class CustomerInvoiceRead(CustomerInvoiceBase):
 
     class Config:
         from_attributes = True
+
+    @classmethod
+    def from_orm_with_creator(cls, invoice):
+        """Create instance with creator name populated"""
+        data = {
+            'id': invoice.id,
+            'customer_id': invoice.customer_id,
+            'customer_name': invoice.customer.customer_name if invoice.customer else None,
+            'area_id': invoice.area_id,
+            'invoice_number': invoice.invoice_number,
+            'invoice_date': invoice.invoice_date,
+            'due_date': invoice.due_date,
+            'event_date': invoice.event_date,
+            'event_type': invoice.event_type,
+            'event_location': invoice.event_location,
+            'guest_count': invoice.guest_count,
+            'is_tax_exempt': invoice.is_tax_exempt,
+            'tax_rate': invoice.tax_rate,
+            'deposit_amount': invoice.deposit_amount,
+            'notes': invoice.notes,
+            'status': invoice.status,
+            'subtotal': invoice.subtotal,
+            'discount_amount': invoice.discount_amount,
+            'tax_amount': invoice.tax_amount,
+            'total_amount': invoice.total_amount,
+            'paid_amount': invoice.paid_amount,
+            'balance_due': invoice.balance_due,
+            'created_by': invoice.created_by,
+            'created_by_name': invoice.creator.full_name if invoice.creator else None,
+            'created_at': invoice.created_at,
+            'updated_at': invoice.updated_at,
+            'line_items': invoice.line_items,
+            'payments': invoice.payments,
+        }
+        return cls(**data)
 
 
 # ============================================================================

@@ -914,8 +914,13 @@ function showCreateView() {
 function showTab(tabId) {
     // Update tab buttons
     const buttons = document.querySelectorAll('.nav-tabs button');
-    buttons.forEach(btn => btn.classList.remove('active'));
-    event.target.classList.add('active');
+    buttons.forEach(btn => {
+        btn.classList.remove('active');
+        // Activate the button that corresponds to this tab
+        if (btn.getAttribute('onclick')?.includes(tabId)) {
+            btn.classList.add('active');
+        }
+    });
 
     // Update tab content
     const tabs = document.querySelectorAll('.tab-content');

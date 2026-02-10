@@ -14,8 +14,8 @@ from maintenance.config import settings
 from maintenance.database import Base
 from maintenance.models import (
     EquipmentCategory, Equipment, EquipmentHistory,
-    MaintenanceSchedule, WorkOrder, WorkOrderComment,
-    WorkOrderPart, Vendor
+    MaintenanceSchedule, MaintenanceLog, MaintenanceDocument,
+    WorkOrder, WorkOrderComment, WorkOrderPart, Vendor
 )
 
 config = context.config

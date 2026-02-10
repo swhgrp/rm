@@ -1,22 +1,32 @@
 """Maintenance schedules router for Maintenance Service"""
 import logging
-from datetime import date, timedelta
+import os
+import shutil
+from datetime import date, datetime, timedelta
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
 from maintenance.database import get_db
-from maintenance.models import MaintenanceSchedule, Equipment, ScheduleFrequency
+from maintenance.models import (
+    MaintenanceSchedule, Equipment, ScheduleFrequency,
+    MaintenanceLog, MaintenanceDocument
+)
 from maintenance.schemas import (
     MaintenanceScheduleCreate, MaintenanceScheduleUpdate,
     MaintenanceScheduleResponse, MaintenanceScheduleWithEquipment,
-    MaintenanceDueItem
+    MaintenanceDueItem, MaintenanceLogResponse
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+UPLOAD_DIR = "/app/uploads/maintenance"
+ALLOWED_EXTENSIONS = {'.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 
 def calculate_next_due(frequency: ScheduleFrequency, from_date: date, custom_days: Optional[int] = None) -> date:
@@ -221,10 +231,12 @@ async def update_schedule(
 @router.post("/{schedule_id}/complete", response_model=MaintenanceScheduleResponse)
 async def complete_maintenance(
     schedule_id: int,
-    notes: Optional[str] = None,
+    completed_date: Optional[str] = Form(None),
+    notes: Optional[str] = Form(None),
+    files: List[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db)
 ):
-    """Mark maintenance as completed and calculate next due date"""
+    """Mark maintenance as completed with optional custom date and document uploads"""
     query = select(MaintenanceSchedule).where(MaintenanceSchedule.id == schedule_id)
     result = await db.execute(query)
     schedule = result.scalar_one_or_none()
@@ -232,13 +244,79 @@ async def complete_maintenance(
     if not schedule:
         raise HTTPException(status_code=404, detail="Schedule not found")
 
-    today = date.today()
-    schedule.last_performed = today
+    # Parse completed_date (default to today)
+    if completed_date:
+        try:
+            actual_date = date.fromisoformat(completed_date)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+        if actual_date > date.today():
+            raise HTTPException(status_code=400, detail="Completed date cannot be in the future.")
+    else:
+        actual_date = date.today()
+
+    # Validate uploaded files
+    validated_files = []
+    for uploaded_file in files:
+        if not uploaded_file.filename:
+            continue
+        file_ext = os.path.splitext(uploaded_file.filename)[1].lower()
+        if file_ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File type '{file_ext}' not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+            )
+        uploaded_file.file.seek(0, 2)
+        file_size = uploaded_file.file.tell()
+        uploaded_file.file.seek(0)
+        if file_size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File '{uploaded_file.filename}' exceeds maximum size of 10MB."
+            )
+        validated_files.append((uploaded_file, file_size))
+
+    # Update the schedule
+    schedule.last_performed = actual_date
     schedule.next_due = calculate_next_due(
         schedule.frequency,
-        today,
+        actual_date,
         schedule.custom_interval_days
     )
+
+    # Create log entry
+    log_entry = MaintenanceLog(
+        schedule_id=schedule.id,
+        completed_date=actual_date,
+        notes=notes,
+    )
+    db.add(log_entry)
+    await db.flush()  # Get log_entry.id for document references
+
+    # Save uploaded files
+    if validated_files:
+        schedule_dir = os.path.join(UPLOAD_DIR, str(schedule_id))
+        os.makedirs(schedule_dir, exist_ok=True)
+
+        for uploaded_file, file_size in validated_files:
+            timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+            safe_filename = f"{timestamp}_{uploaded_file.filename}"
+            file_path = os.path.join(schedule_dir, safe_filename)
+            try:
+                with open(file_path, "wb") as buffer:
+                    shutil.copyfileobj(uploaded_file.file, buffer)
+            except Exception as e:
+                logger.error(f"Failed to save file {uploaded_file.filename}: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to save file: {uploaded_file.filename}")
+
+            doc = MaintenanceDocument(
+                log_id=log_entry.id,
+                file_name=uploaded_file.filename,
+                file_path=file_path,
+                file_size=file_size,
+                mime_type=uploaded_file.content_type,
+            )
+            db.add(doc)
 
     await db.commit()
     await db.refresh(schedule)
@@ -248,8 +326,7 @@ async def complete_maintenance(
     eq_result = await db.execute(eq_query)
     equipment = eq_result.scalar_one_or_none()
     if equipment:
-        equipment.last_maintenance_date = today
-        # Find next earliest maintenance for this equipment
+        equipment.last_maintenance_date = actual_date
         next_query = (
             select(MaintenanceSchedule.next_due)
             .where(
@@ -266,8 +343,55 @@ async def complete_maintenance(
         equipment.next_maintenance_date = next_date
         await db.commit()
 
-    logger.info(f"Completed maintenance schedule: {schedule.name} (ID: {schedule.id})")
+    logger.info(f"Completed maintenance schedule: {schedule.name} (ID: {schedule.id}), date: {actual_date}")
     return schedule
+
+
+@router.get("/{schedule_id}/history", response_model=List[MaintenanceLogResponse])
+async def get_completion_history(
+    schedule_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get completion history for a maintenance schedule"""
+    sched_query = select(MaintenanceSchedule.id).where(MaintenanceSchedule.id == schedule_id)
+    sched_result = await db.execute(sched_query)
+    if not sched_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Schedule not found")
+
+    query = (
+        select(MaintenanceLog)
+        .options(selectinload(MaintenanceLog.documents))
+        .where(MaintenanceLog.schedule_id == schedule_id)
+        .order_by(MaintenanceLog.completed_date.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.get("/documents/{document_id}/download")
+async def download_document(
+    document_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Download a maintenance document"""
+    query = select(MaintenanceDocument).where(MaintenanceDocument.id == document_id)
+    result = await db.execute(query)
+    document = result.scalar_one_or_none()
+
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not os.path.exists(document.file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    return FileResponse(
+        document.file_path,
+        filename=document.file_name,
+        media_type=document.mime_type
+    )
 
 
 @router.delete("/{schedule_id}", status_code=204)

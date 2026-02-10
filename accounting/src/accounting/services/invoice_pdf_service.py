@@ -7,13 +7,15 @@ from io import BytesIO
 from datetime import date
 from decimal import Decimal
 from typing import Optional
+from pathlib import Path
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, HRFlowable, Image
 from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -219,7 +221,7 @@ class InvoicePDFService:
 
         elements = []
 
-        # === HEADER: Location/Company name + INVOICE title ===
+        # === HEADER: Logo + Location/Company name + INVOICE title ===
         company_display = self.company_name
         if area and area.name:
             company_display = area.name
@@ -246,8 +248,27 @@ class InvoicePDFService:
                 addr_parts.append(area.email)
             location_info = '<br/>'.join(addr_parts)
 
-        # Build left side: company name + location details
-        left_content = [Paragraph(company_display, self.styles['CompanyName'])]
+        # Check for logo
+        logo_image = None
+        if area and area.logo_path:
+            logo_full_path = area.logo_path
+            # Handle relative paths
+            if not os.path.isabs(logo_full_path):
+                logo_full_path = os.path.join('/app/uploads/logos', logo_full_path)
+            if os.path.exists(logo_full_path):
+                try:
+                    logo_image = Image(logo_full_path)
+                    # Scale logo to fit - max height 0.8 inch, preserve aspect ratio
+                    logo_image._restrictSize(1.5*inch, 0.8*inch)
+                except Exception as e:
+                    logger.warning(f"Could not load logo from {logo_full_path}: {e}")
+
+        # Build left side: logo (if exists) + company name + location details
+        left_content = []
+        if logo_image:
+            left_content.append(logo_image)
+            left_content.append(Spacer(1, 0.1*inch))
+        left_content.append(Paragraph(company_display, self.styles['CompanyName']))
         if location_info:
             left_content.append(Paragraph(location_info, self.styles['LocationInfo']))
 
@@ -462,7 +483,7 @@ class InvoicePDFService:
                 Paragraph(f"-${float(invoice.discount_amount):,.2f}", self.styles['NumberRight'])
             ])
 
-        # Tax
+        # Tax - always show tax line
         if invoice.tax_amount and invoice.tax_amount > 0:
             tax_label = f"Tax ({float(invoice.tax_rate)}%):" if invoice.tax_rate else "Tax:"
             totals_data.append([
@@ -473,6 +494,12 @@ class InvoicePDFService:
             totals_data.append([
                 Paragraph("Tax:", self.styles['InvoiceText']),
                 Paragraph("Tax Exempt", self.styles['SmallText'])
+            ])
+        else:
+            # Show $0.00 tax when no tax applied
+            totals_data.append([
+                Paragraph("Tax:", self.styles['InvoiceText']),
+                Paragraph("$0.00", self.styles['NumberRight'])
             ])
 
         # Total

@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from maintenance.database import get_db
 from maintenance.models import (
-    Equipment, MaintenanceSchedule, WorkOrder,
+    Equipment, MaintenanceSchedule, MaintenanceLog, WorkOrder,
     EquipmentStatus, WorkOrderStatus, WorkOrderPriority
 )
 from maintenance.schemas import (
@@ -295,3 +295,79 @@ async def get_alerts(
     alerts.sort(key=lambda x: severity_order.get(x["severity"], 4))
 
     return {"alerts": alerts, "count": len(alerts)}
+
+
+@router.get("/recent-activity")
+async def get_recent_activity(
+    location_id: Optional[int] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get recent activity across the maintenance system"""
+    from datetime import datetime
+    activities = []
+
+    # Recent maintenance completions
+    log_query = (
+        select(MaintenanceLog)
+        .options(
+            selectinload(MaintenanceLog.schedule).selectinload(MaintenanceSchedule.equipment)
+        )
+        .order_by(MaintenanceLog.created_at.desc())
+        .limit(10)
+    )
+    if location_id:
+        log_query = (
+            log_query
+            .join(MaintenanceSchedule)
+            .join(Equipment)
+            .where(Equipment.location_id == location_id)
+        )
+    log_result = await db.execute(log_query)
+    for log in log_result.scalars().all():
+        eq = log.schedule.equipment if log.schedule else None
+        eq_name = eq.name if eq else "Unknown"
+        schedule_name = log.schedule.name if log.schedule else "Unknown"
+        location_id_val = eq.location_id if eq else None
+        activities.append({
+            "type": "maintenance_completed",
+            "title": f"{schedule_name}",
+            "subtitle": eq_name,
+            "location_id": location_id_val,
+            "timestamp": log.created_at.isoformat(),
+            "completed_date": log.completed_date.isoformat(),
+        })
+
+    # Recent work order activity (created or completed in last 30 days)
+    cutoff = date.today() - timedelta(days=30)
+    wo_query = (
+        select(WorkOrder)
+        .options(selectinload(WorkOrder.equipment))
+        .where(WorkOrder.reported_date >= datetime.combine(cutoff, datetime.min.time()))
+        .order_by(WorkOrder.reported_date.desc())
+        .limit(10)
+    )
+    if location_id:
+        wo_query = wo_query.where(WorkOrder.location_id == location_id)
+    wo_result = await db.execute(wo_query)
+    for wo in wo_result.scalars().all():
+        eq_name = wo.equipment.name if wo.equipment else "General"
+        if wo.status == WorkOrderStatus.COMPLETED:
+            activities.append({
+                "type": "work_order_completed",
+                "title": wo.title,
+                "subtitle": eq_name,
+                "location_id": wo.location_id,
+                "timestamp": (wo.completed_date or wo.updated_at or wo.reported_date).isoformat(),
+            })
+        else:
+            activities.append({
+                "type": "work_order_created",
+                "title": wo.title,
+                "subtitle": eq_name,
+                "location_id": wo.location_id,
+                "timestamp": wo.reported_date.isoformat(),
+            })
+
+    # Sort all by timestamp desc and limit
+    activities.sort(key=lambda x: x["timestamp"], reverse=True)
+    return activities[:10]

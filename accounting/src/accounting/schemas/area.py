@@ -68,6 +68,7 @@ class AreaUpdate(BaseModel):
 class AreaResponse(AreaBase):
     id: int
     is_active: bool
+    logo_path: Optional[str] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 

@@ -36,6 +36,9 @@ class Area(Base):
     email = Column(String(100), nullable=True)
     website = Column(String(200), nullable=True)
 
+    # Branding
+    logo_path = Column(String(500), nullable=True)  # Path to logo image file
+
     # Safe GL account for this location
     safe_account_id = Column(Integer, ForeignKey('accounts.id', ondelete='SET NULL'), nullable=True)
 

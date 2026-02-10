@@ -9,7 +9,7 @@
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 20px;
-        margin-bottom: 30px;
+        margin-bottom: 24px;
     }
 
     .stat-card {
@@ -42,21 +42,12 @@
     .stat-card.error .stat-value { color: var(--error); }
     .stat-card.success .stat-value { color: var(--success); }
 
-    .content-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 20px;
-    }
-
-    @media (max-width: 992px) {
-        .content-grid { grid-template-columns: 1fr; }
-    }
-
     .card {
         background-color: var(--bg-secondary);
         border: 1px solid var(--border-primary);
         border-radius: 12px;
         overflow: hidden;
+        margin-bottom: 24px;
     }
 
     .card-header {
@@ -78,15 +69,105 @@
     }
 
     .card-body {
+        padding: 0;
+    }
+
+    .card-body.padded {
         padding: 20px;
     }
 
-    .list-item {
-        padding: 12px 0;
+    /* Action Items */
+    .action-item {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 20px;
         border-bottom: 1px solid var(--border-primary);
+        border-left: 4px solid transparent;
+        transition: background-color 0.15s ease;
+    }
+
+    .action-item:last-child { border-bottom: none; }
+    .action-item:hover { background-color: var(--bg-tertiary); }
+
+    .action-item.overdue { border-left-color: var(--error); }
+    .action-item.due-soon { border-left-color: var(--warning); }
+    .action-item.upcoming { border-left-color: var(--info); }
+
+    .action-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 14px;
+    }
+
+    .action-icon.overdue { background-color: var(--error-bg); color: var(--error); }
+    .action-icon.due-soon { background-color: var(--warning-bg); color: var(--warning); }
+    .action-icon.upcoming { background-color: var(--info-bg); color: var(--info); }
+    .action-icon.critical { background-color: var(--error-bg); color: var(--error); }
+
+    .action-content { flex: 1; min-width: 0; }
+
+    .action-title {
+        font-weight: 500;
+        color: var(--text-primary);
+        font-size: 14px;
+        margin-bottom: 2px;
+    }
+
+    .action-subtitle {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .action-badge {
+        flex-shrink: 0;
+    }
+
+    .badge {
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 500;
+        white-space: nowrap;
+    }
+
+    .badge-overdue { background-color: var(--error-bg); color: var(--error); }
+    .badge-due-soon { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-upcoming { background-color: var(--info-bg); color: var(--info); }
+    .badge-critical { background-color: var(--error-bg); color: var(--error); }
+    .badge-high { background-color: var(--warning-bg); color: var(--warning); }
+    .badge-medium { background-color: var(--info-bg); color: var(--info); }
+    .badge-low { background-color: var(--success-bg); color: var(--success); }
+    .badge-open { background-color: var(--info-bg); color: var(--info); }
+    .badge-in_progress { background-color: var(--warning-bg); color: var(--warning); }
+
+    /* Bottom two-column grid */
+    .bottom-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+    }
+
+    .bottom-grid .card {
+        margin-bottom: 0;
+    }
+
+    @media (max-width: 992px) {
+        .bottom-grid { grid-template-columns: 1fr; }
+    }
+
+    /* List items for work orders */
+    .list-item {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border-primary);
     }
 
     .list-item:last-child { border-bottom: none; }
@@ -95,28 +176,62 @@
         font-weight: 500;
         color: var(--text-primary);
         margin-bottom: 3px;
+        font-size: 14px;
     }
 
     .list-item-subtitle {
-        font-size: 13px;
+        font-size: 12px;
         color: var(--text-muted);
     }
 
-    .badge {
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 500;
+    /* Activity items */
+    .activity-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        padding: 10px 20px;
+        border-bottom: 1px solid var(--border-primary);
     }
 
-    .badge-critical { background-color: var(--error-bg); color: var(--error); }
-    .badge-high { background-color: var(--warning-bg); color: var(--warning); }
-    .badge-medium { background-color: var(--info-bg); color: var(--info); }
-    .badge-low { background-color: var(--success-bg); color: var(--success); }
-    .badge-open { background-color: var(--info-bg); color: var(--info); }
-    .badge-in_progress { background-color: var(--warning-bg); color: var(--warning); }
-    .badge-completed { background-color: var(--success-bg); color: var(--success); }
-    .badge-overdue { background-color: var(--error-bg); color: var(--error); }
+    .activity-item:last-child { border-bottom: none; }
+
+    .activity-icon {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 12px;
+        margin-top: 2px;
+    }
+
+    .activity-icon.maintenance_completed { background-color: var(--success-bg); color: var(--success); }
+    .activity-icon.work_order_completed { background-color: var(--info-bg); color: var(--info); }
+    .activity-icon.work_order_created { background-color: var(--warning-bg); color: var(--warning); }
+
+    .activity-content { flex: 1; min-width: 0; }
+
+    .activity-title {
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-primary);
+        margin-bottom: 2px;
+    }
+
+    .activity-subtitle {
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+
+    .activity-time {
+        font-size: 11px;
+        color: var(--text-muted);
+        white-space: nowrap;
+        flex-shrink: 0;
+        margin-top: 3px;
+    }
 
     .empty-state {
         text-align: center;
@@ -129,28 +244,6 @@
         margin-bottom: 15px;
         opacity: 0.5;
     }
-
-    .alert-item {
-        padding: 12px 15px;
-        border-radius: 8px;
-        margin-bottom: 10px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-    }
-
-    .alert-item:last-child { margin-bottom: 0; }
-
-    .alert-critical { background-color: var(--error-bg); border-left: 4px solid var(--error); }
-    .alert-high { background-color: var(--warning-bg); border-left: 4px solid var(--warning); }
-    .alert-medium { background-color: var(--info-bg); border-left: 4px solid var(--info); }
-
-    .alert-icon { font-size: 20px; }
-    .alert-critical .alert-icon { color: var(--error); }
-    .alert-high .alert-icon { color: var(--warning); }
-    .alert-medium .alert-icon { color: var(--info); }
-
-    .alert-message { flex: 1; font-size: 14px; }
 
     .loading {
         display: flex;
@@ -216,6 +309,15 @@
     .btn-primary:hover {
         background-color: var(--accent-hover);
     }
+
+    .action-items-count {
+        font-size: 12px;
+        font-weight: 500;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background-color: var(--error-bg);
+        color: var(--error);
+    }
 {% endblock %}
 
 {% block content %}
@@ -228,6 +330,7 @@
         </div>
     </div>
 
+    <!-- Stats Row -->
     <div class="stats-grid" id="statsGrid">
         <div class="stat-card">
             <div class="stat-value" id="totalEquipment">-</div>
@@ -247,43 +350,39 @@
         </div>
     </div>
 
-    <div class="content-grid">
+    <!-- Action Items (full width) -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">
+                <i class="bi bi-exclamation-triangle"></i> Action Items
+                <span class="action-items-count" id="actionItemsCount" style="display:none">0</span>
+            </div>
+        </div>
+        <div class="card-body" id="actionItemsContainer">
+            <div class="loading"><div class="spinner"></div></div>
+        </div>
+        <a href="/portal/maintenance/schedules" class="view-all">View All Schedules <i class="bi bi-arrow-right"></i></a>
+    </div>
+
+    <!-- Bottom Row: Recent Activity + Work Orders -->
+    <div class="bottom-grid">
         <div class="card">
             <div class="card-header">
-                <div class="card-title"><i class="bi bi-exclamation-triangle"></i> Alerts</div>
+                <div class="card-title"><i class="bi bi-activity"></i> Recent Activity</div>
             </div>
-            <div class="card-body" id="alertsContainer">
+            <div class="card-body" id="activityContainer">
                 <div class="loading"><div class="spinner"></div></div>
             </div>
         </div>
 
         <div class="card">
             <div class="card-header">
-                <div class="card-title"><i class="bi bi-clipboard-check"></i> Recent Work Orders</div>
+                <div class="card-title"><i class="bi bi-clipboard-check"></i> Open Work Orders</div>
             </div>
             <div class="card-body" id="workOrdersContainer">
                 <div class="loading"><div class="spinner"></div></div>
             </div>
             <a href="/portal/maintenance/work-orders" class="view-all">View All Work Orders <i class="bi bi-arrow-right"></i></a>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title"><i class="bi bi-calendar-check"></i> Upcoming Maintenance</div>
-            </div>
-            <div class="card-body" id="maintenanceContainer">
-                <div class="loading"><div class="spinner"></div></div>
-            </div>
-            <a href="/portal/maintenance/schedules" class="view-all">View All Schedules <i class="bi bi-arrow-right"></i></a>
-        </div>
-
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title"><i class="bi bi-pie-chart"></i> Equipment by Status</div>
-            </div>
-            <div class="card-body" id="equipmentStatusContainer">
-                <div class="loading"><div class="spinner"></div></div>
-            </div>
         </div>
     </div>
 {% endblock %}
@@ -291,6 +390,19 @@
 {% block extra_scripts %}
 <script>
     const API_BASE = '/maintenance';
+    let locations = [];
+
+    async function loadLocations() {
+        try {
+            const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+            if (response.ok) locations = await response.json();
+        } catch (e) { /* ignore */ }
+    }
+
+    function getLocationName(id) {
+        const loc = locations.find(l => l.id === id);
+        return loc ? loc.name : '';
+    }
 
     async function loadDashboard() {
         try {
@@ -310,46 +422,138 @@
             }
 
             renderWorkOrders(data.recent_work_orders || []);
-            renderEquipmentStatus(data.equipment_by_status || {});
-
         } catch (error) {
             console.error('Error loading dashboard:', error);
         }
     }
 
-    async function loadAlerts() {
+    async function loadActionItems() {
         try {
-            const response = await fetch(`${API_BASE}/dashboard/alerts`);
-            const data = await response.json();
-            renderAlerts(data.alerts || []);
+            const [alertsRes, maintenanceRes] = await Promise.all([
+                fetch(`${API_BASE}/dashboard/alerts`),
+                fetch(`${API_BASE}/dashboard/maintenance-due?days_ahead=14&include_overdue=true`)
+            ]);
+
+            const alertsData = await alertsRes.json();
+            const maintenanceData = await maintenanceRes.json();
+
+            renderActionItems(alertsData.alerts || [], maintenanceData || []);
         } catch (error) {
-            console.error('Error loading alerts:', error);
-            document.getElementById('alertsContainer').innerHTML = '<div class="empty-state"><i class="bi bi-check-circle"></i><p>Unable to load alerts</p></div>';
+            console.error('Error loading action items:', error);
+            document.getElementById('actionItemsContainer').innerHTML =
+                '<div class="empty-state"><i class="bi bi-check-circle"></i><p>Unable to load action items</p></div>';
         }
     }
 
-    async function loadUpcomingMaintenance() {
+    async function loadRecentActivity() {
         try {
-            const response = await fetch(`${API_BASE}/dashboard/maintenance-due?days_ahead=14`);
+            const response = await fetch(`${API_BASE}/dashboard/recent-activity`);
             const data = await response.json();
-            renderUpcomingMaintenance(data || []);
+            renderRecentActivity(data || []);
         } catch (error) {
-            console.error('Error loading maintenance:', error);
-            document.getElementById('maintenanceContainer').innerHTML = '<div class="empty-state"><i class="bi bi-calendar"></i><p>Unable to load schedules</p></div>';
+            console.error('Error loading activity:', error);
+            document.getElementById('activityContainer').innerHTML =
+                '<div class="empty-state"><i class="bi bi-activity"></i><p>Unable to load activity</p></div>';
         }
     }
 
-    function renderAlerts(alerts) {
-        const container = document.getElementById('alertsContainer');
-        if (alerts.length === 0) {
-            container.innerHTML = '<div class="empty-state"><i class="bi bi-check-circle"></i><p>No active alerts</p></div>';
+    function renderActionItems(alerts, maintenanceItems) {
+        const container = document.getElementById('actionItemsContainer');
+        const items = [];
+
+        // Build unified list from maintenance-due (includes overdue)
+        for (const m of maintenanceItems) {
+            let urgency, badgeClass, badgeText;
+            if (m.days_until_due < 0) {
+                urgency = 0;
+                badgeClass = 'badge-overdue';
+                badgeText = Math.abs(m.days_until_due) + 'd overdue';
+            } else if (m.days_until_due <= 2) {
+                urgency = 1;
+                badgeClass = 'badge-due-soon';
+                badgeText = m.days_until_due === 0 ? 'Due today' : m.days_until_due === 1 ? 'Tomorrow' : '2 days';
+            } else {
+                urgency = 2;
+                badgeClass = 'badge-upcoming';
+                badgeText = m.days_until_due + ' days';
+            }
+
+            items.push({
+                urgency,
+                sortKey: m.days_until_due,
+                type: 'maintenance',
+                iconClass: urgency === 0 ? 'overdue' : urgency === 1 ? 'due-soon' : 'upcoming',
+                rowClass: urgency === 0 ? 'overdue' : urgency === 1 ? 'due-soon' : 'upcoming',
+                title: m.schedule_name,
+                subtitle: `${m.equipment_name}${m.location_name ? ' \u2022 ' + m.location_name : ''}`,
+                badgeClass,
+                badgeText,
+            });
+        }
+
+        // Add critical/overdue work order alerts
+        for (const a of alerts) {
+            if (a.type === 'critical_work_order') {
+                items.push({
+                    urgency: -1,
+                    sortKey: -999,
+                    type: 'alert',
+                    iconClass: 'critical',
+                    rowClass: 'overdue',
+                    title: a.message,
+                    subtitle: 'Critical priority',
+                    badgeClass: 'badge-critical',
+                    badgeText: 'Critical',
+                });
+            } else if (a.type === 'overdue_work_order') {
+                items.push({
+                    urgency: 0,
+                    sortKey: -(a.days_overdue || 1),
+                    type: 'alert',
+                    iconClass: 'overdue',
+                    rowClass: 'overdue',
+                    title: a.message,
+                    subtitle: `${a.days_overdue || 1}d overdue`,
+                    badgeClass: 'badge-overdue',
+                    badgeText: (a.days_overdue || 1) + 'd overdue',
+                });
+            }
+        }
+
+        // Sort: most urgent first
+        items.sort((a, b) => a.urgency !== b.urgency ? a.urgency - b.urgency : a.sortKey - b.sortKey);
+
+        // Show count badge
+        const countEl = document.getElementById('actionItemsCount');
+        if (items.length > 0) {
+            countEl.textContent = items.length;
+            countEl.style.display = 'inline';
+        }
+
+        if (items.length === 0) {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-check-circle"></i><p>All caught up! No action items.</p></div>';
             return;
         }
 
-        container.innerHTML = alerts.slice(0, 5).map(alert => `
-            <div class="alert-item alert-${alert.severity}">
-                <i class="bi bi-exclamation-circle alert-icon"></i>
-                <div class="alert-message">${alert.message}</div>
+        const iconMap = {
+            'overdue': 'bi-exclamation-circle',
+            'due-soon': 'bi-clock',
+            'upcoming': 'bi-calendar-event',
+            'critical': 'bi-exclamation-triangle-fill',
+        };
+
+        container.innerHTML = items.slice(0, 5).map(item => `
+            <div class="action-item ${item.rowClass}">
+                <div class="action-icon ${item.iconClass}">
+                    <i class="bi ${iconMap[item.iconClass] || 'bi-clock'}"></i>
+                </div>
+                <div class="action-content">
+                    <div class="action-title">${escapeHtml(item.title)}</div>
+                    <div class="action-subtitle">${escapeHtml(item.subtitle)}</div>
+                </div>
+                <div class="action-badge">
+                    <span class="badge ${item.badgeClass}">${item.badgeText}</span>
+                </div>
             </div>
         `).join('');
     }
@@ -361,73 +565,92 @@
             return;
         }
 
-        container.innerHTML = workOrders.slice(0, 5).map(wo => `
+        container.innerHTML = workOrders.slice(0, 6).map(wo => `
             <div class="list-item">
                 <div>
-                    <div class="list-item-title">${wo.title}</div>
-                    <div class="list-item-subtitle">${wo.equipment_name || 'General'}</div>
+                    <div class="list-item-title">${escapeHtml(wo.title)}</div>
+                    <div class="list-item-subtitle">${escapeHtml(wo.equipment_name || 'General')}</div>
                 </div>
                 <span class="badge badge-${wo.priority}">${wo.priority}</span>
             </div>
         `).join('');
     }
 
-    function renderUpcomingMaintenance(items) {
-        const container = document.getElementById('maintenanceContainer');
-        if (items.length === 0) {
-            container.innerHTML = '<div class="empty-state"><i class="bi bi-calendar-check"></i><p>No upcoming maintenance</p></div>';
+    function renderRecentActivity(activities) {
+        const container = document.getElementById('activityContainer');
+        if (activities.length === 0) {
+            container.innerHTML = '<div class="empty-state"><i class="bi bi-activity"></i><p>No recent activity</p></div>';
             return;
         }
 
-        container.innerHTML = items.slice(0, 5).map(item => `
-            <div class="list-item">
-                <div>
-                    <div class="list-item-title">${item.schedule_name}</div>
-                    <div class="list-item-subtitle">${item.equipment_name}</div>
+        const iconMap = {
+            'maintenance_completed': 'bi-check-circle',
+            'work_order_completed': 'bi-clipboard-check',
+            'work_order_created': 'bi-clipboard-plus',
+        };
+
+        const labelMap = {
+            'maintenance_completed': 'Completed',
+            'work_order_completed': 'WO Completed',
+            'work_order_created': 'WO Created',
+        };
+
+        container.innerHTML = activities.slice(0, 5).map(a => {
+            const icon = iconMap[a.type] || 'bi-circle';
+            const label = labelMap[a.type] || '';
+            const locName = getLocationName(a.location_id);
+
+            // Use completed_date for maintenance, otherwise timestamp
+            let dateStr;
+            if (a.type === 'maintenance_completed' && a.completed_date) {
+                dateStr = new Date(a.completed_date + 'T00:00:00').toLocaleDateString();
+            } else {
+                dateStr = new Date(a.timestamp).toLocaleDateString();
+            }
+
+            const subtitleParts = [a.subtitle];
+            if (locName) subtitleParts.push(locName);
+
+            return `
+                <div class="activity-item">
+                    <div class="activity-icon ${a.type}">
+                        <i class="bi ${icon}"></i>
+                    </div>
+                    <div class="activity-content">
+                        <div class="activity-title">${escapeHtml(a.title)}</div>
+                        <div class="activity-subtitle">${escapeHtml(subtitleParts.join(' \u2022 '))} \u2022 ${escapeHtml(label)}</div>
+                    </div>
+                    <div class="activity-time">${dateStr}</div>
                 </div>
-                <span class="badge ${item.days_until_due < 0 ? 'badge-overdue' : 'badge-medium'}">
-                    ${item.days_until_due < 0 ? Math.abs(item.days_until_due) + ' days overdue' : item.days_until_due + ' days'}
-                </span>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
-    function renderEquipmentStatus(statusCounts) {
-        const container = document.getElementById('equipmentStatusContainer');
-        const statuses = Object.entries(statusCounts);
+    function formatTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMin = Math.floor(diffMs / 60000);
+        const diffHour = Math.floor(diffMin / 60);
+        const diffDay = Math.floor(diffHour / 24);
 
-        if (statuses.length === 0) {
-            container.innerHTML = '<div class="empty-state"><i class="bi bi-gear"></i><p>No equipment data</p></div>';
-            return;
-        }
-
-        const statusLabels = {
-            'operational': 'Operational',
-            'needs_maintenance': 'Needs Maintenance',
-            'under_repair': 'Under Repair',
-            'out_of_service': 'Out of Service',
-            'retired': 'Retired'
-        };
-
-        const statusColors = {
-            'operational': 'success',
-            'needs_maintenance': 'warning',
-            'under_repair': 'info',
-            'out_of_service': 'error',
-            'retired': 'muted'
-        };
-
-        container.innerHTML = statuses.map(([status, count]) => `
-            <div class="list-item">
-                <div class="list-item-title">${statusLabels[status] || status}</div>
-                <span class="badge badge-${statusColors[status] || 'medium'}">${count}</span>
-            </div>
-        `).join('');
+        if (diffDay > 30) return date.toLocaleDateString();
+        if (diffDay > 0) return `${diffDay}d ago`;
+        if (diffHour > 0) return `${diffHour}h ago`;
+        if (diffMin > 0) return `${diffMin}m ago`;
+        return 'Just now';
     }
 
-    // Load all data on page load
-    loadDashboard();
-    loadAlerts();
-    loadUpcomingMaintenance();
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Load all data
+    loadLocations().then(() => {
+        loadDashboard();
+        loadActionItems();
+        loadRecentActivity();
+    });
 </script>
 {% endblock %}

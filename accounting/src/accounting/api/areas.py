@@ -7,9 +7,15 @@ Inventory is the source of truth for locations.
 import os
 import httpx
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+import shutil
+from pathlib import Path
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
+
+# Logo storage directory
+LOGO_UPLOAD_DIR = Path("/app/uploads/logos")
 
 from accounting.db.database import get_db
 from accounting.models.user import User
@@ -338,3 +344,138 @@ async def sync_areas_from_inventory(
     except Exception as e:
         logger.error(f"Sync error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# LOGO UPLOAD ENDPOINTS
+# ============================================================================
+
+@router.post("/{area_id}/logo")
+async def upload_area_logo(
+    area_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """
+    Upload a logo image for an area/location.
+
+    Supported formats: PNG, JPG, JPEG, GIF, SVG
+    Max size: 2MB
+    """
+    area = db.query(Area).filter(Area.id == area_id).first()
+    if not area:
+        raise HTTPException(status_code=404, detail="Area not found")
+
+    # Validate file type
+    allowed_extensions = {'.png', '.jpg', '.jpeg', '.gif', '.svg'}
+    file_ext = Path(file.filename).suffix.lower() if file.filename else ''
+    if file_ext not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid file type. Allowed: {', '.join(allowed_extensions)}"
+        )
+
+    # Read file content
+    content = await file.read()
+
+    # Validate file size (2MB max)
+    if len(content) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 2MB")
+
+    # Create upload directory if it doesn't exist
+    LOGO_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Delete old logo if exists
+    if area.logo_path:
+        old_logo_path = LOGO_UPLOAD_DIR / area.logo_path
+        if old_logo_path.exists():
+            try:
+                old_logo_path.unlink()
+            except Exception as e:
+                logger.warning(f"Could not delete old logo: {e}")
+
+    # Generate unique filename
+    safe_code = area.code.lower().replace(' ', '_')
+    filename = f"{safe_code}_logo{file_ext}"
+    file_path = LOGO_UPLOAD_DIR / filename
+
+    # Save file
+    try:
+        with open(file_path, 'wb') as f:
+            f.write(content)
+    except Exception as e:
+        logger.error(f"Error saving logo: {e}")
+        raise HTTPException(status_code=500, detail="Error saving logo file")
+
+    # Update area with logo path
+    area.logo_path = filename
+    db.commit()
+
+    logger.info(f"Uploaded logo for area {area.code}: {filename}")
+
+    return {
+        "success": True,
+        "message": f"Logo uploaded for {area.name}",
+        "logo_path": filename
+    }
+
+
+@router.delete("/{area_id}/logo")
+async def delete_area_logo(
+    area_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """Delete the logo for an area/location"""
+    area = db.query(Area).filter(Area.id == area_id).first()
+    if not area:
+        raise HTTPException(status_code=404, detail="Area not found")
+
+    if not area.logo_path:
+        raise HTTPException(status_code=404, detail="Area has no logo")
+
+    # Delete file
+    logo_path = LOGO_UPLOAD_DIR / area.logo_path
+    if logo_path.exists():
+        try:
+            logo_path.unlink()
+        except Exception as e:
+            logger.warning(f"Could not delete logo file: {e}")
+
+    # Clear logo path in database
+    area.logo_path = None
+    db.commit()
+
+    return {"success": True, "message": "Logo deleted"}
+
+
+@router.get("/{area_id}/logo")
+async def get_area_logo(
+    area_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get the logo image for an area/location"""
+    area = db.query(Area).filter(Area.id == area_id).first()
+    if not area:
+        raise HTTPException(status_code=404, detail="Area not found")
+
+    if not area.logo_path:
+        raise HTTPException(status_code=404, detail="Area has no logo")
+
+    logo_path = LOGO_UPLOAD_DIR / area.logo_path
+    if not logo_path.exists():
+        raise HTTPException(status_code=404, detail="Logo file not found")
+
+    # Determine media type
+    ext = logo_path.suffix.lower()
+    media_types = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml'
+    }
+    media_type = media_types.get(ext, 'application/octet-stream')
+
+    return FileResponse(logo_path, media_type=media_type)

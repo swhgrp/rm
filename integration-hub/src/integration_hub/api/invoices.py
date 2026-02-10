@@ -548,6 +548,106 @@ async def reparse_invoice_with_vendor_rules(
     return result
 
 
+@router.post("/parse-all-csv")
+async def parse_all_csv_invoices(
+    db: Session = Depends(get_db)
+):
+    """
+    Parse all pending CSV invoices.
+
+    Finds all invoices with status 'pending_csv' and processes them.
+    Useful for batch processing after email check imports new CSV files.
+
+    Returns:
+        - processed: Number of invoices processed
+        - success: Number successfully parsed
+        - failed: Number that failed parsing
+        - details: List of results for each invoice
+    """
+    from integration_hub.services.csv_invoice_parser import get_csv_parser
+
+    pending = db.query(HubInvoice).filter(
+        HubInvoice.status == 'pending_csv'
+    ).all()
+
+    if not pending:
+        return {
+            'processed': 0,
+            'success': 0,
+            'failed': 0,
+            'message': 'No pending CSV invoices found',
+            'details': []
+        }
+
+    parser = get_csv_parser(db)
+    results = []
+    success_count = 0
+    failed_count = 0
+
+    for invoice in pending:
+        result = parser.process_hub_invoice(invoice.id)
+        results.append({
+            'invoice_id': invoice.id,
+            'filename': invoice.source_filename,
+            'success': result['success'],
+            'message': result['message']
+        })
+        if result['success']:
+            success_count += 1
+        else:
+            failed_count += 1
+
+    return {
+        'processed': len(pending),
+        'success': success_count,
+        'failed': failed_count,
+        'message': f'Processed {len(pending)} CSV invoice(s): {success_count} succeeded, {failed_count} failed',
+        'details': results
+    }
+
+
+@router.post("/{invoice_id}/parse-csv")
+async def parse_csv_invoice(
+    invoice_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Parse a CSV invoice file (e.g., fintech beer/alcohol invoices).
+
+    This endpoint processes invoices with status 'pending_csv' that have CSV
+    file attachments. It parses the CSV, extracts invoice data grouped by
+    invoice number, and creates line items.
+
+    If the CSV contains multiple invoices (different invoice numbers or stores),
+    additional HubInvoice records will be created.
+
+    Returns:
+        - success: Whether parsing succeeded
+        - message: Status message
+        - invoices: List of created/updated invoices with their details
+    """
+    from integration_hub.services.csv_invoice_parser import get_csv_parser
+
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    # Check if it's a CSV invoice
+    if invoice.status != 'pending_csv' and not (invoice.source_filename and invoice.source_filename.lower().endswith('.csv')):
+        raise HTTPException(
+            status_code=400,
+            detail="Invoice is not a CSV file or has already been processed"
+        )
+
+    parser = get_csv_parser(db)
+    result = parser.process_hub_invoice(invoice_id)
+
+    if not result['success']:
+        raise HTTPException(status_code=400, detail=result['message'])
+
+    return result
+
+
 @router.get("/{invoice_id}/vendor-rules-status")
 async def get_invoice_vendor_rules_status(
     invoice_id: int,

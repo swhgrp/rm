@@ -21,6 +21,7 @@ services:
       - restaurant-network
     volumes:
       - ./src:/app/src:ro
+      - maintenance_uploads:/app/uploads/maintenance
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 30s
@@ -51,3 +52,4 @@ networks:
 
 volumes:
   maintenance_postgres_data:
+  maintenance_uploads:

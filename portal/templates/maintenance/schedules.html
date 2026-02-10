@@ -144,18 +144,28 @@
     .badge-upcoming { background-color: var(--success-bg); color: var(--success); }
 
     .actions-cell {
-        display: flex;
-        gap: 8px;
+        white-space: nowrap;
+    }
+
+    .actions-cell .actions-wrap {
+        display: inline-flex;
+        gap: 6px;
     }
 
     .btn-icon {
-        padding: 6px 10px;
+        width: 32px;
+        height: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
         border: 1px solid var(--border-primary);
         border-radius: 4px;
         background-color: var(--bg-secondary);
         color: var(--text-secondary);
         cursor: pointer;
         font-size: 14px;
+        flex-shrink: 0;
         transition: all 0.2s ease;
     }
 
@@ -409,6 +419,96 @@
         text-align: center;
         font-style: italic;
     }
+
+    /* Completion modal styles */
+    .file-upload-area {
+        border: 2px dashed var(--border-primary);
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        background-color: var(--bg-tertiary);
+    }
+
+    .file-upload-area:hover {
+        border-color: var(--accent-primary);
+        background-color: var(--bg-elevated);
+    }
+
+    .file-upload-area i {
+        font-size: 32px;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+        display: block;
+    }
+
+    .file-upload-area p {
+        color: var(--text-secondary);
+        font-size: 13px;
+        margin: 0;
+    }
+
+    .file-upload-area .hint {
+        color: var(--text-muted);
+        font-size: 12px;
+        margin-top: 4px;
+    }
+
+    .file-list {
+        margin-top: 10px;
+    }
+
+    .file-list-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background-color: var(--bg-tertiary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        margin-bottom: 6px;
+        font-size: 13px;
+    }
+
+    .file-list-item .file-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        overflow: hidden;
+    }
+
+    .file-list-item .file-info i {
+        color: var(--text-muted);
+        flex-shrink: 0;
+    }
+
+    .file-list-item .file-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .file-list-item .file-size {
+        color: var(--text-muted);
+        flex-shrink: 0;
+        margin-left: 8px;
+    }
+
+    .file-list-item .btn-remove {
+        background: none;
+        border: none;
+        color: var(--error);
+        cursor: pointer;
+        padding: 2px 6px;
+        font-size: 16px;
+        flex-shrink: 0;
+        border-radius: 4px;
+    }
+
+    .file-list-item .btn-remove:hover {
+        background-color: var(--error-bg);
+    }
 {% endblock %}
 
 {% block content %}
@@ -601,6 +701,43 @@
                 <button class="btn-secondary" onclick="closeAddVendorModal()">Cancel</button>
                 <button class="btn-primary" onclick="saveNewVendor()">
                     <i class="bi bi-plus-lg"></i> Add Vendor
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- Complete Maintenance Modal -->
+    <div class="modal-overlay" id="completeModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Complete Maintenance</h3>
+                <button class="modal-close" onclick="closeCompleteModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="schedule-info" id="completeScheduleInfo"></div>
+                <input type="hidden" id="completeScheduleId">
+                <div class="form-group">
+                    <label for="completedDate">Completion Date</label>
+                    <input type="date" id="completedDate">
+                </div>
+                <div class="form-group">
+                    <label for="completionNotes">Notes</label>
+                    <textarea id="completionNotes" rows="3" placeholder="Optional notes about the work performed..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Documents</label>
+                    <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
+                        <i class="bi bi-cloud-upload"></i>
+                        <p>Click to upload files</p>
+                        <p class="hint">PDF, JPG, PNG, DOC/DOCX - Max 10MB each</p>
+                    </div>
+                    <input type="file" id="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="display:none" onchange="handleFileSelection(event)">
+                    <div class="file-list" id="fileList"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeCompleteModal()">Cancel</button>
+                <button class="btn-primary" id="submitCompleteBtn" onclick="submitCompletion()">
+                    <i class="bi bi-check-lg"></i> Mark Completed
                 </button>
             </div>
         </div>
@@ -1018,8 +1155,8 @@
 
         tbody.innerHTML = schedules.map(s => {
             const eq = equipment.find(e => e.id === s.equipment_id);
-            const nextDue = s.next_due ? new Date(s.next_due) : null;
-            const lastPerformed = s.last_performed ? new Date(s.last_performed).toLocaleDateString() : 'Never';
+            const nextDue = s.next_due ? new Date(s.next_due + 'T00:00:00') : null;
+            const lastPerformed = s.last_performed ? new Date(s.last_performed + 'T00:00:00').toLocaleDateString() : 'Never';
 
             let dueStatus = 'upcoming';
             let dueBadge = '';
@@ -1055,15 +1192,17 @@
                     <td><span class="badge badge-${statusBadge}">${statusLabel}</span></td>
                     <td>${lastPerformed}</td>
                     <td class="actions-cell">
-                        <button class="btn-icon success" onclick="markCompleted(${s.id})" title="Mark Completed">
-                            <i class="bi bi-check-lg"></i>
-                        </button>
-                        <button class="btn-icon" onclick="editSchedule(${s.id})" title="Edit">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        <button class="btn-icon" onclick="createWorkOrder(${s.id})" title="Create Work Order">
-                            <i class="bi bi-clipboard-plus"></i>
-                        </button>
+                        <div class="actions-wrap">
+                            <button class="btn-icon success" onclick="markCompleted(${s.id})" title="Mark Completed">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                            <button class="btn-icon" onclick="editSchedule(${s.id})" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn-icon" onclick="createWorkOrder(${s.id})" title="Create Work Order">
+                                <i class="bi bi-clipboard-plus"></i>
+                            </button>
+                        </div>
                     </td>
                 </tr>
             `;
@@ -1210,28 +1349,138 @@
         }
     }
 
-    async function markCompleted(id) {
-        const confirmed = await showConfirm(
-            'Mark this maintenance as completed? This will update the next due date.',
-            'Mark Completed'
-        );
-        if (!confirmed) return;
+    let selectedFiles = [];
+
+    function markCompleted(id) {
+        const schedule = allSchedules.find(s => s.id === id);
+        if (!schedule) return;
+
+        document.getElementById('completeScheduleId').value = id;
+
+        const eq = equipment.find(e => e.id === schedule.equipment_id);
+        document.getElementById('completeScheduleInfo').innerHTML = `
+            <p><strong>${escapeHtml(schedule.name)}</strong></p>
+            <p>${eq ? escapeHtml(eq.name) : 'Unknown equipment'} &bull; ${schedule.frequency}</p>
+        `;
+
+        const today = new Date().toISOString().split('T')[0];
+        const dateInput = document.getElementById('completedDate');
+        dateInput.value = today;
+        dateInput.max = today;
+
+        document.getElementById('completionNotes').value = '';
+        selectedFiles = [];
+        document.getElementById('fileInput').value = '';
+        renderFileList();
+
+        document.getElementById('completeModal').classList.add('active');
+    }
+
+    function closeCompleteModal() {
+        document.getElementById('completeModal').classList.remove('active');
+        selectedFiles = [];
+    }
+
+    function handleFileSelection(event) {
+        const newFiles = Array.from(event.target.files);
+        for (const file of newFiles) {
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+            const allowed = ['.pdf', '.jpg', '.jpeg', '.png', '.doc', '.docx'];
+            if (!allowed.includes(ext)) {
+                showWarning(`File type "${ext}" not allowed: ${file.name}`);
+                continue;
+            }
+            if (file.size > 10 * 1024 * 1024) {
+                showWarning(`File exceeds 10MB limit: ${file.name}`);
+                continue;
+            }
+            if (!selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+                selectedFiles.push(file);
+            }
+        }
+        event.target.value = '';
+        renderFileList();
+    }
+
+    function removeFile(index) {
+        selectedFiles.splice(index, 1);
+        renderFileList();
+    }
+
+    function renderFileList() {
+        const container = document.getElementById('fileList');
+        if (selectedFiles.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        const iconMap = {
+            '.pdf': 'bi-file-earmark-pdf',
+            '.jpg': 'bi-file-earmark-image',
+            '.jpeg': 'bi-file-earmark-image',
+            '.png': 'bi-file-earmark-image',
+            '.doc': 'bi-file-earmark-word',
+            '.docx': 'bi-file-earmark-word'
+        };
+
+        container.innerHTML = selectedFiles.map((file, idx) => {
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+            const icon = iconMap[ext] || 'bi-file-earmark';
+            return `
+                <div class="file-list-item">
+                    <div class="file-info">
+                        <i class="bi ${icon}"></i>
+                        <span class="file-name">${escapeHtml(file.name)}</span>
+                        <span class="file-size">${formatFileSize(file.size)}</span>
+                    </div>
+                    <button class="btn-remove" onclick="removeFile(${idx})" title="Remove">&times;</button>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    async function submitCompletion() {
+        const scheduleId = document.getElementById('completeScheduleId').value;
+        const completedDate = document.getElementById('completedDate').value;
+        const notes = document.getElementById('completionNotes').value;
+
+        const btn = document.getElementById('submitCompleteBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
 
         try {
-            const response = await fetch(`${API_BASE}/schedules/${id}/complete`, {
-                method: 'POST'
+            const formData = new FormData();
+            if (completedDate) formData.append('completed_date', completedDate);
+            if (notes) formData.append('notes', notes);
+            for (const file of selectedFiles) {
+                formData.append('files', file);
+            }
+
+            const response = await fetch(`${API_BASE}/schedules/${scheduleId}/complete`, {
+                method: 'POST',
+                body: formData
             });
 
             if (response.ok) {
+                closeCompleteModal();
                 loadSchedules();
                 showSuccess('Maintenance marked as completed');
             } else {
                 const error = await response.json();
-                showError(error.detail || 'Unknown error');
+                showError(error.detail || 'Failed to complete maintenance');
             }
         } catch (error) {
-            console.error('Error marking completed:', error);
-            showError('Failed to mark schedule as completed');
+            console.error('Error completing maintenance:', error);
+            showError('Failed to complete maintenance');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-lg"></i> Mark Completed';
         }
     }
 

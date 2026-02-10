@@ -171,13 +171,14 @@ def get_invoice(
         joinedload(CustomerInvoice.customer),
         joinedload(CustomerInvoice.area),
         joinedload(CustomerInvoice.line_items),
-        joinedload(CustomerInvoice.payments)
+        joinedload(CustomerInvoice.payments),
+        joinedload(CustomerInvoice.creator)
     ).filter(CustomerInvoice.id == invoice_id).first()
 
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    return invoice
+    return CustomerInvoiceRead.from_orm_with_creator(invoice)
 
 
 @router.post("/", response_model=CustomerInvoiceRead)

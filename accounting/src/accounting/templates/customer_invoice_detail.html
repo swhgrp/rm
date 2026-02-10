@@ -769,6 +769,7 @@ function displayInvoiceDetails(invoice) {
     }
 
     // Audit trail
+    document.getElementById('createdBy').textContent = invoice.created_by_name || '-';
     document.getElementById('createdDate').textContent = formatDateTime(invoice.created_at);
 
     // Sent date

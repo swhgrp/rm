@@ -1,8 +1,8 @@
 """
 IMAP Email Monitor Service
 
-Monitors configured email inbox for new invoice emails with PDF attachments.
-Extracts PDFs, generates hash for deduplication, and creates invoice records.
+Monitors configured email inbox for new invoice emails with PDF and CSV attachments.
+Extracts files, generates hash for deduplication, and creates invoice records.
 """
 
 import imaplib
@@ -26,11 +26,14 @@ logger = logging.getLogger(__name__)
 class EmailMonitorService:
     """Service for monitoring email inbox and processing invoice attachments"""
 
+    # Supported attachment file types
+    SUPPORTED_EXTENSIONS = ('.pdf', '.csv')
+
     def __init__(self, db: Session):
         self.db = db
         self.settings = self._load_settings()
-        self.pdf_storage_path = Path("/app/uploads")
-        self.pdf_storage_path.mkdir(parents=True, exist_ok=True)
+        self.storage_path = Path("/app/uploads")
+        self.storage_path.mkdir(parents=True, exist_ok=True)
 
     def _load_settings(self) -> dict:
         """Load email settings from database"""
@@ -77,9 +80,9 @@ class EmailMonitorService:
 
         return mail
 
-    def _calculate_pdf_hash(self, pdf_content: bytes) -> str:
-        """Calculate SHA-256 hash of PDF content for deduplication"""
-        return hashlib.sha256(pdf_content).hexdigest()
+    def _calculate_file_hash(self, file_content: bytes) -> str:
+        """Calculate SHA-256 hash of file content for deduplication"""
+        return hashlib.sha256(file_content).hexdigest()
 
     def _is_duplicate_invoice(self, file_hash: str) -> bool:
         """Check if invoice with this hash already exists"""
@@ -88,16 +91,16 @@ class EmailMonitorService:
         ).first()
         return existing is not None
 
-    def _save_pdf(self, pdf_content: bytes, filename: str, file_hash: str) -> Path:
-        """Save PDF to disk with hash-based naming"""
+    def _save_file(self, file_content: bytes, filename: str, file_hash: str) -> Path:
+        """Save file to disk with hash-based naming"""
         # Use hash as filename to avoid duplicates
         safe_filename = f"{file_hash[:16]}_{filename}"
-        file_path = self.pdf_storage_path / safe_filename
+        file_path = self.storage_path / safe_filename
 
         with open(file_path, 'wb') as f:
-            f.write(pdf_content)
+            f.write(file_content)
 
-        logger.info(f"Saved PDF to {file_path}")
+        logger.info(f"Saved file to {file_path}")
         return file_path
 
     def _decode_email_subject(self, subject) -> str:
@@ -116,8 +119,8 @@ class EmailMonitorService:
 
         return subject_text
 
-    def _extract_pdf_attachments(self, msg: email.message.Message) -> List[Tuple[str, bytes]]:
-        """Extract all PDF attachments from email message"""
+    def _extract_attachments(self, msg: email.message.Message) -> List[Tuple[str, bytes]]:
+        """Extract all supported attachments (PDF, CSV) from email message"""
         attachments = []
 
         for part in msg.walk():
@@ -127,11 +130,12 @@ class EmailMonitorService:
                 continue
 
             filename = part.get_filename()
-            if filename and filename.lower().endswith('.pdf'):
-                pdf_content = part.get_payload(decode=True)
-                if pdf_content:
-                    logger.info(f"Found PDF attachment: {filename} ({len(pdf_content)} bytes)")
-                    attachments.append((filename, pdf_content))
+            if filename and filename.lower().endswith(self.SUPPORTED_EXTENSIONS):
+                file_content = part.get_payload(decode=True)
+                if file_content:
+                    file_type = 'CSV' if filename.lower().endswith('.csv') else 'PDF'
+                    logger.info(f"Found {file_type} attachment: {filename} ({len(file_content)} bytes)")
+                    attachments.append((filename, file_content))
 
         return attachments
 
@@ -145,15 +149,19 @@ class EmailMonitorService:
         email_date: datetime
     ) -> HubInvoice:
         """Create invoice database record"""
+        # Determine file type for status
+        is_csv = filename.lower().endswith('.csv')
+        initial_status = 'pending_csv' if is_csv else 'pending'
+
         invoice = HubInvoice(
-            invoice_number=None,  # Will be extracted by OCR
+            invoice_number=None,  # Will be extracted by OCR/parsing
             invoice_date=email_date,
-            vendor_name=None,  # Will be extracted by OCR
-            total_amount=0.0,  # Will be extracted by OCR
-            status='pending',  # Needs OCR processing
+            vendor_name=None,  # Will be extracted by OCR/parsing
+            total_amount=0.0,  # Will be extracted by OCR/parsing
+            status=initial_status,  # Needs processing
             source='email',
             source_filename=filename,
-            pdf_path=str(file_path),
+            pdf_path=str(file_path),  # Also used for CSV path
             invoice_hash=file_hash,
             email_subject=email_subject,
             email_from=email_from,
@@ -235,18 +243,18 @@ class EmailMonitorService:
 
                     logger.info(f"Processing email from {email_from}: {email_subject}")
 
-                    # Extract PDF attachments
-                    attachments = self._extract_pdf_attachments(msg)
+                    # Extract PDF and CSV attachments
+                    attachments = self._extract_attachments(msg)
 
                     if not attachments:
-                        logger.info(f"No PDF attachments found in email {msg_id}")
+                        logger.info(f"No supported attachments (PDF/CSV) found in email {msg_id}")
                         continue
 
-                    # Process each PDF attachment
-                    for filename, pdf_content in attachments:
+                    # Process each attachment
+                    for filename, file_content in attachments:
                         try:
                             # Calculate hash
-                            file_hash = self._calculate_pdf_hash(pdf_content)
+                            file_hash = self._calculate_file_hash(file_content)
 
                             # Check for duplicates
                             if self._is_duplicate_invoice(file_hash):
@@ -254,8 +262,8 @@ class EmailMonitorService:
                                 stats['duplicates'] += 1
                                 continue
 
-                            # Save PDF
-                            file_path = self._save_pdf(pdf_content, filename, file_hash)
+                            # Save file (PDF or CSV)
+                            file_path = self._save_file(file_content, filename, file_hash)
 
                             # Create invoice record
                             invoice = self._create_invoice_record(
@@ -267,18 +275,34 @@ class EmailMonitorService:
                                 email_date=email_date
                             )
 
-                            # Auto-parse the invoice using OpenAI
-                            try:
-                                from integration_hub.services.invoice_parser import get_invoice_parser
-                                parser = get_invoice_parser()
-                                parse_result = parser.parse_and_save(invoice.id, self.db)
-                                if parse_result['success']:
-                                    logger.info(f"Auto-parsed invoice {invoice.id}: {parse_result['message']}")
-                                else:
-                                    logger.warning(f"Failed to auto-parse invoice {invoice.id}: {parse_result['message']}")
-                            except Exception as e:
-                                logger.error(f"Error auto-parsing invoice {invoice.id}: {str(e)}")
-                                # Don't fail the email processing if parsing fails
+                            # Auto-parse the invoice
+                            is_csv = filename.lower().endswith('.csv')
+                            if is_csv:
+                                # Parse CSV invoices
+                                try:
+                                    from integration_hub.services.csv_invoice_parser import get_csv_parser
+                                    csv_parser = get_csv_parser(self.db)
+                                    parse_result = csv_parser.process_hub_invoice(invoice.id)
+                                    if parse_result['success']:
+                                        logger.info(f"Auto-parsed CSV invoice {invoice.id}: {parse_result['message']}")
+                                    else:
+                                        logger.warning(f"Failed to auto-parse CSV invoice {invoice.id}: {parse_result['message']}")
+                                except Exception as e:
+                                    logger.error(f"Error auto-parsing CSV invoice {invoice.id}: {str(e)}")
+                                    # Don't fail the email processing if parsing fails
+                            else:
+                                # Parse PDF invoices with OCR
+                                try:
+                                    from integration_hub.services.invoice_parser import get_invoice_parser
+                                    parser = get_invoice_parser()
+                                    parse_result = parser.parse_and_save(invoice.id, self.db)
+                                    if parse_result['success']:
+                                        logger.info(f"Auto-parsed invoice {invoice.id}: {parse_result['message']}")
+                                    else:
+                                        logger.warning(f"Failed to auto-parse invoice {invoice.id}: {parse_result['message']}")
+                                except Exception as e:
+                                    logger.error(f"Error auto-parsing invoice {invoice.id}: {str(e)}")
+                                    # Don't fail the email processing if parsing fails
 
                             stats['processed'] += 1
 

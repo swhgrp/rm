@@ -206,6 +206,32 @@ class MaintenanceScheduleWithEquipment(MaintenanceScheduleResponse):
     location_name: Optional[str] = None
 
 
+# ==================== Maintenance Log / Completion Schemas ====================
+
+class MaintenanceDocumentResponse(BaseModel):
+    id: int
+    log_id: int
+    file_name: str
+    file_size: Optional[int] = None
+    mime_type: Optional[str] = None
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class MaintenanceLogResponse(BaseModel):
+    id: int
+    schedule_id: int
+    completed_date: date
+    notes: Optional[str] = None
+    created_at: datetime
+    documents: List[MaintenanceDocumentResponse] = []
+
+    class Config:
+        from_attributes = True
+
+
 # ==================== Work Order Schemas ====================
 
 class WorkOrderBase(BaseModel):

@@ -176,6 +176,38 @@ class MaintenanceSchedule(Base):
     # Relationships
     equipment = relationship("Equipment", back_populates="maintenance_schedules")
     vendor = relationship("Vendor", back_populates="maintenance_schedules")
+    logs = relationship("MaintenanceLog", back_populates="schedule", order_by="desc(MaintenanceLog.completed_date)")
+
+
+class MaintenanceLog(Base):
+    """Log entry for each maintenance completion event"""
+    __tablename__ = "maintenance_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    schedule_id = Column(Integer, ForeignKey("maintenance_schedules.id"), nullable=False, index=True)
+    completed_date = Column(Date, nullable=False)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    schedule = relationship("MaintenanceSchedule", back_populates="logs")
+    documents = relationship("MaintenanceDocument", back_populates="log", cascade="all, delete-orphan")
+
+
+class MaintenanceDocument(Base):
+    """Document attachment for a maintenance completion log"""
+    __tablename__ = "maintenance_documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    log_id = Column(Integer, ForeignKey("maintenance_logs.id"), nullable=False, index=True)
+    file_name = Column(String(255), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    file_size = Column(Integer, nullable=True)
+    mime_type = Column(String(100), nullable=True)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    log = relationship("MaintenanceLog", back_populates="documents")
 
 
 class WorkOrder(Base):

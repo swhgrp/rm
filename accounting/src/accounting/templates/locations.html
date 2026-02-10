@@ -219,6 +219,27 @@
 
                     <hr class="my-4">
 
+                    <!-- Logo Branding -->
+                    <h6 class="mb-3"><i class="bi bi-image"></i> Branding</h6>
+                    <div class="mb-3">
+                        <label for="logoUpload" class="form-label">Location Logo</label>
+                        <div class="d-flex align-items-center gap-3">
+                            <div id="logoPreview" style="width: 120px; height: 80px; border: 1px dashed var(--border-primary); border-radius: 4px; display: flex; align-items: center; justify-content: center; background: var(--bg-primary);">
+                                <span class="text-muted small">No logo</span>
+                            </div>
+                            <div>
+                                <input type="file" class="form-control" id="logoUpload" accept=".png,.jpg,.jpeg,.gif,.svg" style="max-width: 250px;">
+                                <small class="text-muted d-block mt-1">PNG, JPG, GIF, or SVG (max 2MB)</small>
+                                <button type="button" class="btn btn-sm btn-outline-danger mt-2" id="removeLogo" onclick="removeLogo()" style="display: none;">
+                                    <i class="bi bi-trash"></i> Remove Logo
+                                </button>
+                            </div>
+                        </div>
+                        <small class="text-muted">Logo appears on customer invoices and reports</small>
+                    </div>
+
+                    <hr class="my-4">
+
                     <!-- Status -->
                     <div class="mb-3">
                         <div class="form-check form-switch">
@@ -408,6 +429,8 @@ function showCreateModal() {
     document.getElementById('locationId').value = '';
     document.getElementById('locationActive').checked = true;
     document.getElementById('country').value = 'United States';
+    // Reset logo preview
+    updateLogoPreview(null);
     locationModal.show();
 }
 
@@ -444,6 +467,9 @@ function editLocation(id) {
     document.getElementById('safeAccountId').value = location.safe_account_id || '';
 
     document.getElementById('locationActive').checked = location.is_active;
+
+    // Logo preview
+    updateLogoPreview(location.logo_path ? id : null);
 
     locationModal.show();
 }
@@ -512,6 +538,15 @@ async function saveLocation() {
         if (!response.ok) {
             const error = await response.json();
             throw new Error(error.detail || 'Failed to save location');
+        }
+
+        const savedLocation = await response.json();
+        const locationId = editingLocationId || savedLocation.id;
+
+        // Upload logo if one was selected
+        const logoFile = document.getElementById('logoUpload').files[0];
+        if (logoFile) {
+            await uploadLogo(locationId, logoFile);
         }
 
         showNotification(
@@ -585,6 +620,71 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// Logo management functions
+function updateLogoPreview(areaId) {
+    const preview = document.getElementById('logoPreview');
+    const removeBtn = document.getElementById('removeLogo');
+    const fileInput = document.getElementById('logoUpload');
+
+    // Reset file input
+    fileInput.value = '';
+
+    if (areaId) {
+        // Show existing logo
+        preview.innerHTML = `<img src="/accounting/api/areas/${areaId}/logo" alt="Logo" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.parentElement.innerHTML='<span class=\\'text-muted small\\'>No logo</span>'">`;
+        removeBtn.style.display = 'inline-block';
+    } else {
+        preview.innerHTML = '<span class="text-muted small">No logo</span>';
+        removeBtn.style.display = 'none';
+    }
+}
+
+async function uploadLogo(areaId, file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch(`/accounting/api/areas/${areaId}/logo`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to upload logo');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error uploading logo:', error);
+        showNotification('Logo upload failed: ' + error.message, 'error');
+    }
+}
+
+async function removeLogo() {
+    if (!editingLocationId) return;
+
+    if (!confirm('Are you sure you want to remove the logo?')) return;
+
+    try {
+        const response = await fetch(`/accounting/api/areas/${editingLocationId}/logo`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Failed to remove logo');
+        }
+
+        updateLogoPreview(null);
+        showNotification('Logo removed', 'success');
+        await loadLocations();
+    } catch (error) {
+        console.error('Error removing logo:', error);
+        showNotification(error.message, 'error');
+    }
 }
 
 async function syncFromInventory() {

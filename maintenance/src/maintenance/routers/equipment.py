@@ -9,7 +9,10 @@ from sqlalchemy.orm import selectinload
 import httpx
 
 from maintenance.database import get_db
-from maintenance.models import Equipment, EquipmentCategory, EquipmentHistory, EquipmentStatus, WorkOrder, WorkOrderStatus
+from maintenance.models import (
+    Equipment, EquipmentCategory, EquipmentHistory, EquipmentStatus,
+    WorkOrder, WorkOrderStatus, MaintenanceSchedule, MaintenanceLog, MaintenanceDocument
+)
 from maintenance.schemas import (
     EquipmentCreate, EquipmentUpdate, EquipmentResponse,
     EquipmentListResponse, EquipmentDetailResponse,
@@ -218,8 +221,15 @@ async def delete_equipment(equipment_id: int, db: AsyncSession = Depends(get_db)
     logger.info(f"Retired equipment: {equipment.name} (ID: {equipment.id})")
 
 
+class HistoryDocumentItem(BaseModel):
+    id: int
+    file_name: str
+    file_size: int | None = None
+    mime_type: str | None = None
+
+
 class CombinedHistoryItem(BaseModel):
-    """Combined history item for equipment history + work orders"""
+    """Combined history item for equipment history + work orders + maintenance logs"""
     id: int
     equipment_id: int
     changed_by: int | None = None
@@ -229,6 +239,7 @@ class CombinedHistoryItem(BaseModel):
     new_value: str | None = None
     notes: str | None = None
     created_at: dt
+    documents: List[HistoryDocumentItem] = []
 
     class Config:
         from_attributes = True
@@ -267,7 +278,31 @@ async def get_equipment_history(
     wo_result = await db.execute(wo_query)
     work_orders = wo_result.scalars().all()
 
-    logger.info(f"Equipment {equipment_id}: Found {len(history_records)} history records and {len(work_orders)} work orders")
+    # Get maintenance logs for this equipment (through schedules)
+    schedule_id_query = (
+        select(MaintenanceSchedule.id)
+        .where(MaintenanceSchedule.equipment_id == equipment_id)
+    )
+    schedule_result = await db.execute(schedule_id_query)
+    schedule_ids = [s for s in schedule_result.scalars().all()]
+
+    maintenance_logs = []
+    if schedule_ids:
+        log_query = (
+            select(MaintenanceLog)
+            .options(
+                selectinload(MaintenanceLog.documents),
+                selectinload(MaintenanceLog.schedule)
+            )
+            .where(MaintenanceLog.schedule_id.in_(schedule_ids))
+        )
+        log_result = await db.execute(log_query)
+        maintenance_logs = log_result.scalars().all()
+
+    logger.info(
+        f"Equipment {equipment_id}: Found {len(history_records)} history records, "
+        f"{len(work_orders)} work orders, {len(maintenance_logs)} maintenance logs"
+    )
 
     # Combine and format results
     combined = []
@@ -301,6 +336,38 @@ async def get_equipment_history(
             new_value=wo.status.value if wo.status else None,
             notes=notes,
             created_at=wo.completed_date or wo.created_at
+        ))
+
+    # Add maintenance log entries
+    for log in maintenance_logs:
+        schedule_name = log.schedule.name if log.schedule else "Maintenance"
+        notes = schedule_name
+        if log.notes:
+            notes = f"{schedule_name}: {log.notes}"
+
+        docs = [
+            HistoryDocumentItem(
+                id=doc.id,
+                file_name=doc.file_name,
+                file_size=doc.file_size,
+                mime_type=doc.mime_type,
+            )
+            for doc in (log.documents or [])
+        ]
+
+        from datetime import datetime as datetime_mod
+        log_datetime = datetime_mod.combine(log.completed_date, datetime_mod.min.time())
+
+        combined.append(CombinedHistoryItem(
+            id=log.id + 200000,  # Offset to avoid ID collision
+            equipment_id=equipment_id,
+            changed_by=None,
+            change_type="maintenance",
+            old_value=None,
+            new_value=str(log.completed_date),
+            notes=notes,
+            created_at=log_datetime,
+            documents=docs,
         ))
 
     # Sort by created_at descending and apply pagination

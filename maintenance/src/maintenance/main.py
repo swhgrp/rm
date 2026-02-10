@@ -1,12 +1,13 @@
 """Main FastAPI application for Maintenance & Equipment Tracking Service"""
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from maintenance.config import settings
-from maintenance.database import init_db
+from maintenance.database import init_db, async_engine
 from maintenance.routers import equipment, categories, schedules, work_orders, vendors, dashboard
 
 # Configure logging
@@ -23,6 +24,18 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Maintenance Service...")
     # Initialize database tables if needed
     await init_db()
+    # Warm up the connection pool with retries
+    from sqlalchemy import text
+    for attempt in range(5):
+        try:
+            async with async_engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            logger.info("Database connection pool warmed up")
+            break
+        except Exception as e:
+            logger.warning(f"DB warmup attempt {attempt + 1}/5 failed: {e}")
+            if attempt < 4:
+                await asyncio.sleep(2)
     logger.info("Maintenance Service started successfully")
     yield
     logger.info("Shutting down Maintenance Service...")

@@ -19,8 +19,9 @@ COPY src/ ./
 COPY alembic.ini .
 COPY alembic/ ./alembic/
 
-# Create non-root user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+# Create uploads directory and non-root user
+RUN mkdir -p /app/uploads/maintenance && \
+    useradd -m -u 1000 appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Expose port

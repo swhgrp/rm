@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice Details - SW Hospitality Group{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <a href="javascript:history.back()" class="btn btn-sm btn-outline-secondary me-2">
+                <i class="bi bi-arrow-left"></i> Back
+            </a>
+            <span class="fs-5 fw-bold" id="pageTitle">Invoice Details</span>
+        </div>
+    </div>
+
+    <div id="invoiceContent">
+        <div class="text-center py-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading invoice details...</p>
+        </div>
+    </div>
+</div>
+
+<script>
+const invoiceId = {{ invoice_id }};
+
+function getToken() {
+    return localStorage.getItem('access_token');
+}
+
+function getStatusBadge(status) {
+    const badges = {
+        'pending': '<span class="badge bg-secondary">Pending</span>',
+        'parsing': '<span class="badge bg-info">Parsing</span>',
+        'parse_failed': '<span class="badge bg-danger">Parse Failed</span>',
+        'mapping': '<span class="badge bg-warning text-dark">Mapping</span>',
+        'ready': '<span class="badge bg-primary">Ready</span>',
+        'sent': '<span class="badge bg-success">Sent</span>',
+        'error': '<span class="badge bg-danger">Error</span>',
+        'partial': '<span class="badge bg-warning text-dark">Partial</span>',
+        'statement': '<span class="badge bg-secondary">Statement</span>'
+    };
+    return badges[status] || `<span class="badge bg-secondary">${status}</span>`;
+}
+
+document.addEventListener('DOMContentLoaded', loadInvoice);
+
+async function loadInvoice() {
+    try {
+        const response = await fetch(`api/hub-invoices/${invoiceId}`, {
+            headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const invoice = await response.json();
+        renderInvoice(invoice);
+    } catch (error) {
+        console.error('Error loading invoice:', error);
+        document.getElementById('invoiceContent').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i> Failed to load invoice details: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function renderInvoice(invoice) {
+    document.getElementById('pageTitle').textContent = `Invoice: ${invoice.invoice_number || invoice.id}`;
+
+    const date = invoice.invoice_date ? new Date(invoice.invoice_date).toLocaleDateString() : '-';
+    const dueDate = invoice.due_date ? new Date(invoice.due_date).toLocaleDateString() : '-';
+
+    let html = `
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header"><h6 class="mb-0">Invoice Information</h6></div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Vendor:</strong> ${invoice.vendor_name || '-'}</p>
+                                <p class="mb-2"><strong>Invoice #:</strong> ${invoice.invoice_number || '-'}</p>
+                                <p class="mb-2"><strong>Location:</strong> ${invoice.location_name || '-'}</p>
+                                <p class="mb-2"><strong>Status:</strong> ${getStatusBadge(invoice.status)}</p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Date:</strong> ${date}</p>
+                                <p class="mb-2"><strong>Due Date:</strong> ${dueDate}</p>
+                                <p class="mb-2"><strong>Total:</strong> ${invoice.total_amount != null ? '$' + invoice.total_amount.toFixed(2) : '-'}</p>
+                                <p class="mb-2"><strong>Tax:</strong> ${invoice.tax_amount != null ? '$' + invoice.tax_amount.toFixed(2) : '-'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header"><h6 class="mb-0">Sync Status</h6></div>
+                    <div class="card-body">
+                        <p class="mb-2">
+                            <span class="badge ${invoice.sent_to_inventory ? 'bg-success' : 'bg-secondary'} me-2">
+                                <i class="bi bi-${invoice.sent_to_inventory ? 'check' : 'x'}"></i> Inventory
+                            </span>
+                            ${invoice.inventory_invoice_id ? '<small class="text-muted">ID: ' + invoice.inventory_invoice_id + '</small>' : ''}
+                        </p>
+                        <p class="mb-2">
+                            <span class="badge ${invoice.sent_to_accounting ? 'bg-success' : 'bg-secondary'}">
+                                <i class="bi bi-${invoice.sent_to_accounting ? 'check' : 'x'}"></i> Accounting
+                            </span>
+                            ${invoice.accounting_je_id ? '<small class="text-muted">JE: ' + invoice.accounting_je_id + '</small>' : ''}
+                        </p>
+                        ${invoice.inventory_error ? '<div class="alert alert-danger mt-2 mb-0 py-1 px-2" style="font-size:12px;"><strong>Inventory:</strong> ' + invoice.inventory_error + '</div>' : ''}
+                        ${invoice.accounting_error ? '<div class="alert alert-danger mt-2 mb-0 py-1 px-2" style="font-size:12px;"><strong>Accounting:</strong> ' + invoice.accounting_error + '</div>' : ''}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Line Items (${invoice.items ? invoice.items.length : 0})</h6>
+                ${invoice.items ? '<small class="text-muted">' + invoice.items.filter(i => i.is_mapped).length + ' of ' + invoice.items.length + ' mapped</small>' : ''}
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover" style="font-size: 13px;">
+                        <thead class="table-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Description</th>
+                                <th>Code</th>
+                                <th>Qty</th>
+                                <th>UOM</th>
+                                <th>Pack</th>
+                                <th class="text-end">Unit Price</th>
+                                <th class="text-end">Total</th>
+                                <th>Mapped</th>
+                                <th>Category</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+    `;
+
+    if (invoice.items && invoice.items.length > 0) {
+        invoice.items.forEach(item => {
+            const mappedBadge = item.is_mapped
+                ? '<span class="badge bg-success">Yes</span>'
+                : '<span class="badge bg-danger">No</span>';
+
+            html += `
+                <tr class="${!item.is_mapped ? 'table-warning' : ''}">
+                    <td>${item.line_number || '-'}</td>
+                    <td>${item.item_description || '-'}</td>
+                    <td><small class="text-muted">${item.item_code || '-'}</small></td>
+                    <td>${item.quantity}</td>
+                    <td>${item.unit_of_measure || '-'}</td>
+                    <td>${item.pack_size || '-'}</td>
+                    <td class="text-end">$${item.unit_price.toFixed(2)}</td>
+                    <td class="text-end">$${item.line_total.toFixed(2)}</td>
+                    <td>${mappedBadge}</td>
+                    <td><small>${item.inventory_category || '-'}</small></td>
+                </tr>
+            `;
+        });
+    } else {
+        html += '<tr><td colspan="10" class="text-muted text-center">No line items</td></tr>';
+    }
+
+    html += `
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('invoiceContent').innerHTML = html;
+}
+</script>
+{% endblock %}

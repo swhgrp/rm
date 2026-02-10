@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** February 6, 2026
+**Last Updated:** February 10, 2026
 **Status:** ~98% Complete - All 10 Systems Production Ready ✅
-**Latest:** Security audit remediation - API key rotation, hardcoded credentials removal, invoice line item management (Feb 6, 2026) ✅
+**Latest:** Maintenance completion logging with document attachments, dashboard redesign, area logo branding, CSV invoice parsing, CalDAV menu sync (Feb 10, 2026) ✅
 
 ---
 
@@ -347,8 +347,8 @@ restaurant-system/
 **Maintenance Portal (NEW Jan 2026):** 🌟
 - ✅ Equipment management UI
 - ✅ Work order management UI
-- ✅ Maintenance schedules UI
-- ✅ Dashboard with stats and alerts
+- ✅ Maintenance schedules UI with completion logging
+- ✅ Dashboard with action items, recent activity, and open work orders
 - ✅ **URL:** https://rm.swhgrp.com/portal/maintenance/
 
 **Missing (~5%):**
@@ -530,7 +530,7 @@ restaurant-system/
 - ✅ **Draft invoice editing** with full line item replacement 🆕
 - ✅ **Draft/void invoice deletion** 🆕
 - ✅ **Post vs Email separation** - Post finalizes to GL, Email sends to customer 🆕
-- ✅ **Professional PDF invoices** with location branding (ReportLab) 🌟
+- ✅ **Professional PDF invoices** with location branding and logo upload (ReportLab) 🌟
 - ✅ **Auto GL posting** - Journal entries created on invoice post (DR: AR, CR: Revenue) 🌟
 - ✅ **Credit limit enforcement** (prevents over-limit invoicing) 🌟
 - ✅ **Email invoice delivery** with SMTP configuration 🌟
@@ -723,6 +723,7 @@ restaurant-system/
 **🌟 Automated Invoice Intake Pipeline (Oct 31, 2025):**
 - ✅ **Email monitoring** - Automated IMAP email checking every 15 minutes
 - ✅ **PDF extraction** - Attachment capture with SHA-256 deduplication
+- ✅ **CSV invoice parsing** - Automated parsing for CSV-format vendor invoices
 - ✅ **OpenAI parsing** - GPT-4o Vision powered invoice data extraction
 - ✅ **Intelligent auto-mapping** - Multi-strategy item-to-GL mapping:
   - Vendor item code matching (confidence: 1.0)
@@ -919,7 +920,9 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 - ✅ Configurable intervals (e.g., every 2 weeks, every 3 months)
 - ✅ Next due date calculation
 - ✅ Overdue maintenance alerts
-- ✅ Schedule completion tracking
+- ✅ Schedule completion tracking with custom date selection
+- ✅ Maintenance completion logging (MaintenanceLog with date, notes, performed_by)
+- ✅ Document attachments on completion (MaintenanceDocument with file uploads)
 - ✅ One-click work order creation from schedules
 - ✅ Location filter on schedules page
 - ✅ Vendor assignment to scheduled maintenance
@@ -933,10 +936,10 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 
 **Dashboard & Alerts:**
 - ✅ Real-time statistics (total equipment, open work orders, overdue items)
-- ✅ Alert system for critical maintenance
-- ✅ Recent work orders list
-- ✅ Upcoming maintenance preview
-- ✅ Equipment by status breakdown
+- ✅ Unified action items (overdue + upcoming maintenance + critical work orders)
+- ✅ Recent activity feed with location names and completion dates
+- ✅ Open work orders panel
+- ✅ DB connection warmup with retry on startup
 
 **Portal Integration:**
 - ✅ Full Portal UI with consistent styling
@@ -948,8 +951,8 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 
 **API Endpoints:**
 - `/maintenance/health` - Health check
-- `/maintenance/dashboard` - Dashboard stats and alerts
-- `/maintenance/equipment` - Equipment CRUD
+- `/maintenance/dashboard` - Dashboard stats, alerts, and recent activity
+- `/maintenance/equipment` - Equipment CRUD with history
 - `/maintenance/categories` - Category management
 - `/maintenance/work-orders` - Work order management
 - `/maintenance/schedules` - PM scheduling
@@ -1517,7 +1520,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 - ✅ **Quick hold creation** - Block dates without full event details
 - ✅ **Hold expiration** - Auto-expire holds after configurable period
 - ✅ **Convert to event** - One-click conversion to full event
-- ✅ **CalDAV sync service** - Calendar synchronization for events
+- ✅ **CalDAV sync service** - Calendar synchronization for events with menu details and bar info
 
 **Integration Hub - UoM Architecture**
 - ✅ **Hub owns UoM** - Source of truth for units of measure
