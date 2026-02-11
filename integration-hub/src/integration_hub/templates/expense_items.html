@@ -102,7 +102,7 @@
                     </thead>
                     <tbody>
                         {% for item in expense_items %}
-                        <tr data-description="{{ item.item_description|lower }}" data-id="{{ item.id }}">
+                        <tr data-description="{{ item.item_description|lower }}" data-itemcode="{{ item.item_code|default('', true)|lower }}" data-id="{{ item.id }}">
                             <td>
                                 <strong>{{ item.item_description }}</strong>
                                 {% if item.notes %}
@@ -304,7 +304,8 @@ function filterItems() {
 
     rows.forEach(row => {
         const description = row.dataset.description || '';
-        const matches = description.includes(searchText);
+        const itemcode = row.dataset.itemcode || '';
+        const matches = description.includes(searchText) || itemcode.includes(searchText);
         row.style.display = matches ? '' : 'none';
         if (matches) visibleCount++;
     });

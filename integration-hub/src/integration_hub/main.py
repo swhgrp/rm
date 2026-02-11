@@ -2523,6 +2523,12 @@ async def map_items_by_description(
             {"desc": item_description}
         ).fetchone()
 
+        # Collect the first item_code and vendor_id from matched items
+        first_item_code = next((item.item_code for item in items if item.item_code), None)
+        # Get vendor_id from the invoice that owns the first item
+        first_invoice = db.query(HubInvoice).filter(HubInvoice.id == items[0].invoice_id).first()
+        vendor_id = first_invoice.vendor_id if first_invoice else None
+
         if existing:
             # Update existing mapping
             db.execute(
@@ -2534,6 +2540,8 @@ async def map_items_by_description(
                         gl_asset_account = :asset,
                         gl_cogs_account = :cogs,
                         gl_waste_account = :waste,
+                        item_code = COALESCE(:item_code, item_code),
+                        vendor_id = COALESCE(:vendor_id, vendor_id),
                         is_active = true,
                         updated_at = NOW()
                     WHERE item_description = :desc
@@ -2545,6 +2553,8 @@ async def map_items_by_description(
                     "asset": gl_asset_account_int,
                     "cogs": gl_cogs_account_int,
                     "waste": gl_waste_account_int,
+                    "item_code": first_item_code,
+                    "vendor_id": vendor_id,
                     "desc": item_description
                 }
             )
@@ -2553,12 +2563,14 @@ async def map_items_by_description(
             db.execute(
                 sql_text("""
                     INSERT INTO invoice_item_mapping
-                    (item_description, inventory_item_id, inventory_item_name, inventory_category,
+                    (item_description, item_code, vendor_id, inventory_item_id, inventory_item_name, inventory_category,
                      gl_asset_account, gl_cogs_account, gl_waste_account, is_active, notes)
-                    VALUES (:desc, :inv_id, :inv_name, :category, :asset, :cogs, :waste, true, :notes)
+                    VALUES (:desc, :item_code, :vendor_id, :inv_id, :inv_name, :category, :asset, :cogs, :waste, true, :notes)
                 """),
                 {
                     "desc": item_description,
+                    "item_code": first_item_code,
+                    "vendor_id": vendor_id,
                     "inv_id": inventory_item_id,
                     "inv_name": items[0].inventory_item_name if items else None,
                     "category": inventory_category or "Uncategorized",
