@@ -332,13 +332,8 @@
                             {% set vi_info = vendor_item_info.get(item.inventory_item_id, {}) %}
                             {% set has_vendor_info = vi_info.get('conversion_factor') is not none %}
                             <td>
-                                {% if has_vendor_info %}
-                                    {% set cf = vi_info.conversion_factor|int %}
-                                    {% if cf > 1 %}
-                                        CS
-                                    {% else %}
-                                        EA
-                                    {% endif %}
+                                {% if vi_info.get('purchase_unit_abbr') %}
+                                    {{ vi_info.purchase_unit_abbr|upper }}
                                 {% elif item.unit_of_measure %}
                                     {{ item.unit_of_measure }}
                                 {% else %}
