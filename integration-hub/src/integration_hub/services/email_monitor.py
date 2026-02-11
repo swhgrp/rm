@@ -16,6 +16,8 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session
 
+from sqlalchemy import func as sql_func
+
 from integration_hub.models.system_setting import SystemSetting
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.db.database import SessionLocal
@@ -175,6 +177,120 @@ class EmailMonitorService:
         logger.info(f"Created invoice record ID {invoice.id} for {filename}")
         return invoice
 
+    def _resolve_cross_format_duplicates(self, invoice_ids: List[int]) -> int:
+        """
+        After parsing, check if the same invoice_number exists from both PDF and CSV.
+        Prefer CSV (structured data) over PDF. For same-format duplicates, keep the earlier one.
+
+        Only marks invoices as duplicate if they haven't been sent yet.
+
+        Args:
+            invoice_ids: IDs of just-parsed invoices to check
+
+        Returns:
+            Number of invoices marked as duplicate
+        """
+        marked_count = 0
+        # Statuses safe to mark as duplicate (not yet sent/processed)
+        markable_statuses = ('pending', 'pending_csv', 'mapping', 'ready', 'parse_failed')
+
+        for inv_id in invoice_ids:
+            try:
+                invoice = self.db.query(HubInvoice).filter(HubInvoice.id == inv_id).first()
+                if not invoice or not invoice.invoice_number:
+                    continue
+                if invoice.status == 'duplicate':
+                    continue
+
+                # Find other invoices with same invoice_number (not statements or already duplicate)
+                duplicates = self.db.query(HubInvoice).filter(
+                    HubInvoice.invoice_number == invoice.invoice_number,
+                    HubInvoice.id != invoice.id,
+                    HubInvoice.status.notin_(['statement', 'duplicate']),
+                    HubInvoice.invoice_number.isnot(None),
+                ).all()
+
+                if not duplicates:
+                    continue
+
+                current_is_csv = bool(
+                    invoice.source_filename and invoice.source_filename.lower().endswith('.csv')
+                )
+
+                for dup in duplicates:
+                    dup_is_csv = bool(
+                        dup.source_filename and dup.source_filename.lower().endswith('.csv')
+                    )
+
+                    # If both have location info, only consider duplicate if same location
+                    if invoice.location_name and dup.location_name:
+                        if invoice.location_name != dup.location_name:
+                            continue
+
+                    if current_is_csv and not dup_is_csv:
+                        # Current is CSV, dup is PDF -> mark PDF as duplicate
+                        if dup.status in markable_statuses:
+                            dup.status = 'duplicate'
+                            dup.parse_error = f"Duplicate of CSV invoice #{invoice.id}"
+                            marked_count += 1
+                            logger.info(
+                                f"Marked PDF invoice {dup.id} as duplicate of CSV invoice "
+                                f"{invoice.id} (invoice_number: {invoice.invoice_number})"
+                            )
+                    elif not current_is_csv and dup_is_csv:
+                        # Current is PDF, dup is CSV -> mark current PDF as duplicate
+                        if invoice.status in markable_statuses:
+                            invoice.status = 'duplicate'
+                            invoice.parse_error = f"Duplicate of CSV invoice #{dup.id}"
+                            marked_count += 1
+                            logger.info(
+                                f"Marked PDF invoice {invoice.id} as duplicate of CSV invoice "
+                                f"{dup.id} (invoice_number: {invoice.invoice_number})"
+                            )
+                            break  # Current is marked, stop checking
+                    elif current_is_csv and dup_is_csv:
+                        # Both CSV -> keep earlier one (lower ID)
+                        if invoice.id > dup.id:
+                            if invoice.status in markable_statuses:
+                                invoice.status = 'duplicate'
+                                invoice.parse_error = f"Duplicate of CSV invoice #{dup.id}"
+                                marked_count += 1
+                                logger.info(
+                                    f"Marked CSV invoice {invoice.id} as duplicate of earlier "
+                                    f"CSV invoice {dup.id} (invoice_number: {invoice.invoice_number})"
+                                )
+                                break
+                        else:
+                            if dup.status in markable_statuses:
+                                dup.status = 'duplicate'
+                                dup.parse_error = f"Duplicate of CSV invoice #{invoice.id}"
+                                marked_count += 1
+                                logger.info(
+                                    f"Marked CSV invoice {dup.id} as duplicate of earlier "
+                                    f"CSV invoice {invoice.id} (invoice_number: {invoice.invoice_number})"
+                                )
+                    else:
+                        # Both PDF -> keep earlier one
+                        if invoice.id > dup.id:
+                            if invoice.status in markable_statuses:
+                                invoice.status = 'duplicate'
+                                invoice.parse_error = f"Duplicate of PDF invoice #{dup.id}"
+                                marked_count += 1
+                                break
+                        else:
+                            if dup.status in markable_statuses:
+                                dup.status = 'duplicate'
+                                dup.parse_error = f"Duplicate of PDF invoice #{invoice.id}"
+                                marked_count += 1
+
+                if marked_count:
+                    self.db.commit()
+
+            except Exception as e:
+                logger.error(f"Error checking duplicates for invoice {inv_id}: {e}")
+
+        return marked_count
+
     def process_unread_emails(self) -> dict:
         """
         Check inbox for unread emails and process PDF attachments
@@ -285,6 +401,12 @@ class EmailMonitorService:
                                     parse_result = csv_parser.process_hub_invoice(invoice.id)
                                     if parse_result['success']:
                                         logger.info(f"Auto-parsed CSV invoice {invoice.id}: {parse_result['message']}")
+                                        # Check for cross-format duplicates
+                                        parsed_ids = [inv['id'] for inv in parse_result.get('invoices', [])]
+                                        if parsed_ids:
+                                            dup_count = self._resolve_cross_format_duplicates(parsed_ids)
+                                            if dup_count:
+                                                stats['duplicates'] += dup_count
                                     else:
                                         logger.warning(f"Failed to auto-parse CSV invoice {invoice.id}: {parse_result['message']}")
                                 except Exception as e:
@@ -298,6 +420,10 @@ class EmailMonitorService:
                                     parse_result = parser.parse_and_save(invoice.id, self.db)
                                     if parse_result['success']:
                                         logger.info(f"Auto-parsed invoice {invoice.id}: {parse_result['message']}")
+                                        # Check for cross-format duplicates (PDF may duplicate existing CSV)
+                                        dup_count = self._resolve_cross_format_duplicates([invoice.id])
+                                        if dup_count:
+                                            stats['duplicates'] += dup_count
                                     else:
                                         logger.warning(f"Failed to auto-parse invoice {invoice.id}: {parse_result['message']}")
                                 except Exception as e:

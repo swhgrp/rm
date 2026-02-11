@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** February 10, 2026
+**Last Updated:** February 11, 2026
 **Status:** ~98% Complete - All 10 Systems Production Ready ✅
-**Latest:** Maintenance completion logging with document attachments, dashboard redesign, area logo branding, CSV invoice parsing, CalDAV menu sync (Feb 10, 2026) ✅
+**Latest:** Integration Hub UOM restructure — `price_is_per_unit` flag for accurate per-unit vs per-case cost calculations, vendor parsing rules, RNDC/Southern Glaziers vendor item imports (Feb 11, 2026) ✅
 
 ---
 
@@ -683,6 +683,14 @@ restaurant-system/
 - **Inventory owns:** Master Items, Count Units, Location Costs, Locations
 - **Location-aware pricing:** Vendor items track prices per location from invoices
 - **Weighted average costing:** Hub updates Inventory's `MasterItemLocationCost` on invoice processing
+- **UOM pricing flag:** `price_is_per_unit` on invoice items — set at mapping time for accurate cost calculation
+
+**🆕 UOM Restructure & Vendor Parsing Rules (Feb 11, 2026):**
+- ✅ **`price_is_per_unit` flag** - Boolean on invoice items distinguishes per-unit (EA/BTL) vs per-case (CS) pricing
+- ✅ **Set at mapping time** - Auto-mapper and manual mapping compare parsed UOM against vendor item's `purchase_unit_abbr`
+- ✅ **Cost updater uses flag** - Replaces fragile string matching with structured flag (with fallback for legacy data)
+- ✅ **Vendor parsing rules** - Per-vendor AI instructions for invoice column disambiguation (e.g., Breakthru Case/Btles/Pieces columns)
+- ✅ **Vendor item imports** - Republic National Distributing (32 items from eRNDC), Southern Glaziers (148 items from CSV)
 
 **🤖 AI Semantic Search & Backbar-Style Sizing (Dec 28, 2025):**
 - ✅ **AI-powered semantic search** - Find vendor items using natural language
@@ -1250,6 +1258,7 @@ docker compose exec inventory-db psql -U inventory_user -d inventory_db -c "\l+"
 - **Hub provides:** Vendor items, pricing, invoices, GL mappings, UOM, Categories (source of truth)
 - **Inventory provides:** Master items, count units, location costs, locations
 - **Location-aware costing:** Hub updates `MasterItemLocationCost` when invoices are processed
+- **UOM pricing:** `price_is_per_unit` flag on invoice items ensures correct per-unit vs per-case cost calculation
 - **Location sync:** Accounting fetches locations from Inventory via `/_sync` endpoint
 - **Note:** Hub is authoritative for vendor/pricing data; Inventory owns item costs and locations
 
@@ -1500,6 +1509,26 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 ## 📝 Recent Updates
+
+### February 11, 2026 - Integration Hub UOM Restructure 📏
+
+**UOM Pricing Flag (`price_is_per_unit`):**
+- ✅ **New `price_is_per_unit` column** on `hub_invoice_items` — distinguishes per-unit (EA/BTL) vs per-case (CS) pricing
+- ✅ **Set at mapping time** — Auto-mapper and manual mapping compare invoice UOM against vendor item's `purchase_unit_abbr`
+- ✅ **Cost updater uses flag** — Replaces fragile string matching for cost-per-primary-unit calculation
+- ✅ **Pack size override** — Vendor item's `units_per_case` overrides AI-parsed pack_size
+- ✅ **Vendor parsing rules** — Breakthru Beverage Case/Btles/Pieces column disambiguation
+- ✅ **Vendor item imports** — Republic National Distributing (32 items), Southern Glaziers (148 items)
+
+**Files Modified:**
+- `integration-hub/alembic/versions/20260211_0001_add_price_is_per_unit.py` - Migration + backfill
+- `integration-hub/src/integration_hub/models/hub_invoice_item.py` - New column
+- `integration-hub/src/integration_hub/services/auto_mapper.py` - Helper function, cache, mapping enrichment
+- `integration-hub/src/integration_hub/services/location_cost_updater.py` - Flag-based pricing
+- `integration-hub/src/integration_hub/services/inventory_sender.py` - Payload update
+- `integration-hub/src/integration_hub/main.py` - Manual mapping endpoint
+
+---
 
 ### January 5, 2026 - Multi-System Enhancements 🚀
 

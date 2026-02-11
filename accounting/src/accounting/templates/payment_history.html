@@ -366,7 +366,7 @@ async function viewPayment(paymentId) {
                 </div>
                 <div class="col-md-6">
                     <label class="form-label text-muted">Vendor</label>
-                    <div class="fw-bold">${payment.vendor_name}</div>
+                    <div class="fw-bold">${payment.vendor_name || 'N/A'}</div>
                 </div>
                 <div class="col-md-6">
                     <label class="form-label text-muted">Payment Date</label>
@@ -403,9 +403,9 @@ async function viewPayment(paymentId) {
                         <tbody>
                             ${payment.applications.map(app => `
                                 <tr>
-                                    <td>${app.bill_number}</td>
+                                    <td>${app.bill_number || 'N/A'}</td>
                                     <td>$${parseFloat(app.amount_applied).toFixed(2)}</td>
-                                    <td>$${parseFloat(app.discount_taken).toFixed(2)}</td>
+                                    <td>$${parseFloat(app.discount_applied || 0).toFixed(2)}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -483,7 +483,10 @@ document.getElementById('voidPaymentBtn').addEventListener('click', function() {
 });
 
 function formatDate(dateString) {
-    const date = new Date(dateString);
+    if (!dateString) return 'N/A';
+    // Parse YYYY-MM-DD without timezone conversion
+    const parts = dateString.split('T')[0].split('-');
+    const date = new Date(parts[0], parts[1] - 1, parts[2]);
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 

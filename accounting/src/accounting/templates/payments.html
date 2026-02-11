@@ -607,7 +607,7 @@ document.getElementById('paymentForm').addEventListener('submit', async function
         applications: selectedBills.map(bill => ({
             vendor_bill_id: bill.id,
             amount_applied: bill.amount,
-            discount_taken: bill.discount
+            discount_applied: bill.discount
         }))
     };
 
@@ -637,13 +637,8 @@ document.getElementById('paymentForm').addEventListener('submit', async function
             const payment = await response.json();
             alert(`Payment created successfully! Payment #${payment.payment_number}`);
 
-            if (selectedMethod === 'check') {
-                // Redirect to check batch page
-                window.location.href = '/accounting/check-batches';
-            } else {
-                // Redirect to payment history
-                window.location.href = '/accounting/payment-history';
-            }
+            // Redirect to payment history to see the created payment
+            window.location.href = '/accounting/payment-history';
         } else {
             const error = await response.json();
             alert(`Error creating payment: ${error.detail || 'Unknown error'}`);

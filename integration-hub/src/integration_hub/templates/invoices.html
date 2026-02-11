@@ -48,6 +48,11 @@
             </button>
         </li>
         <li class="nav-item" role="presentation">
+            <button class="nav-link" id="tab-duplicates" data-filter="duplicates" type="button">
+                <i class="bi bi-copy"></i> Duplicates <span class="badge bg-dark ms-1" id="count-duplicates">0</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
             <button class="nav-link" id="tab-all" data-filter="all" type="button">
                 <i class="bi bi-list-ul"></i> All <span class="badge bg-secondary ms-1" id="count-all">0</span>
             </button>
@@ -180,6 +185,8 @@
                                 <span class="badge bg-info">Statement</span>
                                 {% elif invoice.status == 'sent' %}
                                 <span class="badge badge-sent">Sent</span>
+                                {% elif invoice.status == 'duplicate' %}
+                                <span class="badge bg-dark">Duplicate</span>
                                 {% elif invoice.status == 'error' %}
                                 <span class="badge badge-error">Error</span>
                                 {% else %}
@@ -330,7 +337,8 @@ function updateTabCounts() {
         sent: 0,
         statements: 0,
         errors: 0,
-        all: rows.length
+        duplicates: 0,
+        all: 0
     };
 
     rows.forEach(row => {
@@ -338,7 +346,9 @@ function updateTabCounts() {
         const hasErrors = row.getAttribute('data-has-errors') === 'true';
 
         // Count based on actual status - simpler and matches database
-        if (status === 'pending' || status === 'pending_csv' || status === 'mapping') {
+        if (status === 'duplicate') {
+            counts.duplicates++;
+        } else if (status === 'pending' || status === 'pending_csv' || status === 'mapping') {
             counts.pending++;
         } else if (status === 'ready') {
             counts.ready++;
@@ -346,6 +356,11 @@ function updateTabCounts() {
             counts.sent++;
         } else if (status === 'statement') {
             counts.statements++;
+        }
+
+        // Exclude duplicates from 'all' count
+        if (status !== 'duplicate') {
+            counts.all++;
         }
 
         if (hasErrors) {
@@ -359,6 +374,7 @@ function updateTabCounts() {
     document.getElementById('count-sent').textContent = counts.sent;
     document.getElementById('count-statements').textContent = counts.statements;
     document.getElementById('count-errors').textContent = counts.errors;
+    document.getElementById('count-duplicates').textContent = counts.duplicates;
     document.getElementById('count-all').textContent = counts.all;
 }
 
@@ -392,6 +408,11 @@ function filterTable() {
             matchesTab = (status === 'statement');
         } else if (currentTabFilter === 'errors') {
             matchesTab = hasErrors;
+        } else if (currentTabFilter === 'duplicates') {
+            matchesTab = (status === 'duplicate');
+        } else if (currentTabFilter === 'all') {
+            // All tab excludes duplicates
+            matchesTab = (status !== 'duplicate');
         }
 
         if (matchesSearch && matchesSource && matchesTab) {
@@ -492,6 +513,10 @@ function changePage(direction) {
             matchesTab = (status === 'statement');
         } else if (currentTabFilter === 'errors') {
             matchesTab = hasErrors;
+        } else if (currentTabFilter === 'duplicates') {
+            matchesTab = (status === 'duplicate');
+        } else if (currentTabFilter === 'all') {
+            matchesTab = (status !== 'duplicate');
         }
 
         if (matchesSearch && matchesSource && matchesTab) {
@@ -701,7 +726,7 @@ async function parseCsvInvoice(invoiceId) {
     }
 
     try {
-        const response = await fetch(`/api/v1/invoices/${invoiceId}/parse-csv`, {
+        const response = await fetch(`/hub/api/v1/invoices/${invoiceId}/parse-csv`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

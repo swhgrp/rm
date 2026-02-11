@@ -61,6 +61,11 @@ class PaymentService:
             else:
                 check_number = self._get_next_check_number(payment_data.bank_account_id)
 
+        # All payments start as DRAFT
+        # Checks: DRAFT → batch → print → PRINTED → CLEARED
+        # ACH/Wire: DRAFT → batch → submit → SUBMITTED → CLEARED
+        initial_status = PaymentStatus.DRAFT
+
         # Create payment record
         payment = Payment(
             payment_number=payment_number,
@@ -72,7 +77,7 @@ class PaymentService:
             amount=payment_data.amount,
             discount_amount=payment_data.discount_amount,
             net_amount=net_amount,
-            status=PaymentStatus.DRAFT,
+            status=initial_status,
             check_number=check_number,
             scheduled_date=payment_data.scheduled_date,
             memo=payment_data.memo,
@@ -479,12 +484,20 @@ class PaymentService:
 
     def _get_next_check_number(self, bank_account_id: int) -> int:
         """Get next available check number for bank account"""
-        last_check = self.db.query(CheckNumberRegistry).filter(
+        # Check both registry and payments table to avoid unique constraint violations
+        last_registry = self.db.query(func.max(CheckNumberRegistry.check_number)).filter(
             CheckNumberRegistry.bank_account_id == bank_account_id
-        ).order_by(CheckNumberRegistry.check_number.desc()).first()
+        ).scalar()
+
+        last_payment = self.db.query(func.max(Payment.check_number)).filter(
+            Payment.bank_account_id == bank_account_id,
+            Payment.check_number.isnot(None)
+        ).scalar()
+
+        last_check = max(last_registry or 0, last_payment or 0)
 
         if last_check:
-            return last_check.check_number + 1
+            return last_check + 1
         else:
             # Get starting check number from bank account settings (if field exists)
             bank_account = self.db.query(BankAccount).filter(BankAccount.id == bank_account_id).first()

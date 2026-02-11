@@ -93,8 +93,13 @@ class AutoSendService:
         logger.info(f"Auto-sending invoice {invoice.invoice_number} (ID: {invoice_id})")
 
         # Determine which systems need this invoice
-        # Send to inventory only if at least one item has a real inventory category (not 'Uncategorized' which means expense-only)
-        has_inventory_items = any(item.inventory_category and item.inventory_category != 'Uncategorized' for item in items)
+        # Send to inventory only if at least one item is a real inventory item (not expense-only)
+        expense_methods = {'vendor_expense_rule', 'expense_mapping'}
+        has_inventory_items = any(
+            item.inventory_category and item.inventory_category != 'Uncategorized'
+            and item.mapping_method not in expense_methods
+            for item in items
+        )
         # Always send to accounting (all items have GL accounts)
         needs_accounting = True
 
@@ -307,13 +312,16 @@ class AutoSendService:
             errors.append(f"{len(unmapped_items)} items are not mapped")
 
         # Check all items have GL accounts
-        # For expense-only items (no inventory_category or 'Uncategorized'), only gl_cogs_account is required
+        # For expense items (vendor_expense_rule, expense_mapping, or no category), only gl_cogs_account is required
         # For inventory items, both gl_asset_account and gl_cogs_account are required
+        expense_methods = {'vendor_expense_rule', 'expense_mapping'}
         items_without_gl = [
             item for item in items
             if item.is_mapped and (
                 not item.gl_cogs_account or
-                (item.inventory_category and item.inventory_category != 'Uncategorized' and not item.gl_asset_account)
+                (item.inventory_category and item.inventory_category != 'Uncategorized'
+                 and item.mapping_method not in expense_methods
+                 and not item.gl_asset_account)
             )
         ]
         if items_without_gl:
@@ -366,6 +374,19 @@ class AutoSendService:
         items = db.query(HubInvoiceItem).filter(
             HubInvoiceItem.invoice_id == invoice_id
         ).all()
+
+        # Validate before retry - same checks as initial send
+        validation_result = self._validate_invoice_ready(invoice, items, db)
+        if not validation_result["ready"]:
+            return {
+                "success": False,
+                "inventory_sent": invoice.sent_to_inventory,
+                "accounting_sent": invoice.sent_to_accounting,
+                "inventory_id": invoice.inventory_invoice_id,
+                "journal_entry_id": invoice.accounting_je_id,
+                "errors": validation_result["errors"],
+                "incomplete_uom_items": validation_result.get("incomplete_uom_items", [])
+            }
 
         logger.info(f"Retrying send for invoice {invoice.invoice_number} (system: {retry_system})")
 

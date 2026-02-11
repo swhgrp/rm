@@ -34,9 +34,16 @@ def create_payment(
     current_user: User = Depends(require_auth)
 ):
     """Create a new payment"""
-    service = PaymentService(db)
-    result = service.create_payment(payment, current_user.id)
-    return result
+    try:
+        service = PaymentService(db)
+        result = service.create_payment(payment, current_user.id)
+        return result
+    except Exception as e:
+        db.rollback()
+        error_msg = str(e)
+        if 'unique' in error_msg.lower() or 'duplicate' in error_msg.lower():
+            raise HTTPException(status_code=409, detail=f"Duplicate check number. Please try again or enter a check number manually.")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.get("/", response_model=List[PaymentResponse])
@@ -62,7 +69,7 @@ def list_payments(
     if status:
         query = query.filter(Payment.status == status)
     if payment_method:
-        query = query.filter(Payment.payment_method == payment_method.upper())
+        query = query.filter(Payment.payment_method == payment_method.lower())
     if bank_account_id:
         query = query.filter(Payment.bank_account_id == bank_account_id)
     if start_date:
@@ -82,13 +89,25 @@ def list_payments(
     return result
 
 
-@router.get("/{payment_id}", response_model=PaymentResponse)
+@router.get("/{payment_id}")
 def get_payment(payment_id: int, db: Session = Depends(get_db)):
     """Get payment by ID"""
+    from accounting.models.vendor_bill import VendorBill
+
     payment = db.query(Payment).filter(Payment.id == payment_id).first()
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
-    return payment
+
+    payment_dict = PaymentResponse.model_validate(payment).model_dump()
+    payment_dict['vendor_name'] = payment.vendor.name if payment.vendor else None
+
+    # Enrich applications with bill numbers
+    if payment_dict.get('applications'):
+        for app in payment_dict['applications']:
+            bill = db.query(VendorBill).filter(VendorBill.id == app['vendor_bill_id']).first()
+            app['bill_number'] = bill.bill_number if bill else f"Bill #{app['vendor_bill_id']}"
+
+    return payment_dict
 
 
 @router.put("/{payment_id}", response_model=PaymentResponse)
@@ -150,9 +169,10 @@ def create_batch_payment(
 # Check Printing
 # ============================================================================
 
-@router.get("/check-batches/", response_model=List[CheckBatchResponse])
+@router.get("/check-batches/")
 def list_check_batches(
     status: Optional[str] = None,
+    bank_account_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db)
@@ -162,9 +182,20 @@ def list_check_batches(
 
     if status:
         query = query.filter(CheckBatch.status == status)
+    if bank_account_id:
+        query = query.filter(CheckBatch.bank_account_id == bank_account_id)
 
     batches = query.order_by(CheckBatch.batch_date.desc()).offset(skip).limit(limit).all()
-    return batches
+
+    result = []
+    for batch in batches:
+        batch_dict = CheckBatchResponse.model_validate(batch).model_dump()
+        batch_dict['bank_account'] = {
+            'account_name': batch.bank_account.account_name if batch.bank_account else None,
+            'account_number': batch.bank_account.account_number if batch.bank_account else None
+        }
+        result.append(batch_dict)
+    return result
 
 
 @router.post("/check-batches/", response_model=CheckBatchResponse)

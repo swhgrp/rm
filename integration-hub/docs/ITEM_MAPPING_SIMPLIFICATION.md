@@ -253,11 +253,4 @@ The `category_gl_mapping` table maps inventory categories to GL accounts:
 
 ## Location Reference
 
-| Internal ID | Store ID | Name |
-|-------------|----------|------|
-| 1 | 200 | McKinney |
-| 2 | 300 | Arlington |
-| 3 | 400 | Dallas |
-| 4 | 500 | Fort Worth |
-| 5 | 600 | Plano |
-| 6 | 700 | Frisco |
+Locations are managed in the Inventory service (source of truth). Use `/inventory/api/locations/_sync` to get current locations.

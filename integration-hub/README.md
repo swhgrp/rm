@@ -6,7 +6,7 @@ The Integration Hub is an **invoice processing and general ledger (GL) mapping s
 
 ## Status: Production Ready (~98% Complete) ✅
 
-**Last Updated:** January 5, 2026
+**Last Updated:** February 11, 2026
 
 **Note:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
@@ -27,6 +27,35 @@ The Inventory system owns:
 - **Locations** - Restaurant locations (source of truth for all systems)
 
 ## Recent Updates
+
+### February 11, 2026 - UOM Restructure & Vendor Parsing Rules 📏🏷️
+
+**UOM Pricing Flag (`price_is_per_unit`):**
+- ✅ **New column** on `hub_invoice_items` — Boolean flag distinguishes per-unit (EA/BTL) vs per-case (CS) pricing
+- ✅ **Set at mapping time** — Auto-mapper and manual mapping compare parsed invoice UOM against vendor item's `purchase_unit_abbr`
+- ✅ **`determine_price_is_per_unit()` helper** — Handles EA/EACH/BTL/BOTTLE/PC/PIECE → True, CS/CASE → False, with None fallback
+- ✅ **Cost updater uses flag** — Replaces fragile string matching; keeps string-based fallback for legacy/unmapped items
+- ✅ **Pack size override** — Auto-mapper overrides AI-parsed `pack_size` with vendor item's `units_per_case` (more reliable)
+- ✅ **Inventory sender** — Includes `price_is_per_unit` in payload sent to Inventory system
+
+**Vendor Parsing Rules:**
+- ✅ **Breakthru Beverage** — AI instructions for Case/Btles/Pieces column disambiguation
+- ✅ **Gordon Food Service** — Existing rule for Qty Ship vs Qty Ord columns
+
+**Vendor Item Imports:**
+- ✅ **Republic National Distributing** — 32 items from eRNDC catalog (wines, spirits, mixers)
+- ✅ **Southern Glaziers** — 148 items from CSV across 4 locations (Nest, Seaside, Okee, SW Grill)
+
+**Database Migration:** `20260211_0001_add_price_is_per_unit.py`
+
+**Files Modified:**
+- `models/hub_invoice_item.py` — Added `price_is_per_unit` column
+- `services/auto_mapper.py` — `determine_price_is_per_unit()`, UOM data in mapping result, cache `units_per_case`
+- `services/location_cost_updater.py` — Uses flag with string-based fallback
+- `services/inventory_sender.py` — Includes flag in payload
+- `main.py` — Manual mapping endpoint sets flag from vendor item
+
+---
 
 ### December 28, 2025 - Expense Items vs Vendor Items Separation 📦💰
 

@@ -12,12 +12,22 @@
             </div>
             <div>
                 {% if invoice.pdf_path %}
-                <a href="/hub/api/invoices/{{ invoice.id }}/pdf" target="_blank" class="btn btn-info">
-                    <i class="bi bi-file-pdf"></i> View PDF
-                </a>
-                <a href="/hub/api/invoices/{{ invoice.id }}/pdf?download=1" class="btn btn-success">
-                    <i class="bi bi-download"></i> Download PDF
-                </a>
+                    {% set is_csv = invoice.source_filename and invoice.source_filename.lower().endswith('.csv') %}
+                    {% if is_csv %}
+                    <button class="btn btn-info" onclick="toggleCsvViewer()">
+                        <i class="bi bi-filetype-csv"></i> View CSV
+                    </button>
+                    <a href="/hub/api/invoices/{{ invoice.id }}/pdf?download=1" class="btn btn-success">
+                        <i class="bi bi-download"></i> Download CSV
+                    </a>
+                    {% else %}
+                    <a href="/hub/api/invoices/{{ invoice.id }}/pdf" target="_blank" class="btn btn-info">
+                        <i class="bi bi-file-pdf"></i> View PDF
+                    </a>
+                    <a href="/hub/api/invoices/{{ invoice.id }}/pdf?download=1" class="btn btn-success">
+                        <i class="bi bi-download"></i> Download PDF
+                    </a>
+                    {% endif %}
                 {% endif %}
                 <button class="btn btn-warning" onclick="reparseInvoice()" id="reparseBtn">
                     <i class="bi bi-arrow-clockwise"></i> Re-parse Invoice
@@ -120,6 +130,8 @@
                                     <td>
                                         {% if invoice.status == 'pending' %}
                                         <span class="badge badge-pending">Pending</span>
+                                        {% elif invoice.status == 'pending_csv' %}
+                                        <span class="badge bg-info">CSV Pending</span>
                                         {% elif invoice.status == 'mapping' %}
                                         <span class="badge badge-pending">Mapping</span>
                                         {% elif invoice.status == 'ready' %}
@@ -130,6 +142,8 @@
                                         <span class="badge badge-sent">Sent</span>
                                         {% elif invoice.status == 'partial' %}
                                         <span class="badge bg-warning">Partially Sent</span>
+                                        {% elif invoice.status == 'duplicate' %}
+                                        <span class="badge bg-dark">Duplicate</span>
                                         {% elif invoice.status == 'error' %}
                                         <span class="badge badge-error">Error</span>
                                         {% endif %}
@@ -246,6 +260,27 @@
             </div>
         </div>
     </div>
+
+    <!-- CSV Viewer Panel -->
+    {% set is_csv = invoice.source_filename and invoice.source_filename.lower().endswith('.csv') %}
+    {% if is_csv %}
+    <div class="card mt-4" id="csvViewerPanel" style="display: none;">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-filetype-csv"></i> CSV Source: {{ invoice.source_filename }}</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="toggleCsvViewer()">
+                <i class="bi bi-x-lg"></i> Close
+            </button>
+        </div>
+        <div class="card-body p-0">
+            <div id="csvLoading" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Loading CSV data...</p>
+            </div>
+            <div id="csvContent" style="display: none; max-height: 500px; overflow: auto;">
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Invoice Items -->
     <div class="card mt-4">
@@ -534,6 +569,61 @@
 
 {% block extra_scripts %}
 <script>
+// CSV Viewer
+let csvViewerLoaded = false;
+
+function toggleCsvViewer() {
+    const panel = document.getElementById('csvViewerPanel');
+    if (!panel) return;
+
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        if (!csvViewerLoaded) {
+            loadCsvData();
+        }
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+async function loadCsvData() {
+    try {
+        const response = await fetch('/hub/api/invoices/{{ invoice.id }}/csv-data');
+        const data = await response.json();
+
+        if (!response.ok) {
+            document.getElementById('csvLoading').innerHTML =
+                `<div class="alert alert-danger m-3">${data.detail || 'Error loading CSV'}</div>`;
+            return;
+        }
+
+        // Build table HTML
+        let html = '<table class="table table-sm table-striped table-hover mb-0" style="font-size: 0.8rem;">';
+        html += '<thead class="table-dark" style="position: sticky; top: 0;"><tr>';
+        for (const header of data.headers) {
+            html += `<th class="text-nowrap">${header}</th>`;
+        }
+        html += '</tr></thead><tbody>';
+
+        for (const row of data.rows) {
+            html += '<tr>';
+            for (const header of data.headers) {
+                html += `<td class="text-nowrap">${row[header] || ''}</td>`;
+            }
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+
+        document.getElementById('csvContent').innerHTML = html;
+        document.getElementById('csvContent').style.display = 'block';
+        document.getElementById('csvLoading').style.display = 'none';
+        csvViewerLoaded = true;
+    } catch (error) {
+        document.getElementById('csvLoading').innerHTML =
+            `<div class="alert alert-danger m-3">Error loading CSV: ${error.message}</div>`;
+    }
+}
+
 function showEditModal() {
     const modal = new bootstrap.Modal(document.getElementById('editInvoiceModal'));
     modal.show();

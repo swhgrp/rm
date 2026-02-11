@@ -941,10 +941,10 @@ class InvoiceParser:
             if not items_result:
                 return {"fixed": 0, "fixes": []}
 
-            # Get vendor_name from invoice (use name matching, not ID, since IDs differ between systems)
+            # Get vendor info from invoice
             invoice_vendor = db.execute(
                 sql_text("""
-                    SELECT vendor_name FROM hub_invoices WHERE id = :invoice_id
+                    SELECT vendor_name, vendor_id FROM hub_invoices WHERE id = :invoice_id
                 """),
                 {"invoice_id": invoice_id}
             ).fetchone()
@@ -953,28 +953,46 @@ class InvoiceParser:
                 return {"fixed": 0, "fixes": []}
 
             vendor_name = invoice_vendor[0]
+            hub_vendor_id = invoice_vendor[1]
 
-            # Get inventory items for vendors matching this name
+            # Try Inventory DB first, then fall back to Hub vendor items
+            inv_items = []
+
+            # Source 1: Inventory database
             inventory_db_url = os.getenv('INVENTORY_DATABASE_URL')
-            if not inventory_db_url:
-                logger.warning("INVENTORY_DATABASE_URL not set, cannot fix UOMs")
-                return {"fixed": 0, "fixes": []}
-            engine = create_engine(inventory_db_url)
+            if inventory_db_url:
+                try:
+                    engine = create_engine(inventory_db_url)
+                    base_vendor = vendor_name
+                    for suffix in ['Inc.', 'Inc', 'LLC', 'L.L.C.', 'Corp.', 'Corporation', 'Co.', 'Company']:
+                        base_vendor = base_vendor.replace(suffix, '')
+                    base_vendor = base_vendor.replace(',', '').strip()
 
-            # Extract base vendor name for matching (e.g., "Gordon Food Service" from "Gordon Food Service Inc.")
-            # Strip common suffixes: Inc., Inc, LLC, L.L.C., Corp., Corporation
-            base_vendor = vendor_name
-            for suffix in ['Inc.', 'Inc', 'LLC', 'L.L.C.', 'Corp.', 'Corporation', 'Co.', 'Company']:
-                base_vendor = base_vendor.replace(suffix, '')
-            base_vendor = base_vendor.replace(',', '').strip()
+                    with engine.connect() as inv_conn:
+                        inv_items = inv_conn.execute(text("""
+                            SELECT vi.vendor_sku, vi.vendor_product_name
+                            FROM vendor_items vi
+                            JOIN vendors v ON v.id = vi.vendor_id
+                            WHERE v.name ILIKE :vendor_pattern AND vi.is_active = true
+                        """), {"vendor_pattern": f"%{base_vendor}%"}).fetchall()
+                except Exception as e:
+                    logger.warning(f"Could not query inventory DB for description matching: {e}")
 
-            with engine.connect() as inv_conn:
-                inv_items = inv_conn.execute(text("""
-                    SELECT vi.vendor_sku, vi.vendor_product_name
-                    FROM vendor_items vi
-                    JOIN vendors v ON v.id = vi.vendor_id
-                    WHERE v.name ILIKE :vendor_pattern AND vi.is_active = true
-                """), {"vendor_pattern": f"%{base_vendor}%"}).fetchall()
+            # Source 2: Hub vendor items (fallback when Inventory has no items for this vendor)
+            if not inv_items and hub_vendor_id:
+                hub_items = db.execute(
+                    sql_text("""
+                        SELECT vendor_sku, vendor_product_name
+                        FROM hub_vendor_items
+                        WHERE vendor_id = :vendor_id
+                          AND vendor_sku IS NOT NULL
+                          AND status IN ('active', 'needs_review')
+                    """),
+                    {"vendor_id": hub_vendor_id}
+                ).fetchall()
+                if hub_items:
+                    inv_items = hub_items
+                    logger.info(f"Using {len(hub_items)} Hub vendor items for description matching (Inventory had none)")
 
             if not inv_items:
                 return {"fixed": 0, "fixes": []}
@@ -1641,9 +1659,11 @@ class InvoiceParser:
             if ocr_correction_stats.get('corrected', 0) > 0:
                 logger.info(f"Corrected {ocr_correction_stats['corrected']} OCR errors in item codes")
 
-            # Step 2: Normalize item descriptions based on item codes
-            # This fixes OCR variations where the same item code has different parsed descriptions
-            self._normalize_item_descriptions(invoice_id, db)
+            # Step 2: DISABLED - _normalize_item_descriptions used the deprecated
+            # item_code_mapping_deprecated table which has no vendor context, causing
+            # generic item codes like "Services" to overwrite correct descriptions
+            # across different invoices/products. Inventory vendor_items is now the
+            # source of truth for item descriptions (see ITEM_MAPPING_SIMPLIFICATION.md)
 
             # Step 3: Fix OCR errors using description matching
             # When codes don't match but descriptions are very similar, use inventory SKU
@@ -1810,7 +1830,7 @@ class InvoiceParser:
             # Run post-processing fixes
             upc_fix_stats = self._fix_upc_as_item_code(invoice_id, db)
             ocr_correction_stats = self._validate_and_correct_item_codes(invoice_id, db)
-            self._normalize_item_descriptions(invoice_id, db)
+            # _normalize_item_descriptions DISABLED - see parse_and_save comment
             desc_fix_stats = self._fix_ocr_by_description(invoice_id, db)
 
             # Auto-map items

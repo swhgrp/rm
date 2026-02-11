@@ -32,8 +32,15 @@ restaurant-system/
 
 ### Service Communication
 - Inventory service is **source of truth** for locations - other services fetch via `/inventory/api/locations/_sync`
-- Hub is source of truth for vendors and invoices
+- Hub is source of truth for vendors, invoices, UOM, and vendor items
 - Services communicate via internal HTTP calls on Docker network
+
+### Invoice Cost Update Flow
+- Hub's `LocationCostUpdaterService` writes directly to Inventory's PostgreSQL DB (not via API)
+- `price_is_per_unit` flag on `hub_invoice_items` — set at mapping time by comparing parsed invoice UOM against vendor item's `purchase_unit_abbr`
+- Auto-mapper enriches invoice items: sets `price_is_per_unit`, overrides `pack_size` with vendor's `units_per_case`
+- Cost updater uses flag (with string-based fallback for legacy items); weight items handled via `size_unit.measure_type`
+- Manual mapping endpoint also sets `price_is_per_unit` from vendor item data
 
 ### Database Connections
 - Most services: sync SQLAlchemy (`Session`, `get_db`)

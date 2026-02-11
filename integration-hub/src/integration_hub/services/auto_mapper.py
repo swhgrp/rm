@@ -31,6 +31,48 @@ from integration_hub.models.hub_vendor_item import HubVendorItem, VendorItemStat
 
 logger = logging.getLogger(__name__)
 
+# Individual unit abbreviations (invoice UOM strings that indicate per-unit pricing)
+INDIVIDUAL_UNIT_ABBRS = {'EA', 'EACH', 'BTL', 'BOTTLE', 'PC', 'PIECE'}
+# Case abbreviations (invoice UOM strings that indicate per-case pricing)
+CASE_UNIT_ABBRS = {'CS', 'CASE'}
+
+
+def determine_price_is_per_unit(
+    invoice_uom: Optional[str],
+    vendor_purchase_abbr: Optional[str]
+) -> Optional[bool]:
+    """
+    Determine whether an invoice line item's unit_price is per individual unit
+    or per case, by comparing the parsed invoice UOM against the vendor item's
+    structured purchase_unit_abbr.
+
+    Returns:
+        True  - price is per individual unit (EA/BTL/BOTTLE)
+        False - price is per case (CS/CASE)
+        None  - cannot determine (fallback to string-based logic)
+    """
+    uom = (invoice_uom or '').strip().upper()
+    vendor_abbr = (vendor_purchase_abbr or '').strip().upper()
+
+    # If invoice says individual unit → per unit regardless of vendor config
+    if uom in INDIVIDUAL_UNIT_ABBRS:
+        return True
+
+    # If vendor item is sold per each → per unit
+    if vendor_abbr in INDIVIDUAL_UNIT_ABBRS:
+        return True
+
+    # If invoice says case → per case
+    if uom in CASE_UNIT_ABBRS:
+        return False
+
+    # If vendor item is sold per case → per case (even if invoice UOM is empty/unknown)
+    if vendor_abbr in CASE_UNIT_ABBRS:
+        return False
+
+    # Cannot determine
+    return None
+
 
 def normalize_text(text: str) -> str:
     """Normalize text for comparison - lowercase, remove extra spaces/punctuation"""
@@ -101,6 +143,36 @@ class AutoMapperService:
     def __init__(self, db: Session):
         self.db = db
         self._vendor_items_cache = None
+        self._vendor_expense_cache = {}
+
+    def _get_vendor_expense_rule(self, vendor_id: int) -> Optional[Dict]:
+        """Check if vendor is an expense vendor with a default GL account rule."""
+        if vendor_id in self._vendor_expense_cache:
+            return self._vendor_expense_cache[vendor_id]
+
+        try:
+            result = self.db.execute(
+                sql_text("""
+                    SELECT is_expense_vendor, default_gl_account, expense_category
+                    FROM vendors
+                    WHERE id = :vendor_id AND is_expense_vendor = true
+                """),
+                {"vendor_id": vendor_id}
+            ).fetchone()
+
+            if result:
+                rule = {
+                    'default_gl_account': result[1],
+                    'expense_category': result[2] or 'Expense'
+                }
+                self._vendor_expense_cache[vendor_id] = rule
+                return rule
+            else:
+                self._vendor_expense_cache[vendor_id] = None
+                return None
+        except Exception as e:
+            logger.warning(f"Error checking vendor expense rule: {e}")
+            return None
 
     def fetch_vendor_items(self, include_inactive: bool = False) -> List[Dict]:
         """
@@ -137,6 +209,7 @@ class AutoMapperService:
                     'purchase_unit_id': vi.purchase_unit_id,
                     'purchase_unit_name': vi.purchase_unit_name,
                     'purchase_unit_abbr': vi.purchase_unit_abbr,
+                    'units_per_case': int(vi.units_per_case) if vi.units_per_case else None,
                     'pack_size': vi.pack_size,
                     'pack_to_primary_factor': float(vi.pack_to_primary_factor) if vi.pack_to_primary_factor else 1.0,
                     'status': vi.status.value if vi.status else 'active',
@@ -535,6 +608,8 @@ class AutoMapperService:
             'gl_asset_account': gl_accounts['gl_asset_account'] if gl_accounts else None,
             'gl_cogs_account': gl_accounts['gl_cogs_account'] if gl_accounts else None,
             'gl_waste_account': gl_accounts.get('gl_waste_account') if gl_accounts else None,
+            'purchase_unit_abbr': vendor_item.get('purchase_unit_abbr'),
+            'units_per_case': vendor_item.get('units_per_case'),
             'is_expense': False,
             'reason': None if has_required_gl else 'no_category_gl_mapping'
         }
@@ -544,9 +619,11 @@ class AutoMapperService:
         Attempt to automatically map a single item
 
         Matching strategy (in order of priority):
+        0. Vendor expense rule - entire vendor is an expense vendor (all items → same GL)
         1. SKU match - exact match against vendor_items.vendor_sku
         2. Learned mapping - user-approved mappings from previous manual mappings
-        3. Expense mapping - expense items from invoice_item_mapping_deprecated
+        3. Fuzzy description match - vendor-scoped fuzzy name matching (0.8+ threshold)
+        4. Expense mapping - expense items from invoice_item_mapping_deprecated
 
         Args:
             item: The invoice item to map
@@ -556,6 +633,29 @@ class AutoMapperService:
         Returns:
             Dict with mapping result including location info
         """
+        # 0. Check if vendor is an expense vendor (all items go to same GL account)
+        if vendor_id:
+            vendor_expense = self._get_vendor_expense_rule(vendor_id)
+            if vendor_expense:
+                return {
+                    'mapped': True,
+                    'method': 'vendor_expense_rule',
+                    'confidence': 1.0,
+                    'vendor_item_id': None,
+                    'inventory_vendor_item_id': None,
+                    'vendor_item_name': None,
+                    'master_item_id': None,
+                    'master_item_name': None,
+                    'category': vendor_expense['expense_category'],
+                    'gl_asset_account': None,
+                    'gl_cogs_account': vendor_expense['default_gl_account'],
+                    'gl_waste_account': None,
+                    'is_expense': True,
+                    'expense_mapping_id': None,
+                    'matched_location_id': None,
+                    'is_cross_location': False
+                }
+
         # 1. Try SKU match against Hub vendor items (location-aware)
         if item.item_code:
             vendor_item = self.match_by_sku(item.item_code, vendor_id, location_id)
@@ -575,7 +675,20 @@ class AutoMapperService:
                 result['is_cross_location'] = (location_id and vendor_item.get('location_id') != location_id)
                 return result
 
-        # 3. Try expense mapping (from invoice_item_mapping_deprecated table)
+        # 3. Try fuzzy description match against vendor items (vendor-scoped, high threshold)
+        if vendor_id and item.item_description:
+            fuzzy_result = self.match_by_fuzzy_name(
+                item.item_description, vendor_id, location_id,
+                min_similarity=0.8
+            )
+            if fuzzy_result:
+                vendor_item, score = fuzzy_result
+                result = self._build_mapping_result(vendor_item, 'fuzzy_name', confidence=score)
+                result['matched_location_id'] = vendor_item.get('location_id')
+                result['is_cross_location'] = (location_id and vendor_item.get('location_id') != location_id)
+                return result
+
+        # 4. Try expense mapping (from invoice_item_mapping_deprecated table)
         # Pass both description and item_code for better matching
         expense = self.match_by_expense_mapping(item.item_description, item.item_code)
         if expense:
@@ -598,7 +711,7 @@ class AutoMapperService:
                 'is_cross_location': False
             }
 
-        # 4. No match found
+        # 5. No match found
         return {
             'mapped': False,
             'reason': 'no_match',
@@ -626,6 +739,18 @@ class AutoMapperService:
                 # Store for reference when sending to Inventory
                 item.inventory_item_name = mapping_result.get('master_item_name')
 
+            # Determine price_is_per_unit from vendor item's purchase_unit_abbr
+            if mapping_result.get('purchase_unit_abbr'):
+                item.price_is_per_unit = determine_price_is_per_unit(
+                    item.unit_of_measure,
+                    mapping_result.get('purchase_unit_abbr')
+                )
+
+            # Override pack_size with vendor item's units_per_case (more reliable than AI-parsed)
+            vendor_upc = mapping_result.get('units_per_case')
+            if vendor_upc:
+                item.pack_size = vendor_upc
+
             # Only fully map if we have required GL accounts
             if not mapping_result.get('mapped'):
                 return False
@@ -635,6 +760,7 @@ class AutoMapperService:
             item.gl_cogs_account = mapping_result.get('gl_cogs_account')
             item.gl_waste_account = mapping_result.get('gl_waste_account')
             item.is_mapped = True
+            item.mapping_method = mapping_result.get('method')
             # Store confidence - 1.0 for exact SKU match, lower for fuzzy matches
             item.mapping_confidence = mapping_result.get('confidence', 1.0)
 

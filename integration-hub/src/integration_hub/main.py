@@ -1088,7 +1088,7 @@ async def get_invoice_pdf(
     db: Session = Depends(get_db)
 ):
     """
-    Serve the PDF file for an invoice
+    Serve the PDF or CSV file for an invoice
     If download=1 parameter is provided, force download instead of preview
     """
     import logging
@@ -1100,33 +1100,89 @@ async def get_invoice_pdf(
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     if not invoice.pdf_path:
-        raise HTTPException(status_code=404, detail="Invoice has no PDF file")
+        raise HTTPException(status_code=404, detail="Invoice has no file attached")
 
     # Check if file exists
-    pdf_path = Path(invoice.pdf_path)
-    if not pdf_path.exists():
-        logger.error(f"PDF file not found: {invoice.pdf_path}")
-        raise HTTPException(status_code=404, detail="PDF file not found on disk")
+    file_path = Path(invoice.pdf_path)
+    if not file_path.exists():
+        logger.error(f"File not found: {invoice.pdf_path}")
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    # Detect file type
+    is_csv = (invoice.source_filename and invoice.source_filename.lower().endswith('.csv')) or \
+             invoice.pdf_path.lower().endswith('.csv')
+
+    if is_csv:
+        ext = ".csv"
+        media_type = "text/csv"
+    else:
+        ext = ".pdf"
+        media_type = "application/pdf"
 
     # Determine filename for download
-    filename = f"invoice_{invoice.invoice_number}_{invoice.vendor_name}.pdf".replace(" ", "_").replace("/", "-")
+    filename = f"invoice_{invoice.invoice_number}_{invoice.vendor_name}{ext}".replace(" ", "_").replace("/", "-")
 
     # Serve file
     if download:
-        # Force download
         return FileResponse(
-            path=str(pdf_path),
-            media_type="application/pdf",
+            path=str(file_path),
+            media_type=media_type,
             filename=filename,
             headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
     else:
-        # Preview in browser
         return FileResponse(
-            path=str(pdf_path),
-            media_type="application/pdf",
+            path=str(file_path),
+            media_type=media_type,
             headers={"Content-Disposition": f"inline; filename={filename}"}
         )
+
+
+@app.get("/api/invoices/{invoice_id}/csv-data")
+async def get_invoice_csv_data(
+    invoice_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Return CSV file contents as JSON for rendering in the UI.
+    Returns headers and rows for table display.
+    """
+    import csv
+    from io import StringIO
+
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    if not invoice.pdf_path:
+        raise HTTPException(status_code=404, detail="Invoice has no file attached")
+
+    file_path = Path(invoice.pdf_path)
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    is_csv = (invoice.source_filename and invoice.source_filename.lower().endswith('.csv')) or \
+             invoice.pdf_path.lower().endswith('.csv')
+    if not is_csv:
+        raise HTTPException(status_code=400, detail="Invoice file is not a CSV")
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        reader = csv.DictReader(StringIO(content))
+        headers = reader.fieldnames or []
+        rows = [row for row in reader]
+
+        return {
+            "success": True,
+            "filename": invoice.source_filename,
+            "headers": headers,
+            "rows": rows,
+            "row_count": len(rows)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading CSV: {str(e)}")
 
 
 @app.delete("/api/invoices/{invoice_id}")
@@ -1521,6 +1577,47 @@ async def recalculate_invoice_status_endpoint(
         "new_status": new_status,
         "message": f"Status updated from '{old_status}' to '{new_status}'"
     }
+
+
+# ============================================================================
+# DUPLICATE RESOLUTION
+# ============================================================================
+
+@app.post("/api/invoices/resolve-duplicates")
+async def resolve_duplicate_invoices(db: Session = Depends(get_db)):
+    """
+    Scan all parsed invoices and mark cross-format duplicates.
+    Prefers CSV over PDF. For same-format duplicates, keeps the earlier one.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    try:
+        from integration_hub.services.email_monitor import EmailMonitorService
+        monitor = EmailMonitorService(db)
+
+        # Get all non-statement, non-duplicate invoices with invoice numbers
+        invoices = db.query(HubInvoice).filter(
+            HubInvoice.invoice_number.isnot(None),
+            HubInvoice.status.notin_(['statement', 'duplicate']),
+        ).order_by(HubInvoice.id).all()
+
+        invoice_ids = [inv.id for inv in invoices]
+        marked = monitor._resolve_cross_format_duplicates(invoice_ids)
+
+        logger.info(f"Duplicate resolution complete: {marked} invoices marked as duplicate")
+
+        return {
+            "success": True,
+            "checked": len(invoice_ids),
+            "duplicates_marked": marked,
+            "message": f"Checked {len(invoice_ids)} invoices, marked {marked} as duplicate"
+        }
+
+    except Exception as e:
+        logger.error(f"Error resolving duplicates: {str(e)}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ============================================================================
@@ -2299,6 +2396,18 @@ async def map_item(
     item.gl_waste_account = gl_waste_account
     item.is_mapped = True
     item.mapping_method = 'manual'
+
+    # Determine price_is_per_unit from vendor item data
+    if inventory_item_id:
+        vendor_item = db.query(HubVendorItem).filter(HubVendorItem.id == inventory_item_id).first()
+        if vendor_item:
+            from integration_hub.services.auto_mapper import determine_price_is_per_unit
+            item.price_is_per_unit = determine_price_is_per_unit(
+                item.unit_of_measure,
+                vendor_item.purchase_unit_abbr
+            )
+            if vendor_item.units_per_case:
+                item.pack_size = int(vendor_item.units_per_case)
 
     db.commit()
 

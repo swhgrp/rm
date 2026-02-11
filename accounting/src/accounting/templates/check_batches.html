@@ -243,8 +243,12 @@ async function loadBatches() {
         // Build query parameters from filters
         const params = new URLSearchParams();
         const statusFilter = document.getElementById('filterStatus').value;
+        const bankAccountFilter = document.getElementById('filterBankAccount').value;
         if (statusFilter) {
             params.append('status', statusFilter);
+        }
+        if (bankAccountFilter) {
+            params.append('bank_account_id', bankAccountFilter);
         }
 
         const url = '/accounting/api/payments/check-batches/' + (params.toString() ? '?' + params.toString() : '');

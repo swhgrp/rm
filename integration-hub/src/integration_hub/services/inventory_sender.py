@@ -182,7 +182,8 @@ class InventorySenderService:
                 "pack_size": item.pack_size,  # Units per case (e.g., 12 for a 12-pack)
                 "unit_price": float(item.unit_price),
                 "line_total": float(item.line_total),
-                "category": item.inventory_category
+                "category": item.inventory_category,
+                "price_is_per_unit": item.price_is_per_unit
             }
 
             payload["items"].append(item_payload)

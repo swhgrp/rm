@@ -199,7 +199,7 @@ Share a file or folder with HR users, departments, roles, or locations.
   "shared_with_user_id": 5,
   "shared_with_department": "Accounting",
   "shared_with_role": "Manager",
-  "shared_with_location": "Dallas",
+  "shared_with_location": "Seaside Grill",
 
   // Granular permissions:
   "can_view": true,

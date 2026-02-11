@@ -44,6 +44,10 @@ class HubInvoiceItem(Base):
     mapping_confidence = Column(Numeric(3, 2), nullable=True)  # 0.00 to 1.00
     suggested_item_id = Column(Integer, nullable=True)  # AI suggestion
 
+    # UOM pricing flag - set at mapping time from vendor item data
+    # True = unit_price is per individual unit (EA/BTL), False = per case (CS)
+    price_is_per_unit = Column(Boolean, nullable=True)
+
     # Notes
     notes = Column(Text, nullable=True)
 

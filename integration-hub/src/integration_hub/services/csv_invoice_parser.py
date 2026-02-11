@@ -7,6 +7,7 @@ Retailer Store Number.
 """
 
 import csv
+import hashlib
 import logging
 from io import StringIO
 from typing import Dict, List, Optional, Tuple
@@ -46,7 +47,8 @@ class CSVInvoiceParser:
                 self._location_cache[str(row.code)] = (row.id, row.name)
             logger.info(f"Loaded {len(self._location_cache)} location mappings")
         except Exception as e:
-            # Try direct connection if cross-database query fails
+            # Cross-database query failed - rollback to clear aborted transaction state
+            self.db.rollback()
             logger.warning(f"Could not load locations from inventory_db: {e}")
             # Fallback: hardcode known mappings (should be updated to use proper DB connection)
             self._location_cache = {
@@ -308,8 +310,10 @@ class CSVInvoiceParser:
                         email_subject=hub_invoice.email_subject,
                         email_from=hub_invoice.email_from,
                         email_received_at=hub_invoice.email_received_at,
-                        # Generate unique hash by appending invoice number
-                        invoice_hash=f"{hub_invoice.invoice_hash}_{inv_data['invoice_number']}_{inv_data['store_number']}"
+                        # Generate unique hash for child invoice (must fit varchar(64))
+                        invoice_hash=hashlib.sha256(
+                            f"{hub_invoice.invoice_hash}_{inv_data['invoice_number']}_{inv_data['store_number']}".encode()
+                        ).hexdigest()
                     )
                     self.db.add(invoice)
 
@@ -367,6 +371,21 @@ class CSVInvoiceParser:
                 })
 
             self.db.commit()
+
+            # Auto-map items for all created/updated invoices
+            try:
+                from integration_hub.services.auto_mapper import get_auto_mapper
+                mapper = get_auto_mapper(self.db)
+                for inv_info in created_invoices:
+                    try:
+                        stats = mapper.map_invoice_items(inv_info['id'])
+                        inv_info['mapped'] = stats.get('mapped_count', 0)
+                        inv_info['unmapped'] = stats.get('unmapped_count', 0)
+                        logger.info(f"Auto-mapped CSV invoice {inv_info['id']}: {stats.get('mapped_count', 0)} mapped, {stats.get('unmapped_count', 0)} unmapped")
+                    except Exception as e:
+                        logger.error(f"Error auto-mapping CSV invoice {inv_info['id']}: {e}")
+            except Exception as e:
+                logger.error(f"Error initializing auto-mapper: {e}")
 
             return {
                 'success': True,

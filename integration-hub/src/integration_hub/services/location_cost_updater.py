@@ -201,10 +201,20 @@ class LocationCostUpdaterService:
         # Calculate cost per primary unit (lb for weight, bottle/each for count/volume)
         # Use units_per_case (Backbar-style) or fall back to deprecated pack_to_primary_factor
         units_per_case = float(vendor_item.units_per_case or vendor_item.pack_to_primary_factor or 1.0)
-        unit_price = float(item.unit_price or 0)  # This is typically the CASE price from invoice
+        unit_price = float(item.unit_price or 0)
 
         if units_per_case == 0:
             return {'skipped': True, 'reason': 'zero_units_per_case'}
+
+        # Determine if the invoice line item is priced per individual unit (EA/BTL)
+        # vs per case (CS/CASE). Use the price_is_per_unit flag set at mapping time,
+        # with string-based fallback for items mapped before the flag was added.
+        if item.price_is_per_unit is not None:
+            is_individual_unit = item.price_is_per_unit
+        else:
+            # Fallback: string-based detection for legacy/unmapped items
+            uom = (item.unit_of_measure or '').strip().upper()
+            is_individual_unit = uom in ('EA', 'EACH', 'BTL', 'BOTTLE', 'PC', 'PIECE')
 
         # Check if this is a weight-based item
         is_weight_item = (vendor_item.size_unit and
@@ -212,15 +222,20 @@ class LocationCostUpdaterService:
                           vendor_item.size_quantity and
                           float(vendor_item.size_quantity) > 0)
 
-        if is_weight_item:
-            # Weight items: divide by total weight (units × size)
+        if is_individual_unit:
+            # Individual unit pricing - unit_price is already per bottle/each
+            # Example: Hendricks Gin 1 bottle @ $38.20 = $38.20/bottle
+            cost_per_primary = unit_price
+            qty_in_primary = float(item.quantity or 0)
+        elif is_weight_item:
+            # Weight items: divide case price by total weight (units × size)
             # Example: Grouper 10lb case @ $138.13 = $138.13 / (1 × 10) = $13.81/lb
             # Example: Cheese 4×5lb bags @ $47.54 = $47.54 / (4 × 5) = $2.38/lb
             total_weight = units_per_case * float(vendor_item.size_quantity)
             cost_per_primary = unit_price / total_weight
             qty_in_primary = float(item.quantity or 0) * total_weight
         else:
-            # Count/volume items: divide by units per case
+            # Case pricing: divide case price by units per case
             # Example: Wine 12-bottle case @ $36 = $36 / 12 = $3.00/bottle
             cost_per_primary = unit_price / units_per_case
             qty_in_primary = float(item.quantity or 0) * units_per_case
