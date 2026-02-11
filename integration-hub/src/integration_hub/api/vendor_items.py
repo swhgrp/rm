@@ -1765,11 +1765,13 @@ async def get_vendor_item_location_prices(
 
     # Query hub_invoice_items joined with hub_invoices to get prices by location
     # Match by vendor + item_code OR vendor + item_description
+    # Include price_is_per_unit to correctly interpret unit_price
     query = text("""
         SELECT
             i.location_id,
-            MAX(ii.unit_price) as last_price,
-            MAX(i.invoice_date) as last_invoice_date
+            ii.unit_price as last_price,
+            i.invoice_date as last_invoice_date,
+            ii.price_is_per_unit
         FROM hub_invoice_items ii
         JOIN hub_invoices i ON ii.invoice_id = i.id
         WHERE i.vendor_id = :vendor_id
@@ -1778,8 +1780,7 @@ async def get_vendor_item_location_prices(
             OR (ii.item_description = :vendor_product_name)
           )
           AND i.location_id IS NOT NULL
-        GROUP BY i.location_id
-        ORDER BY last_invoice_date DESC
+        ORDER BY i.invoice_date DESC, ii.id DESC
     """)
 
     try:
@@ -1812,26 +1813,47 @@ async def get_vendor_item_location_prices(
         except Exception as e:
             logger.warning(f"Could not fetch location names from Inventory DB: {e}")
 
-        prices = []
+        # Deduplicate: keep only the most recent invoice line per location
+        seen_locations = {}
         for row in results:
             location_id = row[0]
-            # location_id in Hub invoices is often a string name like "Tiki Terrace"
-            # Try to match against Inventory locations by ID or by name
+            if location_id not in seen_locations:
+                seen_locations[location_id] = row
+
+        prices = []
+        for location_id, row in seen_locations.items():
             location_name = location_names.get(location_id, None)
             if not location_name:
-                # If location_id is actually a name string, use it directly
                 location_name = str(location_id) if location_id else "Unknown"
 
-            # Invoice unit_price is case cost, calculate unit cost
-            case_cost = float(row[1]) if row[1] else 0
-            unit_cost = case_cost / units_per_case if units_per_case > 0 else case_cost
+            invoice_price = float(row[1]) if row[1] else 0
+            is_per_unit = row[3]
+
+            # Determine case cost and unit cost based on pricing type
+            if is_per_unit is True:
+                # Invoice price is per individual unit (e.g., $38.20/bottle)
+                unit_cost = invoice_price
+                case_cost = invoice_price * units_per_case
+            elif is_per_unit is False:
+                # Invoice price is per case
+                case_cost = invoice_price
+                unit_cost = invoice_price / units_per_case if units_per_case > 0 else invoice_price
+            else:
+                # Flag not set — fallback: check vendor purchase_unit_abbr
+                vendor_abbr = (item.purchase_unit_abbr or '').strip().upper()
+                if vendor_abbr in ('EA', 'EACH', 'BTL', 'BOTTLE', 'PC', 'PIECE'):
+                    unit_cost = invoice_price
+                    case_cost = invoice_price * units_per_case
+                else:
+                    case_cost = invoice_price
+                    unit_cost = invoice_price / units_per_case if units_per_case > 0 else invoice_price
 
             prices.append({
                 "location_id": location_id,
                 "location_name": location_name,
-                "case_cost": case_cost,
-                "unit_cost": unit_cost,
-                "last_purchase_price": case_cost,  # Alias for compatibility
+                "case_cost": round(case_cost, 2),
+                "unit_cost": round(unit_cost, 2),
+                "last_purchase_price": round(invoice_price, 2),
                 "units_per_case": units_per_case,
                 "price_updated_at": row[2].isoformat() if row[2] else None
             })
