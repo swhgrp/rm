@@ -52,6 +52,8 @@ class GeneralLedgerLineResponse(BaseModel):
     credit_amount: Decimal
     balance: Decimal
     status: str
+    area_id: Optional[int] = None
+    area_name: Optional[str] = None
 
 
 class GeneralLedgerResponse(BaseModel):
@@ -212,9 +214,13 @@ def get_general_ledger(
         JournalEntry.description,
         JournalEntryLine.debit_amount,
         JournalEntryLine.credit_amount,
-        JournalEntry.status
+        JournalEntry.status,
+        JournalEntryLine.area_id,
+        Area.name.label('area_name')
     ).join(
         JournalEntryLine, JournalEntry.id == JournalEntryLine.journal_entry_id
+    ).outerjoin(
+        Area, JournalEntryLine.area_id == Area.id
     ).filter(and_(*transaction_filters)).order_by(JournalEntry.entry_date, JournalEntry.entry_number)
 
     transactions = transactions_query.all()
@@ -240,7 +246,9 @@ def get_general_ledger(
             debit_amount=debit_amount,
             credit_amount=credit_amount,
             balance=running_balance,
-            status=txn.status.value
+            status=txn.status.value,
+            area_id=txn.area_id,
+            area_name=txn.area_name
         ))
 
     ending_balance = running_balance
@@ -1733,6 +1741,445 @@ def get_balance_sheet_hierarchical(
         total_assets=total_assets,
         total_liabilities_equity=total_liabilities_equity,
         is_balanced=is_balanced
+    )
+
+
+# Multi-Location Balance Sheet Endpoint
+
+class MultiLocationBSEntry(BaseModel):
+    area_id: Optional[int]
+    area_name: str
+    amount: Decimal
+
+
+class MultiLocationBSAccountLine(BaseModel):
+    account_id: int
+    account_number: str
+    account_name: str
+    locations: List[MultiLocationBSEntry]
+    total: Decimal
+
+
+class MultiLocationBSSectionResponse(BaseModel):
+    section_name: str
+    accounts: List[MultiLocationBSAccountLine]
+    location_totals: List[MultiLocationBSEntry]
+    total: Decimal
+
+
+class MultiLocationBalanceSheetResponse(BaseModel):
+    as_of_date: date
+    locations: List[dict]  # [{id, name, code}, ...]
+    asset_section: MultiLocationBSSectionResponse
+    liability_section: MultiLocationBSSectionResponse
+    equity_section: MultiLocationBSSectionResponse
+    total_assets_by_location: List[MultiLocationBSEntry]
+    total_liabilities_equity_by_location: List[MultiLocationBSEntry]
+    total_assets: Decimal
+    total_liabilities_equity: Decimal
+
+
+@router.get("/balance-sheet-by-location", response_model=MultiLocationBalanceSheetResponse)
+def get_balance_sheet_by_location(
+    as_of_date: date = Query(..., description="As of date for Balance Sheet"),
+    area_ids: Optional[str] = Query(None, description="Comma-separated area IDs to include (null = all)"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
+    """
+    Generate Balance Sheet broken down by location.
+    Shows each account's balance per location side-by-side.
+    """
+    # Get areas - filtered or all
+    if area_ids:
+        id_list = [int(x.strip()) for x in area_ids.split(',') if x.strip()]
+        all_areas = db.query(Area).filter(Area.id.in_(id_list), Area.is_active == True).order_by(Area.code).all()
+    else:
+        all_areas = db.query(Area).filter(Area.is_active == True).order_by(Area.code).all()
+    location_list = [{"id": a.id, "name": a.name, "code": a.code} for a in all_areas]
+
+    def get_account_balances_by_location(account_type: AccountType):
+        """Get all accounts of a specific type with per-location balances"""
+        accounts = db.query(Account).filter(
+            Account.account_type == account_type,
+            Account.is_active == True
+        ).order_by(Account.account_number).all()
+
+        result = []
+        location_totals = {a.id: Decimal('0.00') for a in all_areas}
+        location_totals[None] = Decimal('0.00')  # unassigned
+        grand_total = Decimal('0.00')
+
+        for account in accounts:
+            # Query balances grouped by area_id for this account
+            area_balances = db.query(
+                JournalEntryLine.area_id,
+                func.sum(JournalEntryLine.debit_amount).label('total_debits'),
+                func.sum(JournalEntryLine.credit_amount).label('total_credits')
+            ).join(
+                JournalEntry
+            ).filter(
+                JournalEntryLine.account_id == account.id,
+                JournalEntry.status == JournalEntryStatus.POSTED,
+                JournalEntry.entry_date <= as_of_date
+            ).group_by(JournalEntryLine.area_id).all()
+
+            if not area_balances:
+                continue
+
+            locations = []
+            account_total = Decimal('0.00')
+            has_activity = False
+
+            # Build a map of area_id -> balance
+            balance_map = {}
+            for row in area_balances:
+                debits = row.total_debits or Decimal('0.00')
+                credits = row.total_credits or Decimal('0.00')
+                if account_type == AccountType.ASSET:
+                    balance = debits - credits
+                else:
+                    balance = credits - debits
+                if balance != Decimal('0.00'):
+                    balance_map[row.area_id] = balance
+                    has_activity = True
+
+            if not has_activity:
+                continue
+
+            # Build location entries for each area
+            for area in all_areas:
+                bal = balance_map.get(area.id, Decimal('0.00'))
+                locations.append(MultiLocationBSEntry(
+                    area_id=area.id,
+                    area_name=area.name,
+                    amount=bal
+                ))
+                location_totals[area.id] += bal
+                account_total += bal
+
+            # Unassigned (area_id is None)
+            unassigned = balance_map.get(None, Decimal('0.00'))
+            if unassigned != Decimal('0.00'):
+                locations.append(MultiLocationBSEntry(
+                    area_id=None,
+                    area_name="Unassigned",
+                    amount=unassigned
+                ))
+                location_totals[None] += unassigned
+                account_total += unassigned
+
+            grand_total += account_total
+
+            result.append(MultiLocationBSAccountLine(
+                account_id=account.id,
+                account_number=account.account_number,
+                account_name=account.account_name,
+                locations=locations,
+                total=account_total
+            ))
+
+        # Build location totals list
+        totals_list = []
+        for area in all_areas:
+            totals_list.append(MultiLocationBSEntry(
+                area_id=area.id,
+                area_name=area.name,
+                amount=location_totals[area.id]
+            ))
+        if location_totals[None] != Decimal('0.00'):
+            totals_list.append(MultiLocationBSEntry(
+                area_id=None,
+                area_name="Unassigned",
+                amount=location_totals[None]
+            ))
+
+        return result, totals_list, grand_total
+
+    asset_accounts, asset_loc_totals, total_assets = get_account_balances_by_location(AccountType.ASSET)
+    liability_accounts, liability_loc_totals, total_liabilities = get_account_balances_by_location(AccountType.LIABILITY)
+    equity_accounts, equity_loc_totals, total_equity = get_account_balances_by_location(AccountType.EQUITY)
+
+    # Calculate YTD net income per location
+    ytd_start = date(as_of_date.year, 1, 1)
+
+    ytd_by_area = db.query(
+        JournalEntryLine.area_id,
+        func.sum(
+            func.coalesce(JournalEntryLine.credit_amount, 0) - func.coalesce(JournalEntryLine.debit_amount, 0)
+        ).label('net_revenue'),
+    ).join(JournalEntry).join(Account).filter(
+        Account.account_type == AccountType.REVENUE,
+        JournalEntry.status == JournalEntryStatus.POSTED,
+        JournalEntry.entry_date >= ytd_start,
+        JournalEntry.entry_date <= as_of_date
+    ).group_by(JournalEntryLine.area_id).all()
+
+    ytd_expenses_by_area = db.query(
+        JournalEntryLine.area_id,
+        func.sum(
+            func.coalesce(JournalEntryLine.debit_amount, 0) - func.coalesce(JournalEntryLine.credit_amount, 0)
+        ).label('net_expense'),
+    ).join(JournalEntry).join(Account).filter(
+        Account.account_type.in_([AccountType.EXPENSE, AccountType.COGS]),
+        JournalEntry.status == JournalEntryStatus.POSTED,
+        JournalEntry.entry_date >= ytd_start,
+        JournalEntry.entry_date <= as_of_date
+    ).group_by(JournalEntryLine.area_id).all()
+
+    revenue_map = {row.area_id: (row.net_revenue or Decimal('0.00')) for row in ytd_by_area}
+    expense_map = {row.area_id: (row.net_expense or Decimal('0.00')) for row in ytd_expenses_by_area}
+
+    # Add net income as an equity line item
+    ni_locations = []
+    ni_total = Decimal('0.00')
+    for area in all_areas:
+        rev = revenue_map.get(area.id, Decimal('0.00'))
+        exp = expense_map.get(area.id, Decimal('0.00'))
+        ni = rev - exp
+        ni_locations.append(MultiLocationBSEntry(area_id=area.id, area_name=area.name, amount=ni))
+        ni_total += ni
+        # Add to equity location totals
+        for lt in equity_loc_totals:
+            if lt.area_id == area.id:
+                lt.amount += ni
+                break
+
+    if ni_total != Decimal('0.00'):
+        equity_accounts.append(MultiLocationBSAccountLine(
+            account_id=0,
+            account_number="NET-INCOME",
+            account_name="Net Income (YTD)",
+            locations=ni_locations,
+            total=ni_total
+        ))
+        total_equity += ni_total
+
+    # Calculate total assets and L+E by location
+    total_assets_by_loc = []
+    total_le_by_loc = []
+    for area in all_areas:
+        asset_amt = Decimal('0.00')
+        for lt in asset_loc_totals:
+            if lt.area_id == area.id:
+                asset_amt = lt.amount
+                break
+        total_assets_by_loc.append(MultiLocationBSEntry(area_id=area.id, area_name=area.name, amount=asset_amt))
+
+        liab_amt = Decimal('0.00')
+        eq_amt = Decimal('0.00')
+        for lt in liability_loc_totals:
+            if lt.area_id == area.id:
+                liab_amt = lt.amount
+                break
+        for lt in equity_loc_totals:
+            if lt.area_id == area.id:
+                eq_amt = lt.amount
+                break
+        total_le_by_loc.append(MultiLocationBSEntry(area_id=area.id, area_name=area.name, amount=liab_amt + eq_amt))
+
+    return MultiLocationBalanceSheetResponse(
+        as_of_date=as_of_date,
+        locations=location_list,
+        asset_section=MultiLocationBSSectionResponse(
+            section_name="Assets",
+            accounts=asset_accounts,
+            location_totals=asset_loc_totals,
+            total=total_assets
+        ),
+        liability_section=MultiLocationBSSectionResponse(
+            section_name="Liabilities",
+            accounts=liability_accounts,
+            location_totals=liability_loc_totals,
+            total=total_liabilities
+        ),
+        equity_section=MultiLocationBSSectionResponse(
+            section_name="Equity",
+            accounts=equity_accounts,
+            location_totals=equity_loc_totals,
+            total=total_equity
+        ),
+        total_assets_by_location=total_assets_by_loc,
+        total_liabilities_equity_by_location=total_le_by_loc,
+        total_assets=total_assets,
+        total_liabilities_equity=total_liabilities + total_equity
+    )
+
+
+# Multi-Location P&L Endpoint
+
+class MultiLocationPLEntry(BaseModel):
+    area_id: Optional[int]
+    area_name: str
+    amount: Decimal
+
+
+class MultiLocationPLAccountLine(BaseModel):
+    account_id: int
+    account_number: str
+    account_name: str
+    locations: List[MultiLocationPLEntry]
+    total: Decimal
+
+
+class MultiLocationPLSectionResponse(BaseModel):
+    section_name: str
+    accounts: List[MultiLocationPLAccountLine]
+    location_totals: List[MultiLocationPLEntry]
+    total: Decimal
+
+
+class MultiLocationProfitLossResponse(BaseModel):
+    start_date: date
+    end_date: date
+    locations: List[dict]
+    revenue_section: MultiLocationPLSectionResponse
+    cogs_section: MultiLocationPLSectionResponse
+    gross_profit_by_location: List[MultiLocationPLEntry]
+    gross_profit: Decimal
+    expense_section: MultiLocationPLSectionResponse
+    net_income_by_location: List[MultiLocationPLEntry]
+    net_income: Decimal
+
+
+@router.get("/profit-loss-by-location", response_model=MultiLocationProfitLossResponse)
+def get_profit_loss_by_location(
+    start_date: date = Query(..., description="Start date for P&L"),
+    end_date: date = Query(..., description="End date for P&L"),
+    area_ids: Optional[str] = Query(None, description="Comma-separated area IDs to include (null = all)"),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_auth)
+):
+    """
+    Generate P&L broken down by location.
+    Shows each account's balance per location side-by-side.
+    """
+    # Get areas - filtered or all
+    if area_ids:
+        id_list = [int(x.strip()) for x in area_ids.split(',') if x.strip()]
+        all_areas = db.query(Area).filter(Area.id.in_(id_list), Area.is_active == True).order_by(Area.code).all()
+    else:
+        all_areas = db.query(Area).filter(Area.is_active == True).order_by(Area.code).all()
+
+    location_list = [{"id": a.id, "name": a.name, "code": a.code} for a in all_areas]
+
+    def get_account_balances_by_location(account_type: AccountType):
+        """Get all accounts of a specific type with per-location P&L balances"""
+        accounts = db.query(Account).filter(
+            Account.account_type == account_type,
+            Account.is_active == True
+        ).order_by(Account.account_number).all()
+
+        result = []
+        location_totals = {a.id: Decimal('0.00') for a in all_areas}
+        grand_total = Decimal('0.00')
+
+        for account in accounts:
+            area_balances = db.query(
+                JournalEntryLine.area_id,
+                func.sum(JournalEntryLine.debit_amount).label('total_debits'),
+                func.sum(JournalEntryLine.credit_amount).label('total_credits')
+            ).join(
+                JournalEntry
+            ).filter(
+                JournalEntryLine.account_id == account.id,
+                JournalEntry.status == JournalEntryStatus.POSTED,
+                JournalEntry.entry_date >= start_date,
+                JournalEntry.entry_date <= end_date,
+                JournalEntryLine.area_id.in_([a.id for a in all_areas])
+            ).group_by(JournalEntryLine.area_id).all()
+
+            if not area_balances:
+                continue
+
+            balance_map = {}
+            has_activity = False
+            for row in area_balances:
+                debits = row.total_debits or Decimal('0.00')
+                credits = row.total_credits or Decimal('0.00')
+                if account_type == AccountType.REVENUE:
+                    balance = credits - debits
+                else:
+                    balance = debits - credits
+                if balance != Decimal('0.00'):
+                    balance_map[row.area_id] = balance
+                    has_activity = True
+
+            if not has_activity:
+                continue
+
+            locations = []
+            account_total = Decimal('0.00')
+            for area in all_areas:
+                bal = balance_map.get(area.id, Decimal('0.00'))
+                locations.append(MultiLocationPLEntry(
+                    area_id=area.id, area_name=area.name, amount=bal
+                ))
+                location_totals[area.id] += bal
+                account_total += bal
+
+            grand_total += account_total
+
+            result.append(MultiLocationPLAccountLine(
+                account_id=account.id,
+                account_number=account.account_number,
+                account_name=account.account_name,
+                locations=locations,
+                total=account_total
+            ))
+
+        totals_list = [
+            MultiLocationPLEntry(area_id=a.id, area_name=a.name, amount=location_totals[a.id])
+            for a in all_areas
+        ]
+
+        return result, totals_list, grand_total
+
+    revenue_accounts, revenue_loc_totals, total_revenue = get_account_balances_by_location(AccountType.REVENUE)
+    cogs_accounts, cogs_loc_totals, total_cogs = get_account_balances_by_location(AccountType.COGS)
+    expense_accounts, expense_loc_totals, total_expenses = get_account_balances_by_location(AccountType.EXPENSE)
+
+    gross_profit = total_revenue - total_cogs
+    net_income = gross_profit - total_expenses
+
+    # Gross profit by location
+    gp_by_loc = []
+    ni_by_loc = []
+    for i, area in enumerate(all_areas):
+        rev = revenue_loc_totals[i].amount
+        cogs = cogs_loc_totals[i].amount
+        exp = expense_loc_totals[i].amount
+        gp = rev - cogs
+        ni = gp - exp
+        gp_by_loc.append(MultiLocationPLEntry(area_id=area.id, area_name=area.name, amount=gp))
+        ni_by_loc.append(MultiLocationPLEntry(area_id=area.id, area_name=area.name, amount=ni))
+
+    return MultiLocationProfitLossResponse(
+        start_date=start_date,
+        end_date=end_date,
+        locations=location_list,
+        revenue_section=MultiLocationPLSectionResponse(
+            section_name="Revenue",
+            accounts=revenue_accounts,
+            location_totals=revenue_loc_totals,
+            total=total_revenue
+        ),
+        cogs_section=MultiLocationPLSectionResponse(
+            section_name="Cost of Goods Sold",
+            accounts=cogs_accounts,
+            location_totals=cogs_loc_totals,
+            total=total_cogs
+        ),
+        gross_profit_by_location=gp_by_loc,
+        gross_profit=gross_profit,
+        expense_section=MultiLocationPLSectionResponse(
+            section_name="Operating Expenses",
+            accounts=expense_accounts,
+            location_totals=expense_loc_totals,
+            total=total_expenses
+        ),
+        net_income_by_location=ni_by_loc,
+        net_income=net_income
     )
 
 

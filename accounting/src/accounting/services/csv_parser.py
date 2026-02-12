@@ -4,6 +4,7 @@ Supports multiple bank CSV formats with auto-detection
 """
 import io
 import csv
+import re
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, date
 from decimal import Decimal
@@ -26,6 +27,15 @@ class CSVParserService:
             "amount_field": "Amount",
             "type_field": "Type",
             "check_field": "Check or Slip #",
+            "date_format": "%m/%d/%Y"
+        },
+        "chase_activity": {
+            "name": "Chase Activity (shifted)",
+            "columns": ["Details", "Posting Date", "Description", "Amount", "Type", "Balance", "Check or Slip #"],
+            "date_field": "Details",
+            "description_field": "Posting Date",
+            "amount_field": "Description",
+            "type_field": "Amount",
             "date_format": "%m/%d/%Y"
         },
         "chase_credit": {
@@ -86,10 +96,16 @@ class CSVParserService:
             # Try pandas for robust CSV parsing
             df = pd.read_csv(io.StringIO(content_str))
 
+            logger.info(f"CSV columns: {list(df.columns)}")
+            logger.info(f"CSV shape: {df.shape}")
+            if len(df) > 0:
+                logger.info(f"CSV first row: {dict(df.iloc[0])}")
+
             # Auto-detect format if not provided
             if bank_format is None:
                 bank_format = CSVParserService._detect_format(df)
 
+            logger.info(f"Detected bank format: {bank_format}")
             format_spec = CSVParserService.BANK_FORMATS.get(bank_format, CSVParserService.BANK_FORMATS["generic"])
 
             # Parse transactions
@@ -128,8 +144,14 @@ class CSVParserService:
 
         # Check Chase format
         if "Posting Date" in columns or "posting date" in columns_lower:
-            if "Check or Slip #" in columns:
-                return "chase"
+            # Chase Activity CSVs often have data shifted: the "Details" column
+            # contains dates and "Posting Date" contains descriptions.
+            # Detect by checking if first non-null "Details" value looks like a date.
+            if "Details" in columns and len(df) > 0:
+                first_details = str(df["Details"].dropna().iloc[0]) if not df["Details"].dropna().empty else ""
+                if re.match(r'^\d{1,2}/\d{1,2}/\d{2,4}$', first_details):
+                    return "chase_activity"
+            return "chase"
 
         # Check Chase Credit Card format
         if "Transaction Date" in columns and "Post Date" in columns:
@@ -156,12 +178,15 @@ class CSVParserService:
         for col in df.columns:
             col_lower = col.strip().lower()
             for key, value in format_spec.items():
-                if isinstance(value, str) and value.lower() == col or value.lower() == col_lower:
+                if isinstance(value, str) and (value.lower() == col.strip().lower() or value.lower() == col_lower):
                     column_map[key] = col
 
         date_field = column_map.get("date_field", format_spec.get("date_field"))
         description_field = column_map.get("description_field", format_spec.get("description_field"))
         amount_field = column_map.get("amount_field", format_spec.get("amount_field"))
+
+        logger.info(f"Column map: {column_map}")
+        logger.info(f"Using fields - date: {date_field}, description: {description_field}, amount: {amount_field}")
 
         for _, row in df.iterrows():
             try:

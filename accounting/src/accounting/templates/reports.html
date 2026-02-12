@@ -184,6 +184,70 @@
         border-top: 1px solid var(--border-primary);
         border-bottom: 2px solid var(--border-primary);
     }
+    /* Location picker chips */
+    .loc-picker {
+        display: none;
+        background: var(--bg-secondary);
+        padding: 0.6rem 1rem;
+        border-radius: 6px;
+        border: 1px solid var(--border-primary);
+        margin-bottom: 1rem;
+    }
+    .loc-picker-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.5rem;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+    .loc-picker-header a {
+        color: var(--accent-primary);
+        text-decoration: none;
+        font-weight: 500;
+    }
+    .loc-picker-header a:hover { text-decoration: underline; }
+    .loc-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+    }
+    .loc-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.3rem 0.7rem;
+        border-radius: 16px;
+        border: 1.5px solid var(--border-primary);
+        background: var(--bg-primary);
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        user-select: none;
+        color: var(--text-secondary);
+    }
+    .loc-chip:hover {
+        border-color: var(--accent-primary);
+    }
+    .loc-chip.selected {
+        background: #e3edf7;
+        border-color: var(--accent-primary);
+        color: var(--text-primary);
+        font-weight: 500;
+    }
+    .loc-chip input[type="checkbox"] {
+        display: none;
+    }
+    .loc-chip .chip-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--border-primary);
+        transition: background 0.15s ease;
+    }
+    .loc-chip.selected .chip-dot {
+        background: var(--accent-primary);
+    }
 </style>
 {% endblock %}
 
@@ -216,11 +280,12 @@
             </div>
             <div class="form-group">
                 <label for="pl-location">Location</label>
-                <select id="pl-location">
+                <select id="pl-location" onchange="togglePLByLocation()">
                     <option value="">All Locations (Consolidated)</option>
+                    <option value="__by_location__">All Locations (By Location)</option>
                 </select>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="pl-hierarchical-group">
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                     <input type="checkbox" id="pl-hierarchical" checked style="width: auto; margin: 0;">
                     <span>Show Hierarchical</span>
@@ -232,7 +297,27 @@
                     <span>Hide Zero Amounts</span>
                 </label>
             </div>
+            <div class="form-group" id="pl-periods-group">
+                <label for="pl-periods">Compare</label>
+                <select id="pl-periods">
+                    <option value="0">Single Period</option>
+                    <option value="2">Last 2 Months</option>
+                    <option value="3">Last 3 Months</option>
+                    <option value="6">Last 6 Months</option>
+                    <option value="12">Last 12 Months</option>
+                </select>
+            </div>
             <button class="btn btn-primary" onclick="loadProfitLoss()">Generate Report</button>
+        </div>
+
+        <!-- Location Picker (shown when By Location selected) -->
+        <div id="pl-location-picker" class="loc-picker">
+            <div class="loc-picker-header">
+                <span>Locations:</span>
+                <a href="#" onclick="toggleAllLocations('pl', true); return false;">All</a>
+                <a href="#" onclick="toggleAllLocations('pl', false); return false;">None</a>
+            </div>
+            <div id="pl-location-checkboxes" class="loc-chips"></div>
         </div>
 
         <div class="report-actions" id="pl-actions" style="display: none;">
@@ -258,11 +343,12 @@
             </div>
             <div class="form-group">
                 <label for="bs-location">Location</label>
-                <select id="bs-location">
+                <select id="bs-location" onchange="toggleBSByLocation()">
                     <option value="">All Locations (Consolidated)</option>
+                    <option value="__by_location__">All Locations (By Location)</option>
                 </select>
             </div>
-            <div class="form-group">
+            <div class="form-group" id="bs-hierarchical-group">
                 <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
                     <input type="checkbox" id="bs-hierarchical" checked style="width: auto; margin: 0;">
                     <span>Show Hierarchical</span>
@@ -275,6 +361,16 @@
                 </label>
             </div>
             <button class="btn btn-primary" onclick="loadBalanceSheet()">Generate Report</button>
+        </div>
+
+        <!-- Location Picker (shown when By Location selected) -->
+        <div id="bs-location-picker" class="loc-picker">
+            <div class="loc-picker-header">
+                <span>Locations:</span>
+                <a href="#" onclick="toggleAllLocations('bs', true); return false;">All</a>
+                <a href="#" onclick="toggleAllLocations('bs', false); return false;">None</a>
+            </div>
+            <div id="bs-location-checkboxes" class="loc-chips"></div>
         </div>
 
         <div class="report-actions" id="bs-actions" style="display: none;">
@@ -509,7 +605,7 @@
     }
 
     function populateLocationDropdowns() {
-        const dropdowns = ['pl-location', 'bs-location', 'tb-location', 'gl-location', 'aging-location'];
+        const dropdowns = ['tb-location', 'gl-location', 'aging-location'];
         const options = areas.map(area =>
             `<option value="${area.id}">${area.code} - ${area.name}</option>`
         ).join('');
@@ -520,6 +616,79 @@
                 select.innerHTML = '<option value="">All Locations (Consolidated)</option>' + options;
             }
         });
+
+        // P&L and Balance Sheet have extra "By Location" option
+        ['pl-location', 'bs-location'].forEach(id => {
+            const select = document.getElementById(id);
+            if (select) {
+                select.innerHTML = '<option value="">All Locations (Consolidated)</option>'
+                    + '<option value="__by_location__">All Locations (By Location)</option>'
+                    + options;
+            }
+        });
+
+        // Populate location picker checkboxes
+        populateLocationPickers();
+    }
+
+    function populateLocationPickers() {
+        ['pl', 'bs'].forEach(prefix => {
+            const container = document.getElementById(`${prefix}-location-checkboxes`);
+            if (!container) return;
+            container.innerHTML = areas.map(area =>
+                `<label class="loc-chip selected" onclick="toggleChip(this)">
+                    <input type="checkbox" class="${prefix}-loc-cb" value="${area.id}" checked>
+                    <span class="chip-dot"></span>
+                    ${area.name}
+                </label>`
+            ).join('');
+        });
+    }
+
+    function toggleChip(label) {
+        const cb = label.querySelector('input[type="checkbox"]');
+        // The click event toggles the checkbox first, so read its new state
+        setTimeout(() => {
+            label.classList.toggle('selected', cb.checked);
+        }, 0);
+    }
+
+    function toggleAllLocations(prefix, selectAll) {
+        document.querySelectorAll(`.${prefix}-loc-cb`).forEach(cb => {
+            cb.checked = selectAll;
+            cb.closest('.loc-chip').classList.toggle('selected', selectAll);
+        });
+    }
+
+    function getSelectedLocationIds(prefix) {
+        return Array.from(document.querySelectorAll(`.${prefix}-loc-cb:checked`))
+            .map(cb => cb.value);
+    }
+
+    function togglePLByLocation() {
+        const val = document.getElementById('pl-location').value;
+        const hierarchicalGroup = document.getElementById('pl-hierarchical-group');
+        const picker = document.getElementById('pl-location-picker');
+        if (val === '__by_location__') {
+            hierarchicalGroup.style.display = 'none';
+            picker.style.display = 'block';
+        } else {
+            hierarchicalGroup.style.display = '';
+            picker.style.display = 'none';
+        }
+    }
+
+    function toggleBSByLocation() {
+        const val = document.getElementById('bs-location').value;
+        const hierarchicalGroup = document.getElementById('bs-hierarchical-group');
+        const picker = document.getElementById('bs-location-picker');
+        if (val === '__by_location__') {
+            hierarchicalGroup.style.display = 'none';
+            picker.style.display = 'block';
+        } else {
+            hierarchicalGroup.style.display = '';
+            picker.style.display = 'none';
+        }
     }
 
     // Load data on page load
@@ -559,6 +728,48 @@
         document.getElementById('pl-actions').style.display = 'none';
 
         try {
+            const numPeriods = parseInt(document.getElementById('pl-periods').value) || 0;
+
+            // Multi-location "By Location" mode (only when single period)
+            if (areaId === '__by_location__' && numPeriods === 0) {
+                const selectedIds = getSelectedLocationIds('pl');
+
+                if (selectedIds.length === 0) {
+                    showNotification('Please select at least one location', 'No Locations');
+                    return;
+                }
+
+                let url = `/accounting/api/reports/profit-loss-by-location?start_date=${startDate}&end_date=${endDate}`;
+                url += `&area_ids=${selectedIds.join(',')}`;
+
+                const response = await fetch(url);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Failed to load report');
+
+                window.currentPLData = data;
+                renderProfitLossByLocation(data);
+                document.getElementById('pl-actions').style.display = 'flex';
+                return;
+            }
+
+            // Multi-month comparison mode (works with consolidated, single location, or by-location)
+            if (numPeriods > 0) {
+                let url = `/accounting/api/reports/multi-period-profit-loss?current_start=${startDate}&current_end=${endDate}&num_periods=${numPeriods - 1}&period_type=month`;
+                if (areaId && areaId !== '__by_location__') {
+                    url += `&area_id=${areaId}`;
+                }
+                if (hideZero) url += '&hide_zero=true';
+
+                const response = await fetch(url);
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || 'Failed to load report');
+
+                window.currentPLData = data;
+                renderMultiPeriodProfitLoss(data);
+                document.getElementById('pl-actions').style.display = 'flex';
+                return;
+            }
+
             const endpoint = isHierarchical ? 'profit-loss-hierarchical' : 'profit-loss';
             let url = `/accounting/api/reports/${endpoint}?start_date=${startDate}&end_date=${endDate}`;
             if (areaId) {
@@ -801,6 +1012,27 @@
         document.getElementById('bs-actions').style.display = 'none';
 
         try {
+            // Multi-location "By Location" mode
+            if (areaId === '__by_location__') {
+                const selectedIds = getSelectedLocationIds('bs');
+                if (selectedIds.length === 0) {
+                    showNotification('Please select at least one location', 'No Locations');
+                    return;
+                }
+                let url = `/accounting/api/reports/balance-sheet-by-location?as_of_date=${asOfDate}&area_ids=${selectedIds.join(',')}`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Failed to load report');
+                }
+
+                window.currentBSData = data;
+                renderBalanceSheetByLocation(data);
+                document.getElementById('bs-actions').style.display = 'flex';
+                return;
+            }
+
             const endpoint = isHierarchical ? 'balance-sheet-hierarchical' : 'balance-sheet';
             let url = `/accounting/api/reports/${endpoint}?as_of_date=${asOfDate}`;
             if (areaId) {
@@ -1050,6 +1282,271 @@
         reportDiv.style.display = 'block';
     }
 
+    // Render Balance Sheet by Location (multi-location side-by-side)
+    function renderBalanceSheetByLocation(data) {
+        const reportDiv = document.getElementById('bs-report');
+        const locations = data.locations;
+        const numLocCols = locations.length;
+        const totalCols = numLocCols + 2; // Account name + location columns + Total
+
+        let html = `
+            <div class="report-header">
+                <h2>Balance Sheet — By Location</h2>
+                <p class="subtitle">
+                    As of ${new Date(data.as_of_date).toLocaleDateString()}
+                </p>
+            </div>
+        `;
+
+        html += '<div style="overflow-x: auto;">';
+        html += '<table class="report-table" style="min-width: 600px;">';
+
+        // Header row
+        html += '<thead><tr><th>Account</th>';
+        locations.forEach(loc => {
+            html += `<th class="number" style="min-width: 120px;">${loc.name}</th>`;
+        });
+        html += '<th class="number" style="min-width: 120px;">Total</th></tr></thead>';
+        html += '<tbody>';
+
+        function renderSection(section, sectionName) {
+            html += `<tr><td colspan="${totalCols}" class="account-type-header">${sectionName}</td></tr>`;
+
+            section.accounts.forEach(acc => {
+                const isNetIncome = acc.account_number === 'NET-INCOME';
+                const nameStyle = isNetIncome ? 'font-style: italic;' : '';
+                const link = isNetIncome
+                    ? `<span style="${nameStyle}">${acc.account_name}</span>`
+                    : `<a href="/accounting/accounts/${acc.account_id}" style="color: #58a6ff; text-decoration: none;">${acc.account_number} - ${acc.account_name}</a>`;
+
+                html += `<tr><td>${link}</td>`;
+                locations.forEach(loc => {
+                    const entry = acc.locations.find(l => l.area_id === loc.id);
+                    const amt = entry ? parseFloat(entry.amount) : 0;
+                    html += `<td class="number">${amt !== 0 ? formatCurrency(amt) : '-'}</td>`;
+                });
+                html += `<td class="number"><strong>${formatCurrency(parseFloat(acc.total))}</strong></td>`;
+                html += '</tr>';
+            });
+
+            // Section totals
+            html += `<tr class="total-row"><td><strong>Total ${sectionName}</strong></td>`;
+            section.location_totals.forEach(lt => {
+                if (lt.area_name !== 'Unassigned') {
+                    html += `<td class="number"><strong>${formatCurrency(parseFloat(lt.amount))}</strong></td>`;
+                }
+            });
+            html += `<td class="number"><strong>${formatCurrency(parseFloat(section.total))}</strong></td>`;
+            html += '</tr>';
+        }
+
+        // Assets
+        renderSection(data.asset_section, 'Assets');
+        html += `<tr><td colspan="${totalCols}" style="height: 1rem;"></td></tr>`;
+
+        // Liabilities
+        renderSection(data.liability_section, 'Liabilities');
+
+        // Equity
+        renderSection(data.equity_section, 'Equity');
+
+        // Total L+E row
+        html += `<tr class="total-row" style="background: #e8f4f8;"><td><strong>TOTAL LIABILITIES & EQUITY</strong></td>`;
+        data.total_liabilities_equity_by_location.forEach(lt => {
+            html += `<td class="number"><strong>${formatCurrency(parseFloat(lt.amount))}</strong></td>`;
+        });
+        html += `<td class="number"><strong>${formatCurrency(parseFloat(data.total_liabilities_equity))}</strong></td>`;
+        html += '</tr>';
+
+        html += '</tbody></table></div>';
+
+        reportDiv.innerHTML = html;
+        reportDiv.style.display = 'block';
+    }
+
+    // Render P&L by Location (multi-location side-by-side)
+    function renderProfitLossByLocation(data) {
+        const reportDiv = document.getElementById('pl-report');
+        const locations = data.locations;
+        const numLocCols = locations.length;
+        const totalCols = numLocCols + 2; // Account name + location columns + Total
+
+        let html = `
+            <div class="report-header">
+                <h2>Profit & Loss — By Location</h2>
+                <p class="subtitle">
+                    ${new Date(data.start_date).toLocaleDateString()} to ${new Date(data.end_date).toLocaleDateString()}
+                </p>
+            </div>
+        `;
+
+        html += '<div style="overflow-x: auto;">';
+        html += '<table class="report-table" style="min-width: 600px;">';
+
+        // Header row
+        html += '<thead><tr><th>Account</th>';
+        locations.forEach(loc => {
+            html += `<th class="number" style="min-width: 120px;">${loc.name}</th>`;
+        });
+        html += '<th class="number" style="min-width: 120px;">Total</th></tr></thead>';
+        html += '<tbody>';
+
+        function renderSection(section, sectionName) {
+            html += `<tr><td colspan="${totalCols}" class="account-type-header">${sectionName}</td></tr>`;
+
+            section.accounts.forEach(acc => {
+                html += `<tr><td><a href="/accounting/accounts/${acc.account_id}" style="color: #58a6ff; text-decoration: none;">${acc.account_number} - ${acc.account_name}</a></td>`;
+                locations.forEach(loc => {
+                    const entry = acc.locations.find(l => l.area_id === loc.id);
+                    const amt = entry ? parseFloat(entry.amount) : 0;
+                    html += `<td class="number">${amt !== 0 ? formatCurrency(amt) : '-'}</td>`;
+                });
+                html += `<td class="number"><strong>${formatCurrency(parseFloat(acc.total))}</strong></td>`;
+                html += '</tr>';
+            });
+
+            // Section totals
+            html += `<tr class="total-row"><td><strong>Total ${sectionName}</strong></td>`;
+            section.location_totals.forEach(lt => {
+                html += `<td class="number"><strong>${formatCurrency(parseFloat(lt.amount))}</strong></td>`;
+            });
+            html += `<td class="number"><strong>${formatCurrency(parseFloat(section.total))}</strong></td>`;
+            html += '</tr>';
+        }
+
+        // Revenue
+        renderSection(data.revenue_section, 'Revenue');
+
+        // COGS
+        if (data.cogs_section.accounts.length > 0) {
+            renderSection(data.cogs_section, 'Cost of Goods Sold');
+        }
+
+        // Gross Profit row
+        html += `<tr class="total-row" style="background: #e8f4f8;"><td><strong>GROSS PROFIT</strong></td>`;
+        data.gross_profit_by_location.forEach(gp => {
+            html += `<td class="number"><strong>${formatCurrency(parseFloat(gp.amount))}</strong></td>`;
+        });
+        html += `<td class="number"><strong>${formatCurrency(parseFloat(data.gross_profit))}</strong></td>`;
+        html += '</tr>';
+
+        // Expenses
+        if (data.expense_section.accounts.length > 0) {
+            renderSection(data.expense_section, 'Operating Expenses');
+        }
+
+        // Net Income row
+        const niPositive = parseFloat(data.net_income) >= 0;
+        html += `<tr class="${niPositive ? 'balance-check' : 'balance-check unbalanced'}" style="font-size: 1.05rem;"><td><strong>NET INCOME</strong></td>`;
+        data.net_income_by_location.forEach(ni => {
+            html += `<td class="number"><strong>${formatCurrency(parseFloat(ni.amount))}</strong></td>`;
+        });
+        html += `<td class="number"><strong>${formatCurrency(parseFloat(data.net_income))}</strong></td>`;
+        html += '</tr>';
+
+        html += '</tbody></table></div>';
+
+        reportDiv.innerHTML = html;
+        reportDiv.style.display = 'block';
+    }
+
+    // Render Multi-Period Comparative P&L (month-by-month)
+    function renderMultiPeriodProfitLoss(data) {
+        const reportDiv = document.getElementById('pl-report');
+        const priorPeriods = data.prior_periods || [];
+        const allPeriodLabels = [data.current_label, ...priorPeriods.map(p => p.label)];
+        const totalCols = allPeriodLabels.length + 1; // Account name + period columns
+
+        let html = `
+            <div class="report-header">
+                <h2>Profit & Loss — Month Comparison</h2>
+                <p class="subtitle">
+                    ${allPeriodLabels.join(' | ')}
+                    ${data.area_name ? ` — ${data.area_name}` : ''}
+                </p>
+            </div>
+        `;
+
+        html += '<div style="overflow-x: auto;">';
+        html += '<table class="report-table" style="min-width: 600px;">';
+
+        // Header row
+        html += '<thead><tr><th>Account</th>';
+        allPeriodLabels.forEach(label => {
+            html += `<th class="number" style="min-width: 120px;">${label}</th>`;
+        });
+        html += '</tr></thead>';
+        html += '<tbody>';
+
+        function renderAccountRow(acc, indent) {
+            const paddingStyle = indent > 0 ? `padding-left: ${indent * 1.5}rem;` : '';
+            const weightStyle = acc.is_summary ? 'font-weight: 600;' : '';
+            html += `<tr><td style="${paddingStyle} ${weightStyle}"><a href="/accounting/accounts/${acc.account_id}" style="color: #58a6ff; text-decoration: none;">${acc.account_number} - ${acc.account_name}</a></td>`;
+            // Current period
+            const curAmt = parseFloat(acc.current_amount);
+            html += `<td class="number">${curAmt !== 0 ? formatCurrency(curAmt) : '-'}</td>`;
+            // Prior periods
+            (acc.prior_periods || []).forEach(amt => {
+                const val = parseFloat(amt);
+                html += `<td class="number">${val !== 0 ? formatCurrency(val) : '-'}</td>`;
+            });
+            html += '</tr>';
+
+            // Render children
+            if (acc.children && acc.children.length > 0) {
+                acc.children.forEach(child => renderAccountRow(child, indent + 1));
+            }
+        }
+
+        function renderSection(section, sectionName) {
+            html += `<tr><td colspan="${totalCols}" class="account-type-header">${sectionName}</td></tr>`;
+            section.accounts.forEach(acc => renderAccountRow(acc, 0));
+
+            // Section totals
+            html += `<tr class="total-row"><td><strong>Total ${sectionName}</strong></td>`;
+            html += `<td class="number"><strong>${formatCurrency(parseFloat(section.current_total))}</strong></td>`;
+            (section.prior_totals || []).forEach(t => {
+                html += `<td class="number"><strong>${formatCurrency(parseFloat(t))}</strong></td>`;
+            });
+            html += '</tr>';
+        }
+
+        // Revenue
+        renderSection(data.revenue_section, 'Revenue');
+
+        // COGS
+        if (data.cogs_section.accounts.length > 0) {
+            renderSection(data.cogs_section, 'Cost of Goods Sold');
+        }
+
+        // Gross Profit row
+        html += `<tr class="total-row" style="background: #e8f4f8;"><td><strong>GROSS PROFIT</strong></td>`;
+        html += `<td class="number"><strong>${formatCurrency(parseFloat(data.gross_profit_current))}</strong></td>`;
+        (data.gross_profit_prior || []).forEach(gp => {
+            html += `<td class="number"><strong>${formatCurrency(parseFloat(gp))}</strong></td>`;
+        });
+        html += '</tr>';
+
+        // Expenses
+        if (data.expense_section.accounts.length > 0) {
+            renderSection(data.expense_section, 'Operating Expenses');
+        }
+
+        // Net Income row
+        const niPositive = parseFloat(data.net_income_current) >= 0;
+        html += `<tr class="${niPositive ? 'balance-check' : 'balance-check unbalanced'}" style="font-size: 1.05rem;"><td><strong>NET INCOME</strong></td>`;
+        html += `<td class="number"><strong>${formatCurrency(parseFloat(data.net_income_current))}</strong></td>`;
+        (data.net_income_prior || []).forEach(ni => {
+            html += `<td class="number"><strong>${formatCurrency(parseFloat(ni))}</strong></td>`;
+        });
+        html += '</tr>';
+
+        html += '</tbody></table></div>';
+
+        reportDiv.innerHTML = html;
+        reportDiv.style.display = 'block';
+    }
+
     // Load Trial Balance
     async function loadTrialBalance() {
         const date = document.getElementById('tb-date').value;
@@ -1250,6 +1747,7 @@
                         <th>Date</th>
                         <th>Entry Number</th>
                         <th>Description</th>
+                        <th>Location</th>
                         <th class="number">Debit</th>
                         <th class="number">Credit</th>
                         <th class="number">Balance</th>
@@ -1264,6 +1762,7 @@
                         <td>${new Date(txn.entry_date).toLocaleDateString()}</td>
                         <td>${txn.entry_number}</td>
                         <td>${txn.description}</td>
+                        <td>${txn.area_name || '<span style="color: #999;">—</span>'}</td>
                         <td class="number">${parseFloat(txn.debit_amount).toFixed(2)}</td>
                         <td class="number">${parseFloat(txn.credit_amount).toFixed(2)}</td>
                         <td class="number gl-balance">${parseFloat(txn.balance).toFixed(2)}</td>
@@ -1273,7 +1772,7 @@
 
             html += `
                     <tr class="total-row">
-                        <td colspan="3"><strong>TOTALS</strong></td>
+                        <td colspan="4"><strong>TOTALS</strong></td>
                         <td class="number"><strong>${parseFloat(data.total_debits).toFixed(2)}</strong></td>
                         <td class="number"><strong>${parseFloat(data.total_credits).toFixed(2)}</strong></td>
                         <td></td>

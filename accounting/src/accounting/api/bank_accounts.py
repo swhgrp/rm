@@ -498,6 +498,11 @@ async def import_statement(
     # Read file content
     file_content = await file.read()
 
+    # Normalize bank-specific CSV formats (chase_csv, bofa_csv, wells_csv) to 'csv'
+    # The CSV parser auto-detects the bank format from column headers
+    if file_format and file_format.endswith('_csv'):
+        file_format = 'csv'
+
     # Determine file format if not provided
     if not file_format:
         filename = file.filename.lower()
@@ -544,6 +549,11 @@ async def import_statement(
     warnings = []
 
     for txn_data in result["transactions"]:
+        # Skip transactions with no date (required field)
+        if not txn_data.get("transaction_date"):
+            warnings.append(f"Skipped transaction with no date: {txn_data.get('description', 'unknown')}")
+            continue
+
         # Check for duplicates (same account, date, amount, description)
         existing = db.query(BankTransaction).filter(
             BankTransaction.bank_account_id == account_id,
@@ -555,6 +565,18 @@ async def import_statement(
         if existing:
             duplicates_skipped += 1
             continue
+
+        # Truncate string fields to fit DB column limits
+        if txn_data.get("payee") and len(txn_data["payee"]) > 255:
+            txn_data["payee"] = txn_data["payee"][:255]
+        if txn_data.get("check_number") and len(txn_data["check_number"]) > 50:
+            txn_data["check_number"] = txn_data["check_number"][:50]
+        if txn_data.get("reference_number") and len(txn_data["reference_number"]) > 100:
+            txn_data["reference_number"] = txn_data["reference_number"][:100]
+        if txn_data.get("category") and len(txn_data["category"]) > 100:
+            txn_data["category"] = txn_data["category"][:100]
+        if txn_data.get("transaction_type") and len(txn_data["transaction_type"]) > 50:
+            txn_data["transaction_type"] = txn_data["transaction_type"][:50]
 
         # Create transaction
         try:

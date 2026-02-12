@@ -92,6 +92,16 @@ curl -s http://localhost:{port}/endpoint | python3 -m json.tool
 | Maintenance | 8000 | 8006 |
 | Food Safety | 8000 | 8007 |
 
+### Accounting Reports — Multi-Location & Multi-Period (Feb 2026)
+- **GL Account Detail** (`account_detail.html`): Location column, location filter dropdown, area_id/area_name in `GeneralLedgerLineResponse`
+- **GL report on Reports page** (`reports.html` → `renderGeneralLedger`): Also has Location column
+- **Balance Sheet by Location**: `GET /api/reports/balance-sheet-by-location` — side-by-side columns per location, `area_ids` comma-separated filter
+- **P&L by Location**: `GET /api/reports/profit-loss-by-location` — same pattern, `area_ids` filter
+- **Multi-Period P&L**: `GET /api/reports/multi-period-profit-loss` — month-by-month comparison (existing endpoint)
+- **Location picker UI**: Styled chip/pill selector (`.loc-chip` CSS class) shown when "All Locations (By Location)" selected
+- **Compare dropdown**: P&L tab has "Compare" dropdown for Last 2/3/6/12 Months using multi-period endpoint
+- `JournalEntryLine.area_id` FK → `areas.id` is how location is tracked on all journal entries
+
 ## Important Notes
 - Never modify `.env` files (contain production secrets)
 - Location data comes from inventory service - don't duplicate

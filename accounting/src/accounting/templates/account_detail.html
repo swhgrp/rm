@@ -248,6 +248,11 @@
         <option value="DRAFT">Draft Only</option>
     </select>
 
+    <label for="locationFilter">Location:</label>
+    <select id="locationFilter" onchange="loadTransactions()">
+        <option value="">All Locations</option>
+    </select>
+
     <button class="btn btn-primary" onclick="loadTransactions()">Refresh</button>
 </div>
 
@@ -259,6 +264,7 @@
                 <th>Date</th>
                 <th>Entry Number</th>
                 <th>Description</th>
+                <th>Location</th>
                 <th class="number">Debit</th>
                 <th class="number">Credit</th>
                 <th class="number">Balance</th>
@@ -268,7 +274,7 @@
         </thead>
         <tbody>
             <tr>
-                <td colspan="8" style="text-align: center; padding: 2rem;">Loading transactions...</td>
+                <td colspan="9" style="text-align: center; padding: 2rem;">Loading transactions...</td>
             </tr>
         </tbody>
     </table>
@@ -327,6 +333,7 @@ async function loadTransactions() {
     const startDate = document.getElementById('startDate').value;
     const endDate = document.getElementById('endDate').value;
     const status = document.getElementById('statusFilter').value;
+    const areaId = document.getElementById('locationFilter').value;
 
     if (!startDate || !endDate) {
         showNotification('Please select start and end dates', 'Missing Dates');
@@ -335,6 +342,9 @@ async function loadTransactions() {
 
     try {
         let url = `/accounting/api/reports/general-ledger/${accountId}?start_date=${startDate}&end_date=${endDate}`;
+        if (areaId) {
+            url += `&area_id=${areaId}`;
+        }
 
         const response = await fetch(url);
         if (!response.ok) throw new Error('Failed to load transactions');
@@ -354,7 +364,7 @@ function displayTransactions(data) {
     if (data.transactions.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8">
+                <td colspan="9">
                     <div class="empty-state">
                         <i class="bi bi-inbox"></i>
                         <p>No transactions found for the selected date range</p>
@@ -375,6 +385,7 @@ function displayTransactions(data) {
                 <td>${formatDateLocal(txn.entry_date)}</td>
                 <td><a href="/accounting/journal-entries" style="color: var(--accent-primary);">${txn.entry_number}</a></td>
                 <td>${txn.description}</td>
+                <td>${txn.area_name || '<span style="color: var(--text-secondary);">—</span>'}</td>
                 <td class="number">${debit > 0 ? formatCurrency(debit) : '-'}</td>
                 <td class="number">${credit > 0 ? formatCurrency(credit) : '-'}</td>
                 <td class="number running-balance ${balance >= 0 ? 'balance-positive' : 'balance-negative'}">
@@ -567,10 +578,10 @@ function exportTransactions() {
     csv += `Period: ${transactionData.start_date} to ${transactionData.end_date}\n`;
     csv += `Generated: ${new Date().toLocaleDateString()}\n\n`;
     csv += `Beginning Balance: ${formatCurrency(transactionData.beginning_balance)}\n\n`;
-    csv += 'Date,Entry Number,Description,Debit,Credit,Balance,Status\n';
+    csv += 'Date,Entry Number,Description,Location,Debit,Credit,Balance,Status\n';
 
     transactionData.transactions.forEach(txn => {
-        csv += `"${txn.entry_date}","${txn.entry_number}","${txn.description}",`;
+        csv += `"${txn.entry_date}","${txn.entry_number}","${txn.description}","${txn.area_name || ''}",`;
         csv += `"${formatCurrency(txn.debit_amount)}","${formatCurrency(txn.credit_amount)}",`;
         csv += `"${formatCurrency(txn.balance)}","${txn.status}"\n`;
     });
@@ -596,9 +607,30 @@ function exportTransactions() {
     }
 }
 
+// Load areas/locations for filter dropdown
+async function loadAreas() {
+    try {
+        const response = await fetch('/accounting/api/areas/');
+        if (response.ok) {
+            const areas = await response.json();
+            areas.sort((a, b) => a.code.localeCompare(b.code));
+            const select = document.getElementById('locationFilter');
+            areas.forEach(area => {
+                const option = document.createElement('option');
+                option.value = area.id;
+                option.textContent = `${area.code} - ${area.name}`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading areas:', error);
+    }
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadAccountDetails();
+    loadAreas();
 
     // Set default date range (last 90 days)
     const endDate = new Date();
