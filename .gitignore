@@ -46,10 +46,8 @@ logs/
 *.sqlite3
 
 # Uploads
-uploads/*
-!uploads/.gitkeep
-**/uploads/*.pdf
-**/uploads/*.PDF
+**/uploads/
+!**/uploads/.gitkeep
 
 # Backups
 backups/*
@@ -70,6 +68,7 @@ Thumbs.db
 
 # Temporary files
 *.tmp
+*.tmp.*
 *.temp
 .cache/
 
