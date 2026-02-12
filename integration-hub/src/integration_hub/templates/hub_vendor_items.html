@@ -7,8 +7,8 @@
 {% block content %}
 <div class="container-fluid">
     <div class="page-header">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h1><i class="bi bi-box-seam"></i> Vendor Items</h1>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h4 class="mb-0"><i class="bi bi-box-seam"></i> Vendor Items</h4>
             <div>
                 <button class="btn btn-outline-secondary me-2" onclick="exportVendorItems()">
                     <i class="bi bi-download"></i> Export
@@ -37,60 +37,60 @@
     {% endif %}
 
     <!-- Stats Cards -->
-    <div class="row mb-4">
-        <div class="col-md-2">
+    <div class="row mb-2 g-2">
+        <div class="col">
             <div class="card text-center">
-                <div class="card-body py-3">
-                    <h3 class="mb-0" id="totalCount">{{ stats.total }}</h3>
-                    <small class="text-muted">Total Items</small>
+                <div class="card-body py-1 px-2">
+                    <h5 class="mb-0" id="totalCount">{{ stats.total }}</h5>
+                    <small class="text-muted" style="font-size: 0.75rem;">Total Items</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-2">
+        <div class="col">
             <div class="card text-center">
-                <div class="card-body py-3">
-                    <h3 class="mb-0 text-success" id="activeCount">{{ stats.active }}</h3>
-                    <small class="text-muted">Active</small>
+                <div class="card-body py-1 px-2">
+                    <h5 class="mb-0 text-success" id="activeCount">{{ stats.active }}</h5>
+                    <small class="text-muted" style="font-size: 0.75rem;">Active</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-2">
+        <div class="col">
             <div class="card text-center">
-                <div class="card-body py-3">
-                    <h3 class="mb-0 text-warning" id="needsReviewCount">{{ stats.needs_review }}</h3>
-                    <small class="text-muted">Needs Review</small>
+                <div class="card-body py-1 px-2">
+                    <h5 class="mb-0 text-warning" id="needsReviewCount">{{ stats.needs_review }}</h5>
+                    <small class="text-muted" style="font-size: 0.75rem;">Needs Review</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-2">
+        <div class="col">
             <div class="card text-center">
-                <div class="card-body py-3">
-                    <h3 class="mb-0 text-secondary" id="inactiveCount">{{ stats.inactive }}</h3>
-                    <small class="text-muted">Inactive</small>
+                <div class="card-body py-1 px-2">
+                    <h5 class="mb-0 text-secondary" id="inactiveCount">{{ stats.inactive }}</h5>
+                    <small class="text-muted" style="font-size: 0.75rem;">Inactive</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-2">
+        <div class="col">
             <div class="card text-center">
-                <div class="card-body py-3">
-                    <h3 class="mb-0 text-info" id="syncedCount">{{ stats.synced }}</h3>
-                    <small class="text-muted">Synced</small>
+                <div class="card-body py-1 px-2">
+                    <h5 class="mb-0 text-info" id="syncedCount">{{ stats.synced }}</h5>
+                    <small class="text-muted" style="font-size: 0.75rem;">Synced</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-2">
+        <div class="col">
             <div class="card text-center">
-                <div class="card-body py-3">
-                    <h3 class="mb-0 text-primary" id="vendorCount">{{ stats.vendors }}</h3>
-                    <small class="text-muted">Vendors</small>
+                <div class="card-body py-1 px-2">
+                    <h5 class="mb-0 text-primary" id="vendorCount">{{ stats.vendors }}</h5>
+                    <small class="text-muted" style="font-size: 0.75rem;">Vendors</small>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Filters -->
-    <div class="card mb-3">
-        <div class="card-body py-2">
+    <div class="card mb-2">
+        <div class="card-body py-2 px-3">
             <div class="row align-items-center g-2">
                 <div class="col-md-4">
                     <div class="input-group">

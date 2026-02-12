@@ -20,6 +20,7 @@ from sqlalchemy import func as sql_func
 
 from integration_hub.models.system_setting import SystemSetting
 from integration_hub.models.hub_invoice import HubInvoice
+from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.db.database import SessionLocal
 
 logger = logging.getLogger(__name__)
@@ -182,16 +183,16 @@ class EmailMonitorService:
         After parsing, check if the same invoice_number exists from both PDF and CSV.
         Prefer CSV (structured data) over PDF. For same-format duplicates, keep the earlier one.
 
-        Only marks invoices as duplicate if they haven't been sent yet.
+        Duplicates that haven't been sent yet are auto-deleted (not just flagged).
 
         Args:
             invoice_ids: IDs of just-parsed invoices to check
 
         Returns:
-            Number of invoices marked as duplicate
+            Number of invoices removed as duplicate
         """
         marked_count = 0
-        # Statuses safe to mark as duplicate (not yet sent/processed)
+        # Statuses safe to remove as duplicate (not yet sent/processed)
         markable_statuses = ('pending', 'pending_csv', 'mapping', 'ready', 'parse_failed')
 
         for inv_id in invoice_ids:
@@ -227,61 +228,56 @@ class EmailMonitorService:
                         if invoice.location_name != dup.location_name:
                             continue
 
+                    # Determine which invoice to delete
+                    to_delete = None
+                    keep_id = None
+
                     if current_is_csv and not dup_is_csv:
-                        # Current is CSV, dup is PDF -> mark PDF as duplicate
+                        # CSV vs PDF -> delete PDF
                         if dup.status in markable_statuses:
-                            dup.status = 'duplicate'
-                            dup.parse_error = f"Duplicate of CSV invoice #{invoice.id}"
-                            marked_count += 1
-                            logger.info(
-                                f"Marked PDF invoice {dup.id} as duplicate of CSV invoice "
-                                f"{invoice.id} (invoice_number: {invoice.invoice_number})"
-                            )
+                            to_delete = dup
+                            keep_id = invoice.id
                     elif not current_is_csv and dup_is_csv:
-                        # Current is PDF, dup is CSV -> mark current PDF as duplicate
+                        # PDF vs CSV -> delete current PDF
                         if invoice.status in markable_statuses:
-                            invoice.status = 'duplicate'
-                            invoice.parse_error = f"Duplicate of CSV invoice #{dup.id}"
-                            marked_count += 1
-                            logger.info(
-                                f"Marked PDF invoice {invoice.id} as duplicate of CSV invoice "
-                                f"{dup.id} (invoice_number: {invoice.invoice_number})"
-                            )
-                            break  # Current is marked, stop checking
+                            to_delete = invoice
+                            keep_id = dup.id
                     elif current_is_csv and dup_is_csv:
-                        # Both CSV -> keep earlier one (lower ID)
+                        # Both CSV -> delete later one (higher ID)
                         if invoice.id > dup.id:
                             if invoice.status in markable_statuses:
-                                invoice.status = 'duplicate'
-                                invoice.parse_error = f"Duplicate of CSV invoice #{dup.id}"
-                                marked_count += 1
-                                logger.info(
-                                    f"Marked CSV invoice {invoice.id} as duplicate of earlier "
-                                    f"CSV invoice {dup.id} (invoice_number: {invoice.invoice_number})"
-                                )
-                                break
+                                to_delete = invoice
+                                keep_id = dup.id
                         else:
                             if dup.status in markable_statuses:
-                                dup.status = 'duplicate'
-                                dup.parse_error = f"Duplicate of CSV invoice #{invoice.id}"
-                                marked_count += 1
-                                logger.info(
-                                    f"Marked CSV invoice {dup.id} as duplicate of earlier "
-                                    f"CSV invoice {invoice.id} (invoice_number: {invoice.invoice_number})"
-                                )
+                                to_delete = dup
+                                keep_id = invoice.id
                     else:
-                        # Both PDF -> keep earlier one
+                        # Both PDF -> delete later one
                         if invoice.id > dup.id:
                             if invoice.status in markable_statuses:
-                                invoice.status = 'duplicate'
-                                invoice.parse_error = f"Duplicate of PDF invoice #{dup.id}"
-                                marked_count += 1
-                                break
+                                to_delete = invoice
+                                keep_id = dup.id
                         else:
                             if dup.status in markable_statuses:
-                                dup.status = 'duplicate'
-                                dup.parse_error = f"Duplicate of PDF invoice #{invoice.id}"
-                                marked_count += 1
+                                to_delete = dup
+                                keep_id = invoice.id
+
+                    if to_delete:
+                        # Delete duplicate invoice and its items
+                        item_count = self.db.query(HubInvoiceItem).filter(
+                            HubInvoiceItem.invoice_id == to_delete.id
+                        ).delete()
+                        del_id = to_delete.id
+                        self.db.delete(to_delete)
+                        marked_count += 1
+                        logger.info(
+                            f"Deleted duplicate invoice {del_id} ({item_count} items), "
+                            f"keeping invoice {keep_id} "
+                            f"(invoice_number: {invoice.invoice_number})"
+                        )
+                        if to_delete is invoice:
+                            break  # Current invoice deleted, stop checking
 
                 if marked_count:
                     self.db.commit()

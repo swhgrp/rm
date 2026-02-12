@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 from integration_hub.models.hub_vendor_item import HubVendorItem
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
+from integration_hub.models.vendor_item_uom import VendorItemUOM
 from integration_hub.models.size_unit import SizeUnit
 from integration_hub.services.vendor_item_review import check_uom_completeness
 
@@ -122,6 +123,13 @@ class LocationCostUpdaterService:
             HubInvoiceItem.inventory_item_id.isnot(None)  # Has vendor item link
         ).all()
 
+        # Aggregate items by vendor_item_id — same vendor item may appear on
+        # multiple invoice lines (e.g. Hendricks qty 2 + qty 1 = 3 total)
+        from collections import defaultdict
+        item_groups = defaultdict(list)
+        for item in items:
+            item_groups[item.inventory_item_id].append(item)
+
         stats = {
             'invoice_id': invoice_id,
             'location_id': location_id,
@@ -133,9 +141,13 @@ class LocationCostUpdaterService:
             'errors': []
         }
 
-        for item in items:
+        for vendor_item_id, group_items in item_groups.items():
             try:
-                result = self._update_item_cost(item, invoice, location_id)
+                # Sum quantities across all lines for this vendor item
+                representative = group_items[0]
+                total_qty = sum(float(it.quantity or 0) for it in group_items)
+                result = self._update_item_cost(representative, invoice, location_id,
+                                                aggregated_quantity=total_qty)
                 if result.get('skipped'):
                     if result.get('reason') == 'incomplete_uom':
                         stats['skipped_incomplete_uom'] += 1
@@ -148,7 +160,7 @@ class LocationCostUpdaterService:
                     stats['costs_updated'] += 1
                     stats['items_processed'] += 1
             except Exception as e:
-                error_msg = f"Error updating cost for item {item.id}: {str(e)}"
+                error_msg = f"Error updating cost for vendor item {vendor_item_id}: {str(e)}"
                 logger.error(error_msg)
                 stats['errors'].append(error_msg)
 
@@ -166,7 +178,8 @@ class LocationCostUpdaterService:
         self,
         item: HubInvoiceItem,
         invoice: HubInvoice,
-        location_id: int
+        location_id: int,
+        aggregated_quantity: float = None
     ) -> Dict:
         """
         Update cost for a single invoice item.
@@ -198,47 +211,68 @@ class LocationCostUpdaterService:
             )
             return {'skipped': True, 'reason': 'incomplete_uom', 'missing_fields': uom_check['missing_fields']}
 
-        # Calculate cost per primary unit (lb for weight, bottle/each for count/volume)
-        # Use units_per_case (Backbar-style) or fall back to deprecated pack_to_primary_factor
-        units_per_case = float(vendor_item.units_per_case or vendor_item.pack_to_primary_factor or 1.0)
         unit_price = float(item.unit_price or 0)
 
-        if units_per_case == 0:
-            return {'skipped': True, 'reason': 'zero_units_per_case'}
+        # Use aggregated quantity if multiple invoice lines map to same vendor item
+        invoice_qty = aggregated_quantity if aggregated_quantity is not None else float(item.quantity or 0)
 
-        # Determine if the invoice line item is priced per individual unit (EA/BTL)
-        # vs per case (CS/CASE). Use the price_is_per_unit flag set at mapping time,
-        # with string-based fallback for items mapped before the flag was added.
-        if item.price_is_per_unit is not None:
-            is_individual_unit = item.price_is_per_unit
-        else:
-            # Fallback: string-based detection for legacy/unmapped items
-            uom = (item.unit_of_measure or '').strip().upper()
-            is_individual_unit = uom in ('EA', 'EACH', 'BTL', 'BOTTLE', 'PC', 'PIECE')
+        # --- New path: Use matched_uom conversion_factor (deterministic) ---
+        if item.matched_uom_id:
+            matched_uom = self.db.query(VendorItemUOM).filter(
+                VendorItemUOM.id == item.matched_uom_id
+            ).first()
+            if matched_uom and matched_uom.conversion_factor:
+                cf = float(matched_uom.conversion_factor)
+                if cf == 0:
+                    return {'skipped': True, 'reason': 'zero_conversion_factor'}
+                cost_per_primary = unit_price / cf
+                qty_in_primary = invoice_qty * cf
+                logger.debug(
+                    f"Cost calc (matched_uom): item {item.id}, price=${unit_price}, "
+                    f"cf={cf}, cost_per_primary=${cost_per_primary:.4f}, qty={qty_in_primary}"
+                )
 
-        # Check if this is a weight-based item
-        is_weight_item = (vendor_item.size_unit and
-                          vendor_item.size_unit.measure_type == 'weight' and
-                          vendor_item.size_quantity and
-                          float(vendor_item.size_quantity) > 0)
+                # Write back last cost to the matched purchase UOM
+                matched_uom.last_cost = unit_price
+                matched_uom.last_cost_date = invoice.invoice_date
+            else:
+                logger.warning(f"matched_uom_id {item.matched_uom_id} not found, falling back to legacy")
+                item.matched_uom_id = None  # Clear invalid reference
 
-        if is_individual_unit:
-            # Individual unit pricing - unit_price is already per bottle/each
-            # Example: Hendricks Gin 1 bottle @ $38.20 = $38.20/bottle
-            cost_per_primary = unit_price
-            qty_in_primary = float(item.quantity or 0)
-        elif is_weight_item:
-            # Weight items: divide case price by total weight (units × size)
-            # Example: Grouper 10lb case @ $138.13 = $138.13 / (1 × 10) = $13.81/lb
-            # Example: Cheese 4×5lb bags @ $47.54 = $47.54 / (4 × 5) = $2.38/lb
-            total_weight = units_per_case * float(vendor_item.size_quantity)
-            cost_per_primary = unit_price / total_weight
-            qty_in_primary = float(item.quantity or 0) * total_weight
-        else:
-            # Case pricing: divide case price by units per case
-            # Example: Wine 12-bottle case @ $36 = $36 / 12 = $3.00/bottle
-            cost_per_primary = unit_price / units_per_case
-            qty_in_primary = float(item.quantity or 0) * units_per_case
+        # --- Legacy path: Use price_is_per_unit flag + weight detection ---
+        if not item.matched_uom_id:
+            units_per_case = float(vendor_item.units_per_case or vendor_item.pack_to_primary_factor or 1.0)
+
+            if units_per_case == 0:
+                return {'skipped': True, 'reason': 'zero_units_per_case'}
+
+            if item.price_is_per_unit is not None:
+                is_individual_unit = item.price_is_per_unit
+            else:
+                uom = (item.unit_of_measure or '').strip().upper()
+                is_individual_unit = uom in ('EA', 'EACH', 'BTL', 'BOTTLE', 'PC', 'PIECE')
+
+            is_weight_item = (vendor_item.size_unit and
+                              vendor_item.size_unit.measure_type == 'weight' and
+                              vendor_item.size_quantity and
+                              float(vendor_item.size_quantity) > 0)
+
+            if is_individual_unit:
+                cost_per_primary = unit_price
+                qty_in_primary = invoice_qty
+            elif is_weight_item:
+                total_weight = units_per_case * float(vendor_item.size_quantity)
+                cost_per_primary = unit_price / total_weight
+                qty_in_primary = invoice_qty * total_weight
+            else:
+                cost_per_primary = unit_price / units_per_case
+                qty_in_primary = invoice_qty * units_per_case
+
+            logger.debug(
+                f"Cost calc (legacy): item {item.id}, price=${unit_price}, "
+                f"per_unit={is_individual_unit if item.price_is_per_unit is not None else 'string-detect'}, "
+                f"cost_per_primary=${cost_per_primary:.4f}, qty={qty_in_primary}"
+            )
 
         if qty_in_primary == 0:
             return {'skipped': True, 'reason': 'zero_quantity'}

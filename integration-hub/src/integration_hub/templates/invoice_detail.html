@@ -332,12 +332,17 @@
                             {% set vi_info = vendor_item_info.get(item.inventory_item_id, {}) %}
                             {% set has_vendor_info = vi_info.get('conversion_factor') is not none %}
                             <td>
-                                {% if vi_info.get('purchase_unit_abbr') %}
-                                    {{ vi_info.purchase_unit_abbr|upper }}
-                                {% elif item.unit_of_measure %}
+                                {% if item.unit_of_measure %}
                                     {{ item.unit_of_measure }}
+                                {% elif vi_info.get('purchase_unit_abbr') %}
+                                    {{ vi_info.purchase_unit_abbr|upper }}
                                 {% else %}
                                     <span class="text-muted">-</span>
+                                {% endif %}
+                                {% if item.matched_uom and item.matched_uom.uom %}
+                                    <span class="badge bg-success ms-1" title="Matched: {{ item.matched_uom.uom.name }} (cf={{ item.matched_uom.conversion_factor }})">{{ item.matched_uom.uom.abbreviation }}</span>
+                                {% elif item.is_mapped and item.inventory_item_id and not item.matched_uom_id %}
+                                    <i class="bi bi-exclamation-triangle text-warning ms-1" title="No UOM match — using legacy cost calculation"></i>
                                 {% endif %}
                             </td>
                             <td>
@@ -408,7 +413,11 @@
                             </td>
                             <td>
                                 {% if item.is_mapped %}
-                                <span class="text-success"><i class="bi bi-check-circle"></i> Mapped</span>
+                                    {% if vi_info.get('uom_complete') == false and vi_info.get('uom_complete') is not none %}
+                                    <span class="text-warning" title="UOM incomplete — missing: {{ vi_info.get('uom_missing', [])|join(', ') }}"><i class="bi bi-exclamation-triangle-fill"></i> UOM Needed</span>
+                                    {% else %}
+                                    <span class="text-success"><i class="bi bi-check-circle"></i> Mapped</span>
+                                    {% endif %}
                                 {% else %}
                                 <span class="text-danger"><i class="bi bi-exclamation-circle"></i> Unmapped</span>
                                 {% endif %}

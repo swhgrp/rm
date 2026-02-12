@@ -30,6 +30,7 @@ from integration_hub.models.system_setting import SystemSetting
 from integration_hub.models.size_unit import SizeUnit
 from integration_hub.models.container import Container
 from integration_hub.models.upload_job import UploadJob, UploadJobStatus
+from integration_hub.models.vendor_item_uom import VendorItemUOM
 
 __all__ = [
     # UOM
@@ -59,4 +60,6 @@ __all__ = [
     # Upload Jobs
     'UploadJob',
     'UploadJobStatus',
+    # Vendor Item UOMs
+    'VendorItemUOM',
 ]

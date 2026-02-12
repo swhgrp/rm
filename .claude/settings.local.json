@@ -135,7 +135,21 @@
       "Bash(do echo \"=== $user event count ===\")",
       "Bash(/root/.local/bin/pip install:*)",
       "Bash(/usr/bin/pip3 install:*)",
-      "Bash(apt-get install:*)"
+      "Bash(apt-get install:*)",
+      "Bash(git -C /opt/restaurant-system diff integration-hub/src/integration_hub/main.py integration-hub/src/integration_hub/templates/expense_items.html)",
+      "Bash(git -C /opt/restaurant-system add integration-hub/src/integration_hub/main.py integration-hub/src/integration_hub/templates/expense_items.html)",
+      "Bash(git -C /opt/restaurant-system commit -m \"$\\(cat <<''EOF''\nfix\\(hub\\): Save vendor_id and item_code in expense item mappings\n\nBulk mapping endpoint was not storing vendor_id or item_code in the\ninvoice_item_mapping table, causing the Expense Items page to show\n\"-\" for vendor and item code columns. Also added item_code search\nto the expense items filter.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C /opt/restaurant-system push)",
+      "Bash(git -C /opt/restaurant-system diff integration-hub/src/integration_hub/templates/invoice_detail.html)",
+      "Bash(git -C /opt/restaurant-system add integration-hub/src/integration_hub/templates/invoice_detail.html)",
+      "Bash(git -C /opt/restaurant-system commit -m \"$\\(cat <<''EOF''\nfix\\(hub\\): Use vendor purchase_unit_abbr for Unit column on invoice detail\n\nThe template was using units_per_case > 1 to show CS, else EA. This was\nwrong for items like Hendricks Gin \\(sold per bottle but 6 per case\\) which\nshowed CS instead of EA. Now uses the vendor item''s purchase_unit_abbr\nwhich correctly reflects the actual purchasing unit.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C /opt/restaurant-system diff integration-hub/src/integration_hub/api/vendor_items.py)",
+      "Bash(git -C /opt/restaurant-system add integration-hub/src/integration_hub/api/vendor_items.py)",
+      "Bash(git -C /opt/restaurant-system commit -m \"$\\(cat <<''EOF''\nfix\\(hub\\): Use price_is_per_unit flag in location price display\n\nThe location-prices endpoint assumed invoice unit_price was always a\ncase cost, causing items priced per unit \\(like Hendricks Gin at\n$38.20/bottle\\) to show $38.20 as case cost and $6.37 as unit cost.\nNow uses the price_is_per_unit flag to correctly calculate: per-unit\nitems show unit_cost = invoice price, case_cost = price * units_per_case.\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(pdftoppm:*)",
+      "WebFetch(domain:docs.restaurant365.com)",
+      "WebFetch(domain:help.restaurant365.net)",
+      "WebFetch(domain:restaurant365-academy-com.s3.amazonaws.com)"
     ],
     "deny": [],
     "ask": []

@@ -135,6 +135,20 @@ class CSVInvoiceParser:
         """
         try:
             reader = csv.DictReader(StringIO(content))
+            fieldnames = reader.fieldnames or []
+
+            # Detect statement/summary CSVs (no line-item detail)
+            # Statement CSVs use camelCase columns like "VendorName", "InvoiceNumber"
+            # Detail CSVs use spaced columns like "Invoice Number", "Product Number"
+            statement_columns = {'VendorName', 'InvoiceNumber', 'InvoiceAmount'}
+            if statement_columns.issubset(set(fieldnames)) and 'Product Number' not in fieldnames:
+                logger.info(f"CSV detected as statement/summary (columns: {fieldnames[:5]}...)")
+                return {
+                    'success': True,
+                    'message': 'CSV is a statement/summary file (no line-item detail)',
+                    'invoices': [],
+                    'is_statement': True
+                }
 
             # Group rows by invoice number + store number (same invoice can span multiple stores)
             invoice_groups: Dict[str, Dict] = {}
@@ -288,6 +302,13 @@ class CSVInvoiceParser:
                 return result
 
             if not result['invoices']:
+                if result.get('is_statement'):
+                    hub_invoice.is_statement = True
+                    hub_invoice.status = 'statement'
+                    hub_invoice.parse_error = None
+                    self.db.commit()
+                    logger.info(f"CSV invoice {hub_invoice_id} marked as statement")
+                    return {'success': True, 'message': 'CSV is a statement file', 'is_statement': True}
                 hub_invoice.status = 'parse_failed'
                 hub_invoice.parse_error = 'No invoices found in CSV'
                 self.db.commit()

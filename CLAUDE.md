@@ -35,12 +35,18 @@ restaurant-system/
 - Hub is source of truth for vendors, invoices, UOM, and vendor items
 - Services communicate via internal HTTP calls on Docker network
 
-### Invoice Cost Update Flow
+### Invoice Cost Update Flow (Multi-UOM System — Feb 2026)
 - Hub's `LocationCostUpdaterService` writes directly to Inventory's PostgreSQL DB (not via API)
-- `price_is_per_unit` flag on `hub_invoice_items` — set at mapping time by comparing parsed invoice UOM against vendor item's `purchase_unit_abbr`
-- Auto-mapper enriches invoice items: sets `price_is_per_unit`, overrides `pack_size` with vendor's `units_per_case`
-- Cost updater uses flag (with string-based fallback for legacy items); weight items handled via `size_unit.measure_type`
-- Manual mapping endpoint also sets `price_is_per_unit` from vendor item data
+- **Multi-UOM architecture:** `vendor_item_uoms` table stores multiple purchase UOMs per vendor item with `conversion_factor`
+- `hub_invoice_items.matched_uom_id` FK → `vendor_item_uoms` — set at mapping time by matching invoice UOM to vendor item's defined UOMs
+- Cost calculation: `cost_per_primary = unit_price / conversion_factor` (deterministic, no guessing)
+- `uom_normalizer.py` normalizes invoice UOM strings → standard abbreviations (CS→cs, BTL→btl, LB→lb, etc.)
+- Auto-mapper: `match_invoice_uom_to_vendor_uom()` → exact UOM match → normalized → default fallback
+- **Legacy fallback:** `price_is_per_unit` flag still set during transition period; cost updater uses `matched_uom_id` when available, falls back to flag
+- Manual mapping endpoint also sets `matched_uom_id`
+- `vendor_item_uoms.last_cost` / `last_cost_date` auto-populated from invoice prices
+- UOM CRUD API: GET/POST/PUT/DELETE at `/api/v1/vendor-items/{id}/uoms`
+- Inventory service vendor items page is **read-only** (Hub is source of truth)
 
 ### Database Connections
 - Most services: sync SQLAlchemy (`Session`, `get_db`)

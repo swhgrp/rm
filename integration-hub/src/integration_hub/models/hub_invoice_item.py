@@ -46,7 +46,13 @@ class HubInvoiceItem(Base):
 
     # UOM pricing flag - set at mapping time from vendor item data
     # True = unit_price is per individual unit (EA/BTL), False = per case (CS)
+    # DEPRECATED: Use matched_uom_id instead for deterministic cost calculation
     price_is_per_unit = Column(Boolean, nullable=True)
+
+    # Matched purchase UOM from vendor item (replaces price_is_per_unit)
+    # FK to vendor_item_uoms — tells us exactly which UOM this invoice line matches
+    matched_uom_id = Column(Integer, ForeignKey("vendor_item_uoms.id"), nullable=True)
+    matched_uom = relationship("VendorItemUOM")
 
     # Notes
     notes = Column(Text, nullable=True)

@@ -26,8 +26,8 @@
     <h1 class="mb-4">Vendor Items</h1>
 
     <div class="alert alert-info mb-3">
-        <i class="bi bi-link-45deg"></i> <strong>Vendor Items</strong> – Data is managed by Integration Hub (source of truth). Changes made here are synced with Hub.
-        <a href="/hub/" target="_blank" class="alert-link ms-2"><i class="bi bi-box-arrow-up-right"></i> Open Integration Hub</a>
+        <i class="bi bi-lock"></i> <strong>Vendor Items</strong> – Read-only view. Data is managed by Integration Hub (source of truth).
+        <a href="/hub/" target="_blank" class="alert-link ms-2"><i class="bi bi-box-arrow-up-right"></i> Manage in Integration Hub</a>
     </div>
 
     <div class="d-flex justify-content-between align-items-center mb-3">
@@ -40,14 +40,6 @@
                 <option value="true">Linked</option>
                 <option value="false">Not Linked</option>
             </select>
-        </div>
-        <div>
-            <button class="btn btn-outline-primary me-2" onclick="showVendorItemUploadModal()">
-                <i class="bi bi-upload"></i> Import Vendor Items
-            </button>
-            <button class="btn btn-primary" onclick="showVendorItemModal()">
-                <i class="bi bi-plus-circle"></i> Add Vendor Item
-            </button>
         </div>
     </div>
 
@@ -205,15 +197,18 @@
     </div>
 </div>
 
-<!-- Vendor Item Modal -->
+<!-- Vendor Item Modal (Read-Only View) -->
 <div class="modal fade" id="vendorItemModal" tabindex="-1">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="vendorItemModalTitle">Edit Vendor Item</h5>
+                <h5 class="modal-title" id="vendorItemModalTitle">Vendor Item Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
+                <div class="alert alert-secondary py-2 mb-3">
+                    <small><i class="bi bi-lock"></i> Read-only — edit in <a href="/hub/" target="_blank">Integration Hub</a></small>
+                </div>
                 <form id="vendorItemForm">
                     <!-- Status Badge (auto-calculated, read-only) -->
                     <div class="mb-3 d-flex align-items-center" id="viStatusSection" style="display: none !important;">
@@ -227,20 +222,17 @@
                         <h6 class="text-muted mb-3"><i class="bi bi-tag"></i> Identity</h6>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="viVendorId" class="form-label">Vendor *</label>
-                                <select class="form-select" id="viVendorId" required>
-                                    <option value="">Select vendor...</option>
-                                </select>
+                                <label class="form-label">Vendor</label>
+                                <input type="text" class="form-control" id="viVendorName" readonly>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="viVendorSku" class="form-label">Vendor Item Code / SKU</label>
-                                <input type="text" class="form-control" id="viVendorSku" placeholder="Code as it appears on invoices">
+                                <label class="form-label">Vendor Item Code / SKU</label>
+                                <input type="text" class="form-control" id="viVendorSku" readonly>
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label for="viVendorProductName" class="form-label">Invoice Display Name *</label>
-                            <input type="text" class="form-control" id="viVendorProductName" required placeholder="Raw text as it appears on invoices">
-                            <small class="form-text text-muted">Match invoice lines by vendor + SKU/name signature</small>
+                            <label class="form-label">Invoice Display Name</label>
+                            <input type="text" class="form-control" id="viVendorProductName" readonly>
                         </div>
                     </div>
 
@@ -249,24 +241,19 @@
                         <h6 class="text-muted mb-3"><i class="bi bi-box-seam"></i> Purchasing Definition</h6>
                         <div class="row">
                             <div class="col-md-4 mb-3">
-                                <label for="viPurchaseUnitId" class="form-label">Purchase UOM *</label>
-                                <select class="form-select" id="viPurchaseUnitId" required>
-                                    <option value="">Select unit...</option>
-                                </select>
-                                <small class="form-text text-muted">e.g., Case, Each, Keg</small>
+                                <label class="form-label">Purchase UOM</label>
+                                <input type="text" class="form-control" id="viPurchaseUomDisplay" readonly>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label for="viConversionFactor" class="form-label">Primary Units per Purchase *</label>
-                                <input type="number" step="0.001" class="form-control" id="viConversionFactor" value="1" oninput="updateCostCalculation()">
-                                <small class="form-text text-muted">e.g., 12 bottles per case</small>
+                                <label class="form-label">Primary Units per Purchase</label>
+                                <input type="text" class="form-control" id="viConversionFactor" readonly>
                             </div>
                             <div class="col-md-4 mb-3">
-                                <label for="viUnitPrice" class="form-label">Last Purchase Price</label>
+                                <label class="form-label">Last Purchase Price</label>
                                 <div class="input-group">
                                     <span class="input-group-text">$</span>
-                                    <input type="number" step="0.01" class="form-control" id="viUnitPrice" oninput="updateCostCalculation()">
+                                    <input type="text" class="form-control" id="viUnitPrice" readonly>
                                 </div>
-                                <small class="form-text text-muted">Per purchase unit</small>
                             </div>
                         </div>
                     </div>
@@ -296,25 +283,19 @@
                         <h6 class="text-muted mb-3"><i class="bi bi-link-45deg"></i> Mapping</h6>
                         <div class="row">
                             <div class="col-md-6 mb-3">
-                                <label for="viMasterItemId" class="form-label">Master Item <span class="text-muted">(optional - can link later)</span></label>
-                                <div class="searchable-select-wrapper">
-                                    <input type="text" class="form-control search-input" id="searchMasterItem" placeholder="Search master items...">
-                                    <select class="form-select" id="viMasterItemId" size="6">
-                                        <option value="">Select master item...</option>
-                                    </select>
-                                </div>
+                                <label class="form-label">Master Item</label>
+                                <input type="text" class="form-control" id="viMasterItemName" readonly>
                             </div>
                             <div class="col-md-6 mb-3">
-                                <label for="viCategory" class="form-label">Category <small class="text-muted">(display only)</small></label>
-                                <input type="text" class="form-control" id="viCategory" readonly placeholder="From master item">
+                                <label class="form-label">Category</label>
+                                <input type="text" class="form-control" id="viCategory" readonly>
                             </div>
                         </div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="saveVendorItem()">Save Vendor Item</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -356,9 +337,7 @@
     document.addEventListener('DOMContentLoaded', async function() {
         // Load filter dropdowns, vendor items, AND modal dropdown data in PARALLEL
         await Promise.all([
-            loadFilterDropdowns(),
-            loadVendorItems(),
-            preloadModalDropdowns()
+            loadVendorItems()
         ]);
 
         // Check for highlight parameter to auto-open edit modal
@@ -374,43 +353,29 @@
         }
     });
 
-    // Load only the filter dropdowns (not modal dropdowns)
-    async function loadFilterDropdowns() {
-        try {
-            // Load vendors for filter
-            const vendorsResp = await apiRequest('api/vendors/');
-            const vendorFilter = document.getElementById('vendorItemFilterVendor');
+    // Vendor filter dropdown is populated from loaded Hub data (see loadVendorItems)
+    // This avoids ID mismatch between Inventory and Hub vendor IDs
+    function populateVendorFilter(items) {
+        const vendorFilter = document.getElementById('vendorItemFilterVendor');
+        if (!vendorFilter) return;
 
-            if (vendorFilter && Array.isArray(vendorsResp)) {
-                vendorFilter.innerHTML = '<option value="">All Vendors</option>';
-                vendorsResp.sort((a, b) => a.name.localeCompare(b.name));
-                vendorsResp.forEach(v => {
-                    vendorFilter.innerHTML += `<option value="${v.id}">${v.name}</option>`;
-                });
+        const currentSelection = vendorFilter.value;
+
+        // Extract unique vendors from Hub data
+        const vendorMap = new Map();
+        items.forEach(vi => {
+            if (vi.vendor_name && !vendorMap.has(vi.vendor_name)) {
+                vendorMap.set(vi.vendor_name, vi.vendor_name);
             }
+        });
 
-            // Master items filter removed - too slow with 500+ items
-            // Use search box instead for filtering by master item name
-        } catch (error) {
-            console.error('Error loading filter dropdowns:', error);
-        }
-    }
+        vendorFilter.innerHTML = '<option value="">All Vendors</option>';
+        [...vendorMap.keys()].sort().forEach(name => {
+            vendorFilter.innerHTML += `<option value="${name}">${name}</option>`;
+        });
 
-    // Preload modal dropdown data in background for instant modal opening
-    async function preloadModalDropdowns() {
-        try {
-            const [vendors, items, units] = await Promise.all([
-                apiRequest('api/vendors/'),
-                apiRequest('api/items/?limit=1000'),
-                apiRequest('api/units/hub')  // Fetch from Hub (source of truth)
-            ]);
-            cachedVendors = Array.isArray(vendors) ? vendors.sort((a, b) => a.name.localeCompare(b.name)) : [];
-            const itemsArr = Array.isArray(items) ? items : (items.items || []);
-            cachedMasterItems = itemsArr.sort((a, b) => a.name.localeCompare(b.name));
-            cachedUnits = Array.isArray(units) ? units.sort((a, b) => a.name.localeCompare(b.name)) : [];
-        } catch (error) {
-            console.error('Error preloading modal dropdowns:', error);
-        }
+        // Restore selection if it still exists
+        if (currentSelection) vendorFilter.value = currentSelection;
     }
 
     // Note: apiRequest is provided by auth.js globally
@@ -476,20 +441,17 @@
     }
 
     // ========== VENDOR ITEMS ==========
-    // Now fetches from Hub (source of truth)
+    // Fetches all vendor items from Hub (source of truth)
+    // Filtering is done client-side to avoid ID mismatches between Inventory and Hub
     async function loadVendorItems() {
         const tbody = document.getElementById('vendorItemsTableBody');
         tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4"><div class="spinner-border spinner-border-sm"></div> Loading vendor items...</td></tr>';
 
         try {
-            const vendorFilter = document.getElementById('vendorItemFilterVendor').value;
-            const linkedFilter = document.getElementById('vendorItemFilterLinked').value;
-
-            // Fetch all pages from Hub API in parallel for speed
+            // Always load all items — filter client-side to avoid vendor ID mismatch
             const params = new URLSearchParams();
             params.append('page', '1');
             params.append('page_size', '500');
-            if (vendorFilter) params.append('vendor_id', vendorFilter);
 
             // First request to get total count
             const firstResponse = await apiRequest(`api/hub-vendor-items/?${params.toString()}`);
@@ -511,9 +473,19 @@
                 });
             }
 
+            // Populate vendor filter dropdown from actual Hub data
+            populateVendorFilter(allItems);
+
             let items = allItems;
 
+            // Apply vendor filter client-side (by vendor name, not ID)
+            const vendorFilter = document.getElementById('vendorItemFilterVendor').value;
+            if (vendorFilter) {
+                items = items.filter(vi => vi.vendor_name === vendorFilter);
+            }
+
             // Apply linked filter client-side
+            const linkedFilter = document.getElementById('vendorItemFilterLinked').value;
             if (linkedFilter === 'true') {
                 items = items.filter(vi => vi.inventory_master_item_id);
             } else if (linkedFilter === 'false') {
@@ -535,8 +507,9 @@
                 vendor_product_name: vi.vendor_product_name,
                 purchase_unit_id: vi.purchase_unit_id,
                 purchase_unit_name: vi.purchase_unit_name,
+                purchase_unit_abbr: vi.purchase_unit_abbr,
                 pack_to_primary_factor: vi.pack_to_primary_factor,
-                conversion_factor: vi.conversion_factor,  // Keep old field for compatibility
+                conversion_factor: vi.conversion_factor,
                 unit_price: vi.unit_price,
                 last_purchase_price: vi.last_purchase_price,
                 last_price: vi.last_price,
@@ -544,9 +517,7 @@
                 is_active: vi.is_active,
                 is_preferred: vi.is_preferred,
                 category: vi.category,
-                // Keep Hub-specific fields for reference
-                hub_vendor_item_id: vi.id,
-                inventory_vendor_item_id: vi.inventory_vendor_item_id
+                inventory_master_item_name: vi.inventory_master_item_name
             }));
 
             displayVendorItems();
@@ -614,11 +585,8 @@
                     <td>${costPerMaster !== '-' ? '$' + costPerMaster : '-'}</td>
                     <td>${statusBadge}${preferredBadge}</td>
                     <td>
-                        <button class="btn btn-sm btn-outline-primary" onclick="editVendorItem(${vi.id})">
-                            <i class="bi bi-pencil"></i>
-                        </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deleteVendorItem(${vi.id})">
-                            <i class="bi bi-trash"></i>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="editVendorItem(${vi.id})" title="View details">
+                            <i class="bi bi-eye"></i>
                         </button>
                     </td>
                 </tr>
@@ -706,52 +674,44 @@
         }
     }
 
-    async function showVendorItemModal(vendorItemId = null) {
+    async function showVendorItemModal(vendorItemId) {
+        if (!vendorItemId) return;
         currentEditVendorItemId = vendorItemId;
 
-        // Load dropdowns
-        await Promise.all([
-            loadVendorItemDropdowns(),
-            loadUnitsOfMeasure()
-        ]);
-
-        // Hide location prices section for new items
+        // Hide location prices section initially
         const pricesSection = document.getElementById('viLocationPricesSection');
         if (pricesSection) pricesSection.style.display = 'none';
 
-        // Hide status section for new items
+        // Hide status section initially
         const statusSection = document.getElementById('viStatusSection');
         if (statusSection) statusSection.style.display = 'none';
 
-        if (vendorItemId) {
-            document.getElementById('vendorItemModalTitle').textContent = 'Edit Vendor Item';
-            const vendorItem = vendorItems.find(vi => vi.id === vendorItemId);
-            if (vendorItem) {
-                // Identity
-                document.getElementById('viVendorId').value = vendorItem.vendor_id;
-                document.getElementById('viVendorSku').value = vendorItem.vendor_sku || '';
-                document.getElementById('viVendorProductName').value = vendorItem.vendor_product_name;
+        document.getElementById('vendorItemModalTitle').textContent = 'Vendor Item Details';
+        const vendorItem = vendorItems.find(vi => vi.id === vendorItemId);
+        if (vendorItem) {
+            // Identity — use Hub-provided text values (not local IDs)
+            document.getElementById('viVendorName').value = vendorItem.vendor_name || '-';
+            document.getElementById('viVendorSku').value = vendorItem.vendor_sku || '-';
+            document.getElementById('viVendorProductName').value = vendorItem.vendor_product_name || '-';
 
-                // Status badge (auto-calculated)
-                updateVendorItemStatusBadge(vendorItem);
+            // Status badge
+            updateVendorItemStatusBadge(vendorItem);
 
-                // Purchasing
-                document.getElementById('viPurchaseUnitId').value = vendorItem.purchase_unit_id;
-                const conversionFactor = vendorItem.pack_to_primary_factor || vendorItem.conversion_factor || 1;
-                document.getElementById('viConversionFactor').value = parseFloat(conversionFactor).toFixed(2);
-                document.getElementById('viUnitPrice').value = vendorItem.last_purchase_price || vendorItem.unit_price || '';
+            // Purchasing — use Hub-provided text values
+            const uomName = vendorItem.purchase_unit_name || '';
+            const uomAbbr = vendorItem.purchase_unit_abbr || '';
+            document.getElementById('viPurchaseUomDisplay').value = uomAbbr ? `${uomName} (${uomAbbr})` : (uomName || '-');
+            const conversionFactor = vendorItem.pack_to_primary_factor || vendorItem.conversion_factor || 1;
+            document.getElementById('viConversionFactor').value = parseFloat(conversionFactor).toFixed(2);
+            const price = vendorItem.last_purchase_price || vendorItem.unit_price || '';
+            document.getElementById('viUnitPrice').value = price ? parseFloat(price).toFixed(2) : '-';
 
-                // Mapping
-                document.getElementById('viMasterItemId').value = vendorItem.master_item_id || '';
-                document.getElementById('viCategory').value = vendorItem.category || '';
+            // Mapping — use Hub-provided text values
+            document.getElementById('viMasterItemName').value = vendorItem.master_item_name || vendorItem.inventory_master_item_name || 'Not linked';
+            document.getElementById('viCategory').value = vendorItem.category || '-';
 
-                // Load location prices (async)
-                loadVendorItemLocationPrices(vendorItemId);
-            }
-        } else {
-            document.getElementById('vendorItemModalTitle').textContent = 'Add Vendor Item';
-            document.getElementById('vendorItemForm').reset();
-            document.getElementById('viConversionFactor').value = '1';
+            // Load location prices (async)
+            loadVendorItemLocationPrices(vendorItemId);
         }
 
         if (!vendorItemModal) {
@@ -760,132 +720,8 @@
         vendorItemModal.show();
     }
 
-    async function loadVendorItemDropdowns() {
-        // Use cached data if available (preloaded on page load)
-        // Otherwise fetch fresh data
-        if (!cachedVendors || !cachedMasterItems || !cachedUnits) {
-            await preloadModalDropdowns();
-        }
-
-        // Populate vendors dropdown
-        const vendorSelect = document.getElementById('viVendorId');
-        vendorSelect.innerHTML = '<option value="">Select vendor...</option>';
-        if (cachedVendors) {
-            cachedVendors.forEach(v => {
-                vendorSelect.innerHTML += `<option value="${v.id}">${v.name}</option>`;
-            });
-        }
-
-        // Populate master items dropdown
-        const itemSelect = document.getElementById('viMasterItemId');
-        itemSelect.innerHTML = '<option value="">Select master item...</option>';
-        if (cachedMasterItems) {
-            cachedMasterItems.forEach(item => {
-                itemSelect.innerHTML += `<option value="${item.id}">${item.name}</option>`;
-            });
-        }
-
-        // Populate units dropdown
-        const unitSelect = document.getElementById('viPurchaseUnitId');
-        unitSelect.innerHTML = '<option value="">Select unit...</option>';
-        if (cachedUnits) {
-            cachedUnits.forEach(u => {
-                unitSelect.innerHTML += `<option value="${u.id}">${u.name} (${u.abbreviation})</option>`;
-            });
-        }
-    }
-
-
-    // Save vendor item to Hub (source of truth)
-    async function saveVendorItem() {
-        const vendorId = document.getElementById('viVendorId').value;
-        const masterItemId = document.getElementById('viMasterItemId').value;
-        const vendorProductName = document.getElementById('viVendorProductName').value;
-        const purchaseUnitId = document.getElementById('viPurchaseUnitId').value;
-
-        const saveTimestamp = new Date().toISOString();
-        console.log(`[${saveTimestamp}] ===== SAVE VENDOR ITEM TO HUB =====`);
-        console.log(`[${saveTimestamp}] Form Values:`, { vendorId, masterItemId, vendorProductName, purchaseUnitId, currentEditVendorItemId });
-
-        // Validate required fields
-        if (!vendorId || !vendorProductName || !purchaseUnitId) {
-            showAlert('Please fill in all required fields (Vendor, Invoice Display Name, Purchase UOM)', 'warning');
-            return;
-        }
-
-        const conversionFactorValue = document.getElementById('viConversionFactor').value;
-        const packFactor = conversionFactorValue ? parseFloat(conversionFactorValue) : 1.0;
-
-        // Auto-calculate status based on completeness
-        const hasAllFields = masterItemId && purchaseUnitId && packFactor > 0;
-        const autoStatus = hasAllFields ? 'active' : 'needs_review';
-
-        const data = {
-            vendor_id: parseInt(vendorId),
-            inventory_master_item_id: masterItemId ? parseInt(masterItemId) : null,
-            vendor_sku: document.getElementById('viVendorSku').value || null,
-            vendor_product_name: vendorProductName,
-            purchase_unit_id: parseInt(purchaseUnitId),
-            pack_to_primary_factor: packFactor,
-            last_purchase_price: document.getElementById('viUnitPrice').value ? parseFloat(document.getElementById('viUnitPrice').value) : null,
-            status: autoStatus,  // Auto-calculated, not user-selected
-            category: document.getElementById('viCategory').value || null
-        };
-
-        console.log(`[${saveTimestamp}] Sending data to Hub:`, JSON.stringify(data, null, 2));
-
-        try {
-            // Use Hub API proxy endpoints
-            if (currentEditVendorItemId) {
-                console.log(`[${saveTimestamp}] *** CALLING PUT api/hub-vendor-items/${currentEditVendorItemId} ***`);
-                const result = await apiRequest(`api/hub-vendor-items/${currentEditVendorItemId}`, {
-                    method: 'PUT',
-                    body: JSON.stringify(data)
-                });
-                console.log(`[${saveTimestamp}] *** PUT RESPONSE:`, result);
-                showAlert('Vendor item updated successfully in Hub', 'success');
-            } else {
-                console.log(`[${saveTimestamp}] Calling POST api/hub-vendor-items/`);
-                const result = await apiRequest('api/hub-vendor-items/', {
-                    method: 'POST',
-                    body: JSON.stringify(data)
-                });
-                console.log(`[${saveTimestamp}] POST RESPONSE:`, result);
-                showAlert('Vendor item created successfully in Hub', 'success');
-            }
-
-            vendorItemModal.hide();
-            await loadVendorItems();
-        } catch (error) {
-            console.error(`[${saveTimestamp}] ERROR saving vendor item to Hub:`, error);
-            showAlert(`Failed to save vendor item: ${error.message || error}`, 'danger');
-        }
-    }
-
     async function editVendorItem(vendorItemId) {
         await showVendorItemModal(vendorItemId);
-    }
-
-    // Delete vendor item from Hub (source of truth)
-    async function deleteVendorItem(vendorItemId) {
-        const vendorItem = vendorItems.find(vi => vi.id === vendorItemId);
-        if (!vendorItem) return;
-
-        showConfirmation(
-            'Delete Vendor Item',
-            `Are you sure you want to delete vendor item "${vendorItem.vendor_product_name}"?`,
-            async () => {
-                try {
-                    // Use Hub API proxy endpoint
-                    await apiRequest(`api/hub-vendor-items/${vendorItemId}`, { method: 'DELETE' });
-                    showAlert('Vendor item deleted successfully from Hub', 'success');
-                    loadVendorItems();
-                } catch (error) {
-                    console.error('Error deleting vendor item from Hub:', error);
-                    showAlert('Failed to delete vendor item', 'danger');
-                }
-            }
-        );
     }
 
     // Vendor Item Upload Functions

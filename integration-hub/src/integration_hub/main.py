@@ -24,6 +24,7 @@ from integration_hub.models.upload_job import UploadJob, UploadJobStatus
 from integration_hub.models.item_gl_mapping import ItemGLMapping, CategoryGLMapping
 from integration_hub.models.vendor import Vendor
 from integration_hub.models.hub_vendor_item import HubVendorItem
+from integration_hub.models.vendor_item_uom import VendorItemUOM
 from integration_hub.models.price_history import PriceHistory
 from integration_hub.models.vendor_alias import VendorAlias
 from integration_hub.schemas.vendor import VendorCreate, VendorResponse, VendorSyncStatus
@@ -261,8 +262,11 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    # Get invoice items
-    items = db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).all()
+    # Get invoice items (eager-load matched UOM for display)
+    from sqlalchemy.orm import joinedload as _jl
+    items = db.query(HubInvoiceItem).options(
+        _jl(HubInvoiceItem.matched_uom).joinedload(VendorItemUOM.uom)
+    ).filter(HubInvoiceItem.invoice_id == invoice_id).all()
 
     # Get locations from inventory database for location dropdown
     from sqlalchemy import create_engine, text
@@ -344,6 +348,7 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
         if vendor_item_ids:
             # Query Hub's hub_vendor_items table with size_unit eagerly loaded
             from integration_hub.models.hub_vendor_item import HubVendorItem
+            from integration_hub.services.vendor_item_review import check_uom_completeness
             from sqlalchemy.orm import joinedload
             hub_items = db.query(HubVendorItem).options(
                 joinedload(HubVendorItem.size_unit),
@@ -354,6 +359,7 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
                 size_display = vi.size_display  # Uses the model's property
                 size_unit_symbol = vi.size_unit.symbol if vi.size_unit else None
                 container_name = vi.container.name if vi.container else None
+                uom_check = check_uom_completeness(vi)
                 vendor_item_info[vi.id] = {
                     "pack_size": vi.pack_size,
                     "conversion_factor": float(vi.units_per_case) if vi.units_per_case else 1.0,
@@ -362,7 +368,9 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
                     "size_display": size_display,  # e.g., "355 ml can"
                     "size_unit_symbol": size_unit_symbol,  # e.g., "ml"
                     "container": container_name,  # e.g., "can"
-                    "size_quantity": float(vi.size_quantity) if vi.size_quantity else None
+                    "size_quantity": float(vi.size_quantity) if vi.size_quantity else None,
+                    "uom_complete": uom_check['is_complete'],
+                    "uom_missing": uom_check['missing_fields']
                 }
     except Exception as e:
         import logging
@@ -2262,6 +2270,23 @@ async def convert_vendor_item_to_expense(vendor_item_id: int, request: Request, 
             mapping_id = result.fetchone()[0]
             logger.info(f"Created new expense mapping {mapping_id} for vendor item {vendor_item_id}")
 
+        # Clear matched_uom_id on invoice items that reference this vendor item's UOMs
+        # (must happen before deleting UOMs to avoid FK violation)
+        uom_ids = [u.id for u in vendor_item.purchase_uoms]
+        if uom_ids:
+            db.execute(sql_text("""
+                UPDATE hub_invoice_items
+                SET matched_uom_id = NULL
+                WHERE matched_uom_id = ANY(:uom_ids)
+            """), {"uom_ids": uom_ids})
+
+        # Also clear inventory_item_id on invoice items pointing to this vendor item
+        db.execute(sql_text("""
+            UPDATE hub_invoice_items
+            SET inventory_item_id = NULL
+            WHERE inventory_item_id = :vi_id
+        """), {"vi_id": vendor_item_id})
+
         # Delete the vendor item - expense items don't belong in vendor items table
         # The expense mapping in invoice_item_mapping_deprecated is the only record needed
         product_name = vendor_item.vendor_product_name
@@ -2397,15 +2422,21 @@ async def map_item(
     item.is_mapped = True
     item.mapping_method = 'manual'
 
-    # Determine price_is_per_unit from vendor item data
+    # Determine price_is_per_unit from vendor item data + match UOM
     if inventory_item_id:
         vendor_item = db.query(HubVendorItem).filter(HubVendorItem.id == inventory_item_id).first()
         if vendor_item:
-            from integration_hub.services.auto_mapper import determine_price_is_per_unit
+            from integration_hub.services.auto_mapper import determine_price_is_per_unit, match_invoice_uom_to_vendor_uom
             item.price_is_per_unit = determine_price_is_per_unit(
                 item.unit_of_measure,
                 vendor_item.purchase_unit_abbr
             )
+            # Match invoice UOM to vendor item's defined purchase UOMs
+            matched_uom_id = match_invoice_uom_to_vendor_uom(
+                item.unit_of_measure, inventory_item_id, db
+            )
+            if matched_uom_id:
+                item.matched_uom_id = matched_uom_id
             if vendor_item.units_per_case:
                 item.pack_size = int(vendor_item.units_per_case)
 

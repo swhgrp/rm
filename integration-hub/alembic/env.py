@@ -10,6 +10,7 @@ from integration_hub.db.database import Base
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.models.item_gl_mapping import ItemGLMapping, CategoryGLMapping
+from integration_hub.models.vendor_item_uom import VendorItemUOM
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

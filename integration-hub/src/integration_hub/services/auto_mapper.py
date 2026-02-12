@@ -28,6 +28,8 @@ from sqlalchemy import text as sql_text
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_vendor_item import HubVendorItem, VendorItemStatus
+from integration_hub.models.vendor_item_uom import VendorItemUOM
+from integration_hub.services.uom_normalizer import normalize_uom_string, resolve_uom_id
 
 logger = logging.getLogger(__name__)
 
@@ -54,24 +56,103 @@ def determine_price_is_per_unit(
     uom = (invoice_uom or '').strip().upper()
     vendor_abbr = (vendor_purchase_abbr or '').strip().upper()
 
-    # If invoice says individual unit → per unit regardless of vendor config
+    # Invoice UOM takes priority - it describes what the price on THIS invoice is for
     if uom in INDIVIDUAL_UNIT_ABBRS:
         return True
 
-    # If vendor item is sold per each → per unit
-    if vendor_abbr in INDIVIDUAL_UNIT_ABBRS:
-        return True
-
-    # If invoice says case → per case
     if uom in CASE_UNIT_ABBRS:
         return False
 
-    # If vendor item is sold per case → per case (even if invoice UOM is empty/unknown)
+    # Fall back to vendor item's purchase unit when invoice UOM is empty/unknown
+    if vendor_abbr in INDIVIDUAL_UNIT_ABBRS:
+        return True
+
     if vendor_abbr in CASE_UNIT_ABBRS:
         return False
 
     # Cannot determine
     return None
+
+
+def match_invoice_uom_to_vendor_uom(
+    invoice_uom: Optional[str],
+    vendor_item_id: int,
+    db: Session
+) -> Optional[int]:
+    """
+    Match a parsed invoice UOM string to one of the vendor item's defined purchase UOMs.
+
+    Steps:
+    1. Normalize the invoice UOM string → standard abbreviation (e.g., "CASE" → "cs")
+    2. Resolve to a units_of_measure.id
+    3. Look up vendor_item_uoms for an exact match on (vendor_item_id, uom_id)
+    4. Fall back to the default purchase UOM for this vendor item
+
+    Returns:
+        vendor_item_uoms.id or None
+    """
+    # Get all active purchase UOMs for this vendor item
+    purchase_uoms = db.query(VendorItemUOM).filter(
+        VendorItemUOM.vendor_item_id == vendor_item_id,
+        VendorItemUOM.is_active == True
+    ).all()
+
+    if not purchase_uoms:
+        logger.debug(f"No purchase UOMs defined for vendor item {vendor_item_id}")
+        return None
+
+    # Try exact UOM match first
+    if invoice_uom:
+        uom_id = resolve_uom_id(invoice_uom, db)
+        if uom_id:
+            for puom in purchase_uoms:
+                if puom.uom_id == uom_id:
+                    logger.debug(
+                        f"UOM match: invoice '{invoice_uom}' → vendor_item_uom {puom.id} "
+                        f"(cf={puom.conversion_factor})"
+                    )
+                    return puom.id
+
+        # Normalized string match — invoice "BTL" normalizes to "ea", match against UOM abbreviation
+        normalized = normalize_uom_string(invoice_uom)
+        if normalized:
+            from integration_hub.models.unit_of_measure import UnitOfMeasure
+            for puom in purchase_uoms:
+                uom_obj = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == puom.uom_id).first()
+                if uom_obj and uom_obj.abbreviation and uom_obj.abbreviation.lower() == normalized.lower():
+                    logger.debug(
+                        f"UOM match (normalized): invoice '{invoice_uom}' → '{normalized}' → "
+                        f"vendor_item_uom {puom.id} (cf={puom.conversion_factor})"
+                    )
+                    return puom.id
+
+    # Single-unit equivalence: if normalized UOM is a single-unit type (bg, pk, bx)
+    # and no direct match was found, try matching to EA
+    SINGLE_UNIT_EQUIVALENTS = {'bg', 'pk', 'bx'}  # bag, pack, box → treat as each
+    if invoice_uom:
+        normalized = normalize_uom_string(invoice_uom) if not invoice_uom else normalize_uom_string(invoice_uom)
+        if normalized and normalized.lower() in SINGLE_UNIT_EQUIVALENTS:
+            # UOM_IDS['ea'] = 1
+            for puom in purchase_uoms:
+                if puom.uom_id == 1:  # ea
+                    logger.debug(
+                        f"UOM match (single-unit equiv): invoice '{invoice_uom}' → '{normalized}' → EA "
+                        f"vendor_item_uom {puom.id} (cf={puom.conversion_factor})"
+                    )
+                    return puom.id
+
+    # Fall back to default purchase UOM
+    for puom in purchase_uoms:
+        if puom.is_default:
+            logger.debug(
+                f"UOM fallback to default: vendor_item_uom {puom.id} "
+                f"(cf={puom.conversion_factor}) for vendor item {vendor_item_id}"
+            )
+            return puom.id
+
+    # Last resort: return the first active UOM
+    logger.debug(f"UOM fallback to first active: vendor_item_uom {purchase_uoms[0].id}")
+    return purchase_uoms[0].id
 
 
 def normalize_text(text: str) -> str:
@@ -739,12 +820,21 @@ class AutoMapperService:
                 # Store for reference when sending to Inventory
                 item.inventory_item_name = mapping_result.get('master_item_name')
 
-            # Determine price_is_per_unit from vendor item's purchase_unit_abbr
+            # Determine price_is_per_unit from vendor item's purchase_unit_abbr (legacy)
             if mapping_result.get('purchase_unit_abbr'):
                 item.price_is_per_unit = determine_price_is_per_unit(
                     item.unit_of_measure,
                     mapping_result.get('purchase_unit_abbr')
                 )
+
+            # Match invoice UOM to vendor item's defined purchase UOMs (new path)
+            vendor_item_id = mapping_result.get('vendor_item_id')
+            if vendor_item_id:
+                matched_uom_id = match_invoice_uom_to_vendor_uom(
+                    item.unit_of_measure, vendor_item_id, self.db
+                )
+                if matched_uom_id:
+                    item.matched_uom_id = matched_uom_id
 
             # Override pack_size with vendor item's units_per_case (more reliable than AI-parsed)
             vendor_upc = mapping_result.get('units_per_case')

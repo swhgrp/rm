@@ -1,14 +1,14 @@
 """
-Hub Vendor Items API endpoints
+Hub Vendor Items API endpoints (Read-Only)
 
 These endpoints proxy to the Integration Hub to display vendor items.
 Hub is the source of truth for vendor item data.
+All create/edit/delete operations must be done in Integration Hub.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Optional, Dict, Any
-from pydantic import BaseModel
+from typing import Optional
 import logging
 
 from restaurant_inventory.core.deps import get_db, get_current_user
@@ -18,35 +18,6 @@ from restaurant_inventory.services.hub_client import get_hub_client
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-
-class VendorItemCreate(BaseModel):
-    """Create vendor item request - maps Inventory fields to Hub fields"""
-    vendor_id: int
-    master_item_id: Optional[int] = None
-    vendor_sku: Optional[str] = None
-    vendor_product_name: str
-    purchase_unit_id: int
-    conversion_factor: float = 1.0
-    minimum_order_quantity: Optional[float] = None
-    lead_time_days: Optional[int] = None
-    is_preferred: bool = False
-    notes: Optional[str] = None
-    is_active: bool = True
-
-
-class VendorItemUpdate(BaseModel):
-    """Update vendor item request"""
-    master_item_id: Optional[int] = None
-    vendor_sku: Optional[str] = None
-    vendor_product_name: Optional[str] = None
-    purchase_unit_id: Optional[int] = None
-    conversion_factor: Optional[float] = None
-    minimum_order_quantity: Optional[float] = None
-    lead_time_days: Optional[int] = None
-    is_preferred: Optional[bool] = None
-    notes: Optional[str] = None
-    is_active: Optional[bool] = None
 
 
 @router.get("/health")
@@ -159,190 +130,7 @@ async def lookup_hub_vendor_item_by_sku(
         )
 
 
-async def get_unit_info(db: Session, unit_id: int) -> Dict[str, Any]:
-    """Look up unit name and abbreviation from local database."""
-    from restaurant_inventory.models import UnitOfMeasure
-    unit = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == unit_id).first()
-    if unit:
-        return {"name": unit.name, "abbreviation": unit.abbreviation}
-    return {"name": None, "abbreviation": None}
-
-
-async def get_master_item_name(db: Session, item_id: int) -> Optional[str]:
-    """Look up master item name from local database."""
-    from restaurant_inventory.models import Item
-    item = db.query(Item).filter(Item.id == item_id).first()
-    return item.name if item else None
-
-
-async def get_hub_vendor_id(inventory_vendor_id: int) -> Optional[int]:
-    """
-    Map Inventory vendor ID to Hub vendor ID.
-    Hub vendors have an inventory_vendor_id field that references Inventory's vendor.id.
-    """
-    import httpx
-    from restaurant_inventory.services.hub_client import HUB_API_URL
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.get(f"{HUB_API_URL}/api/vendors/")
-            if response.status_code == 200:
-                vendors = response.json()
-                for v in vendors:
-                    if v.get('inventory_vendor_id') == inventory_vendor_id:
-                        return v.get('id')
-    except Exception as e:
-        logger.error(f"Error looking up Hub vendor: {str(e)}")
-
-    return None
-
-
-@router.post("/")
-async def create_hub_vendor_item(
-    item_data: VendorItemCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Create a new vendor item in Hub.
-    Maps Inventory vendor_id to Hub vendor_id.
-    Looks up unit and master item names from local database.
-    """
-    hub_client = get_hub_client()
-
-    try:
-        # Map Inventory vendor_id to Hub vendor_id
-        hub_vendor_id = await get_hub_vendor_id(item_data.vendor_id)
-        if not hub_vendor_id:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Vendor ID {item_data.vendor_id} not found in Hub. Vendor may need to be synced first."
-            )
-
-        # Look up unit info
-        unit_info = await get_unit_info(db, item_data.purchase_unit_id)
-
-        # Look up master item name if provided
-        master_item_name = None
-        if item_data.master_item_id:
-            master_item_name = await get_master_item_name(db, item_data.master_item_id)
-
-        # Map to Hub's expected field names
-        hub_data = {
-            "vendor_id": hub_vendor_id,  # Use Hub's vendor ID
-            "inventory_master_item_id": item_data.master_item_id,
-            "inventory_master_item_name": master_item_name,
-            "vendor_sku": item_data.vendor_sku,
-            "vendor_product_name": item_data.vendor_product_name,
-            "purchase_unit_id": item_data.purchase_unit_id,
-            "purchase_unit_name": unit_info["name"],
-            "purchase_unit_abbr": unit_info["abbreviation"],
-            "conversion_factor": item_data.conversion_factor,
-            "is_preferred": item_data.is_preferred,
-            "is_active": item_data.is_active,
-            "notes": item_data.notes
-        }
-
-        result = await hub_client.create_vendor_item(hub_data)
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error creating vendor item in Hub: {str(e)}")
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error creating vendor item in Hub: {str(e)}"
-        )
-
-
-@router.put("/{vendor_item_id}")
-async def update_hub_vendor_item(
-    vendor_item_id: int,
-    item_data: VendorItemUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Update a vendor item in Hub.
-    """
-    hub_client = get_hub_client()
-
-    try:
-        # Build update data, only including non-None fields
-        hub_data = {}
-
-        if item_data.master_item_id is not None:
-            hub_data["inventory_master_item_id"] = item_data.master_item_id
-            if item_data.master_item_id:
-                hub_data["inventory_master_item_name"] = await get_master_item_name(db, item_data.master_item_id)
-            else:
-                hub_data["inventory_master_item_name"] = None
-
-        if item_data.vendor_sku is not None:
-            hub_data["vendor_sku"] = item_data.vendor_sku
-
-        if item_data.vendor_product_name is not None:
-            hub_data["vendor_product_name"] = item_data.vendor_product_name
-
-        if item_data.purchase_unit_id is not None:
-            hub_data["purchase_unit_id"] = item_data.purchase_unit_id
-            unit_info = await get_unit_info(db, item_data.purchase_unit_id)
-            hub_data["purchase_unit_name"] = unit_info["name"]
-            hub_data["purchase_unit_abbr"] = unit_info["abbreviation"]
-
-        if item_data.conversion_factor is not None:
-            hub_data["conversion_factor"] = item_data.conversion_factor
-
-        if item_data.is_preferred is not None:
-            hub_data["is_preferred"] = item_data.is_preferred
-
-        if item_data.is_active is not None:
-            hub_data["is_active"] = item_data.is_active
-
-        if item_data.notes is not None:
-            hub_data["notes"] = item_data.notes
-
-        result = await hub_client.update_vendor_item(vendor_item_id, hub_data)
-        if not result:
-            raise HTTPException(status_code=404, detail="Vendor item not found in Hub")
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error updating vendor item {vendor_item_id} in Hub: {str(e)}")
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error updating vendor item in Hub: {str(e)}"
-        )
-
-
-@router.delete("/{vendor_item_id}")
-async def delete_hub_vendor_item(
-    vendor_item_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Delete (soft-delete) a vendor item in Hub.
-    """
-    hub_client = get_hub_client()
-
-    try:
-        result = await hub_client.delete_vendor_item(vendor_item_id)
-        if not result:
-            raise HTTPException(status_code=404, detail="Vendor item not found in Hub")
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error deleting vendor item {vendor_item_id} in Hub: {str(e)}")
-        raise HTTPException(
-            status_code=502,
-            detail=f"Error deleting vendor item in Hub: {str(e)}"
-        )
-
-
-# REMOVED (Dec 25, 2025): VendorItemSync and sync endpoints
-# Hub is now the sole source of truth for vendor items.
-# The local vendor_items table was dropped.
-# These endpoints were previously used for bidirectional sync but are no longer needed.
+# REMOVED (Feb 2026): POST/PUT/DELETE endpoints and helper functions removed.
+# Hub is the sole source of truth for vendor items.
+# Vendor items should only be created/edited/deleted in Integration Hub.
+# The Inventory UI is now read-only for vendor item data.

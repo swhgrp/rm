@@ -3,21 +3,21 @@
 {% block title %}Vendors - Integration Hub{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container-fluid px-3">
     <div class="page-header">
-        <div class="d-flex justify-content-between align-items-center">
-            <h1><i class="bi bi-building"></i> Vendor Management</h1>
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h4 class="mb-0"><i class="bi bi-building"></i> Vendor Management</h4>
             <div>
-                <button class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#aliasesModal">
+                <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#aliasesModal">
                     <i class="bi bi-tags"></i> Manage Aliases
                 </button>
-                <button class="btn btn-success" onclick="syncVendors(event)">
+                <button class="btn btn-success btn-sm" onclick="syncVendors(event)">
                     <i class="bi bi-arrow-repeat"></i> Sync from Systems
                 </button>
-                <button class="btn btn-outline-warning" onclick="showPushToSystemsModal()">
+                <button class="btn btn-outline-warning btn-sm" onclick="showPushToSystemsModal()">
                     <i class="bi bi-cloud-upload"></i> Push to Systems
                 </button>
-                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addVendorModal">
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addVendorModal">
                     <i class="bi bi-plus-circle"></i> Add New Vendor
                 </button>
             </div>
@@ -25,43 +25,43 @@
     </div>
 
     <!-- Vendor Summary Cards -->
-    <div class="row mb-4" id="vendorSummaryCards">
-        <div class="col-md-3">
-            <div class="card bg-light">
-                <div class="card-body text-center">
-                    <h3 class="mb-0" id="totalVendors">-</h3>
-                    <small class="text-muted">Total Vendors</small>
+    <div class="row mb-2 g-2" id="vendorSummaryCards">
+        <div class="col">
+            <div class="card text-center">
+                <div class="card-body py-1 px-2">
+                    <h5 class="mb-0" id="totalVendors">-</h5>
+                    <small class="text-muted" style="font-size: 0.75rem;">Total Vendors</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-light">
-                <div class="card-body text-center">
-                    <h3 class="mb-0" id="totalAliases">-</h3>
-                    <small class="text-muted">Aliases Defined</small>
+        <div class="col">
+            <div class="card text-center">
+                <div class="card-body py-1 px-2">
+                    <h5 class="mb-0" id="totalAliases">-</h5>
+                    <small class="text-muted" style="font-size: 0.75rem;">Aliases Defined</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-light">
-                <div class="card-body text-center">
-                    <h3 class="mb-0" id="linkedInvoices">-</h3>
-                    <small class="text-muted">Linked Invoices</small>
+        <div class="col">
+            <div class="card text-center">
+                <div class="card-body py-1 px-2">
+                    <h5 class="mb-0" id="linkedInvoices">-</h5>
+                    <small class="text-muted" style="font-size: 0.75rem;">Linked Invoices</small>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-light">
-                <div class="card-body text-center">
-                    <h3 class="mb-0 text-success" id="unlinkedInvoices">-</h3>
-                    <small class="text-muted">Unlinked Invoices</small>
+        <div class="col">
+            <div class="card text-center">
+                <div class="card-body py-1 px-2">
+                    <h5 class="mb-0 text-success" id="unlinkedInvoices">-</h5>
+                    <small class="text-muted" style="font-size: 0.75rem;">Unlinked Invoices</small>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
+        <div class="card-header d-flex justify-content-between align-items-center py-2">
             <span><i class="bi bi-list"></i> All Vendors</span>
             <div class="d-flex align-items-center gap-3">
                 <button class="btn btn-warning btn-sm" id="mergeBtn" style="display: none;" onclick="showMergeModal()">
@@ -73,9 +73,9 @@
                 </div>
             </div>
         </div>
-        <div class="card-body">
+        <div class="card-body py-2 px-3">
             <!-- Search Filter -->
-            <div class="row mb-3">
+            <div class="row mb-2">
                 <div class="col-md-4">
                     <div class="input-group">
                         <span class="input-group-text"><i class="bi bi-search"></i></span>

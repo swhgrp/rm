@@ -29,6 +29,7 @@ from integration_hub.db.database import get_db
 from integration_hub.models.hub_vendor_item import HubVendorItem, VendorItemStatus
 from integration_hub.models.vendor import Vendor
 from integration_hub.models.unit_of_measure import UnitOfMeasure
+from integration_hub.models.vendor_item_uom import VendorItemUOM
 from integration_hub.services.vendor_item_review import VendorItemReviewService, check_uom_completeness
 
 logger = logging.getLogger(__name__)
@@ -266,6 +267,42 @@ class VendorItemListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+# --- Purchase UOM schemas ---
+
+class PurchaseUOMCreate(BaseModel):
+    """Create a purchase UOM for a vendor item"""
+    uom_id: int
+    conversion_factor: float = 1.0
+    is_default: bool = False
+    expected_price: Optional[float] = None
+
+class PurchaseUOMUpdate(BaseModel):
+    """Update a purchase UOM"""
+    conversion_factor: Optional[float] = None
+    is_default: Optional[bool] = None
+    expected_price: Optional[float] = None
+    is_active: Optional[bool] = None
+
+class PurchaseUOMResponse(BaseModel):
+    """Purchase UOM response"""
+    id: int
+    vendor_item_id: int
+    uom_id: int
+    uom_name: Optional[str] = None
+    uom_abbreviation: Optional[str] = None
+    conversion_factor: float
+    is_default: bool
+    expected_price: Optional[float] = None
+    last_cost: Optional[float] = None
+    last_cost_date: Optional[datetime] = None
+    is_active: bool
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
 
 
 # ============================================================================
@@ -2089,6 +2126,21 @@ async def get_vendor_item_invoice_history(
     if not item:
         raise HTTPException(status_code=404, detail="Vendor item not found")
 
+    # Build location name lookup from Inventory DB
+    location_names = {}
+    try:
+        inventory_db_url = os.getenv('INVENTORY_DATABASE_URL', '')
+        if inventory_db_url:
+            from sqlalchemy import create_engine
+            inv_engine = create_engine(inventory_db_url)
+            with inv_engine.connect() as inv_conn:
+                loc_rows = inv_conn.execute(
+                    text("SELECT id, name FROM locations WHERE is_active = true")
+                ).fetchall()
+                location_names = {r[0]: r[1] for r in loc_rows}
+    except Exception as e:
+        logger.warning(f"Could not fetch location names: {e}")
+
     # Query invoices that contain this vendor item
     query = text("""
         SELECT
@@ -2122,11 +2174,13 @@ async def get_vendor_item_invoice_history(
 
         invoices = []
         for row in results:
+            loc_id = row[3]
             invoices.append({
                 "invoice_id": row[0],
                 "invoice_number": row[1],
                 "invoice_date": row[2].isoformat() if row[2] else None,
-                "location_id": row[3],
+                "location_id": loc_id,
+                "location_name": location_names.get(loc_id, f"Location {loc_id}") if loc_id else None,
                 "quantity": float(row[4]) if row[4] else None,
                 "unit_price": float(row[5]) if row[5] else None,
                 "item_code": row[6],
@@ -2231,3 +2285,200 @@ async def get_compatible_dimensions(
         "has_vendor_items": True,
         "message": f"Compatible dimensions based on {len(vendor_items)} active vendor item(s)."
     }
+
+
+# ============================================================================
+# PURCHASE UOM ENDPOINTS
+# ============================================================================
+
+def _build_purchase_uom_response(puom: VendorItemUOM) -> PurchaseUOMResponse:
+    """Build response from VendorItemUOM model"""
+    return PurchaseUOMResponse(
+        id=puom.id,
+        vendor_item_id=puom.vendor_item_id,
+        uom_id=puom.uom_id,
+        uom_name=puom.uom.name if puom.uom else None,
+        uom_abbreviation=puom.uom.abbreviation if puom.uom else None,
+        conversion_factor=float(puom.conversion_factor),
+        is_default=puom.is_default,
+        expected_price=float(puom.expected_price) if puom.expected_price else None,
+        last_cost=float(puom.last_cost) if puom.last_cost else None,
+        last_cost_date=puom.last_cost_date,
+        is_active=puom.is_active,
+        created_at=puom.created_at,
+        updated_at=puom.updated_at,
+    )
+
+
+@router.get("/{vendor_item_id}/uoms", response_model=List[PurchaseUOMResponse])
+async def list_purchase_uoms(
+    vendor_item_id: int,
+    include_inactive: bool = Query(False),
+    db: Session = Depends(get_db)
+):
+    """List purchase UOMs for a vendor item."""
+    item = db.query(HubVendorItem).filter(HubVendorItem.id == vendor_item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Vendor item not found")
+
+    query = db.query(VendorItemUOM).options(
+        joinedload(VendorItemUOM.uom)
+    ).filter(VendorItemUOM.vendor_item_id == vendor_item_id)
+
+    if not include_inactive:
+        query = query.filter(VendorItemUOM.is_active == True)
+
+    uoms = query.order_by(VendorItemUOM.is_default.desc(), VendorItemUOM.id).all()
+    return [_build_purchase_uom_response(u) for u in uoms]
+
+
+@router.post("/{vendor_item_id}/uoms", response_model=PurchaseUOMResponse, status_code=201)
+async def create_purchase_uom(
+    vendor_item_id: int,
+    data: PurchaseUOMCreate,
+    db: Session = Depends(get_db)
+):
+    """Add a purchase UOM to a vendor item."""
+    item = db.query(HubVendorItem).filter(HubVendorItem.id == vendor_item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Vendor item not found")
+
+    # Validate UOM exists
+    uom = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == data.uom_id).first()
+    if not uom:
+        raise HTTPException(status_code=400, detail="UOM not found")
+
+    # Check for duplicate
+    existing = db.query(VendorItemUOM).filter(
+        VendorItemUOM.vendor_item_id == vendor_item_id,
+        VendorItemUOM.uom_id == data.uom_id,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="This UOM already exists for this vendor item")
+
+    # If setting as default, clear existing default
+    if data.is_default:
+        db.query(VendorItemUOM).filter(
+            VendorItemUOM.vendor_item_id == vendor_item_id,
+            VendorItemUOM.is_default == True
+        ).update({"is_default": False})
+
+    puom = VendorItemUOM(
+        vendor_item_id=vendor_item_id,
+        uom_id=data.uom_id,
+        conversion_factor=data.conversion_factor,
+        is_default=data.is_default,
+        expected_price=data.expected_price,
+    )
+    db.add(puom)
+    db.commit()
+    db.refresh(puom)
+
+    # Eager-load the UOM relationship for the response
+    puom = db.query(VendorItemUOM).options(
+        joinedload(VendorItemUOM.uom)
+    ).filter(VendorItemUOM.id == puom.id).first()
+
+    logger.info(f"Created purchase UOM {puom.id} for vendor item {vendor_item_id}: "
+                f"uom={uom.abbreviation}, cf={data.conversion_factor}")
+    return _build_purchase_uom_response(puom)
+
+
+@router.put("/{vendor_item_id}/uoms/{uom_entry_id}", response_model=PurchaseUOMResponse)
+async def update_purchase_uom(
+    vendor_item_id: int,
+    uom_entry_id: int,
+    data: PurchaseUOMUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update a purchase UOM entry."""
+    puom = db.query(VendorItemUOM).options(
+        joinedload(VendorItemUOM.uom)
+    ).filter(
+        VendorItemUOM.id == uom_entry_id,
+        VendorItemUOM.vendor_item_id == vendor_item_id,
+    ).first()
+    if not puom:
+        raise HTTPException(status_code=404, detail="Purchase UOM not found")
+
+    if data.conversion_factor is not None:
+        puom.conversion_factor = data.conversion_factor
+    if data.expected_price is not None:
+        puom.expected_price = data.expected_price
+    if data.is_active is not None:
+        puom.is_active = data.is_active
+    if data.is_default is not None and data.is_default:
+        # Clear other defaults first
+        db.query(VendorItemUOM).filter(
+            VendorItemUOM.vendor_item_id == vendor_item_id,
+            VendorItemUOM.is_default == True,
+            VendorItemUOM.id != uom_entry_id,
+        ).update({"is_default": False})
+        puom.is_default = True
+    elif data.is_default is not None:
+        puom.is_default = False
+
+    db.commit()
+    db.refresh(puom)
+
+    logger.info(f"Updated purchase UOM {uom_entry_id} for vendor item {vendor_item_id}")
+    return _build_purchase_uom_response(puom)
+
+
+@router.delete("/{vendor_item_id}/uoms/{uom_entry_id}")
+async def delete_purchase_uom(
+    vendor_item_id: int,
+    uom_entry_id: int,
+    db: Session = Depends(get_db)
+):
+    """Deactivate a purchase UOM entry (soft delete)."""
+    puom = db.query(VendorItemUOM).filter(
+        VendorItemUOM.id == uom_entry_id,
+        VendorItemUOM.vendor_item_id == vendor_item_id,
+    ).first()
+    if not puom:
+        raise HTTPException(status_code=404, detail="Purchase UOM not found")
+
+    puom.is_active = False
+    if puom.is_default:
+        puom.is_default = False
+        # Promote the next active UOM as default
+        next_uom = db.query(VendorItemUOM).filter(
+            VendorItemUOM.vendor_item_id == vendor_item_id,
+            VendorItemUOM.is_active == True,
+            VendorItemUOM.id != uom_entry_id,
+        ).first()
+        if next_uom:
+            next_uom.is_default = True
+
+    db.commit()
+    logger.info(f"Deactivated purchase UOM {uom_entry_id} for vendor item {vendor_item_id}")
+    return {"success": True, "message": "Purchase UOM deactivated"}
+
+
+@router.post("/{vendor_item_id}/uoms/{uom_entry_id}/set-default")
+async def set_default_purchase_uom(
+    vendor_item_id: int,
+    uom_entry_id: int,
+    db: Session = Depends(get_db)
+):
+    """Set a purchase UOM as the default for a vendor item."""
+    puom = db.query(VendorItemUOM).filter(
+        VendorItemUOM.id == uom_entry_id,
+        VendorItemUOM.vendor_item_id == vendor_item_id,
+        VendorItemUOM.is_active == True,
+    ).first()
+    if not puom:
+        raise HTTPException(status_code=404, detail="Active purchase UOM not found")
+
+    # Clear existing defaults
+    db.query(VendorItemUOM).filter(
+        VendorItemUOM.vendor_item_id == vendor_item_id,
+        VendorItemUOM.is_default == True,
+    ).update({"is_default": False})
+
+    puom.is_default = True
+    db.commit()
+
+    logger.info(f"Set purchase UOM {uom_entry_id} as default for vendor item {vendor_item_id}")
+    return {"success": True, "message": "Default purchase UOM updated"}

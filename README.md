@@ -9,7 +9,7 @@
 **Production URL:** https://rm.swhgrp.com
 **Last Updated:** February 11, 2026
 **Status:** ~98% Complete - All 10 Systems Production Ready ✅
-**Latest:** Integration Hub UOM restructure — `price_is_per_unit` flag for accurate per-unit vs per-case cost calculations, vendor parsing rules, RNDC/Southern Glaziers vendor item imports (Feb 11, 2026) ✅
+**Latest:** Integration Hub Multi-UOM system — `vendor_item_uoms` table with conversion factors for deterministic cost calculations, UOM matching/normalization, UOM CRUD API, catch-weight item support, compact UI redesign, user manual (Feb 11, 2026) ✅
 
 ---
 

@@ -1600,18 +1600,34 @@ class InvoiceParser:
                 unit_price = float(item_data.get('unit_price') or 0)
                 line_total = float(item_data.get('line_total') or 0)
 
-                # Fallback: If line_total is incorrect or missing, calculate it
-                # Some AI parsers return unit_price as line_total by mistake
+                # Validate line_total vs calculated (qty * unit_price)
                 calculated_total = quantity * unit_price
 
-                # Use calculated total if:
-                # 1. line_total is 0 or missing, OR
-                # 2. line_total equals unit_price (common parsing error), OR
-                # 3. line_total differs significantly from calculated (>$0.02 difference for rounding)
-                if line_total == 0 or line_total == unit_price or abs(line_total - calculated_total) > 0.02:
+                if line_total == 0:
+                    # Missing total - calculate from qty * price
                     line_total = calculated_total
-                    logger.warning(f"Line total mismatch for '{item_data.get('description')}': "
-                                 f"parsed=${item_data.get('line_total')}, calculated=${calculated_total:.2f}. Using calculated.")
+                    logger.warning(f"Missing line total for '{item_data.get('description')}': "
+                                 f"using calculated ${calculated_total:.2f}")
+                elif line_total == unit_price and quantity != 1:
+                    # Common AI error: returned unit_price as line_total
+                    line_total = calculated_total
+                    logger.warning(f"Line total equals unit_price for '{item_data.get('description')}': "
+                                 f"using calculated ${calculated_total:.2f}")
+                elif abs(line_total - calculated_total) > 0.02:
+                    if line_total > calculated_total and quantity > 0:
+                        # AI likely picked up per-unit price but read correct line total
+                        # (e.g., beverage invoices with case total vs per-bottle price)
+                        # Trust line_total and recalculate unit_price
+                        corrected_price = round(line_total / quantity, 4)
+                        logger.warning(f"Price correction for '{item_data.get('description')}': "
+                                     f"unit_price ${unit_price:.4f} -> ${corrected_price:.4f} "
+                                     f"(line_total ${line_total:.2f} / qty {quantity})")
+                        unit_price = corrected_price
+                    else:
+                        # line_total less than calculated - likely parsing error in total
+                        line_total = calculated_total
+                        logger.warning(f"Line total mismatch for '{item_data.get('description')}': "
+                                     f"parsed=${item_data.get('line_total')}, calculated=${calculated_total:.2f}. Using calculated.")
 
                 # Normalize description to title case for consistency
                 raw_description = item_data.get('description') or 'Unknown'
@@ -1791,10 +1807,22 @@ class InvoiceParser:
                 unit_price = float(item_data.get('unit_price') or 0)
                 line_total = float(item_data.get('line_total') or 0)
 
-                # Fallback: Calculate line_total if incorrect
+                # Validate line_total vs calculated (qty * unit_price)
                 calculated_total = quantity * unit_price
-                if line_total == 0 or line_total == unit_price or abs(line_total - calculated_total) > 0.02:
+                if line_total == 0:
                     line_total = calculated_total
+                elif line_total == unit_price and quantity != 1:
+                    line_total = calculated_total
+                elif abs(line_total - calculated_total) > 0.02:
+                    if line_total > calculated_total and quantity > 0:
+                        # AI likely picked up per-unit price but read correct line total
+                        corrected_price = round(line_total / quantity, 4)
+                        logger.warning(f"Price correction for '{item_data.get('description')}': "
+                                     f"unit_price ${unit_price:.4f} -> ${corrected_price:.4f} "
+                                     f"(line_total ${line_total:.2f} / qty {quantity})")
+                        unit_price = corrected_price
+                    else:
+                        line_total = calculated_total
 
                 # Normalize description
                 raw_description = item_data.get('description') or 'Unknown'
