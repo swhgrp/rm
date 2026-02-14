@@ -102,6 +102,21 @@ curl -s http://localhost:{port}/endpoint | python3 -m json.tool
 - **Compare dropdown**: P&L tab has "Compare" dropdown for Last 2/3/6/12 Months using multi-period endpoint
 - `JournalEntryLine.area_id` FK → `areas.id` is how location is tracked on all journal entries
 
+### Invoice Post-Parse Validation (Feb 2026)
+- **Post-parse validator** (`post_parse_validator.py`): runs after AI/CSV parsing, before auto-mapping
+- **Per-item checks**: price_anomaly (>$500), qty_anomaly (>999), possible_sku_as_price, possible_field_swap, possible_fee
+- **Invoice-level**: reconciles `sum(line_totals)` vs `(total_amount - tax_amount)`, flags if >5% AND >$5 mismatch
+- **`needs_review` status**: sits between 'mapping' and 'ready', blocks auto-send
+- **Low-confidence hold**: fuzzy_name mappings with confidence < 0.8 trigger `needs_review`
+- **Auto-reparse**: `email_monitor.py` triggers `reparse_with_vendor_rules()` after first parse if vendor has rules
+- **Approve endpoint**: `POST /api/invoices/{id}/approve-review` clears flags, re-evaluates status
+
+### Vendor Item Name Normalization (Feb 2026)
+- `to_title_case()` in `utils/text_utils.py` — shared utility for smart food/restaurant title casing
+- `HubVendorItem` has `@validates('vendor_product_name')` — auto-normalizes on any create/update
+- Handles: abbreviations (IPA, IQF, PET, AA), number+unit combos (16oz, 750ml), ordinals (25th), apostrophes (D'Asti), hyphens (Bag-in-Box), slashes (Mozzarella/Provolone)
+- Backfill script: `scripts/backfill_vendor_item_names.py` (--dry-run supported)
+
 ## Important Notes
 - Never modify `.env` files (contain production secrets)
 - Location data comes from inventory service - don't duplicate

@@ -155,6 +155,25 @@ def match_invoice_uom_to_vendor_uom(
     return purchase_uoms[0].id
 
 
+def _levenshtein_distance(s1: str, s2: str) -> int:
+    """Calculate Levenshtein (edit) distance between two strings."""
+    if len(s1) < len(s2):
+        return _levenshtein_distance(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+
+    previous_row = list(range(len(s2) + 1))
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    return previous_row[-1]
+
+
 def normalize_text(text: str) -> str:
     """Normalize text for comparison - lowercase, remove extra spaces/punctuation"""
     if not text:
@@ -410,6 +429,150 @@ class AutoMapperService:
                     return vi
 
         return None
+
+    def match_by_near_sku(
+        self,
+        item_code: str,
+        vendor_id: int = None,
+        location_id: int = None,
+        max_distance: int = 2,
+        item_description: str = None,
+        min_desc_similarity: float = 0.3
+    ) -> Optional[Dict]:
+        """
+        Match item code against vendor SKUs using Levenshtein distance,
+        with description similarity as confirmer and tiebreaker.
+
+        Strategy:
+        - Distance 1, single SKU match → accept (description optional)
+        - Distance 1, multiple SKU matches → use description to pick best
+        - Distance 2, single or multiple → require description confirmation
+        - Description similarity is always used to rank and validate
+
+        Args:
+            item_code: The parsed item code from the invoice
+            vendor_id: Vendor ID to scope the search
+            location_id: Location ID for location-specific matching
+            max_distance: Maximum Levenshtein distance (default 2)
+            item_description: Invoice item description for confirming matches
+            min_desc_similarity: Minimum description similarity for distance 2+ (default 0.3)
+
+        Returns:
+            Vendor item dict if confident match found, else None
+        """
+        if not item_code:
+            return None
+
+        item_code_clean = str(item_code).strip()
+        item_code_norm = item_code_clean.lstrip('0') or '0'
+
+        vendor_items = self.fetch_vendor_items()
+
+        # Collect all near-matches, grouped by normalized SKU
+        near_matches_by_sku = {}  # {normalized_sku: (vendor_item_dict, distance)}
+
+        for vi in vendor_items:
+            if vendor_id and vi.get('vendor_id') != vendor_id:
+                continue
+
+            vendor_sku = vi.get('vendor_sku')
+            if not vendor_sku:
+                continue
+
+            sku_clean = str(vendor_sku).strip()
+            sku_norm = sku_clean.lstrip('0') or '0'
+
+            # Skip exact matches (handled by match_by_sku)
+            if sku_norm == item_code_norm:
+                continue
+
+            # Quick length pre-check
+            if abs(len(item_code_norm) - len(sku_norm)) > max_distance:
+                continue
+
+            dist = _levenshtein_distance(item_code_norm, sku_norm)
+            if dist <= max_distance:
+                # Keep the best (closest) match per SKU, prefer same location
+                existing = near_matches_by_sku.get(sku_norm)
+                if existing is None:
+                    near_matches_by_sku[sku_norm] = (vi, dist)
+                else:
+                    # Prefer same-location match for the same SKU
+                    existing_same_loc = existing[0].get('location_id') == location_id
+                    new_same_loc = vi.get('location_id') == location_id
+                    if new_same_loc and not existing_same_loc:
+                        near_matches_by_sku[sku_norm] = (vi, dist)
+
+        if len(near_matches_by_sku) == 0:
+            return None
+
+        # Score each candidate: combine SKU distance with description similarity
+        scored = []
+        for sku_norm, (vi, dist) in near_matches_by_sku.items():
+            desc_score = 0.0
+            if item_description and vi.get('vendor_product_name'):
+                desc_score = calculate_similarity(item_description, vi['vendor_product_name'])
+            scored.append((vi, dist, desc_score))
+
+        # Sort: lowest distance first, then highest description score
+        scored.sort(key=lambda x: (x[1], -x[2]))
+
+        best_vi, best_dist, best_desc = scored[0]
+
+        # Decision logic
+        if best_dist == 1 and len(scored) == 1:
+            # Single distance-1 match — high confidence, accept without description
+            logger.info(
+                f"Near-SKU match (d=1): '{item_code}' → '{best_vi.get('vendor_sku')}' "
+                f"({best_vi.get('vendor_product_name', '')[:40]}) [desc={best_desc:.2f}]"
+            )
+            return best_vi
+
+        if best_dist == 1 and len(scored) > 1:
+            # Multiple distance-1 matches — use description as tiebreaker
+            if item_description and best_desc >= min_desc_similarity:
+                second_desc = scored[1][2] if len(scored) > 1 else 0.0
+                # Accept if best description score is clearly ahead
+                if best_desc > second_desc + 0.1:
+                    logger.info(
+                        f"Near-SKU match (d=1, desc tiebreak): '{item_code}' → "
+                        f"'{best_vi.get('vendor_sku')}' ({best_vi.get('vendor_product_name', '')[:40]}) "
+                        f"[desc={best_desc:.2f} vs {second_desc:.2f}]"
+                    )
+                    return best_vi
+            logger.debug(
+                f"Near-SKU ambiguous (d=1): '{item_code}' has {len(scored)} candidates, "
+                f"desc scores too close: {[(s[0].get('vendor_sku'), s[2]) for s in scored[:3]]}"
+            )
+            return None
+
+        # Distance 2+ — require description confirmation
+        if not item_description:
+            logger.debug(f"Near-SKU skip (d={best_dist}): no description to confirm '{item_code}'")
+            return None
+
+        if best_desc < min_desc_similarity:
+            logger.debug(
+                f"Near-SKU reject (d={best_dist}): '{item_code}' → '{best_vi.get('vendor_sku')}' "
+                f"desc too low ({best_desc:.2f} < {min_desc_similarity})"
+            )
+            return None
+
+        # For distance 2 with multiple candidates, need clear desc winner
+        if len(scored) > 1:
+            second_desc = scored[1][2]
+            if best_desc <= second_desc + 0.1:
+                logger.debug(
+                    f"Near-SKU ambiguous (d={best_dist}): '{item_code}' desc scores too close: "
+                    f"{[(s[0].get('vendor_sku'), s[2]) for s in scored[:3]]}"
+                )
+                return None
+
+        logger.info(
+            f"Near-SKU match (d={best_dist}, desc={best_desc:.2f}): '{item_code}' → "
+            f"'{best_vi.get('vendor_sku')}' ({best_vi.get('vendor_product_name', '')[:40]})"
+        )
+        return best_vi
 
     def match_by_fuzzy_name(
         self,
@@ -743,6 +906,18 @@ class AutoMapperService:
             if vendor_item:
                 result = self._build_mapping_result(vendor_item, 'sku_match', confidence=1.0)
                 # Track if this was a cross-location match
+                result['matched_location_id'] = vendor_item.get('location_id')
+                result['is_cross_location'] = (location_id and vendor_item.get('location_id') != location_id)
+                return result
+
+        # 1b. Try near-SKU match (1-2 digits off, confirmed by description similarity)
+        if item.item_code:
+            vendor_item = self.match_by_near_sku(
+                item.item_code, vendor_id, location_id,
+                item_description=item.item_description
+            )
+            if vendor_item:
+                result = self._build_mapping_result(vendor_item, 'near_sku_match', confidence=0.9)
                 result['matched_location_id'] = vendor_item.get('location_id')
                 result['is_cross_location'] = (location_id and vendor_item.get('location_id') != location_id)
                 return result

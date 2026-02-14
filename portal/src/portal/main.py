@@ -1000,6 +1000,28 @@ async def profile_page(request: Request, db: Session = Depends(get_db)):
     })
 
 
+class AuthValidateRequest(BaseModel):
+    username: str
+    password: str
+
+
+@app.post("/api/auth/validate")
+async def validate_credentials(data: AuthValidateRequest, db: Session = Depends(get_db)):
+    """JSON API for credential validation. Used by sub-services for direct login."""
+    user = db.query(User).filter(User.username == data.username).first()
+    if not user or not verify_password(data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    if not user.is_active:
+        raise HTTPException(status_code=401, detail="Account is disabled")
+    return {
+        "user_id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "full_name": user.full_name,
+        "is_admin": user.is_admin,
+    }
+
+
 class ProfileUpdateRequest(BaseModel):
     full_name: str
     email: str
@@ -1245,6 +1267,12 @@ async def maintenance_settings(request: Request, current_user: User = Depends(ge
 
 
 # Food Safety Routes
+@app.get("/food-safety/login", response_class=HTMLResponse)
+async def food_safety_login_page(request: Request):
+    """Direct login page for food safety system (no auth required)"""
+    return templates.TemplateResponse("food-safety/login.html", {"request": request})
+
+
 @app.get("/food-safety/", response_class=HTMLResponse)
 @app.get("/food-safety", response_class=HTMLResponse)
 async def food_safety_dashboard(request: Request, current_user: User = Depends(get_current_user)):
@@ -1602,6 +1630,16 @@ async def food_safety_new_incident(request: Request, current_user: User = Depend
         raise HTTPException(status_code=403, detail="No access to Food Safety system")
 
     return templates.TemplateResponse("food-safety/incident_form.html", {"request": request, "user": current_user})
+
+
+@app.get("/food-safety/incidents/{incident_id}/print", response_class=HTMLResponse)
+async def food_safety_incident_print(request: Request, incident_id: int, current_user: User = Depends(get_current_user)):
+    """Display printable incident report"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/food-safety/incidents", status_code=303)
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Food Safety system")
+    return templates.TemplateResponse("food-safety/incident_print.html", {"request": request, "user": current_user})
 
 
 @app.get("/food-safety/corrective-actions", response_class=HTMLResponse)

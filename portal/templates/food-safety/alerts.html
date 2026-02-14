@@ -400,7 +400,6 @@
 
 {% block extra_scripts %}
 <script>
-    const API_BASE = '/food-safety';
     let alerts = [];
     let locations = [];
     let equipment = [];
@@ -555,10 +554,11 @@
         if (!currentAlertId) return;
 
         try {
-            const response = await fetch(`${API_BASE}/temperatures/alerts/${currentAlertId}/acknowledge`, {
+            const response = await fetch(`${API_BASE}/temperatures/${currentAlertId}/acknowledge`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
+                    acknowledged_by: window.currentUser ? window.currentUser.user_id : 0,
                     notes: document.getElementById('ack_notes').value || null
                 })
             });
@@ -568,7 +568,11 @@
                 loadAlerts();
             } else {
                 const error = await response.json();
-                showError(error.detail || 'Unknown error');
+                const detail = error.detail;
+                const msg = Array.isArray(detail)
+                    ? detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ')
+                    : detail || 'Unknown error';
+                showError(msg);
             }
         } catch (error) {
             console.error('Error:', error);
@@ -606,7 +610,7 @@
         }
 
         try {
-            const response = await fetch(`${API_BASE}/temperatures/alerts/${currentAlertId}/resolve`, {
+            const response = await fetch(`${API_BASE}/temperatures/${currentAlertId}/resolve`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ notes: notes })
@@ -617,7 +621,11 @@
                 loadAlerts();
             } else {
                 const error = await response.json();
-                showError(error.detail || 'Unknown error');
+                const detail = error.detail;
+                const msg = Array.isArray(detail)
+                    ? detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ')
+                    : detail || 'Unknown error';
+                showError(msg);
             }
         } catch (error) {
             console.error('Error:', error);

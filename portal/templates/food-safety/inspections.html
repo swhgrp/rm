@@ -338,7 +338,7 @@
         <select class="filter-select" id="typeFilter" onchange="filterInspections()">
             <option value="">All Types</option>
             <option value="health_department">Health Department</option>
-            <option value="internal">Internal</option>
+            <option value="internal_audit">Internal Audit</option>
             <option value="third_party">Third Party</option>
             <option value="corporate">Corporate</option>
         </select>
@@ -399,7 +399,6 @@
 
 {% block extra_scripts %}
 <script>
-    const API_BASE = '/food-safety';
     let inspections = [];
     let locations = [];
 
@@ -425,13 +424,27 @@
             const year = document.getElementById('yearFilter').value;
             let url = `${API_BASE}/inspections?`;
             if (locationId) url += `location_id=${locationId}&`;
-            if (year) url += `year=${year}&`;
+            if (year) url += `start_date=${year}-01-01&end_date=${year}-12-31&`;
 
             const response = await fetch(url);
             if (response.ok) {
                 inspections = await response.json();
                 updateStats();
                 filterInspections();
+            } else {
+                const error = await response.json();
+                const detail = error.detail;
+                const msg = Array.isArray(detail)
+                    ? detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ')
+                    : detail || 'Unknown error';
+                document.getElementById('inspectionsTable').innerHTML = `
+                    <tr><td colspan="7">
+                        <div class="empty-state">
+                            <i class="bi bi-exclamation-circle"></i>
+                            <p>Error loading inspections: ${msg}</p>
+                        </div>
+                    </td></tr>
+                `;
             }
         } catch (error) {
             console.error('Error loading inspections:', error);
@@ -446,9 +459,17 @@
         }
     }
 
+    function getResult(i) {
+        return i.passed === true ? 'Passed' : i.passed === false ? 'Failed' : 'Pending';
+    }
+
+    function getResultLower(i) {
+        return i.passed === true ? 'passed' : i.passed === false ? 'failed' : 'pending';
+    }
+
     function updateStats() {
-        const passed = inspections.filter(i => i.result === 'passed').length;
-        const failed = inspections.filter(i => i.result === 'failed').length;
+        const passed = inspections.filter(i => i.passed === true).length;
+        const failed = inspections.filter(i => i.passed === false).length;
         const scores = inspections.filter(i => i.score !== null).map(i => i.score);
         const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : '--';
 
@@ -464,7 +485,7 @@
 
         let filtered = inspections;
         if (type) filtered = filtered.filter(i => i.inspection_type === type);
-        if (result) filtered = filtered.filter(i => i.result === result);
+        if (result) filtered = filtered.filter(i => getResultLower(i) === result);
 
         renderInspections(filtered);
     }
@@ -486,7 +507,7 @@
 
         const typeLabels = {
             'health_department': 'Health Dept',
-            'internal': 'Internal',
+            'internal_audit': 'Internal Audit',
             'third_party': 'Third Party',
             'corporate': 'Corporate'
         };
@@ -494,6 +515,8 @@
         tbody.innerHTML = list.map(i => {
             const loc = locations.find(l => l.id === i.location_id);
             const scoreClass = getScoreClass(i.score);
+            const resultLabel = getResult(i);
+            const resultClass = getResultLower(i);
 
             return `
                 <tr onclick="viewInspection('${i.id}')">
@@ -502,8 +525,8 @@
                     <td>${typeLabels[i.inspection_type] || i.inspection_type}</td>
                     <td>${i.inspector_name || '-'}</td>
                     <td class="${scoreClass}">${i.score !== null ? i.score : '-'}</td>
-                    <td>${i.violation_count || 0}</td>
-                    <td><span class="badge badge-${i.result || 'pending'}">${i.result || 'Pending'}</span></td>
+                    <td>-</td>
+                    <td><span class="badge badge-${resultClass}">${resultLabel}</span></td>
                 </tr>
             `;
         }).join('');
@@ -520,13 +543,22 @@
     async function viewInspection(id) {
         try {
             const response = await fetch(`${API_BASE}/inspections/${id}`);
-            if (response.ok) {
+            if (!response.ok) {
+                const error = await response.json();
+                const detail = error.detail;
+                const msg = Array.isArray(detail)
+                    ? detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ')
+                    : detail || 'Unknown error';
+                alert('Error loading inspection: ' + msg);
+                return;
+            }
+            {
                 const inspection = await response.json();
                 const loc = locations.find(l => l.id === inspection.location_id);
 
                 const typeLabels = {
                     'health_department': 'Health Department',
-                    'internal': 'Internal',
+                    'internal_audit': 'Internal Audit',
                     'third_party': 'Third Party',
                     'corporate': 'Corporate'
                 };
@@ -578,7 +610,7 @@
                             </div>
                             <div class="detail-item">
                                 <label>Result</label>
-                                <span class="badge badge-${inspection.result || 'pending'}">${inspection.result || 'Pending'}</span>
+                                <span class="badge badge-${getResultLower(inspection)}">${getResult(inspection)}</span>
                             </div>
                         </div>
                     </div>
@@ -597,7 +629,7 @@
             }
         } catch (error) {
             console.error('Error:', error);
-            showError('loading inspection');
+            alert('Error loading inspection. Please try again.');
         }
     }
 

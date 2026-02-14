@@ -277,6 +277,16 @@ class LocationCostUpdaterService:
         if qty_in_primary == 0:
             return {'skipped': True, 'reason': 'zero_quantity'}
 
+        # Sync vendor item pricing fields (case_cost, last_purchase_price)
+        # so Purchasing & Pricing section stays in sync with invoice data
+        units_per_case = float(vendor_item.units_per_case or 1)
+        new_case_cost = round(cost_per_primary * units_per_case, 4)
+        if vendor_item.case_cost is None or float(vendor_item.case_cost) != new_case_cost:
+            vendor_item.previous_purchase_price = vendor_item.last_purchase_price
+            vendor_item.case_cost = new_case_cost
+            vendor_item.last_purchase_price = unit_price
+            vendor_item.price_updated_at = invoice.invoice_date
+
         # Update location cost in Inventory database
         engine = self._get_inventory_engine()
         with engine.connect() as conn:

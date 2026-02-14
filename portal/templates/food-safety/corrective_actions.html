@@ -377,7 +377,6 @@
 
 {% block extra_scripts %}
 <script>
-    const API_BASE = '/food-safety';
     let actions = [];
     let locations = [];
     let currentActionId = null;
@@ -401,8 +400,10 @@
     async function loadActions() {
         try {
             const locationId = document.getElementById('locationFilter').value;
-            let url = `${API_BASE}/incidents/corrective-actions?`;
-            if (locationId) url += `location_id=${locationId}&`;
+            let url = `${API_BASE}/incidents/corrective-actions/pending`;
+            const params = [];
+            if (locationId) params.push(`location_id=${locationId}`);
+            if (params.length) url += '?' + params.join('&');
 
             const response = await fetch(url);
             if (response.ok) {
@@ -460,8 +461,10 @@
             filtered = filtered.filter(a => a.status === status);
         }
 
-        if (source) {
-            filtered = filtered.filter(a => a.source_type === source);
+        if (source === 'incident') {
+            filtered = filtered.filter(a => a.incident_id != null);
+        } else if (source === 'inspection') {
+            filtered = filtered.filter(a => a.inspection_violation_id != null);
         }
 
         renderActions(filtered);
@@ -487,7 +490,7 @@
         tbody.innerHTML = list.map(a => {
             const isOverdue = a.due_date && new Date(a.due_date) < today && a.status !== 'completed' && a.status !== 'verified';
             const statusClass = isOverdue ? 'overdue' : a.status;
-            const sourceLabel = a.source_type === 'incident' ? `INC-${a.incident_id}` : `INSP-${a.inspection_id}`;
+            const sourceLabel = a.incident_id ? `INC-${a.incident_id}` : (a.inspection_violation_id ? `INSP-${a.inspection_violation_id}` : '-');
 
             return `
                 <tr>
@@ -506,17 +509,17 @@
 
     function openUpdateModal(actionId) {
         currentActionId = actionId;
-        const action = actions.find(a => a.id === actionId);
+        const action = actions.find(a => String(a.id) === String(actionId));
         if (!action) return;
 
         document.getElementById('actionDetails').innerHTML = `
             <p><strong>Action:</strong> ${escapeHtml(action.action_description)}</p>
             <p><strong>Due Date:</strong> ${action.due_date ? formatDate(action.due_date) : 'Not set'}</p>
-            <p><strong>Assigned To:</strong> ${action.assigned_to || 'Unassigned'}</p>
+            <p><strong>Assigned To:</strong> ${action.assigned_to_name || action.assigned_to || 'Unassigned'}</p>
         `;
 
         document.getElementById('update_status').value = action.status;
-        document.getElementById('update_notes').value = action.notes || '';
+        document.getElementById('update_notes').value = action.completion_notes || '';
         document.getElementById('updateModal').classList.add('active');
     }
 
@@ -529,13 +532,26 @@
         if (!currentActionId) return;
 
         try {
-            const response = await fetch(`${API_BASE}/incidents/corrective-actions/${currentActionId}`, {
-                method: 'PUT',
+            const newStatus = document.getElementById('update_status').value;
+            const notes = document.getElementById('update_notes').value || null;
+
+            // Use the /complete endpoint when marking as completed (supports completion_notes)
+            let url, body;
+            if (newStatus === 'completed') {
+                url = `${API_BASE}/incidents/corrective-actions/${currentActionId}/complete`;
+                body = {
+                    completed_by: window.currentUser ? window.currentUser.user_id : 0,
+                    completion_notes: notes
+                };
+            } else {
+                url = `${API_BASE}/incidents/corrective-actions/${currentActionId}`;
+                body = { status: newStatus };
+            }
+
+            const response = await fetch(url, {
+                method: newStatus === 'completed' ? 'POST' : 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    status: document.getElementById('update_status').value,
-                    notes: document.getElementById('update_notes').value || null
-                })
+                body: JSON.stringify(body)
             });
 
             if (response.ok) {
@@ -543,11 +559,15 @@
                 loadActions();
             } else {
                 const error = await response.json();
-                showError(error.detail || 'Unknown error');
+                const detail = error.detail;
+                const msg = Array.isArray(detail)
+                    ? detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ')
+                    : detail || 'Unknown error';
+                showError(msg);
             }
         } catch (error) {
             console.error('Error:', error);
-            showError('updating action');
+            showError('Error updating action');
         }
     }
 
@@ -562,6 +582,10 @@
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    function showError(message) {
+        alert('Error: ' + message);
     }
 
     // Initialize

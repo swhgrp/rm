@@ -144,10 +144,14 @@ async def create_incident(
     # Generate incident number
     incident_number = await generate_incident_number(db)
 
+    incident_data = data.model_dump()
+    if not incident_data.get("reported_by"):
+        incident_data["reported_by"] = 0  # Default when no auth context
+
     incident = Incident(
         incident_number=incident_number,
         status=IncidentStatus.OPEN,
-        **data.model_dump()
+        **incident_data
     )
     db.add(incident)
     await db.commit()

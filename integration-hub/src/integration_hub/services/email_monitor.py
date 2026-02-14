@@ -420,6 +420,28 @@ class EmailMonitorService:
                                         dup_count = self._resolve_cross_format_duplicates([invoice.id])
                                         if dup_count:
                                             stats['duplicates'] += dup_count
+
+                                        # Auto-reparse with vendor rules if applicable
+                                        try:
+                                            inv_obj = self.db.query(HubInvoice).filter(
+                                                HubInvoice.id == invoice.id
+                                            ).first()
+                                            if (inv_obj and inv_obj.vendor_id
+                                                    and not inv_obj.parsed_with_vendor_rules):
+                                                from integration_hub.models.vendor_parsing_rule import VendorParsingRule
+                                                has_rules = self.db.query(VendorParsingRule).filter(
+                                                    VendorParsingRule.vendor_id == inv_obj.vendor_id,
+                                                    VendorParsingRule.is_active == True
+                                                ).first()
+                                                if has_rules:
+                                                    logger.info(f"Auto-reparsing invoice {invoice.id} with vendor rules (vendor_id={inv_obj.vendor_id})")
+                                                    reparse_result = parser.reparse_with_vendor_rules(invoice.id, self.db)
+                                                    if reparse_result.get('success'):
+                                                        logger.info(f"Auto-reparse succeeded for invoice {invoice.id}: {reparse_result.get('message', '')}")
+                                                    else:
+                                                        logger.warning(f"Auto-reparse failed for invoice {invoice.id}: {reparse_result.get('message', '')}")
+                                        except Exception as e:
+                                            logger.error(f"Error in auto-reparse for invoice {invoice.id}: {str(e)}")
                                     else:
                                         logger.warning(f"Failed to auto-parse invoice {invoice.id}: {parse_result['message']}")
                                 except Exception as e:

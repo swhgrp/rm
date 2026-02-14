@@ -444,7 +444,6 @@
 
 {% block extra_scripts %}
 <script>
-    const API_BASE = '/food-safety';
     let templates = [];
     let editingId = null;
     let templateItems = [];
@@ -504,12 +503,14 @@
                 <td>${t.requires_manager_signoff ? '<i class="bi bi-check-circle text-success"></i> Yes' : 'No'}</td>
                 <td><span class="badge badge-${t.is_active ? 'active' : 'inactive'}">${t.is_active ? 'Active' : 'Inactive'}</span></td>
                 <td>
-                    <button class="btn-icon" onclick="editTemplate('${t.id}')" title="Edit">
-                        <i class="bi bi-pencil"></i>
-                    </button>
-                    <button class="btn-icon" onclick="duplicateTemplate('${t.id}')" title="Duplicate">
-                        <i class="bi bi-copy"></i>
-                    </button>
+                    <div class="actions-wrap" style="display: inline-flex; gap: 5px;">
+                        <button class="btn-icon" onclick="editTemplate('${t.id}')" title="Edit Template">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn-icon" onclick="duplicateTemplate('${t.id}')" title="Duplicate Template">
+                            <i class="bi bi-files"></i>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `).join('');
@@ -526,6 +527,7 @@
     }
 
     async function editTemplate(id) {
+        id = parseInt(id);
         const template = templates.find(t => t.id === id);
         if (!template) return;
 
@@ -538,11 +540,16 @@
         document.getElementById('template_description').value = template.description || '';
         document.getElementById('requires_signoff').checked = template.requires_manager_signoff;
 
-        // Load template items
+        // Load template with items
         try {
-            const response = await fetch(`${API_BASE}/checklists/templates/${id}/items`);
+            const response = await fetch(`${API_BASE}/checklists/templates/${id}`);
             if (response.ok) {
-                templateItems = await response.json();
+                const fullTemplate = await response.json();
+                templateItems = (fullTemplate.items || []).map(item => ({
+                    text: item.text,
+                    response_type: item.response_type || 'yes_no',
+                    sort_order: item.sort_order
+                }));
             } else {
                 templateItems = [];
             }
@@ -555,6 +562,7 @@
     }
 
     function duplicateTemplate(id) {
+        id = parseInt(id);
         const template = templates.find(t => t.id === id);
         if (!template) return;
 
@@ -582,7 +590,11 @@
                 loadTemplates();
             } else {
                 const error = await response.json();
-                showError(error.detail || 'Unknown error');
+                const detail = error.detail;
+                const msg = Array.isArray(detail)
+                    ? detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ')
+                    : detail || 'Unknown error';
+                showError(msg);
             }
         } catch (error) {
             console.error('Error:', error);
@@ -601,7 +613,7 @@
         container.innerHTML = templateItems.map((item, index) => `
             <div class="template-item" data-index="${index}">
                 <span class="drag-handle"><i class="bi bi-grip-vertical"></i></span>
-                <input type="text" value="${escapeHtml(item.item_text)}"
+                <input type="text" value="${escapeHtml(item.text)}"
                        onchange="updateItem(${index}, this.value)" placeholder="Item text...">
                 <button type="button" class="remove-btn" onclick="removeItem(${index})">&times;</button>
             </div>
@@ -610,7 +622,7 @@
 
     function addItem() {
         templateItems.push({
-            item_text: '',
+            text: '',
             sort_order: templateItems.length
         });
         renderItems();
@@ -623,7 +635,7 @@
     }
 
     function updateItem(index, value) {
-        templateItems[index].item_text = value;
+        templateItems[index].text = value;
     }
 
     function removeItem(index) {
@@ -641,16 +653,18 @@
         }
 
         // Filter out empty items
-        const validItems = templateItems.filter(item => item.item_text.trim());
+        const validItems = templateItems.filter(item => item.text.trim());
 
         const data = {
             name: name,
             checklist_type: type,
+            frequency: 'daily',
             description: document.getElementById('template_description').value || null,
             is_active: document.getElementById('template_status').value === 'active',
             requires_manager_signoff: document.getElementById('requires_signoff').checked,
             items: validItems.map((item, index) => ({
-                item_text: item.item_text,
+                text: item.text,
+                response_type: item.response_type || 'yes_no',
                 sort_order: index
             }))
         };
@@ -672,7 +686,11 @@
                 loadTemplates();
             } else {
                 const error = await response.json();
-                showError(error.detail || 'Unknown error');
+                const detail = error.detail;
+                const msg = Array.isArray(detail)
+                    ? detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ')
+                    : detail || 'Unknown error';
+                showError(msg);
             }
         } catch (error) {
             console.error('Error:', error);

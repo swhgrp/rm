@@ -10,8 +10,8 @@ services:
     ports:
       - "8006:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://maintenance:maintenance@postgres:5432/maintenance
-      - DATABASE_URL_SYNC=postgresql://maintenance:maintenance@postgres:5432/maintenance
+      - DATABASE_URL=postgresql+asyncpg://maintenance:maintenance@maintenance-postgres:5432/maintenance
+      - DATABASE_URL_SYNC=postgresql://maintenance:maintenance@maintenance-postgres:5432/maintenance
       - DEBUG=false
       - SERVICE_NAME=maintenance-service
       - PYTHONPATH=/app/src

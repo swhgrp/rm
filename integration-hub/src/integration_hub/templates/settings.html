@@ -110,17 +110,6 @@
                     </small>
                 </div>
 
-                <!-- Enable Auto-Processing -->
-                <div class="form-group">
-                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                        <input type="checkbox" id="auto_process" name="auto_process"
-                               style="width: auto; margin: 0;">
-                        <span>Enable Auto-Processing</span>
-                    </label>
-                    <small style="color: var(--text-secondary); font-size: 12px; display: block; margin-top: 5px;">
-                        Automatically process new invoices (requires OCR setup)
-                    </small>
-                </div>
             </div>
 
             <!-- Check Interval -->
@@ -150,66 +139,6 @@
                 <div id="connectionStatus" style="display: flex; align-items: center; gap: 8px; color: var(--text-secondary); font-size: 14px;">
                     <i class="bi bi-info-circle"></i> <span>Not tested</span>
                 </div>
-            </div>
-        </form>
-    </div>
-
-    <!-- OCR Settings Card -->
-    <div class="card" style="margin-bottom: 30px;">
-        <div class="card-header">
-            <h2><i class="bi bi-file-text"></i> OCR & Data Extraction</h2>
-            <small style="color: var(--text-secondary);">Configure OCR service for automatic invoice parsing</small>
-        </div>
-
-        <form id="ocrSettingsForm" style="padding: 25px;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                <!-- OCR Provider -->
-                <div class="form-group">
-                    <label for="ocr_provider">OCR Provider</label>
-                    <select id="ocr_provider" name="ocr_provider"
-                            style="width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
-                        <option value="">None (Manual Entry Only)</option>
-                        <option value="aws_textract">AWS Textract</option>
-                        <option value="google_document_ai">Google Document AI</option>
-                        <option value="azure_form_recognizer">Azure Form Recognizer</option>
-                    </select>
-                    <small style="color: var(--text-secondary); font-size: 12px;">Select OCR service for invoice parsing</small>
-                </div>
-
-                <!-- Confidence Threshold -->
-                <div class="form-group">
-                    <label for="confidence_threshold">Confidence Threshold</label>
-                    <input type="number" id="confidence_threshold" name="confidence_threshold"
-                           value="0.85" min="0" max="1" step="0.05"
-                           style="width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
-                    <small style="color: var(--text-secondary); font-size: 12px;">Minimum confidence for auto-approval (0-1)</small>
-                </div>
-            </div>
-
-            <!-- API Credentials Section (appears when provider selected) -->
-            <div id="apiCredentialsSection" style="display: none; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border-primary);">
-                <h3 style="margin-bottom: 15px; color: var(--text-primary); font-size: 16px;">API Credentials</h3>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div class="form-group">
-                        <label for="ocr_api_key">API Key</label>
-                        <input type="password" id="ocr_api_key" name="ocr_api_key"
-                               placeholder="Enter API key"
-                               style="width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
-                    </div>
-                    <div class="form-group">
-                        <label for="ocr_region">Region (if applicable)</label>
-                        <input type="text" id="ocr_region" name="ocr_region"
-                               placeholder="us-east-1"
-                               style="width: 100%; padding: 10px; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 6px;">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Save Button -->
-            <div style="margin-top: 25px;">
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-save"></i> Save OCR Settings
-                </button>
             </div>
         </form>
     </div>
@@ -514,7 +443,6 @@ document.getElementById('emailSettingsForm').addEventListener('submit', async fu
         { category: 'email', key: 'imap_host', value: document.getElementById('imap_host').value },
         { category: 'email', key: 'imap_port', value: document.getElementById('imap_port').value },
         { category: 'email', key: 'use_ssl', value: document.getElementById('use_ssl').checked.toString() },
-        { category: 'email', key: 'auto_process', value: document.getElementById('auto_process').checked.toString() },
         { category: 'email', key: 'check_interval', value: document.getElementById('check_interval').value }
     ];
 
@@ -528,35 +456,6 @@ document.getElementById('emailSettingsForm').addEventListener('submit', async fu
 
         if (response.ok) {
             showAlert('Email settings saved successfully!', 'success');
-        } else {
-            showAlert('Error saving settings', 'error');
-        }
-    } catch (error) {
-        showAlert('Error: ' + error.message, 'error');
-    }
-});
-
-// Save OCR settings
-document.getElementById('ocrSettingsForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-
-    const settings = [
-        { category: 'ocr', key: 'ocr_provider', value: document.getElementById('ocr_provider').value },
-        { category: 'ocr', key: 'confidence_threshold', value: document.getElementById('confidence_threshold').value },
-        { category: 'ocr', key: 'ocr_api_key', value: document.getElementById('ocr_api_key').value, is_encrypted: true },
-        { category: 'ocr', key: 'ocr_region', value: document.getElementById('ocr_region').value }
-    ];
-
-    try {
-        const response = await fetch('/hub/api/settings/bulk', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ settings })
-        });
-
-        if (response.ok) {
-            showAlert('OCR settings saved successfully!', 'success');
         } else {
             showAlert('Error saving settings', 'error');
         }
@@ -590,12 +489,6 @@ document.getElementById('dedupSettingsForm').addEventListener('submit', async fu
     } catch (error) {
         showAlert('Error: ' + error.message, 'error');
     }
-});
-
-// Show/hide API credentials based on OCR provider selection
-document.getElementById('ocr_provider').addEventListener('change', function() {
-    const apiSection = document.getElementById('apiCredentialsSection');
-    apiSection.style.display = this.value ? 'block' : 'none';
 });
 
 // Alert helper

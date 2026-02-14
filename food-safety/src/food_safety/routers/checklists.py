@@ -4,13 +4,13 @@ from datetime import date, datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func, delete
 from sqlalchemy.orm import selectinload
 
 from zoneinfo import ZoneInfo
 
 _ET = ZoneInfo("America/New_York")
-def get_now(): return datetime.now(_ET)
+def get_now(): return datetime.now(_ET).replace(tzinfo=None)
 
 from food_safety.database import get_db
 from food_safety.models import (
@@ -54,7 +54,27 @@ async def list_templates(
 
     query = query.order_by(ChecklistTemplate.name)
     result = await db.execute(query)
-    return result.scalars().all()
+    templates = result.scalars().all()
+
+    # Get item counts
+    if templates:
+        template_ids = [t.id for t in templates]
+        count_query = select(
+            ChecklistItem.template_id, func.count(ChecklistItem.id)
+        ).where(
+            ChecklistItem.template_id.in_(template_ids)
+        ).group_by(ChecklistItem.template_id)
+        count_result = await db.execute(count_query)
+        counts = dict(count_result.all())
+
+        responses = []
+        for t in templates:
+            resp = ChecklistTemplateResponse.model_validate(t)
+            resp.item_count = counts.get(t.id, 0)
+            responses.append(resp)
+        return responses
+
+    return []
 
 
 @router.get("/templates/{template_id}", response_model=ChecklistTemplateWithItems)
@@ -129,7 +149,9 @@ async def update_template(
     db: AsyncSession = Depends(get_db)
 ):
     """Update a checklist template"""
-    query = select(ChecklistTemplate).where(ChecklistTemplate.id == template_id)
+    query = select(ChecklistTemplate).options(
+        selectinload(ChecklistTemplate.items)
+    ).where(ChecklistTemplate.id == template_id)
     result = await db.execute(query)
     template = result.scalar_one_or_none()
 
@@ -137,14 +159,39 @@ async def update_template(
         raise HTTPException(status_code=404, detail="Template not found")
 
     update_data = data.model_dump(exclude_unset=True)
+    items_data = update_data.pop("items", None)
+
     for field, value in update_data.items():
         setattr(template, field, value)
+
+    # Replace items if provided
+    if items_data is not None:
+        # Delete checklist_responses referencing old items before removing them
+        old_item_ids = [item.id for item in template.items]
+        if old_item_ids:
+            await db.execute(
+                delete(ChecklistResponse).where(ChecklistResponse.item_id.in_(old_item_ids))
+            )
+        template.items.clear()
+        for idx, item_data in enumerate(items_data):
+            item = ChecklistItem(
+                template_id=template_id,
+                sort_order=item_data.get("sort_order", idx),
+                **{k: v for k, v in item_data.items() if k != "sort_order"}
+            )
+            template.items.append(item)
 
     await db.commit()
     await db.refresh(template)
 
+    # Return with item_count
+    item_count_query = select(func.count(ChecklistItem.id)).where(ChecklistItem.template_id == template_id)
+    count_result = await db.execute(item_count_query)
+    response = ChecklistTemplateResponse.model_validate(template)
+    response.item_count = count_result.scalar()
+
     logger.info(f"Updated checklist template: {template.name}")
-    return template
+    return response
 
 
 @router.post("/templates/{template_id}/items", response_model=ChecklistItemResponse, status_code=201)
@@ -208,7 +255,9 @@ async def list_submissions(
     db: AsyncSession = Depends(get_db)
 ):
     """List checklist submissions"""
-    query = select(ChecklistSubmission)
+    query = select(ChecklistSubmission).options(
+        selectinload(ChecklistSubmission.template)
+    )
 
     if location_id:
         query = query.where(ChecklistSubmission.location_id == location_id)
@@ -223,7 +272,14 @@ async def list_submissions(
 
     query = query.order_by(ChecklistSubmission.submission_date.desc()).limit(limit)
     result = await db.execute(query)
-    return result.scalars().all()
+    submissions = result.scalars().all()
+
+    responses = []
+    for s in submissions:
+        resp = ChecklistSubmissionResponse.model_validate(s)
+        resp.template_name = s.template.name if s.template else None
+        responses.append(resp)
+    return responses
 
 
 @router.get("/submissions/{submission_id}", response_model=ChecklistSubmissionWithDetails)
@@ -390,7 +446,9 @@ async def list_pending_signoffs(
     db: AsyncSession = Depends(get_db)
 ):
     """List submissions pending manager sign-off"""
-    query = select(ChecklistSubmission).where(
+    query = select(ChecklistSubmission).options(
+        selectinload(ChecklistSubmission.template)
+    ).where(
         ChecklistSubmission.status == ChecklistStatus.PENDING_SIGNOFF
     )
 
@@ -399,4 +457,11 @@ async def list_pending_signoffs(
 
     query = query.order_by(ChecklistSubmission.completed_at)
     result = await db.execute(query)
-    return result.scalars().all()
+    submissions = result.scalars().all()
+
+    responses = []
+    for s in submissions:
+        resp = ChecklistSubmissionResponse.model_validate(s)
+        resp.template_name = s.template.name if s.template else None
+        responses.append(resp)
+    return responses

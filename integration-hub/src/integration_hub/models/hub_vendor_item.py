@@ -17,9 +17,10 @@ Vendor Item records are per-location because:
 """
 
 from sqlalchemy import Column, Integer, String, Numeric, DateTime, Boolean, ForeignKey, Text, Enum, UniqueConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, validates
 from sqlalchemy.sql import func
 from integration_hub.db.database import Base
+from integration_hub.utils.text_utils import to_title_case
 import enum
 
 # pgvector support for AI embeddings
@@ -169,6 +170,13 @@ class HubVendorItem(Base):
     unit_uom = relationship("UnitOfMeasure", foreign_keys=[unit_uom_id])
     size_unit = relationship("SizeUnit", foreign_keys=[size_unit_id])
     container = relationship("Container", foreign_keys=[container_id])
+
+    @validates('vendor_product_name')
+    def normalize_product_name(self, key, value):
+        """Auto-normalize product name to title case on create/update."""
+        if value:
+            return to_title_case(value)
+        return value
 
     def __repr__(self):
         name_preview = self.vendor_product_name[:30] if self.vendor_product_name else None

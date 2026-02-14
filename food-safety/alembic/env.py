@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from food_safety.config import settings
 from food_safety.database import Base
 from food_safety.models import (
-    UserPermission, Location, Equipment, Shift,
+    UserPermission, Location, EquipmentTempThreshold, Shift,
     TemperatureLog, TemperatureThreshold,
     ChecklistTemplate, ChecklistItem, ChecklistSubmission,
     ChecklistResponse, ManagerSignoff,

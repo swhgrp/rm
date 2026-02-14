@@ -25,6 +25,12 @@
         font-size: 14px;
     }
 
+    .header-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+
     .btn-primary {
         padding: 10px 20px;
         background-color: var(--accent-primary);
@@ -35,13 +41,83 @@
         font-weight: 500;
         cursor: pointer;
         text-decoration: none;
-        display: flex;
+        display: inline-flex;
         align-items: center;
         gap: 8px;
     }
 
     .btn-primary:hover {
         background-color: var(--accent-hover);
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .btn-sm {
+        padding: 6px 14px;
+        font-size: 13px;
+    }
+
+    .btn-danger {
+        padding: 6px 14px;
+        background-color: var(--error);
+        color: #FFFFFF;
+        border: none;
+        border-radius: 6px;
+        font-size: 13px;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .btn-danger:hover {
+        opacity: 0.85;
+    }
+
+    /* Plan selector bar */
+    .plan-selector-bar {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 20px;
+        padding: 15px 20px;
+        background-color: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 10px;
+        flex-wrap: wrap;
+    }
+
+    .plan-selector-bar label {
+        font-weight: 600;
+        font-size: 14px;
+        white-space: nowrap;
+    }
+
+    .plan-selector-bar select {
+        padding: 8px 12px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        font-size: 14px;
+        background-color: var(--bg-primary);
+        min-width: 250px;
+    }
+
+    .plan-meta {
+        margin-left: auto;
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        font-size: 13px;
+        color: var(--text-secondary);
+    }
+
+    .plan-meta span {
+        display: flex;
+        align-items: center;
+        gap: 5px;
     }
 
     .tabs {
@@ -187,6 +263,38 @@
     .ccp-limit.critical .value { color: var(--error); }
     .ccp-limit.target .value { color: var(--success); }
 
+    .ccp-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 15px;
+        padding-top: 12px;
+        border-top: 1px solid var(--border-primary);
+    }
+
+    .ccp-actions button {
+        padding: 5px 12px;
+        font-size: 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        border: 1px solid var(--border-primary);
+        background-color: var(--bg-secondary);
+        color: var(--text-secondary);
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .ccp-actions button:hover {
+        background-color: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+
+    .ccp-actions button.delete-btn:hover {
+        background-color: var(--error-bg);
+        color: var(--error);
+        border-color: var(--error);
+    }
+
     .flow-diagram {
         display: flex;
         flex-wrap: wrap;
@@ -313,9 +421,9 @@
         background-color: rgba(0, 0, 0, 0.5);
         z-index: 1000;
         justify-content: center;
-        align-items: center;
+        align-items: flex-start;
         overflow-y: auto;
-        padding: 20px;
+        padding: 40px 20px;
     }
 
     .modal-overlay.active { display: flex; }
@@ -323,10 +431,9 @@
     .modal {
         background-color: var(--bg-secondary);
         border-radius: 12px;
-        max-width: 700px;
+        max-width: 750px;
         width: 100%;
-        max-height: 90vh;
-        overflow-y: auto;
+        max-height: none;
     }
 
     .modal-header {
@@ -387,11 +494,18 @@
         border-radius: 6px;
         font-size: 14px;
         background-color: var(--bg-primary);
+        color: var(--text-primary);
     }
 
     .form-row {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+    }
+
+    .form-row-3 {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
         gap: 15px;
     }
 
@@ -403,6 +517,16 @@
         margin-bottom: 20px;
         font-size: 14px;
     }
+
+    .section-divider {
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 15px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--border-primary);
+    }
 {% endblock %}
 
 {% block content %}
@@ -411,260 +535,267 @@
             <h2><i class="bi bi-shield-check"></i> HACCP Management</h2>
             <p class="page-subtitle">Hazard Analysis and Critical Control Points</p>
         </div>
-        <button class="btn-primary" onclick="showAddCCPModal()">
-            <i class="bi bi-plus-lg"></i> Add CCP
-        </button>
+        <div class="header-actions">
+            <button class="btn-primary" onclick="showCreatePlanModal()">
+                <i class="bi bi-plus-lg"></i> New Plan
+            </button>
+        </div>
     </div>
 
-    <div class="tabs">
-        <button class="tab active" onclick="showTab('ccps')">Critical Control Points</button>
-        <button class="tab" onclick="showTab('flow')">Process Flow</button>
-        <button class="tab" onclick="showTab('hazards')">Hazard Analysis</button>
-        <button class="tab" onclick="showTab('monitoring')">Monitoring Records</button>
+    <!-- Plan Selector Bar -->
+    <div class="plan-selector-bar">
+        <label for="planSelect"><i class="bi bi-diagram-3"></i> HACCP Plan:</label>
+        <select id="planSelect" onchange="onPlanSelected()">
+            <option value="">-- Select a plan --</option>
+        </select>
+        <div class="plan-meta" id="planMeta" style="display: none;">
+            <span id="planVersion"></span>
+            <span id="planStatus"></span>
+            <span id="planEffective"></span>
+        </div>
     </div>
 
-    <!-- CCPs Tab -->
-    <div class="tab-content active" id="ccps-tab">
+    <!-- No Plans State -->
+    <div id="noPlansState" style="display: none;">
         <div class="card">
-            <div class="card-header">
-                <h3>Critical Control Points</h3>
-                <select class="filter-select" id="locationFilter" onchange="loadCCPs()" style="padding: 8px 12px; border: 1px solid var(--border-primary); border-radius: 6px;">
-                    <option value="">All Locations</option>
-                </select>
-            </div>
             <div class="card-body">
-                <div id="ccpGrid" class="ccp-grid">
-                    <div class="loading"><div class="spinner"></div></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Process Flow Tab -->
-    <div class="tab-content" id="flow-tab">
-        <div class="card">
-            <div class="card-header">
-                <h3>Process Flow Diagram</h3>
-            </div>
-            <div class="card-body">
-                <div class="flow-diagram" id="flowDiagram">
-                    <div class="flow-step">
-                        <div class="step-number">Step 1</div>
-                        <div class="step-name">Receiving</div>
-                    </div>
-                    <div class="flow-arrow"><i class="bi bi-arrow-right"></i></div>
-                    <div class="flow-step ccp">
-                        <div class="step-number">Step 2</div>
-                        <div class="step-name">Cold Storage</div>
-                        <div class="step-tag">CCP-1</div>
-                    </div>
-                    <div class="flow-arrow"><i class="bi bi-arrow-right"></i></div>
-                    <div class="flow-step">
-                        <div class="step-number">Step 3</div>
-                        <div class="step-name">Preparation</div>
-                    </div>
-                    <div class="flow-arrow"><i class="bi bi-arrow-right"></i></div>
-                    <div class="flow-step ccp">
-                        <div class="step-number">Step 4</div>
-                        <div class="step-name">Cooking</div>
-                        <div class="step-tag">CCP-2</div>
-                    </div>
-                    <div class="flow-arrow"><i class="bi bi-arrow-right"></i></div>
-                    <div class="flow-step ccp">
-                        <div class="step-number">Step 5</div>
-                        <div class="step-name">Hot Holding</div>
-                        <div class="step-tag">CCP-3</div>
-                    </div>
-                    <div class="flow-arrow"><i class="bi bi-arrow-right"></i></div>
-                    <div class="flow-step">
-                        <div class="step-number">Step 6</div>
-                        <div class="step-name">Service</div>
-                    </div>
-                </div>
-                <div class="info-box">
-                    <i class="bi bi-info-circle"></i>
-                    <strong>Note:</strong> Steps highlighted in red are Critical Control Points (CCPs) where monitoring is required to ensure food safety.
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Hazard Analysis Tab -->
-    <div class="tab-content" id="hazards-tab">
-        <div class="card">
-            <div class="card-header">
-                <h3>Hazard Analysis</h3>
-                <button class="btn-primary" onclick="showAddHazardModal()" style="padding: 8px 16px;">
-                    <i class="bi bi-plus-lg"></i> Add Hazard
-                </button>
-            </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Process Step</th>
-                            <th>Hazard Type</th>
-                            <th>Description</th>
-                            <th>Severity</th>
-                            <th>Likelihood</th>
-                            <th>Control Measure</th>
-                            <th>CCP?</th>
-                        </tr>
-                    </thead>
-                    <tbody id="hazardsTable">
-                        <tr>
-                            <td>Receiving</td>
-                            <td>Biological</td>
-                            <td>Pathogens in raw products</td>
-                            <td><span class="badge badge-critical">High</span></td>
-                            <td><span class="badge badge-warning">Medium</span></td>
-                            <td>Supplier verification, temperature check</td>
-                            <td>No</td>
-                        </tr>
-                        <tr>
-                            <td>Cold Storage</td>
-                            <td>Biological</td>
-                            <td>Bacterial growth from temperature abuse</td>
-                            <td><span class="badge badge-critical">High</span></td>
-                            <td><span class="badge badge-warning">Medium</span></td>
-                            <td>Temperature monitoring, alarms</td>
-                            <td><span class="badge badge-critical">CCP-1</span></td>
-                        </tr>
-                        <tr>
-                            <td>Cooking</td>
-                            <td>Biological</td>
-                            <td>Survival of pathogens</td>
-                            <td><span class="badge badge-critical">High</span></td>
-                            <td><span class="badge badge-critical">High</span></td>
-                            <td>Time/temperature control</td>
-                            <td><span class="badge badge-critical">CCP-2</span></td>
-                        </tr>
-                        <tr>
-                            <td>Hot Holding</td>
-                            <td>Biological</td>
-                            <td>Bacterial growth from temperature abuse</td>
-                            <td><span class="badge badge-critical">High</span></td>
-                            <td><span class="badge badge-warning">Medium</span></td>
-                            <td>Temperature monitoring</td>
-                            <td><span class="badge badge-critical">CCP-3</span></td>
-                        </tr>
-                        <tr>
-                            <td>Preparation</td>
-                            <td>Physical</td>
-                            <td>Foreign objects (metal, glass)</td>
-                            <td><span class="badge badge-warning">Medium</span></td>
-                            <td><span class="badge badge-active">Low</span></td>
-                            <td>Visual inspection, metal detectors</td>
-                            <td>No</td>
-                        </tr>
-                        <tr>
-                            <td>Preparation</td>
-                            <td>Chemical</td>
-                            <td>Cross-contamination from sanitizers</td>
-                            <td><span class="badge badge-warning">Medium</span></td>
-                            <td><span class="badge badge-active">Low</span></td>
-                            <td>Proper chemical storage, training</td>
-                            <td>No</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Monitoring Records Tab -->
-    <div class="tab-content" id="monitoring-tab">
-        <div class="card">
-            <div class="card-header">
-                <h3>Monitoring Records</h3>
-                <div style="display: flex; gap: 10px;">
-                    <input type="date" id="monitoringDate" style="padding: 8px 12px; border: 1px solid var(--border-primary); border-radius: 6px;">
-                    <button class="btn-primary" onclick="addMonitoringRecord()" style="padding: 8px 16px;">
-                        <i class="bi bi-plus-lg"></i> Add Record
+                <div class="empty-state">
+                    <i class="bi bi-diagram-3"></i>
+                    <h3>No HACCP Plans</h3>
+                    <p style="margin: 15px 0;">Create your first HACCP plan to start managing critical control points.</p>
+                    <button class="btn-primary" onclick="showCreatePlanModal()">
+                        <i class="bi bi-plus-lg"></i> Create HACCP Plan
                     </button>
                 </div>
             </div>
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date/Time</th>
-                            <th>CCP</th>
-                            <th>Measurement</th>
-                            <th>Critical Limit</th>
-                            <th>Status</th>
-                            <th>Recorded By</th>
-                            <th>Corrective Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="monitoringTable">
-                        <tr>
-                            <td colspan="7">
-                                <div class="loading"><div class="spinner"></div></div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+        </div>
+    </div>
+
+    <!-- Plan Content (shown when a plan is selected) -->
+    <div id="planContent" style="display: none;">
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('ccps', this)">Critical Control Points</button>
+            <button class="tab" onclick="showTab('flow', this)">Process Flow</button>
+            <button class="tab" onclick="showTab('hazards', this)">Hazard Analysis</button>
+            <button class="tab" onclick="showTab('monitoring', this)">Monitoring Records</button>
+        </div>
+
+        <!-- CCPs Tab -->
+        <div class="tab-content active" id="ccps-tab">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Critical Control Points</h3>
+                    <button class="btn-primary btn-sm" onclick="showAddCCPModal()" id="addCCPBtn">
+                        <i class="bi bi-plus-lg"></i> Add CCP
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="ccpGrid" class="ccp-grid">
+                        <div class="empty-state">
+                            <i class="bi bi-shield-exclamation"></i>
+                            <p>Select a plan to view its critical control points.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Process Flow Tab -->
+        <div class="tab-content" id="flow-tab">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Process Flow Diagram</h3>
+                </div>
+                <div class="card-body">
+                    <div class="flow-diagram" id="flowDiagram"></div>
+                    <div class="info-box">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Note:</strong> Steps highlighted in red are Critical Control Points (CCPs) where monitoring is required to ensure food safety. The flow is generated from the CCPs defined in this plan.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hazard Analysis Tab -->
+        <div class="tab-content" id="hazards-tab">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Hazard Analysis</h3>
+                </div>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>CCP #</th>
+                                <th>Process Step</th>
+                                <th>Hazard</th>
+                                <th>Critical Limits</th>
+                                <th>Monitoring</th>
+                                <th>Corrective Action</th>
+                                <th>Verification</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hazardsTable">
+                            <tr><td colspan="7"><div class="empty-state"><p>Select a plan to view hazard analysis.</p></div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Monitoring Records Tab -->
+        <div class="tab-content" id="monitoring-tab">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Monitoring Records</h3>
+                </div>
+                <div class="card-body">
+                    <div class="info-box">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Coming Soon:</strong> Monitoring record tracking is under development. Temperature logs from equipment linked to these CCPs will appear here once the integration is complete.
+                    </div>
+                    <div class="empty-state">
+                        <i class="bi bi-clipboard-data"></i>
+                        <p>Monitoring records will be available in a future update.</p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Add CCP Modal -->
-    <div class="modal-overlay" id="addCCPModal">
+    <!-- Create Plan Modal -->
+    <div class="modal-overlay" id="createPlanModal">
         <div class="modal">
             <div class="modal-header">
-                <h3 class="modal-title">Add Critical Control Point</h3>
-                <button class="modal-close" onclick="closeModal('addCCPModal')">&times;</button>
+                <h3 class="modal-title">Create HACCP Plan</h3>
+                <button class="modal-close" onclick="closeModal('createPlanModal')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="planForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Plan Name *</label>
+                            <input type="text" id="planName" placeholder="e.g., Kitchen HACCP Plan" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Location *</label>
+                            <select id="planLocation" required>
+                                <option value="">Select Location</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="planDescription" rows="2" placeholder="Brief description of this HACCP plan"></textarea>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Version</label>
+                            <input type="text" id="planVersion" placeholder="e.g., 1.0">
+                        </div>
+                        <div class="form-group">
+                            <label>Effective Date *</label>
+                            <input type="date" id="planEffectiveDate" required>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Review Date</label>
+                        <input type="date" id="planReviewDate">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" onclick="closeModal('createPlanModal')">Cancel</button>
+                <button class="btn-primary" onclick="savePlan()">Create Plan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit CCP Modal -->
+    <div class="modal-overlay" id="ccpModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="ccpModalTitle">Add Critical Control Point</h3>
+                <button class="modal-close" onclick="closeModal('ccpModal')">&times;</button>
             </div>
             <div class="modal-body">
                 <form id="ccpForm">
-                    <div class="form-group">
-                        <label>Location *</label>
-                        <select id="ccpLocation" required>
-                            <option value="">Select Location</option>
-                        </select>
-                    </div>
+                    <input type="hidden" id="ccpEditId" value="">
+
+                    <div class="section-divider">Identification</div>
                     <div class="form-row">
                         <div class="form-group">
                             <label>CCP Number *</label>
                             <input type="text" id="ccpNumber" placeholder="e.g., CCP-1" required>
                         </div>
                         <div class="form-group">
-                            <label>Process Step *</label>
-                            <input type="text" id="ccpStep" placeholder="e.g., Cooking" required>
+                            <label>Name *</label>
+                            <input type="text" id="ccpName" placeholder="e.g., Cold Storage Temperature" required>
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label>Process Step *</label>
+                        <input type="text" id="ccpProcessStep" placeholder="e.g., Cold Storage, Cooking, Hot Holding" required>
+                    </div>
+
+                    <div class="section-divider">Hazard &amp; Limits</div>
                     <div class="form-group">
                         <label>Hazard Description *</label>
-                        <textarea id="ccpHazard" rows="2" placeholder="Describe the hazard being controlled" required></textarea>
+                        <textarea id="ccpHazardDescription" rows="2" placeholder="Describe the hazard being controlled" required></textarea>
                     </div>
-                    <div class="form-row">
+                    <div class="form-group">
+                        <label>Critical Limits *</label>
+                        <input type="text" id="ccpCriticalLimits" placeholder="e.g., Internal temp >= 165F for 15 sec; Cold storage <= 41F" required>
+                    </div>
+                    <div class="form-row-3">
                         <div class="form-group">
-                            <label>Critical Limit (Min)</label>
-                            <input type="number" id="ccpLimitMin" step="0.1" placeholder="e.g., 165">
+                            <label>Min Temp</label>
+                            <input type="number" id="ccpMinTemp" step="0.1" placeholder="e.g., 135">
                         </div>
                         <div class="form-group">
-                            <label>Critical Limit (Max)</label>
-                            <input type="number" id="ccpLimitMax" step="0.1" placeholder="e.g., 40">
+                            <label>Max Temp</label>
+                            <input type="number" id="ccpMaxTemp" step="0.1" placeholder="e.g., 41">
+                        </div>
+                        <div class="form-group">
+                            <label>Temp Unit</label>
+                            <select id="ccpTempUnit">
+                                <option value="">--</option>
+                                <option value="F" selected>F</option>
+                                <option value="C">C</option>
+                            </select>
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label>Max Time (minutes)</label>
+                        <input type="number" id="ccpMaxTimeMinutes" min="0" placeholder="e.g., 120">
+                    </div>
+
+                    <div class="section-divider">Monitoring &amp; Response</div>
                     <div class="form-group">
                         <label>Monitoring Procedure *</label>
-                        <textarea id="ccpMonitoring" rows="2" placeholder="How will this CCP be monitored?" required></textarea>
+                        <textarea id="ccpMonitoringProcedure" rows="2" placeholder="How will this CCP be monitored?" required></textarea>
                     </div>
                     <div class="form-group">
-                        <label>Corrective Action *</label>
-                        <textarea id="ccpCorrective" rows="2" placeholder="What action is taken if limits are exceeded?" required></textarea>
+                        <label>Monitoring Frequency *</label>
+                        <input type="text" id="ccpMonitoringFrequency" placeholder="e.g., Every 4 hours, Each batch, Continuous" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Corrective Action Procedure *</label>
+                        <textarea id="ccpCorrectiveActionProcedure" rows="2" placeholder="What action is taken if limits are exceeded?" required></textarea>
                     </div>
                     <div class="form-group">
                         <label>Verification Procedure</label>
-                        <textarea id="ccpVerification" rows="2" placeholder="How is monitoring accuracy verified?"></textarea>
+                        <textarea id="ccpVerificationProcedure" rows="2" placeholder="How is monitoring accuracy verified?"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Records Required</label>
+                        <textarea id="ccpRecordsRequired" rows="2" placeholder="e.g., Temperature logs, calibration records, corrective action reports"></textarea>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button class="btn-secondary" onclick="closeModal('addCCPModal')">Cancel</button>
-                <button class="btn-primary" onclick="saveCCP()">Save CCP</button>
+                <button class="btn-secondary" onclick="closeModal('ccpModal')">Cancel</button>
+                <button class="btn-primary" onclick="saveCCP()" id="saveCCPBtn">Save CCP</button>
             </div>
         </div>
     </div>
@@ -672,278 +803,309 @@
 
 {% block extra_scripts %}
 <script>
-    const API_BASE = '/food-safety';
-    let ccps = [];
+    const FS_API = '/food-safety';
+    let plans = [];
+    let selectedPlan = null;
+    let selectedCCPs = [];
     let locations = [];
 
-    function showTab(tabName) {
+    // ========================
+    // Tab switching
+    // ========================
+    function showTab(tabName, btn) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
 
-        event.target.classList.add('active');
+        if (btn) btn.classList.add('active');
         document.getElementById(tabName + '-tab').classList.add('active');
-
-        if (tabName === 'monitoring') {
-            loadMonitoringRecords();
-        }
     }
 
+    // ========================
+    // Locations
+    // ========================
     async function loadLocations() {
         try {
             const response = await fetch('/inventory/api/locations/_sync?include_inactive=false');
             if (response.ok) {
                 locations = await response.json();
-                const selects = ['locationFilter', 'ccpLocation'];
-                selects.forEach(id => {
-                    const select = document.getElementById(id);
-                    if (select) {
-                        if (id === 'locationFilter') {
-                            select.innerHTML = '<option value="">All Locations</option>';
-                        } else {
-                            select.innerHTML = '<option value="">Select Location</option>';
-                        }
-                        locations.forEach(loc => {
-                            select.innerHTML += `<option value="${loc.id}">${escapeHtml(loc.name)}</option>`;
-                        });
-                    }
-                });
+                const select = document.getElementById('planLocation');
+                if (select) {
+                    select.innerHTML = '<option value="">Select Location</option>';
+                    locations.forEach(loc => {
+                        select.innerHTML += `<option value="${loc.id}">${escapeHtml(loc.name)}</option>`;
+                    });
+                }
             }
         } catch (error) {
             console.error('Error loading locations:', error);
         }
     }
 
-    async function loadCCPs() {
-        const grid = document.getElementById('ccpGrid');
-        try {
-            const locationId = document.getElementById('locationFilter').value;
-            let url = `${API_BASE}/haccp/ccps`;
-            if (locationId) url += `?location_id=${locationId}`;
+    function locationName(locationId) {
+        const loc = locations.find(l => l.id === locationId);
+        return loc ? loc.name : '';
+    }
 
-            const response = await fetch(url);
-            if (response.ok) {
-                ccps = await response.json();
-                renderCCPs();
-            } else {
-                // Show sample data if API not available
-                renderSampleCCPs();
+    // ========================
+    // Plans
+    // ========================
+    async function loadPlans() {
+        try {
+            const response = await fetch(`${FS_API}/haccp/plans`);
+            if (!response.ok) {
+                showError('Failed to load HACCP plans');
+                return;
             }
+            plans = await response.json();
+            populatePlanDropdown();
         } catch (error) {
-            console.error('Error loading CCPs:', error);
-            renderSampleCCPs();
+            console.error('Error loading plans:', error);
+            showError('Could not connect to HACCP service');
         }
     }
 
-    function renderSampleCCPs() {
-        const sampleCCPs = [
-            {
-                number: 'CCP-1',
-                step: 'Cold Storage',
-                hazard: 'Bacterial growth from temperature abuse',
-                critical_limit_max: 40,
-                target_value: 36,
-                monitoring: 'Temperature logged every 4 hours',
-                status: 'active'
-            },
-            {
-                number: 'CCP-2',
-                step: 'Cooking',
-                hazard: 'Survival of pathogenic microorganisms',
-                critical_limit_min: 165,
-                target_value: 165,
-                monitoring: 'Internal temperature of all cooked products',
-                status: 'active'
-            },
-            {
-                number: 'CCP-3',
-                step: 'Hot Holding',
-                hazard: 'Bacterial growth from temperature abuse',
-                critical_limit_min: 135,
-                target_value: 140,
-                monitoring: 'Temperature logged every 2 hours',
-                status: 'active'
-            },
-            {
-                number: 'CCP-4',
-                step: 'Cooling',
-                hazard: 'Bacterial growth during slow cooling',
-                critical_limit_max: 70,
-                target_value: null,
-                monitoring: 'Time/temp: 135°F to 70°F within 2 hrs, 70°F to 41°F within 4 hrs',
-                status: 'active'
-            }
-        ];
+    function populatePlanDropdown() {
+        const select = document.getElementById('planSelect');
+        select.innerHTML = '<option value="">-- Select a plan --</option>';
 
-        const grid = document.getElementById('ccpGrid');
-        grid.innerHTML = sampleCCPs.map(ccp => `
-            <div class="ccp-card critical">
-                <div class="ccp-header">
-                    <div class="ccp-name">${escapeHtml(ccp.step)}</div>
-                    <div class="ccp-number">${escapeHtml(ccp.number)}</div>
-                </div>
-                <div class="ccp-detail">
-                    <label>Hazard</label>
-                    <span>${escapeHtml(ccp.hazard)}</span>
-                </div>
-                <div class="ccp-detail">
-                    <label>Monitoring</label>
-                    <span>${escapeHtml(ccp.monitoring)}</span>
-                </div>
-                <div class="ccp-limits">
-                    ${ccp.critical_limit_min ? `
-                        <div class="ccp-limit critical">
-                            <div class="value">${ccp.critical_limit_min}°F</div>
-                            <div class="label">Min. Limit</div>
-                        </div>
-                    ` : ''}
-                    ${ccp.critical_limit_max ? `
-                        <div class="ccp-limit critical">
-                            <div class="value">${ccp.critical_limit_max}°F</div>
-                            <div class="label">Max. Limit</div>
-                        </div>
-                    ` : ''}
-                    ${ccp.target_value ? `
-                        <div class="ccp-limit target">
-                            <div class="value">${ccp.target_value}°F</div>
-                            <div class="label">Target</div>
-                        </div>
-                    ` : ''}
-                </div>
-            </div>
-        `).join('');
-    }
-
-    function renderCCPs() {
-        const grid = document.getElementById('ccpGrid');
-
-        if (!ccps || ccps.length === 0) {
-            renderSampleCCPs();
+        if (plans.length === 0) {
+            document.getElementById('noPlansState').style.display = 'block';
+            document.getElementById('planContent').style.display = 'none';
             return;
         }
 
-        grid.innerHTML = ccps.map(ccp => {
-            const loc = locations.find(l => l.id === ccp.location_id);
+        document.getElementById('noPlansState').style.display = 'none';
+
+        plans.forEach(plan => {
+            const loc = locationName(plan.location_id);
+            const label = loc ? `${plan.name} (${loc})` : plan.name;
+            select.innerHTML += `<option value="${plan.id}">${escapeHtml(label)}</option>`;
+        });
+
+        // Auto-select first plan
+        if (plans.length > 0) {
+            select.value = plans[0].id;
+            onPlanSelected();
+        }
+    }
+
+    async function onPlanSelected() {
+        const planId = document.getElementById('planSelect').value;
+        if (!planId) {
+            document.getElementById('planContent').style.display = 'none';
+            document.getElementById('planMeta').style.display = 'none';
+            selectedPlan = null;
+            selectedCCPs = [];
+            return;
+        }
+
+        document.getElementById('planContent').style.display = 'block';
+        document.getElementById('ccpGrid').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+
+        try {
+            const response = await fetch(`${FS_API}/haccp/plans/${planId}`);
+            if (!response.ok) {
+                showError('Failed to load plan details');
+                return;
+            }
+            const data = await response.json();
+            selectedPlan = data;
+            selectedCCPs = data.critical_control_points || [];
+
+            // Show plan metadata
+            const metaDiv = document.getElementById('planMeta');
+            metaDiv.style.display = 'flex';
+
+            const versionEl = document.getElementById('planVersion');
+            const statusEl = document.getElementById('planStatus');
+            const effectiveEl = document.getElementById('planEffective');
+
+            versionEl.innerHTML = data.version ? `<i class="bi bi-tag"></i> v${escapeHtml(data.version)}` : '';
+            statusEl.innerHTML = data.is_active !== false
+                ? '<span class="badge badge-active">Active</span>'
+                : '<span class="badge badge-inactive">Inactive</span>';
+            effectiveEl.innerHTML = data.effective_date
+                ? `<i class="bi bi-calendar-check"></i> Effective: ${escapeHtml(data.effective_date)}`
+                : '';
+
+            renderCCPs();
+            renderFlowDiagram();
+            renderHazardAnalysis();
+        } catch (error) {
+            console.error('Error loading plan:', error);
+            showError('Could not load plan details');
+        }
+    }
+
+    function showCreatePlanModal() {
+        document.getElementById('planForm').reset();
+        // Default effective date to today
+        document.getElementById('planEffectiveDate').value = new Date().toISOString().split('T')[0];
+        document.getElementById('createPlanModal').classList.add('active');
+    }
+
+    async function savePlan() {
+        const form = document.getElementById('planForm');
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const data = {
+            name: document.getElementById('planName').value,
+            location_id: parseInt(document.getElementById('planLocation').value),
+            description: document.getElementById('planDescription').value || null,
+            version: document.getElementById('planVersion').value || null,
+            effective_date: document.getElementById('planEffectiveDate').value,
+            review_date: document.getElementById('planReviewDate').value || null,
+            is_active: true,
+            critical_control_points: []
+        };
+
+        try {
+            const response = await fetch(`${FS_API}/haccp/plans`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                const newPlan = await response.json();
+                closeModal('createPlanModal');
+                showSuccess('HACCP plan created successfully');
+                await loadPlans();
+                // Select the newly created plan
+                document.getElementById('planSelect').value = newPlan.id;
+                onPlanSelected();
+            } else {
+                const err = await response.json().catch(() => null);
+                showError(err?.detail || 'Failed to create HACCP plan');
+            }
+        } catch (error) {
+            console.error('Error creating plan:', error);
+            showError('Could not create plan');
+        }
+    }
+
+    // ========================
+    // CCPs
+    // ========================
+    function renderCCPs() {
+        const grid = document.getElementById('ccpGrid');
+
+        if (!selectedCCPs || selectedCCPs.length === 0) {
+            grid.innerHTML = `
+                <div class="empty-state" style="grid-column: 1 / -1;">
+                    <i class="bi bi-shield-exclamation"></i>
+                    <h3>No Critical Control Points</h3>
+                    <p style="margin: 15px 0;">Add CCPs to this plan to define monitoring requirements.</p>
+                    <button class="btn-primary" onclick="showAddCCPModal()">
+                        <i class="bi bi-plus-lg"></i> Add CCP
+                    </button>
+                </div>`;
+            return;
+        }
+
+        // Sort by ccp_number or sort_order
+        const sorted = [...selectedCCPs].sort((a, b) => {
+            if (a.sort_order != null && b.sort_order != null) return a.sort_order - b.sort_order;
+            return (a.ccp_number || '').localeCompare(b.ccp_number || '');
+        });
+
+        grid.innerHTML = sorted.map(ccp => {
+            const tempUnit = ccp.temp_unit || 'F';
             return `
-                <div class="ccp-card critical" onclick="viewCCP('${ccp.id}')">
+                <div class="ccp-card critical">
                     <div class="ccp-header">
-                        <div class="ccp-name">${escapeHtml(ccp.process_step)}</div>
+                        <div>
+                            <div class="ccp-name">${escapeHtml(ccp.name || ccp.process_step)}</div>
+                            <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">${escapeHtml(ccp.process_step)}</div>
+                        </div>
                         <div class="ccp-number">${escapeHtml(ccp.ccp_number)}</div>
                     </div>
-                    ${loc ? `<div style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">${escapeHtml(loc.name)}</div>` : ''}
                     <div class="ccp-detail">
                         <label>Hazard</label>
                         <span>${escapeHtml(ccp.hazard_description)}</span>
                     </div>
                     <div class="ccp-detail">
+                        <label>Critical Limits</label>
+                        <span>${escapeHtml(ccp.critical_limits)}</span>
+                    </div>
+                    <div class="ccp-detail">
                         <label>Monitoring</label>
                         <span>${escapeHtml(ccp.monitoring_procedure)}</span>
                     </div>
+                    <div class="ccp-detail">
+                        <label>Frequency</label>
+                        <span>${escapeHtml(ccp.monitoring_frequency || '-')}</span>
+                    </div>
                     <div class="ccp-limits">
-                        ${ccp.critical_limit_min !== null ? `
+                        ${ccp.min_temp != null ? `
                             <div class="ccp-limit critical">
-                                <div class="value">${ccp.critical_limit_min}°F</div>
-                                <div class="label">Min. Limit</div>
+                                <div class="value">${ccp.min_temp}&deg;${tempUnit}</div>
+                                <div class="label">Min Temp</div>
                             </div>
                         ` : ''}
-                        ${ccp.critical_limit_max !== null ? `
+                        ${ccp.max_temp != null ? `
                             <div class="ccp-limit critical">
-                                <div class="value">${ccp.critical_limit_max}°F</div>
-                                <div class="label">Max. Limit</div>
+                                <div class="value">${ccp.max_temp}&deg;${tempUnit}</div>
+                                <div class="label">Max Temp</div>
                             </div>
                         ` : ''}
+                        ${ccp.max_time_minutes != null ? `
+                            <div class="ccp-limit target">
+                                <div class="value">${ccp.max_time_minutes}m</div>
+                                <div class="label">Max Time</div>
+                            </div>
+                        ` : ''}
+                        ${ccp.min_temp == null && ccp.max_temp == null && ccp.max_time_minutes == null ? `
+                            <div style="color: var(--text-muted); font-size: 13px; padding: 8px;">No numeric limits set</div>
+                        ` : ''}
                     </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    async function loadMonitoringRecords() {
-        const tbody = document.getElementById('monitoringTable');
-        try {
-            const date = document.getElementById('monitoringDate').value || new Date().toISOString().split('T')[0];
-            const response = await fetch(`${API_BASE}/haccp/monitoring?date=${date}`);
-            if (response.ok) {
-                const records = await response.json();
-                renderMonitoringRecords(records);
-            } else {
-                renderSampleMonitoring();
-            }
-        } catch (error) {
-            console.error('Error loading monitoring records:', error);
-            renderSampleMonitoring();
-        }
-    }
-
-    function renderSampleMonitoring() {
-        const tbody = document.getElementById('monitoringTable');
-        const sampleRecords = [
-            { time: '08:00', ccp: 'CCP-1 (Walk-in Cooler)', measurement: '38°F', limit: '≤40°F', status: 'passed', by: 'John D.' },
-            { time: '10:00', ccp: 'CCP-2 (Chicken)', measurement: '172°F', limit: '≥165°F', status: 'passed', by: 'Maria S.' },
-            { time: '12:00', ccp: 'CCP-1 (Walk-in Cooler)', measurement: '37°F', limit: '≤40°F', status: 'passed', by: 'John D.' },
-            { time: '12:30', ccp: 'CCP-3 (Hot Line)', measurement: '142°F', limit: '≥135°F', status: 'passed', by: 'Maria S.' },
-            { time: '14:30', ccp: 'CCP-3 (Hot Line)', measurement: '131°F', limit: '≥135°F', status: 'failed', by: 'Tom R.', action: 'Reheated to 165°F' },
-            { time: '16:00', ccp: 'CCP-1 (Walk-in Cooler)', measurement: '39°F', limit: '≤40°F', status: 'passed', by: 'John D.' }
-        ];
-
-        tbody.innerHTML = sampleRecords.map(r => `
-            <tr>
-                <td>Today ${r.time}</td>
-                <td>${r.ccp}</td>
-                <td><strong>${r.measurement}</strong></td>
-                <td>${r.limit}</td>
-                <td><span class="badge badge-${r.status === 'passed' ? 'active' : 'critical'}">${r.status === 'passed' ? 'OK' : 'Deviation'}</span></td>
-                <td>${r.by}</td>
-                <td>${r.action || '-'}</td>
-            </tr>
-        `).join('');
-    }
-
-    function renderMonitoringRecords(records) {
-        const tbody = document.getElementById('monitoringTable');
-
-        if (!records || records.length === 0) {
-            tbody.innerHTML = `
-                <tr><td colspan="7">
-                    <div class="empty-state">
-                        <i class="bi bi-clipboard-data"></i>
-                        <p>No monitoring records for this date</p>
+                    <div class="ccp-actions">
+                        <button onclick="editCCP(${ccp.id})"><i class="bi bi-pencil"></i> Edit</button>
+                        <button class="delete-btn" onclick="deleteCCP(${ccp.id}, '${escapeHtml(ccp.ccp_number)}')"><i class="bi bi-trash"></i> Delete</button>
                     </div>
-                </td></tr>
-            `;
-            return;
-        }
-
-        tbody.innerHTML = records.map(r => {
-            const ccp = ccps.find(c => c.id === r.ccp_id);
-            return `
-                <tr>
-                    <td>${formatDateTime(r.recorded_at)}</td>
-                    <td>${ccp ? escapeHtml(ccp.ccp_number + ' (' + ccp.process_step + ')') : '-'}</td>
-                    <td><strong>${r.measured_value}°F</strong></td>
-                    <td>${ccp ? (ccp.critical_limit_min ? '≥' + ccp.critical_limit_min + '°F' : '≤' + ccp.critical_limit_max + '°F') : '-'}</td>
-                    <td><span class="badge badge-${r.is_within_limits ? 'active' : 'critical'}">${r.is_within_limits ? 'OK' : 'Deviation'}</span></td>
-                    <td>${escapeHtml(r.recorded_by_name) || '-'}</td>
-                    <td>${r.corrective_action ? escapeHtml(r.corrective_action) : '-'}</td>
-                </tr>
-            `;
+                </div>`;
         }).join('');
     }
 
     function showAddCCPModal() {
+        if (!selectedPlan) {
+            showWarning('Please select a HACCP plan first');
+            return;
+        }
         document.getElementById('ccpForm').reset();
-        document.getElementById('addCCPModal').classList.add('active');
+        document.getElementById('ccpEditId').value = '';
+        document.getElementById('ccpModalTitle').textContent = 'Add Critical Control Point';
+        document.getElementById('saveCCPBtn').textContent = 'Save CCP';
+        document.getElementById('ccpModal').classList.add('active');
     }
 
-    function showAddHazardModal() {
-        showInfo('Hazard analysis modal would open here. This feature allows documenting new potential hazards in the process.');
-    }
+    function editCCP(ccpId) {
+        const ccp = selectedCCPs.find(c => c.id === ccpId);
+        if (!ccp) return;
 
-    function addMonitoringRecord() {
-        showInfo('Monitoring record form would open here. In production, this integrates with temperature logging equipment.');
-    }
+        document.getElementById('ccpEditId').value = ccp.id;
+        document.getElementById('ccpModalTitle').textContent = 'Edit Critical Control Point';
+        document.getElementById('saveCCPBtn').textContent = 'Update CCP';
 
-    function closeModal(id) {
-        document.getElementById(id).classList.remove('active');
+        document.getElementById('ccpNumber').value = ccp.ccp_number || '';
+        document.getElementById('ccpName').value = ccp.name || '';
+        document.getElementById('ccpProcessStep').value = ccp.process_step || '';
+        document.getElementById('ccpHazardDescription').value = ccp.hazard_description || '';
+        document.getElementById('ccpCriticalLimits').value = ccp.critical_limits || '';
+        document.getElementById('ccpMinTemp').value = ccp.min_temp != null ? ccp.min_temp : '';
+        document.getElementById('ccpMaxTemp').value = ccp.max_temp != null ? ccp.max_temp : '';
+        document.getElementById('ccpTempUnit').value = ccp.temp_unit || 'F';
+        document.getElementById('ccpMaxTimeMinutes').value = ccp.max_time_minutes != null ? ccp.max_time_minutes : '';
+        document.getElementById('ccpMonitoringProcedure').value = ccp.monitoring_procedure || '';
+        document.getElementById('ccpMonitoringFrequency').value = ccp.monitoring_frequency || '';
+        document.getElementById('ccpCorrectiveActionProcedure').value = ccp.corrective_action_procedure || '';
+        document.getElementById('ccpVerificationProcedure').value = ccp.verification_procedure || '';
+        document.getElementById('ccpRecordsRequired').value = ccp.records_required || '';
+
+        document.getElementById('ccpModal').classList.add('active');
     }
 
     async function saveCCP() {
@@ -953,41 +1115,152 @@
             return;
         }
 
+        if (!selectedPlan) {
+            showWarning('No plan selected');
+            return;
+        }
+
+        const editId = document.getElementById('ccpEditId').value;
+
         const data = {
-            location_id: parseInt(document.getElementById('ccpLocation').value),
             ccp_number: document.getElementById('ccpNumber').value,
-            process_step: document.getElementById('ccpStep').value,
-            hazard_description: document.getElementById('ccpHazard').value,
-            critical_limit_min: document.getElementById('ccpLimitMin').value ? parseFloat(document.getElementById('ccpLimitMin').value) : null,
-            critical_limit_max: document.getElementById('ccpLimitMax').value ? parseFloat(document.getElementById('ccpLimitMax').value) : null,
-            monitoring_procedure: document.getElementById('ccpMonitoring').value,
-            corrective_action: document.getElementById('ccpCorrective').value,
-            verification_procedure: document.getElementById('ccpVerification').value || null
+            name: document.getElementById('ccpName').value,
+            process_step: document.getElementById('ccpProcessStep').value,
+            hazard_description: document.getElementById('ccpHazardDescription').value,
+            critical_limits: document.getElementById('ccpCriticalLimits').value,
+            min_temp: document.getElementById('ccpMinTemp').value ? parseFloat(document.getElementById('ccpMinTemp').value) : null,
+            max_temp: document.getElementById('ccpMaxTemp').value ? parseFloat(document.getElementById('ccpMaxTemp').value) : null,
+            temp_unit: document.getElementById('ccpTempUnit').value || null,
+            max_time_minutes: document.getElementById('ccpMaxTimeMinutes').value ? parseInt(document.getElementById('ccpMaxTimeMinutes').value) : null,
+            monitoring_procedure: document.getElementById('ccpMonitoringProcedure').value,
+            monitoring_frequency: document.getElementById('ccpMonitoringFrequency').value,
+            corrective_action_procedure: document.getElementById('ccpCorrectiveActionProcedure').value,
+            verification_procedure: document.getElementById('ccpVerificationProcedure').value || null,
+            records_required: document.getElementById('ccpRecordsRequired').value || null
         };
 
         try {
-            const response = await fetch(`${API_BASE}/haccp/ccps`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
-            });
+            let response;
+            if (editId) {
+                // PUT /food-safety/haccp/ccps/{ccp_id}
+                response = await fetch(`${FS_API}/haccp/ccps/${editId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+            } else {
+                // POST /food-safety/haccp/plans/{plan_id}/ccps
+                response = await fetch(`${FS_API}/haccp/plans/${selectedPlan.id}/ccps`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+            }
 
             if (response.ok) {
-                closeModal('addCCPModal');
-                loadCCPs();
+                closeModal('ccpModal');
+                showSuccess(editId ? 'CCP updated successfully' : 'CCP added successfully');
+                await onPlanSelected(); // Reload plan with CCPs
             } else {
-                showError('saving CCP');
+                const err = await response.json().catch(() => null);
+                showError(err?.detail || `Failed to ${editId ? 'update' : 'add'} CCP`);
             }
         } catch (error) {
-            console.error('Error:', error);
-            showError('saving CCP');
+            console.error('Error saving CCP:', error);
+            showError('Could not save CCP');
         }
     }
 
-    function formatDateTime(dateStr) {
-        if (!dateStr) return '-';
-        const date = new Date(dateStr);
-        return date.toLocaleString();
+    async function deleteCCP(ccpId, ccpNumber) {
+        if (!confirm(`Delete ${ccpNumber}? This cannot be undone.`)) return;
+
+        try {
+            const response = await fetch(`${FS_API}/haccp/ccps/${ccpId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                showSuccess(`${ccpNumber} deleted`);
+                await onPlanSelected(); // Reload
+            } else {
+                const err = await response.json().catch(() => null);
+                showError(err?.detail || 'Failed to delete CCP');
+            }
+        } catch (error) {
+            console.error('Error deleting CCP:', error);
+            showError('Could not delete CCP');
+        }
+    }
+
+    // ========================
+    // Process Flow Diagram
+    // ========================
+    function renderFlowDiagram() {
+        const container = document.getElementById('flowDiagram');
+
+        if (!selectedCCPs || selectedCCPs.length === 0) {
+            container.innerHTML = '<div class="empty-state"><p>Add CCPs to see the process flow diagram.</p></div>';
+            return;
+        }
+
+        const sorted = [...selectedCCPs].sort((a, b) => {
+            if (a.sort_order != null && b.sort_order != null) return a.sort_order - b.sort_order;
+            return (a.ccp_number || '').localeCompare(b.ccp_number || '');
+        });
+
+        let html = '';
+        sorted.forEach((ccp, i) => {
+            if (i > 0) {
+                html += '<div class="flow-arrow"><i class="bi bi-arrow-right"></i></div>';
+            }
+            html += `
+                <div class="flow-step ccp">
+                    <div class="step-number">${escapeHtml(ccp.ccp_number)}</div>
+                    <div class="step-name">${escapeHtml(ccp.process_step)}</div>
+                    <div class="step-tag">${escapeHtml(ccp.name || '')}</div>
+                </div>`;
+        });
+
+        container.innerHTML = html;
+    }
+
+    // ========================
+    // Hazard Analysis Table
+    // ========================
+    function renderHazardAnalysis() {
+        const tbody = document.getElementById('hazardsTable');
+
+        if (!selectedCCPs || selectedCCPs.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>No CCPs defined for hazard analysis.</p></div></td></tr>';
+            return;
+        }
+
+        const sorted = [...selectedCCPs].sort((a, b) => {
+            if (a.sort_order != null && b.sort_order != null) return a.sort_order - b.sort_order;
+            return (a.ccp_number || '').localeCompare(b.ccp_number || '');
+        });
+
+        tbody.innerHTML = sorted.map(ccp => `
+            <tr>
+                <td><span class="badge badge-critical">${escapeHtml(ccp.ccp_number)}</span></td>
+                <td>${escapeHtml(ccp.process_step)}</td>
+                <td>${escapeHtml(ccp.hazard_description)}</td>
+                <td>${escapeHtml(ccp.critical_limits)}</td>
+                <td>
+                    <div>${escapeHtml(ccp.monitoring_procedure)}</div>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Freq: ${escapeHtml(ccp.monitoring_frequency || '-')}</div>
+                </td>
+                <td>${escapeHtml(ccp.corrective_action_procedure || '-')}</td>
+                <td>${escapeHtml(ccp.verification_procedure || '-')}</td>
+            </tr>
+        `).join('');
+    }
+
+    // ========================
+    // Utility
+    // ========================
+    function closeModal(id) {
+        document.getElementById(id).classList.remove('active');
     }
 
     function escapeHtml(text) {
@@ -997,8 +1270,9 @@
         return div.innerHTML;
     }
 
+    // ========================
     // Initialize
-    document.getElementById('monitoringDate').value = new Date().toISOString().split('T')[0];
-    loadLocations().then(() => loadCCPs());
+    // ========================
+    loadLocations().then(() => loadPlans());
 </script>
 {% endblock %}

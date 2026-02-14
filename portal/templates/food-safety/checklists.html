@@ -473,11 +473,11 @@
 
 {% block extra_scripts %}
 <script>
-    const API_BASE = '/food-safety';
     let checklists = [];
     let templates = [];
     let locations = [];
     let currentSubmission = null;
+    let currentTemplateItems = [];  // Template items loaded from template endpoint
 
     async function loadLocations() {
         try {
@@ -552,7 +552,7 @@
 
         let filtered = checklists;
         if (status) filtered = filtered.filter(c => c.status === status);
-        if (shift) filtered = filtered.filter(c => c.shift === shift);
+        if (shift) filtered = filtered.filter(c => String(c.shift_id) === shift);
 
         renderChecklists(filtered);
     }
@@ -573,7 +573,6 @@
         container.innerHTML = list.map(c => {
             const loc = locations.find(l => l.id === c.location_id);
             const template = templates.find(t => t.id === c.template_id);
-            const progress = c.total_items > 0 ? Math.round((c.completed_items / c.total_items) * 100) : 0;
 
             return `
                 <div class="checklist-card ${c.status}">
@@ -582,18 +581,13 @@
                             <div class="checklist-title">${template ? escapeHtml(template.name) : 'Checklist'}</div>
                             <div class="checklist-meta">
                                 <i class="bi bi-geo-alt"></i> ${loc ? escapeHtml(loc.name) : 'Unknown'}
+                                ${c.submission_date ? ` &middot; ${c.submission_date}` : ''}
                             </div>
                         </div>
                         <span class="badge badge-${c.status}">${c.status.replace('_', ' ')}</span>
                     </div>
-                    <div class="progress-section">
-                        <div class="progress-bar-bg">
-                            <div class="progress-bar-fill" style="width: ${progress}%"></div>
-                        </div>
-                        <div class="progress-text">${c.completed_items} of ${c.total_items} items completed (${progress}%)</div>
-                    </div>
                     <div class="checklist-footer">
-                        <span class="shift-badge"><i class="bi bi-clock"></i> ${c.shift || 'N/A'}</span>
+                        <span class="shift-badge"><i class="bi bi-clock"></i> ${c.shift_id ? 'Shift ' + c.shift_id : 'N/A'}</span>
                         ${c.status === 'completed'
                             ? `<button class="btn-outline-sm" onclick="viewChecklist('${c.id}')"><i class="bi bi-eye"></i> View</button>`
                             : `<button class="btn-sm" onclick="continueChecklist('${c.id}')"><i class="bi bi-pencil"></i> Continue</button>`
@@ -630,9 +624,9 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    template_id: templateId,
-                    location_id: locationId,
-                    shift: shift
+                    template_id: parseInt(templateId),
+                    location_id: parseInt(locationId),
+                    submission_date: new Date().toISOString().split('T')[0]
                 })
             });
 
@@ -643,25 +637,53 @@
                 continueChecklist(submission.id);
             } else {
                 const error = await response.json();
-                showError(error.detail || 'Unknown error');
+                showError(formatErrorDetail(error));
             }
         } catch (error) {
             console.error('Error:', error);
-            showError('starting checklist');
+            showError('Failed to start checklist');
         }
     }
 
     async function continueChecklist(submissionId) {
         try {
             const response = await fetch(`${API_BASE}/checklists/submissions/${submissionId}`);
-            if (response.ok) {
-                currentSubmission = await response.json();
-                renderFillModal();
-                document.getElementById('fillModal').classList.add('active');
+            if (!response.ok) {
+                showError('Failed to load checklist submission');
+                return;
             }
+            currentSubmission = await response.json();
+
+            // Fetch template items from the template endpoint
+            const templateResponse = await fetch(`${API_BASE}/checklists/templates/${currentSubmission.template_id}`);
+            if (!templateResponse.ok) {
+                showError('Failed to load checklist template items');
+                return;
+            }
+            const templateData = await templateResponse.json();
+            const draft = loadDraft(currentSubmission.id);
+            currentTemplateItems = (templateData.items || []).map(item => {
+                // Check draft first, then existing server responses
+                const draftItem = draft ? draft.find(d => d.id === item.id) : null;
+                const existingResponse = (currentSubmission.responses || []).find(r => r.item_id === item.id);
+                if (draftItem) {
+                    return { ...item, is_completed: draftItem.is_completed, response: draftItem.response || '',
+                             notes: draftItem.notes || '', completed_at: draftItem.completed_at || null };
+                }
+                return {
+                    ...item,
+                    is_completed: existingResponse ? (existingResponse.is_passing || false) : false,
+                    response: existingResponse ? (existingResponse.response_value || '') : '',
+                    notes: existingResponse ? (existingResponse.notes || '') : '',
+                    completed_at: null
+                };
+            });
+
+            renderFillModal();
+            document.getElementById('fillModal').classList.add('active');
         } catch (error) {
             console.error('Error:', error);
-            showError('loading checklist');
+            showError('Failed to load checklist');
         }
     }
 
@@ -673,7 +695,7 @@
         const template = templates.find(t => t.id === currentSubmission.template_id);
         document.getElementById('fillModalTitle').textContent = template ? template.name : 'Checklist';
 
-        const items = currentSubmission.items || [];
+        const items = currentTemplateItems;
         const body = document.getElementById('fillModalBody');
 
         if (items.length === 0) {
@@ -684,17 +706,18 @@
         body.innerHTML = items.map((item, index) => `
             <div class="checklist-item ${item.is_completed ? 'completed' : ''}" id="item_${item.id}">
                 <div class="checklist-checkbox ${item.is_completed ? 'checked' : ''}"
-                     onclick="toggleItem('${item.id}')"
+                     onclick="toggleItem(${item.id})"
                      ${currentSubmission.status === 'completed' ? 'style="pointer-events: none;"' : ''}>
                     ${item.is_completed ? '<i class="bi bi-check"></i>' : ''}
                 </div>
                 <div class="checklist-item-content">
-                    <div class="checklist-item-title">${escapeHtml(item.item_text)}</div>
+                    <div class="checklist-item-title">${escapeHtml(item.text || item.item_text || '')}</div>
                     ${item.description ? `<div class="checklist-item-description">${escapeHtml(item.description)}</div>` : ''}
+                    ${item.is_completed && item.completed_at ? `<div class="checklist-item-description" style="font-size:11px;color:#78909C;"><i class="bi bi-clock"></i> ${new Date(item.completed_at).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</div>` : ''}
                     ${currentSubmission.status !== 'completed' ? `
                         <div class="checklist-item-notes">
-                            <input type="text" placeholder="Notes (optional)" value="${item.notes || ''}"
-                                   onchange="updateItemNotes('${item.id}', this.value)">
+                            <input type="text" placeholder="Notes (optional)" value="${escapeHtml(item.notes || '')}"
+                                   onchange="updateItemNotes(${item.id}, this.value)">
                         </div>
                     ` : (item.notes ? `<div class="checklist-item-description"><strong>Notes:</strong> ${escapeHtml(item.notes)}</div>` : '')}
                 </div>
@@ -702,46 +725,64 @@
         `).join('');
     }
 
-    async function toggleItem(itemId) {
+    function getDraftKey(submissionId) {
+        return `checklist_draft_${submissionId}`;
+    }
+
+    function saveDraft() {
+        if (!currentSubmission) return;
+        const draft = currentTemplateItems.map(i => ({
+            id: i.id, is_completed: i.is_completed, notes: i.notes || '',
+            response: i.response || '', completed_at: i.completed_at || null
+        }));
+        localStorage.setItem(getDraftKey(currentSubmission.id), JSON.stringify(draft));
+    }
+
+    function loadDraft(submissionId) {
+        try {
+            const raw = localStorage.getItem(getDraftKey(submissionId));
+            return raw ? JSON.parse(raw) : null;
+        } catch { return null; }
+    }
+
+    function clearDraft(submissionId) {
+        localStorage.removeItem(getDraftKey(submissionId));
+    }
+
+    function toggleItem(itemId) {
         if (currentSubmission.status === 'completed') return;
 
-        const item = currentSubmission.items.find(i => i.id === itemId);
+        const item = currentTemplateItems.find(i => i.id === itemId);
         if (!item) return;
 
-        try {
-            const response = await fetch(`${API_BASE}/checklists/submissions/${currentSubmission.id}/items/${itemId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    is_completed: !item.is_completed,
-                    notes: item.notes
-                })
-            });
-
-            if (response.ok) {
-                item.is_completed = !item.is_completed;
-                renderFillModal();
-            }
-        } catch (error) {
-            console.error('Error:', error);
-        }
+        item.is_completed = !item.is_completed;
+        item.completed_at = item.is_completed ? new Date().toISOString() : null;
+        saveDraft();
+        renderFillModal();
     }
 
     function updateItemNotes(itemId, notes) {
-        const item = currentSubmission.items.find(i => i.id === itemId);
-        if (item) item.notes = notes;
+        const item = currentTemplateItems.find(i => i.id === itemId);
+        if (item) {
+            item.notes = notes;
+            saveDraft();
+        }
     }
 
     function closeFillModal() {
+        if (currentSubmission && currentSubmission.status === 'in_progress') {
+            saveDraft();
+        }
         document.getElementById('fillModal').classList.remove('active');
         currentSubmission = null;
+        currentTemplateItems = [];
         loadChecklists();
     }
 
     async function submitChecklist() {
-        if (!currentSubmission) return;
+        if (!currentSubmission || currentTemplateItems.length === 0) return;
 
-        const allCompleted = currentSubmission.items.every(i => i.is_completed);
+        const allCompleted = currentTemplateItems.every(i => i.is_completed);
         if (!allCompleted) {
             // Show custom confirm modal instead of browser confirm()
             document.getElementById('confirmIncompleteModal').classList.add('active');
@@ -762,22 +803,44 @@
 
     async function doSubmitChecklist() {
         try {
-            const response = await fetch(`${API_BASE}/checklists/submissions/${currentSubmission.id}/submit`, {
-                method: 'POST'
+            const response = await fetch(`${API_BASE}/checklists/submissions/${currentSubmission.id}/complete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    completed_by: window.currentUser ? window.currentUser.user_id : 0,
+                    responses: currentTemplateItems.map(item => ({
+                        item_id: item.id,
+                        response_value: item.response || (item.is_completed ? 'yes' : 'no'),
+                        is_passing: item.is_completed || false,
+                        notes: item.notes || null
+                    }))
+                })
             });
 
             if (response.ok) {
+                clearDraft(currentSubmission.id);
                 closeFillModal();
                 showSuccess('Checklist submitted successfully');
                 loadChecklists();
             } else {
                 const error = await response.json();
-                showError(error.detail || 'Unknown error');
+                showError(formatErrorDetail(error));
             }
         } catch (error) {
             console.error('Error:', error);
-            showError('submitting checklist');
+            showError('Failed to submit checklist');
         }
+    }
+
+    function formatErrorDetail(error) {
+        if (!error) return 'Unknown error';
+        const detail = error.detail;
+        if (!detail) return error.message || 'Unknown error';
+        if (typeof detail === 'string') return detail;
+        if (Array.isArray(detail)) {
+            return detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+        }
+        return JSON.stringify(detail);
     }
 
     function escapeHtml(text) {

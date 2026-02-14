@@ -25,7 +25,7 @@
         border: 1px solid var(--border-primary);
         border-radius: 12px;
         padding: 30px;
-        max-width: 800px;
+        max-width: 900px;
     }
 
     .form-group {
@@ -63,8 +63,14 @@
         gap: 20px;
     }
 
+    .form-row-3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 20px;
+    }
+
     @media (max-width: 600px) {
-        .form-row {
+        .form-row, .form-row-3 {
             grid-template-columns: 1fr;
         }
     }
@@ -150,7 +156,6 @@
 
     .severity-option.selected {
         border-color: var(--accent-primary);
-        background-color: var(--accent-primary);
         background-color: rgba(46, 125, 50, 0.1);
     }
 
@@ -169,6 +174,104 @@
     .severity-high { background-color: var(--warning); }
     .severity-medium { background-color: var(--info); }
     .severity-low { background-color: var(--success); }
+
+    /* Category-specific section styles */
+    .category-section {
+        display: none;
+        margin-top: 30px;
+        padding-top: 25px;
+        border-top: 2px solid var(--accent-primary);
+    }
+
+    .section-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 25px;
+    }
+
+    .section-header h3 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0;
+        color: var(--accent-primary);
+    }
+
+    .section-header i {
+        font-size: 20px;
+        color: var(--accent-primary);
+    }
+
+    .checkbox-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        padding: 4px 0;
+    }
+
+    .checkbox-row input[type="checkbox"] {
+        width: auto;
+        margin: 0;
+    }
+
+    .body-parts-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+    }
+
+    @media (max-width: 600px) {
+        .body-parts-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    .body-parts-grid label {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 400;
+        font-size: 13px;
+        cursor: pointer;
+        padding: 6px 8px;
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+    }
+
+    .body-parts-grid label:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    .body-parts-grid input[type="checkbox"] {
+        width: auto;
+        margin: 0;
+    }
+
+    .yn-toggle {
+        display: flex;
+        gap: 10px;
+    }
+
+    .yn-toggle label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 400;
+        cursor: pointer;
+        padding: 8px 16px;
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+    }
+
+    .yn-toggle label:hover {
+        background-color: var(--bg-tertiary);
+    }
+
+    .yn-toggle input[type="radio"] {
+        width: auto;
+        margin: 0;
+    }
 {% endblock %}
 
 {% block content %}
@@ -214,6 +317,10 @@
                     <select id="incident_type" required>
                         <option value="">Select category first...</option>
                     </select>
+                </div>
+                <div class="form-group">
+                    <label for="area_involved">Area / Zone</label>
+                    <input type="text" id="area_involved" placeholder="e.g., Kitchen, Patio, Walk-in">
                 </div>
             </div>
 
@@ -271,19 +378,330 @@
                 <textarea id="description" rows="5" required placeholder="Provide a detailed description of what happened, including any products, equipment, or personnel involved..."></textarea>
             </div>
 
-            <div class="form-group">
-                <label for="immediate_actions">Immediate Actions Taken</label>
-                <textarea id="immediate_actions" rows="3" placeholder="Describe any immediate corrective actions taken..."></textarea>
+            <!-- ==================== WORKPLACE SAFETY SECTION ==================== -->
+            <div id="section-workplace_safety" class="category-section">
+                <div class="section-header">
+                    <i class="bi bi-bandaid"></i>
+                    <h3>Workplace Safety Details</h3>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Employee Name</label>
+                        <input type="text" data-field="employee_name" placeholder="Full name of affected employee">
+                    </div>
+                    <div class="form-group">
+                        <label>Job Title</label>
+                        <input type="text" data-field="employee_job_title" placeholder="e.g., Line Cook, Server">
+                    </div>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Date of Birth</label>
+                        <input type="date" data-field="employee_dob">
+                    </div>
+                    <div class="form-group">
+                        <label>Sex</label>
+                        <select data-field="employee_sex">
+                            <option value="">--</option>
+                            <option value="M">Male</option>
+                            <option value="F">Female</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Nature of Injury</label>
+                        <select data-field="injury_nature">
+                            <option value="">Select...</option>
+                            <option value="strain">Strain / Sprain</option>
+                            <option value="laceration">Laceration / Cut</option>
+                            <option value="burn">Burn / Scald</option>
+                            <option value="fracture">Fracture</option>
+                            <option value="contusion">Contusion / Bruise</option>
+                            <option value="puncture">Puncture</option>
+                            <option value="dislocation">Dislocation</option>
+                            <option value="chemical_exposure">Chemical Exposure</option>
+                            <option value="respiratory">Respiratory</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Body Part(s) Affected</label>
+                    <div class="body-parts-grid" id="bodyPartsGrid">
+                        <label><input type="checkbox" value="head"> Head</label>
+                        <label><input type="checkbox" value="neck"> Neck</label>
+                        <label><input type="checkbox" value="shoulder"> Shoulder</label>
+                        <label><input type="checkbox" value="upper_arm"> Upper Arm</label>
+                        <label><input type="checkbox" value="elbow"> Elbow</label>
+                        <label><input type="checkbox" value="forearm"> Forearm</label>
+                        <label><input type="checkbox" value="wrist"> Wrist</label>
+                        <label><input type="checkbox" value="hand_finger"> Hand / Finger</label>
+                        <label><input type="checkbox" value="upper_back"> Upper Back</label>
+                        <label><input type="checkbox" value="lower_back"> Lower Back</label>
+                        <label><input type="checkbox" value="hip"> Hip</label>
+                        <label><input type="checkbox" value="thigh"> Thigh</label>
+                        <label><input type="checkbox" value="knee"> Knee</label>
+                        <label><input type="checkbox" value="lower_leg"> Lower Leg</label>
+                        <label><input type="checkbox" value="ankle"> Ankle</label>
+                        <label><input type="checkbox" value="foot_toe"> Foot / Toe</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Specific Location of Accident</label>
+                    <input type="text" data-field="specific_location" placeholder="e.g., Kitchen near fryer station, walk-in cooler entrance">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Witnesses</label>
+                        <input type="text" data-field="witnesses" placeholder="Names of witnesses">
+                    </div>
+                    <div class="form-group">
+                        <label>Physician / Hospital</label>
+                        <input type="text" data-field="physician_name" placeholder="Name of physician or hospital">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Physician Phone</label>
+                        <input type="text" data-field="physician_phone" placeholder="(561) 555-0123">
+                    </div>
+                    <div class="form-group">
+                        <label>Last Date Worked</label>
+                        <input type="date" data-field="last_date_worked">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Witness Statements</label>
+                    <textarea data-field="witness_statements" rows="3" placeholder="Record any witness statements..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Emergency Response</label>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <label class="checkbox-row"><input type="checkbox" data-field="ambulance_called"> Ambulance Called</label>
+                            <label class="checkbox-row"><input type="checkbox" data-field="hospitalized"> Hospitalized</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Employment</label>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <label class="checkbox-row"><input type="checkbox" data-field="paid_for_injury_date"> Paid for Date of Injury</label>
+                            <label class="checkbox-row"><input type="checkbox" data-field="returned_to_work"> Returned to Work</label>
+                            <label class="checkbox-row"><input type="checkbox" data-field="osha_recordable"> OSHA Recordable</label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Return to Work Date</label>
+                    <input type="date" data-field="return_to_work_date">
+                </div>
+
+                <div class="form-group">
+                    <label>Immediate Actions Taken</label>
+                    <textarea data-field="immediate_actions" rows="3" placeholder="Describe immediate corrective actions taken..."></textarea>
+                </div>
             </div>
 
-            <div class="form-row">
-                <div class="form-group">
-                    <label for="products_affected">Products Affected</label>
-                    <input type="text" id="products_affected" placeholder="List any products involved">
+            <!-- ==================== SECURITY SECTION ==================== -->
+            <div id="section-security" class="category-section">
+                <div class="section-header">
+                    <i class="bi bi-shield-exclamation"></i>
+                    <h3>Security Incident Details</h3>
                 </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Specific Location on Property</label>
+                        <input type="text" data-field="specific_location" placeholder="e.g., Parking lot entrance, back hallway">
+                    </div>
+                    <div class="form-group">
+                        <label>Witnesses</label>
+                        <input type="text" data-field="witnesses" placeholder="Names of witnesses">
+                    </div>
+                </div>
+
                 <div class="form-group">
-                    <label for="witnesses">Witnesses</label>
-                    <input type="text" id="witnesses" placeholder="Names of any witnesses">
+                    <label>People Involved</label>
+                    <textarea data-field="people_involved" rows="3" placeholder="Names, roles, and contact information of all parties involved..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Witness Statements</label>
+                    <textarea data-field="witness_statements" rows="3" placeholder="Record any witness statements..."></textarea>
+                </div>
+
+                <div class="form-row-3">
+                    <div class="form-group">
+                        <label>Emergency Services</label>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <label class="checkbox-row"><input type="checkbox" data-field="police_called"> Police Called</label>
+                            <label class="checkbox-row"><input type="checkbox" data-field="ambulance_called"> Ambulance Called</label>
+                            <label class="checkbox-row"><input type="checkbox" data-field="fire_dept_called"> Fire Dept Called</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Police Case Number</label>
+                        <input type="text" data-field="police_case_number" placeholder="Case #">
+                    </div>
+                    <div class="form-group">
+                        <label>Officer Name / Badge</label>
+                        <input type="text" data-field="police_officer_name" placeholder="Officer name and badge #">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Property Damage</label>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <label class="checkbox-row"><input type="checkbox" data-field="property_damage"> Property Damage Occurred</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Estimated Damage Cost ($)</label>
+                        <input type="number" data-field="estimated_damage_cost" min="0" step="0.01" placeholder="0.00">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Damage Description</label>
+                    <textarea data-field="damage_description" rows="2" placeholder="Describe property damage if any..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Evidence</label>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <label class="checkbox-row"><input type="checkbox" data-field="evidence_collected"> Evidence Collected</label>
+                            <label class="checkbox-row"><input type="checkbox" data-field="camera_footage"> Camera Footage Available</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Camera IDs</label>
+                        <input type="text" data-field="camera_ids" placeholder="e.g., CAM-03, CAM-07">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Evidence Description</label>
+                    <textarea data-field="evidence_description" rows="2" placeholder="Describe evidence collected or preserved..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Suspect Description</label>
+                    <textarea data-field="suspect_description" rows="2" placeholder="Physical description, clothing, vehicle, etc. (if applicable)"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Immediate Actions Taken</label>
+                    <textarea data-field="immediate_actions" rows="3" placeholder="Describe immediate actions taken..."></textarea>
+                </div>
+            </div>
+
+            <!-- ==================== FOOD SAFETY SECTION ==================== -->
+            <div id="section-food_safety" class="category-section">
+                <div class="section-header">
+                    <i class="bi bi-thermometer-half"></i>
+                    <h3>Food Safety Details</h3>
+                </div>
+
+                <div class="form-group">
+                    <label>Products Affected</label>
+                    <textarea data-field="products_affected_detail" rows="3" placeholder="List product names, quantities, and lot/batch numbers..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Batch / Lot Numbers</label>
+                        <input type="text" data-field="batch_lot_numbers" placeholder="e.g., LOT-2026-0213">
+                    </div>
+                    <div class="form-group">
+                        <label>Supplier / Vendor</label>
+                        <input type="text" data-field="supplier_vendor" placeholder="Vendor or supplier involved">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Temperature Readings</label>
+                        <input type="text" data-field="temperature_readings" placeholder="e.g., Walk-in: 52F (should be &lt;41F)">
+                    </div>
+                    <div class="form-group">
+                        <label>Equipment Involved</label>
+                        <input type="text" data-field="equipment_involved" placeholder="e.g., Walk-in Cooler #2">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Product Disposition</label>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <label class="checkbox-row"><input type="checkbox" data-field="product_discarded"> Product Discarded</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Quantity Discarded</label>
+                        <input type="text" data-field="quantity_discarded" placeholder="e.g., 15 lbs chicken breast">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Customer Impact</label>
+                        <div style="display:flex; flex-direction:column; gap:8px;">
+                            <label class="checkbox-row"><input type="checkbox" data-field="customers_affected"> Customers Affected</label>
+                            <label class="checkbox-row"><input type="checkbox" data-field="health_dept_notified"> Health Dept Notified</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Number of Customers Affected</label>
+                        <input type="number" data-field="num_customers_affected" min="0" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Health Dept Contact</label>
+                    <input type="text" data-field="health_dept_contact" placeholder="Contact name and phone number">
+                </div>
+
+                <div class="form-group">
+                    <label>Customer Complaints</label>
+                    <textarea data-field="customer_complaints" rows="2" placeholder="Describe any customer complaints received..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Immediate Actions Taken</label>
+                    <textarea data-field="immediate_actions" rows="3" placeholder="Describe immediate corrective actions taken..."></textarea>
+                </div>
+            </div>
+
+            <!-- ==================== GENERAL SECTION ==================== -->
+            <div id="section-general" class="category-section">
+                <div class="section-header">
+                    <i class="bi bi-clipboard-data"></i>
+                    <h3>Additional Details</h3>
+                </div>
+
+                <div class="form-group">
+                    <label>People Involved</label>
+                    <textarea data-field="people_involved" rows="3" placeholder="Names and roles of people involved..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Immediate Actions Taken</label>
+                    <textarea data-field="immediate_actions" rows="3" placeholder="Describe immediate corrective actions taken..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Additional Details</label>
+                    <textarea data-field="additional_details" rows="4" placeholder="Any other relevant information..."></textarea>
                 </div>
             </div>
 
@@ -301,7 +719,6 @@
 
 {% block extra_scripts %}
 <script>
-    const API_BASE = '/food-safety';
     let locations = [];
 
     // Incident types by category
@@ -346,14 +763,66 @@
 
         if (!category) {
             typeSelect.innerHTML = '<option value="">Select category first...</option>';
-            return;
+        } else {
+            const types = incidentTypes[category] || [];
+            typeSelect.innerHTML = '<option value="">Select type...</option>';
+            types.forEach(type => {
+                typeSelect.innerHTML += `<option value="${type.value}">${escapeHtml(type.label)}</option>`;
+            });
         }
 
-        const types = incidentTypes[category] || [];
-        typeSelect.innerHTML = '<option value="">Select type...</option>';
-        types.forEach(type => {
-            typeSelect.innerHTML += `<option value="${type.value}">${escapeHtml(type.label)}</option>`;
+        // Show/hide category-specific sections
+        document.querySelectorAll('.category-section').forEach(s => s.style.display = 'none');
+        if (category) {
+            const section = document.getElementById('section-' + category);
+            if (section) section.style.display = 'block';
+        }
+    }
+
+    function collectExtraData() {
+        const category = document.getElementById('category').value;
+        const section = document.getElementById('section-' + category);
+        if (!section) return null;
+
+        const data = {};
+        let hasData = false;
+
+        // Collect all data-field elements
+        section.querySelectorAll('[data-field]').forEach(el => {
+            const key = el.dataset.field;
+            if (el.type === 'checkbox') {
+                if (el.checked) {
+                    data[key] = true;
+                    hasData = true;
+                } else {
+                    data[key] = false;
+                }
+            } else if (el.type === 'number') {
+                if (el.value) {
+                    data[key] = parseFloat(el.value);
+                    hasData = true;
+                }
+            } else {
+                if (el.value && el.value.trim()) {
+                    data[key] = el.value.trim();
+                    hasData = true;
+                }
+            }
         });
+
+        // Collect body parts (workplace safety)
+        if (category === 'workplace_safety') {
+            const bodyParts = [];
+            document.querySelectorAll('#bodyPartsGrid input[type="checkbox"]:checked').forEach(cb => {
+                bodyParts.push(cb.value);
+            });
+            if (bodyParts.length > 0) {
+                data.body_parts_affected = bodyParts;
+                hasData = true;
+            }
+        }
+
+        return hasData ? data : null;
     }
 
     async function loadLocations() {
@@ -399,24 +868,23 @@
             return;
         }
 
+        const extraData = collectExtraData();
+
         const data = {
             title: document.getElementById('title').value,
-            location_id: locationId,
+            location_id: parseInt(locationId),
             category: document.getElementById('category').value,
             incident_type: document.getElementById('incident_type').value,
             incident_date: document.getElementById('incident_date').value,
+            incident_time: document.getElementById('incident_time').value || null,
             severity: severity.value,
             description: document.getElementById('description').value,
-            immediate_actions: document.getElementById('immediate_actions').value || null,
-            products_affected: document.getElementById('products_affected').value || null,
-            witnesses: document.getElementById('witnesses').value || null,
-            status: 'open'
+            area_involved: document.getElementById('area_involved').value || null,
+            reported_by: window.currentUser ? window.currentUser.user_id : 0
         };
 
-        // Add time if provided
-        const time = document.getElementById('incident_time').value;
-        if (time) {
-            data.incident_date = `${data.incident_date}T${time}`;
+        if (extraData) {
+            data.extra_data = extraData;
         }
 
         try {
@@ -434,7 +902,11 @@
                 }, 1500);
             } else {
                 const error = await response.json();
-                showError('Error: ' + (error.detail || 'Unknown error'));
+                const detail = error.detail;
+                const msg = Array.isArray(detail)
+                    ? detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ')
+                    : detail || 'Unknown error';
+                showError('Error: ' + msg);
             }
         } catch (error) {
             console.error('Error creating incident:', error);

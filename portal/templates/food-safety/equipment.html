@@ -482,7 +482,6 @@
 
 {% block extra_scripts %}
 <script>
-    const API_BASE = '/food-safety';
     let equipment = [];
     let currentEquipment = null;
 
@@ -643,12 +642,16 @@
                 closeModal();
                 loadEquipment();
             } else {
-                const error = await response.json();
-                showError(error.detail || 'Unknown error');
+                let errMsg = 'Unknown error';
+                try {
+                    const error = await response.json();
+                    errMsg = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
+                } catch (e) { /* ignore */ }
+                showError(errMsg);
             }
         } catch (error) {
             console.error('Error:', error);
-            showError('saving threshold');
+            showError('Error saving threshold. Please try again.');
         }
     }
 
@@ -679,8 +682,12 @@
                 showSuccess('Custom threshold cleared successfully');
                 loadEquipment();
             } else {
-                const error = await response.json();
-                showError(error.detail || 'Failed to clear threshold');
+                let errMsg = 'Failed to clear threshold';
+                try {
+                    const error = await response.json();
+                    errMsg = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
+                } catch (e) { /* ignore */ }
+                showError(errMsg);
             }
         } catch (error) {
             console.error('Error:', error);

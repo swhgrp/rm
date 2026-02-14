@@ -219,7 +219,7 @@
                     <select id="inspection_type" required>
                         <option value="">Select type...</option>
                         <option value="health_department">Health Department</option>
-                        <option value="internal">Internal Audit</option>
+                        <option value="internal_audit">Internal Audit</option>
                         <option value="third_party">Third Party</option>
                         <option value="corporate">Corporate</option>
                     </select>
@@ -289,7 +289,6 @@
 
 {% block extra_scripts %}
 <script>
-    const API_BASE = '/food-safety';
     let locations = [];
     let violationCount = 0;
 
@@ -327,6 +326,7 @@
                     <div class="form-group">
                         <label>Severity</label>
                         <select class="violation-severity">
+                            <option value="observation">Observation</option>
                             <option value="minor">Minor</option>
                             <option value="major">Major</option>
                             <option value="critical">Critical</option>
@@ -364,8 +364,7 @@
                 violations.push({
                     code: card.querySelector('.violation-code').value || null,
                     severity: card.querySelector('.violation-severity').value,
-                    description: description,
-                    corrective_action: card.querySelector('.violation-corrective').value || null
+                    description: description
                 });
             }
         });
@@ -384,12 +383,16 @@
 
         const violations = collectViolations();
 
+        const resultValue = document.getElementById('result').value;
+        const scoreValue = document.getElementById('score').value;
+
         const data = {
-            location_id: locationId,
+            location_id: parseInt(locationId),
             inspection_type: document.getElementById('inspection_type').value,
             inspection_date: document.getElementById('inspection_date').value,
-            score: document.getElementById('score').value ? parseInt(document.getElementById('score').value) : null,
-            result: document.getElementById('result').value,
+            score: scoreValue ? parseFloat(scoreValue) : null,
+            passed: resultValue === 'passed' ? true : resultValue === 'failed' ? false : null,
+            recorded_by: window.currentUser ? window.currentUser.user_id : 0,
             inspector_name: document.getElementById('inspector_name').value || null,
             inspector_agency: document.getElementById('inspector_agency').value || null,
             notes: document.getElementById('notes').value || null,
@@ -411,7 +414,11 @@
                 }, 1500);
             } else {
                 const error = await response.json();
-                showError('Error: ' + (error.detail || 'Unknown error'));
+                const detail = error.detail;
+                const msg = Array.isArray(detail)
+                    ? detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ')
+                    : detail || 'Unknown error';
+                showError('Error: ' + msg);
             }
         } catch (error) {
             console.error('Error saving inspection:', error);

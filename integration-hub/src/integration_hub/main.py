@@ -2440,6 +2440,20 @@ async def map_item(
             if vendor_item.units_per_case:
                 item.pack_size = int(vendor_item.units_per_case)
 
+            # Sync vendor item case_cost from invoice price
+            if item.unit_price and item.matched_uom_id:
+                from integration_hub.models.vendor_item_uom import VendorItemUOM
+                matched_uom = db.query(VendorItemUOM).filter(VendorItemUOM.id == item.matched_uom_id).first()
+                if matched_uom and matched_uom.conversion_factor:
+                    cf = float(matched_uom.conversion_factor)
+                    if cf > 0:
+                        cost_per_primary = float(item.unit_price) / cf
+                        units_per_case = float(vendor_item.units_per_case or 1)
+                        vendor_item.case_cost = round(cost_per_primary * units_per_case, 4)
+                        vendor_item.last_purchase_price = float(item.unit_price)
+                        from datetime import datetime, timezone
+                        vendor_item.price_updated_at = datetime.now(timezone.utc)
+
     db.commit()
 
     # Save learned mapping for future auto-mapping (if mapping to a vendor item)
@@ -3003,6 +3017,43 @@ async def send_invoice_to_systems(invoice_id: int, db: Session = Depends(get_db)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/invoices/{invoice_id}/approve-review")
+async def approve_invoice_review(invoice_id: int, db: Session = Depends(get_db)):
+    """
+    Clear review flags and allow invoice to proceed to 'ready' status.
+
+    Called when a human has reviewed the flagged invoice and approves it.
+    Clears needs_review flag, sets approved_by/approved_at, and re-evaluates status.
+    """
+    invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
+    if not invoice:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+
+    if not invoice.needs_review and invoice.status != 'needs_review':
+        return {"success": True, "message": "Invoice is not flagged for review", "status": invoice.status}
+
+    from datetime import datetime, timezone
+    old_reasons = invoice.review_reason
+    invoice.needs_review = False
+    invoice.review_reason = None
+    invoice.approved_at = datetime.now(timezone.utc)
+    db.commit()
+
+    # Re-evaluate status (may transition to 'ready' or stay at 'mapping')
+    from integration_hub.services.invoice_status import update_invoice_status
+    new_status = update_invoice_status(invoice, db)
+    db.commit()
+
+    logger.info(f"Invoice {invoice_id} review approved. Previous reasons: {old_reasons}. New status: {new_status}")
+
+    return {
+        "success": True,
+        "message": f"Review cleared. Status: {new_status}",
+        "status": new_status,
+        "previous_review_reasons": old_reasons
+    }
 
 
 @app.post("/api/invoices/{invoice_id}/retry")

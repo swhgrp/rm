@@ -385,14 +385,36 @@
         </select>
         <select class="filter-select" id="typeFilter" onchange="filterIncidents()">
             <option value="">All Types</option>
-            <option value="contamination">Contamination</option>
-            <option value="temperature_abuse">Temperature Abuse</option>
-            <option value="pest">Pest</option>
-            <option value="allergen">Allergen</option>
-            <option value="foreign_object">Foreign Object</option>
-            <option value="illness">Illness</option>
-            <option value="injury">Injury</option>
-            <option value="other">Other</option>
+            <optgroup label="Food Safety">
+                <option value="temperature_violation">Temperature Violation</option>
+                <option value="contamination">Contamination</option>
+                <option value="cross_contamination">Cross Contamination</option>
+                <option value="foreign_object">Foreign Object</option>
+                <option value="pest_sighting">Pest Sighting</option>
+                <option value="allergen_issue">Allergen Issue</option>
+                <option value="improper_storage">Improper Storage</option>
+                <option value="hygiene_violation">Hygiene Violation</option>
+                <option value="equipment_failure">Equipment Failure</option>
+                <option value="employee_illness">Employee Illness</option>
+                <option value="customer_complaint">Customer Complaint</option>
+            </optgroup>
+            <optgroup label="Workplace Safety">
+                <option value="workplace_injury">Workplace Injury</option>
+                <option value="slip_fall">Slip &amp; Fall</option>
+                <option value="burn">Burn</option>
+                <option value="cut_laceration">Cut / Laceration</option>
+                <option value="chemical_exposure">Chemical Exposure</option>
+                <option value="fire_hazard">Fire Hazard</option>
+                <option value="electrical_hazard">Electrical Hazard</option>
+                <option value="near_miss">Near Miss</option>
+                <option value="customer_injury">Customer Injury</option>
+            </optgroup>
+            <optgroup label="Other">
+                <option value="security_incident">Security Incident</option>
+                <option value="property_damage">Property Damage</option>
+                <option value="vehicle_incident">Vehicle Incident</option>
+                <option value="other">Other</option>
+            </optgroup>
         </select>
     </div>
 
@@ -432,6 +454,9 @@
                 <!-- Populated by JS -->
             </div>
             <div class="modal-footer">
+                <a id="printReportLink" href="#" target="_blank" class="btn-primary" style="text-decoration:none;">
+                    <i class="bi bi-printer"></i> Print Report
+                </a>
                 <button class="btn-secondary" onclick="closeViewModal()">Close</button>
             </div>
         </div>
@@ -440,7 +465,6 @@
 
 {% block extra_scripts %}
 <script>
-    const API_BASE = '/food-safety';
     let incidents = [];
     let locations = [];
 
@@ -537,13 +561,29 @@
         }
 
         const typeLabels = {
+            'temperature_violation': 'Temperature Violation',
             'contamination': 'Contamination',
-            'temperature_abuse': 'Temperature Abuse',
-            'pest': 'Pest',
-            'allergen': 'Allergen',
+            'cross_contamination': 'Cross Contamination',
             'foreign_object': 'Foreign Object',
-            'illness': 'Illness',
-            'injury': 'Injury',
+            'pest_sighting': 'Pest Sighting',
+            'allergen_issue': 'Allergen Issue',
+            'improper_storage': 'Improper Storage',
+            'hygiene_violation': 'Hygiene Violation',
+            'equipment_failure': 'Equipment Failure',
+            'employee_illness': 'Employee Illness',
+            'customer_complaint': 'Customer Complaint',
+            'workplace_injury': 'Workplace Injury',
+            'slip_fall': 'Slip & Fall',
+            'burn': 'Burn',
+            'cut_laceration': 'Cut / Laceration',
+            'chemical_exposure': 'Chemical Exposure',
+            'fire_hazard': 'Fire Hazard',
+            'electrical_hazard': 'Electrical Hazard',
+            'near_miss': 'Near Miss',
+            'customer_injury': 'Customer Injury',
+            'security_incident': 'Security Incident',
+            'property_damage': 'Property Damage',
+            'vehicle_incident': 'Vehicle Incident',
             'other': 'Other'
         };
 
@@ -563,6 +603,63 @@
         }).join('');
     }
 
+    const categoryLabels = {
+        'food_safety': 'Food Safety',
+        'workplace_safety': 'Workplace Safety',
+        'security': 'Security',
+        'general': 'General'
+    };
+
+    const extraDataLabels = {
+        // Workplace Safety
+        employee_name: 'Employee Name', employee_job_title: 'Job Title', employee_dob: 'Date of Birth',
+        employee_sex: 'Sex', injury_nature: 'Nature of Injury', body_parts_affected: 'Body Parts Affected',
+        specific_location: 'Specific Location', witnesses: 'Witnesses', witness_statements: 'Witness Statements',
+        ambulance_called: 'Ambulance Called', hospitalized: 'Hospitalized', physician_name: 'Physician/Hospital',
+        physician_phone: 'Physician Phone', paid_for_injury_date: 'Paid for Date of Injury',
+        last_date_worked: 'Last Date Worked', returned_to_work: 'Returned to Work',
+        return_to_work_date: 'Return to Work Date', osha_recordable: 'OSHA Recordable',
+        immediate_actions: 'Immediate Actions Taken',
+        // Security
+        people_involved: 'People Involved', police_called: 'Police Called',
+        police_case_number: 'Police Case Number', police_officer_name: 'Officer Name/Badge',
+        fire_dept_called: 'Fire Dept Called', property_damage: 'Property Damage',
+        damage_description: 'Damage Description', estimated_damage_cost: 'Estimated Damage Cost',
+        evidence_collected: 'Evidence Collected', evidence_description: 'Evidence Description',
+        camera_footage: 'Camera Footage Available', camera_ids: 'Camera IDs',
+        suspect_description: 'Suspect Description',
+        // Food Safety
+        products_affected_detail: 'Products Affected', batch_lot_numbers: 'Batch/Lot Numbers',
+        temperature_readings: 'Temperature Readings', equipment_involved: 'Equipment Involved',
+        product_discarded: 'Product Discarded', quantity_discarded: 'Quantity Discarded',
+        customers_affected: 'Customers Affected', num_customers_affected: 'Number of Customers',
+        customer_complaints: 'Customer Complaints', health_dept_notified: 'Health Dept Notified',
+        health_dept_contact: 'Health Dept Contact', supplier_vendor: 'Supplier/Vendor',
+        // General
+        additional_details: 'Additional Details'
+    };
+
+    function renderExtraData(extra_data, category) {
+        if (!extra_data || Object.keys(extra_data).length === 0) return '';
+        const sectionTitle = categoryLabels[category] ? categoryLabels[category] + ' Details' : 'Additional Details';
+        let html = `<div class="detail-section"><h4>${escapeHtml(sectionTitle)}</h4><div class="detail-grid">`;
+        for (const [key, value] of Object.entries(extra_data)) {
+            if (value === null || value === undefined || value === '' || value === false) continue;
+            const label = extraDataLabels[key] || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            let display;
+            if (typeof value === 'boolean') {
+                display = value ? 'Yes' : 'No';
+            } else if (Array.isArray(value)) {
+                display = value.join(', ');
+            } else {
+                display = String(value);
+            }
+            html += `<div class="detail-item"><label>${escapeHtml(label)}</label><span>${escapeHtml(display)}</span></div>`;
+        }
+        html += '</div></div>';
+        return html;
+    }
+
     async function viewIncident(id) {
         try {
             const response = await fetch(`${API_BASE}/incidents/${id}`);
@@ -571,15 +668,22 @@
                 const loc = locations.find(l => l.id === incident.location_id);
 
                 const typeLabels = {
-                    'contamination': 'Contamination',
-                    'temperature_abuse': 'Temperature Abuse',
-                    'pest': 'Pest',
-                    'allergen': 'Allergen',
-                    'foreign_object': 'Foreign Object',
-                    'illness': 'Illness',
-                    'injury': 'Injury',
+                    'temperature_violation': 'Temperature Violation', 'contamination': 'Contamination',
+                    'cross_contamination': 'Cross Contamination', 'foreign_object': 'Foreign Object',
+                    'pest_sighting': 'Pest Sighting', 'allergen_issue': 'Allergen Issue',
+                    'improper_storage': 'Improper Storage', 'hygiene_violation': 'Hygiene Violation',
+                    'equipment_failure': 'Equipment Failure', 'employee_illness': 'Employee Illness',
+                    'customer_complaint': 'Customer Complaint', 'workplace_injury': 'Workplace Injury',
+                    'slip_fall': 'Slip & Fall', 'burn': 'Burn', 'cut_laceration': 'Cut / Laceration',
+                    'chemical_exposure': 'Chemical Exposure', 'fire_hazard': 'Fire Hazard',
+                    'electrical_hazard': 'Electrical Hazard', 'near_miss': 'Near Miss',
+                    'customer_injury': 'Customer Injury', 'security_incident': 'Security Incident',
+                    'property_damage': 'Property Damage', 'vehicle_incident': 'Vehicle Incident',
                     'other': 'Other'
                 };
+
+                // Set print link
+                document.getElementById('printReportLink').href = `/portal/food-safety/incidents/${incident.id}/print`;
 
                 document.getElementById('viewModalTitle').textContent = `${incident.incident_number} - ${incident.title}`;
                 document.getElementById('viewModalBody').innerHTML = `
@@ -593,6 +697,10 @@
                             <div class="detail-item">
                                 <label>Severity</label>
                                 <span class="badge badge-${incident.severity}">${incident.severity}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Category</label>
+                                <span>${categoryLabels[incident.category] || incident.category || '-'}</span>
                             </div>
                             <div class="detail-item">
                                 <label>Type</label>
@@ -610,6 +718,10 @@
                                 <label>Reported By</label>
                                 <span>${incident.reported_by || '-'}</span>
                             </div>
+                            <div class="detail-item">
+                                <label>Area Involved</label>
+                                <span>${incident.area_involved || '-'}</span>
+                            </div>
                         </div>
                     </div>
                     ${incident.description ? `
@@ -618,6 +730,7 @@
                             <div class="description-box">${escapeHtml(incident.description)}</div>
                         </div>
                     ` : ''}
+                    ${renderExtraData(incident.extra_data, incident.category)}
                     ${incident.root_cause ? `
                         <div class="detail-section">
                             <h4>Root Cause</h4>
@@ -666,7 +779,11 @@
                 viewIncident(id);
             } else {
                 const error = await response.json();
-                showError(error.detail || 'Unknown error');
+                const detail = error.detail;
+                const msg = Array.isArray(detail)
+                    ? detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ')
+                    : detail || 'Unknown error';
+                showError(msg);
             }
         } catch (error) {
             console.error('Error:', error);
@@ -685,6 +802,10 @@
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    function showError(message) {
+        alert('Error: ' + message);
     }
 
     // Initialize

@@ -5,7 +5,7 @@ from decimal import Decimal
 from pydantic import BaseModel, Field
 from food_safety.models import (
     UserRole, TemperatureAlertStatus, ChecklistType, ChecklistStatus,
-    IncidentType, IncidentStatus, CorrectiveActionStatus,
+    IncidentType, IncidentStatus, IncidentCategory, CorrectiveActionStatus,
     InspectionType, ViolationSeverity
 )
 
@@ -298,12 +298,14 @@ class ChecklistTemplateUpdate(BaseModel):
     frequency: Optional[str] = Field(None, max_length=50)
     requires_manager_signoff: Optional[bool] = None
     is_active: Optional[bool] = None
+    items: Optional[List[ChecklistItemCreate]] = None
 
 
 class ChecklistTemplateResponse(ChecklistTemplateBase):
     id: int
     location_id: Optional[int]
     shift_id: Optional[int]
+    item_count: int = 0
     created_at: datetime
     updated_at: datetime
     created_by: Optional[int]
@@ -372,6 +374,7 @@ class ChecklistSubmissionResponse(ChecklistSubmissionBase):
     completed_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
+    template_name: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -411,6 +414,7 @@ class ManagerSignoffResponse(BaseModel):
 
 class IncidentBase(BaseModel):
     location_id: int
+    category: Optional[IncidentCategory] = IncidentCategory.FOOD_SAFETY
     incident_type: IncidentType
     title: str = Field(..., max_length=300)
     description: str
@@ -419,10 +423,11 @@ class IncidentBase(BaseModel):
     severity: str = Field(..., max_length=20)  # "low", "medium", "high", "critical"
     product_involved: Optional[str] = Field(None, max_length=200)
     area_involved: Optional[str] = Field(None, max_length=200)
+    extra_data: Optional[dict] = None
 
 
 class IncidentCreate(IncidentBase):
-    reported_by: int
+    reported_by: Optional[int] = None
 
 
 class IncidentUpdate(BaseModel):
@@ -438,6 +443,7 @@ class IncidentUpdate(BaseModel):
     investigation_notes: Optional[str] = None
     root_cause: Optional[str] = None
     resolution_notes: Optional[str] = None
+    extra_data: Optional[dict] = None
 
 
 class IncidentInvestigate(BaseModel):

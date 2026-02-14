@@ -6,7 +6,7 @@ The Integration Hub is an **invoice processing and general ledger (GL) mapping s
 
 ## Status: Production Ready (~98% Complete) ✅
 
-**Last Updated:** February 11, 2026
+**Last Updated:** February 13, 2026
 
 **Note:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
@@ -27,6 +27,42 @@ The Inventory system owns:
 - **Locations** - Restaurant locations (source of truth for all systems)
 
 ## Recent Updates
+
+### February 13, 2026 - Post-Parse Validation, Auto-Reparse & Vendor Item Name Normalization 🛡️✍️
+
+**Post-Parse Validation System (catches AI/CSV parsing errors before they reach Accounting):**
+- ✅ **`post_parse_validator.py`** — Sanity checks + total reconciliation after every parse
+- ✅ **Per-item checks** — price_anomaly (>$500), qty_anomaly (>999), possible_sku_as_price, possible_field_swap, possible_fee (delivery/surcharge/deposit keywords)
+- ✅ **Invoice-level total reconciliation** — `sum(line_totals)` vs `(total_amount - tax)`, flags if >5% AND >$5 mismatch
+- ✅ **`needs_review` status** — New status between 'mapping' and 'ready', blocks auto-send
+- ✅ **Low-confidence hold queue** — Fuzzy-name mappings with confidence < 0.8 trigger needs_review
+- ✅ **Approve endpoint** — `POST /api/invoices/{id}/approve-review` clears flags, re-evaluates status
+
+**Auto-Reparse with Vendor Rules:**
+- ✅ **Auto-reparse trigger** — After first parse identifies vendor, auto-reparses if vendor has parsing rules
+- ✅ **`parsed_with_vendor_rules` flag** — Prevents infinite reparse loops
+- ✅ **Integrated into email_monitor.py** — Seamless pipeline: parse → identify vendor → reparse with rules
+
+**Vendor Item Name Normalization:**
+- ✅ **`to_title_case()`** in shared `utils/text_utils.py` — Smart food/restaurant title casing
+- ✅ **`@validates` on HubVendorItem** — Auto-normalizes `vendor_product_name` on every create/update
+- ✅ **Handles edge cases** — Abbreviations (IPA, IQF, PET, AA), number+unit combos (16oz, 750ml), ordinals (25th), apostrophes (D'Asti), hyphens (Bag-in-Box), slashes (Mozzarella/Provolone)
+- ✅ **Backfill script** — `scripts/backfill_vendor_item_names.py` (--dry-run supported), normalized 189/731 existing items
+
+**Settings Cleanup:**
+- ✅ **Removed dead OCR settings UI** — OCR provider/credentials form was never wired to the parser
+- ✅ **Removed dead Auto-Processing checkbox** — Setting was saved but never read by email monitor
+
+**Database Migration:**
+- `20260213_0001_add_validation_fields.py` — needs_review, review_reason, parsed_with_vendor_rules, line_items_total on hub_invoices; validation_flags on hub_invoice_items
+
+**New Files:**
+- `services/post_parse_validator.py` — Post-parse validation service
+- `utils/text_utils.py` — Shared text normalization utilities
+- `scripts/backfill_vendor_item_names.py` — Vendor item name backfill
+- `scripts/batch_reparse_gfs_store.py` — Batch re-parse GFS Store format invoices
+
+---
 
 ### February 11, 2026 - Multi-UOM System, Catch-Weight Support & UI Redesign 📏🥩🎨
 
@@ -951,12 +987,16 @@ integration-hub/
 │       │   ├── size_unit.py         # Size units
 │       │   ├── container.py         # Container types
 │       │   └── __init__.py
-│       ├── services/            # Business logic (8 files)
+│       ├── utils/               # Shared utilities (NEW Feb 2026)
+│       │   ├── text_utils.py        # to_title_case() for name normalization
+│       │   └── __init__.py
+│       ├── services/            # Business logic (9 files)
 │       │   ├── inventory_sender.py
 │       │   ├── accounting_sender.py
 │       │   ├── auto_send.py
 │       │   ├── vendor_sync.py
 │       │   ├── uom_normalizer.py    # UOM string normalization (NEW Feb 2026)
+│       │   ├── post_parse_validator.py  # Post-parse sanity checks (NEW Feb 2026)
 │       │   ├── embedding_service.py # OpenAI embeddings
 │       │   ├── reporting.py
 │       │   └── __init__.py
@@ -986,12 +1026,15 @@ integration-hub/
 │       ├── 20260211_0001_add_price_is_per_unit.py     # price_is_per_unit flag
 │       ├── 20260212_0001_add_vendor_item_uoms.py      # Multi-UOM table + matched_uom_id
 │       ├── 20260212_0002_seed_vendor_item_uoms.py     # Data migration
-│       └── 20260212_0003_add_last_cost_to_vendor_item_uoms.py  # Last cost tracking
+│       ├── 20260212_0003_add_last_cost_to_vendor_item_uoms.py  # Last cost tracking
+│       └── 20260213_0001_add_validation_fields.py  # Post-parse validation columns
 ├── scripts/                     # Utility scripts
 │   ├── import_gfs_uoms.py           # GFS UOM CSV import
 │   ├── fix_catchweight_uoms.py      # Catch-weight UOM corrections
 │   ├── reparse_gfs_catchweight_invoices.py  # Re-parse GFS invoices
-│   └── update_gfs_catchweight_rules.py      # Update GFS parsing rules
+│   ├── update_gfs_catchweight_rules.py      # Update GFS parsing rules
+│   ├── backfill_vendor_item_names.py        # Title case normalization backfill
+│   └── batch_reparse_gfs_store.py           # Batch re-parse GFS Store invoices
 ├── INTEGRATION_HUB_MANUAL.md   # User manual
 ├── Dockerfile
 ├── requirements.txt

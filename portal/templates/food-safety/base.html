@@ -469,6 +469,9 @@
             <div class="page-title">
                 <i class="bi bi-shield-check"></i> Safety & Compliance
             </div>
+            <div id="userInfo" style="font-size: 14px; color: var(--text-secondary);">
+                <i class="bi bi-person-circle"></i> <span id="userName">Loading...</span>
+            </div>
         </div>
 
         <!-- Main content -->
@@ -623,6 +626,28 @@
 
         // Override window.alert to use toast notifications
         window.alert = (msg) => showToast(msg, 'info');
+    </script>
+
+    <!-- Load current user context -->
+    <script>
+        window.currentUser = null;
+        const API_BASE = '/food-safety';
+
+        (async function loadCurrentUser() {
+            try {
+                const response = await fetch('/food-safety/auth/me');
+                if (response.ok) {
+                    window.currentUser = await response.json();
+                    const nameEl = document.getElementById('userName');
+                    if (nameEl) nameEl.textContent = window.currentUser.full_name;
+                } else if (response.status === 401) {
+                    document.getElementById('userName').textContent = 'Not logged in';
+                }
+            } catch (e) {
+                console.error('Failed to load user context:', e);
+                document.getElementById('userName').textContent = 'Not logged in';
+            }
+        })();
     </script>
 
     {% block extra_scripts %}{% endblock %}

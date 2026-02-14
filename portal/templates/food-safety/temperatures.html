@@ -421,7 +421,6 @@
 
 {% block extra_scripts %}
 <script>
-    const API_BASE = '/food-safety';
     let locations = [];
     let equipment = [];
     let temperatureLogs = [];
@@ -537,14 +536,35 @@
         renderQuickLogCards();
     }
 
+    function getDateRange(period) {
+        const today = new Date();
+        const fmt = d => d.toISOString().split('T')[0];
+        const start = new Date(today);
+
+        switch (period) {
+            case 'yesterday':
+                start.setDate(today.getDate() - 1);
+                return { start_date: fmt(start), end_date: fmt(start) };
+            case 'week':
+                start.setDate(today.getDate() - today.getDay());
+                return { start_date: fmt(start), end_date: fmt(today) };
+            case 'month':
+                start.setDate(1);
+                return { start_date: fmt(start), end_date: fmt(today) };
+            case 'today':
+            default:
+                return { start_date: fmt(today), end_date: fmt(today) };
+        }
+    }
+
     async function loadTemperatureLogs() {
         try {
             const locationId = document.getElementById('locationFilter').value;
             const dateFilter = document.getElementById('dateFilter').value;
+            const range = getDateRange(dateFilter);
 
-            let url = `${API_BASE}/temperatures?`;
+            let url = `${API_BASE}/temperatures?start_date=${range.start_date}&end_date=${range.end_date}&`;
             if (locationId) url += `location_id=${locationId}&`;
-            if (dateFilter) url += `period=${dateFilter}&`;
 
             const response = await fetch(url);
             if (response.ok) {
@@ -568,8 +588,10 @@
         const status = document.getElementById('statusFilter').value;
         let filtered = temperatureLogs;
 
-        if (status) {
-            filtered = temperatureLogs.filter(log => log.alert_status === status);
+        if (status === 'ok') {
+            filtered = filtered.filter(log => log.is_within_range);
+        } else if (status === 'critical') {
+            filtered = filtered.filter(log => !log.is_within_range);
         }
 
         renderLogs(filtered);
@@ -674,9 +696,10 @@
         }
 
         const data = {
-            equipment_id: equipmentId,
+            equipment_id: parseInt(equipmentId),
             temperature: parseFloat(temperature),
-            unit: document.getElementById('log_unit').value,
+            temp_unit: document.getElementById('log_unit').value,
+            logged_by: window.currentUser ? window.currentUser.user_id : 0,
             notes: document.getElementById('log_notes').value || null
         };
 
@@ -692,7 +715,11 @@
                 loadData();
             } else {
                 const error = await response.json();
-                showError('logging temperature: ' + (error.detail || 'Unknown error'));
+                const detail = error.detail;
+                const msg = Array.isArray(detail)
+                    ? detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ')
+                    : detail || 'Unknown error';
+                showError('logging temperature: ' + msg);
             }
         } catch (error) {
             console.error('Error:', error);

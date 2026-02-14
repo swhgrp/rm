@@ -7,8 +7,13 @@ This ensures consistent status transitions across all operations.
 UOM Validation:
 - Invoice cannot reach 'ready' status if any mapped vendor item has incomplete UOM
 - Required UOM fields: size_quantity, size_unit_id, container_id, units_per_case
+
+Post-Parse Validation:
+- Invoices flagged with needs_review go to 'needs_review' instead of 'ready'
+- Low-confidence fuzzy mappings trigger review hold
 """
 
+import json
 import logging
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
@@ -95,9 +100,14 @@ def update_invoice_status(invoice: HubInvoice, db: Session) -> str:
     Returns:
         The new status string
     """
-    # Don't modify sent, partial, or statement status
+    # Don't modify sent, partial, statement, or error status
     if invoice.status in ['sent', 'partial', 'statement', 'error']:
         logger.debug(f"Invoice {invoice.id} status '{invoice.status}' not modified (protected status)")
+        return invoice.status
+
+    # Don't modify needs_review unless explicitly cleared (via approve endpoint)
+    if invoice.status == 'needs_review':
+        logger.debug(f"Invoice {invoice.id} status 'needs_review' not modified (requires manual approval)")
         return invoice.status
 
     total_items = get_total_items_count(invoice.id, db)
@@ -130,7 +140,43 @@ def update_invoice_status(invoice: HubInvoice, db: Session) -> str:
             else:
                 logger.debug(f"Invoice {invoice.id}: {incomplete_uom_count} items with incomplete UOM, staying at 'mapping'")
         else:
-            # All items mapped AND all have complete UOM - status should be 'ready'
+            # All items mapped AND all have complete UOM — check for review flags before 'ready'
+
+            # Check if post-parse validation flagged this invoice
+            if getattr(invoice, 'needs_review', False) and invoice.needs_review:
+                if invoice.status != 'needs_review':
+                    old_status = invoice.status
+                    invoice.status = 'needs_review'
+                    logger.info(f"Invoice {invoice.id}: flagged for review ({invoice.review_reason}), "
+                               f"status changed from '{old_status}' to 'needs_review'")
+                return invoice.status
+
+            # Check for low-confidence fuzzy mappings
+            low_conf_count = db.query(HubInvoiceItem).filter(
+                HubInvoiceItem.invoice_id == invoice.id,
+                HubInvoiceItem.is_mapped == True,
+                HubInvoiceItem.mapping_confidence < 0.8,
+                HubInvoiceItem.mapping_method == 'fuzzy_name'
+            ).count()
+
+            if low_conf_count > 0:
+                invoice.needs_review = True
+                reasons = []
+                if invoice.review_reason:
+                    try:
+                        reasons = json.loads(invoice.review_reason)
+                    except (json.JSONDecodeError, TypeError):
+                        reasons = []
+                reasons.append(f"low_confidence:{low_conf_count}_items")
+                invoice.review_reason = json.dumps(reasons)
+                if invoice.status != 'needs_review':
+                    old_status = invoice.status
+                    invoice.status = 'needs_review'
+                    logger.info(f"Invoice {invoice.id}: {low_conf_count} low-confidence fuzzy mappings, "
+                               f"status changed from '{old_status}' to 'needs_review'")
+                return invoice.status
+
+            # All clear — status should be 'ready'
             if invoice.status != 'ready':
                 old_status = invoice.status
                 invoice.status = 'ready'

@@ -71,6 +71,13 @@ class HubInvoice(Base):
     # 'sent' - sent to both systems
     # 'error' - sync error
     # 'partial' - sent to one system but not other
+    # 'needs_review' - all mapped but flagged for human review
+
+    # Post-parse validation
+    needs_review = Column(Boolean, default=False, index=True)  # Flagged for human review
+    review_reason = Column(Text, nullable=True)  # JSON list of reasons
+    parsed_with_vendor_rules = Column(Boolean, default=False)  # Prevents re-parse loops
+    line_items_total = Column(Numeric(12, 2), nullable=True)  # Cached sum of line totals
 
     # Parse retry tracking
     parse_attempts = Column(Integer, default=0)  # Number of parse attempts

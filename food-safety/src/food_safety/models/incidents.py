@@ -5,6 +5,7 @@ from sqlalchemy import (
     Column, Integer, String, Text, DateTime, Boolean,
     ForeignKey, Date, Enum, Index
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from food_safety.database import Base
 
@@ -94,6 +95,7 @@ class Incident(Base):
     # Product/area involved
     product_involved = Column(String(200), nullable=True)
     area_involved = Column(String(200), nullable=True)
+    extra_data = Column(JSONB, nullable=True, default=dict, server_default='{}')
 
     # Reporting
     reported_by = Column(Integer, nullable=False)  # HR user ID

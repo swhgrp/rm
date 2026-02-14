@@ -25,96 +25,8 @@ from sqlalchemy import text as sql_text, func
 logger = logging.getLogger(__name__)
 
 
-def to_title_case(text: str) -> str:
-    """
-    Convert text to title case with smart handling for food/restaurant items.
-
-    Handles edge cases:
-    - Preserves common abbreviations (LB, OZ, CS, EA, etc.)
-    - Handles slash/comma separated items
-    - Preserves numbers and units
-    - Handles hyphenated words
-
-    Examples:
-    - "CHICKEN BREAST BNLS SKNLS" -> "Chicken Breast Bnls Sknls"
-    - "BEEF, GROUND 80/20" -> "Beef, Ground 80/20"
-    - "OIL OLIVE EXTRA-VIRGIN" -> "Oil Olive Extra-Virgin"
-    """
-    if not text:
-        return text
-
-    # Common abbreviations/units to preserve in uppercase
-    preserve_upper = {
-        'LB', 'OZ', 'CS', 'EA', 'CT', 'PK', 'BX', 'BG', 'GL', 'QT', 'PT',
-        'GAL', 'PKG', 'DOZ', 'PC', 'SL', 'BTL', 'CAN', 'JAR', 'TUB',
-        'USDA', 'IQF', 'RTU', 'RTE', 'NAE', 'ABF', 'LSRW'
-    }
-
-    # Common words to keep lowercase (unless first word)
-    lowercase_words = {'and', 'or', 'with', 'w/', 'in', 'for', 'of', 'the', 'a', 'an'}
-
-    def process_word(word: str, is_first: bool) -> str:
-        """Process a single word for title casing."""
-        # Skip empty words
-        if not word:
-            return word
-
-        # Check if it's a preserved abbreviation
-        word_upper = word.upper()
-        if word_upper in preserve_upper:
-            return word_upper
-
-        # Check for numbers/fractions (e.g., "80/20", "6x5", "0.75")
-        if any(c.isdigit() for c in word):
-            # Keep as-is if mostly numbers/symbols
-            alpha_count = sum(1 for c in word if c.isalpha())
-            if alpha_count <= 1:
-                return word
-            # Title case the letters, keep numbers
-            result = []
-            capitalize_next = True
-            for c in word:
-                if c.isalpha():
-                    if capitalize_next:
-                        result.append(c.upper())
-                        capitalize_next = False
-                    else:
-                        result.append(c.lower())
-                else:
-                    result.append(c)
-            return ''.join(result)
-
-        # Handle hyphenated words (e.g., "extra-virgin")
-        if '-' in word:
-            parts = word.split('-')
-            return '-'.join(process_word(p, i == 0) for i, p in enumerate(parts))
-
-        # Lowercase words (except if first word)
-        word_lower = word.lower()
-        if not is_first and word_lower in lowercase_words:
-            return word_lower
-
-        # Standard title case
-        return word.capitalize()
-
-    # Split by spaces but preserve original spacing
-    words = text.split(' ')
-    result_words = []
-
-    for i, word in enumerate(words):
-        # Handle comma at end of word
-        suffix = ''
-        if word.endswith(','):
-            suffix = ','
-            word = word[:-1]
-        elif word.endswith('.'):
-            suffix = '.'
-            word = word[:-1]
-
-        processed = process_word(word, i == 0)
-        result_words.append(processed + suffix)
-
-    return ' '.join(result_words)
+# Imported from shared utility — used throughout this module
+from integration_hub.utils.text_utils import to_title_case
 
 
 def normalize_vendor_name(name: str) -> str:
@@ -1663,6 +1575,17 @@ class InvoiceParser:
             invoice.status = 'mapping'
             db.commit()
 
+            # Post-parse validation: sanity checks + total reconciliation
+            try:
+                from integration_hub.services.post_parse_validator import apply_validation_to_invoice
+                validation_result = apply_validation_to_invoice(invoice_id, db)
+                logger.info(f"Post-parse validation for invoice {invoice_id}: "
+                           f"flags={validation_result.get('item_validation', {}).get('flags_set', 0)}, "
+                           f"total_match={validation_result.get('total_validation', {}).get('match', True)}")
+            except Exception as e:
+                logger.error(f"Post-parse validation error for invoice {invoice_id}: {str(e)}")
+                validation_result = {}
+
             # Step 0: Fix UPC codes extracted as item codes
             # This detects long codes starting with 000 and corrects them using historical data
             upc_fix_stats = self._fix_upc_as_item_code(invoice_id, db)
@@ -1721,7 +1644,8 @@ class InvoiceParser:
                 "vendor_matched": vendor is not None,
                 "vendor_name": parsed_data.get('vendor_name'),
                 "location_matched": location_matched,
-                "location_name": parsed_data.get('location_name')
+                "location_name": parsed_data.get('location_name'),
+                "validation": validation_result
             }
 
         except Exception as e:
@@ -1853,7 +1777,19 @@ class InvoiceParser:
                 unmapped_count += 1
 
             invoice.status = 'mapping'
+            invoice.parsed_with_vendor_rules = True
             db.commit()
+
+            # Post-parse validation: sanity checks + total reconciliation
+            validation_result = {}
+            try:
+                from integration_hub.services.post_parse_validator import apply_validation_to_invoice
+                validation_result = apply_validation_to_invoice(invoice_id, db)
+                logger.info(f"Post-parse validation (reparse) for invoice {invoice_id}: "
+                           f"flags={validation_result.get('item_validation', {}).get('flags_set', 0)}, "
+                           f"total_match={validation_result.get('total_validation', {}).get('match', True)}")
+            except Exception as e:
+                logger.error(f"Post-parse validation error for invoice {invoice_id}: {str(e)}")
 
             # Run post-processing fixes
             upc_fix_stats = self._fix_upc_as_item_code(invoice_id, db)
@@ -1880,6 +1816,7 @@ class InvoiceParser:
                 "items_unmapped": mapping_stats.get('unmapped_count', 0),
                 "used_vendor_rules": True,
                 "vendor_rule_id": vendor_rules.id,
+                "validation": validation_result
             }
 
         except Exception as e:

@@ -352,7 +352,6 @@
 
 {% block extra_scripts %}
 <script>
-    const API_BASE = '/food-safety';
     let pendingList = [];
     let templates = [];
     let locations = [];
@@ -388,7 +387,7 @@
     async function loadPending() {
         try {
             const locationId = document.getElementById('locationFilter').value;
-            let url = `${API_BASE}/checklists/submissions/pending-signoff?`;
+            let url = `${API_BASE}/checklists/pending-signoffs?`;
             if (locationId) url += `location_id=${locationId}&`;
 
             const response = await fetch(url);
@@ -413,7 +412,7 @@
         const status = document.getElementById('statusFilter').value;
         let filtered = pendingList;
         if (status) {
-            filtered = pendingList.filter(p => p.signoff_status === status);
+            filtered = pendingList.filter(p => (p.status || 'pending') === status);
         }
         renderPending(filtered);
     }
@@ -436,10 +435,10 @@
         tbody.innerHTML = list.map(p => {
             const template = templates.find(t => t.id === p.template_id);
             const loc = locations.find(l => l.id === p.location_id);
-            const statusClass = p.signoff_status || 'pending';
+            const statusClass = p.status || 'pending';
 
             let actions = '';
-            if (!p.signoff_status || p.signoff_status === 'pending') {
+            if (!p.status || p.status === 'pending' || p.status === 'completed') {
                 actions = `<button class="btn-sm btn-view" onclick="openReviewModal('${p.id}')"><i class="bi bi-eye"></i> Review</button>`;
             } else {
                 actions = `<button class="btn-sm btn-view" onclick="viewChecklist('${p.id}')"><i class="bi bi-eye"></i> View</button>`;
@@ -447,11 +446,11 @@
 
             return `
                 <tr>
-                    <td><strong>${template ? escapeHtml(template.name) : 'Checklist'}</strong></td>
-                    <td>${loc ? escapeHtml(loc.name) : '-'}</td>
-                    <td>${p.shift || '-'}</td>
-                    <td>${p.submitted_by || '-'}</td>
-                    <td>${formatTime(p.submitted_at)}</td>
+                    <td><strong>${template ? escapeHtml(template.name) : (escapeHtml(p.template_name) || 'Checklist')}</strong></td>
+                    <td>${loc ? escapeHtml(loc.name) : (escapeHtml(p.location_name) || '-')}</td>
+                    <td>${p.shift_id ? 'Shift ' + p.shift_id : '-'}</td>
+                    <td>${escapeHtml(p.completed_by_name) || p.completed_by || '-'}</td>
+                    <td>${formatTime(p.completed_at)}</td>
                     <td><span class="badge badge-${statusClass}">${statusClass}</span></td>
                     <td>${actions}</td>
                 </tr>
@@ -464,36 +463,73 @@
 
         try {
             const response = await fetch(`${API_BASE}/checklists/submissions/${submissionId}`);
-            if (response.ok) {
-                const submission = await response.json();
-                const template = templates.find(t => t.id === submission.template_id);
-                const loc = locations.find(l => l.id === submission.location_id);
+            if (!response.ok) {
+                showError('Failed to load checklist submission');
+                return;
+            }
+            const submission = await response.json();
+            const template = templates.find(t => t.id === submission.template_id);
+            const loc = locations.find(l => l.id === submission.location_id);
 
-                document.getElementById('checklistSummary').innerHTML = `
-                    <p><strong>Checklist:</strong> ${template ? escapeHtml(template.name) : 'Checklist'}</p>
-                    <p><strong>Location:</strong> ${loc ? escapeHtml(loc.name) : '-'}</p>
-                    <p><strong>Shift:</strong> ${submission.shift || '-'}</p>
-                    <p><strong>Submitted:</strong> ${formatTime(submission.submitted_at)}</p>
-                    <p><strong>Progress:</strong> ${submission.completed_items}/${submission.total_items} items completed</p>
-                `;
+            document.getElementById('checklistSummary').innerHTML = `
+                <p><strong>Checklist:</strong> ${template ? escapeHtml(template.name) : escapeHtml(submission.template_name) || 'Checklist'}</p>
+                <p><strong>Location:</strong> ${loc ? escapeHtml(loc.name) : escapeHtml(submission.location_name) || '-'}</p>
+                <p><strong>Shift:</strong> ${submission.shift_id ? 'Shift ' + submission.shift_id : '-'}</p>
+                <p><strong>Completed by:</strong> ${escapeHtml(submission.completed_by_name) || submission.completed_by || '-'}</p>
+                <p><strong>Completed at:</strong> ${formatTime(submission.completed_at)}</p>
+            `;
 
-                const items = submission.items || [];
-                document.getElementById('checklistItems').innerHTML = items.map(item => `
+            // Fetch template items and merge with responses
+            let templateItems = [];
+            try {
+                const templateResponse = await fetch(`${API_BASE}/checklists/templates/${submission.template_id}`);
+                if (templateResponse.ok) {
+                    const templateData = await templateResponse.json();
+                    templateItems = templateData.items || [];
+                }
+            } catch (e) {
+                console.error('Error loading template items:', e);
+            }
+
+            const responses = submission.responses || [];
+            let displayItems = [];
+
+            if (templateItems.length > 0) {
+                // Merge template items with responses
+                displayItems = templateItems.map(item => {
+                    const resp = responses.find(r => r.item_id === item.id);
+                    return {
+                        text: item.text || item.item_text || '',
+                        is_completed: resp ? (resp.is_passing || false) : false,
+                        notes: resp ? (resp.notes || '') : ''
+                    };
+                });
+            } else {
+                // Fallback: show responses directly
+                displayItems = responses.map(r => ({
+                    text: r.item_text || r.text || 'Item',
+                    is_completed: r.is_passing || false,
+                    notes: r.notes || ''
+                }));
+            }
+
+            document.getElementById('checklistItems').innerHTML = displayItems.length > 0
+                ? displayItems.map(item => `
                     <div class="checklist-item ${item.is_completed ? 'completed' : 'incomplete'}">
                         <i class="bi bi-${item.is_completed ? 'check-circle-fill' : 'x-circle-fill'}"></i>
                         <div>
-                            <div>${escapeHtml(item.item_text)}</div>
+                            <div>${escapeHtml(item.text)}</div>
                             ${item.notes ? `<small style="color: var(--text-muted);">Notes: ${escapeHtml(item.notes)}</small>` : ''}
                         </div>
                     </div>
-                `).join('');
+                `).join('')
+                : '<div style="padding: 15px; color: var(--text-muted);">No checklist items found.</div>';
 
-                document.getElementById('review_notes').value = '';
-                document.getElementById('reviewModal').classList.add('active');
-            }
+            document.getElementById('review_notes').value = '';
+            document.getElementById('reviewModal').classList.add('active');
         } catch (error) {
             console.error('Error:', error);
-            showError('loading checklist');
+            showError('Failed to load checklist for review');
         }
     }
 
@@ -514,21 +550,23 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    action: 'approve',
+                    signed_off_by: window.currentUser ? window.currentUser.user_id : 0,
+                    is_approved: true,
                     notes: document.getElementById('review_notes').value || null
                 })
             });
 
             if (response.ok) {
                 closeReviewModal();
+                showSuccess('Checklist approved successfully');
                 loadPending();
             } else {
                 const error = await response.json();
-                showError(error.detail || 'Unknown error');
+                showError(formatErrorDetail(error));
             }
         } catch (error) {
             console.error('Error:', error);
-            showError('approving checklist');
+            showError('Failed to approve checklist');
         }
     }
 
@@ -546,22 +584,36 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    action: 'reject',
+                    signed_off_by: window.currentUser ? window.currentUser.user_id : 0,
+                    is_approved: false,
+                    rejection_reason: notes,
                     notes: notes
                 })
             });
 
             if (response.ok) {
                 closeReviewModal();
+                showSuccess('Checklist rejected');
                 loadPending();
             } else {
                 const error = await response.json();
-                showError(error.detail || 'Unknown error');
+                showError(formatErrorDetail(error));
             }
         } catch (error) {
             console.error('Error:', error);
-            showError('rejecting checklist');
+            showError('Failed to reject checklist');
         }
+    }
+
+    function formatErrorDetail(error) {
+        if (!error) return 'Unknown error';
+        const detail = error.detail;
+        if (!detail) return error.message || 'Unknown error';
+        if (typeof detail === 'string') return detail;
+        if (Array.isArray(detail)) {
+            return detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ');
+        }
+        return JSON.stringify(detail);
     }
 
     function formatTime(dateStr) {

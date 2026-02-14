@@ -505,7 +505,6 @@
 {% block extra_scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
-    const API_BASE = '/food-safety';
     let currentReport = 'temperature';
     let currentPeriod = 'week';
     let reportData = null;
@@ -622,16 +621,21 @@
                 document.getElementById('btnExportCSV').disabled = false;
                 document.getElementById('btnExportPDF').disabled = false;
             } else {
-                const error = await response.json();
-                throw new Error(error.detail || 'Failed to generate report');
+                let errMsg = 'Failed to generate report';
+                try {
+                    const error = await response.json();
+                    errMsg = typeof error.detail === 'string' ? error.detail : JSON.stringify(error.detail);
+                } catch (e) { /* ignore parse errors */ }
+                throw new Error(errMsg);
             }
         } catch (error) {
             console.error('Error generating report:', error);
+            const errText = typeof error === 'string' ? error : (error.message || 'Unknown error');
             container.innerHTML = `
                 <div class="empty-state">
                     <i class="bi bi-exclamation-circle"></i>
                     <p>Error generating report</p>
-                    <p style="font-size: 12px; margin-top: 5px;">${escapeHtml(error.message)}</p>
+                    <p style="font-size: 12px; margin-top: 5px;">${escapeHtml(errText)}</p>
                 </div>
             `;
             document.getElementById('btnExportCSV').disabled = true;
@@ -756,13 +760,13 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon orange"><i class="bi bi-clock"></i></div>
-                    <div class="stat-value">${summary.pending_signoffs}</div>
+                    <div class="stat-value">${summary.pending_signoff_count}</div>
                     <div class="stat-label">Pending Sign-offs</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon red"><i class="bi bi-x-circle"></i></div>
-                    <div class="stat-value">${summary.failed_items}</div>
-                    <div class="stat-label">Failed Items</div>
+                    <div class="stat-value">${summary.pass_rate.toFixed(1)}%</div>
+                    <div class="stat-label">Pass Rate</div>
                 </div>
             </div>
 
@@ -797,15 +801,15 @@
                             ${details.length === 0 ? `
                                 <tr><td colspan="6" class="empty-state">No checklist submissions found</td></tr>
                             ` : details.slice(0, 100).map(d => {
-                                const passRate = d.total_items > 0 ? (d.passed_items / d.total_items * 100) : 0;
+                                const passRate = d.items_total > 0 ? (d.items_passed / d.items_total * 100) : 0;
                                 const status = passRate === 100 ? 'ok' : passRate >= 80 ? 'warning' : 'critical';
                                 return `
                                     <tr>
-                                        <td>${formatDateTime(d.submitted_at)}</td>
-                                        <td>${escapeHtml(d.checklist_name || 'Unknown')}</td>
+                                        <td>${d.completed_at ? formatDateTime(d.completed_at) : formatDate(d.submission_date)}</td>
+                                        <td>${escapeHtml(d.template_name || 'Unknown')}</td>
                                         <td>${escapeHtml(d.location_name || 'Unknown')}</td>
-                                        <td>${escapeHtml(d.submitted_by_name || 'Unknown')}</td>
-                                        <td>${d.passed_items}/${d.total_items} (${passRate.toFixed(0)}%)</td>
+                                        <td>${d.completed_by != null ? d.completed_by : 'Unknown'}</td>
+                                        <td>${d.items_passed}/${d.items_total} (${passRate.toFixed(0)}%)</td>
                                         <td><span class="badge badge-${status}">${status === 'ok' ? 'Complete' : status === 'warning' ? 'Partial' : 'Failed'}</span></td>
                                     </tr>
                                 `;
@@ -818,7 +822,7 @@
 
         // Render trend chart
         if (trends && trends.length > 0) {
-            renderTrendChart(trends, 'Submissions', 'submissions_count', 'failed_count');
+            renderTrendChart(trends, 'Submissions', 'submissions', 'pending');
         }
     }
 
@@ -835,17 +839,17 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon green"><i class="bi bi-graph-up"></i></div>
-                    <div class="stat-value">${summary.avg_score ? summary.avg_score.toFixed(1) : 'N/A'}</div>
+                    <div class="stat-value">${summary.average_score ? summary.average_score.toFixed(1) : 'N/A'}</div>
                     <div class="stat-label">Average Score</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon red"><i class="bi bi-exclamation-circle"></i></div>
-                    <div class="stat-value">${summary.total_violations}</div>
+                    <div class="stat-value">${summary.violations_by_severity ? Object.values(summary.violations_by_severity).reduce((a, b) => a + b, 0) : 0}</div>
                     <div class="stat-label">Total Violations</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon orange"><i class="bi bi-arrow-repeat"></i></div>
-                    <div class="stat-value">${summary.pending_followups}</div>
+                    <div class="stat-value">${summary.follow_ups_required}</div>
                     <div class="stat-label">Pending Follow-ups</div>
                 </div>
             </div>
@@ -882,7 +886,8 @@
                             ${details.length === 0 ? `
                                 <tr><td colspan="7" class="empty-state">No inspections found</td></tr>
                             ` : details.slice(0, 100).map(d => {
-                                const status = d.score >= 90 ? 'ok' : d.score >= 70 ? 'warning' : 'critical';
+                                const status = d.passed === true ? 'ok' : d.passed === false ? 'critical' : (d.score >= 70 ? 'warning' : 'critical');
+                                const statusLabel = d.passed === true ? 'Passed' : d.passed === false ? 'Failed' : 'Pending';
                                 return `
                                     <tr>
                                         <td>${formatDate(d.inspection_date)}</td>
@@ -891,7 +896,7 @@
                                         <td>${escapeHtml(d.inspector_name || 'Unknown')}</td>
                                         <td><strong>${d.score ? d.score.toFixed(1) : 'N/A'}</strong></td>
                                         <td>${d.violations_count || 0}</td>
-                                        <td><span class="badge badge-${status}">${d.status || 'Completed'}</span></td>
+                                        <td><span class="badge badge-${status}">${statusLabel}</span></td>
                                     </tr>
                                 `;
                             }).join('')}
@@ -920,12 +925,12 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon red"><i class="bi bi-folder-x"></i></div>
-                    <div class="stat-value">${summary.open_incidents}</div>
+                    <div class="stat-value">${summary.open_count}</div>
                     <div class="stat-label">Open</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-icon green"><i class="bi bi-check-circle"></i></div>
-                    <div class="stat-value">${summary.resolved_incidents}</div>
+                    <div class="stat-value">${summary.resolved_count}</div>
                     <div class="stat-label">Resolved</div>
                 </div>
                 <div class="stat-card">
@@ -958,7 +963,7 @@
                                 <th>Type</th>
                                 <th>Severity</th>
                                 <th>Location</th>
-                                <th>Description</th>
+                                <th>Title</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
@@ -974,7 +979,7 @@
                                         <td>${escapeHtml(d.incident_type || 'Unknown')}</td>
                                         <td><span class="badge badge-${severityClass}">${escapeHtml(d.severity || 'Unknown')}</span></td>
                                         <td>${escapeHtml(d.location_name || 'Unknown')}</td>
-                                        <td>${escapeHtml((d.description || '').substring(0, 50))}${(d.description || '').length > 50 ? '...' : ''}</td>
+                                        <td>${escapeHtml((d.title || '').substring(0, 50))}${(d.title || '').length > 50 ? '...' : ''}</td>
                                         <td><span class="badge badge-${statusClass}">${escapeHtml(d.status || 'Unknown')}</span></td>
                                     </tr>
                                 `;
@@ -1054,7 +1059,7 @@
                 datasets: [
                     {
                         label: 'Average Score',
-                        data: trends.map(t => t.avg_score || 0),
+                        data: trends.map(t => t.average_score || 0),
                         borderColor: '#43A047',
                         backgroundColor: 'rgba(67, 160, 71, 0.1)',
                         fill: true,
@@ -1180,7 +1185,8 @@
     }
 
     function escapeHtml(text) {
-        if (!text) return '';
+        if (text == null) return '';
+        if (typeof text !== 'string') text = String(text);
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;

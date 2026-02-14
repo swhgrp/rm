@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** February 11, 2026
+**Last Updated:** February 13, 2026
 **Status:** ~98% Complete - All 10 Systems Production Ready ✅
-**Latest:** Integration Hub Multi-UOM system — `vendor_item_uoms` table with conversion factors for deterministic cost calculations, UOM matching/normalization, UOM CRUD API, catch-weight item support, compact UI redesign, user manual (Feb 11, 2026) ✅
+**Latest:** Integration Hub post-parse validation safety nets, auto-reparse with vendor rules, vendor item name normalization, Food Safety incident management with JSONB extra_data (Feb 13, 2026) ✅
 
 ---
 

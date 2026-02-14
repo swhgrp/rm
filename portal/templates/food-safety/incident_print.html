@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incident Report</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.10.0/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', -apple-system, Arial, sans-serif; color: #333; line-height: 1.5; font-size: 13px; }
+
+        @media screen {
+            body { max-width: 850px; margin: 30px auto; padding: 0 20px 60px; background: #f5f5f5; }
+            .report-container { background: #fff; padding: 40px; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+        }
+
+        @media print {
+            body { margin: 0; padding: 15px; background: #fff; }
+            .report-container { padding: 0; }
+            .no-print { display: none !important; }
+            .section { page-break-inside: avoid; }
+        }
+
+        .print-bar {
+            position: sticky; top: 0; background: #455A64; color: #fff;
+            padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;
+            border-radius: 8px; margin-bottom: 20px; z-index: 10;
+        }
+        .print-bar a { color: rgba(255,255,255,0.8); text-decoration: none; font-size: 14px; }
+        .print-bar a:hover { color: #fff; }
+        .print-btn {
+            padding: 8px 20px; background: #fff; color: #455A64; border: none;
+            border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .print-btn:hover { background: #e0e0e0; }
+
+        /* Report Header */
+        .report-header {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            border-bottom: 3px solid #455A64; padding-bottom: 15px; margin-bottom: 25px;
+        }
+        .company-name { font-size: 22px; font-weight: 700; color: #455A64; }
+        .report-type { font-size: 14px; color: #888; margin-top: 2px; }
+        .incident-number { font-family: 'Courier New', monospace; font-size: 20px; font-weight: 700; color: #455A64; }
+        .report-date { font-size: 12px; color: #888; margin-top: 4px; text-align: right; }
+
+        /* Sections */
+        .section { margin-bottom: 22px; }
+        .section-title {
+            font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+            color: #455A64; border-bottom: 2px solid #e0e0e0; padding-bottom: 6px; margin-bottom: 12px;
+        }
+
+        /* Field Grid */
+        .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 24px; }
+        .field-grid.three-col { grid-template-columns: 1fr 1fr 1fr; }
+        .field-item { margin-bottom: 4px; }
+        .field-label { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+        .field-value { font-size: 13px; color: #333; }
+        .field-value.empty { color: #ccc; font-style: italic; }
+
+        .full-width { grid-column: 1 / -1; }
+
+        /* Text blocks */
+        .text-block {
+            background: #f9f9f9; border: 1px solid #eee; border-radius: 4px;
+            padding: 10px 12px; white-space: pre-wrap; font-size: 13px; line-height: 1.6;
+        }
+
+        /* Badges */
+        .badge {
+            display: inline-block; padding: 2px 10px; border-radius: 12px;
+            font-size: 11px; font-weight: 600; text-transform: capitalize;
+        }
+        .badge-critical { background: #ffebee; color: #c62828; }
+        .badge-high { background: #fff3e0; color: #e65100; }
+        .badge-medium { background: #e3f2fd; color: #1565c0; }
+        .badge-low { background: #e8f5e9; color: #2e7d32; }
+        .badge-open { background: #fff3e0; color: #e65100; }
+        .badge-investigating { background: #e3f2fd; color: #1565c0; }
+        .badge-action_required { background: #fce4ec; color: #c62828; }
+        .badge-resolved { background: #e8f5e9; color: #2e7d32; }
+        .badge-closed { background: #f5f5f5; color: #757575; }
+
+        /* Yes/No */
+        .yn-yes { color: #2e7d32; font-weight: 600; }
+        .yn-no { color: #999; }
+
+        /* Corrective Actions Table */
+        .ca-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .ca-table th { background: #f5f5f5; text-align: left; padding: 6px 10px; border: 1px solid #e0e0e0; font-size: 10px; text-transform: uppercase; color: #666; }
+        .ca-table td { padding: 6px 10px; border: 1px solid #e0e0e0; }
+
+        /* Footer */
+        .report-footer {
+            margin-top: 30px; padding-top: 12px; border-top: 1px solid #e0e0e0;
+            display: flex; justify-content: space-between; font-size: 10px; color: #999;
+        }
+
+        /* Body parts chips */
+        .body-part-chip {
+            display: inline-block; background: #e3f2fd; color: #1565c0;
+            padding: 2px 8px; border-radius: 10px; font-size: 11px; margin: 2px 3px 2px 0;
+        }
+
+        #loadingMsg { text-align: center; padding: 60px; color: #999; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <div class="print-bar no-print">
+        <a href="/portal/food-safety/incidents"><i class="bi bi-arrow-left"></i> Back to Incidents</a>
+        <button class="print-btn" onclick="window.print()"><i class="bi bi-printer"></i> Print Report</button>
+    </div>
+
+    <div class="report-container">
+        <div id="loadingMsg">Loading incident report...</div>
+        <div id="reportContent" style="display:none;"></div>
+    </div>
+
+<script>
+    const API_BASE = '/food-safety';
+    const pathMatch = window.location.pathname.match(/incidents\/(\d+)\/print/);
+    const incidentId = pathMatch ? pathMatch[1] : null;
+
+    const categoryLabels = {
+        'food_safety': 'Food Safety',
+        'workplace_safety': 'Workplace Safety',
+        'security': 'Security',
+        'general': 'General'
+    };
+
+    const typeLabels = {
+        'temperature_violation': 'Temperature Violation', 'contamination': 'Contamination',
+        'cross_contamination': 'Cross Contamination', 'foreign_object': 'Foreign Object',
+        'pest_sighting': 'Pest Sighting', 'allergen_issue': 'Allergen Issue',
+        'improper_storage': 'Improper Storage', 'hygiene_violation': 'Hygiene Violation',
+        'equipment_failure': 'Equipment Failure', 'employee_illness': 'Employee Illness',
+        'customer_complaint': 'Customer Complaint', 'workplace_injury': 'Workplace Injury',
+        'slip_fall': 'Slip & Fall', 'burn': 'Burn', 'cut_laceration': 'Cut / Laceration',
+        'chemical_exposure': 'Chemical Exposure', 'fire_hazard': 'Fire Hazard',
+        'electrical_hazard': 'Electrical Hazard', 'near_miss': 'Near Miss',
+        'customer_injury': 'Customer Injury', 'security_incident': 'Security Incident',
+        'property_damage': 'Property Damage', 'vehicle_incident': 'Vehicle Incident',
+        'other': 'Other'
+    };
+
+    const bodyPartLabels = {
+        'head': 'Head', 'neck': 'Neck', 'shoulder': 'Shoulder', 'upper_arm': 'Upper Arm',
+        'elbow': 'Elbow', 'forearm': 'Forearm', 'wrist': 'Wrist', 'hand_finger': 'Hand/Finger',
+        'upper_back': 'Upper Back', 'lower_back': 'Lower Back', 'hip': 'Hip', 'thigh': 'Thigh',
+        'knee': 'Knee', 'lower_leg': 'Lower Leg', 'ankle': 'Ankle', 'foot_toe': 'Foot/Toe'
+    };
+
+    const injuryLabels = {
+        'strain': 'Strain / Sprain', 'laceration': 'Laceration / Cut', 'burn': 'Burn / Scald',
+        'fracture': 'Fracture', 'contusion': 'Contusion / Bruise', 'puncture': 'Puncture',
+        'dislocation': 'Dislocation', 'chemical_exposure': 'Chemical Exposure',
+        'respiratory': 'Respiratory', 'other': 'Other'
+    };
+
+    function esc(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function fmtDate(d) {
+        if (!d) return '<span class="field-value empty">--</span>';
+        return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    }
+
+    function fmtDateTime(dt) {
+        if (!dt) return '<span class="field-value empty">--</span>';
+        return new Date(dt).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+    }
+
+    function yn(val) {
+        if (val === true) return '<span class="yn-yes">Yes</span>';
+        if (val === false) return '<span class="yn-no">No</span>';
+        return '<span class="field-value empty">--</span>';
+    }
+
+    function field(label, value) {
+        const v = value ? esc(String(value)) : '<span class="field-value empty">--</span>';
+        return `<div class="field-item"><div class="field-label">${label}</div><div class="field-value">${v}</div></div>`;
+    }
+
+    function fieldRaw(label, html) {
+        return `<div class="field-item"><div class="field-label">${label}</div><div class="field-value">${html}</div></div>`;
+    }
+
+    async function loadAndRender() {
+        if (!incidentId) {
+            document.getElementById('loadingMsg').textContent = 'Invalid incident ID';
+            return;
+        }
+
+        try {
+            const resp = await fetch(`${API_BASE}/incidents/${incidentId}`);
+            if (!resp.ok) {
+                document.getElementById('loadingMsg').textContent = 'Error loading incident (status ' + resp.status + ')';
+                return;
+            }
+            const incident = await resp.json();
+
+            // Load locations
+            let locations = [];
+            try {
+                const locResp = await fetch('/inventory/api/locations/_sync?include_inactive=false');
+                if (locResp.ok) locations = await locResp.json();
+            } catch(e) {}
+
+            const loc = locations.find(l => l.id === incident.location_id);
+            const locationName = loc ? loc.name : ('Location #' + incident.location_id);
+
+            document.title = `${incident.incident_number} - Incident Report`;
+
+            let html = '';
+
+            // Header
+            html += `
+                <div class="report-header">
+                    <div>
+                        <div class="company-name">SW Hospitality Group</div>
+                        <div class="report-type">${esc(categoryLabels[incident.category] || incident.category)} Incident Report</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div class="incident-number">${esc(incident.incident_number)}</div>
+                        <div class="report-date">${fmtDate(incident.incident_date)}</div>
+                    </div>
+                </div>
+            `;
+
+            // Incident Summary
+            html += `
+                <div class="section">
+                    <div class="section-title">Incident Summary</div>
+                    <div class="field-grid">
+                        ${field('Title', incident.title)}
+                        ${fieldRaw('Status', `<span class="badge badge-${incident.status}">${incident.status.replace('_', ' ')}</span>`)}
+                        ${field('Category', categoryLabels[incident.category] || incident.category)}
+                        ${field('Type', typeLabels[incident.incident_type] || incident.incident_type)}
+                        ${field('Location', locationName)}
+                        ${fieldRaw('Severity', `<span class="badge badge-${incident.severity}">${incident.severity}</span>`)}
+                        ${field('Date', fmtDate(incident.incident_date))}
+                        ${field('Time', incident.incident_time || null)}
+                        ${field('Area / Zone', incident.area_involved)}
+                        ${field('Reported', fmtDateTime(incident.reported_at))}
+                    </div>
+                </div>
+            `;
+
+            // Description
+            html += `
+                <div class="section">
+                    <div class="section-title">Description</div>
+                    <div class="text-block">${esc(incident.description)}</div>
+                </div>
+            `;
+
+            // Category-specific details
+            const extra = incident.extra_data || {};
+            if (Object.keys(extra).length > 0) {
+                html += renderCategoryDetails(incident.category, extra);
+            }
+
+            // Investigation
+            if (incident.investigated_by || incident.investigation_notes || incident.root_cause) {
+                html += `
+                    <div class="section">
+                        <div class="section-title">Investigation</div>
+                        <div class="field-grid">
+                            ${field('Investigated By', incident.investigated_by_name || (incident.investigated_by ? 'User #' + incident.investigated_by : null))}
+                            <div></div>
+                        </div>
+                        ${incident.investigation_notes ? `<div style="margin-top:8px;"><div class="field-label">Investigation Notes</div><div class="text-block">${esc(incident.investigation_notes)}</div></div>` : ''}
+                        ${incident.root_cause ? `<div style="margin-top:8px;"><div class="field-label">Root Cause</div><div class="text-block">${esc(incident.root_cause)}</div></div>` : ''}
+                    </div>
+                `;
+            }
+
+            // Corrective Actions
+            const actions = incident.corrective_actions || [];
+            if (actions.length > 0) {
+                html += `
+                    <div class="section">
+                        <div class="section-title">Corrective Actions</div>
+                        <table class="ca-table">
+                            <thead><tr><th>#</th><th>Action</th><th>Assigned To</th><th>Due Date</th><th>Status</th><th>Completed</th></tr></thead>
+                            <tbody>
+                                ${actions.map((a, i) => `
+                                    <tr>
+                                        <td>${i + 1}</td>
+                                        <td>${esc(a.action_description)}</td>
+                                        <td>${a.assigned_to_name || (a.assigned_to ? '#' + a.assigned_to : '--')}</td>
+                                        <td>${a.due_date ? fmtDate(a.due_date) : '--'}</td>
+                                        <td><span class="badge badge-${a.status}">${a.status}</span></td>
+                                        <td>${a.completed_at ? fmtDateTime(a.completed_at) : '--'}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            // Resolution
+            if (incident.resolved_by || incident.resolution_notes) {
+                html += `
+                    <div class="section">
+                        <div class="section-title">Resolution</div>
+                        <div class="field-grid">
+                            ${field('Resolved By', incident.resolved_by_name || (incident.resolved_by ? 'User #' + incident.resolved_by : null))}
+                            ${field('Resolved At', incident.resolved_at ? fmtDateTime(incident.resolved_at) : null)}
+                        </div>
+                        ${incident.resolution_notes ? `<div style="margin-top:8px;"><div class="field-label">Resolution Notes</div><div class="text-block">${esc(incident.resolution_notes)}</div></div>` : ''}
+                    </div>
+                `;
+            }
+
+            // Footer
+            html += `
+                <div class="report-footer">
+                    <div>SW Hospitality Group &mdash; Safety & Compliance System</div>
+                    <div>Generated: ${new Date().toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true, timeZoneName: 'short' })}</div>
+                </div>
+            `;
+
+            document.getElementById('loadingMsg').style.display = 'none';
+            document.getElementById('reportContent').style.display = 'block';
+            document.getElementById('reportContent').innerHTML = html;
+
+        } catch (err) {
+            console.error(err);
+            document.getElementById('loadingMsg').textContent = 'Error loading report: ' + err.message;
+        }
+    }
+
+    function renderCategoryDetails(category, extra) {
+        switch (category) {
+            case 'workplace_safety': return renderWorkplaceSafety(extra);
+            case 'security': return renderSecurity(extra);
+            case 'food_safety': return renderFoodSafety(extra);
+            case 'general': return renderGeneral(extra);
+            default: return renderGeneral(extra);
+        }
+    }
+
+    function renderWorkplaceSafety(d) {
+        let bodyPartsHtml = '--';
+        if (d.body_parts_affected && d.body_parts_affected.length) {
+            bodyPartsHtml = d.body_parts_affected.map(p => `<span class="body-part-chip">${esc(bodyPartLabels[p] || p)}</span>`).join('');
+        }
+
+        return `
+            <div class="section">
+                <div class="section-title">Workplace Safety Details</div>
+                <div class="field-grid">
+                    ${field('Employee Name', d.employee_name)}
+                    ${field('Job Title', d.employee_job_title)}
+                    ${field('Date of Birth', d.employee_dob ? fmtDate(d.employee_dob) : null)}
+                    ${field('Sex', d.employee_sex)}
+                    ${field('Nature of Injury', injuryLabels[d.injury_nature] || d.injury_nature)}
+                    ${field('Specific Location', d.specific_location)}
+                    <div class="field-item full-width">
+                        <div class="field-label">Body Parts Affected</div>
+                        <div class="field-value">${bodyPartsHtml}</div>
+                    </div>
+                </div>
+                <div class="field-grid" style="margin-top:12px;">
+                    ${field('Witnesses', d.witnesses)}
+                    ${field('Physician / Hospital', d.physician_name)}
+                    ${field('Physician Phone', d.physician_phone)}
+                    ${field('Last Date Worked', d.last_date_worked ? fmtDate(d.last_date_worked) : null)}
+                    ${fieldRaw('Ambulance Called', yn(d.ambulance_called))}
+                    ${fieldRaw('Hospitalized', yn(d.hospitalized))}
+                    ${fieldRaw('Paid for Injury Date', yn(d.paid_for_injury_date))}
+                    ${fieldRaw('Returned to Work', yn(d.returned_to_work))}
+                    ${field('Return Date', d.return_to_work_date ? fmtDate(d.return_to_work_date) : null)}
+                    ${fieldRaw('OSHA Recordable', yn(d.osha_recordable))}
+                </div>
+                ${d.witness_statements ? `<div style="margin-top:10px;"><div class="field-label">Witness Statements</div><div class="text-block">${esc(d.witness_statements)}</div></div>` : ''}
+                ${d.immediate_actions ? `<div style="margin-top:10px;"><div class="field-label">Immediate Actions Taken</div><div class="text-block">${esc(d.immediate_actions)}</div></div>` : ''}
+            </div>
+        `;
+    }
+
+    function renderSecurity(d) {
+        return `
+            <div class="section">
+                <div class="section-title">Security Incident Details</div>
+                <div class="field-grid">
+                    ${field('Specific Location', d.specific_location)}
+                    ${field('Witnesses', d.witnesses)}
+                    ${fieldRaw('Police Called', yn(d.police_called))}
+                    ${field('Police Case #', d.police_case_number)}
+                    ${field('Officer Name/Badge', d.police_officer_name)}
+                    ${fieldRaw('Ambulance Called', yn(d.ambulance_called))}
+                    ${fieldRaw('Fire Dept Called', yn(d.fire_dept_called))}
+                    ${fieldRaw('Property Damage', yn(d.property_damage))}
+                    ${field('Est. Damage Cost', d.estimated_damage_cost != null ? '$' + Number(d.estimated_damage_cost).toFixed(2) : null)}
+                    ${fieldRaw('Evidence Collected', yn(d.evidence_collected))}
+                    ${fieldRaw('Camera Footage', yn(d.camera_footage))}
+                    ${field('Camera IDs', d.camera_ids)}
+                </div>
+                ${d.people_involved ? `<div style="margin-top:10px;"><div class="field-label">People Involved</div><div class="text-block">${esc(d.people_involved)}</div></div>` : ''}
+                ${d.witness_statements ? `<div style="margin-top:10px;"><div class="field-label">Witness Statements</div><div class="text-block">${esc(d.witness_statements)}</div></div>` : ''}
+                ${d.damage_description ? `<div style="margin-top:10px;"><div class="field-label">Damage Description</div><div class="text-block">${esc(d.damage_description)}</div></div>` : ''}
+                ${d.evidence_description ? `<div style="margin-top:10px;"><div class="field-label">Evidence Description</div><div class="text-block">${esc(d.evidence_description)}</div></div>` : ''}
+                ${d.suspect_description ? `<div style="margin-top:10px;"><div class="field-label">Suspect Description</div><div class="text-block">${esc(d.suspect_description)}</div></div>` : ''}
+                ${d.immediate_actions ? `<div style="margin-top:10px;"><div class="field-label">Immediate Actions Taken</div><div class="text-block">${esc(d.immediate_actions)}</div></div>` : ''}
+            </div>
+        `;
+    }
+
+    function renderFoodSafety(d) {
+        return `
+            <div class="section">
+                <div class="section-title">Food Safety Details</div>
+                <div class="field-grid">
+                    ${field('Batch / Lot Numbers', d.batch_lot_numbers)}
+                    ${field('Supplier / Vendor', d.supplier_vendor)}
+                    ${field('Temperature Readings', d.temperature_readings)}
+                    ${field('Equipment Involved', d.equipment_involved)}
+                    ${fieldRaw('Product Discarded', yn(d.product_discarded))}
+                    ${field('Qty Discarded', d.quantity_discarded)}
+                    ${fieldRaw('Customers Affected', yn(d.customers_affected))}
+                    ${field('# Customers', d.num_customers_affected)}
+                    ${fieldRaw('Health Dept Notified', yn(d.health_dept_notified))}
+                    ${field('Health Dept Contact', d.health_dept_contact)}
+                </div>
+                ${d.products_affected_detail ? `<div style="margin-top:10px;"><div class="field-label">Products Affected (Detail)</div><div class="text-block">${esc(d.products_affected_detail)}</div></div>` : ''}
+                ${d.customer_complaints ? `<div style="margin-top:10px;"><div class="field-label">Customer Complaints</div><div class="text-block">${esc(d.customer_complaints)}</div></div>` : ''}
+                ${d.immediate_actions ? `<div style="margin-top:10px;"><div class="field-label">Immediate Actions Taken</div><div class="text-block">${esc(d.immediate_actions)}</div></div>` : ''}
+            </div>
+        `;
+    }
+
+    function renderGeneral(d) {
+        return `
+            <div class="section">
+                <div class="section-title">Additional Details</div>
+                ${d.people_involved ? `<div style="margin-bottom:10px;"><div class="field-label">People Involved</div><div class="text-block">${esc(d.people_involved)}</div></div>` : ''}
+                ${d.immediate_actions ? `<div style="margin-bottom:10px;"><div class="field-label">Immediate Actions Taken</div><div class="text-block">${esc(d.immediate_actions)}</div></div>` : ''}
+                ${d.additional_details ? `<div style="margin-bottom:10px;"><div class="field-label">Additional Details</div><div class="text-block">${esc(d.additional_details)}</div></div>` : ''}
+            </div>
+        `;
+    }
+
+    loadAndRender();
+</script>
+</body>
+</html>

@@ -136,6 +136,7 @@ services:
     - ./integration-hub/src:/app/src
     - ./integration-hub/alembic:/app/alembic
     - ./integration-hub/uploads:/app/uploads
+    - ./integration-hub/scripts:/app/scripts
     env_file:
     - ./integration-hub/.env
     environment:

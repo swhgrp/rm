@@ -54,6 +54,9 @@ class HubInvoiceItem(Base):
     matched_uom_id = Column(Integer, ForeignKey("vendor_item_uoms.id"), nullable=True)
     matched_uom = relationship("VendorItemUOM")
 
+    # Post-parse validation flags (comma-separated: "price_anomaly,possible_fee")
+    validation_flags = Column(String(500), nullable=True)
+
     # Notes
     notes = Column(Text, nullable=True)
 

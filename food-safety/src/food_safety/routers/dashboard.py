@@ -6,13 +6,20 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
+from sqlalchemy.orm import selectinload
+
 from food_safety.database import get_db
 from food_safety.models import (
     TemperatureLog, TemperatureAlertStatus,
     ChecklistSubmission, ChecklistTemplate, ChecklistStatus,
-    Incident, IncidentStatus, CorrectiveAction, CorrectiveActionStatus
+    Incident, IncidentStatus, CorrectiveAction, CorrectiveActionStatus,
+    Location
 )
-from food_safety.schemas import DashboardStats, DashboardAlerts
+from food_safety.schemas import (
+    DashboardStats, DashboardAlerts,
+    TemperatureLogWithDetails, ChecklistSubmissionWithDetails,
+    IncidentWithDetails, CorrectiveActionResponse
+)
 from food_safety.services.maintenance_client import maintenance_client
 
 logger = logging.getLogger(__name__)
@@ -94,14 +101,39 @@ async def get_dashboard_stats(
     result = await db.execute(temps_query)
     recent_temps = result.scalars().all()
 
+    # Hydrate temps with location names
+    recent_temp_responses = []
+    if recent_temps:
+        loc_ids = list(set(t.location_id for t in recent_temps))
+        loc_q = select(Location.id, Location.name).where(Location.id.in_(loc_ids))
+        loc_names = dict((await db.execute(loc_q)).all())
+        for t in recent_temps:
+            resp = TemperatureLogWithDetails.model_validate(t)
+            resp.location_name = loc_names.get(t.location_id)
+            recent_temp_responses.append(resp)
+
     # Pending signoffs
-    signoffs_query = select(ChecklistSubmission).where(
+    signoffs_query = select(ChecklistSubmission).options(
+        selectinload(ChecklistSubmission.template)
+    ).where(
         ChecklistSubmission.status == ChecklistStatus.PENDING_SIGNOFF
     ).order_by(ChecklistSubmission.created_at.desc()).limit(10)
     if location_id:
         signoffs_query = signoffs_query.where(ChecklistSubmission.location_id == location_id)
     result = await db.execute(signoffs_query)
     pending_signoffs = result.scalars().all()
+
+    # Hydrate signoffs with template/location names
+    pending_signoff_responses = []
+    if pending_signoffs:
+        loc_ids = list(set(s.location_id for s in pending_signoffs))
+        loc_q = select(Location.id, Location.name).where(Location.id.in_(loc_ids))
+        loc_names = dict((await db.execute(loc_q)).all())
+        for s in pending_signoffs:
+            resp = ChecklistSubmissionWithDetails.model_validate(s)
+            resp.template_name = s.template.name if s.template else None
+            resp.location_name = loc_names.get(s.location_id)
+            pending_signoff_responses.append(resp)
 
     return DashboardStats(
         total_equipment=total_equipment,
@@ -110,8 +142,8 @@ async def get_dashboard_stats(
         checklists_completed_today=checklists_completed_today,
         open_incidents=open_incidents,
         pending_corrective_actions=pending_corrective_actions,
-        recent_temperatures=[],  # Would need to hydrate with details
-        pending_signoffs=[]  # Would need to hydrate with details
+        recent_temperatures=recent_temp_responses,
+        pending_signoffs=pending_signoff_responses
     )
 
 
@@ -136,7 +168,9 @@ async def get_dashboard_alerts(
     temp_alerts = result.scalars().all()
 
     # Overdue checklists (in_progress past due)
-    overdue_query = select(ChecklistSubmission).where(
+    overdue_query = select(ChecklistSubmission).options(
+        selectinload(ChecklistSubmission.template)
+    ).where(
         and_(
             ChecklistSubmission.status == ChecklistStatus.IN_PROGRESS,
             ChecklistSubmission.submission_date < today
@@ -166,9 +200,47 @@ async def get_dashboard_alerts(
     result = await db.execute(overdue_ca_query)
     overdue_cas = result.scalars().all()
 
+    # Batch-load location names for all entities
+    all_loc_ids = set()
+    for t in temp_alerts:
+        all_loc_ids.add(t.location_id)
+    for c in overdue_checklists:
+        all_loc_ids.add(c.location_id)
+    for i in open_incidents:
+        all_loc_ids.add(i.location_id)
+    loc_names = {}
+    if all_loc_ids:
+        loc_q = select(Location.id, Location.name).where(Location.id.in_(list(all_loc_ids)))
+        loc_names = dict((await db.execute(loc_q)).all())
+
+    # Hydrate temperature alerts
+    temp_alert_responses = []
+    for t in temp_alerts:
+        resp = TemperatureLogWithDetails.model_validate(t)
+        resp.location_name = loc_names.get(t.location_id)
+        temp_alert_responses.append(resp)
+
+    # Hydrate overdue checklists
+    overdue_checklist_responses = []
+    for c in overdue_checklists:
+        resp = ChecklistSubmissionWithDetails.model_validate(c)
+        resp.template_name = c.template.name if c.template else None
+        resp.location_name = loc_names.get(c.location_id)
+        overdue_checklist_responses.append(resp)
+
+    # Hydrate open incidents
+    incident_responses = []
+    for i in open_incidents:
+        resp = IncidentWithDetails.model_validate(i)
+        resp.location_name = loc_names.get(i.location_id)
+        incident_responses.append(resp)
+
+    # Hydrate corrective actions
+    ca_responses = [CorrectiveActionResponse.model_validate(ca) for ca in overdue_cas]
+
     return DashboardAlerts(
-        temperature_alerts=[],  # Would need to hydrate
-        overdue_checklists=[],  # Would need to hydrate
-        open_incidents=[],  # Would need to hydrate
-        overdue_corrective_actions=[]  # Would need to hydrate
+        temperature_alerts=temp_alert_responses,
+        overdue_checklists=overdue_checklist_responses,
+        open_incidents=incident_responses,
+        overdue_corrective_actions=ca_responses
     )

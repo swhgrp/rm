@@ -293,6 +293,11 @@ class AutoSendService:
         if invoice.sent_to_inventory and invoice.sent_to_accounting:
             errors.append("Invoice already sent to both systems")
 
+        # Check review flag
+        if getattr(invoice, 'needs_review', False) and invoice.needs_review:
+            errors.append(f"Invoice is flagged for review ({invoice.review_reason or 'unknown reason'}). "
+                         "Approve or clear review flags before sending.")
+
         # Check status
         # Allow 'ready', 'partial' (for initial send), and 'error' (for retry)
         if invoice.status not in ['ready', 'partial', 'error']:

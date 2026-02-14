@@ -1802,15 +1802,17 @@ async def get_vendor_item_location_prices(
 
     # Query hub_invoice_items joined with hub_invoices to get prices by location
     # Match by vendor + item_code OR vendor + item_description
-    # Include price_is_per_unit to correctly interpret unit_price
+    # Include matched_uom_id conversion_factor (Multi-UOM) and price_is_per_unit (legacy)
     query = text("""
         SELECT
             i.location_id,
             ii.unit_price as last_price,
             i.invoice_date as last_invoice_date,
-            ii.price_is_per_unit
+            ii.price_is_per_unit,
+            viu.conversion_factor as matched_cf
         FROM hub_invoice_items ii
         JOIN hub_invoices i ON ii.invoice_id = i.id
+        LEFT JOIN vendor_item_uoms viu ON viu.id = ii.matched_uom_id
         WHERE i.vendor_id = :vendor_id
           AND (
             (ii.item_code IS NOT NULL AND ii.item_code = :vendor_sku)
@@ -1865,18 +1867,24 @@ async def get_vendor_item_location_prices(
 
             invoice_price = float(row[1]) if row[1] else 0
             is_per_unit = row[3]
+            matched_cf = float(row[4]) if row[4] else None
 
-            # Determine case cost and unit cost based on pricing type
-            if is_per_unit is True:
-                # Invoice price is per individual unit (e.g., $38.20/bottle)
+            # Determine case cost and unit cost
+            # Prefer Multi-UOM conversion_factor when matched_uom_id is set
+            if matched_cf is not None:
+                # Multi-UOM path: cost_per_primary = invoice_price / conversion_factor
+                unit_cost = invoice_price / matched_cf if matched_cf > 0 else invoice_price
+                case_cost = unit_cost * units_per_case
+            elif is_per_unit is True:
+                # Legacy: invoice price is per individual unit
                 unit_cost = invoice_price
                 case_cost = invoice_price * units_per_case
             elif is_per_unit is False:
-                # Invoice price is per case
+                # Legacy: invoice price is per case
                 case_cost = invoice_price
                 unit_cost = invoice_price / units_per_case if units_per_case > 0 else invoice_price
             else:
-                # Flag not set — fallback: check vendor purchase_unit_abbr
+                # No UOM info — fallback: check vendor purchase_unit_abbr
                 vendor_abbr = (item.purchase_unit_abbr or '').strip().upper()
                 if vendor_abbr in ('EA', 'EACH', 'BTL', 'BOTTLE', 'PC', 'PIECE'):
                     unit_cost = invoice_price

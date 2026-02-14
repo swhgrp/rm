@@ -393,6 +393,17 @@ class CSVInvoiceParser:
 
             self.db.commit()
 
+            # Post-parse validation: sanity checks + total reconciliation
+            try:
+                from integration_hub.services.post_parse_validator import apply_validation_to_invoice
+                for inv_info in created_invoices:
+                    validation_result = apply_validation_to_invoice(inv_info['id'], self.db)
+                    inv_info['validation'] = validation_result
+                    if validation_result.get('needs_review'):
+                        logger.info(f"CSV invoice {inv_info['id']} flagged for review: {validation_result.get('review_reasons', [])}")
+            except Exception as e:
+                logger.error(f"Post-parse validation error for CSV invoices: {str(e)}")
+
             # Auto-map items for all created/updated invoices
             try:
                 from integration_hub.services.auto_mapper import get_auto_mapper
