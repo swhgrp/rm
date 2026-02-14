@@ -1,8 +1,11 @@
 """Incident management router for Food Safety Service"""
 import logging
+import os
+import shutil
 from datetime import date, datetime
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
@@ -17,12 +20,18 @@ from food_safety.models import (
     Incident, CorrectiveAction, IncidentType, IncidentStatus,
     CorrectiveActionStatus, Location
 )
+from food_safety.models.incidents import IncidentDocument
 from food_safety.schemas import (
     IncidentCreate, IncidentUpdate, IncidentResponse, IncidentWithDetails,
     IncidentInvestigate, IncidentResolve,
+    IncidentDocumentResponse,
     CorrectiveActionCreate, CorrectiveActionUpdate, CorrectiveActionResponse,
     CorrectiveActionComplete, CorrectiveActionVerify
 )
+
+UPLOAD_DIR = "/app/uploads/incidents"
+ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.doc', '.docx'}
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -263,6 +272,136 @@ async def close_incident(
 
     logger.info(f"Closed incident: {incident.incident_number}")
     return incident
+
+
+# ==================== Incident Documents ====================
+
+@router.get("/{incident_id}/documents", response_model=List[IncidentDocumentResponse])
+async def list_incident_documents(
+    incident_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """List documents attached to an incident"""
+    query = select(IncidentDocument).where(
+        IncidentDocument.incident_id == incident_id
+    ).order_by(IncidentDocument.uploaded_at.desc())
+    result = await db.execute(query)
+    return result.scalars().all()
+
+
+@router.post("/{incident_id}/documents", response_model=List[IncidentDocumentResponse], status_code=201)
+async def upload_incident_documents(
+    incident_id: int,
+    files: List[UploadFile] = File(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """Upload documents/images to an incident"""
+    # Verify incident exists
+    query = select(Incident.id).where(Incident.id == incident_id)
+    result = await db.execute(query)
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="Incident not found")
+
+    # Validate files
+    validated = []
+    for f in files:
+        if not f.filename:
+            continue
+        ext = os.path.splitext(f.filename)[1].lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File type '{ext}' not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+            )
+        f.file.seek(0, 2)
+        size = f.file.tell()
+        f.file.seek(0)
+        if size > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"File '{f.filename}' exceeds maximum size of 10MB."
+            )
+        validated.append((f, size))
+
+    # Save files
+    incident_dir = os.path.join(UPLOAD_DIR, str(incident_id))
+    os.makedirs(incident_dir, exist_ok=True)
+
+    docs = []
+    for uploaded_file, file_size in validated:
+        timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        safe_name = f"{timestamp}_{uploaded_file.filename}"
+        file_path = os.path.join(incident_dir, safe_name)
+
+        try:
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(uploaded_file.file, buffer)
+        except Exception as e:
+            logger.error(f"Failed to save file {uploaded_file.filename}: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to save file: {uploaded_file.filename}")
+
+        doc = IncidentDocument(
+            incident_id=incident_id,
+            file_name=uploaded_file.filename,
+            file_path=file_path,
+            file_size=file_size,
+            mime_type=uploaded_file.content_type,
+        )
+        db.add(doc)
+        docs.append(doc)
+
+    await db.commit()
+    for doc in docs:
+        await db.refresh(doc)
+
+    logger.info(f"Uploaded {len(docs)} document(s) to incident {incident_id}")
+    return docs
+
+
+@router.get("/documents/{document_id}/download")
+async def download_incident_document(
+    document_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Download an incident document"""
+    query = select(IncidentDocument).where(IncidentDocument.id == document_id)
+    result = await db.execute(query)
+    doc = result.scalar_one_or_none()
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    if not os.path.exists(doc.file_path):
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    return FileResponse(
+        doc.file_path,
+        filename=doc.file_name,
+        media_type=doc.mime_type or "application/octet-stream"
+    )
+
+
+@router.delete("/documents/{document_id}", status_code=204)
+async def delete_incident_document(
+    document_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete an incident document"""
+    query = select(IncidentDocument).where(IncidentDocument.id == document_id)
+    result = await db.execute(query)
+    doc = result.scalar_one_or_none()
+
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    # Delete file from disk
+    if os.path.exists(doc.file_path):
+        os.remove(doc.file_path)
+
+    await db.delete(doc)
+    await db.commit()
+
+    logger.info(f"Deleted document {document_id}")
 
 
 # ==================== Corrective Actions ====================

@@ -44,6 +44,8 @@ class VendorUpdate(BaseModel):
     payment_terms: Optional[str] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
+    send_to_inventory: Optional[bool] = None
+    send_to_accounting: Optional[bool] = None
 
 
 class VendorMergeRequest(BaseModel):
@@ -133,6 +135,8 @@ async def get_vendor(vendor_id: int, db: Session = Depends(get_db)):
         'payment_terms': vendor.payment_terms,
         'notes': vendor.notes,
         'is_active': vendor.is_active,
+        'send_to_inventory': vendor.send_to_inventory,
+        'send_to_accounting': vendor.send_to_accounting,
         'inventory_vendor_id': vendor.inventory_vendor_id,
         'accounting_vendor_id': vendor.accounting_vendor_id,
         'aliases': [{'id': a.id, 'alias_name': a.alias_name, 'source': a.source} for a in aliases]
@@ -203,6 +207,10 @@ async def update_vendor(
         vendor.notes = updates.notes
     if updates.is_active is not None:
         vendor.is_active = updates.is_active
+    if updates.send_to_inventory is not None:
+        vendor.send_to_inventory = updates.send_to_inventory
+    if updates.send_to_accounting is not None:
+        vendor.send_to_accounting = updates.send_to_accounting
 
     db.commit()
 

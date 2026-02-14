@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** February 13, 2026
+**Last Updated:** February 14, 2026
 **Status:** ~98% Complete - All 10 Systems Production Ready ✅
-**Latest:** Integration Hub post-parse validation safety nets, auto-reparse with vendor rules, vendor item name normalization, Food Safety incident management with JSONB extra_data (Feb 13, 2026) ✅
+**Latest:** Food Safety incident edit/upload/reporter names, HR required documents bug fix & missing docs tracking (Feb 14, 2026) ✅
 
 ---
 
@@ -445,6 +445,9 @@ restaurant-system/
 - ✅ User account management for Portal SSO
 - ✅ Emergency contacts (encrypted)
 - ✅ Employee document storage with expiration tracking
+- ✅ Required documents enforcement (ID, SSN, Food Certificate) on new hire creation
+- ✅ Missing documents warning banner on employee profile
+- ✅ Missing docs badge on employees list ("Docs & Certs" column)
 - ✅ Role-based access control (Admin, Manager, Employee)
 - ✅ Email settings management
 - ✅ **E-Signature Templates** - Visual field editor for PDF signature placement
@@ -969,6 +972,54 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 **Access:**
 - Portal UI: https://rm.swhgrp.com/portal/maintenance/
 - API Docs: https://rm.swhgrp.com/maintenance/docs
+
+---
+
+### 10. Food Safety System ✅ **Production Ready (NEW - Feb 2026)** 🌟
+**Food safety & compliance incident tracking with document uploads and category-specific data**
+
+- **URL:** https://rm.swhgrp.com/portal/food-safety/
+- **API:** https://rm.swhgrp.com/food-safety/
+- **Database:** food_safety (PostgreSQL 15)
+- **Technology:** FastAPI, async SQLAlchemy (asyncpg), Alembic
+- **Status:** Production ready with full feature set ✅
+
+**Incident Management:**
+- ✅ Incident creation with 4 categories (food safety, workplace safety, security, general)
+- ✅ 24 incident types across categories
+- ✅ Category-specific detail fields stored as JSONB (`extra_data`)
+- ✅ Incident editing with full field population including category-specific sections
+- ✅ Status workflow (open → investigating → resolved → closed)
+- ✅ Severity levels (critical, high, medium, low)
+- ✅ Location-based filtering
+- ✅ Auto-generated incident numbers (INC-YYYY-NNNN)
+- ✅ Double-submit prevention on forms
+- ✅ Reporter name display (fetched from portal user system)
+- ✅ Print-friendly incident reports
+
+**Document & Photo Uploads:**
+- ✅ File upload on incident creation and editing
+- ✅ Upload directly from view modal (no need to open edit page)
+- ✅ Drag-and-drop support
+- ✅ Image, PDF, and Word document support (max 10MB)
+- ✅ Download and delete documents
+- ✅ Persistent storage via Docker volumes
+
+**User Permissions:**
+- ✅ Role-based access (admin, manager, user, viewer)
+- ✅ HR employee integration for user management
+- ✅ Portal SSO authentication
+
+**API Endpoints:**
+- `/food-safety/health` - Health check
+- `/food-safety/incidents` - Incident CRUD
+- `/food-safety/incidents/{id}/documents` - Document upload/list
+- `/food-safety/incidents/documents/{id}/download` - Document download
+- `/food-safety/users` - User permission management
+
+**Access:**
+- Portal UI: https://rm.swhgrp.com/portal/food-safety/
+- API Docs: https://rm.swhgrp.com/food-safety/docs
 
 ---
 

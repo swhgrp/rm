@@ -1,8 +1,10 @@
 {% extends "food-safety/base.html" %}
 
-{% block title %}Report Incident - Safety & Compliance - SW Hospitality Group{% endblock %}
+{% set is_edit = incident_id %}
+{% block title %}{{ 'Edit Incident' if is_edit else 'Report Incident' }} - Safety & Compliance - SW Hospitality Group{% endblock %}
 
-{% block nav_new_incident %}active{% endblock %}
+{% block nav_incidents %}{{ 'active' if is_edit else '' }}{% endblock %}
+{% block nav_new_incident %}{{ '' if is_edit else 'active' }}{% endblock %}
 
 {% block extra_styles %}
     .page-header {
@@ -100,6 +102,11 @@
 
     .btn-primary:hover {
         background-color: var(--accent-hover);
+    }
+
+    .btn-primary:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
     }
 
     .btn-secondary {
@@ -272,16 +279,81 @@
         width: auto;
         margin: 0;
     }
+
+    /* File upload styles */
+    .file-upload-area {
+        border: 2px dashed var(--border-primary);
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.2s;
+    }
+
+    .file-upload-area:hover {
+        border-color: var(--accent-primary);
+    }
+
+    .file-upload-area.dragover {
+        border-color: var(--accent-primary);
+        background-color: rgba(46, 125, 50, 0.05);
+    }
+
+    .file-upload-area input[type="file"] {
+        display: none;
+    }
+
+    .file-list {
+        margin-top: 12px;
+    }
+
+    .file-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 12px;
+        background-color: var(--bg-tertiary);
+        border-radius: 6px;
+        margin-bottom: 6px;
+        font-size: 13px;
+    }
+
+    .file-item .file-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .file-item .file-size {
+        color: var(--text-muted);
+        font-size: 12px;
+    }
+
+    .file-item .file-remove {
+        background: none;
+        border: none;
+        color: var(--error);
+        cursor: pointer;
+        font-size: 16px;
+        padding: 2px 6px;
+    }
+
+    .file-item .file-download {
+        color: var(--accent-primary);
+        text-decoration: none;
+        font-size: 14px;
+        margin-right: 8px;
+    }
 {% endblock %}
 
 {% block content %}
     <div class="page-header">
-        <h2 class="page-title">Report Incident</h2>
-        <p class="page-subtitle">Document a new safety or compliance incident for investigation</p>
+        <h2 class="page-title">{{ 'Edit Incident' if is_edit else 'Report Incident' }}</h2>
+        <p class="page-subtitle">{{ 'Update incident details' if is_edit else 'Document a new safety or compliance incident for investigation' }}</p>
     </div>
 
     <div class="alert alert-success" id="successAlert">
-        Incident reported successfully! Redirecting...
+        {{ 'Incident updated successfully! Redirecting...' if is_edit else 'Incident reported successfully! Redirecting...' }}
     </div>
     <div class="alert alert-error" id="errorAlert"></div>
 
@@ -376,6 +448,20 @@
             <div class="form-group">
                 <label for="description">Description <span class="required">*</span></label>
                 <textarea id="description" rows="5" required placeholder="Provide a detailed description of what happened, including any products, equipment, or personnel involved..."></textarea>
+            </div>
+
+            <!-- ==================== FILE UPLOADS ==================== -->
+            <div class="form-group">
+                <label>Documents / Photos</label>
+                <div class="file-upload-area" id="fileUploadArea">
+                    <input type="file" id="fileInput" multiple accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx">
+                    <i class="bi bi-cloud-arrow-up" style="font-size: 24px; color: var(--text-muted);"></i>
+                    <p style="margin: 8px 0 0; color: var(--text-muted); font-size: 13px;">
+                        Click or drag files here (images, PDFs, Word docs &mdash; max 10MB each)
+                    </p>
+                </div>
+                <div class="file-list" id="existingFiles"></div>
+                <div class="file-list" id="pendingFiles"></div>
             </div>
 
             <!-- ==================== WORKPLACE SAFETY SECTION ==================== -->
@@ -709,8 +795,8 @@
                 <a href="/portal/food-safety/incidents" class="btn-secondary">
                     <i class="bi bi-x-lg"></i> Cancel
                 </a>
-                <button type="submit" class="btn-primary">
-                    <i class="bi bi-check-lg"></i> Report Incident
+                <button type="submit" class="btn-primary" id="submitBtn">
+                    <i class="bi bi-check-lg"></i> <span id="submitBtnText">{{ 'Save Changes' if is_edit else 'Report Incident' }}</span>
                 </button>
             </div>
         </form>
@@ -719,7 +805,9 @@
 
 {% block extra_scripts %}
 <script>
+    const EDIT_ID = '{{ incident_id }}';
     let locations = [];
+    let pendingFiles = []; // Files queued for upload (new incident or new files on edit)
 
     // Incident types by category
     const incidentTypes = {
@@ -849,11 +937,191 @@
         document.querySelector(`input[value="${severity}"]`).closest('.severity-option').classList.add('selected');
     }
 
-    // Set default date to today
-    document.getElementById('incident_date').value = new Date().toISOString().split('T')[0];
+    // ==================== FILE UPLOAD HANDLING ====================
+
+    function formatFileSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function renderPendingFiles() {
+        const container = document.getElementById('pendingFiles');
+        container.innerHTML = pendingFiles.map((f, i) => `
+            <div class="file-item">
+                <div class="file-info">
+                    <i class="bi bi-file-earmark"></i>
+                    <span>${escapeHtml(f.name)}</span>
+                    <span class="file-size">(${formatFileSize(f.size)})</span>
+                </div>
+                <button type="button" class="file-remove" onclick="removePendingFile(${i})" title="Remove">&times;</button>
+            </div>
+        `).join('');
+    }
+
+    function removePendingFile(index) {
+        pendingFiles.splice(index, 1);
+        renderPendingFiles();
+    }
+
+    function addFiles(fileList) {
+        for (const f of fileList) {
+            if (f.size > 10 * 1024 * 1024) {
+                showError(`File "${f.name}" exceeds 10MB limit`);
+                continue;
+            }
+            pendingFiles.push(f);
+        }
+        renderPendingFiles();
+    }
+
+    // File input and drag-drop
+    const uploadArea = document.getElementById('fileUploadArea');
+    const fileInput = document.getElementById('fileInput');
+
+    uploadArea.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+        addFiles(fileInput.files);
+        fileInput.value = '';
+    });
+    uploadArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+    });
+    uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+    uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        addFiles(e.dataTransfer.files);
+    });
+
+    async function uploadPendingFiles(incidentId) {
+        if (pendingFiles.length === 0) return;
+        const formData = new FormData();
+        pendingFiles.forEach(f => formData.append('files', f));
+        try {
+            await fetch(`${API_BASE}/incidents/${incidentId}/documents`, {
+                method: 'POST',
+                body: formData
+            });
+        } catch (e) {
+            console.error('Error uploading files:', e);
+        }
+    }
+
+    async function loadExistingDocuments(incidentId) {
+        try {
+            const response = await fetch(`${API_BASE}/incidents/${incidentId}/documents`);
+            if (response.ok) {
+                const docs = await response.json();
+                const container = document.getElementById('existingFiles');
+                container.innerHTML = docs.map(doc => `
+                    <div class="file-item" id="doc-${doc.id}">
+                        <div class="file-info">
+                            <i class="bi bi-file-earmark"></i>
+                            <span>${escapeHtml(doc.file_name)}</span>
+                            <span class="file-size">(${formatFileSize(doc.file_size || 0)})</span>
+                        </div>
+                        <div>
+                            <a href="${API_BASE}/incidents/documents/${doc.id}/download" class="file-download" title="Download"><i class="bi bi-download"></i></a>
+                            <button type="button" class="file-remove" onclick="deleteDocument(${doc.id})" title="Delete">&times;</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } catch (e) {
+            console.error('Error loading documents:', e);
+        }
+    }
+
+    async function deleteDocument(docId) {
+        if (!confirm('Delete this document?')) return;
+        try {
+            const response = await fetch(`${API_BASE}/incidents/documents/${docId}`, { method: 'DELETE' });
+            if (response.ok || response.status === 204) {
+                const el = document.getElementById('doc-' + docId);
+                if (el) el.remove();
+            }
+        } catch (e) {
+            console.error('Error deleting document:', e);
+        }
+    }
+
+    // ==================== EDIT MODE: POPULATE FORM ====================
+
+    async function populateForm(incidentId) {
+        try {
+            const response = await fetch(`${API_BASE}/incidents/${incidentId}`);
+            if (!response.ok) {
+                showError('Failed to load incident');
+                return;
+            }
+            const incident = await response.json();
+
+            // Main fields
+            document.getElementById('title').value = incident.title || '';
+            document.getElementById('description').value = incident.description || '';
+            document.getElementById('area_involved').value = incident.area_involved || '';
+            document.getElementById('incident_date').value = incident.incident_date || '';
+            document.getElementById('incident_time').value = incident.incident_time || '';
+
+            // Location (wait for locations to be loaded)
+            document.getElementById('location_id').value = incident.location_id || '';
+
+            // Category → triggers type options
+            document.getElementById('category').value = incident.category || '';
+            updateIncidentTypes();
+
+            // Set incident type after types are populated
+            document.getElementById('incident_type').value = incident.incident_type || '';
+
+            // Severity
+            if (incident.severity) {
+                selectSeverity(incident.severity);
+            }
+
+            // Extra data (category-specific fields)
+            if (incident.extra_data && typeof incident.extra_data === 'object') {
+                const category = incident.category;
+                const section = document.getElementById('section-' + category);
+                if (section) {
+                    for (const [key, value] of Object.entries(incident.extra_data)) {
+                        // Body parts are special
+                        if (key === 'body_parts_affected' && Array.isArray(value)) {
+                            value.forEach(part => {
+                                const cb = section.querySelector(`#bodyPartsGrid input[value="${part}"]`);
+                                if (cb) cb.checked = true;
+                            });
+                            continue;
+                        }
+
+                        const el = section.querySelector(`[data-field="${key}"]`);
+                        if (!el) continue;
+
+                        if (el.type === 'checkbox') {
+                            el.checked = !!value;
+                        } else {
+                            el.value = value || '';
+                        }
+                    }
+                }
+            }
+
+            // Load existing documents
+            loadExistingDocuments(incidentId);
+        } catch (error) {
+            console.error('Error loading incident:', error);
+            showError('Error loading incident data');
+        }
+    }
+
+    // ==================== FORM SUBMIT ====================
 
     document.getElementById('incidentForm').addEventListener('submit', async (e) => {
         e.preventDefault();
+
+        const submitBtn = document.getElementById('submitBtn');
+        const submitBtnText = document.getElementById('submitBtnText');
 
         const locationId = document.getElementById('location_id').value;
         const severity = document.querySelector('input[name="severity"]:checked');
@@ -868,6 +1136,10 @@
             return;
         }
 
+        // Disable button to prevent double submission
+        submitBtn.disabled = true;
+        submitBtnText.textContent = EDIT_ID ? 'Saving...' : 'Submitting...';
+
         const extraData = collectExtraData();
 
         const data = {
@@ -880,21 +1152,33 @@
             severity: severity.value,
             description: document.getElementById('description').value,
             area_involved: document.getElementById('area_involved').value || null,
-            reported_by: window.currentUser ? window.currentUser.user_id : 0
         };
+
+        if (!EDIT_ID) {
+            data.reported_by = window.currentUser ? window.currentUser.user_id : 0;
+        }
 
         if (extraData) {
             data.extra_data = extraData;
         }
 
         try {
-            const response = await fetch(`${API_BASE}/incidents`, {
-                method: 'POST',
+            const url = EDIT_ID ? `${API_BASE}/incidents/${EDIT_ID}` : `${API_BASE}/incidents`;
+            const method = EDIT_ID ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
 
             if (response.ok) {
+                const result = await response.json();
+                const incidentId = EDIT_ID || result.id;
+
+                // Upload any pending files
+                await uploadPendingFiles(incidentId);
+
                 document.getElementById('successAlert').style.display = 'block';
                 document.getElementById('errorAlert').style.display = 'none';
                 setTimeout(() => {
@@ -907,10 +1191,16 @@
                     ? detail.map(e => e.msg || e.message || JSON.stringify(e)).join(', ')
                     : detail || 'Unknown error';
                 showError('Error: ' + msg);
+                // Re-enable button on error
+                submitBtn.disabled = false;
+                submitBtnText.textContent = EDIT_ID ? 'Save Changes' : 'Report Incident';
             }
         } catch (error) {
-            console.error('Error creating incident:', error);
-            showError('Error creating incident. Please try again.');
+            console.error('Error saving incident:', error);
+            showError('Error saving incident. Please try again.');
+            // Re-enable button on error
+            submitBtn.disabled = false;
+            submitBtnText.textContent = EDIT_ID ? 'Save Changes' : 'Report Incident';
         }
     });
 
@@ -918,6 +1208,7 @@
         document.getElementById('errorAlert').textContent = message;
         document.getElementById('errorAlert').style.display = 'block';
         document.getElementById('successAlert').style.display = 'none';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
     function escapeHtml(text) {
@@ -927,7 +1218,18 @@
         return div.innerHTML;
     }
 
-    // Initialize
-    loadLocations();
+    // ==================== INITIALIZE ====================
+
+    // Set default date (only for new incidents)
+    if (!EDIT_ID) {
+        document.getElementById('incident_date').value = new Date().toISOString().split('T')[0];
+    }
+
+    // Load locations, then populate form if editing
+    loadLocations().then(() => {
+        if (EDIT_ID) {
+            populateForm(EDIT_ID);
+        }
+    });
 </script>
 {% endblock %}

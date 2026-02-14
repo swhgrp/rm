@@ -555,8 +555,29 @@ async function loadDocuments(employeeId) {
 function renderDocuments(documents) {
     const container = document.getElementById('documentsContainer');
 
+    // Check for missing required documents
+    const REQUIRED_DOC_TYPES = ['ID Copy', 'Social Security Card'];
+    const REQUIRED_CERT_TYPES = ['Food Handler Certificate', 'Food Manager Certificate'];
+    const uploadedTypes = documents.map(d => d.document_type);
+    const missingDocs = [];
+    REQUIRED_DOC_TYPES.forEach(t => { if (!uploadedTypes.includes(t)) missingDocs.push(t); });
+    if (!REQUIRED_CERT_TYPES.some(t => uploadedTypes.includes(t))) missingDocs.push('Food Certificate');
+
+    let missingBanner = '';
+    if (missingDocs.length > 0) {
+        missingBanner = `
+            <div style="background: #3d1f1f; border: 1px solid #E53935; border-radius: 8px; padding: 12px 16px; margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                <i class="bi bi-exclamation-triangle-fill" style="color: #E53935; font-size: 18px;"></i>
+                <div>
+                    <strong style="color: #E53935;">Missing Required Documents</strong>
+                    <span style="color: #ef9a9a; margin-left: 8px;">${missingDocs.join(', ')}</span>
+                </div>
+            </div>
+        `;
+    }
+
     if (documents.length === 0) {
-        container.innerHTML = `
+        container.innerHTML = missingBanner + `
             <p style="text-align: center; color: var(--text-secondary);">No documents uploaded yet</p>
         `;
         return;
@@ -565,7 +586,7 @@ function renderDocuments(documents) {
     // Restricted document types (admin only)
     const restrictedDocTypes = ['ID Copy', 'Social Security Card'];
 
-    container.innerHTML = `
+    container.innerHTML = missingBanner + `
         <div style="overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse;">
                 <thead>

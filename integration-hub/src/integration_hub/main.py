@@ -3103,7 +3103,7 @@ async def create_vendor(
     """
     Create a new vendor and optionally push to Inventory and Accounting systems
     """
-    # Create vendor in Hub database
+    # Create vendor in Hub database (store sync intent)
     vendor = Vendor(
         name=vendor_data.name,
         contact_name=vendor_data.contact_name,
@@ -3116,7 +3116,9 @@ async def create_vendor(
         payment_terms=vendor_data.payment_terms,
         tax_id=vendor_data.tax_id,
         notes=vendor_data.notes,
-        is_active=vendor_data.is_active
+        is_active=vendor_data.is_active,
+        send_to_inventory=vendor_data.push_to_inventory,
+        send_to_accounting=vendor_data.push_to_accounting,
     )
     db.add(vendor)
     db.commit()

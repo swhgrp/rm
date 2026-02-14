@@ -117,6 +117,24 @@ curl -s http://localhost:{port}/endpoint | python3 -m json.tool
 - Handles: abbreviations (IPA, IQF, PET, AA), number+unit combos (16oz, 750ml), ordinals (25th), apostrophes (D'Asti), hyphens (Bag-in-Box), slashes (Mozzarella/Provolone)
 - Backfill script: `scripts/backfill_vendor_item_names.py` (--dry-run supported)
 
+### Food Safety Incident System (Feb 2026)
+- **Incident CRUD**: Create, view, edit incidents with category-specific `extra_data` JSONB fields
+- **Categories**: `food_safety`, `workplace_safety`, `security`, `general` — 24 incident types
+- **Edit mode**: `incident_form.html` handles both create and edit via `{{ incident_id }}` template variable
+- **Document uploads**: `incident_documents` table, upload/download/delete API at `/incidents/{id}/documents`
+- **View modal uploads**: Can upload photos/docs directly from the incidents list modal (no need to go to edit page)
+- **Reporter names**: `reported_by` stores **portal user ID** (not HR employee ID); names fetched from `/portal/api/users/names`
+- **Double-submit prevention**: Submit button disabled + text changed on click, re-enabled on error
+- **Print view**: Standalone HTML at `/portal/food-safety/incidents/{id}/print`
+
+### HR Required Documents (Feb 2026)
+- **Required doc types**: ID Copy, Social Security Card, Food Handler/Manager Certificate
+- **Upload on create**: `employee_form.html` Required Documents section with `required` file inputs
+- **Bug fix**: `uploadRequiredDocuments()` now skips optional TIPS cert instead of throwing (was causing all uploads to fail)
+- **Missing docs banner**: `employee_detail.html` shows red warning banner listing missing required docs
+- **Employees list badge**: `employees.html` "Docs & Certs" column shows red "X Missing" badge for employees missing required docs
+- **Priority order**: Missing docs > Expired certs > Expiring certs > All Current
+
 ## Important Notes
 - Never modify `.env` files (contain production secrets)
 - Location data comes from inventory service - don't duplicate

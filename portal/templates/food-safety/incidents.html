@@ -329,6 +329,45 @@
         color: white;
         border-color: var(--accent-primary);
     }
+
+    .upload-area {
+        border: 2px dashed var(--border-primary);
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.2s, background-color 0.2s;
+        margin-top: 10px;
+    }
+    .upload-area:hover, .upload-area.dragover {
+        border-color: var(--accent-primary);
+        background-color: var(--bg-tertiary);
+    }
+    .upload-area i { font-size: 24px; color: var(--text-muted); }
+    .upload-area p { margin: 8px 0 0; font-size: 13px; color: var(--text-muted); }
+
+    .doc-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border-primary);
+    }
+    .doc-item:last-child { border-bottom: none; }
+    .doc-item a { color: var(--accent-primary); text-decoration: none; flex: 1; }
+    .doc-item a:hover { text-decoration: underline; }
+    .doc-item .doc-size { font-size: 12px; color: var(--text-muted); }
+    .doc-item .btn-delete-doc {
+        background: none; border: none; color: var(--error); cursor: pointer;
+        padding: 4px 8px; border-radius: 4px; font-size: 13px;
+    }
+    .doc-item .btn-delete-doc:hover { background-color: var(--error-bg); }
+
+    .upload-progress {
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--accent-primary);
+    }
 {% endblock %}
 
 {% block content %}
@@ -427,6 +466,7 @@
                         <th>Title</th>
                         <th>Type</th>
                         <th>Location</th>
+                        <th>Reported By</th>
                         <th>Severity</th>
                         <th>Status</th>
                         <th>Date</th>
@@ -434,7 +474,7 @@
                 </thead>
                 <tbody id="incidentsTable">
                     <tr>
-                        <td colspan="7">
+                        <td colspan="8">
                             <div class="loading"><div class="spinner"></div></div>
                         </td>
                     </tr>
@@ -454,8 +494,11 @@
                 <!-- Populated by JS -->
             </div>
             <div class="modal-footer">
-                <a id="printReportLink" href="#" target="_blank" class="btn-primary" style="text-decoration:none;">
-                    <i class="bi bi-printer"></i> Print Report
+                <a id="editIncidentLink" href="#" class="btn-primary" style="text-decoration:none;">
+                    <i class="bi bi-pencil"></i> Edit
+                </a>
+                <a id="printReportLink" href="#" target="_blank" class="btn-secondary" style="text-decoration:none;">
+                    <i class="bi bi-printer"></i> Print
                 </a>
                 <button class="btn-secondary" onclick="closeViewModal()">Close</button>
             </div>
@@ -467,6 +510,8 @@
 <script>
     let incidents = [];
     let locations = [];
+    let usersMap = {};  // HR user ID → employee name
+    let currentViewId = null;  // Track currently viewed incident for edit button
 
     async function loadLocations() {
         try {
@@ -484,6 +529,26 @@
         }
     }
 
+    async function loadUsers() {
+        try {
+            // Fetch portal user names (reported_by stores portal user IDs)
+            const response = await fetch('/portal/api/users/names');
+            if (response.ok) {
+                const users = await response.json();
+                users.forEach(u => {
+                    usersMap[u.id] = u.full_name || `User ${u.id}`;
+                });
+            }
+        } catch (e) {
+            console.error('Error loading users:', e);
+        }
+    }
+
+    function getUserName(userId) {
+        if (!userId) return '-';
+        return usersMap[userId] || `User ${userId}`;
+    }
+
     async function loadIncidents() {
         try {
             const locationId = document.getElementById('locationFilter').value;
@@ -499,7 +564,7 @@
         } catch (error) {
             console.error('Error loading incidents:', error);
             document.getElementById('incidentsTable').innerHTML = `
-                <tr><td colspan="7">
+                <tr><td colspan="8">
                     <div class="empty-state">
                         <i class="bi bi-exclamation-circle"></i>
                         <p>Error loading incidents</p>
@@ -550,7 +615,7 @@
 
         if (!list || list.length === 0) {
             tbody.innerHTML = `
-                <tr><td colspan="7">
+                <tr><td colspan="8">
                     <div class="empty-state">
                         <i class="bi bi-check-circle"></i>
                         <p>No incidents found</p>
@@ -595,6 +660,7 @@
                     <td><strong>${escapeHtml(i.title)}</strong></td>
                     <td>${typeLabels[i.incident_type] || i.incident_type}</td>
                     <td>${loc ? escapeHtml(loc.name) : '-'}</td>
+                    <td>${escapeHtml(getUserName(i.reported_by))}</td>
                     <td><span class="badge badge-${i.severity}">${i.severity}</span></td>
                     <td><span class="badge badge-${i.status}">${i.status}</span></td>
                     <td>${formatDate(i.incident_date || i.created_at)}</td>
@@ -665,6 +731,7 @@
             const response = await fetch(`${API_BASE}/incidents/${id}`);
             if (response.ok) {
                 const incident = await response.json();
+                currentViewId = incident.id;
                 const loc = locations.find(l => l.id === incident.location_id);
 
                 const typeLabels = {
@@ -682,8 +749,36 @@
                     'other': 'Other'
                 };
 
-                // Set print link
+                // Set print and edit links
                 document.getElementById('printReportLink').href = `/portal/food-safety/incidents/${incident.id}/print`;
+                document.getElementById('editIncidentLink').href = `/portal/food-safety/incidents/${incident.id}/edit`;
+
+                // Load documents for this incident
+                let docsHtml = `<div class="detail-section"><h4>Documents & Photos</h4><div id="modalDocsList">`;
+                try {
+                    const docsResp = await fetch(`${API_BASE}/incidents/${incident.id}/documents`);
+                    if (docsResp.ok) {
+                        const docs = await docsResp.json();
+                        docs.forEach(doc => {
+                            const isImage = (doc.mime_type || '').startsWith('image/');
+                            const size = doc.file_size ? `(${(doc.file_size / 1024).toFixed(0)} KB)` : '';
+                            docsHtml += `<div class="doc-item" id="doc-${doc.id}">
+                                <i class="bi bi-${isImage ? 'image' : 'file-earmark'}"></i>
+                                <a href="${API_BASE}/incidents/documents/${doc.id}/download">${escapeHtml(doc.file_name)}</a>
+                                <span class="doc-size">${size}</span>
+                                <button class="btn-delete-doc" onclick="deleteDocument(${doc.id}, ${incident.id})" title="Delete"><i class="bi bi-trash"></i></button>
+                            </div>`;
+                        });
+                    }
+                } catch (e) { /* ignore */ }
+                docsHtml += `</div>
+                    <div class="upload-area" id="modalUploadArea" onclick="document.getElementById('modalFileInput').click()">
+                        <i class="bi bi-cloud-upload"></i>
+                        <p>Click or drag files here to upload photos or documents</p>
+                        <input type="file" id="modalFileInput" multiple accept="image/*,.pdf,.doc,.docx" style="display:none;" onchange="uploadFilesFromModal(${incident.id})">
+                    </div>
+                    <div id="modalUploadProgress" class="upload-progress" style="display:none;"></div>
+                </div>`;
 
                 document.getElementById('viewModalTitle').textContent = `${incident.incident_number} - ${incident.title}`;
                 document.getElementById('viewModalBody').innerHTML = `
@@ -716,7 +811,11 @@
                             </div>
                             <div class="detail-item">
                                 <label>Reported By</label>
-                                <span>${incident.reported_by || '-'}</span>
+                                <span>${escapeHtml(getUserName(incident.reported_by))}</span>
+                            </div>
+                            <div class="detail-item">
+                                <label>Reported At</label>
+                                <span>${incident.reported_at ? new Date(incident.reported_at).toLocaleString() : '-'}</span>
                             </div>
                             <div class="detail-item">
                                 <label>Area Involved</label>
@@ -731,6 +830,7 @@
                         </div>
                     ` : ''}
                     ${renderExtraData(incident.extra_data, incident.category)}
+                    ${docsHtml}
                     ${incident.root_cause ? `
                         <div class="detail-section">
                             <h4>Root Cause</h4>
@@ -808,7 +908,120 @@
         alert('Error: ' + message);
     }
 
+    // File upload from view modal
+    async function uploadFilesFromModal(incidentId) {
+        const fileInput = document.getElementById('modalFileInput');
+        const files = fileInput.files;
+        if (!files || files.length === 0) return;
+
+        const progress = document.getElementById('modalUploadProgress');
+        progress.style.display = 'block';
+        progress.textContent = `Uploading ${files.length} file(s)...`;
+
+        let uploaded = 0;
+        let failed = 0;
+
+        for (const file of files) {
+            const formData = new FormData();
+            formData.append('files', file);
+
+            try {
+                const resp = await fetch(`${API_BASE}/incidents/${incidentId}/documents`, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (resp.ok) {
+                    uploaded++;
+                } else {
+                    failed++;
+                    console.error('Upload failed for', file.name, await resp.text());
+                }
+            } catch (e) {
+                failed++;
+                console.error('Upload error:', e);
+            }
+        }
+
+        fileInput.value = '';
+        progress.textContent = failed > 0
+            ? `Uploaded ${uploaded} file(s), ${failed} failed`
+            : `${uploaded} file(s) uploaded successfully`;
+
+        setTimeout(() => { progress.style.display = 'none'; }, 3000);
+
+        // Refresh the documents list
+        refreshDocsList(incidentId);
+    }
+
+    async function deleteDocument(docId, incidentId) {
+        if (!confirm('Delete this document?')) return;
+        try {
+            const resp = await fetch(`${API_BASE}/incidents/documents/${docId}`, { method: 'DELETE' });
+            if (resp.ok) {
+                const el = document.getElementById(`doc-${docId}`);
+                if (el) el.remove();
+            } else {
+                alert('Failed to delete document');
+            }
+        } catch (e) {
+            console.error('Delete error:', e);
+            alert('Error deleting document');
+        }
+    }
+
+    async function refreshDocsList(incidentId) {
+        try {
+            const resp = await fetch(`${API_BASE}/incidents/${incidentId}/documents`);
+            if (!resp.ok) return;
+            const docs = await resp.json();
+            const container = document.getElementById('modalDocsList');
+            if (!container) return;
+
+            container.innerHTML = docs.map(doc => {
+                const isImage = (doc.mime_type || '').startsWith('image/');
+                const size = doc.file_size ? `(${(doc.file_size / 1024).toFixed(0)} KB)` : '';
+                return `<div class="doc-item" id="doc-${doc.id}">
+                    <i class="bi bi-${isImage ? 'image' : 'file-earmark'}"></i>
+                    <a href="${API_BASE}/incidents/documents/${doc.id}/download">${escapeHtml(doc.file_name)}</a>
+                    <span class="doc-size">${size}</span>
+                    <button class="btn-delete-doc" onclick="deleteDocument(${doc.id}, ${incidentId})" title="Delete"><i class="bi bi-trash"></i></button>
+                </div>`;
+            }).join('');
+        } catch (e) {
+            console.error('Error refreshing docs:', e);
+        }
+    }
+
+    // Drag-and-drop support for modal upload area
+    document.addEventListener('dragover', function(e) {
+        const area = document.getElementById('modalUploadArea');
+        if (area && area.contains(e.target)) {
+            e.preventDefault();
+            area.classList.add('dragover');
+        }
+    });
+    document.addEventListener('dragleave', function(e) {
+        const area = document.getElementById('modalUploadArea');
+        if (area && !area.contains(e.relatedTarget)) {
+            area.classList.remove('dragover');
+        }
+    });
+    document.addEventListener('drop', function(e) {
+        const area = document.getElementById('modalUploadArea');
+        if (area && area.contains(e.target)) {
+            e.preventDefault();
+            area.classList.remove('dragover');
+            const fileInput = document.getElementById('modalFileInput');
+            if (fileInput && e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                // Get incident ID from the onchange attribute
+                const incidentId = currentViewId;
+                if (incidentId) uploadFilesFromModal(incidentId);
+            }
+        }
+    });
+
     // Initialize
-    loadLocations().then(() => loadIncidents());
+    Promise.all([loadLocations(), loadUsers()]).then(() => loadIncidents());
 </script>
 {% endblock %}

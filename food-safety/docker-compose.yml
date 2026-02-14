@@ -20,6 +20,8 @@ services:
       - PORTAL_SERVICE_URL=http://portal-app:8000
       - MAINTENANCE_SERVICE_URL=http://maintenance-service:8000
       - PORTAL_SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
+    volumes:
+      - incident_uploads:/app/uploads/incidents
     depends_on:
       - postgres
     networks:
@@ -56,3 +58,4 @@ networks:
 
 volumes:
   food_safety_postgres_data:
+  incident_uploads:

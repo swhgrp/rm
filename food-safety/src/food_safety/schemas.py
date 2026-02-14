@@ -431,6 +431,8 @@ class IncidentCreate(IncidentBase):
 
 
 class IncidentUpdate(BaseModel):
+    location_id: Optional[int] = None
+    category: Optional[IncidentCategory] = None
     incident_type: Optional[IncidentType] = None
     title: Optional[str] = Field(None, max_length=300)
     description: Optional[str] = None
@@ -482,6 +484,21 @@ class IncidentWithDetails(IncidentResponse):
     investigated_by_name: Optional[str] = None
     resolved_by_name: Optional[str] = None
     corrective_actions: List["CorrectiveActionResponse"] = []
+
+
+# ==================== Incident Document Schemas ====================
+
+class IncidentDocumentResponse(BaseModel):
+    id: int
+    incident_id: int
+    file_name: str
+    file_size: Optional[int] = None
+    mime_type: Optional[str] = None
+    uploaded_by: Optional[int] = None
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 # ==================== Corrective Action Schemas ====================

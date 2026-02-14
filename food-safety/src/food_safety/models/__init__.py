@@ -7,8 +7,8 @@ from food_safety.models.checklists import (
     ChecklistResponse, ManagerSignoff, ChecklistType, ChecklistStatus
 )
 from food_safety.models.incidents import (
-    Incident, CorrectiveAction, IncidentType, IncidentCategory, IncidentStatus,
-    CorrectiveActionStatus
+    Incident, CorrectiveAction, IncidentDocument, IncidentType, IncidentCategory,
+    IncidentStatus, CorrectiveActionStatus
 )
 from food_safety.models.inspections import (
     Inspection, InspectionViolation, InspectionType, ViolationSeverity
@@ -26,8 +26,8 @@ __all__ = [
     "ChecklistTemplate", "ChecklistItem", "ChecklistSubmission",
     "ChecklistResponse", "ManagerSignoff", "ChecklistType", "ChecklistStatus",
     # Incidents
-    "Incident", "CorrectiveAction", "IncidentType", "IncidentCategory", "IncidentStatus",
-    "CorrectiveActionStatus",
+    "Incident", "CorrectiveAction", "IncidentDocument", "IncidentType", "IncidentCategory",
+    "IncidentStatus", "CorrectiveActionStatus",
     # Inspections
     "Inspection", "InspectionViolation", "InspectionType", "ViolationSeverity",
     # HACCP

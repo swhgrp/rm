@@ -149,7 +149,7 @@
                         Hire Date <i class="bi bi-arrow-down-up" style="font-size: 10px; opacity: 0.5;"></i>
                     </th>
                     <th class="hide-mobile">Position</th>
-                    <th class="hide-mobile">Certifications</th>
+                    <th class="hide-mobile">Docs & Certs</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
@@ -299,14 +299,24 @@ async function loadEmployees() {
                         const expDate = new Date(cert.expiration_date);
                         return expDate < today;
                     });
+
+                    // Check for missing required documents
+                    const uploadedTypes = docs.map(d => d.document_type);
+                    const missingDocs = [];
+                    if (!uploadedTypes.includes('ID Copy')) missingDocs.push('ID Copy');
+                    if (!uploadedTypes.includes('Social Security Card')) missingDocs.push('SSN');
+                    if (!['Food Handler Certificate', 'Food Manager Certificate'].some(t => uploadedTypes.includes(t))) missingDocs.push('Food Cert');
+                    emp.missingDocs = missingDocs;
                 } else {
                     emp.expiringCerts = [];
                     emp.expiredCerts = [];
+                    emp.missingDocs = ['ID Copy', 'SSN', 'Food Cert'];
                 }
             } catch (err) {
                 console.error(`Error loading docs for employee ${emp.id}:`, err);
                 emp.expiringCerts = [];
                 emp.expiredCerts = [];
+                emp.missingDocs = [];
             }
         }));
 
@@ -382,7 +392,11 @@ function renderEmployees() {
 
     tbody.innerHTML = filteredEmployees.map(emp => {
         let certDisplay = '';
-        if (emp.expiredCerts && emp.expiredCerts.length > 0) {
+        if (emp.missingDocs && emp.missingDocs.length > 0) {
+            certDisplay = `<span class="badge badge-danger" title="Missing: ${emp.missingDocs.join(', ')}">
+                <i class="bi bi-folder-x"></i> ${emp.missingDocs.length} Missing
+            </span>`;
+        } else if (emp.expiredCerts && emp.expiredCerts.length > 0) {
             certDisplay = `<span class="badge badge-danger" title="${emp.expiredCerts.length} expired">
                 <i class="bi bi-exclamation-circle"></i> ${emp.expiredCerts.length} Expired
             </span>`;

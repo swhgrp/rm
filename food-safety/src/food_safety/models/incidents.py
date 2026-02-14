@@ -117,6 +117,7 @@ class Incident(Base):
 
     # Relationships
     corrective_actions = relationship("CorrectiveAction", back_populates="incident", cascade="all, delete-orphan")
+    documents = relationship("IncidentDocument", back_populates="incident", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_incidents_location_date", "location_id", "incident_date"),
@@ -167,3 +168,20 @@ class CorrectiveAction(Base):
         Index("ix_corrective_actions_status", "status"),
         Index("ix_corrective_actions_due_date", "due_date"),
     )
+
+
+class IncidentDocument(Base):
+    """Document/image attachment for an incident"""
+    __tablename__ = "incident_documents"
+
+    id = Column(Integer, primary_key=True, index=True)
+    incident_id = Column(Integer, ForeignKey("incidents.id"), nullable=False, index=True)
+    file_name = Column(String(255), nullable=False)
+    file_path = Column(String(500), nullable=False)
+    file_size = Column(Integer, nullable=True)
+    mime_type = Column(String(100), nullable=True)
+    uploaded_by = Column(Integer, nullable=True)  # HR user ID
+    uploaded_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    incident = relationship("Incident", back_populates="documents")

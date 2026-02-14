@@ -115,6 +115,9 @@ class VendorSyncService:
                     if not vendor.inventory_vendor_id:
                         vendor.inventory_vendor_id = inv_vendor.get("id")
 
+                    # Vendor exists in Inventory — mark intent accordingly
+                    vendor.send_to_inventory = True
+
                     # Update fields from inventory (only if not already set or if inventory has better data)
                     if inv_vendor.get("name"):
                         vendor.name = inv_vendor.get("name")
@@ -129,7 +132,7 @@ class VendorSyncService:
                     vendor.is_active = inv_vendor.get("is_active", True)
                     updated += 1
                 else:
-                    # Create new vendor
+                    # Create new vendor — came from Inventory, so mark for inventory only
                     vendor = Vendor(
                         name=vendor_name,
                         contact_name=inv_vendor.get("contact_name"),
@@ -137,7 +140,9 @@ class VendorSyncService:
                         phone=inv_vendor.get("phone"),
                         address=inv_vendor.get("address"),
                         is_active=inv_vendor.get("is_active", True),
-                        inventory_vendor_id=inv_vendor.get("id")
+                        inventory_vendor_id=inv_vendor.get("id"),
+                        send_to_inventory=True,
+                        send_to_accounting=False,
                     )
                     db.add(vendor)
                     created += 1
@@ -185,6 +190,9 @@ class VendorSyncService:
                     if not vendor.accounting_vendor_id:
                         vendor.accounting_vendor_id = acc_vendor.get("id")
 
+                    # Vendor exists in Accounting — mark intent accordingly
+                    vendor.send_to_accounting = True
+
                     # Update fields from accounting - accounting is source of truth for tax/payment/address
                     if acc_vendor.get("tax_id"):
                         vendor.tax_id = acc_vendor.get("tax_id")
@@ -210,7 +218,7 @@ class VendorSyncService:
 
                     updated += 1
                 else:
-                    # Create new vendor (exists in accounting but not in inventory)
+                    # Create new vendor — came from Accounting, so mark for accounting only
                     vendor = Vendor(
                         name=vendor_name,
                         contact_name=acc_vendor.get("contact_name"),
@@ -223,7 +231,9 @@ class VendorSyncService:
                         tax_id=acc_vendor.get("tax_id"),
                         payment_terms=acc_vendor.get("payment_terms"),
                         is_active=acc_vendor.get("is_active", True),
-                        accounting_vendor_id=acc_vendor.get("id")
+                        accounting_vendor_id=acc_vendor.get("id"),
+                        send_to_inventory=False,
+                        send_to_accounting=True,
                     )
                     db.add(vendor)
                     created += 1
@@ -234,7 +244,7 @@ class VendorSyncService:
         # Commit the merged vendors before auto-pushing
         db.commit()
 
-        # Auto-push vendors to systems where they're missing
+        # Auto-push vendors to systems where they're missing BUT only if user intended it
         pushed_to_inventory = 0
         pushed_to_accounting = 0
 
@@ -242,8 +252,8 @@ class VendorSyncService:
         all_hub_vendors = db.query(Vendor).filter(Vendor.is_active == True).all()
 
         for hub_vendor in all_hub_vendors:
-            # If vendor doesn't exist in Inventory, push it there
-            if not hub_vendor.inventory_vendor_id:
+            # Only push to Inventory if the vendor is marked for inventory sync
+            if hub_vendor.send_to_inventory and not hub_vendor.inventory_vendor_id:
                 try:
                     result = await self.push_vendor_to_inventory(hub_vendor)
                     if result.get("success"):
@@ -253,8 +263,8 @@ class VendorSyncService:
                 except Exception as e:
                     errors.append(f"Error pushing {hub_vendor.name} to Inventory: {str(e)}")
 
-            # If vendor doesn't exist in Accounting, push it there
-            if not hub_vendor.accounting_vendor_id:
+            # Only push to Accounting if the vendor is marked for accounting sync
+            if hub_vendor.send_to_accounting and not hub_vendor.accounting_vendor_id:
                 try:
                     result = await self.push_vendor_to_accounting(hub_vendor)
                     if result.get("success"):

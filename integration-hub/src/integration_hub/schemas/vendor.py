@@ -43,11 +43,15 @@ class VendorUpdate(BaseModel):
     tax_id: Optional[str] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
+    send_to_inventory: Optional[bool] = None
+    send_to_accounting: Optional[bool] = None
 
 
 class VendorResponse(VendorBase):
     """Schema for vendor response"""
     id: int
+    send_to_inventory: bool = True
+    send_to_accounting: bool = True
     inventory_vendor_id: Optional[int] = None
     accounting_vendor_id: Optional[int] = None
     created_at: datetime

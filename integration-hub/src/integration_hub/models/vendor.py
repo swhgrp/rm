@@ -42,7 +42,11 @@ class Vendor(Base):
     # Status
     is_active = Column(Boolean, default=True)
 
-    # System sync tracking
+    # System sync intent (what the user chose when creating the vendor)
+    send_to_inventory = Column(Boolean, default=True, server_default='true')
+    send_to_accounting = Column(Boolean, default=True, server_default='true')
+
+    # System sync tracking (IDs in external systems, set after successful push)
     inventory_vendor_id = Column(Integer, index=True)  # ID in inventory system
     accounting_vendor_id = Column(Integer, index=True)  # ID in accounting system
 

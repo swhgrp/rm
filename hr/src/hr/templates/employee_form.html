@@ -777,28 +777,35 @@ async function uploadRequiredDocuments(employeeId) {
         {
             file: document.getElementById('doc_id').files[0],
             type: 'ID Copy',
+            required: true,
             expiration: null
         },
         {
             file: document.getElementById('doc_ssn').files[0],
             type: 'Social Security Card',
+            required: true,
             expiration: null
         },
         {
             file: document.getElementById('doc_food_cert').files[0],
             type: document.getElementById('doc_food_cert_type').value,
+            required: true,
             expiration: document.getElementById('doc_food_cert_exp').value || null
         },
         {
             file: document.getElementById('doc_tips').files[0],
             type: 'TIPS Certification',
+            required: false,
             expiration: document.getElementById('doc_tips_exp').value || null
         }
     ];
 
     for (const doc of documents) {
         if (!doc.file) {
-            throw new Error(`Missing required document: ${doc.type}`);
+            if (doc.required) {
+                throw new Error(`Missing required document: ${doc.type}`);
+            }
+            continue;  // Skip optional docs without files
         }
 
         const docFormData = new FormData();

@@ -121,22 +121,13 @@
                             <td>{{ vendor.payment_terms or '-' }}</td>
                             <td>
                                 {% if vendor.inventory_vendor_id %}
-                                <span class="badge bg-success" title="Synced to Inventory">
+                                <span class="badge bg-success" title="Linked to Inventory (ID: {{ vendor.inventory_vendor_id }})">
                                     <i class="bi bi-check-circle"></i> Inv
                                 </span>
-                                {% else %}
-                                <span class="badge bg-secondary" title="Not in Inventory">
-                                    <i class="bi bi-x-circle"></i> Inv
-                                </span>
                                 {% endif %}
-
                                 {% if vendor.accounting_vendor_id %}
-                                <span class="badge bg-success" title="Synced to Accounting">
+                                <span class="badge bg-success" title="Linked to Accounting (ID: {{ vendor.accounting_vendor_id }})">
                                     <i class="bi bi-check-circle"></i> Acc
-                                </span>
-                                {% else %}
-                                <span class="badge bg-secondary" title="Not in Accounting">
-                                    <i class="bi bi-x-circle"></i> Acc
                                 </span>
                                 {% endif %}
                             </td>
@@ -1176,15 +1167,28 @@ async function editVendor(vendorId) {
                                     <textarea class="form-control" id="editNotes" rows="2">${escapeHtml(vendor.notes || '')}</textarea>
                                 </div>
                                 <hr>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">Sync to Systems</label>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="editSendToInventory" ${vendor.send_to_inventory ? 'checked' : ''}>
+                                        <label class="form-check-label" for="editSendToInventory">
+                                            Send to Inventory
+                                            ${vendor.inventory_vendor_id ? `<span class="badge bg-success ms-1">ID: ${vendor.inventory_vendor_id}</span>` : ''}
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="editSendToAccounting" ${vendor.send_to_accounting ? 'checked' : ''}>
+                                        <label class="form-check-label" for="editSendToAccounting">
+                                            Send to Accounting
+                                            ${vendor.accounting_vendor_id ? `<span class="badge bg-success ms-1">ID: ${vendor.accounting_vendor_id}</span>` : ''}
+                                        </label>
+                                    </div>
+                                </div>
                                 <h6>Aliases</h6>
                                 <div class="mb-2">
                                     ${vendor.aliases && vendor.aliases.length > 0
                                         ? vendor.aliases.map(a => `<span class="badge bg-info text-dark me-1">${escapeHtml(a.alias_name)}</span>`).join('')
                                         : '<span class="text-muted">No aliases defined</span>'}
-                                </div>
-                                <div class="text-muted small">
-                                    Inventory ID: ${vendor.inventory_vendor_id || 'Not linked'} |
-                                    Accounting ID: ${vendor.accounting_vendor_id || 'Not linked'}
                                 </div>
                             </div>
                             <div class="modal-footer">
@@ -1216,7 +1220,9 @@ async function editVendor(vendorId) {
                 zip_code: document.getElementById('editZipCode').value || null,
                 payment_terms: document.getElementById('editPaymentTerms').value,
                 notes: document.getElementById('editNotes').value || null,
-                is_active: document.getElementById('editIsActive').value === 'true'
+                is_active: document.getElementById('editIsActive').value === 'true',
+                send_to_inventory: document.getElementById('editSendToInventory').checked,
+                send_to_accounting: document.getElementById('editSendToAccounting').checked
             };
 
             try {
