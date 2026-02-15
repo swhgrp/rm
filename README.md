@@ -31,14 +31,14 @@
 
 The SW Hospitality Group Restaurant Management System is a comprehensive microservices platform handling all aspects of restaurant operations including inventory management, human resources, accounting, event planning, and third-party integrations.
 
-### Key Statistics (Verified Jan 23, 2026)
+### Key Statistics (Verified Feb 14, 2026)
 - **10 microservices** running in production (including Maintenance & Food Safety)
 - **490+ Python files** across all systems
 - **170+ HTML templates** for user interfaces
 - **160+ database models** with full relationships
 - **850+ API endpoints** for system integration
-- **23 Docker containers** orchestrated via Docker Compose
-- **~97% completion** - all core systems production ready
+- **24 Docker containers** orchestrated via 3 Docker Compose files (root: 20, maintenance: 2, food-safety: 2)
+- **~98% completion** - all 10 systems production ready
 
 ### Source of Truth Architecture (Dec 27, 2025)
 | Data Domain | Owner System | Consumer Systems |
@@ -686,7 +686,7 @@ restaurant-system/
 - **Inventory owns:** Master Items, Count Units, Location Costs, Locations
 - **Location-aware pricing:** Vendor items track prices per location from invoices
 - **Weighted average costing:** Hub updates Inventory's `MasterItemLocationCost` on invoice processing
-- **UOM pricing flag:** `price_is_per_unit` on invoice items — set at mapping time for accurate cost calculation
+- **Multi-UOM system:** `matched_uom_id` on invoice items links to `vendor_item_uoms` with conversion factors for accurate cost calculation (legacy `price_is_per_unit` flag still set during transition)
 
 **🆕 UOM Restructure & Vendor Parsing Rules (Feb 11, 2026):**
 - ✅ **`price_is_per_unit` flag** - Boolean on invoice items distinguishes per-unit (EA/BTL) vs per-case (CS) pricing
@@ -1061,7 +1061,7 @@ docker compose exec inventory-app alembic upgrade head
 docker compose exec hr-app alembic upgrade head
 docker compose exec accounting-app alembic upgrade head
 docker compose exec events-app alembic upgrade head
-docker compose exec integration-hub-app alembic upgrade head
+docker compose exec integration-hub alembic upgrade head
 ```
 
 5. **Load initial data:**
@@ -1500,7 +1500,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ## 🎉 Acknowledgments
 
 **Built with:**
-- **FastAPI** - Modern async framework for ALL 8 systems (Portal, HR, Inventory, Accounting, Integration Hub, Events, Files, Websites)
+- **FastAPI** - Modern async framework for ALL 10 systems (Portal, HR, Inventory, Accounting, Integration Hub, Events, Files, Websites, Maintenance, Food Safety)
 - PostgreSQL 15 - Reliable database system
 - **SQLAlchemy** - ORM for all systems
 - Redis 7 - Caching and task queues
@@ -1523,25 +1523,25 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 | System | Status | Python Files | Templates | Models | Completion | Notes |
 |--------|--------|--------------|-----------|--------|------------|-------|
-| Portal | ⚠️ Production | 3 | 5 | 1 | **~87%** | ⚠️ Missing profile.html, /debug unauth |
-| Inventory | ✅ Production | 104 | 31 | 32+ | **100%** 🌟 | Waste UoM, transfer enhancements (Jan 5) |
-| HR | ✅ Production | 56 | 14 | 12 | **~95%** | In-memory sessions (should use Redis) |
-| Accounting | ✅ Production | 119 | 38+ | 26+ | **~95%** 🌟 | Plaid integration, scheduler service (Jan 5) |
-| Events | ✅ Production | 53 | 16 | 17+ | **~99%** 🌟 | Quick Holds + CalDAV sync (Jan 5) |
-| Integration Hub | ✅ Production | 53 | 14 | 18+ | **~98%** 🌟 | AI semantic search, Backbar sizing |
-| Files | ✅ Production | 18 | 4 | 6 | **100%** | WebDAV sync + OnlyOffice editing |
-| **Websites** | ✅ Production | 7 | 18 | 10+ | **~90%** | No alembic migrations, stub features |
+| Portal | ⚠️ Production | 3 | 15 | 1 | **~95%** | Monitoring dashboard, password reset |
+| Inventory | ✅ Production | 104 | 31 | 32+ | **100%** 🌟 | POS sync, recipe costing, location costs |
+| HR | ✅ Production | 60+ | 17 | 20+ | **~95%** | Required docs, e-signatures, audit logging |
+| Accounting | ✅ Production | 119 | 38+ | 26+ | **~95%** 🌟 | Plaid, multi-location reports, AR automation |
+| Events | ✅ Production | 53 | 16 | 17+ | **~99%** 🌟 | Quick Holds, CalDAV sync, public intake |
+| Integration Hub | ✅ Production | 61 | 14 | 18+ | **~98%** 🌟 | Multi-UOM, post-parse validation, AI search |
+| Files | ✅ Production | 18 | 4 | 7 | **~85%** | WebDAV sync + OnlyOffice editing |
+| Websites | ✅ Production | 7 | 18 | 11+ | **~90%** | Block-based page builder, menu management |
+| Maintenance | ✅ Production | 16 | 5 | 10 | **100%** 🌟 | Equipment, work orders, PM schedules |
+| Food Safety | ✅ Production | 29 | 5 | 18 | **100%** 🌟 | Incidents, document uploads, user permissions |
 
-**Total:** 450+ Python files, 140+ templates, 140+ database models (verified Jan 5, 2026)
+**Total:** 490+ Python files, 170+ templates, 160+ database models (verified Feb 14, 2026)
 
-**Overall Status:** ~94% Complete - All 8 Systems Production Ready ✅
+**Overall Status:** ~98% Complete - All 10 Systems Production Ready ✅
 
-**Active Issues (Jan 5, 2026):**
-- ⚠️ **Portal:** Missing `templates/profile.html` - `/profile` returns 500 error
+**Active Issues (Feb 14, 2026):**
 - ⚠️ **Portal:** `/debug` endpoint has no authentication
 - ⚠️ **HR:** Uses in-memory dict for sessions (should use Redis)
-- ⚠️ **Hub:** 257 duplicate invoices need cleanup
-- ⚠️ **Events/Websites:** Empty alembic/versions directories
+- ⚠️ **Events/Websites:** Empty alembic/versions directories (use create_all instead)
 
 **Resolved Issues:**
 - ✅ ~~Events System: Authentication not implemented~~ - RESOLVED (Nov 1, 2025)
@@ -1551,8 +1551,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 3.3
-**Last Updated:** January 5, 2026
+**Version:** 3.5
+**Last Updated:** February 14, 2026
 **Maintained By:** SW Hospitality Group Development Team
 
 **For complete system details, see [SYSTEM_DOCUMENTATION.md](./SYSTEM_DOCUMENTATION.md)**
@@ -1560,6 +1560,43 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 ## 📝 Recent Updates
+
+### February 14, 2026 - Food Safety Enhancements & HR Docs Fix
+
+**Food Safety Incident Management:**
+- ✅ **Incident editing** - Full edit page with all fields pre-populated including category-specific sections
+- ✅ **Document uploads** - Upload photos/docs on create, edit, and from view modal
+- ✅ **Reporter name display** - Fetched from portal user system instead of showing raw IDs
+- ✅ **Double-submit prevention** - Submit button disabled + text changed on click
+
+**HR Required Documents:**
+- ✅ **Bug fix** - `uploadRequiredDocuments()` now skips optional TIPS cert (was causing ALL uploads to fail)
+- ✅ **Missing docs banner** - Red warning on employee detail page for missing required documents
+- ✅ **Employees list badge** - "X Missing" badge in Docs & Certs column
+
+**Integration Hub:**
+- ✅ **Post-parse validation** - Sanity checks + total reconciliation after AI/CSV parsing
+- ✅ **Auto-reparse** - Vendor rules applied after first parse when vendor is identified
+- ✅ **Vendor item name normalization** - Smart title case for food/restaurant names
+
+**Documentation:**
+- ✅ **Full system audit** - All 4 documentation files audited and corrected
+- ✅ **SYSTEM_DOCUMENTATION.md rewrite** - Fixed framework claims, added 4 missing systems
+- ✅ **CLAUDE.md corrections** - Docker topology, async services, port table
+
+---
+
+### February 11, 2026 - Multi-UOM System & Catch-Weight Support
+
+**Multi-UOM Architecture:**
+- ✅ **`vendor_item_uoms` table** - Multiple purchase UOMs per vendor item with conversion factors
+- ✅ **`matched_uom_id`** - Invoice items linked to specific vendor UOM at mapping time
+- ✅ **Cost calculation** - `cost_per_primary = unit_price / conversion_factor`
+- ✅ **UOM normalizer** - Standardizes invoice UOM strings (CS→cs, BTL→btl, LB→lb)
+- ✅ **Catch-weight support** - Variable-weight items (meat/seafood) parsed from invoice weight fields
+- ✅ **GFS dual-format parsing** - Delivery (903x) and Store (864x/945x/955x) invoice formats
+
+---
 
 ### February 11, 2026 - Integration Hub UOM Restructure 📏
 
@@ -2253,8 +2290,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 3.5 - Unit Conversions & Pricing Fixes
-**Last Updated:** December 31, 2025
+**Version:** 4.0 - All 10 Systems Production Ready
+**Last Updated:** February 14, 2026
 **Documentation Health:** 96/100 - Excellent ✅
 
-*Beer/wine unit conversions. Correct pricing per count unit ($/can, $/bottle). Volume vs weight pricing logic.*
+*Food Safety incident management, HR required docs fix, Multi-UOM system, post-parse validation, documentation audit.*

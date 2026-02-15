@@ -1,6 +1,6 @@
 # Restaurant System Documentation Index
 
-**Last Updated:** 2025-10-31
+**Last Updated:** 2026-02-14
 
 ---
 
@@ -17,8 +17,8 @@
 
 ### **Master Status Document**
 - **[docs/status/ACCOUNTING_SYSTEM_STATUS.md](docs/status/ACCOUNTING_SYSTEM_STATUS.md)** ⭐
-  - **THE definitive status document**
-  - Overall completion: ~35%
+  - Accounting system status document
+  - Overall completion: ~95%
   - What's done, what's partial, what's not started
   - Prioritized next steps
   - Updated as features are completed
@@ -180,7 +180,7 @@
   - Hybrid approach recommendation
 
 ### **Testing & User Guides**
-- [/tmp/banking_user_test_guide.md](/tmp/banking_user_test_guide.md)
+- Banking user test guide (previously at /tmp/banking_user_test_guide.md — moved or removed)
   - 10 comprehensive test scenarios
   - Step-by-step testing instructions
   - Expected results and screenshots
@@ -303,9 +303,14 @@
 ├── events/                           # Events microservice
 ├── integration-hub/                  # Integration Hub microservice
 ├── files/                            # Files microservice
+├── websites/                         # Website CMS microservice
+├── maintenance/                      # Maintenance & Equipment (separate compose)
+├── food-safety/                      # Food Safety & Compliance (separate compose)
 ├── portal/                           # Portal/landing page
+├── caldav/                           # CalDAV calendar server (Radicale)
 ├── scripts/                          # Operational scripts
 └── shared/                           # Shared libraries
+    ├── nginx/                        # Nginx reverse proxy configuration
     ├── python/                       # Shared Python code
     │   └── portal_sso.py             # SSO authentication (master)
     └── static/js/                    # Shared JavaScript
@@ -318,16 +323,17 @@
 
 | System Component | Status | Documentation |
 |-----------------|--------|---------------|
-| **Core Accounting** | ✅ 100% | [Status Doc](docs/status/ACCOUNTING_SYSTEM_STATUS.md) |
-| **Multi-Location** | ✅ 100% | [Multi-Location Status](docs/status/MULTI_LOCATION_FINAL_STATUS.md) |
-| **Financial Reports** | ✅ 100% | [Progress Summary](docs/status/ACCOUNTING_PROGRESS_SUMMARY.md) |
-| **Integration Hub** | 🔄 70% | [Hub Status](docs/status/INTEGRATION_HUB_STATUS.md) |
-| **Accounts Payable** | 🔄 60% | [AP Progress](docs/status/ACCOUNTS_PAYABLE_PROGRESS.md) |
-| **Accounts Receivable** | 🔄 40% | [Status Doc](docs/status/ACCOUNTING_SYSTEM_STATUS.md) |
-| **Daily Sales** | ✅ 100% | [DSS Validation](docs/banking/DSS_VALIDATION_REPORT.md) |
-| **HR System** | 🔄 Planning | [HR Plan](docs/planning/HR_IMPLEMENTATION_PLAN.md) |
-| **Inventory Integration** | 🔄 70% | [Hub Status](docs/status/INTEGRATION_HUB_STATUS.md) |
-| **Banking/Reconciliation** | 🔄 50% → Week 3 Next | [Phase 1B Progress](docs/banking/PHASE_1B_COMPLETION_SUMMARY.md) ⭐ |
+| **Portal** | ✅ ~95% | [Portal README](portal/README.md) |
+| **Inventory** | ✅ 100% | [Inventory README](inventory/README.md) |
+| **HR** | ✅ ~95% | [HR README](hr/README.md) |
+| **Accounting** | ✅ ~95% | [Status Doc](docs/status/ACCOUNTING_SYSTEM_STATUS.md) |
+| **Events** | ✅ ~99% | [Events README](events/README.md) |
+| **Integration Hub** | ✅ ~98% | [Hub Status](docs/status/INTEGRATION_HUB_STATUS.md) |
+| **Files** | ✅ ~85% | [Files README](files/README.md) |
+| **Websites** | ✅ ~90% | [Websites README](websites/README.md) |
+| **Maintenance** | ✅ 100% | Separate compose: `maintenance/` |
+| **Food Safety** | ✅ 100% | Separate compose: `food-safety/` |
+| **Banking/Reconciliation** | 🔄 50% | [Phase 1B Progress](docs/banking/PHASE_1B_COMPLETION_SUMMARY.md) |
 
 ---
 
@@ -384,7 +390,14 @@
 
 ## 📅 Change Log
 
-### 2025-10-31 (Latest Update)
+### 2026-02-14 (Latest Update)
+- ✅ **Full System Audit & Documentation Corrections**
+  - Fixed CLAUDE.md: Docker topology (3 compose files, not per-service), async services (maintenance + food-safety), source mount claims, rebuild commands
+  - Rewrote SYSTEM_DOCUMENTATION.md: Fixed framework claims (all FastAPI, not Django), removed phantom HR features, added 4 missing systems
+  - Updated feature completion table: All 10 systems now listed with accurate percentages
+  - Added missing services to documentation structure (Websites, Maintenance, Food Safety, CalDAV, Nginx)
+
+### 2025-10-31
 - ✅ **Documentation Audit & Reorganization**
   - Audited all 55 documentation files for currency and relevance
   - Created [DOCUMENTATION_AUDIT_OCT31.md](docs/DOCUMENTATION_AUDIT_OCT31.md)

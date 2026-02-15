@@ -22,10 +22,10 @@ restaurant-system/
 ```
 
 ## Tech Stack
-- **Backend:** FastAPI (Python 3.11), async SQLAlchemy with asyncpg (maintenance), sync SQLAlchemy (most others)
+- **Backend:** FastAPI (Python 3.11), async SQLAlchemy with asyncpg (maintenance, food-safety), sync SQLAlchemy (most others)
 - **Database:** PostgreSQL 15, one DB per service, Alembic migrations
 - **Frontend:** Jinja2 templates, Bootstrap Icons, vanilla JS (no frameworks)
-- **Infrastructure:** Docker Compose per service, Nginx reverse proxy
+- **Infrastructure:** Docker Compose (root compose for most services, separate compose for maintenance and food-safety), Nginx reverse proxy
 - **Auth:** JWT tokens in HTTP-only cookies, portal-based SSO
 
 ## Key Patterns
@@ -50,9 +50,9 @@ restaurant-system/
 
 ### Database Connections
 - Most services: sync SQLAlchemy (`Session`, `get_db`)
-- Maintenance service: **async** SQLAlchemy (`AsyncSession`, `get_db`, `asyncpg`)
-  - Uses `pool_pre_ping=True`, `pool_recycle=300`
-  - Has startup DB warmup with retry (5 attempts, 2s delay) to handle Postgres race conditions
+- Maintenance and Food Safety: **async** SQLAlchemy (`AsyncSession`, `get_db`, `asyncpg`)
+  - Maintenance uses `pool_pre_ping=True`, `pool_recycle=300`
+  - Maintenance has startup DB warmup with retry (5 attempts, 2s delay) to handle Postgres race conditions
 
 ### Portal Templates
 - Located in `portal/templates/{service}/` (e.g., `portal/templates/maintenance/`)
@@ -61,20 +61,29 @@ restaurant-system/
 - Table action buttons use `.actions-wrap` div with `inline-flex` for alignment
 
 ### Docker
-- Each service has its own `docker-compose.yml` and `Dockerfile`
-- Source mounted as read-only volumes: `./src:/app/src:ro`
-- Rebuild with: `cd {service} && docker compose up -d --build`
+- **Root `docker-compose.yml`** manages 20 containers: Portal, Inventory, HR, Accounting, Events, Hub, Files, Websites, CalDAV, OnlyOffice, Nginx, Certbot, and their databases/Redis
+- **Separate compose files**: `maintenance/docker-compose.yml` (2 containers) and `food-safety/docker-compose.yml` (2 containers)
+- Source mounts: only maintenance uses `:ro`; most services have read-write mounts
+- Rebuild root services: `docker compose up -d --build {service}` (from repo root)
+- Rebuild maintenance: `cd maintenance && docker compose up -d --build`
+- Rebuild food-safety: `cd food-safety && docker compose up -d --build`
 
 ## Common Commands
 ```bash
-# Rebuild a service
+# Rebuild a root service (inventory, accounting, hr, events, hub, portal, files, websites)
+docker compose up -d --build inventory-app
+
+# Rebuild maintenance or food-safety (separate compose files)
 cd maintenance && docker compose up -d --build
+cd food-safety && docker compose up -d --build
 
 # Check service logs
-docker compose logs --tail=50 maintenance-service
+docker compose logs --tail=50 inventory-app
+cd maintenance && docker compose logs --tail=50 maintenance-service
 
 # Run Alembic migration
-docker compose exec maintenance-service alembic upgrade head
+docker compose exec inventory-app alembic upgrade head
+cd maintenance && docker compose exec maintenance-service alembic upgrade head
 
 # Test an API endpoint
 curl -s http://localhost:{port}/endpoint | python3 -m json.tool
@@ -91,6 +100,8 @@ curl -s http://localhost:{port}/endpoint | python3 -m json.tool
 | Integration Hub | 8000 | 8005 |
 | Maintenance | 8000 | 8006 |
 | Food Safety | 8000 | 8007 |
+| Files | 8000 | via nginx |
+| Websites | 8000 | via nginx |
 
 ### Accounting Reports — Multi-Location & Multi-Period (Feb 2026)
 - **GL Account Detail** (`account_detail.html`): Location column, location filter dropdown, area_id/area_name in `GeneralLedgerLineResponse`
@@ -138,6 +149,6 @@ curl -s http://localhost:{port}/endpoint | python3 -m json.tool
 ## Important Notes
 - Never modify `.env` files (contain production secrets)
 - Location data comes from inventory service - don't duplicate
-- Maintenance service uses **async** patterns (different from other services)
+- Maintenance and Food Safety services use **async** SQLAlchemy (different from other services)
 - CalDAV sync service pushes events to external calendar server
 - Customer invoice PDFs can include area/location logos for branding
