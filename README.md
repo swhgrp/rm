@@ -1551,7 +1551,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 3.5
+**Version:** 4.0
 **Last Updated:** February 14, 2026
 **Maintained By:** SW Hospitality Group Development Team
 
