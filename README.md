@@ -40,7 +40,7 @@ The SW Hospitality Group Restaurant Management System is a comprehensive microse
 - **24 Docker containers** orchestrated via 3 Docker Compose files (root: 20, maintenance: 2, food-safety: 2)
 - **~98% completion** - all 10 systems production ready
 
-### Source of Truth Architecture (Dec 27, 2025)
+### Source of Truth Architecture
 | Data Domain | Owner System | Consumer Systems |
 |-------------|--------------|------------------|
 | **Locations** | Inventory | Accounting, Hub |
