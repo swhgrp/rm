@@ -448,6 +448,8 @@ restaurant-system/
 - ✅ Required documents enforcement (ID, SSN, Food Certificate) on new hire creation
 - ✅ Missing documents warning banner on employee profile
 - ✅ Missing docs badge on employees list ("Docs & Certs" column)
+- ✅ Document upload with 10MB file size validation (client-side alert + server-side check)
+- ✅ Hire date admin-only editing (readonly for non-admins, preserved across all updates)
 - ✅ Role-based access control (Admin, Manager, Employee)
 - ✅ Email settings management
 - ✅ **E-Signature Templates** - Visual field editor for PDF signature placement

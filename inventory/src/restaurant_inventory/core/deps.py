@@ -55,13 +55,16 @@ def get_current_user(
         token = credentials.credentials
     else:
         # Try to get token from cookie (for SSO)
-        cookie_token = request.cookies.get("access_token")
+        cookie_token = request.cookies.get("access_token") or request.cookies.get("portal_session")
         if cookie_token:
-            # Cookie format is "Bearer <token>"
+            # Cookie format may be "Bearer <token>"
             if cookie_token.startswith("Bearer "):
                 token = cookie_token[7:]
             else:
                 token = cookie_token
+        # Fallback: check query parameter (for server-rendered pages opened in new tabs)
+        if not token:
+            token = request.query_params.get("token")
 
     if not token:
         raise HTTPException(
@@ -71,8 +74,8 @@ def get_current_user(
         )
 
     # Verify token
-    user_id = verify_token(token)
-    if user_id is None:
+    token_data = verify_token(token)
+    if token_data is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -80,9 +83,11 @@ def get_current_user(
         )
 
     # Get user from database with location assignments eagerly loaded
-    user = db.query(User).options(
-        joinedload(User.assigned_locations)
-    ).filter(User.id == int(user_id)).first()
+    query = db.query(User).options(joinedload(User.assigned_locations))
+    if "id" in token_data:
+        user = query.filter(User.id == int(token_data["id"])).first()
+    else:
+        user = query.filter(User.username == token_data["username"]).first()
 
     if user is None:
         raise HTTPException(

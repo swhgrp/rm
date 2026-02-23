@@ -146,6 +146,13 @@ curl -s http://localhost:{port}/endpoint | python3 -m json.tool
 - **Employees list badge**: `employees.html` "Docs & Certs" column shows red "X Missing" badge for employees missing required docs
 - **Priority order**: Missing docs > Expired certs > Expiring certs > All Current
 
+### HR Document Upload & Employee Form (Feb 2026)
+- **Bootstrap modal fix**: Upload modal uses Bootstrap 5 Modal API (`new bootstrap.Modal()`) — custom `.modal.active` class conflicted with Bootstrap CSS
+- **Upload form**: Uses `new FormData(e.target)` with `name` attributes on inputs — more reliable than manual `formData.append()`
+- **File size validation**: 10MB max, client-side `alert()` popup before request is sent (server also validates)
+- **Hire date protection**: `hire_date` added to `EmployeeUpdate` schema (was previously dropped on every save); readonly for non-admins in edit form
+- **Null field rendering**: All nullable fields in `employee_form.html` use `employee.field if employee and employee.field else ''` to prevent rendering Python `None` as string "None"
+
 ## Important Notes
 - Never modify `.env` files (contain production secrets)
 - Location data comes from inventory service - don't duplicate

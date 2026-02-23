@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block title %}Order Sheets - Restaurant Inventory{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1><i class="bi bi-list-check"></i> Order Sheets</h1>
+    <div>
+        <a href="order-sheets/templates" class="btn btn-outline-secondary me-2" id="manageTemplatesBtn" style="display:none;">
+            <i class="bi bi-gear"></i> Manage Templates
+        </a>
+        <button class="btn btn-primary" onclick="showNewOrderModal()">
+            <i class="bi bi-cart-plus"></i> New Order Sheet
+        </button>
+    </div>
+</div>
+
+<!-- Filter Controls -->
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-3">
+                <label for="locationFilter" class="form-label">Location</label>
+                <select class="form-select" id="locationFilter" onchange="loadOrderSheets()">
+                    <option value="">All Locations</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label for="statusFilter" class="form-label">Status</label>
+                <select class="form-select" id="statusFilter" onchange="loadOrderSheets()">
+                    <option value="">All</option>
+                    <option value="DRAFT">Draft</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="SENT">Sent</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Order Sheets Table -->
+<div class="card">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover table-striped">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Location</th>
+                        <th>Template</th>
+                        <th>Status</th>
+                        <th>Progress</th>
+                        <th>Created By</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="sheetsTableBody">
+                    <tr><td colspan="8" class="text-center py-4"><div class="spinner-border" role="status"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- New Order Sheet Modal -->
+<div class="modal fade" id="newOrderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">New Order Sheet</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="newOrderLocation" class="form-label">Location *</label>
+                    <select class="form-select" id="newOrderLocation" onchange="loadTemplatesForLocation()">
+                        <option value="">Select Location</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="newOrderTemplate" class="form-label">Template *</label>
+                    <select class="form-select" id="newOrderTemplate" disabled>
+                        <option value="">Select location first</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="newOrderName" class="form-label">Name (optional)</label>
+                    <input type="text" class="form-control" id="newOrderName" placeholder="Auto-generated if blank">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createOrderSheet()" id="createOrderBtn">
+                    <i class="bi bi-cart-plus"></i> Start Order Sheet
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let orderSheets = [];
+let locations = [];
+let allTemplates = [];
+let newOrderModal = null;
+
+async function loadData() {
+    try {
+        locations = await apiRequest('api/locations/');
+        locations = Array.isArray(locations) ? locations : (locations.locations || []);
+
+        const userData = JSON.parse(localStorage.getItem('user') || '{}');
+        if (['Admin', 'Manager'].includes(userData.role)) {
+            document.getElementById('manageTemplatesBtn').style.display = '';
+        }
+
+        populateLocations();
+        await loadOrderSheets();
+    } catch (error) {
+        console.error('Error:', error);
+        showAlert('Error loading data: ' + error.message, 'danger');
+    }
+}
+
+function populateLocations() {
+    const filter = document.getElementById('locationFilter');
+    const modal = document.getElementById('newOrderLocation');
+    filter.innerHTML = '<option value="">All Locations</option>';
+    modal.innerHTML = '<option value="">Select Location</option>';
+    locations.forEach(loc => {
+        filter.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+        modal.innerHTML += `<option value="${loc.id}">${loc.name}</option>`;
+    });
+}
+
+async function loadOrderSheets() {
+    const locationId = document.getElementById('locationFilter').value;
+    const status = document.getElementById('statusFilter').value;
+    let url = 'api/order-sheets/?limit=100';
+    if (locationId) url += `&location_id=${locationId}`;
+    if (status) url += `&status=${status}`;
+
+    try {
+        orderSheets = await apiRequest(url);
+        displayOrderSheets();
+    } catch (error) {
+        console.error('Error:', error);
+        showAlert('Error loading order sheets: ' + error.message, 'danger');
+    }
+}
+
+function displayOrderSheets() {
+    const tbody = document.getElementById('sheetsTableBody');
+    if (orderSheets.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="text-center py-4 text-muted">
+            <i class="bi bi-inbox" style="font-size:2rem;"></i><br>No order sheets found.
+            Click "New Order Sheet" to get started.</td></tr>`;
+        return;
+    }
+
+    tbody.innerHTML = orderSheets.map(s => {
+        const statusBadge = {
+            'DRAFT': '<span class="badge bg-warning text-dark">Draft</span>',
+            'COMPLETED': '<span class="badge bg-success">Completed</span>',
+            'SENT': '<span class="badge bg-primary">Sent</span>'
+        }[s.status] || `<span class="badge bg-secondary">${s.status}</span>`;
+
+        const progress = s.total_items > 0
+            ? `${s.items_entered}/${s.total_items} entered`
+            : '0 items';
+        const toOrder = s.total_to_order > 0 ? `<br><small class="text-success">${s.total_to_order} to order</small>` : '';
+        const date = new Date(s.created_at).toLocaleDateString();
+
+        let actions = '';
+        if (s.status === 'DRAFT') {
+            actions = `
+                <a href="order-sheets/${s.id}/fill" class="btn btn-sm btn-primary"><i class="bi bi-pencil-square"></i> Fill</a>
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteSheet(${s.id})"><i class="bi bi-trash"></i></button>`;
+        } else {
+            actions = `
+                <a href="order-sheets/${s.id}/fill" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i> View</a>
+                <button class="btn btn-sm btn-outline-secondary" onclick="window.open('order-sheets/${s.id}/print','_blank')"><i class="bi bi-printer"></i></button>`;
+        }
+
+        return `<tr>
+            <td>${s.name || ''}</td>
+            <td>${s.location_name || ''}</td>
+            <td><small>${s.template_name || ''}</small></td>
+            <td>${statusBadge}</td>
+            <td>${progress}${toOrder}</td>
+            <td><small>${s.created_by_name || ''}</small></td>
+            <td><small>${date}</small></td>
+            <td><div class="d-flex gap-1">${actions}</div></td>
+        </tr>`;
+    }).join('');
+}
+
+function showNewOrderModal() {
+    document.getElementById('newOrderName').value = '';
+    document.getElementById('newOrderTemplate').innerHTML = '<option value="">Select location first</option>';
+    document.getElementById('newOrderTemplate').disabled = true;
+    if (!newOrderModal) newOrderModal = new bootstrap.Modal(document.getElementById('newOrderModal'));
+    newOrderModal.show();
+}
+
+async function loadTemplatesForLocation() {
+    const locationId = document.getElementById('newOrderLocation').value;
+    const templateSelect = document.getElementById('newOrderTemplate');
+    if (!locationId) {
+        templateSelect.innerHTML = '<option value="">Select location first</option>';
+        templateSelect.disabled = true;
+        return;
+    }
+
+    try {
+        allTemplates = await apiRequest(`api/order-sheet-templates/?location_id=${locationId}`);
+        templateSelect.innerHTML = '<option value="">Select Template</option>';
+        allTemplates.forEach(t => {
+            templateSelect.innerHTML += `<option value="${t.id}">${t.name} (${t.item_count} items)</option>`;
+        });
+        templateSelect.disabled = false;
+    } catch (error) {
+        showAlert('Error loading templates: ' + error.message, 'danger');
+    }
+}
+
+async function createOrderSheet() {
+    const templateId = document.getElementById('newOrderTemplate').value;
+    const name = document.getElementById('newOrderName').value.trim();
+    if (!templateId) {
+        showAlert('Please select a template', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('createOrderBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Creating...';
+
+    try {
+        const sheet = await apiRequest('api/order-sheets/', {
+            method: 'POST',
+            body: JSON.stringify({
+                template_id: parseInt(templateId),
+                name: name || null
+            })
+        });
+        window.location.href = `/inventory/order-sheets/${sheet.id}/fill`;
+    } catch (error) {
+        showAlert('Error: ' + error.message, 'danger');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-cart-plus"></i> Start Order Sheet';
+    }
+}
+
+async function deleteSheet(sheetId) {
+    if (!confirm('Delete this draft order sheet?')) return;
+    try {
+        await apiRequest(`api/order-sheets/${sheetId}`, { method: 'DELETE' });
+        showAlert('Order sheet deleted', 'success');
+        await loadOrderSheets();
+    } catch (error) {
+        showAlert('Error: ' + error.message, 'danger');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', loadData);
+</script>
+{% endblock %}

@@ -50,12 +50,12 @@ class EmailService:
             html_part = MIMEText(html_content, 'html')
             message.attach(html_part)
 
-            # Connect to SMTP server
+            # Connect to SMTP server (10 second timeout)
             if settings.SMTP_USE_TLS:
-                server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+                server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=5)
                 server.starttls()
             else:
-                server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+                server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=5)
 
             # Login if credentials provided
             if settings.SMTP_PASSWORD:

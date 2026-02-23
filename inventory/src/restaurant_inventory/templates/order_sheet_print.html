@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Sheet - {{ sheet.name or 'Print' }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            color: #333;
+            line-height: 1.4;
+        }
+
+        /* Print bar - hidden in print */
+        .print-bar {
+            background: #455A64;
+            color: white;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .print-bar a { color: white; text-decoration: none; margin-right: 15px; }
+        .print-bar button {
+            background: white; color: #455A64; border: none;
+            padding: 6px 16px; border-radius: 4px; cursor: pointer; font-weight: bold;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .report-header {
+            text-align: center;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #455A64;
+            padding-bottom: 10px;
+        }
+        .report-header h1 {
+            font-size: 22px;
+            color: #455A64;
+            margin-bottom: 2px;
+        }
+        .report-header h2 {
+            font-size: 16px;
+            font-weight: normal;
+            color: #666;
+        }
+        .report-date {
+            font-size: 11px;
+            color: #999;
+            position: absolute;
+            top: 70px;
+            right: 20px;
+        }
+
+        /* Metadata */
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+        .meta-row div { flex: 1; }
+        .meta-label { font-weight: bold; color: #455A64; }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        th {
+            background-color: #ECEFF1;
+            border: 1px solid #B0BEC5;
+            padding: 6px 8px;
+            text-align: left;
+            font-size: 11px;
+            font-weight: bold;
+        }
+        td {
+            border: 1px solid #CFD8DC;
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+
+        .category-row td {
+            background-color: #455A64;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            padding: 5px 8px;
+        }
+        .to-order-positive {
+            font-weight: bold;
+            color: #2e7d32;
+        }
+
+        /* Summary */
+        .summary {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 10px 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-size: 12px;
+        }
+
+        /* Notes */
+        .notes-section {
+            margin-top: 10px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        /* Print styles */
+        @media print {
+            .print-bar { display: none !important; }
+            .container { padding: 0; max-width: 100%; }
+            body { font-size: 10px; }
+            .report-header h1 { font-size: 18px; }
+            .report-header h2 { font-size: 13px; }
+            th, td { padding: 3px 6px; font-size: 10px; }
+            .category-row td { font-size: 11px; }
+            @page { margin: 0.5in; }
+        }
+
+        @media screen {
+            body { background: #eee; }
+            .container {
+                background: white;
+                margin-top: 10px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                border-radius: 4px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Print Bar (screen only) -->
+    <div class="print-bar">
+        <div>
+            <a href="/inventory/order-sheets">&larr; Back to Order Sheets</a>
+        </div>
+        <button onclick="window.print()">Print</button>
+    </div>
+
+    <div class="container">
+        <!-- Report Header -->
+        <div class="report-header" style="position:relative;">
+            <h1>SW Hospitality Group</h1>
+            <h2>Order Sheet</h2>
+            <div class="report-date">{{ sheet.created_at.strftime('%m/%d/%Y') if sheet.created_at else '' }}</div>
+        </div>
+
+        <!-- Metadata -->
+        <div class="meta-row">
+            <div><span class="meta-label">Location:</span> {{ sheet.location_name or '' }}</div>
+            <div><span class="meta-label">Template:</span> {{ sheet.template_name or '' }}</div>
+            <div><span class="meta-label">Created By:</span> {{ sheet.created_by_name or '' }}</div>
+            <div><span class="meta-label">Status:</span> {{ sheet.status }}</div>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary">
+            <strong>Items to Order:</strong> {{ sheet.total_to_order }} of {{ sheet.total_items }} items
+            {% if sheet.sent_to_emails %} &nbsp;|&nbsp; <strong>Sent to:</strong> {{ sheet.sent_to_emails }}{% endif %}
+        </div>
+
+        <!-- Order Table -->
+        <table>
+            <thead>
+                <tr>
+                    <th style="width:40%;">Item</th>
+                    <th class="text-center" style="width:12%;">Par</th>
+                    <th class="text-center" style="width:12%;">On Hand</th>
+                    <th class="text-center" style="width:12%;">To Order</th>
+                    <th style="width:24%;">Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat in sorted_categories %}
+                <tr class="category-row">
+                    <td colspan="5">{{ cat }}</td>
+                </tr>
+                {% for item in categories[cat] %}
+                <tr>
+                    <td>{{ item.item_name or '' }}{% if item.vendor_name %}<br><span style="font-size:9px;color:#666;">{{ item.vendor_name }}</span>{% endif %}</td>
+                    <td class="text-center">{{ item.par_level if item.par_level is not none else '' }}</td>
+                    <td class="text-center">{{ item.on_hand if item.on_hand is not none else '' }}</td>
+                    <td class="text-center {% if item.to_order and item.to_order > 0 %}to-order-positive{% endif %}">
+                        {{ item.to_order if item.to_order is not none else '' }}
+                    </td>
+                    <td>{{ item.notes or '' }}</td>
+                </tr>
+                {% endfor %}
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if sheet.notes %}
+        <div class="notes-section">
+            <strong>Notes:</strong><br>
+            {{ sheet.notes }}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

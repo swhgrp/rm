@@ -965,6 +965,7 @@
                 </a>
             </li>
             <ul id="purchasingSection" class="submenu">
+                <li><a href="order-sheets"><i class="bi bi-list-check"></i> Order Sheets</a></li>
                 <li><a href="invoices"><i class="bi bi-receipt"></i> Invoices</a></li>
                 <li><a href="vendors"><i class="bi bi-truck"></i> Vendors</a></li>
                 <!-- Units of Measure removed - Hub is now source of truth for UoMs -->
@@ -1188,7 +1189,8 @@
 
             // Check if current page is in Purchasing section
             if (currentPath.includes('/invoices') ||
-                currentPath.includes('/vendors')) {
+                currentPath.includes('/vendors') ||
+                currentPath.includes('/order-sheets')) {
                 document.getElementById('purchasingSection').classList.add('open');
                 document.querySelector('[onclick*="purchasingSection"]').classList.add('open');
             }

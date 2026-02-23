@@ -16,6 +16,8 @@ from restaurant_inventory.models.item import MasterItem
 from restaurant_inventory.models.inventory import Inventory
 from restaurant_inventory.models.transfer import Transfer
 from restaurant_inventory.models.waste import WasteRecord
+from restaurant_inventory.models.order_sheet_template import OrderSheetTemplate, OrderSheetTemplateItem
+from restaurant_inventory.models.order_sheet import OrderSheet, OrderSheetItem
 
 # this is the Alembic Config object
 config = context.config

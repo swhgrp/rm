@@ -29,6 +29,8 @@ from .count_session import CountSession
 from .unit_of_measure import UnitCategory, UnitOfMeasure
 from .role import Role
 from .item_unit_conversion import ItemUnitConversion
+from .order_sheet_template import OrderSheetTemplate, OrderSheetTemplateItem
+from .order_sheet import OrderSheet, OrderSheetItem, OrderSheetStatus
 
 # DEPRECATED imports - these models exist in _deprecated/ folder
 # Only import if needed for backward compatibility during migration
@@ -56,6 +58,9 @@ __all__ = [
     "Recipe", "RecipeIngredient", "RecipeCategory",
     # Counting
     "CountTemplate", "CountSession",
+    # Order Sheets
+    "OrderSheetTemplate", "OrderSheetTemplateItem",
+    "OrderSheet", "OrderSheetItem", "OrderSheetStatus",
     # Other
     "AuditLog", "Vendor", "Category", "UnitCategory", "UnitOfMeasure",
     "Role", "ItemUnitConversion",

@@ -32,14 +32,24 @@ def create_access_token(
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def verify_token(token: str) -> Optional[str]:
-    """Verify JWT token and return subject (user_id)"""
+def verify_token(token: str) -> Optional[dict]:
+    """Verify JWT token and return identifier dict.
+
+    Returns {"id": user_id} for inventory tokens (sub is numeric),
+    or {"username": username} for portal SSO tokens (sub is a username).
+    """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
+        sub = payload.get("sub")
+        if sub is None:
             return None
-        return user_id
+        # Inventory tokens have sub=user_id (numeric string)
+        # Portal tokens have sub=username (non-numeric)
+        try:
+            int(sub)
+            return {"id": str(sub)}
+        except (ValueError, TypeError):
+            return {"username": sub}
     except JWTError:
         return None
 

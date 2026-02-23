@@ -79,6 +79,7 @@ class EmployeeUpdate(BaseModel):
     emergency_contact_phone: Optional[str] = None
     emergency_contact_relationship: Optional[str] = None
 
+    hire_date: Optional[date] = None
     employment_status: Optional[str] = None
     employee_type: Optional[str] = None
     starting_pay_rate: Optional[Decimal] = None

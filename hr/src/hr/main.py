@@ -26,6 +26,7 @@ app = FastAPI(
     root_path="/hr"
 )
 
+
 # Include API routers
 app.include_router(auth.router)
 app.include_router(users.router)

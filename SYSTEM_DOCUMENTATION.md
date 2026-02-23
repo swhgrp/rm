@@ -217,6 +217,8 @@ Employee information management system. Manages employee records, documents, and
 - ✅ Employee document storage with expiration tracking
 - ✅ Required documents enforcement (ID, SSN, Food Certificate)
 - ✅ Missing documents warning banner and list badge
+- ✅ Document upload with 10MB file size validation (client-side alert + server-side)
+- ✅ Hire date admin-only editing (readonly for non-admins, preserved across all updates)
 - ✅ Role-based access control (Admin, Manager, Employee)
 - ✅ E-Signature templates (PDF.js field editor + Dropbox Sign integration)
 - ✅ HR Forms (Corrective Action, First Report of Injury with signature pads)

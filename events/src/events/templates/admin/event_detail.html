@@ -21,13 +21,13 @@
     .event-tabs {
         display: flex;
         gap: 5px;
-        margin-bottom: 20px;
+        margin-bottom: 12px;
         border-bottom: 1px solid var(--border-primary);
         flex-wrap: wrap;
     }
 
     .event-tab {
-        padding: 12px 20px;
+        padding: 8px 16px;
         background: transparent;
         border: none;
         color: var(--text-muted);
@@ -38,7 +38,7 @@
         border-bottom: 2px solid transparent;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
     }
 
     .event-tab:hover {
@@ -62,8 +62,8 @@
     .info-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 15px;
-        margin-bottom: 20px;
+        gap: 10px;
+        margin-bottom: 12px;
     }
 
     .info-card {
@@ -71,7 +71,7 @@
         border: 1px solid var(--border-primary);
         border-left: 3px solid var(--accent-primary);
         border-radius: 6px;
-        padding: 15px;
+        padding: 10px 12px;
     }
 
     .info-card-title {
@@ -79,7 +79,7 @@
         color: var(--text-muted);
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
         display: flex;
         align-items: center;
         gap: 6px;
@@ -110,8 +110,8 @@
     .form-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 20px;
-        margin-bottom: 20px;
+        gap: 12px;
+        margin-bottom: 12px;
     }
 
     .form-group {
@@ -122,14 +122,14 @@
     .form-group label {
         font-weight: 600;
         color: var(--text-primary);
-        margin-bottom: 8px;
+        margin-bottom: 4px;
         font-size: 14px;
     }
 
     .form-group input,
     .form-group select,
     .form-group textarea {
-        padding: 10px 12px;
+        padding: 7px 10px;
         background-color: var(--bg-primary);
         border: 1px solid var(--border-primary);
         border-radius: 6px;
@@ -149,13 +149,13 @@
 
     .form-group textarea {
         resize: vertical;
-        min-height: 100px;
+        min-height: 70px;
     }
 
     .alert {
-        padding: 15px 20px;
+        padding: 10px 15px;
         border-radius: 6px;
-        margin-bottom: 20px;
+        margin-bottom: 12px;
         display: none;
         border-left: 3px solid;
     }
@@ -178,7 +178,7 @@
 
     .loading {
         text-align: center;
-        padding: 40px;
+        padding: 20px;
         color: var(--text-muted);
     }
 
@@ -199,21 +199,21 @@
 
     .empty-state {
         text-align: center;
-        padding: 60px 20px;
+        padding: 30px 20px;
         color: var(--text-muted);
     }
 
     .empty-state-icon {
-        font-size: 48px;
-        margin-bottom: 15px;
+        font-size: 36px;
+        margin-bottom: 10px;
         opacity: 0.5;
     }
 
     .empty-state-title {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 600;
         color: var(--text-secondary);
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }
 
     .empty-state-text {
@@ -223,24 +223,24 @@
     .financial-summary {
         background: linear-gradient(135deg, #1E88E5 0%, #42A5F5 100%);
         color: white;
-        padding: 25px;
+        padding: 15px 20px;
         border-radius: 6px;
-        margin-bottom: 20px;
+        margin-bottom: 12px;
     }
 
     .financial-row {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 10px 0;
+        padding: 6px 0;
         border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     }
 
     .financial-row:last-child {
         border-bottom: none;
-        font-size: 20px;
+        font-size: 18px;
         font-weight: 700;
-        padding-top: 15px;
+        padding-top: 10px;
     }
 
     .task-list {
@@ -251,9 +251,9 @@
     .task-item {
         background: var(--bg-secondary);
         border: 1px solid var(--border-primary);
-        padding: 15px;
+        padding: 10px 12px;
         border-radius: 6px;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -290,17 +290,17 @@
     .menu-category {
         background: var(--bg-secondary);
         border: 1px solid var(--border-primary);
-        padding: 20px;
+        padding: 12px 15px;
         border-radius: 6px;
-        margin-bottom: 15px;
+        margin-bottom: 10px;
     }
 
     .menu-category-header {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 15px;
-        padding-bottom: 10px;
+        margin-bottom: 10px;
+        padding-bottom: 8px;
         border-bottom: 1px solid var(--border-primary);
     }
 
@@ -317,9 +317,9 @@
 
     .menu-item {
         background: var(--bg-tertiary);
-        padding: 12px 15px;
+        padding: 8px 12px;
         border-radius: 6px;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -364,10 +364,10 @@
 <!-- Event Content (hidden until loaded) -->
 <div id="eventContent" style="display: none;">
     <!-- Event Header Info -->
-    <div class="row mb-3">
+    <div class="row mb-2">
         <div class="col-12">
-            <h2 id="eventTitle" style="color: var(--text-primary); font-size: 24px; margin-bottom: 10px;">Event Title</h2>
-            <p style="color: var(--text-muted); font-size: 14px;">Event ID: <span id="eventId">...</span></p>
+            <h2 id="eventTitle" style="color: var(--text-primary); font-size: 22px; margin-bottom: 2px;">Event Title</h2>
+            <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 0;">Event ID: <span id="eventId">...</span></p>
         </div>
     </div>
 
@@ -395,9 +395,9 @@
 
     <!-- Overview Tab -->
     <div id="tab-overview" class="tab-content active">
-        <h3 style="color: #c9d1d9; font-size: 18px; margin-bottom: 15px;">Event Overview</h3>
+        <h3 style="color: #c9d1d9; font-size: 16px; margin-bottom: 8px;">Event Overview</h3>
 
-        <div class="info-card" style="margin-bottom: 20px;">
+        <div class="info-card" style="margin-bottom: 10px;">
             <div class="info-card-title"><i class="bi bi-flag"></i> Status</div>
             <div class="info-card-value">
                 <span id="overviewStatus" class="status-badge">Draft</span>
@@ -447,7 +447,7 @@
         </div>
 
         <!-- Menu Summary Card -->
-        <div class="info-card" id="overviewMenuCard" style="display: none; margin-top: 15px; border-left-color: #238636;">
+        <div class="info-card" id="overviewMenuCard" style="display: none; margin-top: 10px; border-left-color: #238636;">
             <div class="info-card-title"><i class="bi bi-egg-fried"></i> Menu Summary</div>
             <div id="overviewMenuSummary" style="font-size: 14px; color: #c9d1d9;">
                 <!-- Populated by JS -->
@@ -455,7 +455,7 @@
         </div>
 
         <!-- Financial Summary Card -->
-        <div class="info-card" id="overviewFinancialsCard" style="display: none; margin-top: 15px; border-left-color: #58a6ff;">
+        <div class="info-card" id="overviewFinancialsCard" style="display: none; margin-top: 10px; border-left-color: #58a6ff;">
             <div class="info-card-title"><i class="bi bi-currency-dollar"></i> Financial Summary</div>
             <div id="overviewFinancialsSummary" style="font-size: 14px;">
                 <!-- Populated by JS -->
@@ -465,7 +465,7 @@
 
     <!-- Details Tab -->
     <div id="tab-details" class="tab-content">
-        <h3 style="color: #c9d1d9; font-size: 18px; margin-bottom: 15px;">Event Details</h3>
+        <h3 style="color: #c9d1d9; font-size: 16px; margin-bottom: 8px;">Event Details</h3>
 
         <form id="detailsForm">
             <div class="form-grid">
@@ -539,13 +539,13 @@
 
     <!-- Menu & Catering Tab -->
     <div id="tab-menu" class="tab-content">
-        <h3 style="color: var(--text-primary); font-size: 18px; margin-bottom: 15px;">Menu & Catering</h3>
+        <h3 style="color: var(--text-primary); font-size: 16px; margin-bottom: 8px;">Menu & Catering</h3>
 
         <div id="menuContent">
             <!-- Service Style -->
-            <div class="info-card" style="margin-bottom: 20px; border-left-color: #58a6ff;">
+            <div class="info-card" style="margin-bottom: 10px; border-left-color: #58a6ff;">
                 <div class="info-card-title"><i class="bi bi-layout-text-window"></i> Service Style</div>
-                <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px;">
                     <select id="menuServiceStyle" class="form-control-custom" style="width: 200px; padding: 8px 12px;">
                         <option value="">Select style...</option>
                         <option value="buffet">Buffet</option>
@@ -561,8 +561,8 @@
             </div>
 
             <!-- Menu Sections -->
-            <div class="info-card" style="margin-bottom: 20px; border-left-color: #238636;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <div class="info-card" style="margin-bottom: 10px; border-left-color: #238636;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                     <div class="info-card-title"><i class="bi bi-list-ul"></i> Menu Items</div>
                     <button class="btn btn-sm btn-primary-custom" onclick="addMenuSection()">
                         <i class="bi bi-plus"></i> Add Section
@@ -571,15 +571,15 @@
                 <div id="menuSections">
                     <!-- Sections will be added here dynamically -->
                 </div>
-                <div id="menuEmptyState" style="color: var(--text-muted); font-style: italic; text-align: center; padding: 20px;">
+                <div id="menuEmptyState" style="color: var(--text-muted); font-style: italic; text-align: center; padding: 10px;">
                     No menu sections yet. Click "Add Section" to start building your menu.
                 </div>
             </div>
 
             <!-- Beverage Service -->
-            <div class="info-card" style="margin-bottom: 20px; border-left-color: #a371f7;">
+            <div class="info-card" style="margin-bottom: 10px; border-left-color: #a371f7;">
                 <div class="info-card-title"><i class="bi bi-cup-straw"></i> Beverage Service</div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 10px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 6px;">
                     <div>
                         <label style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 4px;">Bar Type</label>
                         <select id="menuBarType" class="form-control-custom" style="width: 100%; padding: 8px 12px;">
@@ -596,18 +596,18 @@
                         <input type="text" id="menuBarHours" class="form-control-custom" placeholder="e.g., 6pm - 10pm" style="width: 100%; padding: 8px 12px;">
                     </div>
                 </div>
-                <div style="margin-top: 15px;">
+                <div style="margin-top: 8px;">
                     <label style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 4px;">Beverage Details</label>
                     <textarea id="menuBeverageDetails" class="form-control-custom" rows="2" placeholder="Specific drinks, brands, signature cocktails, etc." style="width: 100%; padding: 8px 12px;"></textarea>
                 </div>
             </div>
 
             <!-- Dietary & Special Requests -->
-            <div class="info-card" style="margin-bottom: 20px; border-left-color: #f0883e;">
+            <div class="info-card" style="margin-bottom: 10px; border-left-color: #f0883e;">
                 <div class="info-card-title"><i class="bi bi-heart-pulse"></i> Dietary & Special Requests</div>
-                <div style="margin-top: 10px;">
+                <div style="margin-top: 6px;">
                     <label style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 4px;">Dietary Accommodations</label>
-                    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;" id="dietaryTags">
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px;" id="dietaryTags">
                         <label style="display: flex; align-items: center; gap: 5px; color: var(--text-primary); cursor: pointer;">
                             <input type="checkbox" id="diet_vegetarian" style="width: 16px; height: 16px;"> Vegetarian
                         </label>
@@ -636,15 +636,15 @@
             </div>
 
             <!-- Equipment/Rentals -->
-            <div class="info-card" style="margin-bottom: 20px; border-left-color: var(--text-muted);">
+            <div class="info-card" style="margin-bottom: 10px; border-left-color: var(--text-muted);">
                 <div class="info-card-title"><i class="bi bi-box-seam"></i> Equipment & Rentals</div>
-                <div style="margin-top: 10px;">
+                <div style="margin-top: 6px;">
                     <textarea id="menuEquipment" class="form-control-custom" rows="2" placeholder="Chafing dishes, linens, china, tables, chairs, etc." style="width: 100%; padding: 8px 12px;"></textarea>
                 </div>
             </div>
 
             <!-- Save Button -->
-            <div style="margin-top: 20px;">
+            <div style="margin-top: 12px;">
                 <button class="btn btn-primary-custom" onclick="saveMenu()">
                     <i class="bi bi-check-lg"></i> Save Menu
                 </button>
@@ -654,21 +654,21 @@
 
     <!-- Financials Tab -->
     <div id="tab-financials" class="tab-content">
-        <h3 style="color: #c9d1d9; font-size: 18px; margin-bottom: 15px;">Financial Information</h3>
+        <h3 style="color: #c9d1d9; font-size: 16px; margin-bottom: 8px;">Financial Information</h3>
 
         <div id="financialsContent">
             <!-- Package Info Card -->
-            <div class="info-card" id="finPackageCard" style="display: none; margin-bottom: 20px; border-left-color: #238636;">
+            <div class="info-card" id="finPackageCard" style="display: none; margin-bottom: 10px; border-left-color: #238636;">
                 <div class="info-card-title"><i class="bi bi-box-seam"></i> Selected Package</div>
                 <div id="finPackageDetails">
-                    <div style="font-size: 16px; font-weight: 600; color: #c9d1d9; margin-bottom: 8px;" id="finPackageName">-</div>
+                    <div style="font-size: 15px; font-weight: 600; color: #c9d1d9; margin-bottom: 4px;" id="finPackageName">-</div>
                     <div style="color: #8b949e; font-size: 14px;" id="finPackagePricing">-</div>
-                    <div style="color: #8b949e; font-size: 13px; margin-top: 6px;" id="finPackageDescription"></div>
+                    <div style="color: #8b949e; font-size: 13px; margin-top: 4px;" id="finPackageDescription"></div>
                 </div>
             </div>
 
             <!-- No Package Warning -->
-            <div class="info-card" id="finNoPackageCard" style="margin-bottom: 20px; border-left-color: #f0883e;">
+            <div class="info-card" id="finNoPackageCard" style="margin-bottom: 10px; border-left-color: #f0883e;">
                 <div class="info-card-title"><i class="bi bi-exclamation-triangle"></i> No Pricing Available</div>
                 <div style="color: #8b949e; font-size: 14px;">
                     Select a package in the Details tab, or add priced items in the Menu & Catering tab.
@@ -676,17 +676,17 @@
             </div>
 
             <!-- Menu Items Card (shown when no package but menu has priced items) -->
-            <div class="info-card" id="finMenuItemsCard" style="display: none; margin-bottom: 20px; border-left-color: #238636;">
+            <div class="info-card" id="finMenuItemsCard" style="display: none; margin-bottom: 10px; border-left-color: #238636;">
                 <div class="info-card-title"><i class="bi bi-list-check"></i> Custom Menu Pricing</div>
-                <div id="finMenuItemsList" style="font-size: 14px; margin-top: 10px;">
+                <div id="finMenuItemsList" style="font-size: 14px; margin-top: 6px;">
                     <!-- Menu items will be listed here -->
                 </div>
             </div>
 
             <!-- Tax & Service Charge Overrides -->
-            <div class="info-card" style="margin-bottom: 20px; border-left-color: #58a6ff;">
+            <div class="info-card" style="margin-bottom: 10px; border-left-color: #58a6ff;">
                 <div class="info-card-title"><i class="bi bi-sliders"></i> Rate Adjustments</div>
-                <div style="display: flex; gap: 30px; flex-wrap: wrap; margin-top: 10px;">
+                <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 6px;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <input type="checkbox" id="finApplyServiceCharge" checked style="width: 18px; height: 18px; cursor: pointer;">
                         <label for="finApplyServiceCharge" style="color: #c9d1d9; cursor: pointer; margin: 0;">Service Charge</label>
@@ -705,7 +705,7 @@
                         <i class="bi bi-calculator"></i> Recalculate
                     </button>
                 </div>
-                <div style="color: #8b949e; font-size: 12px; margin-top: 8px;">
+                <div style="color: #8b949e; font-size: 12px; margin-top: 4px;">
                     <i class="bi bi-info-circle"></i> Uncheck to remove for non-profit events or special pricing
                 </div>
             </div>
@@ -732,28 +732,28 @@
                     <span id="finTaxLabel">Tax (7%):</span>
                     <span id="finTax">$0.00</span>
                 </div>
-                <div class="financial-row total-row" style="font-weight: 600; font-size: 16px; border-top: 1px solid #30363d; padding-top: 10px; margin-top: 10px;">
+                <div class="financial-row total-row" style="font-weight: 600; font-size: 16px; border-top: 1px solid #30363d; padding-top: 6px; margin-top: 6px;">
                     <span>Estimated Total:</span>
                     <span id="finTotal">$0.00</span>
                 </div>
             </div>
 
             <!-- Service Requirements -->
-            <div class="info-card" id="finServiceReqCard" style="display: none; margin-top: 20px;">
+            <div class="info-card" id="finServiceReqCard" style="display: none; margin-top: 10px;">
                 <div class="info-card-title"><i class="bi bi-person-badge"></i> Service Staff (Additional)</div>
                 <div id="finServiceReqDetails" style="font-size: 14px; color: #8b949e;"></div>
             </div>
 
             <!-- Add-ons Available -->
-            <div class="info-card" id="finAddonsCard" style="display: none; margin-top: 15px;">
+            <div class="info-card" id="finAddonsCard" style="display: none; margin-top: 10px;">
                 <div class="info-card-title"><i class="bi bi-plus-circle"></i> Available Add-ons</div>
                 <div id="finAddonsDetails" style="font-size: 14px; color: #8b949e;"></div>
             </div>
 
             <!-- Deposit & Payments -->
-            <div class="info-card" style="margin-top: 20px; border-left-color: #238636;">
+            <div class="info-card" style="margin-top: 10px; border-left-color: #238636;">
                 <div class="info-card-title"><i class="bi bi-credit-card"></i> Deposits & Payments</div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 10px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 6px;">
                     <div>
                         <label style="color: #8b949e; font-size: 12px; display: block; margin-bottom: 4px;">Deposit Required</label>
                         <div style="display: flex; align-items: center; gap: 5px;">
@@ -773,8 +773,8 @@
                 </div>
 
                 <!-- Payment History -->
-                <div style="margin-top: 15px; border-top: 1px solid #30363d; padding-top: 15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div style="margin-top: 10px; border-top: 1px solid #30363d; padding-top: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                         <span style="color: #c9d1d9; font-weight: 500;">Payment History</span>
                         <button class="btn btn-sm btn-primary-custom" onclick="showAddPaymentModal()" style="padding: 4px 10px;">
                             <i class="bi bi-plus"></i> Record Payment
@@ -786,13 +786,13 @@
                 </div>
             </div>
 
-            <div class="info-card" id="finPaymentTermsCard" style="display: none; margin-top: 15px;">
+            <div class="info-card" id="finPaymentTermsCard" style="display: none; margin-top: 10px;">
                 <div class="info-card-title"><i class="bi bi-file-text"></i> Payment Terms</div>
                 <div class="info-card-value" id="finPaymentTerms">-</div>
             </div>
 
             <!-- Save Financials Button -->
-            <div style="margin-top: 20px; display: flex; gap: 10px;">
+            <div style="margin-top: 12px; display: flex; gap: 10px;">
                 <button class="btn btn-primary-custom" onclick="saveFinancials()">
                     <i class="bi bi-check-lg"></i> Save Financial Settings
                 </button>
@@ -845,9 +845,9 @@
 
     <!-- Tasks Tab -->
     <div id="tab-tasks" class="tab-content">
-        <h3 style="color: #c9d1d9; font-size: 18px; margin-bottom: 15px;">Event Tasks</h3>
+        <h3 style="color: #c9d1d9; font-size: 16px; margin-bottom: 8px;">Event Tasks</h3>
 
-        <div style="margin-bottom: 20px;">
+        <div style="margin-bottom: 10px;">
             <button class="btn btn-primary-custom" onclick="window.location.href='/events/tasks?event=' + currentEventId">
                 <i class="bi bi-arrow-right"></i> View in Task Board
             </button>
@@ -860,9 +860,9 @@
 
     <!-- Documents Tab -->
     <div id="tab-documents" class="tab-content">
-        <h3 style="color: #c9d1d9; font-size: 18px; margin-bottom: 15px;">Event Documents</h3>
+        <h3 style="color: #c9d1d9; font-size: 16px; margin-bottom: 8px;">Event Documents</h3>
 
-        <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+        <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
             <button class="btn btn-primary-custom" onclick="downloadBEO()">
                 <i class="bi bi-download"></i> Download BEO
             </button>
@@ -1219,8 +1219,8 @@
         ).join('');
 
         const html = `
-            <div class="menu-section" id="menuSection${sectionId}" style="background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 8px; margin-bottom: 15px; overflow: hidden;">
-                <div class="section-header" onclick="toggleMenuSection(${sectionId})" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; background: var(--bg-tertiary); cursor: pointer; user-select: none;">
+            <div class="menu-section" id="menuSection${sectionId}" style="background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 8px; margin-bottom: 10px; overflow: hidden;">
+                <div class="section-header" onclick="toggleMenuSection(${sectionId})" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: var(--bg-tertiary); cursor: pointer; user-select: none;">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <i class="bi bi-chevron-down section-toggle-icon" id="sectionIcon${sectionId}" style="transition: transform 0.2s; transform: rotate(-90deg); color: var(--text-muted);"></i>
                         <span class="section-header-label" id="sectionLabel${sectionId}" style="color: var(--text-muted);">New Section</span>
@@ -1229,7 +1229,7 @@
                         <i class="bi bi-trash"></i>
                     </button>
                 </div>
-                <div class="section-content" id="sectionContent${sectionId}" style="padding: 15px; display: none;">
+                <div class="section-content" id="sectionContent${sectionId}" style="padding: 10px 12px; display: none;">
                     <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 12px;">
                         <select class="form-control-custom section-type" style="width: 150px; padding: 6px 10px;" onchange="updateSectionLabel(${sectionId})">
                             <option value="">Section Type</option>

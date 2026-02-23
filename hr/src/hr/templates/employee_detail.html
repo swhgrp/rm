@@ -313,17 +313,18 @@
 </div>
 
 <!-- Upload Document Modal -->
-<div id="uploadModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3><i class="bi bi-upload"></i> Upload Document</h3>
-            <button class="close-modal" onclick="closeUploadModal()">&times;</button>
-        </div>
+<div id="uploadModal" class="modal fade" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="bi bi-upload"></i> Upload Document</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
 
-        <form id="uploadForm" class="modal-body">
+            <form id="uploadForm" class="modal-body">
             <div class="form-group">
                 <label for="documentFile">File <span style="color: #E53935;">*</span></label>
-                <input type="file" id="documentFile" required
+                <input type="file" id="documentFile" name="file" required
                        accept=".pdf,.docx,.doc,.jpg,.jpeg,.png,.txt,.xlsx,.xls">
                 <small style="color: var(--text-muted); display: block; margin-top: 5px;">
                     Allowed: PDF, Word, Images, Excel (Max 10MB)
@@ -332,7 +333,7 @@
 
             <div class="form-group">
                 <label for="documentType">Document Type <span style="color: #E53935;">*</span></label>
-                <select id="documentType" required>
+                <select id="documentType" name="document_type" required>
                     <option value="">Select Type</option>
                     <option value="Food Handler Certificate">Food Handler Certificate</option>
                     <option value="Food Manager Certificate">Food Manager Certificate</option>
@@ -352,31 +353,33 @@
 
             <div class="form-group">
                 <label for="expirationDate">Expiration Date (Optional)</label>
-                <input type="date" id="expirationDate">
+                <input type="date" id="expirationDate" name="expiration_date">
             </div>
 
             <div class="form-group">
                 <label for="documentNotes">Notes (Optional)</label>
-                <textarea id="documentNotes" rows="3"></textarea>
+                <textarea id="documentNotes" name="notes" rows="3"></textarea>
             </div>
 
             <div class="modal-footer" style="border-top: none; padding: 0; margin-top: 20px;">
-                <button type="button" class="btn btn-secondary" onclick="closeUploadModal()">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="submit" class="btn btn-primary">Upload</button>
             </div>
         </form>
+        </div>
     </div>
 </div>
 
 <!-- E-Signature Modal -->
-<div id="esignModal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h3><i class="bi bi-pen"></i> Send for E-Signature</h3>
-            <button class="close-modal" onclick="closeEsignModal()">&times;</button>
-        </div>
+<div id="esignModal" class="modal fade" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title"><i class="bi bi-pen"></i> Send for E-Signature</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
 
-        <form id="esignForm" class="modal-body">
+            <form id="esignForm" class="modal-body">
             <div class="form-group">
                 <label for="esignTemplate">Select Template <span style="color: #E53935;">*</span></label>
                 <select id="esignTemplate" required>
@@ -409,12 +412,13 @@
             </div>
 
             <div class="modal-footer" style="border-top: none; padding: 0; margin-top: 20px;">
-                <button type="button" class="btn btn-secondary" onclick="closeEsignModal()">Cancel</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="submit" class="btn btn-primary">
                     <i class="bi bi-send"></i> Send for Signature
                 </button>
             </div>
         </form>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -664,12 +668,19 @@ function getStatusStyle(status) {
     }
 }
 
+let uploadModalInstance = null;
 function openUploadModal() {
-    document.getElementById('uploadModal').classList.add('active');
+    const el = document.getElementById('uploadModal');
+    if (!uploadModalInstance) {
+        uploadModalInstance = new bootstrap.Modal(el);
+    }
+    uploadModalInstance.show();
 }
 
 function closeUploadModal() {
-    document.getElementById('uploadModal').classList.remove('active');
+    if (uploadModalInstance) {
+        uploadModalInstance.hide();
+    }
     document.getElementById('uploadForm').reset();
 }
 
@@ -754,19 +765,25 @@ function closePreviewModal() {
 document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const formData = new FormData();
-    formData.append('file', document.getElementById('documentFile').files[0]);
-    formData.append('document_type', document.getElementById('documentType').value);
-
-    const expirationDate = document.getElementById('expirationDate').value;
-    if (expirationDate) {
-        formData.append('expiration_date', expirationDate);
+    const fileInput = document.getElementById('documentFile');
+    if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+        showAlert('Please select a file to upload', 'error');
+        return;
     }
 
-    const notes = document.getElementById('documentNotes').value;
-    if (notes) {
-        formData.append('notes', notes);
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+    const file = fileInput.files[0];
+    if (file.size > MAX_FILE_SIZE) {
+        const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+        alert(`File is too large (${sizeMB}MB).\n\nMaximum allowed size is 10MB.\nPlease select a smaller file.`);
+        return;
     }
+
+    const formData = new FormData(e.target);
+
+    // Remove empty optional fields so server gets null instead of empty string
+    if (!formData.get('expiration_date')) formData.delete('expiration_date');
+    if (!formData.get('notes')) formData.delete('notes');
 
     try {
         const response = await fetch(`/hr/api/employees/${currentEmployeeId}/documents`, {
@@ -781,7 +798,8 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             loadDocuments(currentEmployeeId);
         } else {
             const error = await response.json();
-            showAlert('Error: ' + (error.detail || 'Failed to upload document'), 'error');
+            const detail = typeof error.detail === 'string' ? error.detail : 'Failed to upload document';
+            showAlert('Error: ' + detail, 'error');
         }
     } catch (error) {
         console.error('Error uploading document:', error);
@@ -849,12 +867,7 @@ function showAlert(message, type) {
     }, 5000);
 }
 
-// Close modals when clicking outside
-document.getElementById('uploadModal').addEventListener('click', (e) => {
-    if (e.target.id === 'uploadModal') {
-        closeUploadModal();
-    }
-});
+// Bootstrap handles close-on-backdrop-click natively for modals
 
 document.getElementById('previewModal').addEventListener('click', (e) => {
     if (e.target.id === 'previewModal') {
@@ -1046,6 +1059,7 @@ function updateTemplateDropdown() {
     }
 }
 
+let esignModalInstance = null;
 function openEsignModal() {
     if (!currentEmployeeEmail) {
         showAlert('Employee does not have an email address', 'error');
@@ -1057,11 +1071,17 @@ function openEsignModal() {
         return;
     }
     document.getElementById('esignEmployeeEmail').textContent = currentEmployeeEmail;
-    document.getElementById('esignModal').classList.add('active');
+    const el = document.getElementById('esignModal');
+    if (!esignModalInstance) {
+        esignModalInstance = new bootstrap.Modal(el);
+    }
+    esignModalInstance.show();
 }
 
 function closeEsignModal() {
-    document.getElementById('esignModal').classList.remove('active');
+    if (esignModalInstance) {
+        esignModalInstance.hide();
+    }
     document.getElementById('esignForm').reset();
 }
 
@@ -1183,12 +1203,7 @@ async function checkSignatureStatus(requestId) {
     }
 }
 
-// Close e-sign modal when clicking outside
-document.getElementById('esignModal').addEventListener('click', (e) => {
-    if (e.target.id === 'esignModal') {
-        closeEsignModal();
-    }
-});
+// Bootstrap handles close-on-backdrop-click natively for e-sign modal
 
 // ============ HR Forms Functions ============
 

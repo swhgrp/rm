@@ -42,6 +42,8 @@ from restaurant_inventory.api.api_v1.endpoints import dashboard
 from restaurant_inventory.api.api_v1.endpoints import cache_management
 from restaurant_inventory.api.api_v1.endpoints import hub_invoices
 from restaurant_inventory.api.api_v1.endpoints import hub_vendor_items
+from restaurant_inventory.api.api_v1.endpoints import order_sheet_templates
+from restaurant_inventory.api.api_v1.endpoints import order_sheets
 # REMOVED (Dec 25, 2025): invoices, vendor_items - Hub is source of truth
 from restaurant_inventory.services.scheduler import start_scheduler, stop_scheduler
 
@@ -106,9 +108,11 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
         # Only redirect for HTML page requests, not API requests
         if not is_api_request and "text/html" in accept:
-            # Redirect to Portal login instead of local login
+            # Redirect to Portal login with return URL to the current page
             from fastapi.responses import RedirectResponse
-            return RedirectResponse(url="/portal/login?redirect=/inventory/", status_code=302)
+            from urllib.parse import quote
+            redirect_path = f"/inventory{path}" if not path.startswith("/inventory") else path
+            return RedirectResponse(url=f"/portal/login?redirect={quote(redirect_path)}", status_code=302)
     # For API requests or other errors, return JSON response
     from fastapi.responses import JSONResponse
     return JSONResponse(
@@ -153,6 +157,9 @@ app.include_router(cache_management.router, prefix="/api/cache", tags=["cache"])
 # Hub integration - source of truth for invoices and vendor items
 app.include_router(hub_invoices.router, prefix="/api/hub-invoices", tags=["hub-invoices"])
 app.include_router(hub_vendor_items.router, prefix="/api/hub-vendor-items", tags=["hub-vendor-items"])
+# Order Sheets
+app.include_router(order_sheet_templates.router, prefix="/api/order-sheet-templates", tags=["order-sheet-templates"])
+app.include_router(order_sheets.router, prefix="/api/order-sheets", tags=["order-sheets"])
 # REMOVED (Dec 25, 2025): /api/invoices, /api/vendor-items - Hub is source of truth
 
 
@@ -360,6 +367,68 @@ async def vendor_items_page(request: Request):
 async def vendors_page(request: Request):
     """Vendors management page"""
     return templates.TemplateResponse("vendors.html", {"request": request})
+
+@app.get("/order-sheets", response_class=HTMLResponse)
+async def order_sheets_page(request: Request):
+    """Order Sheets page"""
+    return templates.TemplateResponse("order_sheets.html", {"request": request})
+
+@app.get("/order-sheets/templates", response_class=HTMLResponse)
+async def order_sheet_templates_page(request: Request):
+    """Order Sheet Templates management page"""
+    return templates.TemplateResponse("order_sheet_templates.html", {"request": request})
+
+@app.get("/order-sheets/{sheet_id}/fill", response_class=HTMLResponse)
+async def order_sheet_fill_page(request: Request, sheet_id: int):
+    """Fill out an order sheet"""
+    return templates.TemplateResponse("order_sheet_fill.html", {"request": request, "sheet_id": sheet_id})
+
+@app.get("/order-sheets/{sheet_id}/print", response_class=HTMLResponse)
+async def order_sheet_print_page(
+    request: Request,
+    sheet_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Printable view of an order sheet (non-API route for proper auth redirect)"""
+    from restaurant_inventory.models.order_sheet import OrderSheet, OrderSheetItem, OrderSheetStatus
+    from restaurant_inventory.models.order_sheet_template import OrderSheetTemplate
+    from restaurant_inventory.models.location import Location
+    from restaurant_inventory.core.deps import get_user_location_ids
+    from sqlalchemy.orm import joinedload
+
+    sheet = db.query(OrderSheet).options(
+        joinedload(OrderSheet.items),
+        joinedload(OrderSheet.template),
+        joinedload(OrderSheet.location),
+        joinedload(OrderSheet.created_by_user)
+    ).filter(OrderSheet.id == sheet_id).first()
+
+    if not sheet:
+        raise HTTPException(status_code=404, detail="Order sheet not found")
+
+    location_ids = get_user_location_ids(current_user, db)
+    if location_ids is not None and sheet.location_id not in location_ids:
+        raise HTTPException(status_code=403, detail="No access to this location")
+
+    # Build response data
+    from restaurant_inventory.api.api_v1.endpoints.order_sheets import _build_sheet_response
+    response = _build_sheet_response(sheet)
+
+    # Group items by category
+    categories = {}
+    for item in response.items:
+        cat = item.item_category or 'Other'
+        if cat not in categories:
+            categories[cat] = []
+        categories[cat].append(item)
+
+    return templates.TemplateResponse("order_sheet_print.html", {
+        "request": request,
+        "sheet": response,
+        "categories": categories,
+        "sorted_categories": sorted(categories.keys())
+    })
 
 @app.get("/units-of-measure", response_class=HTMLResponse)
 async def units_of_measure_page(request: Request):

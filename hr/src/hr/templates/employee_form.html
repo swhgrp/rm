@@ -162,7 +162,7 @@
             <div class="form-group">
                 <label for="middle_name">Middle Name</label>
                 <input type="text" id="middle_name" name="middle_name"
-                       value="{{ employee.middle_name if employee else '' }}">
+                       value="{{ employee.middle_name if employee and employee.middle_name else '' }}">
             </div>
 
             <!-- Last Name -->
@@ -176,7 +176,7 @@
             <div class="form-group">
                 <label for="date_of_birth">Date of Birth <span style="color: #E53935;">*</span></label>
                 <input type="date" id="date_of_birth" name="date_of_birth" required
-                       value="{{ employee.date_of_birth if employee else '' }}">
+                       value="{{ employee.date_of_birth if employee and employee.date_of_birth else '' }}">
             </div>
         </div>
     </div>
@@ -199,7 +199,7 @@
             <div class="form-group">
                 <label for="phone_number">Phone Number <span style="color: #E53935;">*</span></label>
                 <input type="tel" id="phone_number" name="phone_number" required
-                       value="{{ employee.phone_number if employee else '' }}"
+                       value="{{ employee.phone_number if employee and employee.phone_number else '' }}"
                        placeholder="(555) 123-4567">
             </div>
 
@@ -207,14 +207,14 @@
             <div class="form-group" style="grid-column: span 2;">
                 <label for="street_address">Street Address <span style="color: #E53935;">*</span></label>
                 <input type="text" id="street_address" name="street_address" required
-                       value="{{ employee.street_address if employee else '' }}">
+                       value="{{ employee.street_address if employee and employee.street_address else '' }}">
             </div>
 
             <!-- City -->
             <div class="form-group">
                 <label for="city">City <span style="color: #E53935;">*</span></label>
                 <input type="text" id="city" name="city" required
-                       value="{{ employee.city if employee else '' }}">
+                       value="{{ employee.city if employee and employee.city else '' }}">
             </div>
 
             <!-- State -->
@@ -279,7 +279,7 @@
             <div class="form-group">
                 <label for="zip_code">Zip Code <span style="color: #E53935;">*</span></label>
                 <input type="text" id="zip_code" name="zip_code" required
-                       value="{{ employee.zip_code if employee else '' }}"
+                       value="{{ employee.zip_code if employee and employee.zip_code else '' }}"
                        placeholder="12345">
             </div>
         </div>
@@ -296,14 +296,14 @@
             <div class="form-group">
                 <label for="emergency_contact_name">Name</label>
                 <input type="text" id="emergency_contact_name" name="emergency_contact_name"
-                       value="{{ employee.emergency_contact_name if employee else '' }}">
+                       value="{{ employee.emergency_contact_name if employee and employee.emergency_contact_name else '' }}">
             </div>
 
             <!-- Emergency Contact Relationship -->
             <div class="form-group">
                 <label for="emergency_contact_relationship">Relationship</label>
                 <input type="text" id="emergency_contact_relationship" name="emergency_contact_relationship"
-                       value="{{ employee.emergency_contact_relationship if employee else '' }}"
+                       value="{{ employee.emergency_contact_relationship if employee and employee.emergency_contact_relationship else '' }}"
                        placeholder="Spouse, Parent, etc.">
             </div>
 
@@ -311,7 +311,7 @@
             <div class="form-group">
                 <label for="emergency_contact_phone">Phone Number</label>
                 <input type="tel" id="emergency_contact_phone" name="emergency_contact_phone"
-                       value="{{ employee.emergency_contact_phone if employee else '' }}"
+                       value="{{ employee.emergency_contact_phone if employee and employee.emergency_contact_phone else '' }}"
                        placeholder="(555) 123-4567">
             </div>
         </div>
@@ -326,9 +326,10 @@
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
             <!-- Hire Date -->
             <div class="form-group">
-                <label for="hire_date">Hire Date <span style="color: #E53935;">*</span></label>
+                <label for="hire_date">Hire Date <span style="color: #E53935;">*</span>{% if employee and not current_user.is_admin %} <small style="color: var(--text-muted);">(Admin only)</small>{% endif %}</label>
                 <input type="date" id="hire_date" name="hire_date"
-                       value="{{ employee.hire_date if employee else '' }}" required>
+                       value="{{ employee.hire_date if employee and employee.hire_date else '' }}" required
+                       {% if employee and not current_user.is_admin %}readonly style="opacity: 0.7; cursor: not-allowed;"{% endif %}>
             </div>
 
             <!-- Employment Status -->
@@ -386,7 +387,7 @@
                 <div class="form-group">
                     <label for="termination_date">Termination Date <span style="color: #E53935;">*</span></label>
                     <input type="date" id="termination_date" name="termination_date"
-                           value="{{ employee.termination_date if employee else '' }}">
+                           value="{{ employee.termination_date if employee and employee.termination_date else '' }}">
                 </div>
 
                 <!-- Type of Termination -->
@@ -404,7 +405,7 @@
                 <div class="form-group">
                     <label for="final_decision_date">Final Decision Date <span style="color: #E53935;">*</span></label>
                     <input type="date" id="final_decision_date" name="final_decision_date"
-                           value="{{ employee.final_decision_date if employee else '' }}">
+                           value="{{ employee.final_decision_date if employee and employee.final_decision_date else '' }}">
                     <small style="color: var(--text-muted); font-size: 12px;">When termination was approved/confirmed</small>
                 </div>
 
@@ -412,7 +413,7 @@
                 <div class="form-group">
                     <label for="authorized_by">Authorized By <span style="color: #E53935;">*</span></label>
                     <input type="text" id="authorized_by" name="authorized_by"
-                           value="{{ employee.authorized_by if employee else '' }}"
+                           value="{{ employee.authorized_by if employee and employee.authorized_by else '' }}"
                            placeholder="Name of authorizing person">
                     <small style="color: var(--text-muted); font-size: 12px;">Usually HR or upper management</small>
                 </div>
@@ -421,7 +422,7 @@
                 <div class="form-group" style="grid-column: span 2;">
                     <label for="termination_reason">Reason for Termination <span style="color: #E53935;">*</span></label>
                     <textarea id="termination_reason" name="termination_reason" rows="4"
-                              placeholder="Brief explanation (e.g., 'Repeated tardiness despite written warnings.')">{{ employee.termination_reason if employee else '' }}</textarea>
+                              placeholder="Brief explanation (e.g., 'Repeated tardiness despite written warnings.')">{{ employee.termination_reason if employee and employee.termination_reason else '' }}</textarea>
                 </div>
 
                 <!-- Supporting Documentation -->
@@ -853,7 +854,7 @@ document.getElementById('employeeForm').addEventListener('submit', async functio
             emergency_contact_name: document.getElementById('emergency_contact_name').value || null,
             emergency_contact_relationship: document.getElementById('emergency_contact_relationship').value || null,
             emergency_contact_phone: document.getElementById('emergency_contact_phone').value || null,
-            hire_date: document.getElementById('hire_date').value,
+            hire_date: document.getElementById('hire_date').value || null,
             employment_status: document.getElementById('employment_status').value,
             employee_type: document.getElementById('employee_type').value,
             position_id: document.getElementById('position_id').value || null,

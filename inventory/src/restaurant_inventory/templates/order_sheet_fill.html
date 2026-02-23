@@ -1,0 +1,527 @@
+{% extends "base.html" %}
+
+{% block title %}Order Sheet - Restaurant Inventory{% endblock %}
+
+{% block head %}
+<style>
+    .category-header {
+        background-color: #455A64;
+        color: white;
+        font-weight: bold;
+        padding: 8px 12px;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+    }
+    .order-table th {
+        position: sticky;
+        top: 0;
+        z-index: 11;
+        background-color: var(--bg-tertiary) !important;
+    }
+    .order-table input[type="number"] {
+        width: 90px;
+        text-align: center;
+    }
+    .order-table input[type="number"]:focus {
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 2px rgba(69, 90, 100, 0.2);
+    }
+    .to-order-positive {
+        font-weight: bold;
+        color: #2e7d32;
+    }
+    .to-order-zero {
+        color: var(--text-muted);
+    }
+    .manual-override {
+        color: #e65100 !important;
+        font-style: italic;
+    }
+    .summary-bar {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        padding: 12px 20px;
+        box-shadow: var(--shadow-sm);
+    }
+    .save-indicator {
+        font-size: 13px;
+        transition: opacity 0.3s;
+    }
+    .item-notes-input {
+        width: 100%;
+        border: 1px solid var(--border-primary);
+        background: var(--bg-primary);
+        font-size: 12px;
+        padding: 4px 6px;
+        border-radius: 4px;
+    }
+    .item-notes-input:focus {
+        border-color: var(--accent-primary);
+        box-shadow: 0 0 0 2px rgba(69, 90, 100, 0.2);
+        outline: none;
+    }
+    .item-vendor {
+        font-size: 11px;
+        color: var(--text-muted);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+        <h1 class="mb-1"><i class="bi bi-list-check"></i> <span id="sheetName">Order Sheet</span></h1>
+        <div class="text-muted" id="sheetMeta"></div>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+        <span class="save-indicator text-muted" id="saveIndicator"></span>
+        <span class="badge" id="statusBadge"></span>
+        <a href="order-sheets" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left"></i> Back
+        </a>
+        <button class="btn btn-outline-secondary btn-sm" id="printBtn" onclick="printSheet()">
+            <i class="bi bi-printer"></i> Print
+        </button>
+        <button class="btn btn-success btn-sm" id="completeBtn" onclick="completeSheet()" style="display:none;">
+            <i class="bi bi-check-circle"></i> Complete & Send
+        </button>
+        <button class="btn btn-primary btn-sm" id="sendBtn" onclick="showSendModal()" style="display:none;">
+            <i class="bi bi-envelope"></i> Resend
+        </button>
+    </div>
+</div>
+
+<!-- Summary Bar -->
+<div class="summary-bar mb-3 d-flex justify-content-between align-items-center">
+    <div class="d-flex gap-4">
+        <div><strong id="totalItems">0</strong> <small class="text-muted">Total Items</small></div>
+        <div><strong id="itemsEntered">0</strong> <small class="text-muted">Entered</small></div>
+        <div><strong id="itemsToOrder" class="text-success">0</strong> <small class="text-muted">To Order</small></div>
+    </div>
+    <div>
+        <div class="progress" style="width:200px;height:8px;">
+            <div class="progress-bar bg-success" id="progressBar" style="width:0%"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Order Sheet Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive" style="max-height: calc(100vh - 300px); overflow-y: auto;">
+            <table class="table table-sm table-hover order-table mb-0">
+                <thead>
+                    <tr>
+                        <th style="min-width:250px;">Item</th>
+                        <th style="width:90px;text-align:center;">Par</th>
+                        <th style="width:110px;text-align:center;">On Hand</th>
+                        <th style="width:110px;text-align:center;">To Order</th>
+                        <th style="min-width:180px;">Notes</th>
+                    </tr>
+                </thead>
+                <tbody id="orderTableBody">
+                    <tr><td colspan="5" class="text-center py-5"><div class="spinner-border" role="status"></div></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Send Email Modal -->
+<div class="modal fade" id="sendModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Send Order Sheet</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Enter email addresses to send this order sheet to.</p>
+                <div id="emailInputs">
+                    <div class="input-group mb-2">
+                        <input type="email" class="form-control email-input" placeholder="email@example.com">
+                        <button class="btn btn-outline-secondary" type="button" onclick="addEmailInput()">
+                            <i class="bi bi-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div id="previouslySent" style="display:none;" class="mt-3">
+                    <small class="text-muted">Previously sent to: <span id="prevEmails"></span></small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="sendSheet()" id="sendSheetBtn">
+                    <i class="bi bi-send"></i> Send
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const sheetId = {{ sheet_id }};
+let sheet = null;
+let saveTimeout = null;
+let sendModal = null;
+let isDraft = false;
+
+async function loadSheet() {
+    try {
+        sheet = await apiRequest(`api/order-sheets/${sheetId}`);
+        isDraft = sheet.status === 'DRAFT';
+        renderSheet();
+    } catch (error) {
+        showAlert('Error loading order sheet: ' + error.message, 'danger');
+    }
+}
+
+function renderSheet() {
+    document.getElementById('sheetName').textContent = sheet.name || 'Order Sheet';
+
+    const meta = [];
+    if (sheet.location_name) meta.push(`<i class="bi bi-geo-alt"></i> ${sheet.location_name}`);
+    if (sheet.template_name) meta.push(`<i class="bi bi-file-earmark-text"></i> ${sheet.template_name}`);
+    if (sheet.created_by_name) meta.push(`<i class="bi bi-person"></i> ${sheet.created_by_name}`);
+    meta.push(`<i class="bi bi-calendar"></i> ${new Date(sheet.created_at).toLocaleDateString()}`);
+    document.getElementById('sheetMeta').innerHTML = meta.join(' &nbsp;&middot;&nbsp; ');
+
+    // Status badge
+    const badge = document.getElementById('statusBadge');
+    const badges = {
+        'DRAFT': 'bg-warning text-dark', 'COMPLETED': 'bg-success', 'SENT': 'bg-primary'
+    };
+    badge.className = `badge ${badges[sheet.status] || 'bg-secondary'}`;
+    badge.textContent = sheet.status;
+
+    // Action buttons
+    if (isDraft) {
+        document.getElementById('completeBtn').style.display = '';
+    }
+    if (sheet.status === 'COMPLETED' || sheet.status === 'SENT') {
+        document.getElementById('sendBtn').style.display = '';
+    }
+
+    // Summary
+    updateSummary();
+
+    // Build table
+    renderItems();
+}
+
+function renderItems() {
+    const tbody = document.getElementById('orderTableBody');
+
+    // Group items by category
+    const categories = {};
+    sheet.items.forEach(item => {
+        const cat = item.item_category || 'Other';
+        if (!categories[cat]) categories[cat] = [];
+        categories[cat].push(item);
+    });
+
+    let html = '';
+    Object.keys(categories).sort().forEach(cat => {
+        html += `<tr><td colspan="5" class="category-header">${cat}</td></tr>`;
+
+        categories[cat].forEach(item => {
+            const par = item.par_level != null ? parseInt(item.par_level) : '';
+            const onHand = item.on_hand != null ? parseInt(item.on_hand) : '';
+            const toOrder = item.to_order != null ? parseInt(item.to_order) : '';
+            const toOrderClass = toOrder > 0 ? 'to-order-positive' : 'to-order-zero';
+            const vendorName = item.vendor_name || '';
+
+            if (isDraft) {
+                html += `<tr data-item-id="${item.id}">
+                    <td style="padding:6px 12px;"><strong>${item.item_name || ''}</strong>${vendorName ? `<div class="item-vendor">${vendorName}</div>` : ''}</td>
+                    <td style="text-align:center;">${par}</td>
+                    <td style="text-align:center;">
+                        <input type="number" class="form-control form-control-sm on-hand-input"
+                               value="${onHand}" step="1" min="0"
+                               data-item-id="${item.id}" data-par="${par}"
+                               onchange="onHandChanged(this)"
+                               onfocus="this.select()">
+                    </td>
+                    <td style="text-align:center;">
+                        <input type="number" class="form-control form-control-sm to-order-input ${toOrderClass}"
+                               value="${toOrder}" step="1" min="0"
+                               data-item-id="${item.id}"
+                               onchange="toOrderChanged(this)"
+                               onfocus="this.select()">
+                    </td>
+                    <td><input type="text" class="item-notes-input" value="${item.notes || ''}"
+                               data-item-id="${item.id}" onchange="noteChanged(this)"
+                               placeholder="Add note..."></td>
+                </tr>`;
+            } else {
+                html += `<tr>
+                    <td style="padding:6px 12px;"><strong>${item.item_name || ''}</strong>${vendorName ? `<div class="item-vendor">${vendorName}</div>` : ''}</td>
+                    <td style="text-align:center;">${par}</td>
+                    <td style="text-align:center;">${onHand}</td>
+                    <td style="text-align:center;" class="${toOrderClass}">${toOrder}</td>
+                    <td><small class="text-muted">${item.notes || ''}</small></td>
+                </tr>`;
+            }
+        });
+    });
+
+    tbody.innerHTML = html;
+
+    // Auto-focus first empty on-hand input
+    if (isDraft) {
+        const firstEmpty = tbody.querySelector('.on-hand-input[value=""]');
+        if (firstEmpty) firstEmpty.focus();
+    }
+}
+
+function onHandChanged(input) {
+    const itemId = parseInt(input.dataset.itemId);
+    const par = parseInt(input.dataset.par) || 0;
+    const onHand = parseInt(input.value) || 0;
+    const toOrder = Math.max(par - onHand, 0);
+
+    // Update to-order field
+    const toOrderInput = input.closest('tr').querySelector('.to-order-input');
+    toOrderInput.value = toOrder;
+    toOrderInput.className = `form-control form-control-sm to-order-input ${toOrder > 0 ? 'to-order-positive' : 'to-order-zero'}`;
+
+    // Update local data
+    const item = sheet.items.find(i => i.id === itemId);
+    if (item) {
+        item.on_hand = onHand;
+        item.to_order = toOrder;
+    }
+
+    updateSummary();
+    debounceSave();
+}
+
+function toOrderChanged(input) {
+    const itemId = parseInt(input.dataset.itemId);
+    const toOrder = parseInt(input.value) || 0;
+
+    input.className = `form-control form-control-sm to-order-input ${toOrder > 0 ? 'to-order-positive' : 'to-order-zero'} manual-override`;
+
+    const item = sheet.items.find(i => i.id === itemId);
+    if (item) item.to_order = toOrder;
+
+    updateSummary();
+    debounceSave();
+}
+
+function noteChanged(input) {
+    const itemId = parseInt(input.dataset.itemId);
+    const item = sheet.items.find(i => i.id === itemId);
+    if (item) item.notes = input.value;
+    debounceSave();
+}
+
+function updateSummary() {
+    const total = sheet.items.length;
+    const entered = sheet.items.filter(i => i.on_hand != null).length;
+    const toOrder = sheet.items.filter(i => i.to_order != null && parseInt(i.to_order) > 0).length;
+
+    document.getElementById('totalItems').textContent = total;
+    document.getElementById('itemsEntered').textContent = entered;
+    document.getElementById('itemsToOrder').textContent = toOrder;
+
+    const pct = total > 0 ? Math.round((entered / total) * 100) : 0;
+    document.getElementById('progressBar').style.width = pct + '%';
+
+    // Complete button always enabled for drafts
+    const completeBtn = document.getElementById('completeBtn');
+    if (isDraft) {
+        completeBtn.disabled = false;
+    }
+}
+
+function debounceSave() {
+    if (saveTimeout) clearTimeout(saveTimeout);
+    document.getElementById('saveIndicator').textContent = 'Unsaved changes...';
+    document.getElementById('saveIndicator').style.color = '#e65100';
+
+    saveTimeout = setTimeout(saveSheet, 500);
+}
+
+async function saveSheet() {
+    if (!isDraft) return;
+
+    const indicator = document.getElementById('saveIndicator');
+    indicator.textContent = 'Saving...';
+    indicator.style.color = '#1565c0';
+
+    // Collect all items with values
+    const items = sheet.items.map(item => {
+        const row = document.querySelector(`tr[data-item-id="${item.id}"]`);
+        if (!row) return null;
+
+        const onHandInput = row.querySelector('.on-hand-input');
+        const toOrderInput = row.querySelector('.to-order-input');
+        const notesInput = row.querySelector('.item-notes-input');
+
+        return {
+            id: item.id,
+            on_hand: onHandInput.value !== '' ? parseInt(onHandInput.value) : null,
+            to_order: toOrderInput.value !== '' ? parseInt(toOrderInput.value) : null,
+            notes: notesInput ? notesInput.value || null : null
+        };
+    }).filter(Boolean);
+
+    try {
+        await apiRequest(`api/order-sheets/${sheetId}`, {
+            method: 'PUT',
+            body: JSON.stringify({ items })
+        });
+        indicator.textContent = 'Saved';
+        indicator.style.color = '#2e7d32';
+        setTimeout(() => { indicator.textContent = ''; }, 2000);
+    } catch (error) {
+        indicator.textContent = 'Save failed!';
+        indicator.style.color = '#c62828';
+        console.error('Save error:', error);
+    }
+}
+
+async function completeSheet() {
+    if (!confirm('Complete this order sheet and email it to the location team?')) return;
+
+    const btn = document.getElementById('completeBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sending...';
+
+    // Save first
+    await saveSheet();
+
+    try {
+        const result = await apiRequest(`api/order-sheets/${sheetId}/complete`, { method: 'POST' });
+        sheet = result.sheet;
+        isDraft = false;
+        showAlert(result.message || 'Order sheet completed!', 'success');
+        renderSheet();
+    } catch (error) {
+        showAlert('Error: ' + error.message, 'danger');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle"></i> Complete & Send';
+    }
+}
+
+async function showSendModal() {
+    const container = document.getElementById('emailInputs');
+    container.innerHTML = '<div class="text-center py-2"><div class="spinner-border spinner-border-sm"></div> Loading...</div>';
+
+    if (!sendModal) sendModal = new bootstrap.Modal(document.getElementById('sendModal'));
+    sendModal.show();
+
+    // Determine which emails to show
+    let emails = [];
+
+    if (sheet.sent_to_emails) {
+        // If previously sent, use those emails
+        document.getElementById('previouslySent').style.display = '';
+        document.getElementById('prevEmails').textContent = sheet.sent_to_emails;
+        emails = sheet.sent_to_emails.split(',').map(e => e.trim());
+    } else {
+        document.getElementById('previouslySent').style.display = 'none';
+        // Fetch users assigned to this location
+        try {
+            const result = await apiRequest(`api/order-sheets/${sheetId}/location-emails`);
+            emails = (result.emails || []).map(u => u.email);
+        } catch (err) {
+            console.error('Could not load location emails:', err);
+        }
+    }
+
+    if (emails.length === 0) {
+        // No emails found - show empty input
+        container.innerHTML = `
+            <div class="input-group mb-2">
+                <input type="email" class="form-control email-input" placeholder="email@example.com">
+                <button class="btn btn-outline-secondary" type="button" onclick="addEmailInput()">
+                    <i class="bi bi-plus"></i>
+                </button>
+            </div>`;
+    } else {
+        container.innerHTML = '';
+        emails.forEach((email, idx) => {
+            const isLast = idx === emails.length - 1;
+            container.innerHTML += `
+                <div class="input-group mb-2">
+                    <input type="email" class="form-control email-input" value="${email}" placeholder="email@example.com">
+                    <button class="btn btn-outline-${isLast ? 'secondary' : 'danger'}" type="button"
+                            onclick="${isLast ? 'addEmailInput()' : 'this.closest(\'.input-group\').remove()'}">
+                        <i class="bi bi-${isLast ? 'plus' : 'x'}"></i>
+                    </button>
+                </div>`;
+        });
+    }
+}
+
+function addEmailInput() {
+    const container = document.getElementById('emailInputs');
+    const div = document.createElement('div');
+    div.className = 'input-group mb-2';
+    div.innerHTML = `
+        <input type="email" class="form-control email-input" placeholder="email@example.com">
+        <button class="btn btn-outline-danger" type="button" onclick="this.closest('.input-group').remove()">
+            <i class="bi bi-x"></i>
+        </button>`;
+    container.appendChild(div);
+    div.querySelector('input').focus();
+}
+
+async function sendSheet() {
+    const inputs = document.querySelectorAll('.email-input');
+    const emails = Array.from(inputs).map(i => i.value.trim()).filter(Boolean);
+
+    if (emails.length === 0) {
+        showAlert('Enter at least one email address', 'warning');
+        return;
+    }
+
+    const btn = document.getElementById('sendSheetBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Sending...';
+
+    try {
+        const result = await apiRequest(`api/order-sheets/${sheetId}/send`, {
+            method: 'POST',
+            body: JSON.stringify({ emails })
+        });
+        sendModal.hide();
+        showAlert(result.message || 'Order sheet sent!', 'success');
+
+        // Reload to get updated status
+        await loadSheet();
+    } catch (error) {
+        showAlert('Error sending: ' + error.message, 'danger');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send"></i> Send';
+    }
+}
+
+function printSheet() {
+    window.open(`/inventory/order-sheets/${sheetId}/print`, '_blank');
+}
+
+// Keyboard navigation: Enter moves to next on-hand input
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && e.target.classList.contains('on-hand-input')) {
+        e.preventDefault();
+        const inputs = Array.from(document.querySelectorAll('.on-hand-input'));
+        const idx = inputs.indexOf(e.target);
+        if (idx < inputs.length - 1) {
+            inputs[idx + 1].focus();
+            inputs[idx + 1].select();
+        }
+    }
+});
+
+document.addEventListener('DOMContentLoaded', loadSheet);
+</script>
+{% endblock %}
