@@ -153,6 +153,14 @@ curl -s http://localhost:{port}/endpoint | python3 -m json.tool
 - **Hire date protection**: `hire_date` added to `EmployeeUpdate` schema (was previously dropped on every save); readonly for non-admins in edit form
 - **Null field rendering**: All nullable fields in `employee_form.html` use `employee.field if employee and employee.field else ''` to prevent rendering Python `None` as string "None"
 
+### HR Location-Based Access Control (Feb 2026)
+- **Employee filtering**: Uses `employee_locations` many-to-many table (NOT `employee_positions` which is empty)
+- **employees.py**: `list_employees` and `get_employee` filter via subquery on `employee_locations.c.employee_id`
+- **`get_user_location_ids(user)`** in `authorization.py`: returns `None` (admin = all access), `list` (non-admin), `[]` (no assignments)
+- **Corrective action form**: Uses `isAdmin` template variable to call correct endpoint (`/hr/api/locations/all` vs `/hr/api/locations/`)
+- **Auto-select**: When user has only one location, it's auto-selected in dropdowns
+- **Toggle switch UI**: Location assignment modals in HR, Inventory, Events use toggle switches (`.loc-toggle`, `.loc-toggle-inv`, `.loc-toggle-evt`)
+
 ## Important Notes
 - Never modify `.env` files (contain production secrets)
 - Location data comes from inventory service - don't duplicate

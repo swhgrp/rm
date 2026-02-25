@@ -684,14 +684,16 @@
                     const sizeQty = parseFloat(vi.size_quantity) || 1;
                     const measureType = vi.size_unit_measure_type || '';
 
-                    // Only divide by size_quantity for weight and count types (not volume)
-                    // Weight: 25 lb bag = 25 units of weight
-                    // Count: 10 count bag = 10 individual items
-                    // Volume: 750 ml bottle = 1 bottle (750ml is just the size description)
-                    if ((measureType === 'weight' || measureType === 'count') && sizeQty > 1) {
+                    // Only divide by size_quantity for weight/count types where the count unit
+                    // is a base unit (lb, oz, kg, g, ea). Do NOT divide when count unit is a
+                    // specific container (Can 12oz, Bottle 750ml) — the size is just a descriptor.
+                    // e.g., Flour 25lb bag: count_unit=Pound → $21.96 / 2 / 25 = $0.44/lb ✓
+                    // e.g., Can 12oz: count_unit=Can 12oz → $45 / 24 = $1.88/can ✓ (NOT /12)
+                    const containerName = (vi.container_name || '').toLowerCase();
+                    const isSpecificContainer = ['can', 'bottle', 'keg'].includes(containerName);
+                    if ((measureType === 'weight' || measureType === 'count') && sizeQty > 1 && !isSpecificContainer) {
                         costPerBaseUnit = parseFloat(vi.case_cost) / (unitsPerCase * sizeQty);
                     } else {
-                        // Volume items, or items without size_quantity
                         costPerBaseUnit = parseFloat(vi.case_cost) / unitsPerCase;
                     }
                 } else {

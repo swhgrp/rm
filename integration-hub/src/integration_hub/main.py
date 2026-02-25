@@ -973,6 +973,71 @@ async def get_invoice_status(invoice_id: int, db: Session = Depends(get_db)):
     }
 
 
+def _capture_vendor_alias(db: Session, raw_vendor_name: str, vendor_id: int, logger):
+    """
+    Capture a vendor alias when a user manually assigns a vendor to an invoice.
+    If the normalized name matches the vendor's own name, skip (no point aliasing to itself).
+    If an alias already exists for this name+vendor pair, increment match_count.
+    If no alias exists, create one with source='manual_correction'.
+    """
+    from integration_hub.models.vendor_alias import VendorAlias, normalize_vendor_alias
+    from datetime import datetime, timezone
+
+    normalized = normalize_vendor_alias(raw_vendor_name)
+    if not normalized:
+        return
+
+    # Don't alias if the raw name is the same as the vendor name
+    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    if vendor and normalize_vendor_alias(vendor.name) == normalized:
+        return
+
+    try:
+        # Check if alias already exists for this normalized name
+        existing = db.query(VendorAlias).filter(
+            VendorAlias.alias_name_normalized == normalized,
+            VendorAlias.vendor_id == vendor_id
+        ).first()
+
+        if existing:
+            existing.match_count = (existing.match_count or 0) + 1
+            existing.last_used_at = datetime.now(timezone.utc)
+            logger.info(f"Updated existing alias: '{raw_vendor_name}' -> vendor {vendor_id} (match_count: {existing.match_count})")
+        else:
+            # Check if this name is aliased to a DIFFERENT vendor — update it
+            other_alias = db.query(VendorAlias).filter(
+                VendorAlias.alias_name_normalized == normalized
+            ).first()
+
+            if other_alias:
+                # User is correcting a previous alias — update to new vendor
+                old_vendor_id = other_alias.vendor_id
+                other_alias.vendor_id = vendor_id
+                other_alias.match_count = (other_alias.match_count or 0) + 1
+                other_alias.last_used_at = datetime.now(timezone.utc)
+                other_alias.source = 'manual_correction'
+                logger.info(f"Corrected alias: '{raw_vendor_name}' from vendor {old_vendor_id} -> vendor {vendor_id}")
+            else:
+                # Create new alias
+                new_alias = VendorAlias(
+                    alias_name=raw_vendor_name.strip(),
+                    alias_name_normalized=normalized,
+                    vendor_id=vendor_id,
+                    is_active=True,
+                    case_insensitive=True,
+                    source='manual_correction',
+                    confidence=1.0,
+                    match_count=1,
+                    last_used_at=datetime.now(timezone.utc),
+                    created_by='user'
+                )
+                db.add(new_alias)
+                logger.info(f"Created new alias: '{raw_vendor_name}' -> vendor {vendor_id}")
+    except Exception as e:
+        logger.warning(f"Failed to capture vendor alias: {str(e)}")
+        # Don't fail the invoice update over an alias error
+
+
 @app.patch("/api/invoices/{invoice_id}")
 async def update_invoice(
     invoice_id: int,
@@ -995,6 +1060,10 @@ async def update_invoice(
     data = await request.json()
 
     try:
+        # Capture original parsed vendor name BEFORE update (for alias learning)
+        original_vendor_name = invoice.vendor_name
+        original_vendor_id = invoice.vendor_id
+
         # Handle vendor update - either select existing or create new
         if "vendor_id" in data and data["vendor_id"]:
             # Selected existing vendor
@@ -1002,6 +1071,10 @@ async def update_invoice(
             if vendor:
                 invoice.vendor_id = vendor.id
                 invoice.vendor_name = vendor.name
+
+                # Learn alias if vendor changed and we have an original parsed name
+                if original_vendor_name and vendor.id != original_vendor_id:
+                    _capture_vendor_alias(db, original_vendor_name, vendor.id, logger)
             else:
                 raise HTTPException(status_code=404, detail="Vendor not found")
         elif "new_vendor_name" in data and data["new_vendor_name"]:
@@ -1015,6 +1088,10 @@ async def update_invoice(
             invoice.vendor_id = new_vendor.id
             invoice.vendor_name = new_vendor.name
             logger.info(f"Created new vendor: {new_vendor.name} (ID: {new_vendor.id})")
+
+            # Learn alias for the new vendor too
+            if original_vendor_name:
+                _capture_vendor_alias(db, original_vendor_name, new_vendor.id, logger)
 
         # Update fields if provided
         if "vendor_name" in data:
@@ -3160,6 +3237,165 @@ async def sync_vendors(db: Session = Depends(get_db)):
     return result
 
 
+# ============================================================================
+# VENDOR ALIAS MANAGEMENT
+# ============================================================================
+
+@app.get("/api/vendors/{vendor_id}/aliases")
+async def get_vendor_aliases(vendor_id: int, db: Session = Depends(get_db)):
+    """Get all aliases for a vendor"""
+    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    aliases = db.query(VendorAlias).filter(
+        VendorAlias.vendor_id == vendor_id,
+        VendorAlias.is_active == True
+    ).order_by(VendorAlias.match_count.desc()).all()
+
+    return {
+        "vendor_id": vendor_id,
+        "vendor_name": vendor.name,
+        "aliases": [
+            {
+                "id": a.id,
+                "alias_name": a.alias_name,
+                "alias_name_normalized": a.alias_name_normalized,
+                "source": a.source,
+                "confidence": a.confidence,
+                "match_count": a.match_count,
+                "last_used_at": a.last_used_at.isoformat() if a.last_used_at else None,
+                "created_by": a.created_by,
+                "created_at": a.created_at.isoformat() if a.created_at else None,
+            }
+            for a in aliases
+        ]
+    }
+
+
+@app.post("/api/vendors/{vendor_id}/aliases")
+async def create_vendor_alias(
+    vendor_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Manually add an alias for a vendor"""
+    from integration_hub.models.vendor_alias import normalize_vendor_alias
+    from datetime import datetime, timezone
+
+    vendor = db.query(Vendor).filter(Vendor.id == vendor_id).first()
+    if not vendor:
+        raise HTTPException(status_code=404, detail="Vendor not found")
+
+    data = await request.json()
+    alias_name = data.get("alias_name", "").strip()
+    if not alias_name:
+        raise HTTPException(status_code=400, detail="alias_name is required")
+
+    normalized = normalize_vendor_alias(alias_name)
+    if not normalized:
+        raise HTTPException(status_code=400, detail="alias_name normalizes to empty string")
+
+    # Check for existing alias with same normalized name
+    existing = db.query(VendorAlias).filter(
+        VendorAlias.alias_name_normalized == normalized
+    ).first()
+
+    if existing:
+        if existing.vendor_id == vendor_id:
+            raise HTTPException(status_code=409, detail=f"Alias '{alias_name}' already exists for this vendor")
+        else:
+            existing_vendor = db.query(Vendor).filter(Vendor.id == existing.vendor_id).first()
+            raise HTTPException(
+                status_code=409,
+                detail=f"Alias '{alias_name}' already mapped to vendor '{existing_vendor.name if existing_vendor else existing.vendor_id}'"
+            )
+
+    new_alias = VendorAlias(
+        alias_name=alias_name,
+        alias_name_normalized=normalized,
+        vendor_id=vendor_id,
+        is_active=True,
+        case_insensitive=True,
+        source='manual_entry',
+        confidence=1.0,
+        match_count=0,
+        created_by='user',
+        last_used_at=None,
+    )
+    db.add(new_alias)
+    db.commit()
+    db.refresh(new_alias)
+
+    return {
+        "success": True,
+        "alias": {
+            "id": new_alias.id,
+            "alias_name": new_alias.alias_name,
+            "vendor_id": new_alias.vendor_id,
+            "source": new_alias.source,
+        }
+    }
+
+
+@app.delete("/api/vendors/{vendor_id}/aliases/{alias_id}")
+async def delete_vendor_alias(
+    vendor_id: int,
+    alias_id: int,
+    db: Session = Depends(get_db)
+):
+    """Remove (deactivate) a vendor alias"""
+    alias = db.query(VendorAlias).filter(
+        VendorAlias.id == alias_id,
+        VendorAlias.vendor_id == vendor_id
+    ).first()
+
+    if not alias:
+        raise HTTPException(status_code=404, detail="Alias not found")
+
+    db.delete(alias)
+    db.commit()
+
+    return {"success": True, "message": f"Alias '{alias.alias_name}' deleted"}
+
+
+@app.get("/api/vendor-aliases/stats")
+async def get_vendor_alias_stats(db: Session = Depends(get_db)):
+    """Get vendor alias statistics — total count, by source, top matched"""
+    from sqlalchemy import func
+
+    total = db.query(func.count(VendorAlias.id)).filter(VendorAlias.is_active == True).scalar()
+
+    # Count by source
+    source_counts = db.query(
+        VendorAlias.source,
+        func.count(VendorAlias.id)
+    ).filter(VendorAlias.is_active == True).group_by(VendorAlias.source).all()
+
+    # Top 10 most matched aliases
+    top_aliases = db.query(VendorAlias).filter(
+        VendorAlias.is_active == True,
+        VendorAlias.match_count > 0
+    ).order_by(VendorAlias.match_count.desc()).limit(10).all()
+
+    return {
+        "total_aliases": total or 0,
+        "by_source": {source or "unknown": count for source, count in source_counts},
+        "top_matched": [
+            {
+                "id": a.id,
+                "alias_name": a.alias_name,
+                "vendor_id": a.vendor_id,
+                "vendor_name": a.vendor.name if a.vendor else None,
+                "match_count": a.match_count,
+                "last_used_at": a.last_used_at.isoformat() if a.last_used_at else None,
+                "source": a.source,
+            }
+            for a in top_aliases
+        ]
+    }
+
+
 @app.get("/vendors", response_class=HTMLResponse)
 async def vendors_page(request: Request, db: Session = Depends(get_db)):
     """Vendor management page - only show active vendors"""
@@ -3538,6 +3774,7 @@ async def merge_item_codes(
 
     # Get the correct description (from existing mapping or use provided)
     if not correct_description:
+        # Try item_code_mapping for the correct code
         result = db.execute(
             sql_text("SELECT canonical_description FROM item_code_mapping WHERE item_code = :code"),
             {"code": correct_code}
@@ -3545,7 +3782,7 @@ async def merge_item_codes(
         if result:
             correct_description = result[0]
         else:
-            # Get from the first wrong code
+            # Try item_code_mapping for the first wrong code
             result = db.execute(
                 sql_text("SELECT canonical_description FROM item_code_mapping WHERE item_code = :code"),
                 {"code": wrong_code_list[0]}
@@ -3553,7 +3790,17 @@ async def merge_item_codes(
             if result:
                 correct_description = result[0]
             else:
-                raise HTTPException(status_code=400, detail="Could not determine correct description")
+                # Fall back to description from invoice items (correct code first, then wrong code)
+                for lookup_code in [correct_code] + wrong_code_list:
+                    result = db.execute(
+                        sql_text("SELECT item_description FROM hub_invoice_items WHERE item_code = :code LIMIT 1"),
+                        {"code": lookup_code}
+                    ).fetchone()
+                    if result and result[0]:
+                        correct_description = result[0]
+                        break
+                if not correct_description:
+                    raise HTTPException(status_code=400, detail="Could not determine correct description. Please provide one in the Correct Description field.")
 
     # Update all invoice items with wrong codes
     items_updated = 0
@@ -3664,23 +3911,79 @@ async def update_item_code(
 @app.post("/api/item-codes/verify")
 async def verify_item_code(
     item_code: str = Form(...),
+    description: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     """Mark an item code as verified (confirmed correct)"""
     from sqlalchemy import text as sql_text
 
-    db.execute(
-        sql_text("""
-            UPDATE item_code_mapping
-            SET is_verified = true, updated_at = NOW()
-            WHERE item_code = :code
-        """),
+    # Check if the code already exists in item_code_mapping
+    existing = db.execute(
+        sql_text("SELECT id FROM item_code_mapping WHERE item_code = :code"),
         {"code": item_code}
-    )
+    ).fetchone()
+
+    if existing:
+        db.execute(
+            sql_text("""
+                UPDATE item_code_mapping
+                SET is_verified = true, updated_at = NOW()
+                WHERE item_code = :code
+            """),
+            {"code": item_code}
+        )
+    else:
+        # Insert new row with is_verified = true
+        db.execute(
+            sql_text("""
+                INSERT INTO item_code_mapping (item_code, canonical_description, occurrence_count, is_verified, created_at, updated_at)
+                VALUES (:code, :description, 1, true, NOW(), NOW())
+            """),
+            {"code": item_code, "description": description or item_code}
+        )
 
     db.commit()
 
-    return {"success": True, "item_code": item_code}
+    # Auto-map unmapped invoice items with this code if there's a SKU match
+    auto_mapped = 0
+    try:
+        from integration_hub.services.auto_mapper import AutoMapperService
+        mapper = AutoMapperService(db)
+
+        # Find all unmapped invoice items with this item_code
+        unmapped_items = db.query(HubInvoiceItem).filter(
+            HubInvoiceItem.item_code == item_code,
+            HubInvoiceItem.is_mapped == False
+        ).all()
+
+        if unmapped_items:
+            invoices_affected = set()
+            for item in unmapped_items:
+                # Get vendor_id and location_id from the invoice
+                invoice = db.query(HubInvoice).filter(HubInvoice.id == item.invoice_id).first()
+                if not invoice:
+                    continue
+                mapping_result = mapper.map_item(item, vendor_id=invoice.vendor_id, location_id=invoice.location_id)
+                if mapper.apply_mapping(item, mapping_result):
+                    auto_mapped += 1
+                    invoices_affected.add(item.invoice_id)
+
+            if auto_mapped > 0:
+                db.commit()
+                # Update status for affected invoices
+                try:
+                    from integration_hub.services.invoice_status import update_invoice_status
+                    for inv_id in invoices_affected:
+                        inv = db.query(HubInvoice).filter(HubInvoice.id == inv_id).first()
+                        if inv:
+                            update_invoice_status(inv, db)
+                    db.commit()
+                except Exception as e:
+                    logger.warning(f"Failed to update invoice statuses after auto-map: {e}")
+    except Exception as e:
+        logger.warning(f"Auto-map after verify failed: {e}")
+
+    return {"success": True, "item_code": item_code, "auto_mapped": auto_mapped}
 
 
 @app.post("/api/item-codes/fix")

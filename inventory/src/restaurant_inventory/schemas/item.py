@@ -21,7 +21,7 @@ class CountUnitSchema(BaseModel):
 class MasterItemBase(BaseModel):
     name: str
     description: Optional[str] = None
-    category: str
+    category: Optional[str] = None
     # Primary UoM from Hub (source of truth)
     primary_uom_id: Optional[int] = None      # Hub UoM ID
     primary_uom_name: Optional[str] = None    # Cached name for display

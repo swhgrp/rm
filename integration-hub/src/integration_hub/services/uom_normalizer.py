@@ -28,11 +28,12 @@ UOM_ALIAS_MAP = {
     'PIECE': 'ea',
     'PCS': 'ea',
     'UNIT': 'ea',
-    # Bottle variations → map to "each" (a bottle IS an individual unit)
+    # Bottle variations → map to "ea" (a bottle IS an individual unit)
     'BTL': 'ea',
     'BOTTLE': 'ea',
     'BTLS': 'ea',
     'BT': 'ea',
+    'BO': 'ea',
     # Weight
     'LB': 'lb',
     'LBS': 'lb',

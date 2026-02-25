@@ -604,6 +604,7 @@
 <script>
 const employeeId = {{ employee_id }};
 const actionId = {{ action_id if action_id else 'null' }};
+const isAdmin = {{ 'true' if current_user.is_admin else 'false' }};
 let formStatus = 'draft';
 
 // Initialize signature pads
@@ -694,11 +695,9 @@ async function loadEmployee() {
 
 async function loadLocations() {
     try {
-        // Try to get all locations first (for admins), then fall back to user's accessible locations
-        let response = await fetch('/hr/api/locations/all', { credentials: 'include' });
-        if (!response.ok) {
-            response = await fetch('/hr/api/locations', { credentials: 'include' });
-        }
+        // Admins see all locations; non-admins see only their assigned locations
+        const url = isAdmin ? '/hr/api/locations/all' : '/hr/api/locations';
+        const response = await fetch(url, { credentials: 'include' });
         if (response.ok) {
             const locations = await response.json();
             const select = document.getElementById('locationId');
@@ -708,6 +707,10 @@ async function loadLocations() {
                 option.textContent = loc.name;
                 select.appendChild(option);
             });
+            // Auto-select if only one location available
+            if (locations.length === 1) {
+                select.value = locations[0].id;
+            }
         }
     } catch (error) {
         console.error('Error loading locations:', error);

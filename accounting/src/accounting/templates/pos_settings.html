@@ -914,7 +914,8 @@ function updateSalesCachePagination(areaId) {
 async function loadCategoryMappings(areaId) {
     try {
         const response = await fetch(`/accounting/api/pos/category-mappings?area_id=${areaId}`, {
-            credentials: 'include'
+            credentials: 'include',
+            cache: 'no-store'
         });
 
         if (!response.ok) throw new Error('Failed to load mappings');
@@ -1021,13 +1022,14 @@ async function saveCategoryMapping() {
         }
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to save mapping');
+            const text = await response.text();
+            try { const err = JSON.parse(text); throw new Error(err.detail || 'Failed to save mapping'); }
+            catch (e) { if (e.message.includes('Failed to save')) throw e; throw new Error(`Server error (${response.status}). Please try again.`); }
         }
 
-        showNotification('Category mapping saved successfully!');
-        bootstrap.Modal.getInstance(document.getElementById('mappingModal')).hide();
+        bootstrap.Modal.getInstance(document.getElementById('mappingModal'))?.hide();
         await loadCategoryMappings(currentAreaId);
+        showNotification('Category mapping saved successfully!');
     } catch (error) {
         showNotification('Error saving mapping: ' + error.message);
     }
@@ -1046,8 +1048,8 @@ async function deleteMapping(id) {
 
         if (!response.ok) throw new Error('Failed to delete mapping');
 
-        showNotification('Mapping deleted successfully');
         await loadCategoryMappings(currentAreaId);
+        showNotification('Mapping deleted successfully');
     } catch (error) {
         showNotification('Error deleting mapping: ' + error.message);
     }
@@ -1242,7 +1244,8 @@ async function saveBulkMappings() {
 async function loadDiscountMappings(areaId) {
     try {
         const response = await fetch(`/accounting/api/pos/discount-mappings?area_id=${areaId}`, {
-            credentials: 'include'
+            credentials: 'include',
+            cache: 'no-store'
         });
 
         if (!response.ok) throw new Error('Failed to load discount mappings');
@@ -1252,7 +1255,7 @@ async function loadDiscountMappings(areaId) {
         const tbody = document.getElementById('discountMappingsBody');
         tbody.innerHTML = '';
 
-        if (discountMappings.length === 0) {
+        if (discountMappings.length === 0 && unmappedDiscounts.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No discount mappings configured</td></tr>';
             return;
         }
@@ -1357,13 +1360,14 @@ async function saveDiscountMapping() {
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to save mapping');
+            const text = await response.text();
+            try { const err = JSON.parse(text); throw new Error(err.detail || 'Failed to save mapping'); }
+            catch (e) { if (e.message.includes('Failed to save')) throw e; throw new Error(`Server error (${response.status}). Please try again.`); }
         }
 
-        showNotification('Discount mapping saved successfully');
-        bootstrap.Modal.getInstance(document.getElementById('discountMappingModal')).hide();
+        bootstrap.Modal.getInstance(document.getElementById('discountMappingModal'))?.hide();
         await loadDiscountMappings(currentAreaId);
+        showNotification('Discount mapping saved successfully');
     } catch (error) {
         showNotification('Error saving discount mapping: ' + error.message);
     }
@@ -1375,11 +1379,10 @@ async function editDiscountMapping(id) {
 
     document.getElementById('discountMappingId').value = mapping.id;
     document.getElementById('posDiscountName').value = mapping.pos_discount_name;
-    document.getElementById('discountAccountId').value = mapping.discount_account_id;
     document.getElementById('discountMappingIsActive').checked = mapping.is_active;
     document.getElementById('discountMappingModalTitle').textContent = 'Edit Discount Mapping';
 
-    // Populate account dropdown
+    // Populate account dropdown BEFORE setting value
     const select = document.getElementById('discountAccountId');
     select.innerHTML = '<option value="">-- Select Account --</option>';
     accounts
@@ -1387,6 +1390,7 @@ async function editDiscountMapping(id) {
         .forEach(account => {
             select.innerHTML += `<option value="${account.id}">${account.account_number} - ${account.account_name}</option>`;
         });
+    select.value = mapping.discount_account_id;
 
     const modal = new bootstrap.Modal(document.getElementById('discountMappingModal'));
     modal.show();
@@ -1403,8 +1407,8 @@ async function deleteDiscountMapping(id) {
 
         if (!response.ok) throw new Error('Failed to delete mapping');
 
-        showNotification('Discount mapping deleted successfully');
         await loadDiscountMappings(currentAreaId);
+        showNotification('Discount mapping deleted successfully');
     } catch (error) {
         showNotification('Error deleting discount mapping: ' + error.message);
     }
@@ -1417,7 +1421,8 @@ async function deleteDiscountMapping(id) {
 async function loadPaymentMappings(areaId) {
     try {
         const response = await fetch(`/accounting/api/pos/payment-mappings?area_id=${areaId}`, {
-            credentials: 'include'
+            credentials: 'include',
+            cache: 'no-store'
         });
 
         if (!response.ok) throw new Error('Failed to load payment mappings');
@@ -1427,7 +1432,7 @@ async function loadPaymentMappings(areaId) {
         const tbody = document.getElementById('paymentMappingsBody');
         tbody.innerHTML = '';
 
-        if (paymentMappings.length === 0) {
+        if (paymentMappings.length === 0 && unmappedPaymentTypes.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No payment mappings configured</td></tr>';
             return;
         }
@@ -1531,13 +1536,14 @@ async function savePaymentMapping() {
         });
 
         if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.detail || 'Failed to save mapping');
+            const text = await response.text();
+            try { const err = JSON.parse(text); throw new Error(err.detail || 'Failed to save mapping'); }
+            catch (e) { if (e.message.includes('Failed to save')) throw e; throw new Error(`Server error (${response.status}). Please try again.`); }
         }
 
-        showNotification('Payment mapping saved successfully');
-        bootstrap.Modal.getInstance(document.getElementById('paymentMappingModal')).hide();
+        bootstrap.Modal.getInstance(document.getElementById('paymentMappingModal'))?.hide();
         await loadPaymentMappings(currentAreaId);
+        showNotification('Payment mapping saved successfully');
     } catch (error) {
         showNotification('Error saving payment mapping: ' + error.message);
     }
@@ -1549,11 +1555,10 @@ async function editPaymentMapping(id) {
 
     document.getElementById('paymentMappingId').value = mapping.id;
     document.getElementById('posPaymentType').value = mapping.pos_payment_type;
-    document.getElementById('depositAccountId').value = mapping.deposit_account_id;
     document.getElementById('paymentMappingIsActive').checked = mapping.is_active;
     document.getElementById('paymentMappingModalTitle').textContent = 'Edit Payment Mapping';
 
-    // Populate account dropdown
+    // Populate account dropdown BEFORE setting value
     const select = document.getElementById('depositAccountId');
     select.innerHTML = '<option value="">-- Select Account --</option>';
     accounts
@@ -1561,6 +1566,7 @@ async function editPaymentMapping(id) {
         .forEach(account => {
             select.innerHTML += `<option value="${account.id}">${account.account_number} - ${account.account_name}</option>`;
         });
+    select.value = mapping.deposit_account_id;
 
     const modal = new bootstrap.Modal(document.getElementById('paymentMappingModal'));
     modal.show();
@@ -1577,8 +1583,8 @@ async function deletePaymentMapping(id) {
 
         if (!response.ok) throw new Error('Failed to delete mapping');
 
-        showNotification('Payment mapping deleted successfully');
         await loadPaymentMappings(currentAreaId);
+        showNotification('Payment mapping deleted successfully');
     } catch (error) {
         showNotification('Error deleting payment mapping: ' + error.message);
     }

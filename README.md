@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** February 14, 2026
+**Last Updated:** February 25, 2026
 **Status:** ~98% Complete - All 10 Systems Production Ready ✅
-**Latest:** Food Safety incident edit/upload/reporter names, HR required documents bug fix & missing docs tracking (Feb 14, 2026) ✅
+**Latest:** HR location-based employee filtering fix, toggle switch UI for location assignments across HR/Inventory/Events (Feb 25, 2026) ✅
 
 ---
 
@@ -31,7 +31,7 @@
 
 The SW Hospitality Group Restaurant Management System is a comprehensive microservices platform handling all aspects of restaurant operations including inventory management, human resources, accounting, event planning, and third-party integrations.
 
-### Key Statistics (Verified Feb 14, 2026)
+### Key Statistics (Verified Feb 25, 2026)
 - **10 microservices** running in production (including Maintenance & Food Safety)
 - **490+ Python files** across all systems
 - **170+ HTML templates** for user interfaces
@@ -450,6 +450,8 @@ restaurant-system/
 - ✅ Missing docs badge on employees list ("Docs & Certs" column)
 - ✅ Document upload with 10MB file size validation (client-side alert + server-side check)
 - ✅ Hire date admin-only editing (readonly for non-admins, preserved across all updates)
+- ✅ **Location-based employee filtering** - Non-admin users only see employees at their assigned locations (Feb 25, 2026) 🌟
+- ✅ **Toggle switch UI** for location assignments in user management (Feb 25, 2026) 🌟
 - ✅ Role-based access control (Admin, Manager, Employee)
 - ✅ Email settings management
 - ✅ **E-Signature Templates** - Visual field editor for PDF signature placement
@@ -1311,7 +1313,7 @@ docker compose exec inventory-db psql -U inventory_user -d inventory_db -c "\l+"
 - **Hub provides:** Vendor items, pricing, invoices, GL mappings, UOM, Categories (source of truth)
 - **Inventory provides:** Master items, count units, location costs, locations
 - **Location-aware costing:** Hub updates `MasterItemLocationCost` when invoices are processed
-- **UOM pricing:** `price_is_per_unit` flag on invoice items ensures correct per-unit vs per-case cost calculation
+- **Multi-UOM pricing:** `matched_uom_id` links invoice items to vendor UOMs with conversion factors; legacy `price_is_per_unit` flag as fallback
 - **Location sync:** Accounting fetches locations from Inventory via `/_sync` endpoint
 - **Note:** Hub is authoritative for vendor/pricing data; Inventory owns item costs and locations
 

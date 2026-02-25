@@ -596,9 +596,10 @@ class InvoiceParser:
 
         vendor_name = vendor_name.strip()
 
-        # 1. Check vendor aliases first - this handles known variations
-        from integration_hub.models.vendor_alias import VendorAlias
-        normalized = vendor_name.lower().strip()
+        # 1. Check vendor aliases first - this handles known variations and learned corrections
+        from integration_hub.models.vendor_alias import VendorAlias, normalize_vendor_alias
+        from datetime import datetime, timezone
+        normalized = normalize_vendor_alias(vendor_name)
         alias = db.query(VendorAlias).filter(
             VendorAlias.alias_name_normalized == normalized,
             VendorAlias.is_active == True
@@ -607,7 +608,14 @@ class InvoiceParser:
         if alias:
             vendor = db.query(Vendor).filter(Vendor.id == alias.vendor_id).first()
             if vendor:
-                logger.info(f"Vendor alias match: '{vendor_name}' -> '{vendor.name}' (ID: {vendor.id})")
+                # Track usage for learning analytics
+                alias.match_count = (alias.match_count or 0) + 1
+                alias.last_used_at = datetime.now(timezone.utc)
+                try:
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                logger.info(f"Vendor alias match: '{vendor_name}' -> '{vendor.name}' (ID: {vendor.id}, match_count: {alias.match_count})")
                 return vendor
 
         # 2. Exact match (case insensitive)
@@ -1376,6 +1384,105 @@ class InvoiceParser:
 
         if not invoice.pdf_path:
             return {"success": False, "message": "Invoice has no PDF file"}
+
+        # If the file is a CSV, delegate to the CSV parser
+        if invoice.pdf_path.lower().endswith('.csv'):
+            logger.info(f"Invoice {invoice_id} has CSV file — using CSV parser")
+            from integration_hub.services.csv_invoice_parser import CSVInvoiceParser
+            csv_parser = CSVInvoiceParser(db)
+            return csv_parser.process_hub_invoice(invoice_id)
+
+        # For PDF invoices, check if a CSV file exists for the same invoice
+        # CSV data is always preferred over PDF (structured vs OCR)
+        if invoice.invoice_number:
+            inv_num_stripped = invoice.invoice_number.lstrip('0') or '0'
+
+            # Find any CSV invoice record that might contain this invoice number
+            csv_siblings = db.query(HubInvoice).filter(
+                HubInvoice.id != invoice_id,
+                HubInvoice.source_filename.ilike('%.csv'),
+                HubInvoice.pdf_path.ilike('%.csv'),
+            ).all()
+
+            for csv_sib in csv_siblings:
+                if not csv_sib.pdf_path:
+                    continue
+                try:
+                    # Parse the CSV file directly to find matching invoice data
+                    from integration_hub.services.csv_invoice_parser import CSVInvoiceParser
+                    csv_parser = CSVInvoiceParser(db)
+                    csv_result = csv_parser.parse_csv_file(csv_sib.pdf_path)
+
+                    if not csv_result.get('success') or not csv_result.get('invoices'):
+                        continue
+
+                    # Find the invoice in the CSV that matches our invoice number
+                    matching_inv = None
+                    for inv_data in csv_result['invoices']:
+                        csv_inv_num = (inv_data.get('invoice_number') or '').lstrip('0') or '0'
+                        if csv_inv_num == inv_num_stripped:
+                            matching_inv = inv_data
+                            break
+
+                    if not matching_inv or not matching_inv.get('items'):
+                        continue
+
+                    logger.info(f"Invoice {invoice_id} (PDF) found CSV data in file {csv_sib.source_filename} "
+                                f"— {len(matching_inv['items'])} items")
+
+                    # Delete existing items on this invoice
+                    db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).delete()
+
+                    # Create items from CSV data
+                    for line_num, item in enumerate(matching_inv['items'], 1):
+                        new_item = HubInvoiceItem(
+                            invoice_id=invoice_id,
+                            line_number=line_num,
+                            item_description=item['description'],
+                            item_code=item['product_number'],
+                            quantity=item['quantity'],
+                            unit_of_measure=item['unit_of_measure'],
+                            pack_size=item.get('pack_size'),
+                            unit_price=item['unit_price'],
+                            total_amount=item['total'],
+                            is_mapped=False,
+                            notes=f"UPC: {item['upc']}" if item.get('upc') else None,
+                        )
+                        db.add(new_item)
+
+                    # Update header fields from CSV if better
+                    if matching_inv.get('total_amount'):
+                        invoice.total_amount = matching_inv['total_amount']
+                    if matching_inv.get('location_id') and not invoice.location_id:
+                        invoice.location_id = matching_inv['location_id']
+                        invoice.location_name = matching_inv.get('location_name')
+
+                    invoice.status = 'mapping'
+                    db.commit()
+
+                    # Mark the CSV sibling as duplicate
+                    if csv_sib.status not in ('sent', 'duplicate'):
+                        csv_sib.status = 'duplicate'
+                        db.commit()
+
+                    # Auto-map items
+                    try:
+                        from integration_hub.services.auto_mapper import get_auto_mapper
+                        mapper = get_auto_mapper()
+                        mapping_result = mapper.map_invoice_items(invoice_id, db)
+                        logger.info(f"Auto-mapped CSV-sourced items for invoice {invoice_id}: {mapping_result}")
+                    except Exception as e:
+                        logger.error(f"Error auto-mapping after CSV import: {e}")
+
+                    return {
+                        "success": True,
+                        "message": f"Parsed {len(matching_inv['items'])} items from CSV. CSV data preferred over PDF.",
+                        "items_count": len(matching_inv['items']),
+                        "source": "csv_sibling"
+                    }
+                except Exception as e:
+                    logger.warning(f"Error checking CSV sibling {csv_sib.id}: {e}")
+                    continue
 
         # Check if invoice already has items (prevent duplicate parsing)
         existing_items_count = db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).count()

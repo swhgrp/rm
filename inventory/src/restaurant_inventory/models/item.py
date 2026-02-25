@@ -37,7 +37,7 @@ class MasterItem(Base):
 
     # Category (references Hub.categories.id, cached name for display)
     category_id = Column(Integer, nullable=True, index=True)  # References Hub.categories.id
-    category = Column(String, nullable=False, index=True)  # Cached category name
+    category = Column(String, nullable=True, index=True)  # Cached category name (set by Hub on vendor item sync)
 
     # Primary UOM for this item (references Hub.units_of_measure.id)
     # This is cached - MasterItemCountUnit has the full list

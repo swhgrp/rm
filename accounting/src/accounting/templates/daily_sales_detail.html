@@ -53,7 +53,8 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h2 class="mb-0">Daily Sales Entry</h2>
-                    <div id="statusBadge" class="mt-2"></div>
+                    <div id="locationBadge" class="text-muted mt-1" style="display: none;"></div>
+                    <div id="statusBadge" class="mt-1"></div>
                 </div>
                 <div>
                     <button class="btn btn-secondary" onclick="window.location.href='/accounting/daily-sales'">
@@ -539,6 +540,14 @@ async function loadDSS(id) {
         document.getElementById('businessDate').value = dss.business_date;
         document.getElementById('areaId').value = dss.area_id;
         document.getElementById('posSystem').value = dss.pos_system || '';
+
+        // Show location and date in header
+        const area = areas.find(a => a.id === dss.area_id);
+        if (area) {
+            const locBadge = document.getElementById('locationBadge');
+            locBadge.innerHTML = `<i class="bi bi-geo-alt"></i> <strong>${area.name}</strong> &mdash; ${dss.business_date}`;
+            locBadge.style.display = 'block';
+        }
         document.getElementById('discounts').value = dss.discounts;
         document.getElementById('refunds').value = dss.refunds;
         document.getElementById('taxCollected').value = dss.tax_collected;
@@ -547,6 +556,14 @@ async function loadDSS(id) {
         // Load line items - convert from category_breakdown if no line_items exist
         if (dss.line_items && dss.line_items.length > 0) {
             categoryLines = dss.line_items;
+            // Apply category mappings to any lines missing a GL account
+            if (Object.keys(categoryMappings).length > 0) {
+                categoryLines.forEach(line => {
+                    if (!line.revenue_account_id && categoryMappings[line.category]) {
+                        line.revenue_account_id = categoryMappings[line.category];
+                    }
+                });
+            }
         } else if (dss.category_breakdown) {
             // Convert category_breakdown object to line items
             categoryLines = [];
@@ -570,6 +587,13 @@ async function loadDSS(id) {
         // Load payments - convert from payment_breakdown if no payments exist
         if (dss.payments && dss.payments.length > 0) {
             paymentLines = dss.payments;
+            // Apply payment mappings (mapping is authoritative source for deposit accounts)
+            if (Object.keys(paymentMappings).length > 0) {
+                paymentLines.forEach(line => {
+                    const mapped = paymentMappings[line.payment_type] || paymentMappings[line.payment_type?.toUpperCase()];
+                    if (mapped) line.deposit_account_id = mapped;
+                });
+            }
         } else if (dss.payment_breakdown) {
             // Convert payment_breakdown object to payment lines
             paymentLines = [];

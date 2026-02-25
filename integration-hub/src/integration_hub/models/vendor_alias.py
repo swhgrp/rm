@@ -5,17 +5,39 @@ Maps various vendor name variations (from OCR, different invoice formats, etc.)
 to a canonical vendor in the Hub vendors table. This is now the source of truth
 for vendor name normalization.
 
+Supports persistent learning: when a user manually corrects a vendor match,
+the raw OCR name is stored as an alias so future invoices auto-match.
+
 Examples:
 - "Gordon Food Service Inc." -> Gordon Food Service (vendor_id=5)
-- "Gordon Food Service, Inc." -> Gordon Food Service (vendor_id=5)
-- "GORDON FOOD SERVICE, INC." -> Gordon Food Service (vendor_id=5)
-- "GFS" -> Gordon Food Service (vendor_id=5)
+- "SYSCO CHICAGO 847" -> Sysco (vendor_id=3) [learned from manual correction]
+- "GFS DISTRIB CTR" -> Gordon Food Service (vendor_id=5) [learned from OCR]
 """
 
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean
+import re
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from integration_hub.db.database import Base
+
+
+def normalize_vendor_alias(raw_name: str) -> str:
+    """
+    Normalize a vendor name for alias matching.
+    - Lowercase
+    - Strip leading/trailing whitespace
+    - Remove punctuation except hyphens
+    - Collapse multiple spaces to single space
+    - Preserve numbers (they distinguish locations like "SYSCO 847")
+    """
+    if not raw_name:
+        return ""
+    text = raw_name.lower().strip()
+    # Remove punctuation except hyphens and alphanumerics
+    text = re.sub(r'[^a-z0-9\s\-]', '', text)
+    # Collapse multiple spaces
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
 
 class VendorAlias(Base):
@@ -43,7 +65,14 @@ class VendorAlias(Base):
     case_insensitive = Column(Boolean, nullable=False, default=True)
 
     # Source tracking (where did this alias come from)
-    source = Column(String(50), nullable=True)  # 'manual', 'auto', 'migrated', 'ocr'
+    # Values: 'manual', 'manual_correction', 'auto_confirmed', 'manual_entry', 'migrated', 'ocr'
+    source = Column(String(50), nullable=True)
+
+    # Learning fields
+    confidence = Column(Float, nullable=False, default=1.0, server_default='1.0')
+    match_count = Column(Integer, nullable=False, default=1, server_default='1')
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+    created_by = Column(String(100), nullable=True)
 
     # Audit fields
     created_at = Column(DateTime(timezone=True), server_default=func.now())

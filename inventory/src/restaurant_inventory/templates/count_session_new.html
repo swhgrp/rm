@@ -231,47 +231,96 @@
 </div>
 
 <!-- Count Modal -->
-<div class="modal fade" id="countModal" tabindex="-1">
-    <div class="modal-dialog">
+<style>
+    .calc-keypad {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 4px;
+    }
+    .calc-btn {
+        height: 52px;
+        font-size: 1.25rem;
+        border-radius: 8px !important;
+        font-weight: 500;
+    }
+    #calcDisplay {
+        font-size: 2rem;
+        line-height: 1.2;
+        min-height: 2.4rem;
+        white-space: nowrap;
+        overflow: hidden;
+    }
+    @media (max-width: 575.98px) {
+        #countModal .modal-body {
+            display: flex;
+            flex-direction: column;
+        }
+        #countModal .calc-keypad {
+            margin-top: auto;
+        }
+    }
+</style>
+<div class="modal fade" id="countModal" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-fullscreen-sm-down modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title">Count Item</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div id="itemDetails" class="mb-3"></div>
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Quantity *</label>
-                    <div class="d-flex gap-2 mb-2">
-                        <button type="button" class="btn btn-outline-secondary" onclick="setQty(0.10)">0.10</button>
-                        <button type="button" class="btn btn-outline-secondary" onclick="setQty(0.25)">0.25</button>
-                        <button type="button" class="btn btn-outline-secondary" onclick="setQty(0.50)">0.50</button>
-                        <button type="button" class="btn btn-outline-secondary" onclick="setQty(0.75)">0.75</button>
-                        <button type="button" class="btn btn-outline-secondary" onclick="setQty(1.00)">1.00</button>
-                    </div>
-                    <div class="row g-2">
-                        <div class="col-8">
-                            <input type="number" class="form-control form-control-lg text-center" id="qtyInput"
-                                   step="0.01" min="0" inputmode="decimal" onchange="calcVariance()">
-                        </div>
-                        <div class="col-4">
-                            <select class="form-select form-select-lg" id="unitSelect" onchange="updateUnitDisplay()">
-                                <!-- Units will be populated dynamically -->
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div id="varianceAlert" class="alert" style="display: none;"></div>
-                <div class="mb-3">
-                    <label class="form-label">Notes</label>
-                    <textarea class="form-control" id="itemNotesInput" rows="2"></textarea>
+            <!-- Navigation header -->
+            <div class="modal-header bg-primary text-white py-2">
+                <div class="d-flex align-items-center w-100">
+                    <button type="button" class="btn btn-outline-light btn-sm border-0" id="prevItemBtn" onclick="prevItem()" disabled>
+                        <i class="bi bi-chevron-left"></i>
+                    </button>
+                    <span id="itemPosition" class="mx-auto small fw-bold"></span>
+                    <button type="button" class="btn btn-outline-light btn-sm border-0" id="nextItemBtn" onclick="nextItem()" disabled>
+                        <i class="bi bi-chevron-right"></i>
+                    </button>
+                    <button type="button" class="btn-close btn-close-white ms-2" data-bs-dismiss="modal"></button>
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success btn-lg" onclick="saveItemCount()">
-                    <i class="bi bi-check-lg"></i> Save
-                </button>
+
+            <div class="modal-body p-3">
+                <!-- Item details (compact) -->
+                <div id="itemDetails" class="mb-2"></div>
+
+                <!-- Calculator display -->
+                <div class="bg-light rounded-3 p-2 mb-2">
+                    <div id="calcExpressionDisplay" class="text-end text-muted small px-1" style="min-height: 1.2em;"></div>
+                    <div class="text-end font-monospace fw-bold px-1" id="calcDisplay">0</div>
+                </div>
+                <div class="mb-2">
+                    <select class="form-select form-select-sm" id="unitSelect" onchange="updateUnitDisplay()">
+                    </select>
+                </div>
+
+                <div id="varianceAlert" class="alert py-1 px-2 small" style="display: none;"></div>
+
+                <!-- Notes (collapsed by default) -->
+                <div id="notesSection" style="display: none;" class="mb-2">
+                    <textarea class="form-control" id="itemNotesInput" rows="2" placeholder="Add notes..."></textarea>
+                </div>
+
+                <!-- Calculator keypad -->
+                <div class="calc-keypad">
+                    <button type="button" class="btn btn-secondary calc-btn" onclick="calcPress('AC')">AC</button>
+                    <button type="button" class="btn btn-outline-secondary calc-btn" onclick="calcPress('÷')">÷</button>
+                    <button type="button" class="btn btn-outline-secondary calc-btn" onclick="calcPress('×')">×</button>
+                    <button type="button" class="btn btn-outline-secondary calc-btn" onclick="calcPress('⌫')"><i class="bi bi-backspace"></i></button>
+                    <button type="button" class="btn btn-outline-dark calc-btn" onclick="calcPress('7')">7</button>
+                    <button type="button" class="btn btn-outline-dark calc-btn" onclick="calcPress('8')">8</button>
+                    <button type="button" class="btn btn-outline-dark calc-btn" onclick="calcPress('9')">9</button>
+                    <button type="button" class="btn btn-outline-secondary calc-btn" onclick="calcPress('−')">−</button>
+                    <button type="button" class="btn btn-outline-dark calc-btn" onclick="calcPress('4')">4</button>
+                    <button type="button" class="btn btn-outline-dark calc-btn" onclick="calcPress('5')">5</button>
+                    <button type="button" class="btn btn-outline-dark calc-btn" onclick="calcPress('6')">6</button>
+                    <button type="button" class="btn btn-outline-secondary calc-btn" onclick="calcPress('+')">+</button>
+                    <button type="button" class="btn btn-outline-dark calc-btn" onclick="calcPress('1')">1</button>
+                    <button type="button" class="btn btn-outline-dark calc-btn" onclick="calcPress('2')">2</button>
+                    <button type="button" class="btn btn-outline-dark calc-btn" onclick="calcPress('3')">3</button>
+                    <button type="button" class="btn btn-outline-primary calc-btn" onclick="toggleNotes()"><i class="bi bi-chat-text"></i></button>
+                    <button type="button" class="btn btn-outline-dark calc-btn" onclick="calcPress('0')">0</button>
+                    <button type="button" class="btn btn-outline-dark calc-btn" onclick="calcPress('.')">.</button>
+                    <button type="button" class="btn btn-secondary calc-btn" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i></button>
+                    <button type="button" class="btn btn-success calc-btn fw-bold" onclick="saveItemCount()"><i class="bi bi-check-lg"></i></button>
+                </div>
             </div>
         </div>
     </div>
@@ -348,6 +397,8 @@ let allItems = [];
 let sessionItems = {}; // Keyed by storage_area_id
 let currentStorageAreaId = null;
 let currentItem = null;
+let currentItemIndex = -1;
+let calcExpression = '';
 let countModal = null;
 let createItemModal = null;
 let searchTimeout = null;
@@ -798,22 +849,29 @@ function openCountModal(itemId) {
 
     currentItem = item;
 
+    // Track position in the storage area's item list
+    const areaItems = sessionItems[currentStorageAreaId] || [];
+    currentItemIndex = areaItems.findIndex(si => si.master_item_id === itemId);
+
     // Check if already counted in this area
-    const existing = sessionItems[currentStorageAreaId]?.find(si => si.master_item_id === itemId);
+    const existing = areaItems.find(si => si.master_item_id === itemId);
 
     const expectedQty = existing?.expected_quantity ? parseFloat(existing.expected_quantity) : 0;
     const itemUnit = item.unit_of_measure || 'Each';
-    const expectedHtml = expectedQty > 0 ? `
-        <div class="alert alert-info mb-3">
-            <i class="bi bi-info-circle"></i> Expected Quantity: <strong>${expectedQty.toFixed(2)} ${itemUnit}</strong>
-        </div>
-    ` : '';
+    const isCounted = existing?.counted_quantity !== null && existing?.counted_quantity !== undefined;
+    const statusBadge = isCounted
+        ? `<span class="badge bg-success">Counted: ${parseFloat(existing.counted_quantity).toFixed(2)}</span>`
+        : '<span class="badge bg-warning text-dark">Not counted</span>';
 
     document.getElementById('itemDetails').innerHTML = `
-        <h5>${item.name}</h5>
-        <p class="mb-1"><strong>Category:</strong> ${item.category || 'N/A'}</p>
-        <p class="mb-0"><strong>Base Unit:</strong> ${itemUnit}</p>
-        ${expectedHtml}
+        <div class="d-flex justify-content-between align-items-start">
+            <div>
+                <div class="fw-bold">${item.name}</div>
+                <small class="text-muted">${item.category || 'N/A'}</small>
+            </div>
+            ${statusBadge}
+        </div>
+        ${expectedQty > 0 ? `<small class="text-info"><i class="bi bi-info-circle"></i> Expected: ${expectedQty.toFixed(2)} ${itemUnit}</small>` : ''}
     `;
 
     // Populate unit selector with ONLY the count units defined for this item
@@ -859,15 +917,55 @@ function openCountModal(itemId) {
         unitSelect.classList.remove('bg-light');
     }
 
-    document.getElementById('qtyInput').value = existing?.counted_quantity !== null && existing?.counted_quantity !== undefined ? existing.counted_quantity : '';
+    // Initialize calculator display
+    if (existing?.counted_quantity !== null && existing?.counted_quantity !== undefined) {
+        calcExpression = String(parseFloat(existing.counted_quantity));
+    } else {
+        calcExpression = '';
+    }
+    updateCalcDisplay();
+
+    // Notes
     document.getElementById('itemNotesInput').value = existing ? (existing.notes || '') : '';
+    document.getElementById('notesSection').style.display = (existing?.notes) ? 'block' : 'none';
+
+    // Update position indicator and nav buttons
+    updateItemPosition();
 
     if (!countModal) {
         countModal = new bootstrap.Modal(document.getElementById('countModal'));
     }
     countModal.show();
+}
 
-    setTimeout(() => document.getElementById('qtyInput').focus(), 300);
+function updateItemPosition() {
+    const items = sessionItems[currentStorageAreaId] || [];
+    const posEl = document.getElementById('itemPosition');
+    const prevBtn = document.getElementById('prevItemBtn');
+    const nextBtn = document.getElementById('nextItemBtn');
+
+    if (posEl && currentItemIndex >= 0) {
+        posEl.textContent = `(${currentItemIndex + 1} of ${items.length})`;
+    } else if (posEl) {
+        posEl.textContent = '';
+    }
+
+    if (prevBtn) prevBtn.disabled = currentItemIndex <= 0;
+    if (nextBtn) nextBtn.disabled = currentItemIndex < 0 || currentItemIndex >= items.length - 1;
+}
+
+function nextItem() {
+    const items = sessionItems[currentStorageAreaId] || [];
+    if (currentItemIndex >= 0 && currentItemIndex < items.length - 1) {
+        openCountModal(items[currentItemIndex + 1].master_item_id);
+    }
+}
+
+function prevItem() {
+    const items = sessionItems[currentStorageAreaId] || [];
+    if (currentItemIndex > 0) {
+        openCountModal(items[currentItemIndex - 1].master_item_id);
+    }
 }
 
 function updateUnitDisplay() {
@@ -876,41 +974,131 @@ function updateUnitDisplay() {
     calcVariance();
 }
 
-function adjustQty(delta) {
-    const input = document.getElementById('qtyInput');
-    const current = parseFloat(input.value) || 0;
-    input.value = (current + delta).toFixed(2);
-    calcVariance();
+// --- Calculator functions ---
+function calcPress(key) {
+    if (key === 'AC') {
+        calcExpression = '';
+    } else if (key === '⌫') {
+        // Remove last character (trim trailing space from operators)
+        calcExpression = calcExpression.replace(/\s*.$/, '');
+    } else if ('0123456789'.includes(key)) {
+        calcExpression += key;
+    } else if (key === '.') {
+        // Prevent multiple decimals in the current number
+        const parts = calcExpression.split(/[+\-×÷]/);
+        const currentNum = parts[parts.length - 1];
+        if (!currentNum.includes('.')) {
+            calcExpression += '.';
+        }
+    } else if (['+', '−', '×', '÷'].includes(key)) {
+        // Don't allow operator at start (except minus for negative)
+        if (calcExpression === '' && key !== '−') return;
+        // Replace consecutive operator
+        if (/[+\-×÷]\s*$/.test(calcExpression)) {
+            calcExpression = calcExpression.replace(/\s*[+\-×÷]\s*$/, '');
+        }
+        calcExpression += ' ' + key + ' ';
+    }
+
+    updateCalcDisplay();
 }
 
-function setQty(value) {
-    document.getElementById('qtyInput').value = value.toFixed(2);
-    calcVariance();
+function evaluateExpression(expr) {
+    if (!expr || !expr.trim()) return 0;
+    // Replace display operators with JS operators
+    let jsExpr = expr.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-');
+    // Remove trailing operator
+    jsExpr = jsExpr.replace(/\s*[+\-*/]\s*$/, '');
+    // Tokenize: numbers and operators
+    const tokens = jsExpr.match(/-?\d+\.?\d*|[+\-*/]/g);
+    if (!tokens) return 0;
+
+    // Parse into values and ops
+    const values = [parseFloat(tokens[0])];
+    const ops = [];
+    for (let i = 1; i < tokens.length; i += 2) {
+        if (i + 1 >= tokens.length) break;
+        const op = tokens[i];
+        const val = parseFloat(tokens[i + 1]);
+        if (isNaN(val)) break;
+        // Handle * and / first (operator precedence)
+        if (op === '*' || op === '/') {
+            const prev = values.pop();
+            values.push(op === '*' ? prev * val : (val !== 0 ? prev / val : 0));
+        } else {
+            ops.push(op);
+            values.push(val);
+        }
+    }
+
+    // Then handle + and -
+    let result = values[0];
+    for (let i = 0; i < ops.length; i++) {
+        result = ops[i] === '+' ? result + values[i + 1] : result - values[i + 1];
+    }
+
+    return isFinite(result) ? result : 0;
+}
+
+function updateCalcDisplay() {
+    const display = document.getElementById('calcDisplay');
+    const exprDisplay = document.getElementById('calcExpressionDisplay');
+
+    if (!calcExpression) {
+        display.textContent = '0';
+        exprDisplay.textContent = '';
+        return;
+    }
+
+    // If expression has an operator, show expression above and result below
+    if (/[+\-×÷]/.test(calcExpression)) {
+        exprDisplay.textContent = calcExpression;
+        const result = evaluateExpression(calcExpression);
+        display.textContent = '= ' + result.toFixed(2);
+    } else {
+        exprDisplay.textContent = '';
+        display.textContent = calcExpression;
+    }
+}
+
+function getCalcValue() {
+    if (!calcExpression) return 0;
+    return evaluateExpression(calcExpression);
+}
+
+function toggleNotes() {
+    const section = document.getElementById('notesSection');
+    if (section.style.display === 'none') {
+        section.style.display = 'block';
+        document.getElementById('itemNotesInput').focus();
+    } else {
+        section.style.display = 'none';
+    }
 }
 
 function calcVariance() {
-    // Validate the input
-    const input = document.getElementById('qtyInput');
-    const qty = parseFloat(input.value);
-    const alert = document.getElementById('varianceAlert');
-
+    const qty = getCalcValue();
+    const alertEl = document.getElementById('varianceAlert');
     if (qty < 0) {
-        alert.style.display = 'block';
-        alert.className = 'alert alert-danger';
-        alert.textContent = 'Quantity cannot be negative';
-        input.value = 0;
+        alertEl.style.display = 'block';
+        alertEl.className = 'alert alert-danger py-1 px-2 small';
+        alertEl.textContent = 'Quantity cannot be negative';
     } else {
-        alert.style.display = 'none';
+        alertEl.style.display = 'none';
     }
 }
 
 async function saveItemCount() {
-    const qty = parseFloat(document.getElementById('qtyInput').value);
+    const qty = getCalcValue();
     const selectedUnit = document.getElementById('unitSelect').value;
     const notes = document.getElementById('itemNotesInput').value;
 
     if (isNaN(qty) || qty < 0) {
         showAlert('Please enter a valid quantity', 'warning');
+        return;
+    }
+    if (!calcExpression) {
+        showAlert('Please enter a quantity', 'warning');
         return;
     }
 
@@ -991,10 +1179,25 @@ async function saveItemCount() {
             });
         }
 
-        countModal.hide();
         displayItems();
         clearSearch();
-        showAlert(`Count saved (${qty} ${selectedUnit} = ${convertedQty.toFixed(2)} ${baseUnit})`, 'success');
+
+        // Auto-advance to the next item in the list
+        const areaItems = sessionItems[currentStorageAreaId] || [];
+        const savedIndex = currentItemIndex;
+        if (savedIndex >= 0 && savedIndex < areaItems.length - 1) {
+            // Advance to next item
+            showAlert(`Saved: ${qty} ${selectedUnit} = ${convertedQty.toFixed(2)} ${baseUnit}`, 'success');
+            openCountModal(areaItems[savedIndex + 1].master_item_id);
+        } else {
+            // Last item or item not in list — close the modal
+            countModal.hide();
+            if (savedIndex >= 0) {
+                showAlert('All items in this area counted!', 'success');
+            } else {
+                showAlert(`Count saved (${qty} ${selectedUnit} = ${convertedQty.toFixed(2)} ${baseUnit})`, 'success');
+            }
+        }
     } catch (error) {
         showAlert('Error saving count: ' + error.message, 'danger');
     }
@@ -1431,6 +1634,23 @@ async function toggleAreaFinished() {
         showAlert('Error updating area status: ' + error.message, 'danger');
     }
 }
+
+// Keyboard support for calculator when modal is open
+document.addEventListener('keydown', function(e) {
+    if (!countModal || !document.getElementById('countModal').classList.contains('show')) return;
+    // Don't capture when typing in notes
+    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+    if (e.key >= '0' && e.key <= '9') { e.preventDefault(); calcPress(e.key); }
+    else if (e.key === '.') { e.preventDefault(); calcPress('.'); }
+    else if (e.key === '+') { e.preventDefault(); calcPress('+'); }
+    else if (e.key === '-') { e.preventDefault(); calcPress('−'); }
+    else if (e.key === '*') { e.preventDefault(); calcPress('×'); }
+    else if (e.key === '/') { e.preventDefault(); calcPress('÷'); }
+    else if (e.key === 'Backspace') { e.preventDefault(); calcPress('⌫'); }
+    else if (e.key === 'Delete') { e.preventDefault(); calcPress('AC'); }
+    else if (e.key === 'Enter') { e.preventDefault(); saveItemCount(); }
+});
 
 console.log('=== Setting up DOMContentLoaded listener ===');
 document.addEventListener('DOMContentLoaded', function() {

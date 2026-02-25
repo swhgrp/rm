@@ -216,6 +216,42 @@ async def add_template_item(
     return item
 
 
+@router.delete("/templates/{template_id}")
+async def delete_template(
+    template_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete a checklist template. Soft-deletes if submissions exist, hard-deletes otherwise."""
+    query = select(ChecklistTemplate).where(ChecklistTemplate.id == template_id)
+    result = await db.execute(query)
+    template = result.scalar_one_or_none()
+
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    # Check for existing submissions
+    sub_count = await db.execute(
+        select(func.count(ChecklistSubmission.id)).where(
+            ChecklistSubmission.template_id == template_id
+        )
+    )
+    has_submissions = sub_count.scalar() > 0
+
+    if has_submissions:
+        # Soft delete — preserve submission history
+        template.is_active = False
+        template.updated_at = get_now()
+        await db.commit()
+        logger.info(f"Soft-deleted template {template_id} (has submissions)")
+        return {"message": "Template deactivated (has existing submissions)", "soft_deleted": True}
+    else:
+        # Hard delete — no submissions to preserve
+        await db.delete(template)
+        await db.commit()
+        logger.info(f"Hard-deleted template {template_id}")
+        return {"message": "Template deleted", "soft_deleted": False}
+
+
 @router.delete("/templates/{template_id}/items/{item_id}")
 async def delete_template_item(
     template_id: int,

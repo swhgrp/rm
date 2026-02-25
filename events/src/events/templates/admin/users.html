@@ -169,7 +169,7 @@
                     <span class="text-muted small" id="venueModalUserEmail"></span>
                 </p>
 
-                <div id="venueCheckboxes">
+                <div id="venueCheckboxes" style="display: flex; flex-direction: column; gap: 6px;">
                     <div class="text-center py-3">
                         <div class="spinner-border spinner-border-sm" role="status"></div>
                         Loading venues...
@@ -270,6 +270,35 @@
 .venue-checkbox-item:hover {
     background-color: var(--hover-color, #3d3d3d);
 }
+
+/* Venue toggle switches */
+.loc-toggle-evt {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; border-radius: 8px;
+    background: #f8f9fa; border: 1px solid #dee2e6;
+    cursor: pointer; user-select: none;
+    transition: background 0.15s, border-color 0.15s;
+    position: relative; overflow: hidden;
+}
+.loc-toggle-evt:hover { background: #e9ecef; border-color: #adb5bd; }
+.loc-toggle-evt:has(input:checked) { background: #d1e7dd; border-color: #2ea043; }
+.loc-toggle-evt:has(input:disabled) { opacity: 0.6; cursor: default; }
+.loc-toggle-evt input { position: absolute; left: -9999px; opacity: 0; pointer-events: none; }
+.loc-toggle-evt .ttrack {
+    position: relative; flex-shrink: 0; width: 40px; min-width: 40px;
+    height: 22px; background: #adb5bd; border-radius: 11px; transition: background 0.2s;
+}
+.loc-toggle-evt input:checked + .ttrack { background: #2ea043; }
+.loc-toggle-evt input:disabled + .ttrack { background: #2ea043; }
+.loc-toggle-evt .tthumb {
+    position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+    background: #fff; border-radius: 50%; transition: transform 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.loc-toggle-evt input:checked + .ttrack .tthumb,
+.loc-toggle-evt input:disabled:checked + .ttrack .tthumb { transform: translateX(18px); }
+.loc-toggle-evt .tlabel { font-size: 14px; font-weight: 500; color: #212529; }
+.loc-toggle-evt .tlabel small { font-weight: 400; color: #6c757d; }
 </style>
 
 <script>
@@ -588,27 +617,21 @@ async function showVenueModal(userId) {
 
         const isAdmin = user.roles.some(r => r.code === 'admin');
 
-        // Render venue checkboxes
+        // Render venue toggles
         if (allVenues.length === 0) {
             document.getElementById('venueCheckboxes').innerHTML = '<p class="text-muted">No venues configured</p>';
         } else {
             document.getElementById('venueCheckboxes').innerHTML = allVenues.map(venue => `
-                <div class="venue-checkbox-item">
-                    <div class="form-check">
-                        <input
-                            class="form-check-input"
-                            type="checkbox"
-                            id="venue_${venue.id}"
-                            value="${venue.id}"
-                            ${assignedVenueIds.includes(venue.id) ? 'checked' : ''}
-                            ${isAdmin ? 'disabled' : ''}
-                        >
-                        <label class="form-check-label" for="venue_${venue.id}">
-                            <strong>${venue.name}</strong>
-                            ${venue.address ? `<br><small class="text-muted">${venue.address}</small>` : ''}
-                        </label>
-                    </div>
-                </div>
+                <label class="loc-toggle-evt">
+                    <input type="checkbox" value="${venue.id}"
+                        ${assignedVenueIds.includes(venue.id) ? 'checked' : ''}
+                        ${isAdmin ? 'disabled checked' : ''}>
+                    <span class="ttrack"><span class="tthumb"></span></span>
+                    <span class="tlabel">
+                        ${venue.name}
+                        ${venue.address ? `<br><small>${venue.address}</small>` : ''}
+                    </span>
+                </label>
             `).join('');
         }
 

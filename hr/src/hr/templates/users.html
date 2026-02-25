@@ -72,14 +72,12 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="location_ids">Assigned Locations</label>
-                    <div id="locationCheckboxContainer">
-                        <p class="location-hint">
-                            <em>Leave all unchecked to grant access to ALL locations</em>
-                        </p>
-                        <div id="locationCheckboxes">
-                            <!-- Checkboxes will be populated here -->
-                        </div>
+                    <label>Assigned Locations</label>
+                    <p class="location-hint">
+                        Leave all off to grant access to ALL locations
+                    </p>
+                    <div id="locationCheckboxes" class="location-toggles">
+                        <!-- Toggles will be populated here -->
                     </div>
                 </div>
 
@@ -108,14 +106,14 @@
         </div>
         <div class="modal-body">
             <input type="hidden" id="locationUserId">
-            <p style="margin-bottom: 1rem; color: #b0b0b0;">
-                Select locations for <strong id="locationUsername"></strong>:
+            <p style="margin-bottom: 0.75rem; color: var(--text-secondary);">
+                Select locations for <strong id="locationUsername" style="color: var(--text-primary);"></strong>:
             </p>
-            <p style="margin-bottom: 1rem; color: #999; font-size: 0.9rem;">
-                <em>Leave all unchecked to grant access to ALL locations. Check specific locations to restrict access.</em>
+            <p class="location-hint" style="margin-bottom: 1rem;">
+                Leave all off to grant access to ALL locations. Toggle on specific locations to restrict access.
             </p>
-            <div id="locationCheckboxes" style="max-height: 400px; overflow-y: auto;">
-                <!-- Checkboxes will be populated here -->
+            <div id="locationModalToggles" class="location-toggles" style="max-height: 400px; overflow-y: auto;">
+                <!-- Toggles will be populated here -->
             </div>
         </div>
         <div class="modal-footer">
@@ -211,43 +209,22 @@ async function populateLocationCheckboxes(selectedLocationIds = []) {
 
     // If locations aren't loaded yet, load them now
     if (locations.length === 0) {
-        container.innerHTML = '<p style="color: #8b949e; font-size: 13px;">Loading locations...</p>';
+        container.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">Loading locations...</p>';
         await loadLocations();
     }
-
-    console.log('Populating locations, count:', locations.length, 'selected:', selectedLocationIds);
 
     if (locations.length === 0) {
         container.innerHTML = '<p style="color: #f85149; font-size: 13px;">No locations available</p>';
         return;
     }
 
-    container.innerHTML = ''; // Clear loading message
-
-    locations.forEach(location => {
-        const div = document.createElement('div');
-        div.style.marginBottom = '0.5rem';
-
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = `location_${location.id}`;
-        checkbox.value = location.id;
-        checkbox.style.marginRight = '0.5rem';
-
-        if (selectedLocationIds.includes(location.id)) {
-            checkbox.checked = true;
-        }
-
-        const label = document.createElement('label');
-        label.htmlFor = `location_${location.id}`;
-        label.textContent = location.name;
-        label.style.cursor = 'pointer';
-        label.style.color = '#c9d1d9';
-
-        div.appendChild(checkbox);
-        div.appendChild(label);
-        container.appendChild(div);
-    });
+    container.innerHTML = locations.map(location => `
+        <label class="loc-toggle">
+            <input type="checkbox" value="${location.id}" ${selectedLocationIds.includes(location.id) ? 'checked' : ''}>
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">${location.name}</span>
+        </label>
+    `).join('');
 }
 
 async function loadUsers() {
@@ -474,21 +451,14 @@ async function manageLocations(userId, username) {
         console.error('Error loading user locations:', error);
     }
 
-    // Render location checkboxes
-    const checkboxContainer = document.getElementById('locationCheckboxes');
-    checkboxContainer.innerHTML = allLocations.map(location => `
-        <div style="margin-bottom: 0.75rem; padding: 0.5rem; background: #1a1a1a; border-radius: 4px;">
-            <label style="display: flex; align-items: center; cursor: pointer;">
-                <input type="checkbox"
-                       value="${location.id}"
-                       ${userLocationIds.includes(location.id) ? 'checked' : ''}
-                       style="margin-right: 0.75rem; width: 18px; height: 18px;">
-                <span style="color: #e0e0e0;">
-                    <strong>${location.name}</strong>
-                    ${location.city ? ` - ${location.city}, ${location.state || ''}` : ''}
-                </span>
-            </label>
-        </div>
+    // Render location toggles
+    const toggleContainer = document.getElementById('locationModalToggles');
+    toggleContainer.innerHTML = allLocations.map(location => `
+        <label class="loc-toggle">
+            <input type="checkbox" value="${location.id}" ${userLocationIds.includes(location.id) ? 'checked' : ''}>
+            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            <span class="toggle-label">${location.name}</span>
+        </label>
     `).join('');
 
     document.getElementById('locationModal').style.display = 'block';
@@ -500,7 +470,7 @@ function closeLocationModal() {
 
 async function saveUserLocations() {
     const userId = document.getElementById('locationUserId').value;
-    const checkboxes = document.querySelectorAll('#locationCheckboxes input[type="checkbox"]');
+    const checkboxes = document.querySelectorAll('#locationModalToggles input[type="checkbox"]');
     const selectedLocationIds = Array.from(checkboxes)
         .filter(cb => cb.checked)
         .map(cb => parseInt(cb.value));
@@ -674,25 +644,89 @@ initializePage();
         accent-color: var(--accent-primary);
     }
 
-    /* Location checkbox container */
-    #locationCheckboxContainer {
-        max-height: 150px;
-        overflow-y: auto;
-        border: 1px solid var(--border-primary);
-        border-radius: 6px;
-        padding: 12px;
-        background: var(--bg-primary);
-    }
+    /* Location hint text */
     .location-hint {
         color: var(--text-muted);
         font-size: 12px;
         margin-bottom: 10px;
     }
-    #locationCheckboxes label {
-        color: var(--text-primary) !important;
+
+    /* Location toggle container */
+    .location-toggles {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
     }
-    #locationCheckboxes input[type="checkbox"] {
-        accent-color: var(--accent-primary);
+
+    /* Toggle switch row */
+    .loc-toggle {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 14px;
+        border-radius: 8px;
+        background: var(--bg-primary);
+        border: 1px solid var(--border-primary);
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+        user-select: none;
+        position: relative;
+        overflow: hidden;
+    }
+    .loc-toggle:hover {
+        background: var(--bg-tertiary);
+        border-color: var(--text-muted);
+    }
+    .loc-toggle:has(input:checked) {
+        background: rgba(46, 160, 67, 0.1);
+        border-color: #2ea043;
+    }
+
+    /* Hide the real checkbox off-screen */
+    .loc-toggle input[type="checkbox"] {
+        position: absolute;
+        left: -9999px;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    /* Toggle track */
+    .toggle-track {
+        position: relative;
+        flex-shrink: 0;
+        width: 40px;
+        min-width: 40px;
+        height: 22px;
+        background: #484f58;
+        border-radius: 11px;
+        transition: background 0.2s;
+        display: inline-block;
+    }
+    .loc-toggle input:checked + .toggle-track {
+        background: #2ea043;
+    }
+
+    /* Toggle thumb */
+    .toggle-thumb {
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 18px;
+        height: 18px;
+        background: #fff;
+        border-radius: 50%;
+        transition: transform 0.2s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .loc-toggle input:checked + .toggle-track .toggle-thumb {
+        transform: translateX(18px);
+    }
+
+    /* Toggle label text */
+    .toggle-label {
+        color: var(--text-primary);
+        font-size: 14px;
+        font-weight: 500;
     }
 
     /* Modal footer */

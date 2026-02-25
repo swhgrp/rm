@@ -187,7 +187,7 @@
                             </td>
                             <td>
                                 <button class="btn btn-sm btn-primary"
-                                        onclick="openMapModal('{{ item.item_description|replace("'", "\\'") }}', {{ item.occurrence_count }}, {{ item.first_item_id or 'null' }})">
+                                        onclick="openMapModal('{{ item.item_description|replace("'", "\\'") }}', {{ item.occurrence_count }}, {{ item.first_item_id or 'null' }}, '{{ item.item_code|default("", true)|replace("'", "\\'") }}', '{{ item.vendor_names[0]|default("", true)|replace("'", "\\'") if item.vendor_names }}', '{{ item.code_status }}')">
                                     <i class="bi bi-link-45deg"></i> Map
                                 </button>
                             </td>
@@ -338,22 +338,6 @@
                                 </div>
                             </div>
 
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Purchase Unit</label>
-                                    <select class="form-select" id="newPurchaseUnit">
-                                        <option value="1">Each</option>
-                                        <option value="2">Case</option>
-                                        <option value="3">Pound</option>
-                                        <option value="4">Gallon</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Conversion Factor</label>
-                                    <input type="number" class="form-control" id="newConversionFactor" value="1" step="0.01" min="0.01">
-                                    <small class="text-muted">Units per purchase unit</small>
-                                </div>
-                            </div>
                         </div>
 
                         <div id="selectedItemInfo" class="alert alert-light" style="display: none;">
@@ -670,6 +654,8 @@ async function saveFixCode() {
             // Verify the code
             const formData = new URLSearchParams();
             formData.append('item_code', wrongCode);
+            const desc = document.getElementById('currentDescDisplay').textContent.trim();
+            if (desc) formData.append('description', desc);
 
             const response = await fetch('/hub/api/item-codes/verify', {
                 method: 'POST',
@@ -679,7 +665,13 @@ async function saveFixCode() {
 
             if (response.ok) {
                 fixCodeModal.hide();
-                await showAlert('Item code verified successfully!', 'Success');
+                const result = await response.json();
+                const mapped = result.auto_mapped || 0;
+                if (mapped > 0) {
+                    await showAlert(`Item code verified and ${mapped} item(s) auto-mapped!`, 'Success');
+                } else {
+                    await showAlert('Item code verified successfully!', 'Success');
+                }
                 location.reload();
             } else {
                 const error = await response.json();
@@ -1012,15 +1004,17 @@ function filterSelect(searchTerm, selectId) {
     selectElement.style.pointerEvents = 'auto';
 }
 
-function openMapModal(description, occurrenceCount, itemId) {
+function openMapModal(description, occurrenceCount, itemId, itemCode, vendorName, codeStatus) {
     isBulkMode = false;
     selectedItems = [];
 
     document.getElementById('mapModalTitle').textContent = 'Map Item to All Instances';
-    document.getElementById('mapModalInfo').innerHTML = `
-        <strong>Item:</strong> <span id="modalItemDescription">${description}</span><br>
-        <strong>Occurrences:</strong> <span id="modalOccurrenceCount">${occurrenceCount}</span> unmapped instances will be mapped
-    `;
+    let infoHtml = `<strong>Item:</strong> <span id="modalItemDescription">${description}</span><br>`;
+    if (itemCode) {
+        infoHtml += `<strong>Code:</strong> <code>${itemCode}</code><br>`;
+    }
+    infoHtml += `<strong>Occurrences:</strong> <span id="modalOccurrenceCount">${occurrenceCount}</span> unmapped instances will be mapped`;
+    document.getElementById('mapModalInfo').innerHTML = infoHtml;
 
     document.getElementById('itemDescription').value = description;
 
@@ -1047,6 +1041,25 @@ function openMapModal(description, occurrenceCount, itemId) {
 
     // Re-setup listeners to ensure they work
     setupSearchListeners();
+
+    // Auto-populate "Create New" fields
+    document.getElementById('newProductName').value = description;
+
+    // Auto-select vendor if we have one
+    if (vendorName) {
+        const vendorSelect = document.getElementById('newVendorId');
+        for (let i = 0; i < vendorSelect.options.length; i++) {
+            if (vendorSelect.options[i].text === vendorName) {
+                vendorSelect.value = vendorSelect.options[i].value;
+                break;
+            }
+        }
+    }
+
+    // Auto-populate SKU from verified item code
+    if (itemCode && (codeStatus === 'verified' || codeStatus === 'verified_no_inventory' || codeStatus === 'in_inventory')) {
+        document.getElementById('newVendorSku').value = itemCode;
+    }
 
     // Hide suggestions panel initially
     document.getElementById('suggestionsPanel').style.display = 'none';
@@ -1142,8 +1155,6 @@ async function saveMapping() {
             const newProductName = document.getElementById('newProductName').value.trim();
             const newVendorSku = document.getElementById('newVendorSku').value.trim();
             const newCategory = document.getElementById('newCategory').value;
-            const newPurchaseUnit = document.getElementById('newPurchaseUnit').value;
-            const newConversionFactor = document.getElementById('newConversionFactor').value || 1;
 
             if (!newVendorId) {
                 await showAlert('Please select a vendor', 'Validation Error');
@@ -1175,8 +1186,6 @@ async function saveMapping() {
                         vendor_product_name: newProductName,
                         vendor_sku: newVendorSku || null,
                         category: newCategory,
-                        purchase_unit_id: parseInt(newPurchaseUnit),
-                        conversion_factor: parseFloat(newConversionFactor),
                         is_active: true
                     })
                 });

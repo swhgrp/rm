@@ -107,6 +107,175 @@ async def sync_vendor_item_to_inventory(item: "HubVendorItem", vendor: "Vendor",
         return None
 
 
+def _find_inventory_uom(conn, name=None, abbreviation=None):
+    """Look up a UOM from Inventory's units_of_measure table."""
+    from sqlalchemy import text
+    if name:
+        row = conn.execute(
+            text("SELECT id, name, abbreviation FROM units_of_measure WHERE LOWER(name) = LOWER(:name)"),
+            {"name": name}
+        ).fetchone()
+        if row:
+            return (row[0], row[1], row[2])
+    if abbreviation:
+        row = conn.execute(
+            text("SELECT id, name, abbreviation FROM units_of_measure WHERE LOWER(abbreviation) = LOWER(:abbr)"),
+            {"abbr": abbreviation}
+        ).fetchone()
+        if row:
+            return (row[0], row[1], row[2])
+    return None
+
+
+def _find_specific_container_uom(conn, container_name, size_qty, size_symbol):
+    """Try to find a specific UOM like 'Can 12oz' or 'Bottle 750ml' in Inventory."""
+    from sqlalchemy import text
+    if not size_qty or not size_symbol:
+        return None
+    # Format size: integer if whole number (12, not 12.0)
+    size_val = int(size_qty) if size_qty == int(size_qty) else size_qty
+    # Try exact match: "Can 12oz", "Bottle 750ml"
+    search_name = f"{container_name.title()} {size_val}{size_symbol}"
+    row = conn.execute(
+        text("SELECT id, name, abbreviation FROM units_of_measure WHERE LOWER(name) = LOWER(:name)"),
+        {"name": search_name}
+    ).fetchone()
+    if row:
+        return (row[0], row[1], row[2])
+    # Try pattern match: "Can 12%" or "Bottle 750%"
+    pattern = f"{container_name.title()} {size_val}%"
+    row = conn.execute(
+        text("SELECT id, name, abbreviation FROM units_of_measure WHERE name ILIKE :pattern"),
+        {"pattern": pattern}
+    ).fetchone()
+    if row:
+        return (row[0], row[1], row[2])
+    return None
+
+
+# Containers that map to Each if no specific UOM found
+GENERIC_CONTAINERS = {'box', 'bag', 'case', 'each', 'pack', 'tub', 'jar'}
+
+
+def sync_master_item_defaults(item, db):
+    """
+    Sync category and primary count unit from vendor item to master item.
+    Only sets fields on master item if they are currently NULL (never overwrites).
+    Creates master_item_count_units primary record if none exists.
+
+    UOM IDs are looked up dynamically from Inventory's units_of_measure table.
+    For container items (can, bottle, keg), tries to find specific UOMs like
+    'Can 12oz' or 'Bottle 750ml' before falling back to Each.
+    """
+    if not item.inventory_master_item_id:
+        return
+
+    from sqlalchemy import text, create_engine
+    from integration_hub.models.size_unit import SizeUnit
+
+    size_unit = db.query(SizeUnit).filter(SizeUnit.id == item.size_unit_id).first() if item.size_unit_id else None
+    container = None
+    if item.container_id:
+        from integration_hub.models.container import Container
+        container = db.query(Container).filter(Container.id == item.container_id).first()
+
+    try:
+        inventory_db_url = os.getenv(
+            'INVENTORY_DATABASE_URL',
+            'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
+        )
+        inv_engine = create_engine(inventory_db_url)
+
+        with inv_engine.connect() as conn:
+            # Read current master item state
+            master = conn.execute(
+                text("SELECT id, category, primary_uom_id FROM master_items WHERE id = :id"),
+                {"id": item.inventory_master_item_id}
+            ).fetchone()
+
+            if not master:
+                logger.warning(f"Master item {item.inventory_master_item_id} not found in Inventory")
+                return
+
+            # Look up the default "Each" UOM (fallback for everything)
+            each_uom = _find_inventory_uom(conn, name='Each') or (14, 'Each', 'ea')
+
+            # Determine the primary count unit by looking up from Inventory UOMs
+            if size_unit and size_unit.measure_type == 'volume':
+                # Volume items → Fluid Ounce (for POS liquor tracking)
+                uom = _find_inventory_uom(conn, name='Fluid Ounce') or each_uom
+            elif container and container.name.lower() in ('can', 'bottle', 'keg'):
+                # Try specific UOM first (e.g., "Can 12oz", "Bottle 750ml")
+                uom = _find_specific_container_uom(
+                    conn, container.name.lower(),
+                    float(item.size_quantity) if item.size_quantity else None,
+                    size_unit.symbol if size_unit else None
+                )
+                if not uom:
+                    # Fall back to Each for cans/bottles without specific UOM
+                    uom = each_uom
+            elif container and container.name.lower() in GENERIC_CONTAINERS:
+                uom = each_uom
+            elif size_unit and size_unit.measure_type == 'weight':
+                # Weight item without container → use weight unit
+                uom = _find_inventory_uom(conn, abbreviation=size_unit.symbol) or each_uom
+            else:
+                uom = each_uom
+
+            uom_id, uom_name, uom_abbr = uom
+            existing_category = master[1]
+            existing_primary_uom_id = master[2]
+            changes = []
+
+            # Set category if NULL
+            if not existing_category and item.category:
+                conn.execute(
+                    text("UPDATE master_items SET category = :category, updated_at = NOW() WHERE id = :id"),
+                    {"id": item.inventory_master_item_id, "category": item.category}
+                )
+                changes.append(f"category='{item.category}'")
+
+            # Set primary UOM if NULL
+            if not existing_primary_uom_id:
+                conn.execute(
+                    text("""UPDATE master_items
+                            SET primary_uom_id = :uom_id, primary_uom_name = :uom_name,
+                                primary_uom_abbr = :uom_abbr, updated_at = NOW()
+                            WHERE id = :id"""),
+                    {"id": item.inventory_master_item_id, "uom_id": uom_id,
+                     "uom_name": uom_name, "uom_abbr": uom_abbr}
+                )
+                changes.append(f"primary_uom='{uom_name}'")
+
+            # Create primary count unit record if none exists
+            existing_cu = conn.execute(
+                text("""SELECT id FROM master_item_count_units
+                        WHERE master_item_id = :mid AND is_primary = true AND is_active = true"""),
+                {"mid": item.inventory_master_item_id}
+            ).fetchone()
+
+            if not existing_cu:
+                conn.execute(
+                    text("""INSERT INTO master_item_count_units
+                            (master_item_id, uom_id, uom_name, uom_abbreviation, is_primary,
+                             conversion_to_primary, display_order, is_active, created_at)
+                            VALUES (:mid, :uom_id, :uom_name, :uom_abbr, true,
+                                    1.0, 0, true, NOW())
+                            ON CONFLICT (master_item_id, uom_id) DO NOTHING"""),
+                    {"mid": item.inventory_master_item_id, "uom_id": uom_id,
+                     "uom_name": uom_name, "uom_abbr": uom_abbr}
+                )
+                changes.append(f"count_unit='{uom_name}'")
+
+            conn.commit()
+
+            if changes:
+                logger.info(f"Synced defaults to master item {item.inventory_master_item_id}: {', '.join(changes)}")
+
+    except Exception as e:
+        logger.error(f"Error syncing master item defaults: {str(e)}")
+
+
 # ============================================================================
 # PYDANTIC SCHEMAS
 # ============================================================================
@@ -129,7 +298,7 @@ class VendorItemCreate(BaseModel):
     vendor_sku: Optional[str] = None
     vendor_product_name: str
     vendor_description: Optional[str] = None
-    purchase_unit_id: int
+    purchase_unit_id: int = 1  # Default to "Each"
     purchase_unit_name: Optional[str] = None
     purchase_unit_abbr: Optional[str] = None
     pack_size: Optional[str] = None
@@ -1170,79 +1339,20 @@ async def update_vendor_item(
             db.refresh(item)
             logger.info(f"Auto-approved vendor item {item.id} - UOM is now complete")
 
-    # Sync size_unit (primary UoM) to master item if updated and item is mapped
-    # For VOLUME items: use Fluid Ounce (id=15) as primary for POS liquor tracking
-    # For other items: use the vendor item's size unit
-    if "size_unit_id" in update_data and item.inventory_master_item_id and item.size_unit_id:
-        try:
-            from sqlalchemy import text, create_engine
-            from integration_hub.models.size_unit import SizeUnit
+    # Sync category, primary UOM, and count unit to master item
+    if item.inventory_master_item_id:
+        trigger_fields = {"inventory_master_item_id", "size_unit_id", "category", "container_id"}
+        if trigger_fields & set(update_data.keys()):
+            sync_master_item_defaults(item, db)
 
-            # Get size unit details
-            size_unit = db.query(SizeUnit).filter(SizeUnit.id == item.size_unit_id).first()
-            if size_unit:
-                inventory_db_url = os.getenv(
-                    "INVENTORY_DATABASE_URL",
-                    "postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db"
-                )
-                inv_engine = create_engine(inventory_db_url)
-
-                # For volume items, set primary UoM to Fluid Ounce for POS tracking
-                if size_unit.measure_type == "volume" and size_unit.conversion_to_inventory_unit:
-                    uom_id, uom_name, uom_abbr = 15, "Fluid Ounce", "fl oz"
-                    logger.info(f"Volume item detected - using Fluid Ounce as primary UoM instead of {size_unit.symbol}")
-                else:
-                    uom_id, uom_name, uom_abbr = size_unit.id, size_unit.name, size_unit.symbol
-
-                with inv_engine.connect() as conn:
-                    conn.execute(
-                        text("""UPDATE master_items
-                                SET primary_uom_id = :uom_id,
-                                    primary_uom_name = :uom_name,
-                                    primary_uom_abbr = :uom_abbr,
-                                    updated_at = NOW()
-                                WHERE id = :id"""),
-                        {
-                            "id": item.inventory_master_item_id,
-                            "uom_id": uom_id,
-                            "uom_name": uom_name,
-                            "uom_abbr": uom_abbr
-                        }
-                    )
-                    conn.commit()
-                    logger.info(f"Synced primary UoM '{uom_abbr}' to master item {item.inventory_master_item_id}")
-        except Exception as e:
-            logger.error(f"Error syncing primary UoM to master item: {str(e)}")
-
-    # Sync category to master item if category was updated and item is mapped
-    if "category" in update_data and item.inventory_master_item_id and item.category:
-        try:
-            from sqlalchemy import text, create_engine
-            inventory_db_url = os.getenv(
-                "INVENTORY_DATABASE_URL",
-                "postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db"
-            )
-            inv_engine = create_engine(inventory_db_url)
-            with inv_engine.connect() as conn:
-                conn.execute(
-                    text("UPDATE master_items SET category = :category, updated_at = NOW() WHERE id = :id"),
-                    {"id": item.inventory_master_item_id, "category": item.category}
-                )
-                conn.commit()
-                logger.info(f"Synced category '{item.category}' to master item {item.inventory_master_item_id}")
-        except Exception as e:
-            logger.error(f"Error syncing category to master item: {str(e)}")
-
-    # Auto-create bottle conversion and set primary UoM when vendor item with volume is mapped to master item
+    # Auto-create bottle conversion for volume items (used by item_detail.html UI)
     if "inventory_master_item_id" in update_data and item.inventory_master_item_id and item.size_quantity and item.size_unit_id:
         try:
             from sqlalchemy import text, create_engine
             from integration_hub.models.size_unit import SizeUnit
 
-            # Get size unit to check if it has conversion factor for inventory unit
             size_unit = db.query(SizeUnit).filter(SizeUnit.id == item.size_unit_id).first()
             if size_unit and size_unit.conversion_to_inventory_unit and size_unit.measure_type == "volume":
-                # Calculate fl oz from vendor item size
                 fl_oz_amount = float(item.size_quantity) * float(size_unit.conversion_to_inventory_unit)
 
                 inventory_db_url = os.getenv(
@@ -1251,19 +1361,6 @@ async def update_vendor_item(
                 )
                 inv_engine = create_engine(inventory_db_url)
                 with inv_engine.connect() as conn:
-                    # Set primary UoM to Fluid Ounce for volume items
-                    conn.execute(
-                        text("""UPDATE master_items
-                                SET primary_uom_id = 15,
-                                    primary_uom_name = 'Fluid Ounce',
-                                    primary_uom_abbr = 'fl oz',
-                                    updated_at = NOW()
-                                WHERE id = :id"""),
-                        {"id": item.inventory_master_item_id}
-                    )
-                    logger.info(f"Set primary UoM to Fluid Ounce for master item {item.inventory_master_item_id}")
-
-                    # Check if conversion already exists for this item (fl oz -> Bottle)
                     existing = conn.execute(
                         text("""SELECT id FROM item_unit_conversions
                                 WHERE master_item_id = :master_item_id
@@ -1272,8 +1369,6 @@ async def update_vendor_item(
                     ).fetchone()
 
                     if not existing:
-                        # Insert new bottle conversion: 1 Bottle = X fl oz
-                        # from_unit = Fluid Ounce (15), to_unit = Bottle (7)
                         conn.execute(
                             text("""INSERT INTO item_unit_conversions
                                     (master_item_id, from_unit_id, from_unit_name, from_unit_abbr,
@@ -1290,8 +1385,6 @@ async def update_vendor_item(
                         )
                         logger.info(f"Auto-created bottle conversion for master item {item.inventory_master_item_id}: "
                                    f"1 Bottle = {round(fl_oz_amount, 4)} fl oz (from {item.size_quantity} {size_unit.symbol})")
-                    else:
-                        logger.info(f"Bottle conversion already exists for master item {item.inventory_master_item_id}")
 
                     conn.commit()
         except Exception as e:

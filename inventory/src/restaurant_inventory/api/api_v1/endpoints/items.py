@@ -598,16 +598,16 @@ async def get_item_location_costs(
     if location_costs:
         # Use data from MasterItemLocationCost - show ALL locations
         for cost_record, location_name in location_costs:
-            # Determine if this location has actual cost data
-            has_location_specific_data = (
+            # Determine if this location has actual invoice-based cost data
+            has_invoice_data = (
                 cost_record.last_purchase_cost is not None or
                 cost_record.last_purchase_date is not None
             )
 
-            # Use location-specific cost if available, otherwise use default
-            if has_location_specific_data and cost_record.current_weighted_avg_cost:
+            # Use weighted avg cost if available (from invoices or seeded from vendor items)
+            if cost_record.current_weighted_avg_cost:
                 avg_price = float(cost_record.current_weighted_avg_cost)
-                is_default_cost = False
+                is_default_cost = not has_invoice_data
             else:
                 avg_price = default_cost
                 is_default_cost = True
@@ -1945,7 +1945,7 @@ async def create_item_unit_conversion(
                 from_unit_name = from_result[1]
                 from_unit_abbr = from_result[2]
             else:
-                raise HTTPException(status_code=400, detail=f"From unit {from_unit_id} not found in Hub")
+                raise HTTPException(status_code=400, detail=f"From unit {from_unit_id} not found")
 
             # Get to_unit details
             to_result = conn.execute(text("""
@@ -1955,7 +1955,7 @@ async def create_item_unit_conversion(
                 to_unit_name = to_result[1]
                 to_unit_abbr = to_result[2]
             else:
-                raise HTTPException(status_code=400, detail=f"To unit {to_unit_id} not found in Hub")
+                raise HTTPException(status_code=400, detail=f"To unit {to_unit_id} not found")
     except HTTPException:
         raise
     except Exception as e:
@@ -2250,14 +2250,10 @@ async def update_item_count_units(
         count_unit_2_factor: 24 (1 Case = 24 bottles)
     """
     from restaurant_inventory.models.master_item_count_unit import MasterItemCountUnit
-    import httpx
-    import os
 
     item = db.query(MasterItem).filter(MasterItem.id == item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Master item not found")
-
-    HUB_API_URL = os.getenv("HUB_API_URL", "http://integration-hub:8000")
 
     # Get existing count units
     existing_units = db.query(MasterItemCountUnit).filter(
@@ -2268,15 +2264,12 @@ async def update_item_count_units(
     primary_unit = next((cu for cu in existing_units if cu.is_primary), None)
     secondary_units = [cu for cu in existing_units if not cu.is_primary]
 
-    # Helper to fetch UOM info from Hub
-    async def get_hub_uom(uom_id: int) -> dict:
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(f"{HUB_API_URL}/api/uom/{uom_id}")
-                if response.status_code == 200:
-                    return response.json()
-        except Exception as e:
-            logger.warning(f"Could not fetch UOM {uom_id} from Hub: {e}")
+    # Look up UOM from Inventory's own units_of_measure table
+    from restaurant_inventory.models.unit_of_measure import UnitOfMeasure
+    def get_uom_info(uom_id: int) -> dict:
+        uom = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == uom_id).first()
+        if uom:
+            return {"name": uom.name, "abbreviation": uom.abbreviation}
         return None
 
     changes_made = []
@@ -2304,9 +2297,9 @@ async def update_item_count_units(
             changes_made.append(f"Promoted {existing_with_uom.uom_name} from secondary to primary")
 
         # Fetch UOM info from Hub
-        uom_info = await get_hub_uom(primary_count_unit_id)
+        uom_info = get_uom_info(primary_count_unit_id)
         if not uom_info:
-            raise HTTPException(status_code=400, detail=f"UOM {primary_count_unit_id} not found in Hub")
+            raise HTTPException(status_code=400, detail=f"UOM {primary_count_unit_id} not found")
 
         if primary_unit:
             # Update existing primary count unit
@@ -2355,9 +2348,9 @@ async def update_item_count_units(
                 secondary_units = [cu for cu in secondary_units if cu != existing_with_uom]
 
             # Fetch UOM info from Hub
-            uom_info = await get_hub_uom(count_unit_2_id)
+            uom_info = get_uom_info(count_unit_2_id)
             if not uom_info:
-                raise HTTPException(status_code=400, detail=f"UOM {count_unit_2_id} not found in Hub")
+                raise HTTPException(status_code=400, detail=f"UOM {count_unit_2_id} not found")
 
             factor = count_unit_2_factor if count_unit_2_factor else 1.0
 
@@ -2407,9 +2400,9 @@ async def update_item_count_units(
                 existing_units = [cu for cu in existing_units if cu != existing_with_uom]
                 secondary_units = [cu for cu in secondary_units if cu != existing_with_uom]
 
-            uom_info = await get_hub_uom(count_unit_3_id)
+            uom_info = get_uom_info(count_unit_3_id)
             if not uom_info:
-                raise HTTPException(status_code=400, detail=f"UOM {count_unit_3_id} not found in Hub")
+                raise HTTPException(status_code=400, detail=f"UOM {count_unit_3_id} not found")
 
             factor = count_unit_3_factor if count_unit_3_factor else 1.0
 

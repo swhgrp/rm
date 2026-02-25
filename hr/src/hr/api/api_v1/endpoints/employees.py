@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, R
 from sqlalchemy.orm import Session, joinedload
 from hr.db.database import get_db
 from hr.schemas.employee import Employee, EmployeeCreate, EmployeeUpdate
-from hr.models.employee import Employee as EmployeeModel
+from hr.models.employee import Employee as EmployeeModel, employee_locations
 from hr.models.employee_position import EmployeePosition
 from hr.models.location import Location
 from hr.models.user import User
@@ -140,27 +140,28 @@ def list_employees(
     """
     List all employees with optional filtering (filtered by user's assigned locations)
 
-    Employees are filtered based on their position assignments.
-    Users only see employees who have positions at locations they have access to.
+    Employees are filtered based on their assigned locations (employee_locations table).
+    Users only see employees who are assigned to locations they have access to.
     """
+    from sqlalchemy import select
+
     # Get user's accessible location IDs
     location_ids = get_user_location_ids(current_user)
 
-    # Build base query with position assignments
-    query = db.query(EmployeeModel).outerjoin(
-        EmployeePosition,
-        EmployeeModel.id == EmployeePosition.employee_id
-    ).options(
-        joinedload(EmployeeModel.position_assignments)
+    # Build base query
+    query = db.query(EmployeeModel).options(
+        joinedload(EmployeeModel.position_assignments),
+        joinedload(EmployeeModel.assigned_locations)
     )
 
-    # Apply location filtering
+    # Apply location filtering based on employee_locations (not employee_positions)
     if location_ids is not None:  # Not admin
-        # Filter to employees with positions at accessible locations
-        # OR employees with no positions (EmployeePosition.id is null)
         query = query.filter(
-            (EmployeePosition.location_id.in_(location_ids)) |
-            (EmployeePosition.id == None)
+            EmployeeModel.id.in_(
+                select(employee_locations.c.employee_id).where(
+                    employee_locations.c.location_id.in_(location_ids)
+                )
+            )
         )
 
     # Apply additional filters
@@ -168,10 +169,15 @@ def list_employees(
         query = query.filter(EmployeeModel.employment_status == status)
 
     if location_id:
-        # Additional filter by specific location
-        query = query.filter(EmployeePosition.location_id == location_id)
+        # Additional filter by specific location (uses employee_locations)
+        query = query.filter(
+            EmployeeModel.id.in_(
+                select(employee_locations.c.employee_id).where(
+                    employee_locations.c.location_id == location_id
+                )
+            )
+        )
 
-    # Distinct to avoid duplicates (employee with multiple positions)
     employees = query.distinct().offset(skip).limit(limit).all()
     return employees
 
@@ -184,22 +190,23 @@ def get_employee(
     current_user: User = Depends(require_auth)
 ):
     """Get a specific employee by ID (only if user has access to their location)"""
+    from sqlalchemy import select
+
     location_ids = get_user_location_ids(current_user)
 
-    # Build query with location filtering and eager load assigned_locations
+    # Build query with eager load assigned_locations
     query = db.query(EmployeeModel).options(
         joinedload(EmployeeModel.assigned_locations)
     ).filter(EmployeeModel.id == employee_id)
 
     # If not admin, verify user has access to at least one of employee's locations
-    # OR employee has no positions assigned
     if location_ids is not None:
-        query = query.outerjoin(
-            EmployeePosition,
-            EmployeeModel.id == EmployeePosition.employee_id
-        ).filter(
-            (EmployeePosition.location_id.in_(location_ids)) |
-            (EmployeePosition.id == None)
+        query = query.filter(
+            EmployeeModel.id.in_(
+                select(employee_locations.c.employee_id).where(
+                    employee_locations.c.location_id.in_(location_ids)
+                )
+            )
         )
 
     employee = query.first()

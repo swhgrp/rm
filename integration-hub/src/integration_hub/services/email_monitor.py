@@ -204,12 +204,19 @@ class EmailMonitorService:
                     continue
 
                 # Find other invoices with same invoice_number (not statements or already duplicate)
+                # Also match with leading zeros stripped (e.g., "04878430" == "4878430")
+                inv_num = invoice.invoice_number.lstrip('0') or '0'
                 duplicates = self.db.query(HubInvoice).filter(
-                    HubInvoice.invoice_number == invoice.invoice_number,
                     HubInvoice.id != invoice.id,
                     HubInvoice.status.notin_(['statement', 'duplicate']),
                     HubInvoice.invoice_number.isnot(None),
                 ).all()
+                # Filter to matching invoice numbers (exact or stripped leading zeros)
+                duplicates = [
+                    d for d in duplicates
+                    if d.invoice_number == invoice.invoice_number
+                    or (d.invoice_number.lstrip('0') or '0') == inv_num
+                ]
 
                 if not duplicates:
                     continue

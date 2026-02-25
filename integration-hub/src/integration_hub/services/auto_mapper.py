@@ -174,8 +174,98 @@ def _levenshtein_distance(s1: str, s2: str) -> int:
     return previous_row[-1]
 
 
+
+# Common food service abbreviations → full words for fuzzy matching
+# Built from GFS invoice patterns and industry-standard abbreviations
+FOOD_ABBREVIATIONS = {
+    # Proteins
+    'chix': 'chicken', 'chkn': 'chicken', 'ckn': 'chicken', 'chk': 'chicken',
+    'wng': 'wing', 'wngs': 'wings',
+    'brst': 'breast', 'brs': 'breast',
+    'tndr': 'tender', 'tndrs': 'tenders', 'tndrln': 'tenderloin',
+    'pty': 'patty', 'ptys': 'patties',
+    'stk': 'steak', 'stks': 'steaks',
+    'shrd': 'shredded',
+    'grnd': 'ground',
+    # Cooking/prep
+    'brd': 'breaded', 'brdd': 'breaded',
+    'ckd': 'cooked',
+    'frsh': 'fresh',
+    'frzn': 'frozen', 'frz': 'frozen',
+    'frtd': 'fried', 'frd': 'fried', 'fritd': 'fried',
+    'crspy': 'crispy',
+    'rstd': 'roasted',
+    'smkd': 'smoked',
+    'grld': 'grilled',
+    'slcd': 'sliced', 'sld': 'sliced',
+    'dcd': 'diced',
+    'hmstyl': 'homestyle',
+    'ssnng': 'seasoning', 'ssnd': 'seasoned',
+    # Sizes/shapes
+    'jmbo': 'jumbo',
+    'lrg': 'large',
+    'med': 'medium',
+    'sml': 'small', 'sm': 'small',
+    'xl': 'extra large',
+    'reg': 'regular',
+    'mni': 'mini',
+    # Cuts/forms
+    'splt': 'split', 'spit': 'split',
+    'bnls': 'boneless', 'bnlss': 'boneless',
+    'skls': 'skinless', 'sknls': 'skinless',
+    'w/skn': 'with skin',
+    'w/tips': 'with tips',
+    'w/bone': 'with bone',
+    # Dairy/cheese
+    'ched': 'cheddar', 'chdr': 'cheddar',
+    'mozz': 'mozzarella',
+    'parm': 'parmesan',
+    'swss': 'swiss',
+    'amrcn': 'american', 'amer': 'american',
+    'crm': 'cream',
+    # Produce
+    'pot': 'potato', 'pots': 'potatoes',
+    'tom': 'tomato', 'toms': 'tomatoes',
+    'orng': 'orange',
+    'lttc': 'lettuce',
+    'onin': 'onion',
+    'grn': 'green',
+    'rd': 'red',
+    'wht': 'white',
+    'blk': 'black',
+    'ylw': 'yellow',
+    # Other food
+    'sndwch': 'sandwich',
+    'sce': 'sauce',
+    'drsg': 'dressing',
+    'sgr': 'sugar',
+    'flr': 'flour',
+    'slt': 'salt',
+    'ppr': 'pepper',
+    'mstrd': 'mustard',
+    # Packaging/container
+    'plas': 'plastic',
+    'cont': 'container',
+    'clr': 'clear',
+    'liq': 'liquid',
+    'pwdfr': 'powder free',
+    'fc': 'food container',
+    'nat': 'natural',
+    'blnd': 'blend',
+    'mld': 'mild',
+    'wrfrm': 'wing reform',
+    'cdn': 'canadian',
+    'cvp': 'cryovac',
+    'iqf': 'individually quick frozen',
+    'ztf': 'zero trans fat',
+    'gchc': 'golden choice',
+    'bbl': 'barrel',
+    'alt': 'alternative',
+}
+
+
 def normalize_text(text: str) -> str:
-    """Normalize text for comparison - lowercase, remove extra spaces/punctuation"""
+    """Normalize text for comparison - lowercase, remove extra spaces/punctuation, expand abbreviations"""
     if not text:
         return ""
     # Lowercase
@@ -188,6 +278,12 @@ def normalize_text(text: str) -> str:
     text = re.sub(r'[^a-z0-9\s]', ' ', text)
     # Collapse multiple spaces
     text = re.sub(r'\s+', ' ', text).strip()
+    # Expand abbreviations to full words
+    words = text.split()
+    expanded = []
+    for w in words:
+        expanded.append(FOOD_ABBREVIATIONS.get(w, w))
+    text = ' '.join(expanded)
     return text
 
 
@@ -195,7 +291,17 @@ def extract_keywords(text: str) -> set:
     """Extract meaningful keywords from product text"""
     normalized = normalize_text(text)
     # Split into words and filter short ones
-    words = set(w for w in normalized.split() if len(w) >= 3)
+    raw_words = [w for w in normalized.split() if len(w) >= 3]
+    # Normalize simple plurals (wings→wing, tenders→tender) for better matching
+    # Don't strip 's' from words ending in ss, us, is, es preceded by consonant clusters
+    no_strip = {'less', 'ness', 'ross', 'bass', 'swiss', 'class', 'glass', 'bonus', 'citrus'}
+    words = set()
+    for w in raw_words:
+        if (w.endswith('s') and len(w) > 4 and w not in no_strip
+                and not w.endswith('ss') and not w.endswith('us')):
+            words.add(w[:-1])
+        else:
+            words.add(w)
     return words
 
 
@@ -1011,6 +1117,10 @@ class AutoMapperService:
                 if matched_uom_id:
                     item.matched_uom_id = matched_uom_id
 
+            # Update vendor item pricing from invoice (so Purchasing & Pricing stays current)
+            if vendor_item_id and item.unit_price:
+                self._update_vendor_item_pricing(vendor_item_id, item)
+
             # Override pack_size with vendor item's units_per_case (more reliable than AI-parsed)
             vendor_upc = mapping_result.get('units_per_case')
             if vendor_upc:
@@ -1034,6 +1144,63 @@ class AutoMapperService:
         except Exception as e:
             logger.error(f"Error applying mapping to item {item.id}: {str(e)}")
             return False
+
+    def _update_vendor_item_pricing(self, vendor_item_id: int, invoice_item: HubInvoiceItem):
+        """
+        Update vendor item pricing fields from invoice data at mapping time.
+        Keeps Purchasing & Pricing section current without waiting for send-to-inventory.
+        """
+        try:
+            vendor_item = self.db.query(HubVendorItem).filter(
+                HubVendorItem.id == vendor_item_id
+            ).first()
+            if not vendor_item:
+                return
+
+            unit_price = float(invoice_item.unit_price)
+            invoice_date = invoice_item.invoice.invoice_date if invoice_item.invoice else None
+
+            # Update matched UOM last_cost
+            if invoice_item.matched_uom_id:
+                matched_uom = self.db.query(VendorItemUOM).filter(
+                    VendorItemUOM.id == invoice_item.matched_uom_id
+                ).first()
+                if matched_uom:
+                    matched_uom.last_cost = unit_price
+                    matched_uom.last_cost_date = invoice_date
+
+                    # Calculate case_cost from conversion factor
+                    cf = float(matched_uom.conversion_factor or 1)
+                    if cf > 0:
+                        cost_per_primary = unit_price / cf
+                        units_per_case = float(vendor_item.units_per_case or 1)
+                        new_case_cost = round(cost_per_primary * units_per_case, 4)
+
+                        if vendor_item.case_cost is None or float(vendor_item.case_cost) != new_case_cost:
+                            vendor_item.previous_purchase_price = vendor_item.last_purchase_price
+                            vendor_item.case_cost = new_case_cost
+                            vendor_item.last_purchase_price = unit_price
+                            vendor_item.price_updated_at = invoice_date
+                            logger.debug(f"Updated vendor item {vendor_item_id} pricing: case_cost={new_case_cost}, last_purchase_price={unit_price}")
+                        return
+
+            # Fallback: no matched UOM — still update last_purchase_price and case_cost directly
+            units_per_case = float(vendor_item.units_per_case or 1)
+            uom_str = (invoice_item.unit_of_measure or '').strip().upper()
+            if uom_str in INDIVIDUAL_UNIT_ABBRS:
+                new_case_cost = round(unit_price * units_per_case, 4)
+            else:
+                new_case_cost = round(unit_price, 4)
+
+            if vendor_item.case_cost is None or float(vendor_item.case_cost) != new_case_cost:
+                vendor_item.previous_purchase_price = vendor_item.last_purchase_price
+                vendor_item.case_cost = new_case_cost
+                vendor_item.last_purchase_price = unit_price
+                vendor_item.price_updated_at = invoice_date
+                logger.debug(f"Updated vendor item {vendor_item_id} pricing (fallback): case_cost={new_case_cost}, last_purchase_price={unit_price}")
+
+        except Exception as e:
+            logger.warning(f"Failed to update vendor item {vendor_item_id} pricing from invoice: {e}")
 
     def map_invoice_items(self, invoice_id: int) -> Dict:
         """

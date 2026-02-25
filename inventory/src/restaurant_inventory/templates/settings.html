@@ -600,7 +600,7 @@
                     <strong id="selectedUserName"></strong> (<span id="selectedUserRole"></span>)
                 </p>
 
-                <div id="locationCheckboxes">
+                <div id="locationCheckboxes" style="display: flex; flex-direction: column; gap: 6px;">
                     <!-- Will be populated dynamically -->
                 </div>
             </div>
@@ -611,6 +611,35 @@
         </div>
     </div>
 </div>
+<style>
+    .loc-toggle-inv {
+        display: flex; align-items: center; gap: 12px;
+        padding: 10px 14px; border-radius: 8px;
+        background: #f8f9fa; border: 1px solid #dee2e6;
+        cursor: pointer; user-select: none;
+        transition: background 0.15s, border-color 0.15s;
+        position: relative; overflow: hidden;
+    }
+    .loc-toggle-inv:hover { background: #e9ecef; border-color: #adb5bd; }
+    .loc-toggle-inv:has(input:checked) { background: #d1e7dd; border-color: #2ea043; }
+    .loc-toggle-inv:has(input:disabled) { opacity: 0.6; cursor: default; }
+    .loc-toggle-inv input { position: absolute; left: -9999px; opacity: 0; pointer-events: none; }
+    .loc-toggle-inv .ttrack {
+        position: relative; flex-shrink: 0; width: 40px; min-width: 40px;
+        height: 22px; background: #adb5bd; border-radius: 11px; transition: background 0.2s;
+    }
+    .loc-toggle-inv input:checked + .ttrack { background: #2ea043; }
+    .loc-toggle-inv input:disabled + .ttrack { background: #2ea043; }
+    .loc-toggle-inv .tthumb {
+        position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+        background: #fff; border-radius: 50%; transition: transform 0.2s;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    .loc-toggle-inv input:checked + .ttrack .tthumb,
+    .loc-toggle-inv input:disabled:checked + .ttrack .tthumb { transform: translateX(18px); }
+    .loc-toggle-inv .tlabel { font-size: 14px; font-weight: 500; color: #212529; }
+    .loc-toggle-inv .tlabel small { font-weight: 400; color: #6c757d; }
+</style>
 
 <!-- Role Modal -->
 <div class="modal fade" id="roleModal" tabindex="-1">
@@ -1428,7 +1457,7 @@
             document.getElementById('selectedUserName').textContent = user.full_name;
             document.getElementById('selectedUserRole').textContent = user.role;
 
-            // Populate location checkboxes
+            // Populate location toggles
             const container = document.getElementById('locationCheckboxes');
             const assignedLocationIds = userLocationData.assigned_locations.map(loc => loc.id);
 
@@ -1436,20 +1465,16 @@
                 container.innerHTML = '<p class="text-muted">No locations available</p>';
             } else {
                 container.innerHTML = locations.map(location => `
-                    <div class="form-check mb-2">
-                        <input
-                            class="form-check-input"
-                            type="checkbox"
-                            id="loc_${location.id}"
-                            value="${location.id}"
+                    <label class="loc-toggle-inv">
+                        <input type="checkbox" value="${location.id}"
                             ${assignedLocationIds.includes(location.id) ? 'checked' : ''}
-                            ${user.role === 'Admin' ? 'disabled' : ''}
-                        >
-                        <label class="form-check-label" for="loc_${location.id}">
+                            ${user.role === 'Admin' ? 'disabled checked' : ''}>
+                        <span class="ttrack"><span class="tthumb"></span></span>
+                        <span class="tlabel">
                             ${location.name}
-                            ${location.address ? `<br><small class="text-muted">${location.address}</small>` : ''}
-                        </label>
-                    </div>
+                            ${location.address ? `<br><small>${location.address}</small>` : ''}
+                        </span>
+                    </label>
                 `).join('');
             }
 

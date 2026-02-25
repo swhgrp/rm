@@ -328,9 +328,9 @@
                                 {% endif %}
                                 {% if item.gl_asset_account or item.gl_cogs_account %}
                                 <small class="text-muted d-block" style="font-size: 10px; line-height: 1.2;">
-                                    {% if item.gl_asset_account %}{{ item.gl_asset_account }}{% endif %}
-                                    {% if item.gl_asset_account and item.gl_cogs_account %}/{% endif %}
-                                    {% if item.gl_cogs_account %}{{ item.gl_cogs_account }}{% endif %}
+                                    {% if item.gl_asset_account %}{{ gl_names.get(item.gl_asset_account|string, item.gl_asset_account) }}{% endif %}
+                                    {% if item.gl_asset_account and item.gl_cogs_account %} / {% endif %}
+                                    {% if item.gl_cogs_account %}{{ gl_names.get(item.gl_cogs_account|string, item.gl_cogs_account) }}{% endif %}
                                 </small>
                                 {% endif %}
                             </td>

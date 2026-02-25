@@ -245,19 +245,7 @@
                         <label for="itemDescription" class="form-label">Description</label>
                         <textarea class="form-control" id="itemDescription" rows="2"></textarea>
                     </div>
-                    <div class="mb-3">
-                        <label for="itemCategory" class="form-label">Category *</label>
-                        <select class="form-select" id="itemCategory" required>
-                            <option value="">Select category...</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="itemUnitId" class="form-label">Unit of Measure *</label>
-                        <select class="form-select" id="itemUnitId" required>
-                            <option value="">Select unit...</option>
-                        </select>
-                        <small class="form-text text-muted">The unit you'll count inventory in (e.g., lbs, each, gallons)</small>
-                    </div>
+                    <small class="text-muted">Category and Unit of Measure are set automatically when a vendor item is linked.</small>
                 </form>
             </div>
             <div class="modal-footer">
@@ -612,8 +600,6 @@
         currentEditItemId = null;
         document.getElementById('itemModalTitle').textContent = 'Add Master Item';
         document.getElementById('itemForm').reset();
-        populateCategoryDropdown();
-        populateUnitDropdowns();
         itemModal.show();
     }
 
@@ -662,34 +648,25 @@
 
         currentEditItemId = itemId;
         document.getElementById('itemModalTitle').textContent = 'Edit Master Item';
-        populateCategoryDropdown();
-        populateUnitDropdowns();
 
         document.getElementById('itemName').value = item.name;
         document.getElementById('itemDescription').value = item.description || '';
-        document.getElementById('itemCategory').value = item.category || '';
-        // Use Hub UoM (primary_uom_id) if available, otherwise fall back to deprecated unit_of_measure_id
-        document.getElementById('itemUnitId').value = item.primary_uom_id || item.unit_of_measure_id || '';
         itemModal.show();
     }
 
     async function saveItem() {
         const name = document.getElementById('itemName').value;
         const description = document.getElementById('itemDescription').value;
-        const category = document.getElementById('itemCategory').value;
-        const primary_uom_id = document.getElementById('itemUnitId').value;
 
-        if (!name || !category || !primary_uom_id) {
-            showAlert('Please fill in all required fields', 'warning');
+        if (!name) {
+            showAlert('Please enter a name', 'warning');
             return;
         }
 
         try {
             const itemData = {
                 name,
-                description,
-                category,
-                primary_uom_id: parseInt(primary_uom_id)  // Use Hub UoM ID
+                description
             };
 
             if (currentEditItemId) {
