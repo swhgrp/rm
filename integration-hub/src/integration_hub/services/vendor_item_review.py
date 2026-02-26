@@ -24,8 +24,6 @@ def get_now(): return datetime.now(_ET)
 
 from integration_hub.models.hub_vendor_item import HubVendorItem, VendorItemStatus
 from integration_hub.models.vendor import Vendor
-from integration_hub.models.vendor_item_uom import VendorItemUOM
-
 logger = logging.getLogger(__name__)
 
 
@@ -367,24 +365,6 @@ class VendorItemReviewService:
         )
 
         self.db.add(new_item)
-        self.db.flush()  # Get the ID before creating UOM
-
-        # Auto-create default purchase UOM (EA with cf=1) so invoice UOM matching works
-        try:
-            from integration_hub.services.uom_normalizer import resolve_uom_id
-            ea_uom_id = resolve_uom_id("EA", self.db) or 1  # EA is typically id=1
-            default_uom = VendorItemUOM(
-                vendor_item_id=new_item.id,
-                uom_id=ea_uom_id,
-                conversion_factor=1.0,
-                is_default=True,
-                last_cost=unit_price,
-                last_cost_date=get_now() if unit_price else None,
-            )
-            self.db.add(default_uom)
-        except Exception as e:
-            logger.warning(f"Failed to auto-create default UOM for vendor item {new_item.id}: {e}")
-
         self.db.commit()
 
         logger.info(f"Created new vendor item from invoice: vendor={vendor_id}, location={location_id}, sku={item_code}")

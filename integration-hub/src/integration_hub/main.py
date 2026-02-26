@@ -24,7 +24,6 @@ from integration_hub.models.upload_job import UploadJob, UploadJobStatus
 from integration_hub.models.item_gl_mapping import ItemGLMapping, CategoryGLMapping
 from integration_hub.models.vendor import Vendor
 from integration_hub.models.hub_vendor_item import HubVendorItem
-from integration_hub.models.vendor_item_uom import VendorItemUOM
 from integration_hub.models.price_history import PriceHistory
 from integration_hub.models.vendor_alias import VendorAlias
 from integration_hub.schemas.vendor import VendorCreate, VendorResponse, VendorSyncStatus
@@ -262,11 +261,8 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    # Get invoice items (eager-load matched UOM for display)
-    from sqlalchemy.orm import joinedload as _jl
-    items = db.query(HubInvoiceItem).options(
-        _jl(HubInvoiceItem.matched_uom).joinedload(VendorItemUOM.uom)
-    ).filter(HubInvoiceItem.invoice_id == invoice_id).all()
+    # Get invoice items
+    items = db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).all()
 
     # Get locations from inventory database for location dropdown
     from sqlalchemy import create_engine, text
@@ -2347,16 +2343,6 @@ async def convert_vendor_item_to_expense(vendor_item_id: int, request: Request, 
             mapping_id = result.fetchone()[0]
             logger.info(f"Created new expense mapping {mapping_id} for vendor item {vendor_item_id}")
 
-        # Clear matched_uom_id on invoice items that reference this vendor item's UOMs
-        # (must happen before deleting UOMs to avoid FK violation)
-        uom_ids = [u.id for u in vendor_item.purchase_uoms]
-        if uom_ids:
-            db.execute(sql_text("""
-                UPDATE hub_invoice_items
-                SET matched_uom_id = NULL
-                WHERE matched_uom_id = ANY(:uom_ids)
-            """), {"uom_ids": uom_ids})
-
         # Also clear inventory_item_id on invoice items pointing to this vendor item
         db.execute(sql_text("""
             UPDATE hub_invoice_items
@@ -2499,37 +2485,28 @@ async def map_item(
     item.is_mapped = True
     item.mapping_method = 'manual'
 
-    # Determine price_is_per_unit from vendor item data + match UOM
+    # Determine price_is_per_unit from vendor item data
     if inventory_item_id:
         vendor_item = db.query(HubVendorItem).filter(HubVendorItem.id == inventory_item_id).first()
         if vendor_item:
-            from integration_hub.services.auto_mapper import determine_price_is_per_unit, match_invoice_uom_to_vendor_uom
+            from integration_hub.services.auto_mapper import determine_price_is_per_unit
             item.price_is_per_unit = determine_price_is_per_unit(
                 item.unit_of_measure,
                 vendor_item.purchase_unit_abbr
             )
-            # Match invoice UOM to vendor item's defined purchase UOMs
-            matched_uom_id = match_invoice_uom_to_vendor_uom(
-                item.unit_of_measure, inventory_item_id, db
-            )
-            if matched_uom_id:
-                item.matched_uom_id = matched_uom_id
             if vendor_item.units_per_case:
                 item.pack_size = int(vendor_item.units_per_case)
 
-            # Sync vendor item case_cost from invoice price
-            if item.unit_price and item.matched_uom_id:
-                from integration_hub.models.vendor_item_uom import VendorItemUOM
-                matched_uom = db.query(VendorItemUOM).filter(VendorItemUOM.id == item.matched_uom_id).first()
-                if matched_uom and matched_uom.conversion_factor:
-                    cf = float(matched_uom.conversion_factor)
-                    if cf > 0:
-                        cost_per_primary = float(item.unit_price) / cf
-                        units_per_case = float(vendor_item.units_per_case or 1)
-                        vendor_item.case_cost = round(cost_per_primary * units_per_case, 4)
-                        vendor_item.last_purchase_price = float(item.unit_price)
-                        from datetime import datetime, timezone
-                        vendor_item.price_updated_at = datetime.now(timezone.utc)
+            # Sync vendor item case_cost from invoice price using pack_to_primary_factor
+            if item.unit_price:
+                cf = float(vendor_item.pack_to_primary_factor or 1.0)
+                if cf > 0:
+                    cost_per_primary = float(item.unit_price) / cf
+                    units_per_case = float(vendor_item.units_per_case or 1)
+                    vendor_item.case_cost = round(cost_per_primary * units_per_case, 4)
+                    vendor_item.last_purchase_price = float(item.unit_price)
+                    from datetime import datetime, timezone
+                    vendor_item.price_updated_at = datetime.now(timezone.utc)
 
     db.commit()
 

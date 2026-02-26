@@ -49,10 +49,8 @@ class HubInvoiceItem(Base):
     # DEPRECATED: Use matched_uom_id instead for deterministic cost calculation
     price_is_per_unit = Column(Boolean, nullable=True)
 
-    # Matched purchase UOM from vendor item (replaces price_is_per_unit)
-    # FK to vendor_item_uoms — tells us exactly which UOM this invoice line matches
-    matched_uom_id = Column(Integer, ForeignKey("vendor_item_uoms.id"), nullable=True)
-    matched_uom = relationship("VendorItemUOM")
+    # DEPRECATED: Was FK to vendor_item_uoms, now unused. Column kept for rollback safety.
+    matched_uom_id = Column(Integer, nullable=True)
 
     # Post-parse validation flags (comma-separated: "price_anomaly,possible_fee")
     validation_flags = Column(String(500), nullable=True)

@@ -6,7 +6,7 @@ The Integration Hub is an **invoice processing and general ledger (GL) mapping s
 
 ## Status: Production Ready (~98% Complete) ✅
 
-**Last Updated:** February 13, 2026
+**Last Updated:** February 26, 2026
 
 **Note:** This is NOT a vendor API integration platform. It does NOT connect to third-party vendor APIs like US Foods or Sysco. It is an internal hub for processing invoices and creating accounting journal entries.
 
@@ -28,6 +28,31 @@ The Inventory system owns:
 
 ## Recent Updates
 
+### February 26, 2026 - UOM Simplification — Single Purchase UOM per Vendor Item
+
+**Removed multi-UOM system in favor of single `pack_to_primary_factor` per vendor item:**
+- ✅ **Removed `vendor_item_uoms` CRUD** — 5 API endpoints, 3 Pydantic schemas, Purchase UOMs UI card + modal + JS
+- ✅ **Removed UOM matching** — `match_invoice_uom_to_vendor_uom()` function and all `matched_uom_id` assignment logic
+- ✅ **Simplified cost calculation** — Single path everywhere: `cost_per_primary = unit_price / pack_to_primary_factor`
+- ✅ **Auto-calculate `pack_to_primary_factor`** — Computed on vendor item save: `units_per_case × size_quantity` (weight/count) or `units_per_case` (volume)
+- ✅ **Backfilled 418+ vendor items** — Corrected `pack_to_primary_factor` for all existing items
+- ✅ **`vendor_item_uoms` table retained** — Historical data preserved, no new records created
+
+**Files Modified:**
+- `services/location_cost_updater.py` — Simplified to single `pack_to_primary_factor` path
+- `services/auto_mapper.py` — Removed `match_invoice_uom_to_vendor_uom()`, simplified pricing
+- `services/vendor_item_review.py` — Removed auto-creation of VendorItemUOM records
+- `api/vendor_items.py` — Removed 5 UOM CRUD endpoints, added auto-calc on save, simplified price history
+- `main.py` — Removed UOM matching from manual mapping + convert-to-expense
+- `models/hub_invoice_item.py` — `matched_uom_id` changed to plain Integer (FK dropped)
+- `templates/vendor_item_detail.html` — Removed Purchase UOMs section
+- `templates/invoice_detail.html` — Removed matched_uom display
+
+**Database Migration:**
+- `20260226_0001_deprecate_vendor_item_uoms.py` — Drop FK, null matched_uom_id, drop index
+
+---
+
 ### February 13, 2026 - Post-Parse Validation, Auto-Reparse & Vendor Item Name Normalization 🛡️✍️
 
 **Post-Parse Validation System (catches AI/CSV parsing errors before they reach Accounting):**
@@ -47,7 +72,7 @@ The Inventory system owns:
 - ✅ **`to_title_case()`** in shared `utils/text_utils.py` — Smart food/restaurant title casing
 - ✅ **`@validates` on HubVendorItem** — Auto-normalizes `vendor_product_name` on every create/update
 - ✅ **Handles edge cases** — Abbreviations (IPA, IQF, PET, AA), number+unit combos (16oz, 750ml), ordinals (25th), apostrophes (D'Asti), hyphens (Bag-in-Box), slashes (Mozzarella/Provolone)
-- ✅ **Backfill script** — `scripts/backfill_vendor_item_names.py` (--dry-run supported), normalized 189/731 existing items
+- ✅ **Backfill completed** — Normalized 189/731 existing items (script removed after completion)
 
 **Settings Cleanup:**
 - ✅ **Removed dead OCR settings UI** — OCR provider/credentials form was never wired to the parser
@@ -59,22 +84,21 @@ The Inventory system owns:
 **New Files:**
 - `services/post_parse_validator.py` — Post-parse validation service
 - `utils/text_utils.py` — Shared text normalization utilities
-- `scripts/backfill_vendor_item_names.py` — Vendor item name backfill
 - `scripts/batch_reparse_gfs_store.py` — Batch re-parse GFS Store format invoices
 
 ---
 
 ### February 11, 2026 - Multi-UOM System, Catch-Weight Support & UI Redesign 📏🥩🎨
 
-**Multi-UOM Architecture (replaces `price_is_per_unit` guessing):**
-- ✅ **`vendor_item_uoms` table** — Multiple purchase UOMs per vendor item with `conversion_factor`
-- ✅ **`matched_uom_id`** on `hub_invoice_items` — FK to `vendor_item_uoms`, set at mapping time
-- ✅ **Deterministic cost calculation** — `cost_per_primary = unit_price / conversion_factor` (no guessing)
-- ✅ **UOM normalizer** (`uom_normalizer.py`) — Normalizes invoice UOM strings → standard abbreviations
-- ✅ **Auto-mapper UOM matching** — `match_invoice_uom_to_vendor_uom()`: exact → normalized → default fallback
-- ✅ **UOM CRUD API** — GET/POST/PUT/DELETE at `/api/v1/vendor-items/{id}/uoms`
-- ✅ **Last cost tracking** — `vendor_item_uoms.last_cost` / `last_cost_date` auto-populated from invoices
-- ✅ **Legacy fallback** — `price_is_per_unit` flag still set during transition; cost updater prefers `matched_uom_id`
+> **Note:** Multi-UOM system (`vendor_item_uoms`, `matched_uom_id`, UOM CRUD endpoints) was **superseded on Feb 26, 2026** by single `pack_to_primary_factor` per vendor item. See Feb 26 changelog entry.
+
+**Multi-UOM Architecture (DEPRECATED — replaced by single `pack_to_primary_factor`):**
+- ~~`vendor_item_uoms` table~~ — Deprecated, table retained for history
+- ~~`matched_uom_id` FK~~ — Dropped, column nulled
+- ~~UOM CRUD API~~ — Endpoints removed
+- ~~Auto-mapper UOM matching~~ — Function removed
+- ✅ **Deterministic cost calculation** — Now via `cost_per_primary = unit_price / pack_to_primary_factor`
+- ✅ **UOM normalizer** (`uom_normalizer.py`) — Still active for invoice UOM string normalization
 
 **Catch-Weight Item Support:**
 - ✅ **GFS catch-weight detection** — Vendor parsing rule detects "WEIGHT:" pattern on GFS invoices
@@ -979,9 +1003,9 @@ integration-hub/
 │       │   └── reporting.py         # Report endpoints
 │       ├── models/              # SQLAlchemy models (9 files)
 │       │   ├── hub_invoice.py
-│       │   ├── hub_invoice_item.py  # matched_uom_id FK to vendor_item_uoms
+│       │   ├── hub_invoice_item.py  # Invoice line items
 │       │   ├── hub_vendor_item.py   # Vendor items with sizing & embeddings
-│       │   ├── vendor_item_uom.py   # Multi-UOM per vendor item (NEW Feb 2026)
+│       │   ├── vendor_item_uom.py   # DEPRECATED: Multi-UOM (table retained for history)
 │       │   ├── item_gl_mapping.py   # (includes CategoryGLMapping)
 │       │   ├── vendor.py
 │       │   ├── size_unit.py         # Size units
@@ -1024,17 +1048,22 @@ integration-hub/
 │       ├── 20251227_0002_add_unit_uom_columns.py      # Unit UOM
 │       ├── 20251227_0003_add_backbar_size_fields.py   # Sizing system
 │       ├── 20260211_0001_add_price_is_per_unit.py     # price_is_per_unit flag
-│       ├── 20260212_0001_add_vendor_item_uoms.py      # Multi-UOM table + matched_uom_id
-│       ├── 20260212_0002_seed_vendor_item_uoms.py     # Data migration
-│       ├── 20260212_0003_add_last_cost_to_vendor_item_uoms.py  # Last cost tracking
-│       └── 20260213_0001_add_validation_fields.py  # Post-parse validation columns
+│       ├── 20260212_0001_add_vendor_item_uoms.py      # Multi-UOM table (DEPRECATED)
+│       ├── 20260212_0002_seed_vendor_item_uoms.py     # Data migration (DEPRECATED)
+│       ├── 20260212_0003_add_last_cost_to_vendor_item_uoms.py  # (DEPRECATED)
+│       ├── 20260213_0001_add_validation_fields.py  # Post-parse validation columns
+│       ├── 20260224_0001_add_vendor_alias_learning_fields.py  # Vendor alias learning
+│       └── 20260226_0001_deprecate_vendor_item_uoms.py  # Drop FK, null matched_uom_id
 ├── scripts/                     # Utility scripts
 │   ├── import_gfs_uoms.py           # GFS UOM CSV import
 │   ├── fix_catchweight_uoms.py      # Catch-weight UOM corrections
 │   ├── reparse_gfs_catchweight_invoices.py  # Re-parse GFS invoices
 │   ├── update_gfs_catchweight_rules.py      # Update GFS parsing rules
-│   ├── backfill_vendor_item_names.py        # Title case normalization backfill
-│   └── batch_reparse_gfs_store.py           # Batch re-parse GFS Store invoices
+│   ├── backfill_master_item_defaults.py     # Master item UOM/category sync
+│   ├── backfill_uoms_and_pricing.py        # Multi-UOM transition backfill
+│   ├── batch_fuzzy_sku_rematch.py          # Batch fuzzy SKU rematch
+│   ├── batch_reparse_gfs_store.py          # Batch re-parse GFS Store invoices
+│   └── fix_gfs_uom_mismatch.py            # Fix GFS UOM mismatches
 ├── INTEGRATION_HUB_MANUAL.md   # User manual
 ├── Dockerfile
 ├── requirements.txt

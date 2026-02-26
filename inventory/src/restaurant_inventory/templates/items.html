@@ -288,22 +288,12 @@ function isAuthenticated() {
 
 async function loadUnitsOfMeasure() {
     try {
-        // Fetch from Hub (source of truth for UoMs)
-        const response = await apiRequest('api/units/hub');
+        // Use local Inventory UOMs (IDs match primary_uom_id / count_units)
+        const response = await apiRequest('api/units/');
         unitsOfMeasure = response;
-        // Don't populate dropdowns here - they don't exist yet
-        // They will be populated when modal opens
     } catch (error) {
-        console.error('Error loading Hub units:', error);
-        // Fallback to local units
-        try {
-            const localResponse = await apiRequest('api/units/');
-            unitsOfMeasure = localResponse;
-            console.warn('Using local UOMs as fallback');
-        } catch (fallbackError) {
-            console.error('Error loading local units:', fallbackError);
-            showAlert('Error loading units of measure', 'danger');
-        }
+        console.error('Error loading units:', error);
+        showAlert('Error loading units of measure', 'danger');
     }
 }
 

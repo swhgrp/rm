@@ -5,9 +5,12 @@ Recipe parsing service using OpenAI API
 import os
 import base64
 import json
+import logging
 from typing import Dict, List, Optional
 from openai import OpenAI
 import PyPDF2
+
+logger = logging.getLogger(__name__)
 
 
 class RecipeParser:
@@ -169,9 +172,9 @@ class RecipeParser:
 
             # Parse the response
             content = response.choices[0].message.content
-            print(f"OpenAI Response Content: {content}")  # Debug logging
+            logger.debug(f"OpenAI Response Content: {content}")
             parsed_data = json.loads(content)
-            print(f"Parsed Data: {parsed_data}")  # Debug logging
+            logger.debug(f"Parsed Data: {parsed_data}")
 
             return {
                 "success": True,

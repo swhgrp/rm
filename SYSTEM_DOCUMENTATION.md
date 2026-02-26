@@ -370,7 +370,7 @@ Automated invoice processing hub with email monitoring, AI parsing, vendor item 
 - ✅ Post-parse validation (price/qty anomalies, total reconciliation)
 - ✅ Auto-reparse with vendor rules after initial parse
 - ✅ Multi-strategy auto-mapping (SKU → near-SKU → learned → fuzzy → expense)
-- ✅ Multi-UOM system (vendor_item_uoms with conversion factors)
+- ✅ Single purchase UOM per vendor item (`pack_to_primary_factor`, auto-calculated from size fields)
 - ✅ Catch-weight support (variable-weight meat/seafood)
 - ✅ Bulk mapping by description (10x faster)
 - ✅ AI semantic search (pgvector, OpenAI embeddings)

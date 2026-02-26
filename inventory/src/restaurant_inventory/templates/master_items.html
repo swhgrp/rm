@@ -33,7 +33,7 @@
 
     <div class="card">
         <div class="card-body">
-            <table class="table table-hover mb-0">
+            <table class="table table-hover mb-0" style="white-space: nowrap;">
                 <thead class="table-dark">
                     <tr>
                         <th style="width: 40px;"><input type="checkbox" class="form-check-input" id="selectAllItems" onchange="toggleSelectAll(this)" title="Select all for merge"></th>
@@ -565,19 +565,11 @@
 
     async function loadUnitsOfMeasure() {
         try {
-            // Fetch from Hub (source of truth for UoMs)
-            const response = await apiRequest('api/units/hub');
+            // Use local Inventory UOMs (IDs match primary_uom_id / count_units)
+            const response = await apiRequest('api/units/');
             unitsOfMeasure = response;
         } catch (error) {
-            console.error('Error loading Hub units:', error);
-            // Fallback to local units if Hub is unavailable
-            try {
-                const localResponse = await apiRequest('api/units/');
-                unitsOfMeasure = localResponse;
-                console.warn('Using local UOMs as fallback');
-            } catch (fallbackError) {
-                console.error('Error loading local units:', fallbackError);
-            }
+            console.error('Error loading units:', error);
         }
     }
 

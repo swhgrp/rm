@@ -28,7 +28,6 @@ from sqlalchemy.orm import Session
 from integration_hub.models.hub_vendor_item import HubVendorItem
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
-from integration_hub.models.vendor_item_uom import VendorItemUOM
 from integration_hub.models.size_unit import SizeUnit
 from integration_hub.services.vendor_item_review import check_uom_completeness
 
@@ -216,63 +215,17 @@ class LocationCostUpdaterService:
         # Use aggregated quantity if multiple invoice lines map to same vendor item
         invoice_qty = aggregated_quantity if aggregated_quantity is not None else float(item.quantity or 0)
 
-        # --- New path: Use matched_uom conversion_factor (deterministic) ---
-        if item.matched_uom_id:
-            matched_uom = self.db.query(VendorItemUOM).filter(
-                VendorItemUOM.id == item.matched_uom_id
-            ).first()
-            if matched_uom and matched_uom.conversion_factor:
-                cf = float(matched_uom.conversion_factor)
-                if cf == 0:
-                    return {'skipped': True, 'reason': 'zero_conversion_factor'}
-                cost_per_primary = unit_price / cf
-                qty_in_primary = invoice_qty * cf
-                logger.debug(
-                    f"Cost calc (matched_uom): item {item.id}, price=${unit_price}, "
-                    f"cf={cf}, cost_per_primary=${cost_per_primary:.4f}, qty={qty_in_primary}"
-                )
+        # Use vendor item's pack_to_primary_factor for conversion
+        cf = float(vendor_item.pack_to_primary_factor or 1.0)
+        if cf == 0:
+            return {'skipped': True, 'reason': 'zero_conversion_factor'}
 
-                # Write back last cost to the matched purchase UOM
-                matched_uom.last_cost = unit_price
-                matched_uom.last_cost_date = invoice.invoice_date
-            else:
-                logger.warning(f"matched_uom_id {item.matched_uom_id} not found, falling back to legacy")
-                item.matched_uom_id = None  # Clear invalid reference
-
-        # --- Legacy path: Use price_is_per_unit flag + weight detection ---
-        if not item.matched_uom_id:
-            units_per_case = float(vendor_item.units_per_case or vendor_item.pack_to_primary_factor or 1.0)
-
-            if units_per_case == 0:
-                return {'skipped': True, 'reason': 'zero_units_per_case'}
-
-            if item.price_is_per_unit is not None:
-                is_individual_unit = item.price_is_per_unit
-            else:
-                uom = (item.unit_of_measure or '').strip().upper()
-                is_individual_unit = uom in ('EA', 'EACH', 'BTL', 'BOTTLE', 'PC', 'PIECE')
-
-            is_weight_item = (vendor_item.size_unit and
-                              vendor_item.size_unit.measure_type == 'weight' and
-                              vendor_item.size_quantity and
-                              float(vendor_item.size_quantity) > 0)
-
-            if is_individual_unit:
-                cost_per_primary = unit_price
-                qty_in_primary = invoice_qty
-            elif is_weight_item:
-                total_weight = units_per_case * float(vendor_item.size_quantity)
-                cost_per_primary = unit_price / total_weight
-                qty_in_primary = invoice_qty * total_weight
-            else:
-                cost_per_primary = unit_price / units_per_case
-                qty_in_primary = invoice_qty * units_per_case
-
-            logger.debug(
-                f"Cost calc (legacy): item {item.id}, price=${unit_price}, "
-                f"per_unit={is_individual_unit if item.price_is_per_unit is not None else 'string-detect'}, "
-                f"cost_per_primary=${cost_per_primary:.4f}, qty={qty_in_primary}"
-            )
+        cost_per_primary = unit_price / cf
+        qty_in_primary = invoice_qty * cf
+        logger.debug(
+            f"Cost calc: item {item.id}, price=${unit_price}, "
+            f"pack_to_primary={cf}, cost_per_primary=${cost_per_primary:.4f}, qty={qty_in_primary}"
+        )
 
         if qty_in_primary == 0:
             return {'skipped': True, 'reason': 'zero_quantity'}

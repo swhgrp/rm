@@ -277,9 +277,7 @@
                                        value="{{ item.quantity }}" style="display: none; width: 70px;" step="0.001" min="0">
                             </td>
                             <td>
-                                {% if item.matched_uom and item.matched_uom.uom %}
-                                    <span title="Matched: {{ item.matched_uom.uom.name }} (cf={{ item.matched_uom.conversion_factor }})">{{ item.matched_uom.uom.abbreviation|upper }}</span>
-                                {% elif item.unit_of_measure %}
+                                {% if item.unit_of_measure %}
                                     {{ item.unit_of_measure }}
                                 {% elif vi_info.get('purchase_unit_abbr') %}
                                     {{ vi_info.purchase_unit_abbr|upper }}

@@ -857,7 +857,10 @@ function openCountModal(itemId) {
     const existing = areaItems.find(si => si.master_item_id === itemId);
 
     const expectedQty = existing?.expected_quantity ? parseFloat(existing.expected_quantity) : 0;
-    const itemUnit = item.unit_of_measure || 'Each';
+    // Base unit = primary (is_primary) unit — quantities are stored/converted to this
+    const baseUnit = item.unit_of_measure || 'Each';
+    // Preferred counting unit (CU1) — what the user wants to count in by default
+    const preferredUnit = item.count_unit_1_name || baseUnit;
     const isCounted = existing?.counted_quantity !== null && existing?.counted_quantity !== undefined;
     const statusBadge = isCounted
         ? `<span class="badge bg-success">Counted: ${parseFloat(existing.counted_quantity).toFixed(2)}</span>`
@@ -871,25 +874,21 @@ function openCountModal(itemId) {
             </div>
             ${statusBadge}
         </div>
-        ${expectedQty > 0 ? `<small class="text-info"><i class="bi bi-info-circle"></i> Expected: ${expectedQty.toFixed(2)} ${itemUnit}</small>` : ''}
+        ${expectedQty > 0 ? `<small class="text-info"><i class="bi bi-info-circle"></i> Expected: ${expectedQty.toFixed(2)} ${baseUnit}</small>` : ''}
     `;
 
-    // Populate unit selector with ONLY the count units defined for this item
-    // If only 1 count unit is defined, only 1 option should be shown
+    // Build unit list from count units (CU1, CU2, CU3) in user's preferred order
     const unitSelect = document.getElementById('unitSelect');
-    let compatibleUnits = [itemUnit]; // Always include primary count unit
+    let compatibleUnits = [];
 
-    // Add additional count units if explicitly defined (count_unit_2 and count_unit_3)
-    if (item.count_unit_2_name) {
-        compatibleUnits.push(item.count_unit_2_name);
-    }
-    if (item.count_unit_3_name) {
-        compatibleUnits.push(item.count_unit_3_name);
-    }
+    // Add count units in order (CU1 first = default)
+    if (item.count_unit_1_name) compatibleUnits.push(item.count_unit_1_name);
+    if (item.count_unit_2_name) compatibleUnits.push(item.count_unit_2_name);
+    if (item.count_unit_3_name) compatibleUnits.push(item.count_unit_3_name);
 
-    // Legacy support: only use secondary_unit if explicitly defined for this item
-    if (item.secondary_unit && item.units_per_secondary && !compatibleUnits.includes(item.secondary_unit)) {
-        compatibleUnits.push(item.secondary_unit);
+    // If no count units defined, fall back to base unit
+    if (compatibleUnits.length === 0) {
+        compatibleUnits.push(baseUnit);
     }
 
     // Remove duplicates (case-insensitive)
@@ -902,10 +901,11 @@ function openCountModal(itemId) {
         return true;
     });
 
-    console.log('Item unit:', item.unit_of_measure, 'Compatible units:', compatibleUnits, 'count_unit_2:', item.count_unit_2_name, 'count_unit_3:', item.count_unit_3_name);
+    console.log('Base unit:', baseUnit, 'Preferred:', preferredUnit, 'Compatible units:', compatibleUnits);
 
-    unitSelect.innerHTML = compatibleUnits.map(unit =>
-        `<option value="${unit}" ${unit && itemUnit && unit.toLowerCase() === itemUnit.toLowerCase() ? 'selected' : ''}>${unit ? unit.toUpperCase() : 'EACH'}</option>`
+    // CU1 (first in list) is selected by default
+    unitSelect.innerHTML = compatibleUnits.map((unit, idx) =>
+        `<option value="${unit}" ${idx === 0 ? 'selected' : ''}>${unit ? unit.toUpperCase() : 'EACH'}</option>`
     ).join('');
 
     // If only 1 unit option, disable dropdown and show as simple text
@@ -1102,7 +1102,8 @@ async function saveItemCount() {
         return;
     }
 
-    // Convert quantity to base unit
+    // Convert quantity to primary (is_primary) unit for storage
+    // All count units have a conversion_to_primary factor
     const baseUnit = currentItem.unit_of_measure || 'Each';
     let convertedQty;
     const selectedUnitLower = selectedUnit ? selectedUnit.toLowerCase() : '';
@@ -1112,28 +1113,29 @@ async function saveItemCount() {
     if (!baseUnit || !selectedUnit) {
         convertedQty = qty;
     }
-    // Already in base unit
+    // Already in base (primary) unit
     else if (selectedUnitLower === baseUnitLower) {
         convertedQty = qty;
     }
-    // Check if using count_unit_2 with conversion factor
+    // Check all count units (CU1, CU2, CU3) for conversion factor
+    else if (currentItem.count_unit_1_name && currentItem.count_unit_1_factor &&
+        selectedUnitLower === currentItem.count_unit_1_name.toLowerCase()) {
+        convertedQty = qty * parseFloat(currentItem.count_unit_1_factor);
+        console.log(`CU1 conversion: ${qty} ${selectedUnit} × ${currentItem.count_unit_1_factor} = ${convertedQty} ${baseUnit}`);
+    }
     else if (currentItem.count_unit_2_name && currentItem.count_unit_2_factor &&
         selectedUnitLower === currentItem.count_unit_2_name.toLowerCase()) {
-        // Convert from count_unit_2 to primary using the unit's contains_quantity
         convertedQty = qty * parseFloat(currentItem.count_unit_2_factor);
-        console.log(`Count Unit 2 conversion: ${qty} ${selectedUnit} × ${currentItem.count_unit_2_factor} = ${convertedQty} ${baseUnit}`);
+        console.log(`CU2 conversion: ${qty} ${selectedUnit} × ${currentItem.count_unit_2_factor} = ${convertedQty} ${baseUnit}`);
     }
-    // Check if using count_unit_3 with conversion factor
     else if (currentItem.count_unit_3_name && currentItem.count_unit_3_factor &&
         selectedUnitLower === currentItem.count_unit_3_name.toLowerCase()) {
-        // Convert from count_unit_3 to primary using the unit's contains_quantity
         convertedQty = qty * parseFloat(currentItem.count_unit_3_factor);
-        console.log(`Count Unit 3 conversion: ${qty} ${selectedUnit} × ${currentItem.count_unit_3_factor} = ${convertedQty} ${baseUnit}`);
+        console.log(`CU3 conversion: ${qty} ${selectedUnit} × ${currentItem.count_unit_3_factor} = ${convertedQty} ${baseUnit}`);
     }
-    // Check if using item-specific legacy secondary_unit conversion
+    // Legacy secondary_unit fallback
     else if (currentItem.secondary_unit && currentItem.units_per_secondary &&
         selectedUnitLower === currentItem.secondary_unit.toLowerCase()) {
-        // Convert from secondary to primary using item-specific ratio
         convertedQty = qty * parseFloat(currentItem.units_per_secondary);
         console.log(`Legacy conversion: ${qty} ${selectedUnit} × ${currentItem.units_per_secondary} = ${convertedQty} ${baseUnit}`);
     } else {

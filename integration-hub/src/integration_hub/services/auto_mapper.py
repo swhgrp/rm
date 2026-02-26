@@ -28,7 +28,6 @@ from sqlalchemy import text as sql_text
 from integration_hub.models.hub_invoice_item import HubInvoiceItem
 from integration_hub.models.hub_invoice import HubInvoice
 from integration_hub.models.hub_vendor_item import HubVendorItem, VendorItemStatus
-from integration_hub.models.vendor_item_uom import VendorItemUOM
 from integration_hub.services.uom_normalizer import normalize_uom_string, resolve_uom_id
 
 logger = logging.getLogger(__name__)
@@ -72,87 +71,6 @@ def determine_price_is_per_unit(
 
     # Cannot determine
     return None
-
-
-def match_invoice_uom_to_vendor_uom(
-    invoice_uom: Optional[str],
-    vendor_item_id: int,
-    db: Session
-) -> Optional[int]:
-    """
-    Match a parsed invoice UOM string to one of the vendor item's defined purchase UOMs.
-
-    Steps:
-    1. Normalize the invoice UOM string → standard abbreviation (e.g., "CASE" → "cs")
-    2. Resolve to a units_of_measure.id
-    3. Look up vendor_item_uoms for an exact match on (vendor_item_id, uom_id)
-    4. Fall back to the default purchase UOM for this vendor item
-
-    Returns:
-        vendor_item_uoms.id or None
-    """
-    # Get all active purchase UOMs for this vendor item
-    purchase_uoms = db.query(VendorItemUOM).filter(
-        VendorItemUOM.vendor_item_id == vendor_item_id,
-        VendorItemUOM.is_active == True
-    ).all()
-
-    if not purchase_uoms:
-        logger.debug(f"No purchase UOMs defined for vendor item {vendor_item_id}")
-        return None
-
-    # Try exact UOM match first
-    if invoice_uom:
-        uom_id = resolve_uom_id(invoice_uom, db)
-        if uom_id:
-            for puom in purchase_uoms:
-                if puom.uom_id == uom_id:
-                    logger.debug(
-                        f"UOM match: invoice '{invoice_uom}' → vendor_item_uom {puom.id} "
-                        f"(cf={puom.conversion_factor})"
-                    )
-                    return puom.id
-
-        # Normalized string match — invoice "BTL" normalizes to "ea", match against UOM abbreviation
-        normalized = normalize_uom_string(invoice_uom)
-        if normalized:
-            from integration_hub.models.unit_of_measure import UnitOfMeasure
-            for puom in purchase_uoms:
-                uom_obj = db.query(UnitOfMeasure).filter(UnitOfMeasure.id == puom.uom_id).first()
-                if uom_obj and uom_obj.abbreviation and uom_obj.abbreviation.lower() == normalized.lower():
-                    logger.debug(
-                        f"UOM match (normalized): invoice '{invoice_uom}' → '{normalized}' → "
-                        f"vendor_item_uom {puom.id} (cf={puom.conversion_factor})"
-                    )
-                    return puom.id
-
-    # Single-unit equivalence: if normalized UOM is a single-unit type (bg, pk, bx)
-    # and no direct match was found, try matching to EA
-    SINGLE_UNIT_EQUIVALENTS = {'bg', 'pk', 'bx'}  # bag, pack, box → treat as each
-    if invoice_uom:
-        normalized = normalize_uom_string(invoice_uom) if not invoice_uom else normalize_uom_string(invoice_uom)
-        if normalized and normalized.lower() in SINGLE_UNIT_EQUIVALENTS:
-            # UOM_IDS['ea'] = 1
-            for puom in purchase_uoms:
-                if puom.uom_id == 1:  # ea
-                    logger.debug(
-                        f"UOM match (single-unit equiv): invoice '{invoice_uom}' → '{normalized}' → EA "
-                        f"vendor_item_uom {puom.id} (cf={puom.conversion_factor})"
-                    )
-                    return puom.id
-
-    # Fall back to default purchase UOM
-    for puom in purchase_uoms:
-        if puom.is_default:
-            logger.debug(
-                f"UOM fallback to default: vendor_item_uom {puom.id} "
-                f"(cf={puom.conversion_factor}) for vendor item {vendor_item_id}"
-            )
-            return puom.id
-
-    # Last resort: return the first active UOM
-    logger.debug(f"UOM fallback to first active: vendor_item_uom {purchase_uoms[0].id}")
-    return purchase_uoms[0].id
 
 
 def _levenshtein_distance(s1: str, s2: str) -> int:
@@ -1108,16 +1026,8 @@ class AutoMapperService:
                     mapping_result.get('purchase_unit_abbr')
                 )
 
-            # Match invoice UOM to vendor item's defined purchase UOMs (new path)
-            vendor_item_id = mapping_result.get('vendor_item_id')
-            if vendor_item_id:
-                matched_uom_id = match_invoice_uom_to_vendor_uom(
-                    item.unit_of_measure, vendor_item_id, self.db
-                )
-                if matched_uom_id:
-                    item.matched_uom_id = matched_uom_id
-
             # Update vendor item pricing from invoice (so Purchasing & Pricing stays current)
+            vendor_item_id = mapping_result.get('vendor_item_id')
             if vendor_item_id and item.unit_price:
                 self._update_vendor_item_pricing(vendor_item_id, item)
 
@@ -1160,35 +1070,12 @@ class AutoMapperService:
             unit_price = float(invoice_item.unit_price)
             invoice_date = invoice_item.invoice.invoice_date if invoice_item.invoice else None
 
-            # Update matched UOM last_cost
-            if invoice_item.matched_uom_id:
-                matched_uom = self.db.query(VendorItemUOM).filter(
-                    VendorItemUOM.id == invoice_item.matched_uom_id
-                ).first()
-                if matched_uom:
-                    matched_uom.last_cost = unit_price
-                    matched_uom.last_cost_date = invoice_date
-
-                    # Calculate case_cost from conversion factor
-                    cf = float(matched_uom.conversion_factor or 1)
-                    if cf > 0:
-                        cost_per_primary = unit_price / cf
-                        units_per_case = float(vendor_item.units_per_case or 1)
-                        new_case_cost = round(cost_per_primary * units_per_case, 4)
-
-                        if vendor_item.case_cost is None or float(vendor_item.case_cost) != new_case_cost:
-                            vendor_item.previous_purchase_price = vendor_item.last_purchase_price
-                            vendor_item.case_cost = new_case_cost
-                            vendor_item.last_purchase_price = unit_price
-                            vendor_item.price_updated_at = invoice_date
-                            logger.debug(f"Updated vendor item {vendor_item_id} pricing: case_cost={new_case_cost}, last_purchase_price={unit_price}")
-                        return
-
-            # Fallback: no matched UOM — still update last_purchase_price and case_cost directly
-            units_per_case = float(vendor_item.units_per_case or 1)
-            uom_str = (invoice_item.unit_of_measure or '').strip().upper()
-            if uom_str in INDIVIDUAL_UNIT_ABBRS:
-                new_case_cost = round(unit_price * units_per_case, 4)
+            # Use vendor item's pack_to_primary_factor for cost calculation
+            cf = float(vendor_item.pack_to_primary_factor or 1.0)
+            if cf > 0:
+                cost_per_primary = unit_price / cf
+                units_per_case = float(vendor_item.units_per_case or 1)
+                new_case_cost = round(cost_per_primary * units_per_case, 4)
             else:
                 new_case_cost = round(unit_price, 4)
 
@@ -1197,7 +1084,7 @@ class AutoMapperService:
                 vendor_item.case_cost = new_case_cost
                 vendor_item.last_purchase_price = unit_price
                 vendor_item.price_updated_at = invoice_date
-                logger.debug(f"Updated vendor item {vendor_item_id} pricing (fallback): case_cost={new_case_cost}, last_purchase_price={unit_price}")
+                logger.debug(f"Updated vendor item {vendor_item_id} pricing: case_cost={new_case_cost}, last_purchase_price={unit_price}")
 
         except Exception as e:
             logger.warning(f"Failed to update vendor item {vendor_item_id} pricing from invoice: {e}")

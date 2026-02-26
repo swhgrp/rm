@@ -1,9 +1,10 @@
 """
-Vendor Item UOM model - Multiple purchase UOMs per vendor item
+DEPRECATED (Feb 2026): Vendor Item UOM model
 
-Each vendor item can be purchased in multiple UOMs (e.g., Case of 12 or Each).
-Each UOM has a conversion_factor defining how many inventory base units it contains.
-This replaces the fragile price_is_per_unit flag with deterministic cost calculation.
+This table is no longer actively used. Each vendor item now has a single purchase UOM
+defined by its purchase_unit_abbr + pack_to_primary_factor fields directly on hub_vendor_items.
+
+The table is retained for historical data. No new records should be created.
 """
 from sqlalchemy import Column, Integer, Numeric, Boolean, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship, backref

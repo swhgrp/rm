@@ -21,83 +21,71 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 from sqlalchemy import text, create_engine
 from integration_hub.db.database import SessionLocal
 from integration_hub.models.hub_vendor_item import HubVendorItem
-from integration_hub.models.size_unit import SizeUnit
-from integration_hub.models.container import Container
-from integration_hub.api.vendor_items import (
-    _find_inventory_uom, _find_specific_container_uom, GENERIC_CONTAINERS
-)
+from integration_hub.api.vendor_items import _find_inventory_uom
 
 
 def determine_count_unit(item, db, inv_conn):
-    """Determine the primary count unit for a vendor item using dynamic Inventory UOM lookup."""
-    size_unit = db.query(SizeUnit).filter(SizeUnit.id == item.size_unit_id).first() if item.size_unit_id else None
-    container = db.query(Container).filter(Container.id == item.container_id).first() if item.container_id else None
-
+    """Determine the primary count unit from vendor item's purchase_unit_abbr."""
     each_uom = _find_inventory_uom(inv_conn, name='Each') or (14, 'Each', 'ea')
 
-    # Volume items → Fluid Ounce
-    if size_unit and size_unit.measure_type == 'volume':
-        return _find_inventory_uom(inv_conn, name='Fluid Ounce') or each_uom
-    # Container with specific UOM (Can 12oz, Bottle 750ml, etc.)
-    elif container and container.name.lower() in ('can', 'bottle', 'keg'):
-        specific = _find_specific_container_uom(
-            inv_conn, container.name.lower(),
-            float(item.size_quantity) if item.size_quantity else None,
-            size_unit.symbol if size_unit else None
-        )
-        return specific or each_uom
-    # Generic containers → Each
-    elif container and container.name.lower() in GENERIC_CONTAINERS:
-        return each_uom
-    # Weight item without container
-    elif size_unit and size_unit.measure_type == 'weight':
-        return _find_inventory_uom(inv_conn, abbreviation=size_unit.symbol) or each_uom
-    else:
-        return each_uom
+    if item.purchase_unit_abbr:
+        uom = _find_inventory_uom(inv_conn, abbreviation=item.purchase_unit_abbr)
+        if uom:
+            return uom
+    return each_uom
 
 
 def fix_mismatched_ids(inv_engine, dry_run=False):
-    """Fix existing records where uom_id doesn't match uom_name."""
+    """
+    Fix existing count unit records where uom_id doesn't match master_items.primary_uom_id.
+
+    The --recheck mode is the authoritative fix (re-derives UOM from vendor item metadata).
+    This mode is a lighter-weight check that ensures count units match primary_uom_id,
+    which is assumed to already be correct (set by sync_master_item_defaults using
+    Inventory DB lookups).
+    """
     print("\n=== Fixing mismatched UOM IDs ===")
     with inv_engine.connect() as conn:
-        # Fix master_item_count_units
+        # Fix master_item_count_units where uom_id doesn't match master_items.primary_uom_id
         bad_cus = conn.execute(text("""
-            SELECT cu.id, cu.master_item_id, cu.uom_id, cu.uom_name, cu.uom_abbreviation
-            FROM master_item_count_units cu
-            LEFT JOIN units_of_measure u ON u.id = cu.uom_id
-            WHERE cu.uom_name != COALESCE(u.name, '')
+            SELECT mcu.id, mi.id as mi_id, mi.name, mcu.uom_id, mcu.uom_name,
+                   mi.primary_uom_id, u.name as correct_name, u.abbreviation as correct_abbr
+            FROM master_item_count_units mcu
+            JOIN master_items mi ON mcu.master_item_id = mi.id
+            LEFT JOIN units_of_measure u ON mi.primary_uom_id = u.id
+            WHERE mcu.is_primary = true
+            AND mcu.uom_id != mi.primary_uom_id
         """)).fetchall()
 
         fixed_cu = 0
         for cu in bad_cus:
-            # Look up correct ID by name
-            correct = conn.execute(
-                text("SELECT id, name, abbreviation FROM units_of_measure WHERE LOWER(name) = LOWER(:name)"),
-                {"name": cu[3]}
-            ).fetchone()
-            if correct:
-                if dry_run:
-                    print(f"  count_unit [{cu[0]}] master={cu[1]}: {cu[3]} id {cu[2]} -> {correct[0]}")
-                else:
-                    # Check if there's already a record with the correct uom_id for this master item
-                    existing = conn.execute(
-                        text("""SELECT id FROM master_item_count_units
-                                WHERE master_item_id = :mid AND uom_id = :uid AND id != :id"""),
-                        {"mid": cu[1], "uid": correct[0], "id": cu[0]}
-                    ).fetchone()
-                    if existing:
-                        # Delete the duplicate bad record
-                        conn.execute(text("DELETE FROM master_item_count_units WHERE id = :id"), {"id": cu[0]})
-                    else:
-                        conn.execute(
-                            text("UPDATE master_item_count_units SET uom_id = :uid WHERE id = :id"),
-                            {"uid": correct[0], "id": cu[0]}
-                        )
-                fixed_cu += 1
+            mcu_id, mi_id, mi_name, cur_uom_id, cur_uom_name, target_id, target_name, target_abbr = cu
+            if dry_run:
+                print(f"  [{mi_id}] {mi_name}: {cur_uom_name}(id={cur_uom_id}) -> {target_name}(id={target_id})")
             else:
-                print(f"  WARNING: No UOM found for name '{cu[3]}' (count_unit {cu[0]})")
+                # Check for duplicate
+                existing = conn.execute(
+                    text("""SELECT id FROM master_item_count_units
+                            WHERE master_item_id = :mid AND uom_id = :uid AND id != :id"""),
+                    {"mid": mi_id, "uid": target_id, "id": mcu_id}
+                ).fetchone()
+                if existing:
+                    conn.execute(text("DELETE FROM master_item_count_units WHERE id = :id"), {"id": mcu_id})
+                    conn.execute(
+                        text("UPDATE master_item_count_units SET is_primary = true, conversion_to_primary = 1.0 WHERE id = :id"),
+                        {"id": existing[0]}
+                    )
+                else:
+                    conn.execute(
+                        text("""UPDATE master_item_count_units
+                                SET uom_id = :uid, uom_name = :name, uom_abbreviation = :abbr
+                                WHERE id = :id"""),
+                        {"uid": target_id, "name": target_name, "abbr": target_abbr, "id": mcu_id}
+                    )
+                print(f"  Fixed [{mi_id}] {mi_name}: {cur_uom_name}(id={cur_uom_id}) -> {target_name}(id={target_id})")
+            fixed_cu += 1
 
-        # Fix master_items.primary_uom_id
+        # Fix master_items where primary_uom_id doesn't match primary_uom_name
         bad_uoms = conn.execute(text("""
             SELECT mi.id, mi.name, mi.primary_uom_id, mi.primary_uom_name, mi.primary_uom_abbr
             FROM master_items mi

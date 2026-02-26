@@ -171,16 +171,17 @@ async def get_master_items(
         item_dict = MasterItemResponse.from_orm(item).model_dump()
 
         # Get count units from MasterItemCountUnit table (new architecture)
+        # Sort by display_order — position 0 is the preferred counting unit
         try:
-            count_units = sorted(item.count_units, key=lambda cu: (not cu.is_primary, cu.display_order or 0))
+            count_units = sorted(item.count_units, key=lambda cu: (cu.display_order or 0))
         except Exception as e:
             logger.warning(f"Error sorting count_units for item {item.id}: {e}")
             count_units = []
         primary_count_unit = next((cu for cu in count_units if cu.is_primary), None)
-        secondary_units = [cu for cu in count_units if not cu.is_primary]
+        secondary_units = [cu for cu in count_units if cu != count_units[0]] if count_units else []
 
-        # Use PRIMARY COUNT UNIT for display (what you physically count, e.g., "Bottle")
-        # NOT the cost tracking unit (primary_uom_name, e.g., "Fluid Ounce")
+        # Use the PRIMARY count unit (is_primary=True) for unit_of_measure
+        # This is the base unit for storage and pricing
         if primary_count_unit:
             unit_name = primary_count_unit.uom_name
         elif item.primary_uom_id:
@@ -202,29 +203,37 @@ async def get_master_items(
             item_dict['primary_count_unit_name'] = primary_count_unit.uom_name
             item_dict['primary_count_unit_abbr'] = primary_count_unit.uom_abbreviation
 
-        # Count Unit 2 (first secondary)
-        if len(secondary_units) >= 1:
-            cu2 = secondary_units[0]
+        # Count units ordered by display_order (user's preferred counting order)
+        # CU1 = preferred default for counting, CU2/CU3 = alternatives
+        if len(count_units) >= 1:
+            cu1 = count_units[0]
+            item_dict['count_unit_1_id'] = cu1.uom_id
+            item_dict['count_unit_1_name'] = cu1.uom_name
+            item_dict['count_unit_1_factor'] = float(cu1.conversion_to_primary) if cu1.conversion_to_primary else None
+        else:
+            item_dict['count_unit_1_id'] = None
+            item_dict['count_unit_1_name'] = None
+            item_dict['count_unit_1_factor'] = None
+
+        if len(count_units) >= 2:
+            cu2 = count_units[1]
             item_dict['count_unit_2_id'] = cu2.uom_id
             item_dict['count_unit_2_name'] = cu2.uom_name
             item_dict['count_unit_2_factor'] = float(cu2.conversion_to_primary) if cu2.conversion_to_primary else None
         else:
-            # Fallback to deprecated relationship
-            item_dict['count_unit_2_id'] = item.count_unit_2_id
-            item_dict['count_unit_2_name'] = item.count_unit_2.name if item.count_unit_2 else None
-            item_dict['count_unit_2_factor'] = float(item.count_unit_2.contains_quantity) if item.count_unit_2 and item.count_unit_2.contains_quantity else None
+            item_dict['count_unit_2_id'] = None
+            item_dict['count_unit_2_name'] = None
+            item_dict['count_unit_2_factor'] = None
 
-        # Count Unit 3 (second secondary)
-        if len(secondary_units) >= 2:
-            cu3 = secondary_units[1]
+        if len(count_units) >= 3:
+            cu3 = count_units[2]
             item_dict['count_unit_3_id'] = cu3.uom_id
             item_dict['count_unit_3_name'] = cu3.uom_name
             item_dict['count_unit_3_factor'] = float(cu3.conversion_to_primary) if cu3.conversion_to_primary else None
         else:
-            # Fallback to deprecated relationship
-            item_dict['count_unit_3_id'] = item.count_unit_3_id
-            item_dict['count_unit_3_name'] = item.count_unit_3.name if item.count_unit_3 else None
-            item_dict['count_unit_3_factor'] = float(item.count_unit_3.contains_quantity) if item.count_unit_3 and item.count_unit_3.contains_quantity else None
+            item_dict['count_unit_3_id'] = None
+            item_dict['count_unit_3_name'] = None
+            item_dict['count_unit_3_factor'] = None
 
         # Get pricing from Hub vendor items (source of truth)
         # This is the cost per vendor's pricing unit
@@ -511,39 +520,47 @@ async def get_master_item(
     item_dict['secondary_unit_name'] = item.secondary_unit_rel.name if item.secondary_unit_rel else item.secondary_unit
 
     # Get count units from MasterItemCountUnit table (new architecture)
-    # Sort by display_order: primary first, then by display_order
-    count_units = sorted(item.count_units, key=lambda cu: (not cu.is_primary, cu.display_order or 0))
+    # Sort by display_order — position 0 is the preferred counting unit
+    count_units = sorted(item.count_units, key=lambda cu: (cu.display_order or 0))
 
-    # Primary count unit (first one, should be is_primary=True)
+    # Primary count unit (is_primary=True) — used for pricing/costing
     primary_cu = next((cu for cu in count_units if cu.is_primary), None)
     if primary_cu:
         item_dict['primary_count_unit_id'] = primary_cu.uom_id
         item_dict['primary_count_unit_name'] = primary_cu.uom_name
         item_dict['primary_count_unit_abbr'] = primary_cu.uom_abbreviation
 
-    # Secondary count units (count_unit_2 and count_unit_3)
-    secondary_units = [cu for cu in count_units if not cu.is_primary]
+    # Count Unit 1 (preferred counting unit — display_order=0)
+    if len(count_units) >= 1:
+        cu1 = count_units[0]
+        item_dict['count_unit_1_id'] = cu1.uom_id
+        item_dict['count_unit_1_name'] = cu1.uom_name
+        item_dict['count_unit_1_factor'] = float(cu1.conversion_to_primary) if cu1.conversion_to_primary else None
+    else:
+        item_dict['count_unit_1_id'] = None
+        item_dict['count_unit_1_name'] = None
+        item_dict['count_unit_1_factor'] = None
 
-    # Count Unit 2
-    if len(secondary_units) >= 1:
-        cu2 = secondary_units[0]
+    # Count Unit 2 (second by display_order)
+    if len(count_units) >= 2:
+        cu2 = count_units[1]
         item_dict['count_unit_2_id'] = cu2.uom_id
         item_dict['count_unit_2_name'] = cu2.uom_name
         item_dict['count_unit_2_factor'] = float(cu2.conversion_to_primary) if cu2.conversion_to_primary else None
     else:
         item_dict['count_unit_2_id'] = None
-        item_dict['count_unit_2_name'] = item.count_unit_2.name if item.count_unit_2 else None  # Fallback to deprecated
+        item_dict['count_unit_2_name'] = None
         item_dict['count_unit_2_factor'] = None
 
-    # Count Unit 3
-    if len(secondary_units) >= 2:
-        cu3 = secondary_units[1]
+    # Count Unit 3 (third by display_order)
+    if len(count_units) >= 3:
+        cu3 = count_units[2]
         item_dict['count_unit_3_id'] = cu3.uom_id
         item_dict['count_unit_3_name'] = cu3.uom_name
         item_dict['count_unit_3_factor'] = float(cu3.conversion_to_primary) if cu3.conversion_to_primary else None
     else:
         item_dict['count_unit_3_id'] = None
-        item_dict['count_unit_3_name'] = item.count_unit_3.name if item.count_unit_3 else None  # Fallback to deprecated
+        item_dict['count_unit_3_name'] = None
         item_dict['count_unit_3_factor'] = None
 
     # Include all count units for advanced UI
@@ -555,7 +572,8 @@ async def get_master_item(
             'uom_abbreviation': cu.uom_abbreviation,
             'is_primary': cu.is_primary,
             'conversion_to_primary': float(cu.conversion_to_primary) if cu.conversion_to_primary else 1.0,
-            'display_order': cu.display_order or 0
+            'display_order': cu.display_order or 0,
+            'is_active': cu.is_active if cu.is_active is not None else True
         }
         for cu in count_units
     ]
@@ -2440,4 +2458,90 @@ async def update_item_count_units(
         )
 
     # Return updated count units
+    return await get_item_count_units(item_id, db, current_user)
+
+
+@router.put("/{item_id}/count-unit-order")
+async def update_count_unit_order(
+    item_id: int,
+    request: Request,
+    count_unit_1_uom_id: int = None,
+    count_unit_2_uom_id: Optional[int] = None,
+    count_unit_3_uom_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_manager_or_admin)
+):
+    """
+    Update the display order of count units for inventory counting.
+
+    This only reorders existing count units — it does NOT create new ones
+    or change conversion factors. Count units define which UOMs are available
+    during inventory counts and their preferred order.
+
+    Count Unit 1 is the default unit shown in inventory count sessions.
+    """
+    from restaurant_inventory.models.master_item_count_unit import MasterItemCountUnit
+
+    item = db.query(MasterItem).filter(MasterItem.id == item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Master item not found")
+
+    existing_units = db.query(MasterItemCountUnit).filter(
+        MasterItemCountUnit.master_item_id == item_id
+    ).all()
+
+    if not existing_units:
+        raise HTTPException(status_code=400, detail="No count units defined for this item. Add units in the Units of Measure section first.")
+
+    # Build a lookup by uom_id
+    unit_by_uom = {cu.uom_id: cu for cu in existing_units}
+
+    # Validate all requested UOM IDs exist as count units for this item
+    requested = [count_unit_1_uom_id]
+    if count_unit_2_uom_id:
+        requested.append(count_unit_2_uom_id)
+    if count_unit_3_uom_id:
+        requested.append(count_unit_3_uom_id)
+
+    for uom_id in requested:
+        if uom_id and uom_id not in unit_by_uom:
+            raise HTTPException(
+                status_code=400,
+                detail=f"UOM ID {uom_id} is not a defined count unit for this item"
+            )
+
+    changes_made = []
+
+    # Assign display_order based on the requested order
+    # Units not in the requested list keep their current order but shifted after
+    ordered_ids = [uid for uid in requested if uid]
+    next_order = 0
+
+    for uom_id in ordered_ids:
+        cu = unit_by_uom[uom_id]
+        if cu.display_order != next_order:
+            changes_made.append(f"Reordered {cu.uom_name} to position {next_order + 1}")
+            cu.display_order = next_order
+        next_order += 1
+
+    # Any remaining units not in the selection get pushed to the end
+    for cu in existing_units:
+        if cu.uom_id not in ordered_ids:
+            if cu.display_order != next_order:
+                cu.display_order = next_order
+            next_order += 1
+
+    db.commit()
+
+    if changes_made:
+        log_audit_event(
+            db=db,
+            action="REORDER_COUNT_UNITS",
+            entity_type="item",
+            entity_id=item_id,
+            user=current_user,
+            changes={"count_unit_order": changes_made},
+            request=request
+        )
+
     return await get_item_count_units(item_id, db, current_user)

@@ -415,20 +415,13 @@
         }
     }
 
-    // Load units of measure from Hub (source of truth)
+    // Load units of measure (local Inventory UOMs - IDs match stored data)
     async function loadUnitsOfMeasure() {
         try {
-            const response = await apiRequest('api/units/hub');
+            const response = await apiRequest('api/units/');
             unitsOfMeasure = response;
         } catch (error) {
-            console.error('Error loading Hub units:', error);
-            // Fallback to local units
-            try {
-                const localResponse = await apiRequest('api/units/');
-                unitsOfMeasure = localResponse;
-            } catch (e) {
-                console.error('Error loading local units:', e);
-            }
+            console.error('Error loading units:', error);
         }
     }
 

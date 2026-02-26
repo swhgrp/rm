@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** February 25, 2026
+**Last Updated:** February 26, 2026
 **Status:** ~98% Complete - All 10 Systems Production Ready ✅
-**Latest:** HR location-based employee filtering fix, toggle switch UI for location assignments across HR/Inventory/Events (Feb 25, 2026) ✅
+**Latest:** UOM simplification — removed multi-UOM system, single `pack_to_primary_factor` per vendor item with auto-calculation on save (Feb 26, 2026) ✅
 
 ---
 
@@ -31,7 +31,7 @@
 
 The SW Hospitality Group Restaurant Management System is a comprehensive microservices platform handling all aspects of restaurant operations including inventory management, human resources, accounting, event planning, and third-party integrations.
 
-### Key Statistics (Verified Feb 25, 2026)
+### Key Statistics (Verified Feb 26, 2026)
 - **10 microservices** running in production (including Maintenance & Food Safety)
 - **490+ Python files** across all systems
 - **170+ HTML templates** for user interfaces
@@ -690,12 +690,14 @@ restaurant-system/
 - **Inventory owns:** Master Items, Count Units, Location Costs, Locations
 - **Location-aware pricing:** Vendor items track prices per location from invoices
 - **Weighted average costing:** Hub updates Inventory's `MasterItemLocationCost` on invoice processing
-- **Multi-UOM system:** `matched_uom_id` on invoice items links to `vendor_item_uoms` with conversion factors for accurate cost calculation (legacy `price_is_per_unit` flag still set during transition)
+- **Single purchase UOM per vendor item:** `pack_to_primary_factor` auto-calculated from size fields; cost calc: `unit_price / pack_to_primary_factor`
+- **DEPRECATED:** `vendor_item_uoms` table and `matched_uom_id` column retained for history but no longer used
 
-**🆕 UOM Restructure & Vendor Parsing Rules (Feb 11, 2026):**
-- ✅ **`price_is_per_unit` flag** - Boolean on invoice items distinguishes per-unit (EA/BTL) vs per-case (CS) pricing
-- ✅ **Set at mapping time** - Auto-mapper and manual mapping compare parsed UOM against vendor item's `purchase_unit_abbr`
-- ✅ **Cost updater uses flag** - Replaces fragile string matching with structured flag (with fallback for legacy data)
+**🆕 UOM Simplification (Feb 26, 2026):**
+- ✅ **Single purchase UOM** - Each vendor item has one purchase UOM defined by `pack_to_primary_factor`
+- ✅ **Auto-calculation** - `pack_to_primary_factor` computed on save: `units_per_case × size_quantity` (weight/count) or `units_per_case` (volume)
+- ✅ **Removed multi-UOM system** - `vendor_item_uoms` CRUD endpoints, `match_invoice_uom_to_vendor_uom()`, Purchase UOMs UI section all removed
+- ✅ **Simplified cost path** - Single deterministic `cost_per_primary = unit_price / pack_to_primary_factor` (no fallbacks)
 - ✅ **Vendor parsing rules** - Per-vendor AI instructions for invoice column disambiguation (e.g., Breakthru Case/Btles/Pieces columns)
 - ✅ **Vendor item imports** - Republic National Distributing (32 items from eRNDC), Southern Glaziers (148 items from CSV)
 
@@ -1313,7 +1315,7 @@ docker compose exec inventory-db psql -U inventory_user -d inventory_db -c "\l+"
 - **Hub provides:** Vendor items, pricing, invoices, GL mappings, UOM, Categories (source of truth)
 - **Inventory provides:** Master items, count units, location costs, locations
 - **Location-aware costing:** Hub updates `MasterItemLocationCost` when invoices are processed
-- **Multi-UOM pricing:** `matched_uom_id` links invoice items to vendor UOMs with conversion factors; legacy `price_is_per_unit` flag as fallback
+- **Single purchase UOM:** `pack_to_primary_factor` on vendor items defines purchase-to-primary-unit conversion; auto-calculated from size fields
 - **Location sync:** Accounting fetches locations from Inventory via `/_sync` endpoint
 - **Note:** Hub is authoritative for vendor/pricing data; Inventory owns item costs and locations
 
@@ -1532,7 +1534,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 | HR | ✅ Production | 60+ | 17 | 20+ | **~95%** | Required docs, e-signatures, audit logging |
 | Accounting | ✅ Production | 119 | 38+ | 26+ | **~95%** 🌟 | Plaid, multi-location reports, AR automation |
 | Events | ✅ Production | 53 | 16 | 17+ | **~99%** 🌟 | Quick Holds, CalDAV sync, public intake |
-| Integration Hub | ✅ Production | 61 | 14 | 18+ | **~98%** 🌟 | Multi-UOM, post-parse validation, AI search |
+| Integration Hub | ✅ Production | 61 | 14 | 18+ | **~98%** 🌟 | Single-UOM pricing, post-parse validation, AI search |
 | Files | ✅ Production | 18 | 4 | 7 | **~85%** | WebDAV sync + OnlyOffice editing |
 | Websites | ✅ Production | 7 | 18 | 11+ | **~90%** | Block-based page builder, menu management |
 | Maintenance | ✅ Production | 16 | 5 | 10 | **100%** 🌟 | Equipment, work orders, PM schedules |
@@ -1556,7 +1558,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 **Version:** 4.0
-**Last Updated:** February 14, 2026
+**Last Updated:** February 26, 2026
 **Maintained By:** SW Hospitality Group Development Team
 
 **For complete system details, see [SYSTEM_DOCUMENTATION.md](./SYSTEM_DOCUMENTATION.md)**
@@ -1564,6 +1566,29 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 ## 📝 Recent Updates
+
+### February 26, 2026 - UOM Simplification & Pack Factor Auto-Calculation
+
+**Single Purchase UOM per Vendor Item:**
+- ✅ **Removed multi-UOM system** — `vendor_item_uoms` table deprecated, Purchase UOMs UI card and CRUD endpoints removed
+- ✅ **Single cost path** — `cost_per_primary = unit_price / pack_to_primary_factor` everywhere (cost updater, auto-mapper, manual mapping)
+- ✅ **Auto-calculate `pack_to_primary_factor`** — Computed on vendor item save from size fields: `units_per_case × size_quantity` (weight/count items) or `units_per_case` (volume items)
+- ✅ **Backfilled all existing vendor items** — 418+ items updated with correct `pack_to_primary_factor`
+- ✅ **Inventory master item display fix** — Vendors table and Estimated Cost now use `pack_to_primary_factor` (was using deprecated `conversion_factor`)
+
+**Removed Code:**
+- `match_invoice_uom_to_vendor_uom()` function from auto_mapper.py
+- 5 UOM CRUD endpoints (`GET/POST/PUT/DELETE /vendor-items/{id}/uoms`, `set-default`)
+- `PurchaseUOMCreate`, `PurchaseUOMUpdate`, `PurchaseUOMResponse` schemas
+- Purchase UOMs card, modal, and JS functions from vendor_item_detail.html
+- Auto-creation of VendorItemUOM records in vendor_item_review.py
+
+**Migration:** `20260226_0001_deprecate_vendor_item_uoms.py`
+- Drops FK constraint from `hub_invoice_items.matched_uom_id` → `vendor_item_uoms`
+- Nulls all `matched_uom_id` values
+- Drops `ix_hub_invoice_items_matched_uom_id` index
+
+---
 
 ### February 14, 2026 - Food Safety Enhancements & HR Docs Fix
 
@@ -1592,11 +1617,12 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ### February 11, 2026 - Multi-UOM System & Catch-Weight Support
 
-**Multi-UOM Architecture:**
-- ✅ **`vendor_item_uoms` table** - Multiple purchase UOMs per vendor item with conversion factors
-- ✅ **`matched_uom_id`** - Invoice items linked to specific vendor UOM at mapping time
-- ✅ **Cost calculation** - `cost_per_primary = unit_price / conversion_factor`
-- ✅ **UOM normalizer** - Standardizes invoice UOM strings (CS→cs, BTL→btl, LB→lb)
+> **Note:** The multi-UOM system (`vendor_item_uoms` table, `matched_uom_id`) was **superseded on Feb 26, 2026** by a single purchase UOM per vendor item using `pack_to_primary_factor`. See Feb 26 changelog entry.
+
+**Multi-UOM Architecture (DEPRECATED):**
+- ~~`vendor_item_uoms` table - Multiple purchase UOMs per vendor item~~ → Replaced by single `pack_to_primary_factor`
+- ~~`matched_uom_id` - Invoice items linked to specific vendor UOM~~ → FK dropped, column nulled
+- ✅ **Cost calculation** - `cost_per_primary = unit_price / pack_to_primary_factor` (simplified single path)
 - ✅ **Catch-weight support** - Variable-weight items (meat/seafood) parsed from invoice weight fields
 - ✅ **GFS dual-format parsing** - Delivery (903x) and Store (864x/945x/955x) invoice formats
 
@@ -1604,10 +1630,10 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ### February 11, 2026 - Integration Hub UOM Restructure 📏
 
-**UOM Pricing Flag (`price_is_per_unit`):**
-- ✅ **New `price_is_per_unit` column** on `hub_invoice_items` — distinguishes per-unit (EA/BTL) vs per-case (CS) pricing
-- ✅ **Set at mapping time** — Auto-mapper and manual mapping compare invoice UOM against vendor item's `purchase_unit_abbr`
-- ✅ **Cost updater uses flag** — Replaces fragile string matching for cost-per-primary-unit calculation
+> **Note:** `price_is_per_unit` flag is **no longer used for cost calculation** as of Feb 26, 2026. Cost updater uses `pack_to_primary_factor` exclusively.
+
+**UOM Pricing Flag (`price_is_per_unit`) — DEPRECATED for cost calc:**
+- ✅ **`price_is_per_unit` column** on `hub_invoice_items` — still set for display purposes
 - ✅ **Pack size override** — Vendor item's `units_per_case` overrides AI-parsed pack_size
 - ✅ **Vendor parsing rules** — Breakthru Beverage Case/Btles/Pieces column disambiguation
 - ✅ **Vendor item imports** — Republic National Distributing (32 items), Southern Glaziers (148 items)
@@ -2295,7 +2321,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 **Version:** 4.0 - All 10 Systems Production Ready
-**Last Updated:** February 14, 2026
+**Last Updated:** February 26, 2026
 **Documentation Health:** 96/100 - Excellent ✅
 
-*Food Safety incident management, HR required docs fix, Multi-UOM system, post-parse validation, documentation audit.*
+*UOM simplification, single purchase UOM per vendor item, auto-calculated pack_to_primary_factor, post-parse validation, documentation audit.*
