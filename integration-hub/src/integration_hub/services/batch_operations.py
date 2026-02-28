@@ -78,9 +78,10 @@ class BatchOperationsService:
                 invoice.approved_at = get_now()
                 invoice.approved_by = approved_by
 
-                # Update status if pending
+                # Re-evaluate status (checks unmapped, UOM, master items)
                 if invoice.status == 'pending':
-                    invoice.status = 'ready'
+                    from integration_hub.services.invoice_status import update_invoice_status
+                    update_invoice_status(invoice, self.db)
 
                 results['approved'] += 1
 

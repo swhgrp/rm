@@ -355,7 +355,8 @@ class AutoMapperService:
         self,
         item_code: str,
         vendor_id: int = None,
-        location_id: int = None
+        location_id: int = None,
+        item_description: str = None
     ) -> Optional[Dict]:
         """
         Match item code against Hub vendor_items.vendor_sku
@@ -367,10 +368,15 @@ class AutoMapperService:
 
         Handles leading zeros: invoice may have '390982' while inventory has '000390982'
 
+        Name safety check: If item_description is provided, verifies that the invoice
+        description is reasonably similar to the vendor item's product name. This catches
+        cases where vendors reassign SKUs to different products.
+
         Args:
             item_code: The item code/SKU to match
             vendor_id: Optional vendor ID to scope the search (Hub vendor ID)
             location_id: Optional location ID for location-specific matching
+            item_description: Optional invoice item description for name similarity check
         """
         if not item_code:
             return None
@@ -381,75 +387,55 @@ class AutoMapperService:
 
         vendor_items = self.fetch_vendor_items()
 
+        def _sku_matches(vendor_sku, item_code_clean, item_code_normalized):
+            """Check if vendor SKU matches the item code (exact or normalized)"""
+            if not vendor_sku:
+                return False
+            vendor_sku_clean = str(vendor_sku).strip()
+            vendor_sku_normalized = vendor_sku_clean.lstrip('0') or '0'
+            return vendor_sku_clean == item_code_clean or vendor_sku_normalized == item_code_normalized
+
+        def _check_name_similarity(vi, match_type, threshold=0.5):
+            """Verify SKU match with name similarity check. Returns vi or None."""
+            if item_description and vi.get('vendor_product_name'):
+                similarity = calculate_similarity(item_description, vi['vendor_product_name'])
+                if similarity < threshold:
+                    logger.warning(
+                        f"SKU match ({match_type}) REJECTED for {item_code}: "
+                        f"invoice desc '{item_description}' vs vendor item {vi['id']} "
+                        f"'{vi['vendor_product_name']}' — similarity {similarity:.2f} < {threshold} "
+                        f"(possible SKU reassignment by vendor)"
+                    )
+                    return None
+            logger.debug(f"SKU match ({match_type}): {item_code} → vendor item {vi['id']}")
+            return vi
+
         # Pass 1: Location-specific match (if location provided)
+        # Same vendor + exact SKU = trust it (no name similarity check)
         if location_id:
             for vi in vendor_items:
-                # Match by vendor + location
                 if vendor_id and vi.get('vendor_id') != vendor_id:
                     continue
                 if vi.get('location_id') != location_id:
                     continue
-
-                vendor_sku = vi.get('vendor_sku')
-                if not vendor_sku:
-                    continue
-
-                vendor_sku_clean = str(vendor_sku).strip()
-                vendor_sku_normalized = vendor_sku_clean.lstrip('0') or '0'
-
-                # Try exact match first
-                if vendor_sku_clean == item_code_clean:
-                    logger.debug(f"SKU match (location-specific): {item_code} → vendor item {vi['id']} at location {location_id}")
-                    return vi
-
-                # Try normalized match (handles leading zeros difference)
-                if vendor_sku_normalized == item_code_normalized:
-                    logger.debug(f"SKU match (location-specific, normalized): {item_code} → vendor item {vi['id']} at location {location_id}")
+                if _sku_matches(vi.get('vendor_sku'), item_code_clean, item_code_normalized):
+                    logger.debug(f"SKU match (location-specific): {item_code} → vendor item {vi['id']}")
                     return vi
 
         # Pass 2: Vendor-only match (any location) - for cross-location item discovery
+        # Same vendor + exact SKU = trust it (no name similarity check)
         for vi in vendor_items:
-            # If vendor_id specified, only match within that vendor
             if vendor_id and vi.get('vendor_id') != vendor_id:
                 continue
-
-            vendor_sku = vi.get('vendor_sku')
-            if not vendor_sku:
-                continue
-
-            vendor_sku_clean = str(vendor_sku).strip()
-            vendor_sku_normalized = vendor_sku_clean.lstrip('0') or '0'
-
-            # Try exact match first
-            if vendor_sku_clean == item_code_clean:
-                logger.debug(f"SKU match (cross-location): {item_code} → vendor item {vi['id']} from location {vi.get('location_id')}")
-                return vi
-
-            # Try normalized match (handles leading zeros difference)
-            if vendor_sku_normalized == item_code_normalized:
-                logger.debug(f"SKU match (cross-location, normalized): {item_code} → vendor item {vi['id']} from location {vi.get('location_id')}")
+            if _sku_matches(vi.get('vendor_sku'), item_code_clean, item_code_normalized):
+                logger.debug(f"SKU match (cross-location): {item_code} → vendor item {vi['id']}")
                 return vi
 
         # Pass 3: Cross-vendor SKU match - handles vendor aliases/duplicates
-        # Only runs if vendor_id was specified but no match found within that vendor
-        # This catches cases where the same product exists under a different vendor alias
         if vendor_id:
             for vi in vendor_items:
-                vendor_sku = vi.get('vendor_sku')
-                if not vendor_sku:
-                    continue
-
-                vendor_sku_clean = str(vendor_sku).strip()
-                vendor_sku_normalized = vendor_sku_clean.lstrip('0') or '0'
-
-                # Try exact match
-                if vendor_sku_clean == item_code_clean:
-                    logger.debug(f"SKU match (cross-vendor): {item_code} → vendor item {vi['id']} (vendor {vi.get('vendor_id')} vs invoice vendor {vendor_id})")
-                    return vi
-
-                # Try normalized match
-                if vendor_sku_normalized == item_code_normalized:
-                    logger.debug(f"SKU match (cross-vendor, normalized): {item_code} → vendor item {vi['id']} (vendor {vi.get('vendor_id')} vs invoice vendor {vendor_id})")
+                if _sku_matches(vi.get('vendor_sku'), item_code_clean, item_code_normalized):
+                    logger.debug(f"SKU match (cross-vendor): {item_code} → vendor item {vi['id']}")
                     return vi
 
         return None
@@ -543,9 +529,20 @@ class AutoMapperService:
 
         best_vi, best_dist, best_desc = scored[0]
 
-        # Decision logic
+        # Decision logic — always require description confirmation
         if best_dist == 1 and len(scored) == 1:
-            # Single distance-1 match — high confidence, accept without description
+            # Single distance-1 match — still require description to prevent wrong product mapping
+            if not item_description:
+                logger.debug(f"Near-SKU skip (d=1): no description to confirm '{item_code}'")
+                return None
+            if best_desc < min_desc_similarity:
+                logger.warning(
+                    f"Near-SKU REJECTED (d=1): '{item_code}' → '{best_vi.get('vendor_sku')}' "
+                    f"({best_vi.get('vendor_product_name', '')[:40]}) — "
+                    f"desc similarity {best_desc:.2f} < {min_desc_similarity} "
+                    f"(invoice desc: '{item_description[:50]}')"
+                )
+                return None
             logger.info(
                 f"Near-SKU match (d=1): '{item_code}' → '{best_vi.get('vendor_sku')}' "
                 f"({best_vi.get('vendor_product_name', '')[:40]}) [desc={best_desc:.2f}]"
@@ -868,6 +865,7 @@ class AutoMapperService:
             'method': method,
             'confidence': confidence,
             'vendor_item_id': vendor_item['id'],  # Hub vendor item ID
+            'vendor_sku': vendor_item.get('vendor_sku'),
             'inventory_vendor_item_id': vendor_item.get('inventory_vendor_item_id'),
             'vendor_item_name': vendor_item.get('vendor_product_name'),
             'master_item_id': vendor_item.get('inventory_master_item_id'),
@@ -926,7 +924,7 @@ class AutoMapperService:
 
         # 1. Try SKU match against Hub vendor items (location-aware)
         if item.item_code:
-            vendor_item = self.match_by_sku(item.item_code, vendor_id, location_id)
+            vendor_item = self.match_by_sku(item.item_code, vendor_id, location_id, item_description=item.item_description)
             if vendor_item:
                 result = self._build_mapping_result(vendor_item, 'sku_match', confidence=1.0)
                 # Track if this was a cross-location match
@@ -1013,6 +1011,11 @@ class AutoMapperService:
             if mapping_result.get('vendor_item_id'):
                 item.inventory_item_id = mapping_result.get('vendor_item_id')
                 item.mapping_method = mapping_result.get('method')
+                # Overwrite parsed code/description with canonical vendor item values
+                if mapping_result.get('vendor_sku'):
+                    item.item_code = mapping_result['vendor_sku']
+                if mapping_result.get('vendor_item_name'):
+                    item.item_description = mapping_result['vendor_item_name']
 
             # Store master item info if available
             if mapping_result.get('inventory_vendor_item_id'):

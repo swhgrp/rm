@@ -338,6 +338,19 @@ async def create_unit(
         UnitOfMeasure.is_active == False,
         (UnitOfMeasure.name == unit_data.name) | (UnitOfMeasure.abbreviation == unit_data.abbreviation)
     ).first()
+    # Derive dimension from category name
+    cat_lower = category.name.lower()
+    if 'weight' in cat_lower:
+        dimension = 'weight'
+    elif 'volume' in cat_lower or 'liquid' in cat_lower:
+        dimension = 'volume'
+    elif 'count' in cat_lower:
+        dimension = 'count'
+    elif 'length' in cat_lower:
+        dimension = 'length'
+    else:
+        dimension = cat_lower.split()[0] if cat_lower else None
+
     if inactive_unit:
         # Reactivate the unit with the new data
         inactive_unit.is_active = True
@@ -345,6 +358,7 @@ async def create_unit(
         inactive_unit.abbreviation = unit_data.abbreviation
         inactive_unit.reference_unit_id = unit_data.reference_unit_id
         inactive_unit.contains_quantity = unit_data.contains_quantity
+        inactive_unit.dimension = dimension
         db.commit()
         db.refresh(inactive_unit)
 
@@ -362,7 +376,7 @@ async def create_unit(
         unit_dict['reference_unit_name'] = inactive_unit.reference_unit.abbreviation if inactive_unit.reference_unit else None
         return UnitOfMeasureResponse(**unit_dict)
 
-    unit = UnitOfMeasure(**unit_data.model_dump())
+    unit = UnitOfMeasure(**unit_data.model_dump(), dimension=dimension)
     db.add(unit)
     db.commit()
     db.refresh(unit)

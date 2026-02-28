@@ -366,7 +366,8 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
                     "container": container_name,  # e.g., "can"
                     "size_quantity": float(vi.size_quantity) if vi.size_quantity else None,
                     "uom_complete": uom_check['is_complete'],
-                    "uom_missing": uom_check['missing_fields']
+                    "uom_missing": uom_check['missing_fields'],
+                    "has_master_item": bool(vi.inventory_master_item_id)
                 }
     except Exception as e:
         import logging
@@ -840,14 +841,11 @@ async def save_uploaded_invoice(
         except Exception as e:
             logger.error(f"Error auto-mapping items: {str(e)}")
 
-    # Update status based on mapping results
+    # Update status based on mapping results (checks unmapped, UOM, master items)
     items = db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice.id).all()
     if items:
-        unmapped_count = sum(1 for item in items if not item.is_mapped)
-        if unmapped_count == 0:
-            invoice.status = 'ready'
-        else:
-            invoice.status = 'mapping'
+        from integration_hub.services.invoice_status import update_invoice_status
+        update_invoice_status(invoice, db)
         db.commit()
 
     # Redirect to the invoice detail page
@@ -873,6 +871,33 @@ async def get_uploaded_pdf(pdf_path: str = Query(...)):
         filename=path.name,
         content_disposition_type="inline"  # Display in browser instead of downloading
     )
+
+
+async def _send_invoice_background(invoice_id: int):
+    """
+    Background task to send invoice to Inventory and Accounting.
+    Uses its own DB session to avoid lifecycle issues with request-scoped sessions.
+    """
+    from integration_hub.db.database import SessionLocal
+    import logging
+
+    logger = logging.getLogger(__name__)
+    db = SessionLocal()
+
+    try:
+        inventory_sender = get_inventory_sender(INVENTORY_API_URL)
+        accounting_sender = get_accounting_sender(ACCOUNTING_API_URL)
+        auto_send = get_auto_send_service(inventory_sender, accounting_sender)
+
+        result = await auto_send.send_invoice(invoice_id, db)
+        if result.get('success'):
+            logger.info(f"Background auto-send for invoice {invoice_id} succeeded")
+        else:
+            logger.warning(f"Background auto-send for invoice {invoice_id} failed: {result.get('errors', [])}")
+    except Exception as e:
+        logger.error(f"Background auto-send error for invoice {invoice_id}: {str(e)}")
+    finally:
+        db.close()
 
 
 def _parse_invoice_background(invoice_id: int):
@@ -989,46 +1014,60 @@ def _capture_vendor_alias(db: Session, raw_vendor_name: str, vendor_id: int, log
         return
 
     try:
-        # Check if alias already exists for this normalized name
-        existing = db.query(VendorAlias).filter(
-            VendorAlias.alias_name_normalized == normalized,
-            VendorAlias.vendor_id == vendor_id
+        # Check by exact alias_name first (matches the unique constraint)
+        existing_exact = db.query(VendorAlias).filter(
+            VendorAlias.alias_name == raw_vendor_name.strip()
         ).first()
 
-        if existing:
-            existing.match_count = (existing.match_count or 0) + 1
-            existing.last_used_at = datetime.now(timezone.utc)
-            logger.info(f"Updated existing alias: '{raw_vendor_name}' -> vendor {vendor_id} (match_count: {existing.match_count})")
-        else:
-            # Check if this name is aliased to a DIFFERENT vendor — update it
-            other_alias = db.query(VendorAlias).filter(
-                VendorAlias.alias_name_normalized == normalized
-            ).first()
-
-            if other_alias:
-                # User is correcting a previous alias — update to new vendor
-                old_vendor_id = other_alias.vendor_id
-                other_alias.vendor_id = vendor_id
-                other_alias.match_count = (other_alias.match_count or 0) + 1
-                other_alias.last_used_at = datetime.now(timezone.utc)
-                other_alias.source = 'manual_correction'
+        if existing_exact:
+            if existing_exact.vendor_id != vendor_id:
+                # User is correcting — reassign to new vendor
+                old_vendor_id = existing_exact.vendor_id
+                existing_exact.vendor_id = vendor_id
+                existing_exact.source = 'manual_correction'
                 logger.info(f"Corrected alias: '{raw_vendor_name}' from vendor {old_vendor_id} -> vendor {vendor_id}")
-            else:
-                # Create new alias
-                new_alias = VendorAlias(
-                    alias_name=raw_vendor_name.strip(),
-                    alias_name_normalized=normalized,
-                    vendor_id=vendor_id,
-                    is_active=True,
-                    case_insensitive=True,
-                    source='manual_correction',
-                    confidence=1.0,
-                    match_count=1,
-                    last_used_at=datetime.now(timezone.utc),
-                    created_by='user'
-                )
-                db.add(new_alias)
-                logger.info(f"Created new alias: '{raw_vendor_name}' -> vendor {vendor_id}")
+            existing_exact.match_count = (existing_exact.match_count or 0) + 1
+            existing_exact.last_used_at = datetime.now(timezone.utc)
+            logger.info(f"Updated existing alias: '{raw_vendor_name}' -> vendor {vendor_id} (match_count: {existing_exact.match_count})")
+            return
+
+        # Check by normalized name (catches slight variations in raw text)
+        existing_norm = db.query(VendorAlias).filter(
+            VendorAlias.alias_name_normalized == normalized
+        ).first()
+
+        if existing_norm:
+            if existing_norm.vendor_id != vendor_id:
+                old_vendor_id = existing_norm.vendor_id
+                existing_norm.vendor_id = vendor_id
+                existing_norm.source = 'manual_correction'
+                logger.info(f"Corrected alias: '{raw_vendor_name}' from vendor {old_vendor_id} -> vendor {vendor_id}")
+            existing_norm.match_count = (existing_norm.match_count or 0) + 1
+            existing_norm.last_used_at = datetime.now(timezone.utc)
+            logger.info(f"Updated existing alias (normalized match): '{raw_vendor_name}' -> vendor {vendor_id}")
+            return
+
+        # Create new alias — use savepoint so constraint errors don't break the main transaction
+        new_alias = VendorAlias(
+            alias_name=raw_vendor_name.strip(),
+            alias_name_normalized=normalized,
+            vendor_id=vendor_id,
+            is_active=True,
+            case_insensitive=True,
+            source='manual_correction',
+            confidence=1.0,
+            match_count=1,
+            last_used_at=datetime.now(timezone.utc),
+            created_by='user'
+        )
+        nested = db.begin_nested()
+        try:
+            db.add(new_alias)
+            db.flush()
+            logger.info(f"Created new alias: '{raw_vendor_name}' -> vendor {vendor_id}")
+        except Exception as flush_err:
+            nested.rollback()
+            logger.warning(f"Alias insert failed (likely duplicate): {str(flush_err)}")
     except Exception as e:
         logger.warning(f"Failed to capture vendor alias: {str(e)}")
         # Don't fail the invoice update over an alias error
@@ -1343,7 +1382,12 @@ async def bulk_update_invoice_items(
         raise HTTPException(status_code=404, detail="Invoice not found")
 
     try:
+        from integration_hub.services.auto_mapper import AutoMapperService
+
         updated_count = 0
+        remapped_items = []
+        mapper = None  # Lazy-init only if item_code changes
+
         for item_data in items_data:
             item_id = item_data.get('id')
             if not item_id:
@@ -1358,9 +1402,17 @@ async def bulk_update_invoice_items(
                 logger.warning(f"Item {item_id} not found for invoice {invoice_id}")
                 continue
 
+            # Track if item_code changed (for auto-remap)
+            item_code_changed = False
+            new_item_code = None
+
             # Update allowed fields
             if 'item_code' in item_data:
-                item.item_code = item_data['item_code']
+                new_code = item_data['item_code']
+                if new_code != item.item_code:
+                    item_code_changed = True
+                    new_item_code = new_code
+                item.item_code = new_code
             if 'item_description' in item_data:
                 item.item_description = item_data['item_description']
             if 'pack_size' in item_data:
@@ -1374,16 +1426,60 @@ async def bulk_update_invoice_items(
                 # Recalculate total
                 item.total_amount = float(item.quantity) * float(item.unit_price)
 
+            # Auto-remap when item_code changes
+            if item_code_changed and new_item_code:
+                if mapper is None:
+                    mapper = AutoMapperService(db)
+
+                vendor_id = invoice.vendor_id
+                location_id = invoice.location_id
+
+                match = mapper.match_by_sku(
+                    item_code=new_item_code,
+                    vendor_id=vendor_id,
+                    location_id=location_id
+                )
+
+                if match:
+                    mapping_result = mapper._build_mapping_result(match, method='sku', confidence=1.0)
+                    mapper.apply_mapping(item, mapping_result)
+                    remapped_items.append({
+                        'item_id': item.id,
+                        'status': 'mapped',
+                        'vendor_item_name': match.get('vendor_product_name'),
+                        'vendor_sku': match.get('vendor_sku'),
+                        'category': match.get('category')
+                    })
+                    logger.info(f"Auto-remapped item {item.id} via item_code change: {new_item_code} → vendor item {match['id']}")
+                else:
+                    # Clear mapping if code changed but no match found
+                    item.inventory_item_id = None
+                    item.is_mapped = False
+                    item.mapping_method = None
+                    item.inventory_category = None
+                    item.gl_asset_account = None
+                    item.gl_cogs_account = None
+                    item.gl_waste_account = None
+                    remapped_items.append({
+                        'item_id': item.id,
+                        'status': 'not_found',
+                        'item_code': new_item_code
+                    })
+                    logger.info(f"Item {item.id} item_code changed to {new_item_code} but no vendor item match found")
+
             updated_count += 1
 
         db.commit()
         logger.info(f"Updated {updated_count} items for invoice {invoice_id}")
 
-        return {
+        result = {
             "success": True,
             "message": f"Updated {updated_count} items",
             "updated_count": updated_count
         }
+        if remapped_items:
+            result["remapped_items"] = remapped_items
+        return result
 
     except Exception as e:
         db.rollback()
@@ -2476,6 +2572,10 @@ async def map_item(
     # Get invoice for vendor_id (needed for learned mapping)
     invoice = db.query(HubInvoice).filter(HubInvoice.id == item.invoice_id).first()
 
+    # Save original parsed values for learned mapping (before overwriting with vendor item values)
+    original_item_code = item.item_code
+    original_item_description = item.item_description
+
     # Update mapping
     item.inventory_item_id = inventory_item_id
     item.inventory_category = inventory_category
@@ -2489,6 +2589,12 @@ async def map_item(
     if inventory_item_id:
         vendor_item = db.query(HubVendorItem).filter(HubVendorItem.id == inventory_item_id).first()
         if vendor_item:
+            # Overwrite parsed code/description with canonical vendor item values
+            if vendor_item.vendor_sku:
+                item.item_code = vendor_item.vendor_sku
+            if vendor_item.vendor_product_name:
+                item.item_description = vendor_item.vendor_product_name
+
             from integration_hub.services.auto_mapper import determine_price_is_per_unit
             item.price_is_per_unit = determine_price_is_per_unit(
                 item.unit_of_measure,
@@ -2517,8 +2623,8 @@ async def map_item(
             mapper = get_auto_mapper(db)
             mapper.save_learned_mapping(
                 vendor_id=invoice.vendor_id,
-                item_code=item.item_code,
-                item_description=item.item_description,
+                item_code=original_item_code,
+                item_description=original_item_description,
                 vendor_item_id=inventory_item_id
             )
         except Exception as e:
@@ -2526,31 +2632,18 @@ async def map_item(
             import logging
             logging.getLogger(__name__).warning(f"Failed to save learned mapping: {str(e)}")
 
-    # Check if invoice is now fully mapped
+    # Re-evaluate invoice status (checks unmapped, UOM completeness, master item links)
     invoice = db.query(HubInvoice).filter(HubInvoice.id == item.invoice_id).first()
-    unmapped_count = db.query(HubInvoiceItem).filter(
-        HubInvoiceItem.invoice_id == invoice.id,
-        HubInvoiceItem.is_mapped == False
-    ).count()
+    from integration_hub.services.invoice_status import update_invoice_status
+    new_status = update_invoice_status(invoice, db)
+    db.commit()
 
-    invoice_ready = unmapped_count == 0
+    invoice_ready = new_status == 'ready'
 
     if invoice_ready:
-        invoice.status = 'ready'
-        db.commit()
-
-        # Trigger auto-send
-        try:
-            inventory_sender = get_inventory_sender(INVENTORY_API_URL)
-            accounting_sender = get_accounting_sender(ACCOUNTING_API_URL)
-            auto_send = get_auto_send_service(inventory_sender, accounting_sender)
-
-            # Send in background (non-blocking)
-            import asyncio
-            asyncio.create_task(auto_send.send_invoice(invoice.id, db))
-        except Exception as e:
-            # Log but don't fail the mapping operation
-            print(f"Auto-send trigger failed: {str(e)}")
+        # Trigger auto-send in background with its own DB session
+        import asyncio
+        asyncio.create_task(_send_invoice_background(invoice.id))
 
     return {"success": True, "item_id": item_id, "invoice_ready": invoice_ready}
 
@@ -2597,6 +2690,11 @@ async def map_items_by_description(
     if not items:
         raise HTTPException(status_code=404, detail=f"No items found with description: {item_description}")
 
+    # Look up vendor item for canonical SKU/name
+    vendor_item = None
+    if inventory_item_id:
+        vendor_item = db.query(HubVendorItem).filter(HubVendorItem.id == inventory_item_id).first()
+
     # Update all matching items
     items_mapped = 0
     invoices_affected = set()
@@ -2609,6 +2707,12 @@ async def map_items_by_description(
         item.gl_waste_account = gl_waste_account_int
         item.is_mapped = True
         item.mapping_method = 'manual_bulk'
+        # Overwrite parsed code/description with canonical vendor item values
+        if vendor_item:
+            if vendor_item.vendor_sku:
+                item.item_code = vendor_item.vendor_sku
+            if vendor_item.vendor_product_name:
+                item.item_description = vendor_item.vendor_product_name
         items_mapped += 1
         invoices_affected.add(item.invoice_id)
 
@@ -2680,8 +2784,8 @@ async def map_items_by_description(
                 }
             )
 
-    # Auto-verify item codes when user maps items
-    # This confirms the item code is correct since user is mapping it
+    # Only auto-verify item codes that are already verified or in inventory
+    # Don't auto-verify suspicious/unverified codes — user must explicitly verify those
     item_codes_to_verify = set()
     for item in items:
         if item.item_code:
@@ -2689,61 +2793,40 @@ async def map_items_by_description(
 
     if item_codes_to_verify:
         for code in item_codes_to_verify:
-            # Check if item code already exists in mapping
             existing_code = db.execute(
                 sql_text("SELECT id, is_verified FROM item_code_mapping WHERE item_code = :code"),
                 {"code": code}
             ).fetchone()
 
-            if existing_code:
-                # Mark as verified if not already
-                if not existing_code[1]:  # is_verified
-                    db.execute(
-                        sql_text("""
-                            UPDATE item_code_mapping
-                            SET is_verified = true, updated_at = NOW()
-                            WHERE item_code = :code
-                        """),
-                        {"code": code}
-                    )
-            else:
-                # Create new verified item code mapping
+            if existing_code and existing_code[1]:
+                # Already verified — no action needed
+                pass
+            elif not existing_code:
+                # New code — record it but don't auto-verify
                 db.execute(
                     sql_text("""
                         INSERT INTO item_code_mapping
                         (item_code, canonical_description, occurrence_count, is_verified, created_at)
-                        VALUES (:code, :desc, :count, true, NOW())
+                        VALUES (:code, :desc, :count, false, NOW())
                     """),
                     {"code": code, "desc": item_description, "count": len(items)}
                 )
 
     db.commit()
 
-    # Check each affected invoice to see if it's now fully mapped
+    # Re-evaluate status for each affected invoice (checks unmapped, UOM, master items)
+    from integration_hub.services.invoice_status import update_invoice_status
     invoices_ready = []
     for invoice_id in invoices_affected:
         invoice = db.query(HubInvoice).filter(HubInvoice.id == invoice_id).first()
-        unmapped_count = db.query(HubInvoiceItem).filter(
-            HubInvoiceItem.invoice_id == invoice_id,
-            HubInvoiceItem.is_mapped == False
-        ).count()
+        new_status = update_invoice_status(invoice, db)
 
-        if unmapped_count == 0:
-            invoice.status = 'ready'
+        if new_status == 'ready':
             invoices_ready.append(invoice.invoice_number)
 
-            # Trigger auto-send
-            try:
-                inventory_sender = get_inventory_sender(INVENTORY_API_URL)
-                accounting_sender = get_accounting_sender(ACCOUNTING_API_URL)
-                auto_send = get_auto_send_service(inventory_sender, accounting_sender)
-
-                # Send in background (non-blocking)
-                import asyncio
-                asyncio.create_task(auto_send.send_invoice(invoice_id, db))
-            except Exception as e:
-                # Log but don't fail the mapping operation
-                print(f"Auto-send trigger failed for invoice {invoice_id}: {str(e)}")
+            # Trigger auto-send in background with its own DB session
+            import asyncio
+            asyncio.create_task(_send_invoice_background(invoice_id))
 
     db.commit()
 
@@ -2753,6 +2836,56 @@ async def map_items_by_description(
         "invoices_affected": len(invoices_affected),
         "invoices_ready": invoices_ready
     }
+
+
+@app.put("/api/expense-mappings/{mapping_id}")
+async def update_expense_mapping(
+    mapping_id: int,
+    gl_cogs_account: str = Form(...),
+    db: Session = Depends(get_db)
+):
+    """Update the GL account on an existing expense item mapping (invoice_item_mapping record)."""
+    import re
+    from sqlalchemy import text as sql_text
+
+    # Parse account number
+    match = re.match(r'(\d+)', gl_cogs_account.strip())
+    if not match:
+        raise HTTPException(status_code=400, detail="Invalid COGS/Expense account number")
+    gl_cogs_account_int = int(match.group(1))
+
+    # Find the mapping record
+    row = db.execute(
+        sql_text("SELECT id, item_description FROM invoice_item_mapping WHERE id = :id"),
+        {"id": mapping_id}
+    ).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Expense mapping not found")
+
+    # Update the mapping record
+    db.execute(
+        sql_text("""
+            UPDATE invoice_item_mapping
+            SET gl_cogs_account = :cogs,
+                updated_at = NOW()
+            WHERE id = :id
+        """),
+        {"cogs": gl_cogs_account_int, "id": mapping_id}
+    )
+
+    # Also update any matching hub_invoice_items (best-effort, don't fail if none exist)
+    item_description = row[1]
+    db.execute(
+        sql_text("""
+            UPDATE hub_invoice_items
+            SET gl_cogs_account = :cogs
+            WHERE item_description = :desc
+        """),
+        {"cogs": gl_cogs_account_int, "desc": item_description}
+    )
+
+    db.commit()
+    return {"success": True, "mapping_id": mapping_id}
 
 
 @app.get("/api/items/{item_id}/suggestions")
@@ -3050,6 +3183,11 @@ async def send_invoice_to_systems(invoice_id: int, db: Session = Depends(get_db)
 
     # Check if already fully sent (prevent duplicate submissions from double-clicks)
     if invoice.sent_to_inventory and invoice.sent_to_accounting:
+        # Fix status if it wasn't properly set to 'sent' (can happen if background
+        # auto-send's session was closed before the final status commit)
+        if invoice.status != 'sent':
+            invoice.status = 'sent'
+            db.commit()
         return {
             "success": True,
             "inventory_sent": True,

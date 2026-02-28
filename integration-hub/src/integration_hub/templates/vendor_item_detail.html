@@ -23,6 +23,25 @@
         background-color: #0d6efd;
         color: white;
     }
+    #editMasterItemDropdown {
+        position: absolute;
+        z-index: 1050;
+        background: var(--bg-secondary, #2d2d2d);
+        border: 1px solid var(--border-color, #444);
+    }
+    #editMasterItemDropdown .dropdown-item {
+        color: var(--text-primary, #e0e0e0);
+        padding: 6px 12px;
+        font-size: 0.9rem;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    #editMasterItemDropdown .dropdown-item:hover,
+    #editMasterItemDropdown .dropdown-item.active {
+        background-color: var(--accent-primary, #0d6efd);
+        color: white;
+    }
 </style>
 {% endblock %}
 
@@ -194,6 +213,40 @@
         </div>
     </div>
 
+    <!-- Mapped Item Codes -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-upc-scan"></i> Mapped Item Codes</h5>
+                    <small class="text-muted" id="mappedCodesCount">Loading...</small>
+                </div>
+                <div class="card-body">
+                    <div id="mappedCodesContent">
+                        <p class="text-muted mb-0">Loading mapped codes...</p>
+                    </div>
+                    <div id="mappedCodesTable" style="display: none;">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Item Code</th>
+                                        <th class="text-end">Invoices</th>
+                                        <th>First Seen</th>
+                                        <th>Last Seen</th>
+                                        <th class="text-end">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mappedCodesTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Row 3: Master Item Mapping -->
     <div class="row">
         <div class="col-12">
@@ -210,6 +263,11 @@
                             <i class="bi bi-exclamation-triangle"></i>
                             <strong>Not Mapped</strong> - This vendor item is not linked to a master item in Inventory.
                             <button class="btn btn-sm btn-warning ms-3" onclick="changeMasterItem()">Link Now</button>
+                        </div>
+                        <div id="uomSyncWarning" class="alert alert-warning mt-2 mb-2" style="display: none;">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <strong>UOM Sync Issue</strong> — <span id="uomSyncWarningText"></span>
+                            <br><small class="text-muted">Edit the Size Unit so it matches an Inventory UOM.</small>
                         </div>
                         <div id="masterItemInfo" style="display: none;">
                             <div class="row">
@@ -268,23 +326,8 @@
                     <div id="priceHistoryContent">
                         <p class="text-muted mb-0">Loading price history...</p>
                     </div>
-                    <div id="priceHistoryTable" style="display: none;">
-                        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
-                            <table class="table table-sm table-hover mb-0">
-                                <thead style="position: sticky; top: 0; background: var(--bg-secondary);">
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Invoice #</th>
-                                        <th class="text-end">Quantity</th>
-                                        <th class="text-end">Unit Price</th>
-                                        <th class="text-end">Total</th>
-                                        <th class="text-end">Change</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="priceHistoryTableBody">
-                                </tbody>
-                            </table>
-                        </div>
+                    <div id="priceChartContainer" style="display: none; position: relative; height: 250px;">
+                        <canvas id="priceChart"></canvas>
                     </div>
                 </div>
             </div>
@@ -370,31 +413,8 @@
             </div>
         </div>
 
-        <div class="col-md-6">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-arrow-repeat"></i> Sync Information</h5>
-                </div>
-                <div class="card-body">
-                    <table class="table table-sm mb-0">
-                        <tbody>
-                            <tr>
-                                <td class="text-muted" style="width: 40%;">Synced to Inventory</td>
-                                <td><span id="syncedStatus" class="badge">-</span></td>
-                            </tr>
-                            <tr>
-                                <td class="text-muted">Inventory Item ID</td>
-                                <td id="inventoryItemId">-</td>
-                            </tr>
-                            <tr>
-                                <td class="text-muted">Last Synced</td>
-                                <td id="lastSyncedAt">-</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+
+
     </div>
 </div>
 
@@ -542,12 +562,17 @@
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Master Item</label>
-                                <select class="form-select" id="editMasterItem">
-                                    <option value="">Not mapped</option>
-                                    {% for item in master_items %}
-                                    <option value="{{ item.id }}">{{ item.name }}</option>
-                                    {% endfor %}
-                                </select>
+                                <div class="position-relative" id="masterItemAutocomplete">
+                                    <input type="text" class="form-control" id="editMasterItemSearch" placeholder="Search master items..." autocomplete="off"
+                                        oninput="filterEditMasterItems(this.value)" onfocus="showEditMasterDropdown()" >
+                                    <input type="hidden" id="editMasterItem" value="">
+                                    <div class="dropdown-menu w-100 shadow-sm" id="editMasterItemDropdown" style="max-height: 250px; overflow-y: auto;">
+                                    </div>
+                                    <div id="editMasterItemSelected" class="mt-1" style="display: none;">
+                                        <span class="badge bg-primary me-1" id="editMasterItemBadge"></span>
+                                        <a href="#" class="text-danger small" onclick="clearEditMasterItem(); return false;">clear</a>
+                                    </div>
+                                </div>
                                 <small class="text-muted">Link to Inventory master item</small>
                             </div>
                             <div class="col-md-6 mb-3">
@@ -679,6 +704,7 @@
 {% endblock %}
 
 {% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 // Get item ID from URL
 const urlParams = new URLSearchParams(window.location.search);
@@ -700,6 +726,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     await loadVendors();
     loadPriceHistory();
     loadLocationPrices();
+    loadMappedCodes();
     loadInvoiceHistory();
 
     // Setup searchable select for expense account
@@ -906,6 +933,14 @@ function displayItemDetails(item) {
         document.getElementById('masterItemId').textContent = item.inventory_master_item_id;
         document.getElementById('masterItemLink').href = `/inventory/item-detail?id=${item.inventory_master_item_id}`;
         loadOtherVendors(item.inventory_master_item_id);
+
+        // UOM sync warning
+        if (item.uom_sync_ok === false) {
+            document.getElementById('uomSyncWarning').style.display = 'block';
+            document.getElementById('uomSyncWarningText').textContent = item.uom_sync_warning || 'Size unit does not match any Inventory UOM';
+        } else {
+            document.getElementById('uomSyncWarning').style.display = 'none';
+        }
     }
 
     // Review Status
@@ -919,18 +954,6 @@ function displayItemDetails(item) {
     document.getElementById('updatedAtDetail').textContent = item.updated_at ?
         new Date(item.updated_at).toLocaleString() : '-';
 
-    // Sync Info
-    const syncedStatus = document.getElementById('syncedStatus');
-    if (item.synced_to_inventory) {
-        syncedStatus.textContent = 'Yes';
-        syncedStatus.className = 'badge bg-success';
-    } else {
-        syncedStatus.textContent = 'No';
-        syncedStatus.className = 'badge bg-warning text-dark';
-    }
-    document.getElementById('inventoryItemId').textContent = item.inventory_vendor_item_id || '-';
-    document.getElementById('lastSyncedAt').textContent = item.synced_to_inventory_at ?
-        new Date(item.synced_to_inventory_at).toLocaleString() : '-';
 }
 
 // Load other vendors for the same master item
@@ -962,15 +985,17 @@ async function loadOtherVendors(masterItemId) {
     }
 }
 
-// Load price history from invoices
+// Load price history from invoices (Chart.js line graph)
+let priceChart = null;
+
 async function loadPriceHistory() {
     const days = document.getElementById('priceHistoryDays').value;
     const content = document.getElementById('priceHistoryContent');
-    const table = document.getElementById('priceHistoryTable');
-    const tbody = document.getElementById('priceHistoryTableBody');
+    const chartContainer = document.getElementById('priceChartContainer');
 
+    content.style.display = 'block';
     content.innerHTML = '<p class="text-muted mb-0">Loading price history...</p>';
-    table.style.display = 'none';
+    chartContainer.style.display = 'none';
 
     try {
         const response = await fetch(`/hub/api/v1/vendor-items/${itemId}/price-history?days=${days}`);
@@ -987,29 +1012,186 @@ async function loadPriceHistory() {
             return;
         }
 
-        content.innerHTML = `<p class="text-muted mb-2">${history.length} price record(s) found</p>`;
+        // Show chart, hide loading text
+        content.style.display = 'none';
+        chartContainer.style.display = 'block';
+
+        const labels = history.map(h => {
+            const d = new Date(h.invoice_date);
+            return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        });
+        const prices = history.map(h => h.unit_price);
+
+        // Destroy previous chart if exists
+        if (priceChart) {
+            priceChart.destroy();
+        }
+
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        priceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Unit Price',
+                    data: prices,
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: '#0d6efd'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        enabled: false,
+                        external: function(context) {
+                            let el = document.getElementById('priceChartTooltip');
+                            if (!el) {
+                                el = document.createElement('div');
+                                el.id = 'priceChartTooltip';
+                                el.style.cssText = 'position:absolute;background:rgba(0,0,0,.85);color:#fff;border-radius:6px;padding:8px 12px;pointer-events:auto;font-size:13px;z-index:10;transition:opacity .15s;white-space:nowrap;';
+                                document.body.appendChild(el);
+                                el._hovered = false;
+                                el.addEventListener('mouseenter', () => {
+                                    el._hovered = true;
+                                    clearTimeout(el._hideTimer);
+                                });
+                                el.addEventListener('mouseleave', () => {
+                                    el._hovered = false;
+                                    el.style.opacity = '0';
+                                    el.style.pointerEvents = 'none';
+                                });
+                            }
+                            const tooltip = context.tooltip;
+                            if (tooltip.opacity === 0) {
+                                // Delay hide so user can move mouse to tooltip
+                                clearTimeout(el._hideTimer);
+                                el._hideTimer = setTimeout(() => {
+                                    if (!el._hovered) {
+                                        el.style.opacity = '0';
+                                        el.style.pointerEvents = 'none';
+                                    }
+                                }, 600);
+                                return;
+                            }
+                            clearTimeout(el._hideTimer);
+                            const idx = tooltip.dataPoints[0].dataIndex;
+                            const h = history[idx];
+                            const d = new Date(h.invoice_date);
+                            const dateStr = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                            el.innerHTML = `<div style="font-weight:600;margin-bottom:4px">${dateStr}</div>`
+                                + `<div>Price: $${h.unit_price.toFixed(2)}</div>`
+                                + (h.quantity ? `<div>Qty: ${h.quantity}</div>` : '')
+                                + (h.invoice_number ? `<div>Invoice: <a href="/hub/invoices/${h.invoice_id}" style="color:#6ea8fe;text-decoration:underline">${h.invoice_number}</a></div>` : '');
+                            const pos = context.chart.canvas.getBoundingClientRect();
+                            el.style.opacity = '1';
+                            el.style.pointerEvents = 'auto';
+                            el.style.left = pos.left + window.scrollX + tooltip.caretX + 'px';
+                            el.style.top = pos.top + window.scrollY + tooltip.caretY - el.offsetHeight - 10 + 'px';
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        ticks: {
+                            callback: function(value) { return '$' + value.toFixed(2); }
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        content.style.display = 'block';
+        content.innerHTML = `<p class="text-danger mb-0">Error loading history: ${error.message}</p>`;
+    }
+}
+
+// Load mapped item codes for this vendor item
+async function loadMappedCodes() {
+    const content = document.getElementById('mappedCodesContent');
+    const table = document.getElementById('mappedCodesTable');
+    const tbody = document.getElementById('mappedCodesTableBody');
+    const countEl = document.getElementById('mappedCodesCount');
+
+    try {
+        const response = await fetch(`/hub/api/v1/vendor-items/${itemId}/mapped-codes`);
+        if (!response.ok) {
+            content.innerHTML = '<p class="text-muted mb-0">No mapped codes found</p>';
+            countEl.textContent = '';
+            return;
+        }
+
+        const data = await response.json();
+        const codes = data.codes || [];
+        const canonicalSku = data.vendor_sku;
+
+        if (codes.length === 0) {
+            content.innerHTML = '<p class="text-muted mb-0">No invoice items mapped to this vendor item yet</p>';
+            countEl.textContent = '0 codes';
+            return;
+        }
+
+        countEl.textContent = `${codes.length} code(s)`;
+        content.style.display = 'none';
         table.style.display = 'block';
 
-        let prevPrice = null;
-        tbody.innerHTML = history.map(h => {
-            const change = prevPrice !== null ? ((h.unit_price - prevPrice) / prevPrice * 100) : null;
-            const changeHtml = change !== null ?
-                `<span class="${change > 0 ? 'text-danger' : change < 0 ? 'text-success' : ''}">${change > 0 ? '+' : ''}${change.toFixed(1)}%</span>` : '-';
-            prevPrice = h.unit_price;
-
+        tbody.innerHTML = codes.map(c => {
+            const isCanonical = c.item_code === canonicalSku;
+            const badge = isCanonical
+                ? '<span class="badge bg-success ms-2">SKU</span>'
+                : '<span class="badge bg-secondary ms-2">Alt</span>';
             return `
                 <tr>
-                    <td>${new Date(h.invoice_date).toLocaleDateString()}</td>
-                    <td><a href="invoice/${h.invoice_id}">${h.invoice_number || '-'}</a></td>
-                    <td class="text-end">${h.quantity?.toFixed(2) || '-'}</td>
-                    <td class="text-end">$${h.unit_price?.toFixed(2) || '-'}</td>
-                    <td class="text-end">$${h.total?.toFixed(2) || '-'}</td>
-                    <td class="text-end">${changeHtml}</td>
+                    <td>
+                        <code class="fw-bold">${c.item_code}</code>${badge}
+                    </td>
+                    <td class="text-end">${c.invoice_count}</td>
+                    <td>${c.first_seen ? new Date(c.first_seen).toLocaleDateString() : '-'}</td>
+                    <td>${c.last_seen ? new Date(c.last_seen).toLocaleDateString() : '-'}</td>
+                    <td class="text-end">
+                        ${!isCanonical ? `<button class="btn btn-outline-danger btn-sm" onclick="unmapCode('${c.item_code}')" title="Unmap all invoice items with this code from this vendor item"><i class="bi bi-x-circle"></i> Unmap</button>` : ''}
+                    </td>
                 </tr>
             `;
         }).join('');
     } catch (error) {
-        content.innerHTML = `<p class="text-danger mb-0">Error loading history: ${error.message}</p>`;
+        content.innerHTML = '<p class="text-muted mb-0">No mapped codes found</p>';
+        countEl.textContent = '';
+    }
+}
+
+// Unmap all invoice items with a specific item code from this vendor item
+async function unmapCode(itemCode) {
+    if (!confirm(`Unmap all invoice items with code "${itemCode}" from this vendor item?\n\nThese items will become unmapped and need to be re-mapped.`)) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/hub/api/v1/vendor-items/${itemId}/unmap-code`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ item_code: itemCode })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.detail || 'Failed to unmap');
+        }
+
+        const result = await response.json();
+        showToast('Success', `Unmapped ${result.unmapped_count} invoice item(s) with code ${itemCode}`, 'success');
+        loadMappedCodes();
+        loadInvoiceHistory();
+    } catch (error) {
+        showAlert(error.message, 'Error');
     }
 }
 
@@ -1146,7 +1328,7 @@ async function loadVendors() {
     }
 }
 
-// Search master items
+// Search master items (for Change Master Item modal)
 function searchMasterItems(query) {
     const select = document.getElementById('masterItemSelect');
     const filtered = masterItems.filter(item =>
@@ -1156,6 +1338,66 @@ function searchMasterItems(query) {
     select.innerHTML = '<option value="">-- No Mapping (Unlink) --</option>' +
         filtered.map(item => `<option value="${item.id}">${item.name}</option>`).join('');
 }
+
+// Edit modal: master item autocomplete
+function filterEditMasterItems(query) {
+    const dropdown = document.getElementById('editMasterItemDropdown');
+    if (!query || query.length < 1) {
+        const items = masterItems.slice(0, 30);
+        renderEditMasterDropdown(items);
+        dropdown.classList.add('show');
+        return;
+    }
+    const q = query.toLowerCase();
+    const filtered = masterItems.filter(item =>
+        item.name.toLowerCase().includes(q)
+    ).slice(0, 30);
+    renderEditMasterDropdown(filtered);
+    dropdown.classList.add('show');
+}
+
+function renderEditMasterDropdown(items) {
+    const dropdown = document.getElementById('editMasterItemDropdown');
+    const currentVal = document.getElementById('editMasterItem').value;
+    dropdown.innerHTML = '<a class="dropdown-item text-muted" href="#" onclick="selectEditMasterItem(\'\', \'\'); return false;">-- Not mapped --</a>' +
+        items.map(item =>
+            `<a class="dropdown-item${item.id == currentVal ? ' active' : ''}" href="#" onclick="selectEditMasterItem(${item.id}, '${item.name.replace(/'/g, "\\'")}'); return false;">${item.name}</a>`
+        ).join('');
+}
+
+function showEditMasterDropdown() {
+    const query = document.getElementById('editMasterItemSearch').value;
+    filterEditMasterItems(query);
+    document.getElementById('editMasterItemDropdown').classList.add('show');
+}
+
+function selectEditMasterItem(id, name) {
+    document.getElementById('editMasterItem').value = id;
+    document.getElementById('editMasterItemSearch').value = name;
+    document.getElementById('editMasterItemDropdown').classList.remove('show');
+    const badge = document.getElementById('editMasterItemBadge');
+    const selected = document.getElementById('editMasterItemSelected');
+    if (id) {
+        badge.textContent = name;
+        selected.style.display = 'block';
+    } else {
+        selected.style.display = 'none';
+    }
+}
+
+function clearEditMasterItem() {
+    document.getElementById('editMasterItem').value = '';
+    document.getElementById('editMasterItemSearch').value = '';
+    document.getElementById('editMasterItemSelected').style.display = 'none';
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    const autocomplete = document.getElementById('masterItemAutocomplete');
+    if (autocomplete && !autocomplete.contains(e.target)) {
+        document.getElementById('editMasterItemDropdown').classList.remove('show');
+    }
+});
 
 // Change master item mapping
 function changeMasterItem() {
@@ -1299,8 +1541,17 @@ function editItem() {
     document.getElementById('editPackFactor').value = currentItem.pack_to_primary_factor || 1;
     document.getElementById('editLastPrice').value = currentItem.last_purchase_price || '';
 
-    // Mapping & Classification
+    // Mapping & Classification — populate searchable master item
     document.getElementById('editMasterItem').value = currentItem.inventory_master_item_id || '';
+    document.getElementById('editMasterItemSearch').value = currentItem.inventory_master_item_name || '';
+    const miBadge = document.getElementById('editMasterItemBadge');
+    const miSelected = document.getElementById('editMasterItemSelected');
+    if (currentItem.inventory_master_item_id && currentItem.inventory_master_item_name) {
+        miBadge.textContent = currentItem.inventory_master_item_name;
+        miSelected.style.display = 'block';
+    } else {
+        miSelected.style.display = 'none';
+    }
     document.getElementById('editCategory').value = currentItem.category || '';
 
     // Status
@@ -1485,9 +1736,9 @@ async function updateCategoryGlInfo() {
 async function submitEditForm(event) {
     event.preventDefault();
 
-    const masterItemSelect = document.getElementById('editMasterItem');
-    const masterItemId = masterItemSelect.value ? parseInt(masterItemSelect.value) : null;
-    const masterItemName = masterItemId ? masterItemSelect.options[masterItemSelect.selectedIndex].text : null;
+    const masterItemHidden = document.getElementById('editMasterItem');
+    const masterItemId = masterItemHidden.value ? parseInt(masterItemHidden.value) : null;
+    const masterItemName = masterItemId ? document.getElementById('editMasterItemSearch').value : null;
 
     const data = {
         // Identity
@@ -1527,9 +1778,16 @@ async function submitEditForm(event) {
             throw new Error(error.detail || 'Failed to save');
         }
 
+        const result = await response.json();
         bootstrap.Modal.getInstance(document.getElementById('editVendorItemModal')).hide();
-        showToast('Success', 'Vendor item updated', 'success');
-        setTimeout(() => location.reload(), 500);
+
+        if (result.uom_sync_warning) {
+            showToast('Warning', result.uom_sync_warning, 'warning');
+            setTimeout(() => location.reload(), 3000);
+        } else {
+            showToast('Success', 'Vendor item updated', 'success');
+            setTimeout(() => location.reload(), 500);
+        }
     } catch (error) {
         showAlert(error.message, 'Error');
     }

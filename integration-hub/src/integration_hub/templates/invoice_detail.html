@@ -264,12 +264,16 @@
                         <tr data-item-id="{{ item.id }}">
                             <td>{{ item.line_number }}</td>
                             <td>{{ item.item_description }}</td>
-                            <td>
+                            <td class="editable-cell" data-field="item_code">
+                                <span class="display-value">
                                 {% if item.item_code %}
                                     <small class="text-muted">{{ item.item_code }}</small>
                                 {% else %}
                                     -
                                 {% endif %}
+                                </span>
+                                <input type="text" class="form-control form-control-sm edit-input"
+                                       value="{{ item.item_code or '' }}" style="display: none; width: 90px;">
                             </td>
                             <td class="editable-cell" data-field="quantity">
                                 <span class="display-value">{% if item.quantity == item.quantity|int %}{{ item.quantity|int }}{% else %}{{ item.quantity }}{% endif %}</span>
@@ -307,8 +311,15 @@
                             <td class="text-end">${{ "{:,.2f}".format(item.line_total) }}</td>
                             <td>
                                 {% if item.is_mapped %}
-                                    {% if vi_info.get('uom_complete') == false and vi_info.get('uom_complete') is not none %}
-                                    <span class="badge bg-warning text-dark" title="UOM incomplete — missing: {{ vi_info.get('uom_missing', [])|join(', ') }}">UOM</span>
+                                    {% set has_uom_issue = vi_info.get('uom_complete') == false and vi_info.get('uom_complete') is not none %}
+                                    {% set has_master_issue = vi_info.get('has_master_item') == false and vi_info.get('has_master_item') is not none %}
+                                    {% if has_uom_issue or has_master_issue %}
+                                        {% if has_uom_issue %}
+                                        <span class="badge bg-warning text-dark" title="UOM incomplete — missing: {{ vi_info.get('uom_missing', [])|join(', ') }}">UOM</span>
+                                        {% endif %}
+                                        {% if has_master_issue %}
+                                        <span class="badge bg-danger" title="Vendor item not linked to a master item in Inventory">No Master</span>
+                                        {% endif %}
                                     {% else %}
                                     <span class="badge bg-success">Yes</span>
                                     {% endif %}
@@ -1012,8 +1023,23 @@ async function saveAllItems() {
         const result = await response.json();
 
         if (response.ok && result.success) {
-            showToast('All items saved successfully!', 'Success', 'success');
-            setTimeout(() => location.reload(), 1000);
+            // Show remap feedback if any items were re-mapped
+            if (result.remapped_items && result.remapped_items.length > 0) {
+                const mapped = result.remapped_items.filter(r => r.status === 'mapped');
+                const notFound = result.remapped_items.filter(r => r.status === 'not_found');
+                let msg = 'Items saved. ';
+                if (mapped.length > 0) {
+                    msg += `${mapped.length} item(s) auto-mapped: ` +
+                        mapped.map(r => r.vendor_item_name || r.vendor_sku).join(', ') + '. ';
+                }
+                if (notFound.length > 0) {
+                    msg += `${notFound.length} item code(s) not found in vendor items.`;
+                }
+                showToast(msg, mapped.length > 0 ? 'Success' : 'Warning', mapped.length > 0 ? 'success' : 'warning');
+            } else {
+                showToast('All items saved successfully!', 'Success', 'success');
+            }
+            setTimeout(() => location.reload(), 1500);
         } else {
             showToast(`Error saving items: ${result.detail || 'Unknown error'}`, 'Error', 'error');
         }

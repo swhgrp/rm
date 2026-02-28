@@ -354,6 +354,25 @@ class AutoSendService:
         if incomplete_uom_items:
             errors.append(f"{len(incomplete_uom_items)} items have incomplete UOM (missing size/unit/container data)")
 
+        # Check all mapped vendor items are linked to a master item in Inventory
+        missing_master_items = []
+        for item in items:
+            if item.is_mapped and item.inventory_item_id:
+                vendor_item = db.query(HubVendorItem).filter(
+                    HubVendorItem.id == item.inventory_item_id
+                ).first()
+
+                if vendor_item and not vendor_item.inventory_master_item_id:
+                    missing_master_items.append({
+                        'invoice_item_id': item.id,
+                        'item_description': item.item_description,
+                        'vendor_item_id': vendor_item.id,
+                        'vendor_product_name': vendor_item.vendor_product_name
+                    })
+
+        if missing_master_items:
+            errors.append(f"{len(missing_master_items)} vendor items not linked to a master item in Inventory")
+
         return {
             "ready": len(errors) == 0,
             "errors": errors,

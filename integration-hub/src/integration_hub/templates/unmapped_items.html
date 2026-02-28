@@ -119,7 +119,8 @@
                                 <input type="checkbox" class="item-checkbox"
                                        value="{{ item.item_description|replace('"', '&quot;') }}"
                                        data-count="{{ item.occurrence_count }}"
-                                       onchange="updateSelectedCount()">
+                                       onchange="updateSelectedCount()"
+                                       {% if item.is_suspicious %}disabled title="Verify or fix code before mapping"{% endif %}>
                             </td>
                             <td class="item-desc-cell">
                                 <strong>{{ item.item_description }}</strong>
@@ -186,10 +187,17 @@
                                 {% endfor %}
                             </td>
                             <td>
+                                {% if item.is_suspicious %}
+                                <button class="btn btn-sm btn-outline-secondary" disabled
+                                        title="Verify or fix the item code before mapping">
+                                    <i class="bi bi-lock"></i> Verify Code First
+                                </button>
+                                {% else %}
                                 <button class="btn btn-sm btn-primary"
                                         onclick="openMapModal('{{ item.item_description|replace("'", "\\'") }}', {{ item.occurrence_count }}, {{ item.first_item_id or 'null' }}, '{{ item.item_code|default("", true)|replace("'", "\\'") }}', '{{ item.vendor_names[0]|default("", true)|replace("'", "\\'") if item.vendor_names }}', '{{ item.code_status }}')">
                                     <i class="bi bi-link-45deg"></i> Map
                                 </button>
+                                {% endif %}
                             </td>
                         </tr>
                         {% endfor %}

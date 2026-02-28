@@ -396,7 +396,7 @@ function openEditModal(description, mappingId, assetAccount, cogsAccount, wasteA
 }
 
 async function saveExpenseEdit() {
-    const description = document.getElementById('editDescription').value;
+    const mappingId = document.getElementById('editMappingId').value;
     const cogsAccount = document.getElementById('editCogsAccount').value;
 
     if (!cogsAccount) {
@@ -405,13 +405,11 @@ async function saveExpenseEdit() {
     }
 
     const formData = new FormData();
-    formData.append('item_description', description);
     formData.append('gl_cogs_account', cogsAccount);
-    // No inventory_item_id means it stays as expense
 
     try {
-        const response = await fetch('/hub/api/items/map-by-description', {
-            method: 'POST',
+        const response = await fetch(`/hub/api/expense-mappings/${mappingId}`, {
+            method: 'PUT',
             body: formData
         });
 

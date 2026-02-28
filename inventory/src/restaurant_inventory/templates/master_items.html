@@ -525,7 +525,7 @@
                     </td>
                     <td><a href="item-detail?id=${item.id}" class="text-decoration-none text-primary" onclick="event.stopPropagation();">${item.name}</a></td>
                     <td>${item.category || '-'}</td>
-                    <td>${item.unit_of_measure || '-'}</td>
+                    <td>${item.unit_of_measure || '<span class="text-warning"><i class="bi bi-exclamation-triangle-fill"></i> Not Set</span>'}</td>
                     <td>${lastPrice}</td>
                     <td>${statusBadge}</td>
                     <td class="text-end" onclick="event.stopPropagation();">
@@ -742,8 +742,8 @@
                     <tr>
                         <td>${vi.vendor_name || '-'}</td>
                         <td>${vi.vendor_sku || '-'}</td>
-                        <td>${vi.purchase_unit_name || '-'} ${vi.pack_size ? `(${vi.pack_size})` : ''}</td>
-                        <td>${vi.unit_price ? '$' + parseFloat(vi.unit_price).toFixed(2) : '-'}</td>
+                        <td>${vi.size_display || vi.purchase_unit_name || '-'}${vi.units_per_case ? ` <small class="text-muted">(${vi.units_per_case}/case)</small>` : ''}</td>
+                        <td>${vi.case_cost ? '$' + parseFloat(vi.case_cost).toFixed(2) : (vi.unit_price ? '$' + parseFloat(vi.unit_price).toFixed(2) : '-')}</td>
                         <td>${statusBadge}${preferredBadge}</td>
                         <td>
                             <a href="vendor-items?highlight=${vi.id}" class="btn btn-sm btn-outline-primary" title="View & Edit">
@@ -1032,7 +1032,7 @@
                 <td>${item.name || '<em>Missing</em>'}</td>
                 <td>${item.category || '-'}</td>
                 <td>
-                    ${item.unit_of_measure || '-'}
+                    ${item.unit_of_measure || '<span class="text-warning"><i class="bi bi-exclamation-triangle-fill"></i> Not Set</span>'}
                     <select class="form-select form-select-sm mt-1" data-row="${item.row_number}" data-type="unit">
                         <option value="">-- Select Unit --</option>
                         ${masterUploadData.unitOptions.map(u =>

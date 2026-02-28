@@ -141,33 +141,96 @@ def _find_specific_container_uom(conn, container_name, size_qty, size_symbol):
     ).fetchone()
     if row:
         return (row[0], row[1], row[2])
-    # Try pattern match: "Can 12%" or "Bottle 750%"
-    pattern = f"{container_name.title()} {size_val}%"
+    # Try pattern with unit symbol: "Bottle 1L%" matches "Bottle 1Lt" but not "Bottle 187ml"
+    pattern_with_unit = f"{container_name.title()} {size_val}{size_symbol}%"
     row = conn.execute(
         text("SELECT id, name, abbreviation FROM units_of_measure WHERE name ILIKE :pattern"),
-        {"pattern": pattern}
+        {"pattern": pattern_with_unit}
+    ).fetchone()
+    if row:
+        return (row[0], row[1], row[2])
+    # Try pattern without unit but with word boundary: "Can 12 %" (space after number)
+    pattern_space = f"{container_name.title()} {size_val} %"
+    row = conn.execute(
+        text("SELECT id, name, abbreviation FROM units_of_measure WHERE name ILIKE :pattern"),
+        {"pattern": pattern_space}
     ).fetchone()
     if row:
         return (row[0], row[1], row[2])
     return None
 
 
-# Containers that map to Each if no specific UOM found
-GENERIC_CONTAINERS = {'box', 'bag', 'case', 'each', 'pack', 'tub', 'jar'}
-
-
-def sync_master_item_defaults(item, db):
+def _get_inventory_uom_lookup():
     """
-    Sync category and primary count unit from vendor item to master item.
-    Only sets fields on master item if they are currently NULL (never overwrites).
-    Creates master_item_count_units primary record if none exists.
+    Fetch ALL active Inventory UOMs into a lookup dict.
+    Keys: lowercase abbreviation and lowercase name.
+    Values: (id, name, abbreviation) tuples.
+    Used by sync and API response serialization.
+    """
+    from sqlalchemy import text, create_engine
+    inventory_db_url = os.getenv(
+        'INVENTORY_DATABASE_URL',
+        'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
+    )
+    inv_engine = create_engine(inventory_db_url)
+    lookup = {}
+    with inv_engine.connect() as conn:
+        rows = conn.execute(
+            text("SELECT id, name, abbreviation FROM units_of_measure WHERE is_active = true")
+        ).fetchall()
+    for row in rows:
+        if row[2]:
+            lookup[row[2].lower()] = (row[0], row[1], row[2])
+        if row[1]:
+            lookup[row[1].lower()] = (row[0], row[1], row[2])
+    return lookup
 
-    Count unit is determined from the vendor item's purchase_unit_abbr,
-    looked up in Inventory's units_of_measure table by abbreviation.
-    Falls back to Each if no match found.
+
+def _check_uom_sync_status(item, inv_uom_lookup):
+    """
+    Check if a vendor item's size unit maps to an Inventory UOM.
+    Returns (uom_sync_ok, uom_sync_warning).
     """
     if not item.inventory_master_item_id:
-        return
+        return None, None  # No master item linked — not applicable
+
+    if not item.size_unit_id:
+        return False, "No size unit set on vendor item"
+
+    # Check if size unit symbol or name is in the lookup
+    size_symbol = item.size_unit.symbol if item.size_unit else None
+    size_name = item.size_unit.name if item.size_unit else None
+
+    if size_symbol and size_symbol.lower() in inv_uom_lookup:
+        return True, None
+    if size_name and size_name.lower() in inv_uom_lookup:
+        return True, None
+
+    # Not found — report warning
+    unit_label = size_symbol or size_name or f"unit_id={item.size_unit_id}"
+    return False, f"Size unit '{unit_label}' not found in Inventory UOMs"
+
+
+def sync_master_item_defaults(item, db) -> dict:
+    """
+    Sync category and primary UOM from vendor item to master item.
+    Hub is the strict source of truth — NO fallback to "Each".
+
+    UOM resolution (priority order):
+    1. Container + size → specific Inventory UOM (e.g. "Can 16oz", "Bottle 750ml", "Keg 1/6 Barrel")
+    2. Hub size unit symbol/name → Inventory UOM lookup (e.g. "lb" → Pound, "patty" → Patty)
+    3. If no match → skip UOM sync entirely (log warning, don't touch master item's UOM)
+
+    Container+size is checked first because the size unit symbol (e.g. "oz") describes
+    the size of the container, not the counting unit. "Can 16oz" is more useful than "Ounce".
+
+    When a UOM is resolved, always update the master item (even if already set)
+    so that Hub corrections propagate.
+
+    Returns dict with sync result: {"uom_synced": bool, "uom_warning": str|None}
+    """
+    if not item.inventory_master_item_id:
+        return {"uom_synced": False, "uom_warning": None}
 
     from sqlalchemy import text, create_engine
 
@@ -189,19 +252,37 @@ def sync_master_item_defaults(item, db):
                 logger.warning(f"Master item {item.inventory_master_item_id} not found in Inventory")
                 return
 
-            # Look up the default "Each" UOM (fallback for everything)
-            each_uom = _find_inventory_uom(conn, name='Each') or (14, 'Each', 'ea')
-
-            # Determine count unit from vendor item's purchase UOM abbreviation
             uom = None
-            if item.purchase_unit_abbr:
-                uom = _find_inventory_uom(conn, abbreviation=item.purchase_unit_abbr)
-            if not uom:
-                uom = each_uom
 
-            uom_id, uom_name, uom_abbr = uom
+            # Primary: try container+size for specific UOMs (e.g. "Can 16oz", "Bottle 750ml")
+            if item.container_id and item.size_quantity and item.size_unit_id:
+                container = db.execute(
+                    text("SELECT name FROM hub_containers WHERE id = :id"),
+                    {"id": item.container_id}
+                ).fetchone()
+                size_unit = db.execute(
+                    text("SELECT symbol FROM hub_size_units WHERE id = :id"),
+                    {"id": item.size_unit_id}
+                ).fetchone()
+                if container and size_unit:
+                    uom = _find_specific_container_uom(
+                        conn, container[0],
+                        float(item.size_quantity),
+                        size_unit[0]
+                    )
+
+            # Secondary: use Hub size unit symbol/name (e.g. "lb" → Pound, "patty" → Patty)
+            if not uom and item.size_unit_id:
+                size_unit = db.execute(
+                    text("SELECT symbol, name FROM hub_size_units WHERE id = :id"),
+                    {"id": item.size_unit_id}
+                ).fetchone()
+                if size_unit and size_unit[0]:
+                    uom = _find_inventory_uom(conn, abbreviation=size_unit[0])
+                    if not uom:
+                        uom = _find_inventory_uom(conn, name=size_unit[1])
+
             existing_category = master[1]
-            existing_primary_uom_id = master[2]
             changes = []
 
             # Set category if NULL
@@ -212,8 +293,11 @@ def sync_master_item_defaults(item, db):
                 )
                 changes.append(f"category='{item.category}'")
 
-            # Set primary UOM if NULL
-            if not existing_primary_uom_id:
+            # UOM sync: only if resolved (no fallback)
+            if uom:
+                uom_id, uom_name, uom_abbr = uom
+
+                # Always update master item UOM when Hub resolves one (fixes propagate)
                 conn.execute(
                     text("""UPDATE master_items
                             SET primary_uom_id = :uom_id, primary_uom_name = :uom_name,
@@ -224,33 +308,70 @@ def sync_master_item_defaults(item, db):
                 )
                 changes.append(f"primary_uom='{uom_name}'")
 
-            # Create primary count unit record if none exists
-            existing_cu = conn.execute(
-                text("""SELECT id FROM master_item_count_units
-                        WHERE master_item_id = :mid AND is_primary = true AND is_active = true"""),
-                {"mid": item.inventory_master_item_id}
-            ).fetchone()
+                # Update or create primary count unit record
+                existing_cu = conn.execute(
+                    text("""SELECT id, uom_id FROM master_item_count_units
+                            WHERE master_item_id = :mid AND is_primary = true AND is_active = true"""),
+                    {"mid": item.inventory_master_item_id}
+                ).fetchone()
 
-            if not existing_cu:
-                conn.execute(
-                    text("""INSERT INTO master_item_count_units
-                            (master_item_id, uom_id, uom_name, uom_abbreviation, is_primary,
-                             conversion_to_primary, display_order, is_active, created_at)
-                            VALUES (:mid, :uom_id, :uom_name, :uom_abbr, true,
-                                    1.0, 0, true, NOW())
-                            ON CONFLICT (master_item_id, uom_id) DO NOTHING"""),
-                    {"mid": item.inventory_master_item_id, "uom_id": uom_id,
-                     "uom_name": uom_name, "uom_abbr": uom_abbr}
+                if existing_cu:
+                    if existing_cu[1] != uom_id:
+                        conn.execute(
+                            text("""UPDATE master_item_count_units
+                                    SET uom_id = :uom_id, uom_name = :uom_name, uom_abbreviation = :uom_abbr
+                                    WHERE id = :cu_id"""),
+                            {"cu_id": existing_cu[0], "uom_id": uom_id,
+                             "uom_name": uom_name, "uom_abbr": uom_abbr}
+                        )
+                        changes.append(f"count_unit='{uom_name}'")
+                else:
+                    conn.execute(
+                        text("""INSERT INTO master_item_count_units
+                                (master_item_id, uom_id, uom_name, uom_abbreviation, is_primary,
+                                 conversion_to_primary, display_order, is_active, created_at)
+                                VALUES (:mid, :uom_id, :uom_name, :uom_abbr, true,
+                                        1.0, 0, true, NOW())
+                                ON CONFLICT (master_item_id, uom_id) DO NOTHING"""),
+                        {"mid": item.inventory_master_item_id, "uom_id": uom_id,
+                         "uom_name": uom_name, "uom_abbr": uom_abbr}
+                    )
+                    changes.append(f"count_unit='{uom_name}'")
+            else:
+                # No match — log warning, don't touch UOM
+                size_info = ""
+                size_symbol = ""
+                if item.size_unit_id:
+                    su = db.execute(
+                        text("SELECT symbol, name FROM hub_size_units WHERE id = :id"),
+                        {"id": item.size_unit_id}
+                    ).fetchone()
+                    size_symbol = su[0] if su else 'unknown'
+                    size_info = f" (size_unit: {size_symbol})"
+                logger.warning(
+                    f"Could not resolve UOM for vendor item {item.id}{size_info} "
+                    f"→ master item {item.inventory_master_item_id} UOM unchanged"
                 )
-                changes.append(f"count_unit='{uom_name}'")
+
+                conn.commit()
+                if changes:
+                    logger.info(f"Synced defaults to master item {item.inventory_master_item_id}: {', '.join(changes)}")
+                return {
+                    "uom_synced": False,
+                    "uom_warning": f"No matching Inventory UOM for size unit \"{size_symbol}\". "
+                                   f"Create a \"{size_symbol.title()}\" UOM in Inventory Settings → Units of Measure, then re-save."
+                }
 
             conn.commit()
 
             if changes:
                 logger.info(f"Synced defaults to master item {item.inventory_master_item_id}: {', '.join(changes)}")
 
+            return {"uom_synced": True, "uom_warning": None}
+
     except Exception as e:
         logger.error(f"Error syncing master item defaults: {str(e)}")
+        return {"uom_synced": False, "uom_warning": f"Sync error: {str(e)}"}
 
 
 # ============================================================================
@@ -400,6 +521,10 @@ class VendorItemResponse(BaseModel):
     uom_complete: Optional[bool] = None
     uom_missing_fields: Optional[List[str]] = None
 
+    # UOM sync status (does Hub size unit map to an Inventory UOM?)
+    uom_sync_ok: Optional[bool] = None  # True=maps, False=no match, None=no master item
+    uom_sync_warning: Optional[str] = None
+
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -499,10 +624,17 @@ async def list_vendor_items(
     offset = (page - 1) * page_size
     items = query.order_by(HubVendorItem.vendor_product_name).offset(offset).limit(page_size).all()
 
+    # Build UOM sync lookup once for all items
+    try:
+        inv_uom_lookup = _get_inventory_uom_lookup()
+    except Exception:
+        inv_uom_lookup = {}
+
     # Build response
     result_items = []
     for item in items:
         uom_check = check_uom_completeness(item)
+        uom_sync_ok, uom_sync_warning = _check_uom_sync_status(item, inv_uom_lookup)
         result_items.append(VendorItemResponse(
             id=item.id,
             vendor_id=item.vendor_id,
@@ -550,6 +682,9 @@ async def list_vendor_items(
             # UOM completeness
             uom_complete=uom_check['is_complete'],
             uom_missing_fields=uom_check['missing_fields'],
+            # UOM sync status
+            uom_sync_ok=uom_sync_ok,
+            uom_sync_warning=uom_sync_warning,
             created_at=item.created_at,
             updated_at=item.updated_at
         ))
@@ -1165,6 +1300,11 @@ async def get_vendor_item(
         raise HTTPException(status_code=404, detail="Vendor item not found")
 
     uom_check = check_uom_completeness(item)
+    try:
+        inv_uom_lookup = _get_inventory_uom_lookup()
+    except Exception:
+        inv_uom_lookup = {}
+    uom_sync_ok, uom_sync_warning = _check_uom_sync_status(item, inv_uom_lookup)
 
     return VendorItemResponse(
         id=item.id,
@@ -1214,6 +1354,9 @@ async def get_vendor_item(
         # UOM completeness
         uom_complete=uom_check['is_complete'],
         uom_missing_fields=uom_check['missing_fields'],
+        # UOM sync status
+        uom_sync_ok=uom_sync_ok,
+        uom_sync_warning=uom_sync_warning,
         created_at=item.created_at,
         updated_at=item.updated_at
     )
@@ -1281,6 +1424,27 @@ async def update_vendor_item(
     db.commit()
     db.refresh(item)
 
+    # Cascade SKU/name changes to all mapped invoice items
+    if "vendor_sku" in update_data or "vendor_product_name" in update_data:
+        from sqlalchemy import text as sql_text
+        cascade_fields = []
+        cascade_params = {"vi_id": vendor_item_id}
+        if "vendor_sku" in update_data and item.vendor_sku:
+            cascade_fields.append("item_code = :sku")
+            cascade_params["sku"] = item.vendor_sku
+        if "vendor_product_name" in update_data and item.vendor_product_name:
+            cascade_fields.append("item_description = :name")
+            cascade_params["name"] = item.vendor_product_name
+        if cascade_fields:
+            result = db.execute(sql_text(f"""
+                UPDATE hub_invoice_items
+                SET {', '.join(cascade_fields)}
+                WHERE inventory_item_id = :vi_id AND is_mapped = true
+            """), cascade_params)
+            if result.rowcount > 0:
+                db.commit()
+                logger.info(f"Cascaded vendor item {vendor_item_id} changes to {result.rowcount} invoice items")
+
     # Reload relationships after update
     db.refresh(item)
     if item.size_unit_id:
@@ -1302,10 +1466,13 @@ async def update_vendor_item(
             logger.info(f"Auto-approved vendor item {item.id} - UOM is now complete")
 
     # Sync category, primary UOM, and count unit to master item
+    sync_warning = None
     if item.inventory_master_item_id:
-        trigger_fields = {"inventory_master_item_id", "size_unit_id", "category", "container_id"}
+        trigger_fields = {"inventory_master_item_id", "size_unit_id", "size_quantity", "category", "container_id"}
         if trigger_fields & set(update_data.keys()):
-            sync_master_item_defaults(item, db)
+            sync_result = sync_master_item_defaults(item, db)
+            if sync_result and not sync_result.get("uom_synced"):
+                sync_warning = sync_result.get("uom_warning")
 
     # Auto-create bottle conversion for volume items (used by item_detail.html UI)
     if "inventory_master_item_id" in update_data and item.inventory_master_item_id and item.size_quantity and item.size_unit_id:
@@ -1362,6 +1529,16 @@ async def update_vendor_item(
             db.commit()
             db.refresh(item)
 
+    # Check UOM sync status for response
+    resp_uom_sync_ok = None
+    resp_uom_sync_warning = sync_warning
+    if item.inventory_master_item_id and not sync_warning:
+        try:
+            inv_uom_lookup = _get_inventory_uom_lookup()
+            resp_uom_sync_ok, resp_uom_sync_warning = _check_uom_sync_status(item, inv_uom_lookup)
+        except Exception:
+            pass
+
     return VendorItemResponse(
         id=item.id,
         vendor_id=item.vendor_id,
@@ -1406,6 +1583,8 @@ async def update_vendor_item(
         notes=item.notes,
         inventory_vendor_item_id=item.inventory_vendor_item_id,
         synced_to_inventory=item.synced_to_inventory,
+        uom_sync_ok=resp_uom_sync_ok if sync_warning is None else False,
+        uom_sync_warning=resp_uom_sync_warning,
         created_at=item.created_at,
         updated_at=item.updated_at
     )
@@ -1627,21 +1806,52 @@ async def import_vendor_items_from_inventory(
 @router.get("/{vendor_item_id}/price-history")
 async def get_vendor_item_price_history(
     vendor_item_id: int,
-    limit: int = Query(20, ge=1, le=100),
+    days: int = Query(90, ge=1, le=365),
+    limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db)
 ):
     """
-    Get price history for a specific vendor item.
+    Get price history for a vendor item from actual invoice data.
+    Returns every invoice appearance with date, price, quantity for charting.
     """
-    from integration_hub.services.price_tracker import get_price_tracker
+    from sqlalchemy import text
 
-    # Verify item exists
     item = db.query(HubVendorItem).filter(HubVendorItem.id == vendor_item_id).first()
     if not item:
         raise HTTPException(status_code=404, detail="Vendor item not found")
 
-    tracker = get_price_tracker(db)
-    history = tracker.get_price_history(vendor_item_id, limit=limit)
+    query = text("""
+        SELECT
+            i.id as invoice_id,
+            i.invoice_number,
+            i.invoice_date,
+            ii.quantity,
+            ii.unit_price,
+            ii.total_amount
+        FROM hub_invoice_items ii
+        JOIN hub_invoices i ON ii.invoice_id = i.id
+        WHERE ii.inventory_item_id = :vendor_item_id
+          AND i.invoice_date >= CURRENT_DATE - :days * INTERVAL '1 day'
+        ORDER BY i.invoice_date ASC, i.id ASC
+        LIMIT :limit
+    """)
+
+    results = db.execute(query, {
+        "vendor_item_id": vendor_item_id,
+        "days": days,
+        "limit": limit
+    }).fetchall()
+
+    history = []
+    for row in results:
+        history.append({
+            "invoice_id": row[0],
+            "invoice_number": row[1],
+            "invoice_date": row[2].isoformat() if row[2] else None,
+            "quantity": float(row[3]) if row[3] else None,
+            "unit_price": float(row[4]) if row[4] else None,
+            "total": float(row[5]) if row[5] else None
+        })
 
     return {
         "vendor_item_id": vendor_item_id,
@@ -2142,6 +2352,117 @@ async def get_containers(db: Session = Depends(get_db)):
 
 
 # ============================================================================
+# MAPPED ITEM CODES ENDPOINT
+# ============================================================================
+
+@router.get("/{vendor_item_id}/mapped-codes")
+async def get_vendor_item_mapped_codes(
+    vendor_item_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get distinct item codes from invoice items mapped to this vendor item.
+    Shows the canonical SKU plus any alternate codes (store variants, OCR misreads).
+    """
+    from sqlalchemy import text
+
+    item = db.query(HubVendorItem).filter(HubVendorItem.id == vendor_item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Vendor item not found")
+
+    rows = db.execute(text("""
+        SELECT ii.item_code,
+               COUNT(*) as invoice_count,
+               MIN(i.invoice_date) as first_seen,
+               MAX(i.invoice_date) as last_seen
+        FROM hub_invoice_items ii
+        JOIN hub_invoices i ON ii.invoice_id = i.id
+        WHERE ii.inventory_item_id = :vendor_item_id
+          AND ii.item_code IS NOT NULL
+          AND ii.item_code != ''
+        GROUP BY ii.item_code
+        ORDER BY COUNT(*) DESC, ii.item_code
+    """), {"vendor_item_id": vendor_item_id}).fetchall()
+
+    return {
+        "vendor_item_id": vendor_item_id,
+        "vendor_sku": item.vendor_sku,
+        "codes": [
+            {
+                "item_code": r[0],
+                "invoice_count": r[1],
+                "first_seen": str(r[2]) if r[2] else None,
+                "last_seen": str(r[3]) if r[3] else None,
+                "is_canonical": r[0] == item.vendor_sku
+            }
+            for r in rows
+        ]
+    }
+
+
+# ============================================================================
+# UNMAP CODE ENDPOINT
+# ============================================================================
+
+class UnmapCodeRequest(BaseModel):
+    item_code: str
+
+@router.post("/{vendor_item_id}/unmap-code")
+async def unmap_code_from_vendor_item(
+    vendor_item_id: int,
+    request: UnmapCodeRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Unmap all invoice items with a specific item_code from this vendor item.
+    Sets inventory_item_id to NULL and is_mapped to False on matching items.
+    """
+    from sqlalchemy import text
+
+    item = db.query(HubVendorItem).filter(HubVendorItem.id == vendor_item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Vendor item not found")
+
+    # Don't allow unmapping the canonical SKU
+    if request.item_code == item.vendor_sku:
+        raise HTTPException(status_code=400, detail="Cannot unmap the canonical SKU. Edit the vendor item SKU instead.")
+
+    result = db.execute(text("""
+        UPDATE hub_invoice_items
+        SET inventory_item_id = NULL, is_mapped = false
+        WHERE inventory_item_id = :vendor_item_id
+          AND item_code = :item_code
+    """), {"vendor_item_id": vendor_item_id, "item_code": request.item_code})
+
+    unmapped_count = result.rowcount
+
+    # Recalculate status on affected invoices
+    affected_invoices = db.execute(text("""
+        SELECT DISTINCT invoice_id FROM hub_invoice_items
+        WHERE item_code = :item_code AND inventory_item_id IS NULL AND is_mapped = false
+    """), {"item_code": request.item_code}).fetchall()
+
+    db.commit()
+
+    # Update invoice statuses
+    from integration_hub.services.invoice_status import update_invoice_status
+    from integration_hub.models.hub_models import HubInvoice
+    for row in affected_invoices:
+        invoice = db.query(HubInvoice).filter(HubInvoice.id == row[0]).first()
+        if invoice and invoice.status not in ('sent', 'partial', 'error'):
+            update_invoice_status(invoice, db)
+
+    logger.info(f"Unmapped {unmapped_count} invoice items with code '{request.item_code}' from vendor item {vendor_item_id}")
+
+    return {
+        "success": True,
+        "unmapped_count": unmapped_count,
+        "item_code": request.item_code,
+        "vendor_item_id": vendor_item_id
+    }
+
+
+# ============================================================================
 # INVOICE HISTORY ENDPOINT
 # ============================================================================
 
@@ -2181,7 +2502,7 @@ async def get_vendor_item_invoice_history(
     except Exception as e:
         logger.warning(f"Could not fetch location names: {e}")
 
-    # Query invoices that contain this vendor item
+    # Query invoices that contain this vendor item (by direct mapping relationship)
     query = text("""
         SELECT
             i.id as invoice_id,
@@ -2195,20 +2516,14 @@ async def get_vendor_item_invoice_history(
             ii.total_amount
         FROM hub_invoice_items ii
         JOIN hub_invoices i ON ii.invoice_id = i.id
-        WHERE i.vendor_id = :vendor_id
-          AND (
-            (ii.item_code IS NOT NULL AND ii.item_code = :vendor_sku)
-            OR (ii.item_description = :vendor_product_name)
-          )
+        WHERE ii.inventory_item_id = :vendor_item_id
         ORDER BY i.invoice_date DESC, i.id DESC
         LIMIT :limit
     """)
 
     try:
         results = db.execute(query, {
-            "vendor_id": item.vendor_id,
-            "vendor_sku": item.vendor_sku,
-            "vendor_product_name": item.vendor_product_name,
+            "vendor_item_id": vendor_item_id,
             "limit": limit
         }).fetchall()
 

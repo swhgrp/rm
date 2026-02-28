@@ -556,8 +556,9 @@
         });
 
         tbody.innerHTML = filteredItems.map(vi => {
-            const costPerMaster = vi.unit_price && vi.conversion_factor ?
-                (vi.unit_price / vi.conversion_factor).toFixed(2) : '-';
+            const upc = parseFloat(vi.units_per_case) || 0;
+            const caseCost = parseFloat(vi.case_cost) || 0;
+            const costPerUnit = caseCost && upc > 0 ? (caseCost / upc).toFixed(2) : '-';
             const statusBadge = vi.is_active ?
                 '<span class="badge bg-success">Active</span>' :
                 '<span class="badge bg-secondary">Inactive</span>';
@@ -573,9 +574,9 @@
                     <td>${masterItemDisplay}</td>
                     <td>${vi.vendor_sku || '-'}</td>
                     <td>${vi.vendor_product_name}</td>
-                    <td>${vi.purchase_unit_name || '-'} ${vi.conversion_factor ? `(${parseFloat(vi.conversion_factor).toFixed(2)})` : ''}</td>
-                    <td>${vi.unit_price ? '$' + parseFloat(vi.unit_price).toFixed(2) : '-'}</td>
-                    <td>${costPerMaster !== '-' ? '$' + costPerMaster : '-'}</td>
+                    <td>${vi.size_display || vi.purchase_unit_name || '-'}${upc > 0 ? ` <small class="text-muted">(${upc}/case)</small>` : ''}</td>
+                    <td>${caseCost ? '$' + caseCost.toFixed(2) : (vi.unit_price ? '$' + parseFloat(vi.unit_price).toFixed(2) : '-')}</td>
+                    <td>${costPerUnit !== '-' ? '$' + costPerUnit : '-'}</td>
                     <td>${statusBadge}${preferredBadge}</td>
                     <td>
                         <button class="btn btn-sm btn-outline-secondary" onclick="editVendorItem(${vi.id})" title="View details">

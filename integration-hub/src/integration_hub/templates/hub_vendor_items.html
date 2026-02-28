@@ -544,6 +544,13 @@ function generateRowHtml(item) {
             data-bs-toggle="tooltip"></i>`;
     }
 
+    // Add sync warning icon if mapped but UOM doesn't resolve to Inventory
+    if (item.inventory_master_item_id && item.uom_sync_ok === false) {
+        uomWarning += `<i class="bi bi-arrow-left-right text-danger ms-1"
+            title="UOM Sync: ${item.uom_sync_warning || 'Size unit not found in Inventory'}"
+            data-bs-toggle="tooltip"></i>`;
+    }
+
     // Format avg cost
     let avgCost = '-';
     if (item.case_cost && item.units_per_case && item.units_per_case > 0) {

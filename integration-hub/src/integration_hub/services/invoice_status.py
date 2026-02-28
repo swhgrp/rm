@@ -70,6 +70,40 @@ def get_items_with_incomplete_uom(invoice_id: int, db: Session) -> list:
     return incomplete_items
 
 
+def get_items_without_master_item(invoice_id: int, db: Session) -> list:
+    """
+    Get mapped inventory items where the vendor item has no master item link.
+
+    Vendor items must be linked to a master item in Inventory for cost updates
+    to work. Expense items (no inventory_item_id) are excluded from this check.
+
+    Returns list of dicts with item info for display in error messages.
+    """
+    mapped_items = db.query(HubInvoiceItem).filter(
+        HubInvoiceItem.invoice_id == invoice_id,
+        HubInvoiceItem.is_mapped == True,
+        HubInvoiceItem.inventory_item_id.isnot(None)
+    ).all()
+
+    missing_master = []
+
+    for item in mapped_items:
+        vendor_item = db.query(HubVendorItem).filter(
+            HubVendorItem.id == item.inventory_item_id
+        ).first()
+
+        if vendor_item and not vendor_item.inventory_master_item_id:
+            missing_master.append({
+                'invoice_item_id': item.id,
+                'item_description': item.item_description,
+                'item_code': item.item_code,
+                'vendor_item_id': vendor_item.id,
+                'vendor_product_name': vendor_item.vendor_product_name
+            })
+
+    return missing_master
+
+
 def get_incomplete_uom_count(invoice_id: int, db: Session) -> int:
     """Get count of mapped items with incomplete UOM for an invoice"""
     return len(get_items_with_incomplete_uom(invoice_id, db))
@@ -128,17 +162,26 @@ def update_invoice_status(invoice: HubInvoice, db: Session) -> str:
             invoice.status = 'mapping'
             logger.info(f"Invoice {invoice.id}: {unmapped_count} unmapped items, status changed from '{old_status}' to 'mapping'")
     else:
-        # All items mapped - check UOM completeness before setting to 'ready'
+        # All items mapped - check UOM completeness and master item linkage before setting to 'ready'
         incomplete_uom_count = get_incomplete_uom_count(invoice.id, db)
+        missing_master_items = get_items_without_master_item(invoice.id, db)
+        missing_master_count = len(missing_master_items)
 
-        if incomplete_uom_count > 0:
-            # Has items with incomplete UOM - cannot go to 'ready'
+        if incomplete_uom_count > 0 or missing_master_count > 0:
+            # Has items with incomplete UOM or missing master item - cannot go to 'ready'
+            reasons = []
+            if incomplete_uom_count > 0:
+                reasons.append(f"{incomplete_uom_count} items with incomplete UOM")
+            if missing_master_count > 0:
+                reasons.append(f"{missing_master_count} items not linked to master item")
+            reason_str = ', '.join(reasons)
+
             if invoice.status != 'mapping':
                 old_status = invoice.status
                 invoice.status = 'mapping'
-                logger.info(f"Invoice {invoice.id}: {incomplete_uom_count} items with incomplete UOM, status changed from '{old_status}' to 'mapping'")
+                logger.info(f"Invoice {invoice.id}: {reason_str}, status changed from '{old_status}' to 'mapping'")
             else:
-                logger.debug(f"Invoice {invoice.id}: {incomplete_uom_count} items with incomplete UOM, staying at 'mapping'")
+                logger.debug(f"Invoice {invoice.id}: {reason_str}, staying at 'mapping'")
         else:
             # All items mapped AND all have complete UOM — check for review flags before 'ready'
 
@@ -218,7 +261,13 @@ def can_set_status_ready(invoice_id: int, db: Session) -> tuple[bool, str, list]
     if incomplete_items:
         return False, f"Invoice has {len(incomplete_items)} items with incomplete UOM", incomplete_items
 
-    return True, "All items mapped with complete UOM", []
+    # Check master item linkage
+    missing_master = get_items_without_master_item(invoice_id, db)
+
+    if missing_master:
+        return False, f"Invoice has {len(missing_master)} vendor items not linked to a master item", missing_master
+
+    return True, "All items mapped with complete UOM and master item links", []
 
 
 def recalculate_invoice_status(invoice_id: int, db: Session) -> str:

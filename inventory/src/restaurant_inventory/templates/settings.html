@@ -39,6 +39,11 @@
             <i class="bi bi-shop"></i> POS Integration
         </button>
     </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="units-tab" data-bs-toggle="tab" data-bs-target="#units" type="button" role="tab">
+            <i class="bi bi-rulers"></i> Units of Measure
+        </button>
+    </li>
 </ul>
 
 <!-- Tab Content -->
@@ -505,6 +510,85 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Units of Measure Tab -->
+    <div class="tab-pane fade" id="units" role="tabpanel">
+        <div class="alert alert-info mb-3">
+            <i class="bi bi-info-circle"></i> <strong>Units of Measure</strong> – Manage unit categories and individual units used across inventory items.
+        </div>
+
+        <div class="row">
+            <!-- Categories List -->
+            <div class="col-md-4">
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="bi bi-folder"></i> Categories</h5>
+                        <button class="btn btn-sm btn-primary" onclick="showAddCategoryModal()">
+                            <i class="bi bi-plus-lg"></i> Add
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="list-group list-group-flush" id="unitCategoriesList">
+                            <div class="p-3 text-muted">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Units List -->
+            <div class="col-md-8">
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="bi bi-rulers"></i>
+                            <span id="selectedCategoryName">Units</span>
+                            <small class="text-muted ms-2" id="selectedCategoryDesc"></small>
+                        </h5>
+                        <button class="btn btn-sm btn-primary" id="addUnitBtn" onclick="showAddUnitModal()" disabled>
+                            <i class="bi bi-plus-lg"></i> Add Unit
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="unitsListContainer">
+                            <p class="text-muted">Select a category to view its units.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Conversion Calculator -->
+                <div class="card" id="conversionCard" style="display: none;">
+                    <div class="card-header">
+                        <h5 class="mb-0"><i class="bi bi-arrow-left-right"></i> Unit Converter</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row align-items-end">
+                            <div class="col-md-3">
+                                <label class="form-label">Quantity</label>
+                                <input type="number" class="form-control" id="convertQuantity" value="1" step="any">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">From</label>
+                                <select class="form-select" id="convertFromUnit"></select>
+                            </div>
+                            <div class="col-md-1 text-center pt-4">
+                                <i class="bi bi-arrow-right fs-4"></i>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">To</label>
+                                <select class="form-select" id="convertToUnit"></select>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-outline-primary w-100" onclick="convertUnits()">Convert</button>
+                            </div>
+                        </div>
+                        <div id="conversionResult" class="mt-2" style="display: none;">
+                            <strong id="conversionResultText"></strong>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1199,6 +1283,7 @@
         locationModal = new bootstrap.Modal(document.getElementById('locationModal'));
         categoryModal = new bootstrap.Modal(document.getElementById('categoryModal'));
         roleModal = new bootstrap.Modal(document.getElementById('roleModal'));
+        unitEditModal = new bootstrap.Modal(document.getElementById('unitEditModal'));
 
         await loadUsers();
         await loadLocations();
@@ -1220,6 +1305,14 @@
             await loadPOSLocations();
             await loadPOSConfiguration();
             await loadSyncHistory();
+        });
+
+        // Setup Units tab event - load categories when tab is shown
+        const unitsTab = document.getElementById('units-tab');
+        unitsTab?.addEventListener('shown.bs.tab', async function() {
+            if (unitCategories.length === 0) {
+                await loadUnitCategories();
+            }
         });
     });
 
@@ -2055,8 +2148,10 @@
         }
 
         tbody.innerHTML = vendorItems.map(vi => {
-            const costPerMaster = vi.unit_price && vi.conversion_factor ?
-                (vi.unit_price / vi.conversion_factor).toFixed(2) : '-';
+            const upc = parseFloat(vi.units_per_case) || 0;
+            const caseCost = parseFloat(vi.case_cost) || 0;
+            const costPerUnit = caseCost && upc > 0 ? '$' + (caseCost / upc).toFixed(2) : '-';
+            const casePrice = caseCost ? '$' + caseCost.toFixed(2) : (vi.unit_price ? '$' + parseFloat(vi.unit_price).toFixed(2) : '-');
             const statusBadge = vi.is_active ?
                 '<span class="badge bg-success">Active</span>' :
                 '<span class="badge bg-secondary">Inactive</span>';
@@ -2069,10 +2164,10 @@
                     <td>${vi.master_item_name || '-'}</td>
                     <td>${vi.vendor_sku || '-'}</td>
                     <td>${vi.vendor_product_name}</td>
-                    <td>${vi.purchase_unit_name || '-'} ${vi.pack_size ? `(${vi.pack_size})` : ''}</td>
-                    <td>${vi.conversion_factor} ${vi.purchase_unit_abbr || ''} = 1 master unit</td>
-                    <td>${vi.unit_price ? '$' + parseFloat(vi.unit_price).toFixed(2) : '-'}</td>
-                    <td>${costPerMaster !== '-' ? '$' + costPerMaster : '-'}</td>
+                    <td>${vi.size_display || vi.purchase_unit_name || '-'}${upc > 0 ? ` <small class="text-muted">(${upc}/case)</small>` : ''}</td>
+                    <td>${casePrice}</td>
+                    <td>${costPerUnit}</td>
+                    <td></td>
                     <td>${statusBadge}${preferredBadge}</td>
                     <td>
                         <button class="btn btn-sm btn-outline-secondary" onclick="editVendorItem(${vi.id})" title="View details">
@@ -2887,6 +2982,9 @@
 
         container.innerHTML = html;
         document.getElementById('conversionCard').style.display = currentCategoryUnits.length > 0 ? 'block' : 'none';
+        if (currentCategoryUnits.length > 0) {
+            updateConversionSelects();
+        }
     }
 
     // Update conversion calculator selects
