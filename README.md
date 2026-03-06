@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** February 26, 2026
+**Last Updated:** March 5, 2026
 **Status:** ~98% Complete - All 10 Systems Production Ready ✅
-**Latest:** UOM simplification — removed multi-UOM system, single `pack_to_primary_factor` per vendor item with auto-calculation on save (Feb 26, 2026) ✅
+**Latest:** Mobile app bearer auth, catering contract PDF, CalDAV calendar item sync, GL learning enhancements, count session reports (Mar 5, 2026) ✅
 
 ---
 
@@ -31,7 +31,7 @@
 
 The SW Hospitality Group Restaurant Management System is a comprehensive microservices platform handling all aspects of restaurant operations including inventory management, human resources, accounting, event planning, and third-party integrations.
 
-### Key Statistics (Verified Feb 26, 2026)
+### Key Statistics (Verified Mar 5, 2026)
 - **10 microservices** running in production (including Maintenance & Food Safety)
 - **490+ Python files** across all systems
 - **170+ HTML templates** for user interfaces
@@ -108,7 +108,7 @@ restaurant-system/
 │   ├── templates/      # 16 HTML templates
 │   │   ├── admin/      # Dashboard, calendar, tasks
 │   │   ├── public/     # Public intake form
-│   │   ├── pdf/        # BEO PDF templates
+│   │   ├── pdf/        # BEO & contract PDF templates
 │   │   └── emails/     # Email templates (with event detail links)
 │   ├── services/       # CalDAV sync service
 │   ├── storage/        # Document storage
@@ -351,6 +351,12 @@ restaurant-system/
 - ✅ Dashboard with action items, recent activity, and open work orders
 - ✅ **URL:** https://rm.swhgrp.com/portal/maintenance/
 
+**Mobile App Support (NEW Mar 2026):** 🌟
+- ✅ `POST /api/mobile/login` — Returns JWT as bearer token in JSON body
+- ✅ `POST /api/mobile/refresh` — Refreshes bearer token using existing token
+- ✅ Bearer token auth added across all services (Events, HR, Accounting, Food Safety)
+- ✅ iOS app (SwiftUI, iOS 17+) at separate repo
+
 **Missing (~5%):**
 - ⚠️ `/debug` endpoint has no authentication - security risk
 - ❌ Two-factor authentication (future)
@@ -379,6 +385,8 @@ restaurant-system/
 - ✅ **Location-aware costing** - Per-location weighted average costs
 - ✅ **Multiple count units** - Primary + 2 additional count units per item
 - ✅ Live count sessions with auto-save (mobile-responsive)
+- ✅ **Count session reports** — printable HTML reports grouped by storage area/category with cost data (NEW Mar 2026) 🌟
+- ✅ **Count session CSV export** — download with cost lookup chain (location → hub → inventory → master item) (NEW Mar 2026) 🌟
 - ✅ Count templates for recurring counts
 - ✅ **Waste tracking with UoM dropdown** - Select unit of measure when logging waste (NEW Jan 5) 🌟
 - ✅ **Transfer form enhancements** - Searchable Select2 dropdown, date picker, UoM selection (NEW Jan 5) 🌟
@@ -555,9 +563,12 @@ restaurant-system/
 
 **Banking:**
 - ✅ Bank account management
-- ✅ Bank reconciliation
+- ✅ Bank reconciliation with inline GL suggestions and search (enhanced Mar 2026) 🌟
+- ✅ **Batch GL suggestions** — single API call for multiple transaction suggestions (Mar 2026) 🌟
+- ✅ **GL learning improvements** — stop-word filtering, competing pattern deactivation, rejection tracking (Mar 2026) 🌟
 - ✅ Transaction import
 - ✅ Check register
+- ✅ **Custom date range picker** on banking dashboard (Mar 2026) 🌟
 - 🔄 Bank feeds (partial)
 
 **Budgeting:**
@@ -585,8 +596,8 @@ restaurant-system/
 - **Public Form:** https://rm.swhgrp.com/events/public/intake (NO AUTH REQUIRED)
 - **Database:** events_db (PostgreSQL 15)
 - **Technology:** FastAPI, SQLAlchemy, WeasyPrint (PDF), FullCalendar.js
-- **Files:** 53 Python files, 16 templates
-- **Latest:** Quick Holds feature + CalDAV sync (Jan 5, 2026) 🌟
+- **Files:** 55 Python files, 18 templates
+- **Latest:** Catering contracts, CalDAV calendar item sync, calendar search (Mar 5, 2026) 🌟
 
 **✅ Portal SSO Integration Complete:**
 - ✅ JWT token validation from Portal
@@ -629,6 +640,7 @@ restaurant-system/
 - ✅ Color-coded by event status
 - ✅ Event filtering
 - ✅ Visual timeline
+- ✅ **Calendar search** with 300ms debounce (server + client-side filtering) (NEW Mar 2026) 🌟
 
 **Task Management:**
 - ✅ Auto-task generation from templates
@@ -641,8 +653,9 @@ restaurant-system/
 
 **Document Generation:**
 - ✅ BEO (Banquet Event Order) PDF generation
+- ✅ **Catering Contract PDF** — formal legal contract with venue logos, menu, financials, legal clauses, signature blocks (NEW Mar 2026) 🌟
 - ✅ Event summary PDF
-- ✅ WeasyPrint rendering
+- ✅ WeasyPrint rendering with venue logo embedding (base64 data URIs)
 - ✅ Download/email delivery
 - 🔄 Version control (partial - 40%)
 
@@ -1533,18 +1546,18 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 | Inventory | ✅ Production | 104 | 31 | 32+ | **100%** 🌟 | POS sync, recipe costing, location costs |
 | HR | ✅ Production | 60+ | 17 | 20+ | **~95%** | Required docs, e-signatures, audit logging |
 | Accounting | ✅ Production | 119 | 38+ | 26+ | **~95%** 🌟 | Plaid, multi-location reports, AR automation |
-| Events | ✅ Production | 53 | 16 | 17+ | **~99%** 🌟 | Quick Holds, CalDAV sync, public intake |
+| Events | ✅ Production | 55 | 18 | 17+ | **~99%** 🌟 | Contracts, CalDAV item sync, calendar search |
 | Integration Hub | ✅ Production | 61 | 14 | 18+ | **~98%** 🌟 | Single-UOM pricing, post-parse validation, AI search |
 | Files | ✅ Production | 18 | 4 | 7 | **~85%** | WebDAV sync + OnlyOffice editing |
 | Websites | ✅ Production | 7 | 18 | 11+ | **~90%** | Block-based page builder, menu management |
 | Maintenance | ✅ Production | 16 | 5 | 10 | **100%** 🌟 | Equipment, work orders, PM schedules |
 | Food Safety | ✅ Production | 29 | 5 | 18 | **100%** 🌟 | Incidents, document uploads, user permissions |
 
-**Total:** 490+ Python files, 170+ templates, 160+ database models (verified Feb 14, 2026)
+**Total:** 495+ Python files, 175+ templates, 160+ database models (verified Mar 5, 2026)
 
 **Overall Status:** ~98% Complete - All 10 Systems Production Ready ✅
 
-**Active Issues (Feb 14, 2026):**
+**Active Issues (Mar 5, 2026):**
 - ⚠️ **Portal:** `/debug` endpoint has no authentication
 - ⚠️ **HR:** Uses in-memory dict for sessions (should use Redis)
 - ⚠️ **Events/Websites:** Empty alembic/versions directories (use create_all instead)
@@ -1557,8 +1570,8 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 
 ---
 
-**Version:** 4.0
-**Last Updated:** February 26, 2026
+**Version:** 4.1
+**Last Updated:** March 5, 2026
 **Maintained By:** SW Hospitality Group Development Team
 
 **For complete system details, see [SYSTEM_DOCUMENTATION.md](./SYSTEM_DOCUMENTATION.md)**
@@ -1566,6 +1579,44 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ---
 
 ## 📝 Recent Updates
+
+### March 5, 2026 - Mobile Auth, Catering Contracts, CalDAV Item Sync, GL Learning, Count Reports
+
+**Mobile App Support:**
+- ✅ **Bearer token auth** added across all services (Events, HR, Accounting, Food Safety, Inventory)
+- ✅ **Portal mobile endpoints** — `POST /api/mobile/login` and `POST /api/mobile/refresh`
+- ✅ **iOS app** — SwiftUI app with biometric login, KeychainService for JWT storage
+
+**Events — Catering Contracts:**
+- ✅ **Catering Contract PDF** — formal legal contract template with 16 sections
+- ✅ **Venue logos** embedded as base64 data URIs (The Nest, SW Grill, Seaside, Links, Park Bistro)
+- ✅ **Financial breakdown** — food subtotal, 21% service fee, 6.5% tax, estimated total, 50% deposit clause
+- ✅ **Menu rendering** — item names from `menu_json`, beverage section with bar_type guard
+- ✅ **Calendar search** — debounced title search with server-side `ilike` + client-side filtering
+
+**Events — CalDAV Improvements:**
+- ✅ **Multi-user event sync** — events push to ALL users assigned to the venue (was creator-only)
+- ✅ **Calendar item CalDAV sync** — notes/reminders/meetings now sync to CalDAV per venue location
+- ✅ Items with location sync to all users at that venue; items without location sync to creator only
+- ✅ Notes/reminders marked transparent (don't block time on phone calendars)
+
+**Accounting — GL Learning & Bank Reconciliation:**
+- ✅ **GL learning enhancements** — stop-word filtering, reordered pattern priority, competing pattern deactivation
+- ✅ **Batch GL suggestions API** — `POST /batch-gl-suggestions` for multiple transactions in one call
+- ✅ **Reconciliation UI overhaul** — default "Unreconciled Only" filter, search bar, inline GL suggestion badges
+- ✅ **Quick GL assignment** — `quickAssignGL()` assigns GL account without modal
+- ✅ **Custom date range** — banking dashboard supports custom date range picker
+
+**Inventory — Count Session Reports:**
+- ✅ **Printable report** — `GET /count/{session_id}/report` grouped by storage area and category with cost data
+- ✅ **CSV export** — `GET /api/v1/count-sessions/{session_id}/export` with full cost lookup chain
+- ✅ **Cost lookup chain** — location cost → hub pricing → inventory unit_cost → master item cost
+
+**Integration Hub:**
+- ✅ **Master item sync improvements** — container-based UOM detection, conflicting count unit cleanup
+- ✅ New maintenance scripts: `backfill_invoice_item_names.py`, `backfill_master_item_uoms.py`, `fix_container_pack_factors.py`, `recalc_container_costs.py`
+
+---
 
 ### February 26, 2026 - UOM Simplification & Pack Factor Auto-Calculation
 
@@ -1663,11 +1714,15 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 - ✅ **Scheduler service** - Background job processing for bank sync
 - ✅ **23 Alembic migrations** - Full database schema versioning
 
-**Events System - Quick Holds**
+**Events System - Quick Holds & CalDAV**
 - ✅ **Quick hold creation** - Block dates without full event details
 - ✅ **Hold expiration** - Auto-expire holds after configurable period
 - ✅ **Convert to event** - One-click conversion to full event
 - ✅ **CalDAV sync service** - Calendar synchronization for events with menu details and bar info
+- ✅ **CalDAV multi-user sync** - Events push to ALL users assigned to the event's venue (Mar 2026)
+- ✅ **Calendar item CalDAV sync** - Notes/reminders/meetings sync to CalDAV per venue (Mar 2026)
+- ✅ **Catering Contract PDF** - Legal contract generation with venue logos, financials, signature blocks (Mar 2026)
+- ✅ **Calendar search** - Title search with debounce and server-side filtering (Mar 2026)
 
 **Integration Hub - UoM Architecture**
 - ✅ **Hub owns UoM** - Source of truth for units of measure

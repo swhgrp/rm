@@ -25,12 +25,12 @@
     <div class="row mb-3">
         <div class="col-md-12">
             <div class="btn-group" role="group">
-                <input type="radio" class="btn-check" name="statusFilter" id="filterAll" value="all" checked>
+                <input type="radio" class="btn-check" name="statusFilter" id="filterAll" value="all">
                 <label class="btn btn-outline-secondary btn-sm" for="filterAll">
                     All Transactions
                 </label>
 
-                <input type="radio" class="btn-check" name="statusFilter" id="filterUnreconciled" value="unreconciled">
+                <input type="radio" class="btn-check" name="statusFilter" id="filterUnreconciled" value="unreconciled" checked>
                 <label class="btn btn-outline-warning btn-sm" for="filterUnreconciled">
                     Unreconciled Only
                 </label>
@@ -41,10 +41,19 @@
                 </label>
             </div>
 
-            <div class="float-end">
-                <input type="date" class="form-control form-control-sm d-inline-block w-auto me-2" id="startDate">
+            <div class="float-end d-flex align-items-center gap-2">
+                <div class="input-group input-group-sm" style="width: 260px;">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" id="searchInput"
+                           placeholder="Search description or amount..."
+                           autocomplete="off">
+                    <button class="btn btn-outline-secondary" id="clearSearchBtn" style="display:none;" onclick="clearSearch()" title="Clear search">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <input type="date" class="form-control form-control-sm d-inline-block w-auto" id="startDate">
                 <span class="text-muted">to</span>
-                <input type="date" class="form-control form-control-sm d-inline-block w-auto ms-2 me-2" id="endDate">
+                <input type="date" class="form-control form-control-sm d-inline-block w-auto" id="endDate">
                 <button class="btn btn-sm btn-primary" onclick="loadTransactions()">
                     <i class="bi bi-funnel me-1"></i>Filter
                 </button>
@@ -69,8 +78,9 @@
                             <th width="100">Date</th>
                             <th>Description</th>
                             <th width="120" class="text-end">Amount</th>
-                            <th width="150">Status</th>
-                            <th width="150" class="text-center">Action</th>
+                            <th width="120">Status</th>
+                            <th>GL Account</th>
+                            <th width="100" class="text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody id="transactionsBody">
@@ -297,11 +307,41 @@
         border-color: var(--primary);
         background-color: rgba(13, 110, 253, 0.1);
     }
+
+    /* Inline GL suggestion badges */
+    .gl-suggestion-badge {
+        cursor: pointer;
+        font-size: 0.8rem;
+        padding: 0.35rem 0.6rem;
+        white-space: nowrap;
+    }
+
+    /* Assigned GL badge */
+    .gl-assigned-badge {
+        font-size: 0.8rem;
+        padding: 0.35rem 0.6rem;
+        white-space: nowrap;
+    }
+    .gl-assigned-badge:hover {
+        filter: brightness(1.1);
+    }
+
+    /* Set Account link */
+    .gl-set-account {
+        cursor: pointer;
+        font-size: 0.8rem;
+        text-decoration: underline;
+        text-decoration-style: dotted;
+    }
+    .gl-set-account:hover {
+        color: var(--primary) !important;
+    }
 </style>
 
 <script>
 let currentBankAccountId = null;
 let currentTransactionId = null;
+let currentSuggestedAccountId = null;  // Track what the system suggested for learning
 let allTransactions = [];
 let openBills = [];
 
@@ -337,6 +377,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // Listen for filter changes
     document.querySelectorAll('input[name="statusFilter"]').forEach(radio => {
         radio.addEventListener('change', filterTransactions);
+    });
+
+    // Listen for search input
+    const searchInput = document.getElementById('searchInput');
+    searchInput.addEventListener('input', function() {
+        document.getElementById('clearSearchBtn').style.display = this.value ? '' : 'none';
+        filterTransactions();
+    });
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            clearSearch();
+        }
     });
 });
 
@@ -377,18 +429,64 @@ async function loadTransactions() {
         const response = await fetch(`/accounting/api/bank-accounts/${currentBankAccountId}/transactions?limit=1000`);
         allTransactions = await response.json();
 
-        // Load vendor recognition for each transaction
-        for (let transaction of allTransactions) {
-            transaction.vendorInfo = await recognizeVendor(transaction.id);
+        // Show transactions immediately, then load vendor info in background
+        filterTransactions();
+
+        // Batch-load GL suggestions for all unreconciled transactions in one call
+        const unreconciledIds = allTransactions
+            .filter(t => t.status === 'unreconciled' && !t.suggested_account)
+            .map(t => t.id);
+
+        if (unreconciledIds.length > 0) {
+            try {
+                const sugResp = await fetch('/accounting/api/bank-statements/batch-gl-suggestions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(unreconciledIds)
+                });
+                if (sugResp.ok) {
+                    const sugMap = await sugResp.json();
+                    allTransactions.forEach(t => {
+                        const data = sugMap[String(t.id)];
+                        if (data && data.suggestions && data.suggestions.length > 0) {
+                            t.glSuggestions = data;
+                        }
+                    });
+                    filterTransactions();
+                }
+            } catch (e) {
+                console.error('Error batch-loading GL suggestions:', e);
+            }
         }
 
-        filterTransactions();
+        // Load vendor recognition in parallel batches (10 at a time)
+        const batchSize = 10;
+        for (let i = 0; i < allTransactions.length; i += batchSize) {
+            const batch = allTransactions.slice(i, i + batchSize);
+            await Promise.all(batch.map(async (transaction) => {
+                transaction.vendorInfo = await recognizeVendor(transaction.id);
+            }));
+            // Re-render after each batch so vendor badges appear progressively
+            filterTransactions();
+        }
 
     } catch (error) {
         console.error('Error loading transactions:', error);
         showToast('Error loading transactions', 'danger');
         document.getElementById('loadingSpinner').style.display = 'none';
         document.getElementById('noTransactions').style.display = 'block';
+    }
+}
+
+// Fetch GL suggestions for a transaction (lightweight — for inline display)
+async function fetchGLSuggestions(transactionId) {
+    try {
+        const response = await fetch(`/accounting/api/bank-statements/transactions/${transactionId}/gl-suggestions`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        return data.suggestions && data.suggestions.length > 0 ? data : null;
+    } catch (error) {
+        return null;
     }
 }
 
@@ -403,18 +501,40 @@ async function recognizeVendor(transactionId) {
     }
 }
 
-// Filter transactions based on status
+// Filter transactions based on status and search term
 function filterTransactions() {
     const filter = document.querySelector('input[name="statusFilter"]:checked').value;
+    const searchTerm = (document.getElementById('searchInput').value || '').trim().toLowerCase();
 
     let filtered = allTransactions;
+
+    // Status filter
     if (filter === 'unreconciled') {
-        filtered = allTransactions.filter(t => t.status === 'unreconciled');
+        filtered = filtered.filter(t => t.status === 'unreconciled');
     } else if (filter === 'reconciled') {
-        filtered = allTransactions.filter(t => t.status === 'reconciled');
+        filtered = filtered.filter(t => t.status === 'reconciled');
+    }
+
+    // Search filter — matches description or amount
+    if (searchTerm) {
+        filtered = filtered.filter(t => {
+            const desc = (t.description || '').toLowerCase();
+            const amount = formatCurrency(t.amount).toLowerCase();
+            const rawAmount = String(t.amount);
+            return desc.includes(searchTerm) || amount.includes(searchTerm) || rawAmount.includes(searchTerm);
+        });
     }
 
     renderTransactions(filtered);
+}
+
+// Clear search input
+function clearSearch() {
+    const searchInput = document.getElementById('searchInput');
+    searchInput.value = '';
+    document.getElementById('clearSearchBtn').style.display = 'none';
+    filterTransactions();
+    searchInput.focus();
 }
 
 // Render transactions table
@@ -424,9 +544,12 @@ function renderTransactions(transactions) {
 
     if (transactions.length === 0) {
         document.getElementById('loadingSpinner').style.display = 'none';
+        document.getElementById('transactionsContainer').style.display = 'none';
         document.getElementById('noTransactions').style.display = 'block';
         return;
     }
+
+    document.getElementById('noTransactions').style.display = 'none';
 
     transactions.forEach(transaction => {
         const row = document.createElement('tr');
@@ -436,61 +559,34 @@ function renderTransactions(transactions) {
         dateCell.textContent = new Date(transaction.transaction_date).toLocaleDateString();
         row.appendChild(dateCell);
 
-        // Description with badges
+        // Description with vendor badges
         const descCell = document.createElement('td');
         descCell.innerHTML = transaction.description || '';
-
-        // Add GL account badge if assigned
-        if (transaction.suggested_account) {
-            const glBadge = document.createElement('div');
-            glBadge.className = 'mt-1 d-flex align-items-center gap-2';
-
-            // Show confidence score if this is an auto-match
-            let confidenceBadge = '';
-            if (transaction.suggestion_confidence && transaction.suggestion_confidence > 0) {
-                const confidence = parseFloat(transaction.suggestion_confidence);
-                const confidenceColor = confidence >= 90 ? 'success' :
-                                       confidence >= 70 ? 'warning' : 'secondary';
-                confidenceBadge = `
-                    <span class="badge bg-${confidenceColor}" title="Auto-Match Confidence">
-                        <i class="bi bi-robot me-1"></i>${Math.round(confidence)}%
-                    </span>
-                `;
-            }
-
-            glBadge.innerHTML = `
-                ${confidenceBadge}
-                <span class="badge bg-info">
-                    <i class="bi bi-journal-text me-1"></i>GL: ${transaction.suggested_account.account_number} - ${transaction.suggested_account.account_name}
-                </span>
-                <button class="btn btn-sm btn-outline-secondary py-0 px-2"
-                        onclick="editGLAssignment(${transaction.id}, '${transaction.description}')"
-                        title="Change GL Account">
-                    <i class="bi bi-pencil-square"></i>
-                </button>
-            `;
-            descCell.appendChild(glBadge);
-        }
 
         // Add vendor badges if vendor recognized
         if (transaction.vendorInfo && transaction.vendorInfo.matched_vendor) {
             const vendorInfo = transaction.vendorInfo;
+            const vendorBadgeWrap = document.createElement('div');
+            vendorBadgeWrap.className = 'mt-1';
 
-            // Open bills badge
+            const vendorBadge = document.createElement('span');
+            vendorBadge.className = 'badge bg-secondary me-1';
+            vendorBadge.innerHTML = `<i class="bi bi-building me-1"></i>${vendorInfo.matched_vendor.vendor_name}`;
+            vendorBadgeWrap.appendChild(vendorBadge);
+
             if (vendorInfo.open_bills_count > 0) {
                 const billsBadge = document.createElement('span');
-                billsBadge.className = 'badge bg-success ms-2 vendor-badge';
-                billsBadge.textContent = `Reconcile ${vendorInfo.open_bills_count}`;
-                descCell.appendChild(billsBadge);
+                billsBadge.className = 'badge bg-success ms-1 vendor-badge';
+                billsBadge.textContent = `${vendorInfo.open_bills_count} bills`;
+                vendorBadgeWrap.appendChild(billsBadge);
             }
-
-            // Exact match badge
             if (vendorInfo.has_exact_match) {
                 const matchBadge = document.createElement('span');
-                matchBadge.className = 'badge bg-warning ms-2 vendor-badge';
-                matchBadge.textContent = '100% Match';
-                descCell.appendChild(matchBadge);
+                matchBadge.className = 'badge bg-warning ms-1 vendor-badge';
+                matchBadge.textContent = 'Exact Match';
+                vendorBadgeWrap.appendChild(matchBadge);
             }
+            descCell.appendChild(vendorBadgeWrap);
         }
 
         row.appendChild(descCell);
@@ -512,7 +608,44 @@ function renderTransactions(transactions) {
         statusCell.appendChild(statusBadge);
         row.appendChild(statusCell);
 
-        // Action
+        // GL Account column — inline clickable suggestions or assigned account
+        const glCell = document.createElement('td');
+
+        if (transaction.suggested_account) {
+            // Already assigned — show as a badge with edit pencil
+            glCell.innerHTML = `
+                <span class="badge bg-info gl-assigned-badge" style="cursor:pointer"
+                      onclick="editGLAssignment(${transaction.id}, '${(transaction.description || '').replace(/'/g, "\\'")}')"
+                      title="Click to change">
+                    ${transaction.suggested_account.account_number} - ${transaction.suggested_account.account_name}
+                    <i class="bi bi-pencil-square ms-1"></i>
+                </span>
+            `;
+        } else if (transaction.status === 'unreconciled' && transaction.glSuggestions) {
+            // Show top suggestion as a clickable badge
+            const topSuggestion = transaction.glSuggestions.suggestions[0];
+            const confidence = Math.round(parseFloat(topSuggestion.confidence_score));
+            const badgeColor = confidence >= 70 ? 'success' : confidence >= 50 ? 'warning' : 'secondary';
+
+            glCell.innerHTML = `
+                <span class="badge bg-${badgeColor} gl-suggestion-badge"
+                      onclick="quickAssignGL(${transaction.id}, ${topSuggestion.account_id}, '${topSuggestion.account_number}', '${topSuggestion.account_name.replace(/'/g, "\\'")}', this)">
+                    ${topSuggestion.account_number} ${topSuggestion.account_name}
+                </span>
+            `;
+        } else if (transaction.status === 'unreconciled') {
+            // No suggestions yet — show set account link
+            glCell.innerHTML = `
+                <span class="text-muted gl-set-account" onclick="showGLAssignment(${transaction.id})"
+                      title="Set GL Account">
+                    Set Account
+                </span>
+            `;
+        }
+
+        row.appendChild(glCell);
+
+        // Action buttons
         const actionCell = document.createElement('td');
         actionCell.className = 'text-center';
 
@@ -520,43 +653,24 @@ function renderTransactions(transactions) {
             const btnGroup = document.createElement('div');
             btnGroup.className = 'd-flex gap-1 justify-content-center';
 
-            // If auto-matched, show Verify & Approve button prominently
-            if (transaction.suggested_account && transaction.suggestion_confidence && parseFloat(transaction.suggestion_confidence) >= 70) {
-                const verifyBtn = document.createElement('button');
-                verifyBtn.className = 'btn btn-sm btn-warning';
-                verifyBtn.innerHTML = '<i class="bi bi-check-circle me-1"></i>Verify';
-                verifyBtn.title = 'Verify & Approve Auto-Match';
-                verifyBtn.onclick = () => verifyAndApproveAutoMatch(transaction.id, transaction.suggested_account.id);
-                btnGroup.appendChild(verifyBtn);
+            // Match Bills button (always available for unreconciled)
+            const matchBtn = document.createElement('button');
+            matchBtn.className = 'btn btn-sm btn-success';
+            matchBtn.innerHTML = '<i class="bi bi-receipt"></i>';
+            matchBtn.title = 'Match Bills';
+            matchBtn.onclick = () => showOpenBills(transaction.id);
+            btnGroup.appendChild(matchBtn);
 
-                // Add smaller reject button
-                const rejectBtn = document.createElement('button');
-                rejectBtn.className = 'btn btn-sm btn-outline-danger';
-                rejectBtn.innerHTML = '<i class="bi bi-x-circle"></i>';
-                rejectBtn.title = 'Reject Auto-Match';
-                rejectBtn.onclick = () => rejectAutoMatch(transaction.id);
-                btnGroup.appendChild(rejectBtn);
-            } else {
-                // Standard buttons for non-auto-matched transactions
-                const matchBtn = document.createElement('button');
-                matchBtn.className = 'btn btn-sm btn-success';
-                matchBtn.innerHTML = '<i class="bi bi-receipt"></i>';
-                matchBtn.title = 'Match Bills';
-                matchBtn.onclick = () => showOpenBills(transaction.id);
-
-                const glBtn = document.createElement('button');
-                glBtn.className = 'btn btn-sm btn-primary';
-                glBtn.innerHTML = '<i class="bi bi-journal-text"></i>';
-                glBtn.title = 'Assign to GL';
-                glBtn.onclick = () => showGLAssignment(transaction.id);
-
-                btnGroup.appendChild(matchBtn);
-                btnGroup.appendChild(glBtn);
-            }
+            // GL Assignment button (opens modal with all suggestions)
+            const glBtn = document.createElement('button');
+            glBtn.className = 'btn btn-sm btn-primary';
+            glBtn.innerHTML = '<i class="bi bi-journal-text"></i>';
+            glBtn.title = 'Assign to GL';
+            glBtn.onclick = () => showGLAssignment(transaction.id);
+            btnGroup.appendChild(glBtn);
 
             actionCell.appendChild(btnGroup);
         } else if (transaction.status === 'reconciled') {
-            // Show if it was confirmed or auto-matched
             if (transaction.confirmed_at) {
                 actionCell.innerHTML = '<i class="bi bi-check-circle-fill text-success" title="Verified & Approved"></i>';
             } else {
@@ -1018,6 +1132,15 @@ async function loadGLSuggestions(transactionId) {
         const suggestionsList = document.getElementById('glSuggestionsList');
         suggestionsList.innerHTML = ''; // Clear previous suggestions
 
+        // Remove any previous auto-assign notices
+        document.querySelectorAll('.auto-assign-notice').forEach(el => el.remove());
+
+        // Track the top suggestion for learning feedback
+        currentSuggestedAccountId = null;
+        if (data.suggestions && data.suggestions.length > 0) {
+            currentSuggestedAccountId = data.suggestions[0].account_id;
+        }
+
         // Phase 3: Auto-assignment for high confidence (>90%)
         if (data.auto_assign_enabled && data.auto_assign_account_id) {
             // Automatically select the high-confidence suggestion
@@ -1026,7 +1149,7 @@ async function loadGLSuggestions(transactionId) {
 
             // Show auto-assign notification
             const autoAssignNotice = document.createElement('div');
-            autoAssignNotice.className = 'alert alert-success mb-3';
+            autoAssignNotice.className = 'alert alert-success mb-3 auto-assign-notice';
             autoAssignNotice.innerHTML = `
                 <i class="bi bi-magic me-2"></i>
                 <strong>Auto-Selected:</strong> High confidence match (${Math.round(data.suggestions[0].confidence_score)}%).
@@ -1165,7 +1288,8 @@ async function confirmGLAssignment() {
             },
             body: JSON.stringify({
                 account_id: parseInt(accountId),
-                memo: memo
+                memo: memo,
+                suggested_account_id: currentSuggestedAccountId || null
                 // Note: area_id is automatically inherited from the bank account
             })
         });
@@ -1193,6 +1317,102 @@ async function confirmGLAssignment() {
     } finally {
         document.getElementById('confirmGLBtn').disabled = false;
         document.getElementById('confirmGLBtn').innerHTML = '<i class="bi bi-check-circle me-1"></i>Confirm Assignment';
+    }
+}
+
+// Quick assign GL from inline suggestion badge (one-click)
+async function quickAssignGL(transactionId, accountId, accountNumber, accountName, badgeEl) {
+    // Disable the badge to prevent double-clicks
+    badgeEl.style.pointerEvents = 'none';
+    badgeEl.style.opacity = '0.6';
+    const originalHTML = badgeEl.innerHTML;
+    badgeEl.innerHTML = '<span class="spinner-border spinner-border-sm" style="width:0.75rem;height:0.75rem"></span> Assigning...';
+
+    try {
+        // Check if transaction already has an assignment (update vs create)
+        const transaction = allTransactions.find(t => t.id === transactionId);
+        const isUpdate = transaction && transaction.suggested_account;
+        const endpoint = isUpdate
+            ? `/accounting/api/bank-statements/transactions/${transactionId}/update-gl?user_id=1`
+            : `/accounting/api/bank-statements/transactions/${transactionId}/assign-gl?user_id=1`;
+        const method = isUpdate ? 'PUT' : 'POST';
+
+        // The top suggestion was what we're assigning, so suggested_account_id = accountId (accepted)
+        const suggestedAccountId = transaction.glSuggestions
+            ? transaction.glSuggestions.suggestions[0].account_id : null;
+
+        const response = await fetch(endpoint, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                account_id: accountId,
+                memo: transaction ? (transaction.description || '') : '',
+                suggested_account_id: suggestedAccountId
+            })
+        });
+
+        if (response.ok) {
+            showToast(`Assigned to ${accountNumber} - ${accountName}`, 'success');
+
+            // Update the transaction in memory
+            if (transaction) {
+                transaction.status = 'reconciled';
+                transaction.suggested_account = {
+                    account_id: accountId,
+                    account_number: accountNumber,
+                    account_name: accountName
+                };
+            }
+
+            // Update the row in-place (no page reload)
+            const row = badgeEl.closest('tr');
+            if (row) {
+                // Update status cell
+                const statusCell = row.cells[3];
+                if (statusCell) {
+                    statusCell.innerHTML = '<span class="badge status-reconciled">Reconciled</span>';
+                }
+
+                // Update GL cell to show assigned badge
+                const glCell = row.cells[4];
+                if (glCell) {
+                    glCell.innerHTML = `
+                        <span class="badge bg-info gl-assigned-badge" style="cursor:pointer"
+                              onclick="editGLAssignment(${transactionId}, '${(transaction.description || '').replace(/'/g, "\\'")}')"
+                              title="Click to change">
+                            ${accountNumber} - ${accountName}
+                            <i class="bi bi-pencil-square ms-1"></i>
+                        </span>
+                    `;
+                }
+
+                // Remove action buttons (reconciled transactions don't need them)
+                const actionCell = row.cells[5];
+                if (actionCell) {
+                    actionCell.innerHTML = '';
+                }
+
+                // If filter is "Unreconciled Only", fade out the row
+                const activeFilter = document.querySelector('input[name="statusFilter"]:checked');
+                if (activeFilter && activeFilter.value === 'unreconciled') {
+                    row.style.transition = 'opacity 0.4s';
+                    row.style.opacity = '0.3';
+                    setTimeout(() => row.remove(), 500);
+                }
+            }
+        } else {
+            const error = await response.json();
+            showToast(`Error: ${error.detail || 'Failed to assign'}`, 'danger');
+            badgeEl.innerHTML = originalHTML;
+            badgeEl.style.pointerEvents = '';
+            badgeEl.style.opacity = '';
+        }
+    } catch (error) {
+        console.error('Error in quick GL assignment:', error);
+        showToast('Error assigning GL account', 'danger');
+        badgeEl.innerHTML = originalHTML;
+        badgeEl.style.pointerEvents = '';
+        badgeEl.style.opacity = '';
     }
 }
 

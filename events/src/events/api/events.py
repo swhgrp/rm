@@ -161,6 +161,7 @@ async def get_calendar_events(
     end: datetime = Query(..., description="Calendar end date"),
     view: str = Query("month", regex="^(month|week|day)$"),
     location: Optional[str] = None,
+    q: Optional[str] = Query(None, description="Search query for event title"),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_auth)
 ):
@@ -195,6 +196,9 @@ async def get_calendar_events(
 
     if location:
         query = query.filter(Event.location == location)
+
+    if q:
+        query = query.filter(Event.title.ilike(f"%{q}%"))
 
     # Exclude canceled events from calendar
     query = query.filter(Event.status != EventStatus.CANCELED)
@@ -306,15 +310,33 @@ async def create_event(
     db.commit()
     db.refresh(event)
 
-    # Sync to CalDAV if enabled
+    # Sync to CalDAV if enabled — push to ALL users with access to this venue
     if settings.CALDAV_ENABLED:
         try:
+            from events.models.user import UserLocation
             caldav_service = CalDAVSyncService()
-            caldav_service.sync_event_to_caldav(event, current_user.email)
-            logger.info(f"Event {event.id} synced to CalDAV for user {current_user.email}")
+
+            users_to_sync = []
+            if event.venue_id:
+                user_venue_assignments = db.query(UserLocation).filter(
+                    UserLocation.venue_id == event.venue_id
+                ).all()
+                for assignment in user_venue_assignments:
+                    user = db.query(User).filter(User.id == assignment.user_id).first()
+                    if user and user.is_active:
+                        users_to_sync.append(user)
+
+            if not users_to_sync:
+                users_to_sync = [current_user]
+
+            for user in users_to_sync:
+                try:
+                    caldav_service.sync_event_to_caldav(event, user.email)
+                    logger.info(f"Event {event.id} synced to CalDAV for user {user.email}")
+                except Exception as e:
+                    logger.error(f"Failed to sync event {event.id} to CalDAV for {user.email}: {e}")
         except Exception as e:
             logger.error(f"Failed to sync event {event.id} to CalDAV: {e}")
-            # Don't fail the request if CalDAV sync fails
 
     # TODO: Generate initial tasks from template
     # TODO: Send confirmation email
@@ -354,17 +376,37 @@ async def update_event(
 
     logger.info(f"After update - event status: {event.status}, venue_id: {event.venue_id}")
 
-    # Sync to CalDAV if enabled
+    # Sync to CalDAV if enabled — push to ALL users with access to this venue
     if settings.CALDAV_ENABLED:
         try:
+            from events.models.user import UserLocation
             caldav_service = CalDAVSyncService()
-            # If event is canceled or closed, remove from CalDAV
-            if event.status in [EventStatus.CANCELED, EventStatus.CLOSED]:
-                caldav_service.remove_event_from_caldav(event, current_user.email)
-                logger.info(f"Event {event.id} removed from CalDAV for user {current_user.email}")
-            else:
-                caldav_service.sync_event_to_caldav(event, current_user.email)
-                logger.info(f"Event {event.id} synced to CalDAV for user {current_user.email}")
+
+            # Get all users who have access to this event's venue
+            users_to_sync = []
+            if event.venue_id:
+                user_venue_assignments = db.query(UserLocation).filter(
+                    UserLocation.venue_id == event.venue_id
+                ).all()
+                for assignment in user_venue_assignments:
+                    user = db.query(User).filter(User.id == assignment.user_id).first()
+                    if user and user.is_active:
+                        users_to_sync.append(user)
+
+            # Fallback to current user if no venue assignments found
+            if not users_to_sync:
+                users_to_sync = [current_user]
+
+            for user in users_to_sync:
+                try:
+                    if event.status in [EventStatus.CANCELED, EventStatus.CLOSED]:
+                        caldav_service.remove_event_from_caldav(event, user.email)
+                        logger.info(f"Event {event.id} removed from CalDAV for user {user.email}")
+                    else:
+                        caldav_service.sync_event_to_caldav(event, user.email)
+                        logger.info(f"Event {event.id} synced to CalDAV for user {user.email}")
+                except Exception as e:
+                    logger.error(f"Failed to sync event {event.id} to CalDAV for {user.email}: {e}")
         except Exception as e:
             logger.error(f"Failed to sync event {event.id} to CalDAV: {e}")
             # Don't fail the request if CalDAV sync fails

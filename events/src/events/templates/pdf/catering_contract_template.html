@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Catering Contract - {{ event.title }}</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 1in 1in 0.75in 1in;
+            @bottom-center {
+                content: counter(page);
+                font-family: 'Times New Roman', 'Georgia', serif;
+                font-size: 10pt;
+                color: #333;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Times New Roman', 'Georgia', serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #222;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .header .venue-name {
+            font-size: 16pt;
+            font-weight: bold;
+        }
+
+        .header .venue-address {
+            font-size: 11pt;
+            color: #444;
+        }
+
+        .contract-date {
+            margin-bottom: 16px;
+        }
+
+        .contract-title {
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            text-decoration: underline;
+            margin-bottom: 16px;
+        }
+
+        .preamble {
+            margin-bottom: 16px;
+            text-align: justify;
+        }
+
+        .section-title {
+            font-weight: bold;
+            margin-top: 14px;
+            margin-bottom: 4px;
+        }
+
+        .section-number {
+            font-weight: bold;
+        }
+
+        .section-body {
+            margin-left: 28px;
+            margin-bottom: 8px;
+            text-align: justify;
+        }
+
+        .subsection {
+            margin-left: 28px;
+            margin-bottom: 4px;
+        }
+
+        .menu-section {
+            margin-left: 28px;
+            margin-bottom: 12px;
+        }
+
+        .menu-section-title {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+
+        .menu-item {
+            margin-left: 14px;
+            margin-bottom: 1px;
+        }
+
+        .menu-cost {
+            margin-left: 14px;
+            margin-top: 4px;
+            font-weight: bold;
+        }
+
+        .financial-summary {
+            margin-left: 28px;
+            margin-top: 8px;
+            margin-bottom: 8px;
+        }
+
+        .financial-summary table {
+            border-collapse: collapse;
+        }
+
+        .financial-summary td {
+            padding: 2px 12px 2px 0;
+        }
+
+        .financial-summary .total-row td {
+            font-weight: bold;
+            border-top: 1px solid #333;
+            padding-top: 4px;
+        }
+
+        .signature-block {
+            margin-top: 40px;
+            page-break-inside: avoid;
+        }
+
+        .sig-line {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            margin-top: 30px;
+        }
+
+        .sig-field {
+            width: 45%;
+        }
+
+        .sig-field .line {
+            border-bottom: 1px solid #333;
+            height: 20px;
+            margin-bottom: 2px;
+        }
+
+        .sig-field .label {
+            font-size: 9pt;
+            color: #555;
+        }
+
+        ol.sections {
+            list-style: none;
+            counter-reset: section;
+            padding: 0;
+        }
+
+        ol.sections > li {
+            counter-increment: section;
+            margin-bottom: 10px;
+        }
+
+        ol.sections > li > .section-heading {
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        ol.sections > li > .section-heading::before {
+            content: counter(section) ". ";
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        {% if venue_logo %}
+        <img src="{{ venue_logo }}" style="max-height: 80px; max-width: 200px; margin-bottom: 8px;">
+        {% endif %}
+        {% if venue %}
+        <div class="venue-name">{{ venue.name }}</div>
+        {% if venue.address %}
+        <div class="venue-address">{{ venue.address }}</div>
+        {% endif %}
+        {% else %}
+        <div class="venue-name">SW Hospitality Group</div>
+        {% endif %}
+    </div>
+
+    <div class="contract-date">{{ contract_date }}</div>
+
+    <div class="contract-title">Catering Contract</div>
+
+    <!-- Preamble -->
+    <div class="preamble">
+        THIS CATERING CONTRACT ("Contract") is made and entered into on {{ contract_date }}, by and between
+        <strong>{{ client.name if client else 'Client' }}{% if client and client.org %} ({{ client.org }}){% endif %}</strong>,
+        (hereinafter referred to as "Client"), AND
+        {{ venue.name if venue else 'SW Hospitality Group' }}{% if venue and venue.address %}, {{ venue.address }}{% endif %}
+        (hereinafter referred to as "Caterer")
+        for the event known as <strong>"{{ event.title }}"</strong>.
+    </div>
+
+    <div class="preamble">
+        NOW, THEREFORE, in consideration of the mutual covenants and promises hereinafter set forth,
+        the parties hereto agree as follows.
+    </div>
+
+    <ol class="sections">
+        <!-- 1. Term -->
+        <li>
+            <div class="section-heading">Term</div>
+            <div class="section-body">
+                Client and Caterer agree that this Contract between the parties is for catering services
+                on {{ event_date }}{% if event_times %}, {{ event_times }}{% endif %}. Said contract may be extended and/or renewed by contract of all
+                parties in writing thereafter.
+            </div>
+        </li>
+
+        <!-- 2. Services Provided -->
+        <li>
+            <div class="section-heading">Services Provided</div>
+            <div class="section-body">
+                <strong>a.</strong> Client hereby agrees to engage the Caterer to provide Client with the following services:
+                <br><br>
+                - Cooking and serving the agreed to food and beverage menu items for the event
+            </div>
+        </li>
+
+        <!-- 3. Event Details -->
+        <li>
+            <div class="section-heading">Event Details</div>
+            <div class="section-body">
+                <strong>a.</strong> This event shall take place on {{ event_date }}{% if event_times %}, {{ event_times }}{% endif %}.
+                <br>
+                <strong>b.</strong> The event will be located at {{ venue.name if venue else 'TBD' }}.
+                {% if event.guest_count %}
+                <br>
+                <strong>c.</strong> The prices quoted in this Contract and the amount of food prepared and any other
+                necessary preparations are made based on an estimate of {{ event.guest_count }} people in attendance
+                at the event. It is the anticipation of both parties that all food items prepared shall be
+                adequate to satisfy {{ event.guest_count }} people.
+                <br>
+                <strong>d.</strong> A final guaranteed guest count must be provided by the Client no later than seven
+                (7) days prior to the event date. If no final count is received, the estimated count of
+                {{ event.guest_count }} shall be considered the guaranteed minimum. The Client shall be
+                charged for the guaranteed number of guests or the actual number served, whichever is greater.
+                {% endif %}
+            </div>
+        </li>
+
+        <!-- 4. Menu to be Served -->
+        <li>
+            <div class="section-heading">Menu to be Served</div>
+            <div class="section-body">
+                {% if event.menu_json and event.menu_json.sections %}
+                    {% for section in event.menu_json.sections %}
+                    {% if section['items'] %}
+                    <div class="menu-section">
+                        <div class="menu-section-title">{{ section.name or section.type|default('Items')|capitalize }}{% if event.menu_json.service_style %}: {{ event.menu_json.service_style|replace('_', ' ')|title }}{% endif %}</div>
+                        {% for item in section['items'] %}
+                        <div class="menu-item">{{ item.name }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                {% elif event.menu_json %}
+                    {% if event.menu_json.appetizers %}
+                    <div class="menu-section">
+                        <div class="menu-section-title">Appetizers</div>
+                        {% for item in event.menu_json.appetizers %}
+                        <div class="menu-item">{{ item }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if event.menu_json.main_course %}
+                    <div class="menu-section">
+                        <div class="menu-section-title">Main Course</div>
+                        {% for item in event.menu_json.main_course %}
+                        <div class="menu-item">{{ item }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    {% if event.menu_json.desserts %}
+                    <div class="menu-section">
+                        <div class="menu-section-title">Desserts</div>
+                        {% for item in event.menu_json.desserts %}
+                        <div class="menu-item">{{ item }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                {% else %}
+                    Menu details to be confirmed.
+                {% endif %}
+
+                {% if has_financials %}
+                <div style="margin-top: 10px;">
+                    <strong>Total Food Cost - ${{ "%.2f"|format(food_subtotal) }}</strong> – Not including sales tax and service fee
+                </div>
+                {% endif %}
+
+                {% set has_bar = event.menu_json and event.menu_json.bar_type and event.menu_json.bar_type not in ['', 'none', 'no_bar', 'non_alcoholic'] %}
+                {% if has_bar or (event.menu_json and event.menu_json.beverage_details) %}
+                <div class="menu-section" style="margin-top: 10px;">
+                    <div class="menu-section-title">Beverage Service:</div>
+                    {% if has_bar %}
+                    <div class="menu-item">{{ event.menu_json.bar_type|replace('_', ' ')|title }} Bar{% if event.menu_json.bar_hours %} ({{ event.menu_json.bar_hours }}){% endif %}</div>
+                    {% endif %}
+                    {% if event.menu_json.beverage_details %}
+                    <div class="menu-item">{{ event.menu_json.beverage_details }}</div>
+                    {% endif %}
+                    <div style="margin-top: 4px;">
+                        Any and all purchases from the beverage service will be run as a tab and paid at the
+                        end of the event by the Client or their representative.
+                    </div>
+                </div>
+                {% endif %}
+
+                <div style="margin-top: 10px;">
+                    Caterer reserves the right to make small changes to the menu only if key ingredients are
+                    unable to be sourced due to reasons beyond the control of both parties.
+                </div>
+            </div>
+        </li>
+
+        <!-- 5. Consideration and Payment Terms -->
+        <li>
+            <div class="section-heading">Consideration and Payment Terms</div>
+            <div class="section-body">
+                In exchange for the specified service, the client shall pay the Caterer by Cash, Check
+                or Credit Card. The Client shall not withhold any amount towards tax from the payment
+                due to the Caterer.
+                {{ "%.1f"|format(tax_rate_pct)|replace('.0', '') }}% sales tax and
+                {{ "%.1f"|format(service_rate_pct)|replace('.0', '') }}% service fee will be added
+                to all food and beverage.
+
+                {% if has_financials %}
+                <div class="financial-summary">
+                    <table>
+                        <tr>
+                            <td>Food &amp; Beverage Subtotal:</td>
+                            <td>${{ "%.2f"|format(food_subtotal) }}</td>
+                        </tr>
+                        {% if service_charge > 0 %}
+                        <tr>
+                            <td>Service Fee ({{ "%.1f"|format(service_rate_pct)|replace('.0', '') }}%):</td>
+                            <td>${{ "%.2f"|format(service_charge) }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if tax > 0 %}
+                        <tr>
+                            <td>Sales Tax ({{ "%.1f"|format(tax_rate_pct)|replace('.0', '') }}%):</td>
+                            <td>${{ "%.2f"|format(tax) }}</td>
+                        </tr>
+                        {% endif %}
+                        <tr class="total-row">
+                            <td>Estimated Total:</td>
+                            <td>${{ "%.2f"|format(total) }}</td>
+                        </tr>
+                    </table>
+                </div>
+                {% endif %}
+
+                A non-refundable deposit of 50% of the estimated total (${{ "%.2f"|format(total * 0.5) if has_financials else '___________' }})
+                is due upon signing of this Contract. The remaining balance shall be due and payable at
+                the conclusion of the event.
+            </div>
+        </li>
+
+        <!-- 6. Additional Services -->
+        <li>
+            <div class="section-heading">Additional Services</div>
+            <div class="section-body">
+                Client agrees to pay for any and all additional services requested by the client not
+                included in this Contract.
+                <br><br>
+                Any additional services requested shall be made by the client in writing.
+            </div>
+        </li>
+
+        <!-- 7. Independent Contractor -->
+        <li>
+            <div class="section-heading">Independent Contractor</div>
+            <div class="section-body">
+                It is agreed that Caterer shall perform the specified work as an independent contractor.
+                The Caterer shall maintain his or her own independent business and shall use his or her
+                own tools and equipment.
+            </div>
+        </li>
+
+        <!-- 8. Force Majeure -->
+        <li>
+            <div class="section-heading">Force Majeure</div>
+            <div class="section-body">
+                If performance of this Contract or any obligation under this Contract is prevented,
+                restricted, or interfered with by causes beyond either party's reasonable control ("Force
+                Majeure"), and if the party unable to carry out its obligations gives the other party
+                prompt written notice of such event, then the obligations of the party invoking this
+                provision shall be suspended to the extent necessary by such event. The term Force
+                Majeure shall include, without limitation, acts of God, plague, epidemic, pandemic,
+                outbreaks of infectious disease or any other public health crisis, including quarantine or
+                other employee restrictions, fire, explosion, vandalism, storm or other similar
+                occurrence, orders or acts of military or civil authority, or by national emergencies,
+                insurrections, riots, or wars, or strikes, lock-outs, work stoppages or other labor
+                disputes, or supplier failures. The excused party shall use reasonable efforts under the
+                circumstances to avoid or remove such causes of non-performance and shall proceed to
+                perform with reasonable dispatch whenever such causes are removed or ceased. An act
+                or omission shall be deemed within the reasonable control of a party if committed,
+                omitted, or caused by such party, or its employees, officers, agents, or affiliates.
+            </div>
+        </li>
+
+        <!-- 9. Cancellation -->
+        <li>
+            <div class="section-heading">Cancellation</div>
+            <div class="section-body">
+                In the event of cancellation of the function by the Client, Caterer is entitled to liquidated
+                damages equivalent to 30% of the total estimated charges for the cancelled function.
+            </div>
+        </li>
+
+        <!-- 10. Insurance and Indemnification -->
+        <li>
+            <div class="section-heading">Insurance and Indemnification</div>
+            <div class="section-body">
+                Caterer shall procure and maintain in full force and effect during the term of this
+                Contract a general liability insurance policy. Client agrees to indemnify and hold
+                harmless Caterer for any damage, theft or loss of Caterer's property (including without
+                limitation, equipment, plates, utensils and motor vehicles) occurring at the event that is
+                caused by guests attending the event.
+            </div>
+        </li>
+
+        <!-- 11. Rules and Regulations -->
+        <li>
+            <div class="section-heading">Rules and Regulations</div>
+            <div class="section-body">
+                Caterer shall work in compliance with all Palm Beach County health department rules
+                and regulations with regard to hygienic preparation and service of food.
+            </div>
+        </li>
+
+        <!-- 12. Assignment -->
+        <li>
+            <div class="section-heading">Assignment</div>
+            <div class="section-body">
+                This Contract shall not be assignable by either party without the prior written consent of
+                the other party. Subject to the foregoing limitation, this Contract shall inure to the
+                benefit of and be binding on the successors and assigns of the respective parties.
+            </div>
+        </li>
+
+        <!-- 13. Entire Contract -->
+        <li>
+            <div class="section-heading">Entire Contract</div>
+            <div class="section-body">
+                This Contract constitutes the entire contract of the parties with respect to the subject
+                matter, and supersedes any and all other agreements, understandings, statements, or
+                representations, either oral or in writing.
+            </div>
+        </li>
+
+        <!-- 14. Applicable Law -->
+        <li>
+            <div class="section-heading">Applicable Law</div>
+            <div class="section-body">
+                This Contract shall be construed under and in accordance with the laws of Florida. Any
+                and all disputes arising under or related to this Agreement shall take place and have
+                venue in the courts in Palm Beach County, Florida.
+            </div>
+        </li>
+
+        <!-- 15. Attorney Fees -->
+        <li>
+            <div class="section-heading">Attorney Fees</div>
+            <div class="section-body">
+                If either party institutes suit or other action against the other to enforce this contract or
+                seek damages with respect to default of obligations hereunder, party ruled in favor shall
+                be entitled to recover all costs and reasonable attorney's fees.
+            </div>
+        </li>
+
+        <!-- 16. Signatories -->
+        <li>
+            <div class="section-heading">Signatories</div>
+            <div class="section-body">
+                This Contract shall be signed on behalf of
+                {% if client and client.org %}{{ client.org }}{% else %}the Client{% endif %}
+                by {{ client.name if client else 'Client' }}
+                and on behalf of {{ venue.name if venue else 'Caterer' }}
+                by its authorized representative, and shall be effective as of the date first written above.
+            </div>
+        </li>
+    </ol>
+
+    <!-- Signature Lines -->
+    <div class="signature-block">
+        <div style="margin-bottom: 6px;">Executed and delivered by its duly authorized representative as of the date first written above</div>
+
+        <div class="sig-line">
+            <div class="sig-field">
+                <div class="line"></div>
+                <div class="label">{{ client.org if client and client.org else 'Client' }} – {{ client.name if client else '' }}</div>
+            </div>
+            <div class="sig-field">
+                <div class="line"></div>
+                <div class="label">Date</div>
+            </div>
+        </div>
+
+        <div class="sig-line">
+            <div class="sig-field">
+                <div class="line"></div>
+                <div class="label">{{ venue.name if venue else 'Caterer' }}</div>
+            </div>
+            <div class="sig-field">
+                <div class="line"></div>
+                <div class="label">Date</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

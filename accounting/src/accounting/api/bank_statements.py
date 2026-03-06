@@ -2,6 +2,7 @@
 Bank statement and matching API endpoints
 """
 import logging
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, desc
@@ -644,20 +645,23 @@ def get_open_bills_for_transaction(
         # Calculate amount difference
         amount_diff = abs(bill_amount_due - transaction_amount_abs)
 
-        # Calculate match confidence
-        if amount_diff < 0.01:  # Exact match (within 1 cent)
+        # Calculate match confidence (use Decimal for comparisons)
+        if amount_diff < Decimal("0.01"):  # Exact match (within 1 cent)
             match_confidence = 100.0
             is_exact_match = True
             exact_matches += 1
-        elif amount_diff < (transaction_amount_abs * 0.01):  # Within 1%
+        elif transaction_amount_abs > 0 and amount_diff < (transaction_amount_abs * Decimal("0.01")):  # Within 1%
             match_confidence = 95.0
             is_exact_match = False
-        elif amount_diff < (transaction_amount_abs * 0.05):  # Within 5%
+        elif transaction_amount_abs > 0 and amount_diff < (transaction_amount_abs * Decimal("0.05")):  # Within 5%
             match_confidence = 85.0
             is_exact_match = False
         else:
             # Base confidence on percentage difference
-            pct_diff = (amount_diff / transaction_amount_abs) * 100
+            if transaction_amount_abs > 0:
+                pct_diff = float(amount_diff / transaction_amount_abs) * 100
+            else:
+                pct_diff = 100.0
             match_confidence = max(50.0, 100.0 - pct_diff)
             is_exact_match = False
 
@@ -1106,7 +1110,7 @@ def assign_transaction_to_gl(
             description=transaction.description or '',
             account_id=gl_request.account_id,
             vendor_id=vendor_id,
-            suggested_account_id=None,  # No suggestion was made for this assignment
+            suggested_account_id=gl_request.suggested_account_id,
             amount=transaction.amount,
             transaction_date=transaction.transaction_date
         )
@@ -1173,12 +1177,15 @@ def update_transaction_gl_assignment(
                 vendor_id = vendor.id
 
         # Record the learning (Phase 2: with amount and transaction_date)
+        # Use frontend-provided suggested_account_id (original auto-suggestion) if available,
+        # otherwise fall back to old_account_id (previous manual assignment)
+        suggested_id = gl_request.suggested_account_id or old_account_id
         learning_service = GLLearningService(db)
         learning_service.learn_from_assignment(
             description=transaction.description or '',
             account_id=gl_request.account_id,
             vendor_id=vendor_id,
-            suggested_account_id=old_account_id,  # Previous suggestion (if any)
+            suggested_account_id=suggested_id,
             amount=transaction.amount,
             transaction_date=transaction.transaction_date
         )
@@ -1255,6 +1262,89 @@ def get_gl_suggestions(
         auto_assign_enabled=auto_assign_enabled,
         auto_assign_account_id=auto_assign_account_id
     )
+
+
+@router.post("/batch-gl-suggestions")
+def batch_gl_suggestions(
+    transaction_ids: List[int],
+    db: Session = Depends(get_db)
+):
+    """
+    Get GL suggestions for multiple transactions in one call.
+    Returns a dict of transaction_id -> suggestions response.
+    """
+    from accounting.services.gl_learning_service import GLLearningService
+    from accounting.utils.vendor_recognition import VendorRecognitionService
+
+    vendor_service = VendorRecognitionService(db)
+    learning_service = GLLearningService(db)
+
+    # Load all requested transactions in one query
+    transactions = db.query(BankTransaction).filter(
+        BankTransaction.id.in_(transaction_ids)
+    ).all()
+    txn_map = {t.id: t for t in transactions}
+
+    results = {}
+    for txn_id in transaction_ids:
+        transaction = txn_map.get(txn_id)
+        if not transaction:
+            continue
+
+        # Vendor recognition
+        vendor_id = None
+        vendor_name = None
+        if transaction.description:
+            extracted_name, vendor, confidence = vendor_service.recognize_vendor(transaction.description)
+            if vendor:
+                vendor_id = vendor.id
+                vendor_name = vendor.vendor_name
+
+        # Get suggestions
+        suggestions = learning_service.get_suggestions_for_transaction(
+            transaction_id=transaction.id,
+            description=transaction.description or '',
+            amount=transaction.amount,
+            vendor_id=vendor_id,
+            transaction_date=transaction.transaction_date
+        )
+
+        # Auto-assign check
+        auto_assign_enabled = False
+        auto_assign_account_id = None
+        if suggestions:
+            top = suggestions[0]
+            if float(top.confidence_score) >= 90.0:
+                auto_assign_enabled = True
+                auto_assign_account_id = top.account_id
+
+        # Only return the top suggestion (UI only shows one)
+        top_suggestion_list = []
+        if suggestions:
+            s = suggestions[0]
+            top_suggestion_list = [{
+                "account_id": s.account_id,
+                "account_number": s.account_number,
+                "account_name": s.account_name,
+                "confidence_score": str(s.confidence_score),
+                "suggestion_type": s.suggestion_type,
+                "reason": s.reason,
+                "times_used": s.times_used
+            }]
+
+        results[str(txn_id)] = {
+            "bank_transaction_id": transaction.id,
+            "description": transaction.description or '',
+            "amount": str(transaction.amount),
+            "vendor_id": vendor_id,
+            "vendor_name": vendor_name,
+            "suggestions": top_suggestion_list,
+            "total_suggestions": len(suggestions),
+            "auto_assign_enabled": auto_assign_enabled,
+            "auto_assign_account_id": auto_assign_account_id
+        }
+
+    return results
 
 
 @router.post("/batch-learn")

@@ -253,6 +253,7 @@ def sync_master_item_defaults(item, db) -> dict:
                 return
 
             uom = None
+            uom_from_container = False
 
             # Primary: try container+size for specific UOMs (e.g. "Can 16oz", "Bottle 750ml")
             if item.container_id and item.size_quantity and item.size_unit_id:
@@ -270,6 +271,8 @@ def sync_master_item_defaults(item, db) -> dict:
                         float(item.size_quantity),
                         size_unit[0]
                     )
+                    if uom:
+                        uom_from_container = True
 
             # Secondary: use Hub size unit symbol/name (e.g. "lb" → Pound, "patty" → Patty)
             if not uom and item.size_unit_id:
@@ -317,6 +320,18 @@ def sync_master_item_defaults(item, db) -> dict:
 
                 if existing_cu:
                     if existing_cu[1] != uom_id:
+                        # Check if another count unit already has this uom_id for this master item
+                        conflict_cu = conn.execute(
+                            text("""SELECT id FROM master_item_count_units
+                                    WHERE master_item_id = :mid AND uom_id = :uom_id AND id != :cu_id"""),
+                            {"mid": item.inventory_master_item_id, "uom_id": uom_id, "cu_id": existing_cu[0]}
+                        ).fetchone()
+                        if conflict_cu:
+                            # Delete the conflicting non-primary row, then update the primary
+                            conn.execute(
+                                text("DELETE FROM master_item_count_units WHERE id = :id"),
+                                {"id": conflict_cu[0]}
+                            )
                         conn.execute(
                             text("""UPDATE master_item_count_units
                                     SET uom_id = :uom_id, uom_name = :uom_name, uom_abbreviation = :uom_abbr
@@ -337,6 +352,17 @@ def sync_master_item_defaults(item, db) -> dict:
                          "uom_name": uom_name, "uom_abbr": uom_abbr}
                     )
                     changes.append(f"count_unit='{uom_name}'")
+
+                # If primary UOM is a container unit (e.g. Can 16oz, Bottle 750ml),
+                # pack_to_primary_factor should be units_per_case (not units_per_case × size_qty).
+                # Each container is one primary unit, so the factor is just how many per case.
+                if uom_from_container and item.units_per_case:
+                    correct_factor = float(item.units_per_case)
+                    current_factor = float(item.pack_to_primary_factor or 0)
+                    if current_factor != correct_factor:
+                        item.pack_to_primary_factor = correct_factor
+                        item.conversion_factor = correct_factor
+                        changes.append(f"pack_to_primary_factor={correct_factor}")
             else:
                 # No match — log warning, don't touch UOM
                 size_info = ""

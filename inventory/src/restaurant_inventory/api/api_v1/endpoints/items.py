@@ -110,35 +110,20 @@ async def get_master_items(
                         vi.inventory_master_item_id,
                         vi.is_preferred,
                         vi.updated_at,
-                        -- New Backbar-style pricing (preferred)
-                        vi.case_cost,
-                        vi.units_per_case,
-                        vi.size_quantity,
-                        su.measure_type as size_unit_measure_type,
-                        -- Deprecated pricing (fallback)
-                        vi.unit_price,
-                        vi.conversion_factor,
-                        -- Calculate unit cost: divide by size_quantity for weight/count types only
-                        -- Weight: 25 lb bag = cost per lb (divide by 25)
-                        -- Count: 10 count bag = cost per each (divide by 10)
-                        -- Volume: 750 ml bottle = cost per bottle (don't divide - 750ml is just size description)
+                        -- Cost per primary count unit using pack_to_primary_factor
+                        -- (already accounts for container vs base unit distinction)
                         CASE
-                            WHEN vi.case_cost IS NOT NULL AND vi.units_per_case IS NOT NULL AND vi.units_per_case > 0
-                                THEN CASE
-                                    WHEN su.measure_type IN ('weight', 'count') AND vi.size_quantity IS NOT NULL AND vi.size_quantity > 1
-                                        THEN vi.case_cost / (vi.units_per_case * vi.size_quantity)
-                                    ELSE vi.case_cost / vi.units_per_case
-                                END
+                            WHEN vi.case_cost IS NOT NULL AND vi.pack_to_primary_factor IS NOT NULL AND vi.pack_to_primary_factor > 0
+                                THEN vi.case_cost / vi.pack_to_primary_factor
                             WHEN vi.unit_price IS NOT NULL AND vi.unit_price > 0 AND vi.conversion_factor IS NOT NULL AND vi.conversion_factor > 0
                                 THEN vi.unit_price / vi.conversion_factor
                             ELSE NULL
                         END as cost_per_unit
                     FROM hub_vendor_items vi
-                    LEFT JOIN hub_size_units su ON vi.size_unit_id = su.id
                     WHERE vi.inventory_master_item_id IS NOT NULL
                       AND vi.is_active = true
                       AND (
-                          (vi.case_cost IS NOT NULL AND vi.units_per_case IS NOT NULL AND vi.units_per_case > 0)
+                          (vi.case_cost IS NOT NULL AND vi.pack_to_primary_factor IS NOT NULL AND vi.pack_to_primary_factor > 0)
                           OR (vi.unit_price IS NOT NULL AND vi.unit_price > 0)
                       )
                 ),

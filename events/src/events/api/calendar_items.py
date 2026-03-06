@@ -7,6 +7,7 @@ from dateutil.relativedelta import relativedelta
 from uuid import UUID, uuid4
 
 from events.core.database import get_db
+from events.core.config import settings
 from events.core.deps import require_auth
 from events.models.user import User, UserLocation
 from events.models.calendar_item import CalendarItem, RecurrencePattern
@@ -16,7 +17,72 @@ from events.schemas.calendar_item import (
     CalendarItemResponse
 )
 
+import logging
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/calendar-items", tags=["calendar-items"])
+
+
+def _sync_item_to_caldav(db: Session, item: CalendarItem, current_user: User):
+    """Sync a calendar item to CalDAV for all users at the item's location."""
+    if not settings.CALDAV_ENABLED:
+        return
+    try:
+        from events.services.caldav_sync_service import CalDAVSyncService
+        caldav_service = CalDAVSyncService()
+
+        users_to_sync = []
+        if item.location_id:
+            # Sync to all active users assigned to this venue
+            assignments = db.query(UserLocation).filter(
+                UserLocation.venue_id == item.location_id
+            ).all()
+            for assignment in assignments:
+                user = db.query(User).filter(User.id == assignment.user_id).first()
+                if user and user.is_active:
+                    users_to_sync.append(user)
+
+        # Fallback: if no location or no assignments, sync to creator only
+        if not users_to_sync:
+            users_to_sync.append(current_user)
+
+        for user in users_to_sync:
+            try:
+                caldav_service.sync_calendar_item_to_caldav(item, user.email)
+            except Exception as e:
+                logger.error(f"Failed to sync calendar item {item.id} to CalDAV for {user.email}: {e}")
+    except Exception as e:
+        logger.error(f"CalDAV sync failed for calendar item {item.id}: {e}")
+
+
+def _remove_item_from_caldav(db: Session, item: CalendarItem, current_user: User):
+    """Remove a calendar item from CalDAV for all users at the item's location."""
+    if not settings.CALDAV_ENABLED:
+        return
+    try:
+        from events.services.caldav_sync_service import CalDAVSyncService
+        caldav_service = CalDAVSyncService()
+
+        users_to_sync = []
+        if item.location_id:
+            assignments = db.query(UserLocation).filter(
+                UserLocation.venue_id == item.location_id
+            ).all()
+            for assignment in assignments:
+                user = db.query(User).filter(User.id == assignment.user_id).first()
+                if user and user.is_active:
+                    users_to_sync.append(user)
+
+        if not users_to_sync:
+            users_to_sync.append(current_user)
+
+        for user in users_to_sync:
+            try:
+                caldav_service.remove_calendar_item_from_caldav(item, user.email)
+            except Exception as e:
+                logger.error(f"Failed to remove calendar item {item.id} from CalDAV for {user.email}: {e}")
+    except Exception as e:
+        logger.error(f"CalDAV removal failed for calendar item {item.id}: {e}")
 
 
 def generate_occurrences(item: CalendarItem, start: datetime, end: datetime) -> List[dict]:
@@ -135,6 +201,9 @@ async def create_calendar_item(
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
+
+    # Sync to CalDAV for all users at this location
+    _sync_item_to_caldav(db, new_item, current_user)
 
     return new_item
 
@@ -326,12 +395,22 @@ async def update_calendar_item(
                     detail="You do not have access to this location"
                 )
 
+    # If location is changing, remove from old location's CalDAV first
+    old_location_id = item.location_id
+    new_location_id = item_data.location_id if item_data.location_id else old_location_id
+
+    if old_location_id and old_location_id != new_location_id:
+        _remove_item_from_caldav(db, item, current_user)
+
     # Update fields
     for field, value in item_data.model_dump(exclude_unset=True).items():
         setattr(item, field, value)
 
     db.commit()
     db.refresh(item)
+
+    # Sync updated item to CalDAV
+    _sync_item_to_caldav(db, item, current_user)
 
     return item
 
@@ -353,6 +432,9 @@ async def delete_calendar_item(
     user_roles = [role.code for role in current_user.roles]
     if "admin" not in user_roles and item.created_by != current_user.id:
         raise HTTPException(status_code=403, detail="Only the creator can delete this item")
+
+    # Remove from CalDAV before deleting from DB
+    _remove_item_from_caldav(db, item, current_user)
 
     db.delete(item)
     db.commit()

@@ -2,7 +2,10 @@
 Count Session CRUD endpoints with workflow management
 """
 
+import csv
+import io
 from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from datetime import datetime
@@ -84,6 +87,98 @@ async def get_count_session(
         )
 
     return _format_count_session(session, include_items=True)
+
+@router.get("/{session_id}/export")
+async def export_count_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Export count session as CSV"""
+    from restaurant_inventory.models.master_item_location_cost import MasterItemLocationCost
+
+    session = db.query(CountSession).options(
+        joinedload(CountSession.items).joinedload(CountSessionItem.master_item),
+        joinedload(CountSession.items).joinedload(CountSessionItem.storage_area),
+    ).filter(CountSession.id == session_id).first()
+
+    if not session:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Count session not found")
+
+    # Check location access
+    from restaurant_inventory.core.deps import get_user_location_ids
+    user_location_ids = get_user_location_ids(current_user)
+    if user_location_ids is not None and session.location_id not in user_location_ids:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    if session.status not in [CountStatus.COMPLETED, CountStatus.APPROVED]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Can only export completed or approved sessions")
+
+    # Pre-load costs for this location
+    cost_records = db.query(MasterItemLocationCost).filter(
+        MasterItemLocationCost.location_id == session.location_id
+    ).all()
+    cost_map = {c.master_item_id: float(c.current_weighted_avg_cost) if c.current_weighted_avg_cost else 0 for c in cost_records}
+
+    # Build CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Storage Area", "Category", "Item", "Unit",
+        "Counted Qty", "Unit Cost", "Extended Value"
+    ])
+
+    for item in sorted(session.items, key=lambda x: (
+        (x.storage_area.name if x.storage_area else "Unassigned"),
+        (x.master_item.category if x.master_item else ""),
+        (x.master_item.name if x.master_item else "")
+    )):
+        mi = item.master_item
+        area_name = item.storage_area.name if item.storage_area else "Unassigned"
+        category = mi.category if mi else ""
+        item_name = mi.name if mi else ""
+        unit = mi.primary_uom_abbr or (mi.unit_of_measure if mi else "") or ""
+
+        # Cost lookup with fallback chain
+        unit_cost = 0
+        if mi:
+            unit_cost = cost_map.get(mi.id, 0)
+            if not unit_cost:
+                # Fallback to inventory record
+                if item.inventory_id:
+                    inv = db.query(Inventory).filter(Inventory.id == item.inventory_id).first()
+                    if inv and inv.unit_cost:
+                        unit_cost = float(inv.unit_cost)
+                if not unit_cost and mi.current_cost:
+                    unit_cost = float(mi.current_cost)
+
+        counted = float(item.counted_quantity) if item.counted_quantity is not None else ""
+        extended = round(float(counted) * unit_cost, 2) if counted != "" and unit_cost else ""
+
+        writer.writerow([
+            area_name, category, item_name, unit,
+            counted,
+            f"{unit_cost:.2f}" if unit_cost else "",
+            f"{extended:.2f}" if extended != "" else "",
+        ])
+
+    output.seek(0)
+
+    # Build filename
+    location_name = ""
+    if session.location:
+        location_name = session.location.name.replace(" ", "_")
+    elif hasattr(session, 'location_id'):
+        location_name = f"loc{session.location_id}"
+    date_str = session.started_at.strftime("%Y%m%d") if session.started_at else "unknown"
+    filename = f"count_session_{session.id}_{location_name}_{date_str}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 
 @router.post("/", response_model=CountSessionResponse)
 async def create_count_session(

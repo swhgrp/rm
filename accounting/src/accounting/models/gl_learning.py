@@ -57,8 +57,8 @@ class VendorGLMapping(Base):
         # Calculate acceptance rate
         acceptance_rate = (self.times_accepted / total_decisions) * 100
 
-        # Boost confidence if used many times
-        usage_boost = min(self.times_used * 2, 20)  # Max 20% boost
+        # Boost based on accepted count (not total uses — rejected uses shouldn't boost)
+        usage_boost = min(self.times_accepted * 4, 20)  # Max 20% boost
 
         return min(acceptance_rate + usage_boost, 100.0)
 
@@ -114,8 +114,8 @@ class DescriptionPatternMapping(Base):
         # Calculate acceptance rate
         acceptance_rate = (self.times_accepted / total_decisions) * 100
 
-        # Smaller usage boost for patterns
-        usage_boost = min(self.times_used * 1, 10)  # Max 10% boost
+        # Boost based on accepted count (not total uses — rejected uses shouldn't boost)
+        usage_boost = min(self.times_accepted * 2, 10)  # Max 10% boost
 
         return min(acceptance_rate + usage_boost, 100.0)
 

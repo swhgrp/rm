@@ -11,6 +11,9 @@
 <button class="btn btn-primary-custom" onclick="downloadBEO()">
     <i class="bi bi-download"></i> Download BEO
 </button>
+<button class="btn btn-primary-custom" onclick="downloadContract()">
+    <i class="bi bi-file-earmark-text"></i> Download Contract
+</button>
 <button class="btn btn-success" style="background-color: #238636; border: 1px solid #2ea043; color: white;" onclick="saveEvent()">
     <i class="bi bi-save"></i> Save Changes
 </button>
@@ -729,7 +732,7 @@
                     <span id="finService">$0.00</span>
                 </div>
                 <div class="financial-row" id="finTaxRow">
-                    <span id="finTaxLabel">Tax (7%):</span>
+                    <span id="finTaxLabel">Tax (6.5%):</span>
                     <span id="finTax">$0.00</span>
                 </div>
                 <div class="financial-row total-row" style="font-weight: 600; font-size: 16px; border-top: 1px solid #30363d; padding-top: 6px; margin-top: 6px;">
@@ -865,6 +868,9 @@
         <div style="display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap;">
             <button class="btn btn-primary-custom" onclick="downloadBEO()">
                 <i class="bi bi-download"></i> Download BEO
+            </button>
+            <button class="btn btn-primary-custom" onclick="downloadContract()">
+                <i class="bi bi-file-earmark-text"></i> Download Contract
             </button>
             <button class="btn btn-secondary-custom" onclick="downloadSummary()">
                 <i class="bi bi-download"></i> Download Summary
@@ -1442,7 +1448,7 @@
         const applyServiceCharge = financials.apply_service_charge !== false; // default true
         const applyTax = financials.apply_tax !== false; // default true
         const serviceRate = financials.service_rate !== undefined ? financials.service_rate * 100 : 21;
-        const taxRate = financials.tax_rate !== undefined ? financials.tax_rate * 100 : 7;
+        const taxRate = financials.tax_rate !== undefined ? financials.tax_rate * 100 : 6.5;
 
         // Set checkbox and input states
         document.getElementById('finApplyServiceCharge').checked = applyServiceCharge;
@@ -1509,9 +1515,11 @@
         document.getElementById('finTax').textContent = formatCurrency(tax);
         document.getElementById('finTotal').textContent = formatCurrency(total);
 
-        // Update labels
-        document.getElementById('finServiceLabel').textContent = `Service Charge (${(serviceRateVal * 100).toFixed(0)}%):`;
-        document.getElementById('finTaxLabel').textContent = `Tax (${(taxRateVal * 100).toFixed(0)}%):`;
+        // Update labels — use input values directly to avoid floating point rounding issues
+        const serviceRateDisplay = document.getElementById('finServiceRate').value;
+        const taxRateDisplay = document.getElementById('finTaxRate').value;
+        document.getElementById('finServiceLabel').textContent = `Service Charge (${serviceRateDisplay}%):`;
+        document.getElementById('finTaxLabel').textContent = `Tax (${taxRateDisplay}%):`;
 
         // Update row visibility based on settings
         document.getElementById('finServiceRow').style.display = applyServiceCharge ? 'flex' : 'none';
@@ -1655,9 +1663,9 @@
         const tax = taxableAmount * taxRate;
         const total = subtotal + serviceCharge + tax;
 
-        // Update labels and values
-        document.getElementById('finServiceLabel').textContent = `Service Charge (${serviceRatePercent.toFixed(0)}%):`;
-        document.getElementById('finTaxLabel').textContent = `Tax (${taxRatePercent.toFixed(0)}%):`;
+        // Update labels and values — use input values directly to avoid floating point rounding
+        document.getElementById('finServiceLabel').textContent = `Service Charge (${document.getElementById('finServiceRate').value}%):`;
+        document.getElementById('finTaxLabel').textContent = `Tax (${document.getElementById('finTaxRate').value}%):`;
 
         document.getElementById('finSubtotal').textContent = formatCurrency(subtotal);
         document.getElementById('finService').textContent = formatCurrency(serviceCharge);
@@ -1726,9 +1734,9 @@
         const tax = taxableAmount * taxRate;
         const total = subtotal + serviceCharge + tax;
 
-        // Update labels
-        document.getElementById('finServiceLabel').textContent = `Service Charge (${serviceRatePercent.toFixed(0)}%):`;
-        document.getElementById('finTaxLabel').textContent = `Tax (${taxRatePercent.toFixed(0)}%):`;
+        // Update labels — use input values directly to avoid floating point rounding
+        document.getElementById('finServiceLabel').textContent = `Service Charge (${document.getElementById('finServiceRate').value}%):`;
+        document.getElementById('finTaxLabel').textContent = `Tax (${document.getElementById('finTaxRate').value}%):`;
 
         // Update values
         document.getElementById('finService').textContent = formatCurrency(serviceCharge);
@@ -2127,6 +2135,10 @@
 
     function downloadBEO() {
         window.open(`/events/api/documents/events/${currentEventId}/beo-pdf`, '_blank');
+    }
+
+    function downloadContract() {
+        window.open(`/events/api/documents/events/${currentEventId}/contract-pdf`, '_blank');
     }
 
     function downloadSummary() {

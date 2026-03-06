@@ -182,7 +182,6 @@
                                     <th class="text-end">Last Cost</th>
                                     <th class="text-end">Weighted Avg</th>
                                     <th class="text-end">Qty on Hand</th>
-                                    <th class="text-center">Invoices</th>
                                     <th>Last Purchase</th>
                                     <th class="text-end">vs. Avg</th>
                                 </tr>
@@ -861,7 +860,6 @@
                     <td class="text-end">${lastPrice}</td>
                     <td class="text-end"><strong>${avgPrice}</strong></td>
                     <td class="text-end">${qtyOnHand}</td>
-                    <td class="text-center">${loc.invoice_count}</td>
                     <td>${lastDate}</td>
                     <td class="text-end">${varianceHtml}</td>
                 </tr>
@@ -881,7 +879,7 @@
         const locationId = locationFilter ? locationFilter.value : '';
 
         try {
-            let url = `api/items/${itemId}/cost-history?limit=50`;
+            let url = `api/items/${itemId}/cost-history?limit=5`;
             if (locationId) {
                 url += `&location_id=${locationId}`;
             }
@@ -918,8 +916,8 @@
                 : '-';
 
             const eventBadge = getEventBadge(record.event_type);
-            const oldCost = record.old_cost !== null ? `$${record.old_cost.toFixed(4)}` : '-';
-            const newCost = record.new_cost !== null ? `$${record.new_cost.toFixed(4)}` : '-';
+            const oldCost = record.old_cost !== null ? `$${record.old_cost.toFixed(2)}` : '-';
+            const newCost = record.new_cost !== null ? `$${record.new_cost.toFixed(2)}` : '-';
             const qty = record.change_qty !== null ? record.change_qty.toFixed(2) : '-';
 
             // Calculate percentage change
@@ -1046,7 +1044,7 @@
             if (unit.is_primary) {
                 conversionDisplay = '<span class="badge bg-primary">Primary</span>';
             } else {
-                conversionDisplay = `= ${factor.toFixed(4).replace(/\.?0+$/, '')} ${primaryName}`;
+                conversionDisplay = `= ${factor.toFixed(2).replace(/\.?0+$/, '')} ${primaryName}`;
             }
 
             // Individual size info

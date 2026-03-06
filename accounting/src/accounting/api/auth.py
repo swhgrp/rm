@@ -39,8 +39,42 @@ def verify_hub_api_key(x_hub_api_key: str = Header(..., alias="X-Hub-API-Key")):
     return True
 
 
+def _try_bearer_auth(request: Request, db: Session) -> Optional[User]:
+    """Try to authenticate via Authorization: Bearer header using Portal JWT."""
+    from jose import jwt, JWTError
+
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+
+    token = auth_header[7:]
+    portal_secret = os.getenv("PORTAL_SECRET_KEY")
+    if not portal_secret:
+        return None
+
+    try:
+        payload = jwt.decode(token, portal_secret, algorithms=["HS256"])
+        username = payload.get("sub")
+        if not username:
+            return None
+    except JWTError:
+        return None
+
+    user = db.query(User).filter(
+        User.username == username,
+        User.is_active == True
+    ).first()
+    return user
+
+
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
-    """Get current logged-in user from session"""
+    """Get current logged-in user from Bearer token or session cookie."""
+    # Try Bearer token first (for mobile app)
+    user = _try_bearer_auth(request, db)
+    if user:
+        return user
+
+    # Fall back to session cookie (web)
     session_token = request.cookies.get("accounting_session")
 
     if not session_token:

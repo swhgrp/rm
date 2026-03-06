@@ -359,7 +359,7 @@
 
         currentCategoryUnits.forEach(unit => {
             const containsText = unit.contains_quantity
-                ? parseFloat(unit.contains_quantity).toFixed(3)
+                ? parseFloat(unit.contains_quantity).toFixed(2)
                 : '-';
             const referenceText = unit.reference_unit_name || '-';
 

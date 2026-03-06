@@ -510,7 +510,7 @@ function displayCountItems() {
                 </thead>
                 <tbody>
                     ${items.map(item => {
-                        const variance = item.variance !== null ? parseFloat(item.variance).toFixed(3) : '-';
+                        const variance = item.variance !== null ? parseFloat(item.variance).toFixed(2) : '-';
                         const variancePercent = item.variance_percent !== null ? parseFloat(item.variance_percent).toFixed(1) + '%' : '';
                         const rowClass = item.flagged ? 'table-warning' : '';
 
@@ -522,8 +522,8 @@ function displayCountItems() {
                                     ${item.flagged ? '<i class="bi bi-flag-fill text-warning ms-1"></i>' : ''}
                                 </td>
                                 <td>${item.item_category}</td>
-                                <td>${item.expected_quantity !== null ? parseFloat(item.expected_quantity).toFixed(3) : '-'} ${item.item_unit}</td>
-                                <td>${item.counted_quantity !== null ? parseFloat(item.counted_quantity).toFixed(3) : '-'} ${item.item_unit}</td>
+                                <td>${item.expected_quantity !== null ? parseFloat(item.expected_quantity).toFixed(2) : '-'} ${item.item_unit}</td>
+                                <td>${item.counted_quantity !== null ? parseFloat(item.counted_quantity).toFixed(2) : '-'} ${item.item_unit}</td>
                                 <td>
                                     ${variance !== '-' ? `<span class="${parseFloat(variance) >= 0 ? 'text-success' : 'text-danger'}">${variance} ${variancePercent}</span>` : '-'}
                                 </td>
@@ -600,10 +600,10 @@ function openCountModal(itemId) {
         <p class="mb-1"><strong>Category:</strong> ${item.item_category}</p>
         <p class="mb-1"><strong>Unit:</strong> ${item.item_unit}</p>
         ${item.item_barcode ? `<p class="mb-1"><strong>Barcode:</strong> ${item.item_barcode}</p>` : ''}
-        <p class="mb-0"><strong>Expected:</strong> ${item.expected_quantity !== null ? parseFloat(item.expected_quantity).toFixed(3) : 'N/A'} ${item.item_unit}</p>
+        <p class="mb-0"><strong>Expected:</strong> ${item.expected_quantity !== null ? parseFloat(item.expected_quantity).toFixed(2) : 'N/A'} ${item.item_unit}</p>
     `;
 
-    document.getElementById('countedQuantity').value = item.counted_quantity !== null ? parseFloat(item.counted_quantity).toFixed(3) : '';
+    document.getElementById('countedQuantity').value = item.counted_quantity !== null ? parseFloat(item.counted_quantity).toFixed(2) : '';
     document.getElementById('itemNotes').value = item.notes || '';
     document.getElementById('itemUnit').textContent = item.item_unit;
 
@@ -621,12 +621,12 @@ function openCountModal(itemId) {
 function adjustCountModal(delta) {
     const input = document.getElementById('countedQuantity');
     const current = parseFloat(input.value) || 0;
-    input.value = (current + delta).toFixed(3);
+    input.value = (current + delta).toFixed(2);
     calculateVariance();
 }
 
 function setCountModal(value) {
-    document.getElementById('countedQuantity').value = value.toFixed(3);
+    document.getElementById('countedQuantity').value = value.toFixed(2);
     calculateVariance();
 }
 
@@ -650,10 +650,10 @@ function calculateVariance() {
 
     if (absPercent > 20 || absVariance > 10) {
         display.className = 'alert alert-warning';
-        display.innerHTML = `<i class="bi bi-flag-fill"></i> <strong>Large variance detected!</strong><br>Variance: ${variance.toFixed(3)} (${variancePercent}%)`;
+        display.innerHTML = `<i class="bi bi-flag-fill"></i> <strong>Large variance detected!</strong><br>Variance: ${variance.toFixed(2)} (${variancePercent}%)`;
     } else if (Math.abs(variance) > 0.001) {
         display.className = 'alert alert-info';
-        display.innerHTML = `Variance: ${variance.toFixed(3)} (${variancePercent}%)`;
+        display.innerHTML = `Variance: ${variance.toFixed(2)} (${variancePercent}%)`;
     } else {
         display.className = 'alert alert-success';
         display.innerHTML = '<i class="bi bi-check-circle"></i> Count matches expected';
@@ -809,10 +809,10 @@ function showReviewModal() {
                     ${flaggedItems.map(item => `
                         <tr>
                             <td><strong>${item.item_name}</strong></td>
-                            <td>${item.expected_quantity !== null ? parseFloat(item.expected_quantity).toFixed(3) : '-'}</td>
-                            <td>${item.counted_quantity !== null ? parseFloat(item.counted_quantity).toFixed(3) : '-'}</td>
+                            <td>${item.expected_quantity !== null ? parseFloat(item.expected_quantity).toFixed(2) : '-'}</td>
+                            <td>${item.counted_quantity !== null ? parseFloat(item.counted_quantity).toFixed(2) : '-'}</td>
                             <td class="${parseFloat(item.variance) >= 0 ? 'text-success' : 'text-danger'}">
-                                ${item.variance !== null ? parseFloat(item.variance).toFixed(3) : '-'}
+                                ${item.variance !== null ? parseFloat(item.variance).toFixed(2) : '-'}
                                 (${item.variance_percent !== null ? parseFloat(item.variance_percent).toFixed(1) + '%' : '-'})
                             </td>
                             <td>${item.notes || '-'}</td>

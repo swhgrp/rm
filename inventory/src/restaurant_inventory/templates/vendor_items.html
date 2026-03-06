@@ -429,7 +429,7 @@
     function updateCostCalculation() {
         const price = parseFloat(document.getElementById('viUnitPrice').value) || 0;
         const factor = parseFloat(document.getElementById('viConversionFactor').value) || 1;
-        const derivedCost = factor > 0 ? (price / factor).toFixed(4) : '-';
+        const derivedCost = factor > 0 ? (price / factor).toFixed(2) : '-';
         document.getElementById('viCostPerMaster').value = derivedCost;
     }
 
@@ -651,7 +651,7 @@
 
             section.style.display = 'block';
             tbody.innerHTML = response.map(p => {
-                const costPerUnit = p.pack_factor > 0 ? (p.last_price / p.pack_factor).toFixed(4) : '-';
+                const costPerUnit = p.pack_factor > 0 ? (p.last_price / p.pack_factor).toFixed(2) : '-';
                 const lastDate = p.last_invoice_date ? new Date(p.last_invoice_date).toLocaleDateString() : '-';
                 return `
                     <tr>

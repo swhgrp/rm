@@ -284,6 +284,7 @@ class GLAssignmentRequest(BaseModel):
     account_id: int
     memo: Optional[str] = None
     area_id: Optional[int] = None
+    suggested_account_id: Optional[int] = None  # What the system suggested, for learning feedback
 
 
 class GLAssignmentResponse(BaseModel):

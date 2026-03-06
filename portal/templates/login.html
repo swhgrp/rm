@@ -194,6 +194,9 @@
         {% endif %}
 
         <form method="post" action="/portal/login">
+            {% if redirect %}
+            <input type="hidden" name="redirect" value="{{ redirect }}">
+            {% endif %}
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required autofocus>

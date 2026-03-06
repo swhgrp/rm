@@ -6,9 +6,8 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from accounting.models.bank_account import BankAccount, BankTransaction
-from accounting.models.account import Account, AccountType
+from accounting.models.account import Account
 from accounting.models.area import Area
-from accounting.models.account_balance import AccountBalance
 from accounting.models.banking_dashboard import (
     DailyCashPosition,
     CashFlowTransaction,
@@ -65,7 +64,7 @@ class DashboardService:
 
         # Get top-level KPIs
         total_cash = self._calculate_total_cash_kpi(area_id)
-        gl_variance = self._calculate_gl_variance_kpi(area_id)
+        gl_variance = self._calculate_gl_variance_kpi(area_id, start_date, end_date)
         recon_rate = self._calculate_reconciliation_rate_kpi(area_id, start_date, end_date)
         unrecon_txns = self._calculate_unreconciled_transactions_kpi(area_id, start_date, end_date)
 
@@ -119,27 +118,31 @@ class DashboardService:
             trend="up" if change and change > 0 else "down" if change and change < 0 else "neutral"
         )
 
-    def _calculate_gl_variance_kpi(self, area_id: Optional[int] = None) -> DashboardKPI:
-        """Calculate variance between bank balances and GL cash accounts"""
-        # Get total bank balance
-        bank_query = self.db.query(func.sum(BankAccount.current_balance))
+    def _calculate_gl_variance_kpi(
+        self,
+        area_id: Optional[int] = None,
+        start_date: date = None,
+        end_date: date = None
+    ) -> DashboardKPI:
+        """Calculate GL variance as the total amount of unreconciled bank transactions.
+
+        This represents bank activity not yet recorded in the GL.
+        As transactions are reconciled, this approaches $0.
+        """
+        query = self.db.query(
+            func.coalesce(func.sum(BankTransaction.amount), 0)
+        ).join(BankAccount).filter(
+            BankTransaction.status == 'unreconciled'
+        )
+
         if area_id:
-            bank_query = bank_query.filter(BankAccount.area_id == area_id)
-        bank_total = bank_query.scalar() or Decimal("0")
+            query = query.filter(BankAccount.area_id == area_id)
+        if start_date:
+            query = query.filter(BankTransaction.transaction_date >= start_date)
+        if end_date:
+            query = query.filter(BankTransaction.transaction_date <= end_date)
 
-        # Get total GL cash account balance
-        # Assuming account_type = 'BANK' or similar for cash accounts
-        gl_query = self.db.query(func.sum(AccountBalance.net_balance)).join(Account)
-        gl_query = gl_query.filter(Account.account_type == AccountType.ASSET)
-        gl_query = gl_query.filter(Account.account_number.like('1000%'))  # Cash accounts typically start with 1000
-
-        if area_id:
-            gl_query = gl_query.filter(AccountBalance.location_id == area_id)
-
-        gl_total = gl_query.scalar() or Decimal("0")
-
-        # Calculate variance
-        variance = bank_total - gl_total
+        variance = query.scalar() or Decimal("0")
 
         return DashboardKPI(
             label="GL vs Bank Variance",
@@ -255,15 +258,19 @@ class DashboardService:
                 BankingAlert.is_active == True
             ).scalar() or 0
 
-            # Get GL variance
-            bank_total = sum(acc.current_balance or Decimal("0") for acc in accounts)
-            gl_total = self.db.query(func.sum(AccountBalance.net_balance)).join(Account).filter(
-                Account.account_type == AccountType.ASSET,
-                Account.account_number.like('1000%'),
-                AccountBalance.location_id == area.id
-            ).scalar() or Decimal("0")
-
-            variance = bank_total - gl_total
+            # GL variance = sum of unreconciled transaction amounts for this location (date-filtered)
+            account_ids = [acc.id for acc in accounts]
+            variance = Decimal("0")
+            if account_ids:
+                var_query = self.db.query(
+                    func.coalesce(func.sum(BankTransaction.amount), 0)
+                ).filter(
+                    BankTransaction.bank_account_id.in_(account_ids),
+                    BankTransaction.status == 'unreconciled',
+                    BankTransaction.transaction_date >= start_date,
+                    BankTransaction.transaction_date <= end_date
+                )
+                variance = var_query.scalar() or Decimal("0")
 
             summaries.append(LocationSummary(
                 area_id=area.id,

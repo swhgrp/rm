@@ -20,14 +20,20 @@ def get_current_user(
     Returns None if not authenticated (allows optional auth)
     Raises HTTPException if token is invalid
     """
-    # Get JWT token from cookie (set by Portal)
-    # Portal uses "portal_session" as cookie name
-    token = request.cookies.get("portal_session")
+    # Try Authorization header first (for mobile app)
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+
+    # Fall back to cookie (set by Portal for web SSO)
+    if not token:
+        token = request.cookies.get("portal_session")
 
     if not token:
         return None
 
-    # Remove "Bearer " prefix if present
+    # Remove "Bearer " prefix if present (cookie may have it)
     if token.startswith("Bearer "):
         token = token[7:]
 

@@ -476,6 +476,15 @@
 <!-- Filters -->
 <div class="filters-bar">
     <div class="filter-item">
+        <label>Search</label>
+        <div style="position: relative;">
+            <i class="bi bi-search" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: #6e7681; font-size: 13px;"></i>
+            <input type="text" id="searchInput" class="form-control-custom" placeholder="Search events..."
+                   style="width: 220px; padding-left: 32px;" oninput="debounceSearch()">
+        </div>
+    </div>
+
+    <div class="filter-item">
         <label>Location</label>
         <select id="filterLocation" class="form-control-custom" style="width: 200px;" onchange="loadCalendarEvents()">
             <option value="">All Locations</option>
@@ -1020,10 +1029,17 @@
         }
     }
 
+    let searchDebounceTimer = null;
+    function debounceSearch() {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = setTimeout(() => loadCalendarEvents(), 300);
+    }
+
     async function fetchCalendarEvents(info, successCallback, failureCallback) {
         try {
             const locationFilter = document.getElementById('filterLocation')?.value || '';
             const statusFilter = document.getElementById('filterStatus')?.value || '';
+            const searchQuery = document.getElementById('searchInput')?.value.trim() || '';
 
             const params = new URLSearchParams({
                 start: info.startStr,
@@ -1031,6 +1047,7 @@
             });
 
             if (locationFilter) params.append('location', locationFilter);
+            if (searchQuery) params.append('q', searchQuery);
 
             // Fetch events, calendar items, and quick holds
             const [eventsResponse, itemsResponse, holdsResponse] = await Promise.all([
@@ -1046,6 +1063,13 @@
             // Apply status filter on events
             if (statusFilter) {
                 events = events.filter(e => e.status === statusFilter);
+            }
+
+            // Apply search filter on calendar items and quick holds (client-side)
+            if (searchQuery) {
+                const q = searchQuery.toLowerCase();
+                items = items.filter(i => i.title && i.title.toLowerCase().includes(q));
+                holds = holds.filter(h => h.title && h.title.toLowerCase().includes(q));
             }
 
             // Map events to calendar format

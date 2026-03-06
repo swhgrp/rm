@@ -5,7 +5,7 @@ Microservices-based restaurant management platform for SW Hospitality Group.
 - **Production URL:** https://rm.swhgrp.com
 - **Architecture:** 10 FastAPI microservices behind Nginx reverse proxy, each with its own PostgreSQL database
 - **Portal:** Central auth + UI at `/portal/`, serves templates from each service's template directory
-- **Last Updated:** February 28, 2026
+- **Last Updated:** March 5, 2026
 
 ## Repository Structure
 ```
@@ -134,6 +134,44 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 
 ## Feature Documentation
 
+### Mobile App Bearer Auth (Mar 2026)
+- **Portal endpoints**: `POST /api/mobile/login` (returns JWT as bearer token), `POST /api/mobile/refresh` (refreshes token)
+- **Bearer token support** added to: Events (`deps.py`), Food Safety (`auth.py`), HR (`auth.py`), Accounting (`auth.py`)
+- Inventory already had Bearer support via `HTTPBearer`
+- Pattern: `_try_bearer_auth()` decodes Portal JWT with `PORTAL_SECRET_KEY`, looks up user by username
+- iOS app at `/opt/SWHospitality/` (separate repo), SwiftUI, iOS 17+
+
+### Catering Contract PDF (Mar 2026)
+- **Template**: `events/src/events/templates/pdf/catering_contract_template.html` — standalone WeasyPrint template
+- **Endpoint**: `GET /api/documents/events/{event_id}/contract-pdf`
+- **Service**: `pdf_service.py` → `generate_catering_contract_pdf()` calculates financials from `menu_json`/`financials_json`
+- **Venue logos**: Embedded as base64 data URIs from `events/src/events/static/logos/`
+- **Financial defaults**: tax_rate=6.5%, service_rate=21%, 50% deposit clause
+- **Beverage guard**: Only shows beverage section when `bar_type` is set and not empty/none/no_bar
+- **Menu rendering**: Item names only (no descriptions), total food cost line, per-section display
+- **Legal clauses**: 16 sections including Force Majeure, Cancellation (30%), FL/Palm Beach law
+
+### Calendar Item CalDAV Sync (Mar 2026)
+- `sync_calendar_item_to_caldav()` / `remove_calendar_item_from_caldav()` in `caldav_sync_service.py`
+- Items with `location_id` sync to all active users at that venue; items without location sync to creator only
+- Items use UID format `item-{id}@swhgrp.com` (vs `{id}@swhgrp.com` for events)
+- Notes/reminders set `TRANSP: TRANSPARENT` so they don't block time on phone calendars
+- Sync triggered on create, update, and delete in `calendar_items.py` API
+- Location change handling: removes from old venue calendar before syncing to new one
+
+### Accounting GL Learning & Bank Reconciliation (Mar 2026)
+- **GL learning improvements**: Stop-word filtering, reordered pattern priority, competing pattern deactivation
+- **Batch GL suggestions**: `POST /batch-gl-suggestions` — loads suggestions for multiple transactions in one call
+- **Reconciliation UI**: Default filter = "Unreconciled Only", added search bar, inline GL suggestion badges, `quickAssignGL()` function
+- **Dashboard GL Variance**: Changed from bank vs GL balance to sum of unreconciled transactions
+- **Custom date range**: Banking dashboard now supports custom date range picker
+
+### Inventory Count Session Reports (Mar 2026)
+- **Report view**: `GET /count/{session_id}/report` — printable HTML report grouped by storage area and category
+- **CSV export**: `GET /api/v1/count-sessions/{session_id}/export` — CSV download with cost data
+- **Cost lookup chain**: location cost → hub pricing → inventory unit_cost → master item cost
+- **Template**: `count_session_report.html` with summary totals by area and category
+
 ### Vendor Item Code Management & Alias Learning (Feb 2026)
 - **Mapped codes endpoint**: `GET /api/vendor-items/{id}/mapped-codes` — shows all distinct item codes from invoices mapped to a vendor item, with invoice count, first/last seen, and `is_canonical` flag
 - **Unmap code endpoint**: `POST /api/vendor-items/{id}/unmap-code` — removes incorrect code mappings; sets `inventory_item_id=NULL` and `is_mapped=false`; recalculates affected invoice statuses; prevents unmapping canonical SKU
@@ -234,7 +272,11 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 
 ### Events System
 - **CalDAV sync**: Bidirectional with external calendar server; web app is source of truth for status
+- **CalDAV multi-user sync**: Events push to ALL users assigned to the event's venue (via `UserLocation` table), not just the current user
+- **Calendar item CalDAV sync** (Mar 2026): Notes/reminders/meetings sync to CalDAV for all users at the item's location; notes/reminders marked as transparent (don't block time)
 - **BEO PDF**: WeasyPrint generation with timezone conversion (`_to_et()` filter), pydyf<0.10 required
+- **Catering Contract PDF** (Mar 2026): `GET /api/documents/events/{event_id}/contract-pdf` — formal legal contract with venue logo, menu, financials, legal clauses, signature blocks
+- **Calendar search**: Search input on calendar page with 300ms debounce, server-side `ilike` filter + client-side filtering
 - **Public intake form**: No auth required at `/events/public/intake`
 - **RBAC**: 5 roles (admin, event_manager, dept_lead, staff, read_only) enforced on all endpoints
 - **Calendar**: FullCalendar.js with status-colored left borders and venue-colored text

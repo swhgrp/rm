@@ -258,6 +258,28 @@ async def get_current_user_info(
     return UserResponse.from_orm(current_user)
 
 
+@router.get("/keepalive")
+async def keepalive(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Keepalive endpoint pinged every 5 minutes by the inactivity warning system.
+    Validates the current token and returns a fresh one to extend the session.
+    """
+    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    new_token = create_access_token(
+        subject=current_user.id, expires_delta=access_token_expires
+    )
+
+    return {
+        "status": "ok",
+        "access_token": new_token,
+        "token_type": "bearer",
+        "expires_in": settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
+    }
+
+
 @router.post("/refresh-token")
 async def refresh_token(
     current_user: User = Depends(get_current_user),

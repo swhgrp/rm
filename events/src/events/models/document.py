@@ -9,6 +9,7 @@ import enum
 class DocumentType(str, enum.Enum):
     """Document type enum"""
     BEO = "beo"
+    CONTRACT = "contract"
     SUMMARY = "summary"
     INVOICE = "invoice"
     OTHER = "other"

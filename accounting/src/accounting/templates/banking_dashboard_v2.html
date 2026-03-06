@@ -63,6 +63,12 @@
                     <option value="90">Last 90 Days</option>
                     <option value="custom">Custom Range</option>
                 </select>
+                <div id="customDateRange" class="d-none d-flex align-items-center gap-1">
+                    <input type="date" class="form-control form-control-sm" id="customStartDate" style="width:140px">
+                    <span class="text-muted">to</span>
+                    <input type="date" class="form-control form-control-sm" id="customEndDate" style="width:140px">
+                    <button class="btn btn-sm btn-primary" onclick="applyCustomRange()">Apply</button>
+                </div>
             </div>
             <!-- Location Filter -->
             <div class="d-flex align-items-center gap-2">
@@ -369,6 +375,8 @@ let cashFlowChart = null;
 let reconHealthChart = null;
 let selectedLocationId = null;
 let selectedPeriodDays = 30;
+let customStartDate = null;
+let customEndDate = null;
 let currentAlertFilter = 'all';
 
 // Chart colors for light theme
@@ -412,9 +420,9 @@ async function loadLocations() {
 
 async function loadDashboardData() {
     try {
-        // Calculate date range
-        const endDate = new Date().toISOString().split('T')[0];
-        const startDate = new Date(Date.now() - selectedPeriodDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        // Calculate date range (use custom dates if set, otherwise preset period)
+        const endDate = customEndDate || new Date().toISOString().split('T')[0];
+        const startDate = customStartDate || new Date(Date.now() - selectedPeriodDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
         // Build URL with filters
         let url = `/accounting/api/banking-dashboard/summary?start_date=${startDate}&end_date=${endDate}`;
@@ -773,11 +781,38 @@ function filterByLocation() {
 
 function changePeriod() {
     const period = document.getElementById('periodFilter').value;
+    const customDiv = document.getElementById('customDateRange');
     if (period === 'custom') {
-        showNotification('Custom date range picker coming soon!');
+        customDiv.classList.remove('d-none');
+        // Default custom dates to last 30 days if not already set
+        if (!document.getElementById('customStartDate').value) {
+            const end = new Date();
+            const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            document.getElementById('customStartDate').value = start.toISOString().split('T')[0];
+            document.getElementById('customEndDate').value = end.toISOString().split('T')[0];
+        }
         return;
     }
+    customDiv.classList.add('d-none');
+    customStartDate = null;
+    customEndDate = null;
     selectedPeriodDays = parseInt(period);
+    loadDashboardData();
+}
+
+function applyCustomRange() {
+    const start = document.getElementById('customStartDate').value;
+    const end = document.getElementById('customEndDate').value;
+    if (!start || !end) {
+        showNotification('Please select both start and end dates');
+        return;
+    }
+    if (start > end) {
+        showNotification('Start date must be before end date');
+        return;
+    }
+    customStartDate = start;
+    customEndDate = end;
     loadDashboardData();
 }
 

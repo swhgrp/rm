@@ -238,10 +238,14 @@ class GLLearningService:
         # Common transaction keywords to extract
         keywords = []
 
-        # Known patterns
+        # Known patterns — more specific patterns listed FIRST so they match before generic ones
         patterns = {
+            'MERCHANT BANKCD': 'MERCHANT BANKCD',
+            'MERCHANT': 'MERCHANT',
+            'CASH DEPOSIT': 'CASH DEPOSIT',
             'INTEREST': 'INTEREST',
             'FEE': 'FEE',
+            'MAINTENANCE FEE': 'MAINTENANCE FEE',
             'MAINTENANCE': 'MAINTENANCE',
             'ATM': 'ATM',
             'DEBIT CARD': 'DEBIT CARD',
@@ -255,6 +259,10 @@ class GLLearningService:
             'PAYMENT': 'PAYMENT',
             'REFUND': 'REFUND',
             'WIRE': 'WIRE',
+            'PAYROLL': 'PAYROLL',
+            'TAX': 'TAX',
+            'LOAN': 'LOAN',
+            'INSURANCE': 'INSURANCE',
         }
 
         for pattern, keyword in patterns.items():
@@ -263,7 +271,14 @@ class GLLearningService:
 
         # Extract vendor-like names (sequences of capital letters)
         # e.g., "AT&T", "SYSCO", "CHEVRON"
+        # Filter out common banking noise words
+        stop_words = {
+            'ORIG', 'NAME', 'DESC', 'DATE', 'ENTRY', 'DESCR', 'TRACE',
+            'IND', 'EED', 'SEC', 'CCD', 'TRN', 'PPD', 'WEB', 'TEL',
+            'DDA', 'REF', 'NSD', 'LLC', 'INC', 'DBA', 'THE', 'FOR',
+        }
         words = re.findall(r'\b[A-Z&]{3,}\b', desc_upper)
+        words = [w for w in words if w not in stop_words]
         keywords.extend(words[:3])  # Limit to first 3 vendor names
 
         return list(set(keywords))  # Remove duplicates
@@ -420,30 +435,43 @@ class GLLearningService:
 
         Called whenever a user assigns a transaction to a GL account.
         Updates vendor mappings, pattern mappings, and detects recurring transactions.
+
+        Logic:
+        - The CHOSEN account (account_id) always gets times_used++ and times_accepted++
+          (if it was the suggestion) — it's always a positive signal.
+        - The REJECTED suggestion (suggested_account_id != account_id) gets times_rejected++
+          without incrementing times_used — it's a negative signal only.
         """
         was_suggested = suggested_account_id is not None
         was_accepted = suggested_account_id == account_id if was_suggested else False
 
         amount_abs = abs(float(amount)) if amount else None
 
-        # Record vendor mapping if vendor recognized (Phase 2: with amount)
+        # 1. Record the CHOSEN account as a positive signal
         if vendor_id:
             self.record_vendor_mapping(
                 vendor_id=vendor_id,
                 account_id=account_id,
-                was_suggested=was_suggested,
+                was_suggested=was_accepted,  # Only True if this was the suggestion
                 was_accepted=was_accepted,
                 amount=amount_abs
             )
 
-        # Always record pattern mapping for learning (Phase 2: with amount)
         self.record_pattern_mapping(
             description=description,
             account_id=account_id,
-            was_suggested=was_suggested,
+            was_suggested=was_accepted,  # Only True if this was the suggestion
             was_accepted=was_accepted,
             amount=amount_abs
         )
+
+        # 2. If a different account was suggested, record the REJECTION on that account
+        if was_suggested and not was_accepted:
+            self._record_rejection(
+                description=description,
+                rejected_account_id=suggested_account_id,
+                vendor_id=vendor_id
+            )
 
         # Phase 2: Detect and record recurring transactions
         if transaction_date and description:
@@ -454,6 +482,61 @@ class GLLearningService:
                 amount=amount_abs,
                 transaction_date=transaction_date
             )
+
+    def _record_rejection(
+        self,
+        description: str,
+        rejected_account_id: int,
+        vendor_id: Optional[int] = None
+    ):
+        """
+        Record a rejection on the suggested account's mappings.
+
+        Only increments times_rejected (not times_used) since the account
+        was suggested but not actually used.
+        """
+        # Record rejection on vendor mapping if exists
+        if vendor_id:
+            mapping = self.db.query(VendorGLMapping).filter(
+                and_(
+                    VendorGLMapping.vendor_id == vendor_id,
+                    VendorGLMapping.account_id == rejected_account_id
+                )
+            ).first()
+            if mapping:
+                mapping.times_rejected += 1
+                mapping.confidence_score = mapping.calculate_confidence()
+
+        # Record rejection on pattern mappings
+        keywords = self._extract_keywords(description)
+        for keyword in keywords:
+            mapping = self.db.query(DescriptionPatternMapping).filter(
+                and_(
+                    DescriptionPatternMapping.pattern == keyword,
+                    DescriptionPatternMapping.account_id == rejected_account_id
+                )
+            ).first()
+            if mapping:
+                mapping.times_rejected += 1
+                mapping.confidence_score = mapping.calculate_confidence()
+
+        # Record rejection on recurring patterns for the rejected account
+        if keywords:
+            recurring_patterns = self.db.query(RecurringTransactionPattern).filter(
+                RecurringTransactionPattern.account_id == rejected_account_id,
+                RecurringTransactionPattern.is_active == True
+            ).all()
+            for pattern in recurring_patterns:
+                # Check if this pattern's description matches the transaction
+                pattern_keywords = pattern.description_pattern.upper().split()
+                if set(pattern_keywords) & set(keywords):
+                    # Deactivate recurring patterns that keep getting rejected
+                    pattern.occurrence_count = max(pattern.occurrence_count - 1, 0)
+                    pattern.confidence_score = pattern.calculate_confidence()
+                    if pattern.occurrence_count <= 0:
+                        pattern.is_active = False
+
+        self.db.commit()
 
     def detect_and_record_recurring_pattern(
         self,
@@ -598,6 +681,20 @@ class GLLearningService:
             )
             new_pattern.confidence_score = new_pattern.calculate_confidence()
             self.db.add(new_pattern)
+
+        # Deactivate competing recurring patterns for OTHER accounts with overlapping keywords
+        competing = self.db.query(RecurringTransactionPattern).filter(
+            RecurringTransactionPattern.account_id != account_id,
+            RecurringTransactionPattern.is_active == True
+        ).all()
+        for comp in competing:
+            comp_keywords = set(comp.description_pattern.upper().split())
+            if comp_keywords & set(keywords):
+                # This pattern overlaps but suggests a different account — decrement it
+                comp.occurrence_count = max(comp.occurrence_count - 1, 0)
+                comp.confidence_score = comp.calculate_confidence()
+                if comp.occurrence_count <= 0:
+                    comp.is_active = False
 
         self.db.commit()
 

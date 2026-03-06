@@ -156,6 +156,9 @@
                 <button class="btn btn-primary btn-lg" id="approveBtn" onclick="approveCount()" style="display: none;">
                     <i class="bi bi-check2-all"></i> Approve & Update Inventory
                 </button>
+                <a class="btn btn-outline-success btn-lg" id="reportBtn" style="display: none;">
+                    <i class="bi bi-file-earmark-text"></i> View Report
+                </a>
             </div>
         </div>
     </div>
@@ -635,6 +638,44 @@ async function startCount() {
         return;
     }
 
+    // Check for existing open count at this location
+    try {
+        const allSessions = await apiRequest('api/count-sessions/?status_filter=IN_PROGRESS');
+        const openSession = allSessions.find(s => s.location_id === parseInt(locationId));
+
+        if (openSession) {
+            const location = locations.find(l => l.id === parseInt(locationId));
+            const locName = location?.name || 'this location';
+            // Use innerHTML for the confirm message to support line breaks
+            const msgEl = document.getElementById('confirmMessage');
+            document.getElementById('confirmTitle').textContent = 'Open Count Found';
+            msgEl.innerHTML =
+                `There is already an open inventory count for <strong>${locName}</strong>:<br><br>` +
+                `"${openSession.name}" — ${openSession.counted_items} of ${openSession.total_items} items counted<br><br>` +
+                `Click <strong>OK</strong> to resume it, or <strong>Cancel</strong> to go back.`;
+
+            const modalElement = document.getElementById('confirmModal');
+            const modal = new bootstrap.Modal(modalElement);
+            const resume = await new Promise((resolve) => {
+                let resolved = false;
+                const okBtn = document.getElementById('confirmOkBtn');
+                const cancelBtn = document.getElementById('confirmCancelBtn');
+                okBtn.onclick = () => { if (!resolved) { resolved = true; modal.hide(); setTimeout(() => resolve(true), 100); } };
+                cancelBtn.onclick = () => { if (!resolved) { resolved = true; modal.hide(); setTimeout(() => resolve(false), 100); } };
+                modalElement.addEventListener('hidden.bs.modal', () => { if (!resolved) { resolved = true; resolve(false); } }, { once: true });
+                modal.show();
+            });
+
+            if (resume) {
+                window.location.href = `/inventory/count?session=${openSession.id}`;
+            }
+            return;
+        }
+    } catch (error) {
+        console.error('Error checking for open sessions:', error);
+        // Continue with creating new session if check fails
+    }
+
     // Generate name from location and date
     const location = locations.find(l => l.id === parseInt(locationId));
     const name = `${location?.name || 'Inventory'} - ${countDate}`;
@@ -683,18 +724,31 @@ async function showCountScreen() {
         if (userRole === "MANAGER" || userRole === "ADMIN") {
             document.getElementById("approveBtn").style.display = "inline-block";
         }
+        // Show report link for completed sessions
+        const reportBtn = document.getElementById("reportBtn");
+        if (reportBtn) {
+            reportBtn.href = `/inventory/count/${session.id}/report`;
+            reportBtn.style.display = "inline-block";
+        }
     } else if (session.status === "APPROVED") {
         document.getElementById("reviewBtn").style.display = "none";
         document.getElementById("completeBtn").style.display = "none";
         document.getElementById("approveBtn").style.display = "none";
         const reviewBtn = document.getElementById("completeFromReviewBtn");
         if (reviewBtn) reviewBtn.style.display = "none";
+        // Show report link for approved sessions
+        const reportBtn = document.getElementById("reportBtn");
+        if (reportBtn) {
+            reportBtn.href = `/inventory/count/${session.id}/report`;
+            reportBtn.style.display = "inline-block";
+        }
     } else {
         document.getElementById("reviewBtn").style.display = "inline-block";
         document.getElementById("completeBtn").style.display = "inline-block";
         const reviewBtn2 = document.getElementById("completeFromReviewBtn");
         if (reviewBtn2) reviewBtn2.style.display = "inline-block";
         document.getElementById("approveBtn").style.display = "none";
+        document.getElementById("reportBtn").style.display = "none";
     }
 
     // Disable inputs for APPROVED counts (read-only)
@@ -986,9 +1040,14 @@ function calcPress(key) {
     } else if (key === '.') {
         // Prevent multiple decimals in the current number
         const parts = calcExpression.split(/[+\-×÷]/);
-        const currentNum = parts[parts.length - 1];
+        const currentNum = parts[parts.length - 1].trim();
         if (!currentNum.includes('.')) {
-            calcExpression += '.';
+            // If starting a number with dot, prepend 0 for clarity (e.g. ".2" → "0.2")
+            if (currentNum === '') {
+                calcExpression += '0.';
+            } else {
+                calcExpression += '.';
+            }
         }
     } else if (['+', '−', '×', '÷'].includes(key)) {
         // Don't allow operator at start (except minus for negative)
@@ -1009,8 +1068,8 @@ function evaluateExpression(expr) {
     let jsExpr = expr.replace(/×/g, '*').replace(/÷/g, '/').replace(/−/g, '-');
     // Remove trailing operator
     jsExpr = jsExpr.replace(/\s*[+\-*/]\s*$/, '');
-    // Tokenize: numbers and operators
-    const tokens = jsExpr.match(/-?\d+\.?\d*|[+\-*/]/g);
+    // Tokenize: numbers (including leading-dot like .5) and operators
+    const tokens = jsExpr.match(/-?(?:\d+\.?\d*|\.\d+)|[+\-*/]/g);
     if (!tokens) return 0;
 
     // Parse into values and ops

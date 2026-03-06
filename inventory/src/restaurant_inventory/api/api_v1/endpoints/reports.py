@@ -1197,13 +1197,13 @@ async def get_top_variance_report(
             item_name=r.item_name,
             category=r.category,
             unit=r.unit or '',
-            min_cost=round(min_cost, 4),
+            min_cost=round(min_cost, 2),
             min_cost_location=min_loc.location_name if min_loc else 'Unknown',
             min_cost_location_id=min_loc.location_id if min_loc else 0,
-            max_cost=round(max_cost, 4),
+            max_cost=round(max_cost, 2),
             max_cost_location=max_loc.location_name if max_loc else 'Unknown',
             max_cost_location_id=max_loc.location_id if max_loc else 0,
-            avg_cost=round(avg_cost, 4),
+            avg_cost=round(avg_cost, 2),
             variance_pct=round(variance_pct, 1),
             location_count=r.location_count
         ))
@@ -1301,7 +1301,7 @@ async def get_best_price_by_location(
             {
                 'location': c.location_name,
                 'location_id': c.location_id,
-                'price': round(float(c.current_weighted_avg_cost), 4)
+                'price': round(float(c.current_weighted_avg_cost), 2)
             }
             for c in sorted(costs, key=lambda x: float(x.current_weighted_avg_cost))
         ]
@@ -1311,10 +1311,10 @@ async def get_best_price_by_location(
             item_name=item.name,
             category=item.category,
             unit=item.unit_of_measure or '',
-            best_price=round(best_price, 4),
+            best_price=round(best_price, 2),
             best_location=best_cost.location_name,
             best_location_id=best_cost.location_id,
-            avg_price=round(avg_price, 4),
+            avg_price=round(avg_price, 2),
             savings_vs_avg=round(savings_pct, 1),
             location_prices=location_prices
         ))

@@ -123,14 +123,26 @@
         // Ping local system keepalive to extend the backend session
         var localUrl = getLocalKeepaliveUrl();
         if (localUrl) {
+            var headers = {};
+            var token = localStorage.getItem('access_token');
+            if (token) {
+                headers['Authorization'] = 'Bearer ' + token;
+            }
             fetch(localUrl, {
                 method: 'GET',
-                credentials: 'include'
+                credentials: 'include',
+                headers: headers
             })
             .then(function(response) {
                 if (response.status === 401) {
                     console.log('Local session expired, redirecting to login');
                     logout();
+                } else if (response.ok) {
+                    response.json().then(function(data) {
+                        if (data.access_token) {
+                            localStorage.setItem('access_token', data.access_token);
+                        }
+                    });
                 }
             })
             .catch(function(error) {

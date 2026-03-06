@@ -710,7 +710,7 @@ async function viewDetails(wasteId) {
                 <dd class="col-sm-8">${record.item_name || 'N/A'}</dd>
 
                 <dt class="col-sm-4">Quantity:</dt>
-                <dd class="col-sm-8">${parseFloat(record.quantity_wasted).toFixed(3)} ${record.item_unit || ''}</dd>
+                <dd class="col-sm-8">${parseFloat(record.quantity_wasted).toFixed(2)} ${record.item_unit || ''}</dd>
 
                 <dt class="col-sm-4">Unit Cost:</dt>
                 <dd class="col-sm-8">$${parseFloat(record.unit_cost || 0).toFixed(2)}</dd>

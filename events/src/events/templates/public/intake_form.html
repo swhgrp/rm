@@ -866,15 +866,22 @@
         const eventEndInput = document.getElementById('eventEndDate');
         const multiDayToggle = document.getElementById('multiDayEvent');
 
-        // When start date changes, auto-set end date to 4 hours later (same day)
+        // Format a Date as local datetime-local string (YYYY-MM-DDTHH:MM)
+        function formatLocalDatetime(d) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            const h = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            return `${y}-${m}-${day}T${h}:${min}`;
+        }
+
+        // When start date changes, auto-set end date to 2 hours later
         eventStartInput.addEventListener('change', function() {
             const startDate = new Date(this.value);
             if (!isNaN(startDate.getTime())) {
-                // Default to 4 hours after start
-                const endDate = new Date(startDate.getTime() + 4 * 60 * 60 * 1000);
-                // Format for datetime-local input
-                const endFormatted = endDate.toISOString().slice(0, 16);
-                eventEndInput.value = endFormatted;
+                const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+                eventEndInput.value = formatLocalDatetime(endDate);
             }
         });
 
@@ -885,9 +892,8 @@
 
             if (startDate && endDate && endDate <= startDate) {
                 alert('End date/time must be after start date/time');
-                // Reset to 4 hours after start
-                const newEnd = new Date(startDate.getTime() + 4 * 60 * 60 * 1000);
-                this.value = newEnd.toISOString().slice(0, 16);
+                const newEnd = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+                this.value = formatLocalDatetime(newEnd);
             }
 
             // Auto-detect multi-day events

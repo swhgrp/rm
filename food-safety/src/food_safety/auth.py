@@ -47,8 +47,17 @@ def _decode_token(token: str) -> Optional[CurrentUser]:
 
 
 def get_current_user_optional(request: Request) -> Optional[CurrentUser]:
-    """Extract current user from portal_session cookie. Returns None if not authenticated."""
-    token = request.cookies.get("portal_session")
+    """Extract current user from Bearer header or portal_session cookie. Returns None if not authenticated."""
+    # Try Authorization header first (for mobile app)
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+
+    # Fall back to cookie (web SSO)
+    if not token:
+        token = request.cookies.get("portal_session")
+
     if not token:
         return None
     return _decode_token(token)

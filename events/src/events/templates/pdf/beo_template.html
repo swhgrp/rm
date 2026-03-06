@@ -564,13 +564,13 @@
                         {% endif %}
                         {% if event.financials_json.service_charge and event.financials_json.apply_service_charge != false %}
                         <tr>
-                            <td>Service Charge ({{ "%.0f"|format((event.financials_json.service_rate or 0.21) * 100) }}%):</td>
+                            <td>Service Charge ({{ "%.1f"|format((event.financials_json.service_rate or 0.21) * 100)|replace('.0', '') }}%):</td>
                             <td style="text-align: right;">${{ "%.2f"|format(event.financials_json.service_charge) }}</td>
                         </tr>
                         {% endif %}
                         {% if event.financials_json.tax and event.financials_json.apply_tax != false %}
                         <tr>
-                            <td>Tax ({{ "%.0f"|format((event.financials_json.tax_rate or 0.07) * 100) }}%):</td>
+                            <td>Tax ({{ "%.1f"|format((event.financials_json.tax_rate or 0.065) * 100)|replace('.0', '') }}%):</td>
                             <td style="text-align: right;">${{ "%.2f"|format(event.financials_json.tax) }}</td>
                         </tr>
                         {% endif %}

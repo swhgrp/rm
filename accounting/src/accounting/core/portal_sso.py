@@ -6,6 +6,9 @@ Shared module for validating Portal SSO tokens across all systems
 from jose import JWTError, jwt
 from typing import Optional, Dict
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Portal secret key - MUST be set via environment variable
 PORTAL_SECRET_KEY = os.getenv("PORTAL_SECRET_KEY")
@@ -30,6 +33,7 @@ def validate_portal_token(token: str, expected_system: str) -> Optional[Dict]:
 
         # Verify the token is for this system
         if payload.get("system") != expected_system:
+            logger.warning(f"SSO token system mismatch: expected={expected_system}, got={payload.get('system')}, sub={payload.get('sub')}")
             return None
 
         # Extract user information

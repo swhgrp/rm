@@ -5,7 +5,7 @@ from icalendar import Calendar, Event as ICalEvent
 from datetime import datetime, timedelta
 from typing import List
 from sqlalchemy.orm import Session
-from events.models import Event, User
+from events.models import Event, User, CalendarItem
 from events.core.config import settings
 import logging
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class CalDAVSyncService:
-    """Syncs events from Events DB to CalDAV server"""
+    """Syncs events and calendar items from Events DB to CalDAV server"""
 
     def __init__(self):
         self.caldav_url = settings.CALDAV_URL or "http://caldav:5232"
@@ -832,3 +832,114 @@ class CalDAVSyncService:
             db.rollback()
 
         return results
+
+    def sync_calendar_item_to_caldav(self, item: CalendarItem, user_email: str):
+        """
+        Sync a calendar item (note/reminder/meeting/blocked time) to CalDAV.
+        Items go into the same venue calendar as events.
+
+        Args:
+            item: CalendarItem object from database
+            user_email: Email of user to sync calendar for
+        """
+        try:
+            cal = Calendar()
+            cal.add('prodid', '-//SW Hospitality Events//EN')
+            cal.add('version', '2.0')
+
+            ical_event = ICalEvent()
+            ical_event.add('uid', f'item-{item.id}@swhgrp.com')
+            ical_event.add('summary', item.title)
+            ical_event.add('dtstart', item.start_at)
+
+            if item.end_at:
+                ical_event.add('dtend', item.end_at)
+            else:
+                # For notes/reminders without end time, set 1-hour duration
+                ical_event.add('dtend', item.start_at + timedelta(hours=1))
+
+            if item.description:
+                ical_event.add('description', item.description)
+
+            # Add item type as category
+            ical_event.add('categories', [item.item_type.value])
+
+            # Mark notes/reminders as transparent (don't block time)
+            if item.item_type.value in ('NOTE', 'REMINDER'):
+                ical_event.add('transp', 'TRANSPARENT')
+
+            if item.updated_at:
+                ical_event.add('last-modified', item.updated_at)
+            else:
+                ical_event.add('last-modified', item.created_at or get_now())
+
+            cal.add_component(ical_event)
+
+            # Use venue calendar if item has a location, otherwise 'notes'
+            if item.location and item.location.name:
+                calendar_name = item.location.name.lower().replace(' ', '-').replace("'", '')
+            else:
+                calendar_name = 'notes'
+
+            caldav_username = self._get_caldav_username(user_email)
+            client = caldav.DAVClient(
+                url=self.caldav_url,
+                headers={'X-Remote-User': caldav_username}
+            )
+
+            calendar_url = f"{self.caldav_url}/{caldav_username}/{calendar_name}/"
+            from caldav import Calendar as CalDAVCalendar
+            venue_cal = CalDAVCalendar(client=client, url=calendar_url, name=calendar_name)
+
+            venue_cal.save_event(cal.to_ical())
+            logger.info(f"Synced calendar item {item.id} to CalDAV calendar '{calendar_name}' for {caldav_username}")
+
+        except Exception as e:
+            logger.error(f"Failed to sync calendar item {item.id} to CalDAV: {e}")
+
+    def remove_calendar_item_from_caldav(self, item: CalendarItem, user_email: str):
+        """
+        Remove a calendar item from CalDAV calendar.
+
+        Args:
+            item: CalendarItem object
+            user_email: User email
+        """
+        try:
+            item_id = str(item.id)
+            caldav_username = self._get_caldav_username(user_email)
+            event_filename = f"item-{item_id}@swhgrp.com.ics"
+
+            # Determine calendar name
+            if item.location and item.location.name:
+                calendar_name = item.location.name.lower().replace(' ', '-').replace("'", '')
+            else:
+                calendar_name = 'notes'
+
+            # Try filesystem deletion first (same pattern as events)
+            import subprocess
+            file_path = f"/data/collections/collection-root/{caldav_username}/{calendar_name}/{event_filename}"
+            try:
+                result = subprocess.run(
+                    ['docker', 'exec', 'caldav', 'rm', '-f', file_path],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    logger.info(f"Deleted calendar item {item_id} from CalDAV for {caldav_username}")
+                    return
+            except Exception:
+                pass
+
+            # Fallback to HTTP DELETE
+            import requests
+            calendar_url = f"{self.caldav_url}/{caldav_username}/{calendar_name}/"
+            delete_url = f"{calendar_url}{event_filename}"
+            response = requests.delete(
+                delete_url,
+                headers={'X-Remote-User': caldav_username}
+            )
+            if response.status_code in [200, 204, 404]:
+                logger.info(f"Deleted calendar item {item_id} via HTTP from CalDAV for {caldav_username}")
+
+        except Exception as e:
+            logger.error(f"Failed to remove calendar item from CalDAV: {e}")

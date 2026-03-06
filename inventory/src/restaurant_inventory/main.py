@@ -308,6 +308,185 @@ async def count_history_page(request: Request):
     """Inventory count history page"""
     return templates.TemplateResponse("count_history.html", {"request": request})
 
+@app.get("/count/{session_id}/report", response_class=HTMLResponse)
+async def count_session_report_page(
+    request: Request,
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Printable report for a completed/approved count session"""
+    from restaurant_inventory.models.count_session import CountSession, CountSessionItem, CountStatus
+    from restaurant_inventory.models.master_item_location_cost import MasterItemLocationCost
+    from restaurant_inventory.models.inventory import Inventory
+    from restaurant_inventory.core.deps import get_user_location_ids
+    from sqlalchemy.orm import joinedload
+    from collections import OrderedDict
+    from decimal import Decimal
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    session = db.query(CountSession).options(
+        joinedload(CountSession.items).joinedload(CountSessionItem.master_item),
+        joinedload(CountSession.items).joinedload(CountSessionItem.storage_area),
+        joinedload(CountSession.items).joinedload(CountSessionItem.counted_by_user),
+        joinedload(CountSession.location),
+        joinedload(CountSession.started_by_user),
+        joinedload(CountSession.completed_by_user),
+        joinedload(CountSession.approved_by_user),
+    ).filter(CountSession.id == session_id).first()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Count session not found")
+
+    # Check location access
+    location_ids = get_user_location_ids(current_user, db)
+    if location_ids is not None and session.location_id not in location_ids:
+        raise HTTPException(status_code=403, detail="No access to this location")
+
+    if session.status not in (CountStatus.COMPLETED, CountStatus.APPROVED):
+        raise HTTPException(status_code=400, detail="Report only available for completed or approved sessions")
+
+    # Pre-load location costs for this location in one query
+    cost_map = {}
+    location_costs = db.query(MasterItemLocationCost).filter(
+        MasterItemLocationCost.location_id == session.location_id
+    ).all()
+    for lc in location_costs:
+        cost_map[lc.master_item_id] = float(lc.current_weighted_avg_cost) if lc.current_weighted_avg_cost else None
+
+    # Pre-load Hub vendor item pricing as fallback for items without location costs
+    hub_pricing = {}
+    try:
+        import os
+        from sqlalchemy import create_engine, text as sa_text
+        hub_db_url = os.getenv("HUB_DATABASE_URL")
+        if hub_db_url:
+            hub_engine = create_engine(hub_db_url)
+            with hub_engine.connect() as conn:
+                rows = conn.execute(sa_text("""
+                    SELECT DISTINCT ON (inventory_master_item_id)
+                        inventory_master_item_id,
+                        CASE
+                            WHEN case_cost IS NOT NULL AND pack_to_primary_factor IS NOT NULL AND pack_to_primary_factor > 0
+                                THEN case_cost / pack_to_primary_factor
+                            ELSE NULL
+                        END as cost_per_unit
+                    FROM hub_vendor_items
+                    WHERE inventory_master_item_id IS NOT NULL
+                      AND is_active = true
+                      AND case_cost IS NOT NULL
+                      AND pack_to_primary_factor IS NOT NULL AND pack_to_primary_factor > 0
+                    ORDER BY inventory_master_item_id, is_preferred DESC, updated_at DESC
+                """)).fetchall()
+                for row in rows:
+                    if row[1]:
+                        hub_pricing[row[0]] = round(float(row[1]), 2)
+            hub_engine.dispose()
+    except Exception:
+        pass  # Hub pricing is a best-effort fallback
+
+    # Build item dicts with cost data
+    all_items = []
+    for item in session.items:
+        # Cost lookup: location cost > hub vendor pricing > inventory unit_cost > deprecated master item cost
+        unit_cost = cost_map.get(item.master_item_id)
+        if unit_cost is None:
+            unit_cost = hub_pricing.get(item.master_item_id)
+        if unit_cost is None and item.inventory_id:
+            inv = db.query(Inventory).filter(Inventory.id == item.inventory_id).first()
+            if inv and inv.unit_cost:
+                unit_cost = float(inv.unit_cost)
+        if unit_cost is None and item.master_item and item.master_item.current_cost:
+            unit_cost = float(item.master_item.current_cost)
+
+        counted_qty = float(item.counted_quantity) if item.counted_quantity is not None else None
+        extended_value = (counted_qty * unit_cost) if counted_qty is not None and unit_cost else None
+
+        # Get unit display: prefer primary_uom_abbr, fall back to deprecated unit relation
+        unit_display = None
+        if item.master_item:
+            unit_display = item.master_item.primary_uom_abbr or (
+                item.master_item.unit.name if item.master_item.unit else None
+            )
+
+        all_items.append({
+            'item_name': item.master_item.name if item.master_item else 'Unknown',
+            'category': item.master_item.category if item.master_item else 'Other',
+            'storage_area_name': item.storage_area.name if item.storage_area else 'Unassigned',
+            'unit': unit_display,
+            'counted_qty': counted_qty,
+            'unit_cost': unit_cost,
+            'extended_value': extended_value,
+            'is_new': item.is_new_item,
+        })
+
+    # Group by storage area
+    by_storage_area = {}
+    for itm in sorted(all_items, key=lambda x: (x['storage_area_name'], x['category'] or '', x['item_name'])):
+        area = itm['storage_area_name']
+        if area not in by_storage_area:
+            by_storage_area[area] = {'items': [], 'subtotal_value': 0.0, 'subtotal_counted': 0.0}
+        by_storage_area[area]['items'].append(itm)
+        if itm['extended_value'] is not None:
+            by_storage_area[area]['subtotal_value'] += itm['extended_value']
+        if itm['counted_qty'] is not None:
+            by_storage_area[area]['subtotal_counted'] += itm['counted_qty']
+
+    # Group by category
+    by_category = {}
+    for itm in sorted(all_items, key=lambda x: (x['category'] or 'Other', x['item_name'])):
+        cat = itm['category'] or 'Other'
+        if cat not in by_category:
+            by_category[cat] = {'items': [], 'subtotal_value': 0.0, 'subtotal_counted': 0.0}
+        by_category[cat]['items'].append(itm)
+        if itm['extended_value'] is not None:
+            by_category[cat]['subtotal_value'] += itm['extended_value']
+        if itm['counted_qty'] is not None:
+            by_category[cat]['subtotal_counted'] += itm['counted_qty']
+
+    # Summary calculations
+    total_items = len(all_items)
+    counted_items = sum(1 for i in all_items if i['counted_qty'] is not None)
+    total_counted_value = sum(i['extended_value'] for i in all_items if i['extended_value'] is not None)
+    total_counted_qty = sum(i['counted_qty'] for i in all_items if i['counted_qty'] is not None)
+
+    # Session data dict for template
+    session_data = {
+        'id': session.id,
+        'name': session.name,
+        'location_name': session.location.name if session.location else '',
+        'inventory_type': session.inventory_type.value if session.inventory_type else 'PARTIAL',
+        'status': session.status.value,
+        'notes': session.notes,
+        'started_at': session.started_at,
+        'completed_at': session.completed_at,
+        'approved_at': session.approved_at,
+        'started_by_name': session.started_by_user.username if session.started_by_user else None,
+        'completed_by_name': session.completed_by_user.username if session.completed_by_user else None,
+        'approved_by_name': session.approved_by_user.username if session.approved_by_user else None,
+    }
+
+    _ET = ZoneInfo("America/New_York")
+
+    return templates.TemplateResponse("count_session_report.html", {
+        "request": request,
+        "session": session_data,
+        "summary": {
+            "total_items": total_items,
+            "counted_items": counted_items,
+            "total_counted_value": total_counted_value,
+            "total_counted_qty": total_counted_qty,
+            "storage_areas": len(by_storage_area),
+            "categories": len(by_category),
+        },
+        "by_storage_area": by_storage_area,
+        "sorted_areas": sorted(by_storage_area.keys()),
+        "by_category": by_category,
+        "sorted_categories": sorted(by_category.keys()),
+        "now": datetime.now(_ET),
+    })
+
 @app.get("/reports", response_class=HTMLResponse)
 async def reports_page(request: Request):
     """Reports page"""

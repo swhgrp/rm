@@ -25,10 +25,45 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 active_sessions = {}
 
 
+def _try_bearer_auth(request: Request, db: Session) -> Optional[User]:
+    """Try to authenticate via Authorization: Bearer header using Portal JWT."""
+    from sqlalchemy.orm import joinedload
+    from jose import jwt, JWTError
+    import os
+
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return None
+
+    token = auth_header[7:]
+    portal_secret = os.getenv("PORTAL_SECRET_KEY")
+    if not portal_secret:
+        return None
+
+    try:
+        payload = jwt.decode(token, portal_secret, algorithms=["HS256"])
+        username = payload.get("sub")
+        if not username:
+            return None
+    except JWTError:
+        return None
+
+    user = db.query(User).options(
+        joinedload(User.assigned_locations)
+    ).filter(User.username == username, User.is_active == True).first()
+    return user
+
+
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
-    """Get current logged-in user from session with location assignments eagerly loaded"""
+    """Get current logged-in user from Bearer token or session cookie, with location assignments eagerly loaded."""
     from sqlalchemy.orm import joinedload
 
+    # Try Bearer token first (for mobile app)
+    user = _try_bearer_auth(request, db)
+    if user:
+        return user
+
+    # Fall back to session cookie (web)
     session_token = request.cookies.get("hr_session")
 
     if not session_token:

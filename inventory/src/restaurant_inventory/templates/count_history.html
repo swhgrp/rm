@@ -214,6 +214,7 @@ function displayCounts() {
                         const canDelete = isAdmin && (count.status === 'COMPLETED' || count.status === 'APPROVED' || count.status === 'CANCELLED');
                         const canResume = count.status === 'IN_PROGRESS';
                         const canReopen = isAdmin && count.status === 'APPROVED';
+                        const canReport = count.status === 'COMPLETED' || count.status === 'APPROVED';
 
                         return `
                             <tr>
@@ -236,6 +237,11 @@ function displayCounts() {
                                                 <i class="bi bi-eye"></i> View
                                             </a>
                                         `}
+                                        ${canReport ? `
+                                            <a href="count/${count.id}/report" class="btn btn-outline-success" title="View Report">
+                                                <i class="bi bi-file-earmark-text"></i> Report
+                                            </a>
+                                        ` : ''}
                                         ${canReopen ? `
                                             <button class="btn btn-outline-warning" onclick="showReopenModal(${count.id}, '${(count.name || 'Unnamed Count').replace(/'/g, "\\'")}')" title="Reopen for Editing">
                                                 <i class="bi bi-unlock"></i> Reopen

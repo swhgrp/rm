@@ -631,14 +631,14 @@ function escapeHtml(text) {
 function updateAddDerivedCost() {
     const price = parseFloat(document.getElementById('addLastPrice').value) || 0;
     const factor = parseFloat(document.getElementById('addPackFactor').value) || 1;
-    const derivedCost = factor > 0 ? (price / factor).toFixed(4) : '-';
+    const derivedCost = factor > 0 ? (price / factor).toFixed(2) : '-';
     document.getElementById('addDerivedCost').value = derivedCost !== '-' ? derivedCost : '-';
 }
 
 function updateEditDerivedCost() {
     const price = parseFloat(document.getElementById('editLastPrice').value) || 0;
     const factor = parseFloat(document.getElementById('editPackFactor').value) || 1;
-    const derivedCost = factor > 0 ? (price / factor).toFixed(4) : '-';
+    const derivedCost = factor > 0 ? (price / factor).toFixed(2) : '-';
     document.getElementById('editDerivedCost').value = derivedCost !== '-' ? derivedCost : '-';
 }
 

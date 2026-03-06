@@ -498,7 +498,8 @@ async def debug_user(request: Request, db: Session = Depends(get_db)):
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     """Login page"""
-    return templates.TemplateResponse("login.html", {"request": request})
+    redirect_url = request.query_params.get("redirect", "")
+    return templates.TemplateResponse("login.html", {"request": request, "redirect": redirect_url})
 
 
 @app.post("/login")
@@ -506,6 +507,7 @@ async def login(
     request: Request,
     username: str = Form(...),
     password: str = Form(...),
+    redirect: str = Form(default=""),
     db: Session = Depends(get_db)
 ):
     """Process login"""
@@ -516,7 +518,8 @@ async def login(
             "login.html",
             {
                 "request": request,
-                "error": "Invalid username or password"
+                "error": "Invalid username or password",
+                "redirect": redirect,
             },
             status_code=400
         )
@@ -526,7 +529,8 @@ async def login(
             "login.html",
             {
                 "request": request,
-                "error": "Account is disabled"
+                "error": "Account is disabled",
+                "redirect": redirect,
             },
             status_code=400
         )
@@ -536,7 +540,8 @@ async def login(
             "login.html",
             {
                 "request": request,
-                "error": "You do not have permission to access the portal"
+                "error": "You do not have permission to access the portal",
+                "redirect": redirect,
             },
             status_code=403
         )
@@ -550,8 +555,8 @@ async def login(
         "is_admin": user.is_admin
     })
 
-    # Check for redirect parameter from query string
-    redirect_url = request.query_params.get("redirect", "/portal/")
+    # Check for redirect parameter from form field, then query string
+    redirect_url = redirect or request.query_params.get("redirect", "/portal/")
 
     # Validate redirect URL (security: only allow internal paths)
     if not redirect_url.startswith("/"):
@@ -1026,6 +1031,84 @@ async def validate_credentials(data: AuthValidateRequest, db: Session = Depends(
         "email": user.email,
         "full_name": user.full_name,
         "is_admin": user.is_admin,
+    }
+
+
+@app.post("/api/mobile/login")
+async def mobile_login(data: AuthValidateRequest, db: Session = Depends(get_db)):
+    """Mobile app login — returns JWT as bearer token in JSON body."""
+    user = db.query(User).filter(User.username == data.username).first()
+    if not user or not verify_password(data.password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    if not user.is_active:
+        raise HTTPException(status_code=401, detail="Account is disabled")
+    if not user.can_access_portal:
+        raise HTTPException(status_code=403, detail="Portal access denied")
+
+    access_token = create_access_token(data={
+        "sub": user.username,
+        "email": user.email,
+        "full_name": user.full_name,
+        "user_id": user.id,
+        "is_admin": user.is_admin,
+    })
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "expires_in": SESSION_EXPIRE_MINUTES * 60,
+        "user": {
+            "user_id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "full_name": user.full_name,
+            "is_admin": user.is_admin,
+            "systems": {
+                "inventory": user.can_access_inventory,
+                "accounting": user.can_access_accounting,
+                "hr": user.can_access_hr,
+                "events": user.can_access_events,
+                "hub": user.can_access_integration_hub,
+                "maintenance": user.can_access_maintenance,
+                "food_safety": user.can_access_food_safety,
+                "files": user.can_access_files,
+            },
+        },
+    }
+
+
+@app.post("/api/mobile/refresh")
+async def mobile_refresh(request: Request, db: Session = Depends(get_db)):
+    """Refresh mobile JWT token using existing bearer token."""
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing bearer token")
+
+    token = auth_header[7:]
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        if not username:
+            raise HTTPException(status_code=401, detail="Invalid token")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    user = db.query(User).filter(User.username == username, User.is_active == True).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found or inactive")
+
+    new_token = create_access_token(data={
+        "sub": user.username,
+        "email": user.email,
+        "full_name": user.full_name,
+        "user_id": user.id,
+        "is_admin": user.is_admin,
+    })
+
+    return {
+        "access_token": new_token,
+        "token_type": "bearer",
+        "expires_in": SESSION_EXPIRE_MINUTES * 60,
     }
 
 
