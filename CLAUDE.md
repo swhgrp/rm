@@ -5,7 +5,15 @@ Microservices-based restaurant management platform for SW Hospitality Group.
 - **Production URL:** https://rm.swhgrp.com
 - **Architecture:** 10 FastAPI microservices behind Nginx reverse proxy, each with its own PostgreSQL database
 - **Portal:** Central auth + UI at `/portal/`, serves templates from each service's template directory
-- **Last Updated:** March 5, 2026
+- **Last Updated:** March 8, 2026
+
+## Infrastructure & Development Environment
+- **Production Server:** Linode Ubuntu instance at `/opt/restaurant-system/`
+- **Development Machine:** Separate Ubuntu workstation (connects to Linode via SSH)
+- **Mac (secondary):** Used for Xcode / iOS builds when needed
+- **iOS App Repo:** `/opt/SWHospitality/` on the Linode server (code written here, built on Mac)
+- **Android App (planned):** Kotlin Multiplatform — shared module + Jetpack Compose UI
+- **Git:** `.git/` owned by root; use `docker run alpine/git` for git operations on the server
 
 ## Repository Structure
 ```
@@ -134,12 +142,16 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 
 ## Feature Documentation
 
-### Mobile App Bearer Auth (Mar 2026)
+### Mobile App (Mar 2026)
+- **iOS app**: `/opt/SWHospitality/` on Linode server (separate repo), SwiftUI, iOS 17+, built on Mac via Xcode
+- **Android app (planned)**: Kotlin Multiplatform (KMP) — shared business logic module + Jetpack Compose UI
+- **KMP strategy**: Shared Kotlin module for models, API client, auth logic; platform-specific UI (SwiftUI iOS, Compose Android)
 - **Portal endpoints**: `POST /api/mobile/login` (returns JWT as bearer token), `POST /api/mobile/refresh` (refreshes token)
 - **Bearer token support** added to: Events (`deps.py`), Food Safety (`auth.py`), HR (`auth.py`), Accounting (`auth.py`)
 - Inventory already had Bearer support via `HTTPBearer`
 - Pattern: `_try_bearer_auth()` decodes Portal JWT with `PORTAL_SECRET_KEY`, looks up user by username
-- iOS app at `/opt/SWHospitality/` (separate repo), SwiftUI, iOS 17+
+- **iOS status**: Auth complete, Inventory module complete (counts, items, waste, transfers, orders), other modules stubbed
+- **Bundle ID**: `com.swhgrp.manager`
 
 ### Catering Contract PDF (Mar 2026)
 - **Template**: `events/src/events/templates/pdf/catering_contract_template.html` — standalone WeasyPrint template

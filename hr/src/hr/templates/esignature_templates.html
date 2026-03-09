@@ -5,14 +5,29 @@
 
 {% block extra_styles %}
 <style>
-    /* Field Editor Modal Overrides */
+    /* Field Editor Modal - full screen overlay */
+    #fieldEditorModal {
+        display: none;
+        position: fixed;
+        z-index: 2000;
+        left: 0;
+        top: 0;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: rgba(0,0,0,0.5);
+    }
+
+    #fieldEditorModal.active {
+        display: block !important;
+    }
+
     #fieldEditorModal .modal-content {
-        max-width: 1100px;
-        width: 95vw;
-        margin: 1vh auto;
-        max-height: 98vh;
-        height: 98vh;
-        display: flex;
+        max-width: none !important;
+        width: calc(100vw - 40px) !important;
+        margin: 10px auto !important;
+        max-height: calc(100vh - 20px) !important;
+        height: calc(100vh - 20px) !important;
+        display: flex !important;
         flex-direction: column;
         overflow: hidden;
     }
@@ -130,6 +145,12 @@
         border-color: #388E3C;
         background: rgba(56, 142, 60, 0.15);
         color: #388E3C;
+    }
+
+    .signature-field.type-name {
+        border-color: #00838F;
+        background: rgba(0, 131, 143, 0.15);
+        color: #00838F;
     }
 
     .signature-field.type-text {
@@ -435,6 +456,11 @@
                         <span>Date Signed</span>
                     </button>
 
+                    <button type="button" class="field-tool-btn" data-field-type="name" onclick="selectFieldType('name')">
+                        <i class="bi bi-person" style="color: #00838F;"></i>
+                        <span>Full Name</span>
+                    </button>
+
                     <button type="button" class="field-tool-btn" data-field-type="text" onclick="selectFieldType('text')">
                         <i class="bi bi-input-cursor-text" style="color: #F57C00;"></i>
                         <span>Text Input</span>
@@ -478,6 +504,7 @@ let pdfScale = 1.0;
 let selectedFieldType = null;
 let placedFields = []; // [{id, type, page, x, y, width, height, required}]
 let fieldIdCounter = 0;
+let userSetScale = false;
 let isDragging = false;
 let isResizing = false;
 let draggedField = null;
@@ -488,6 +515,7 @@ const fieldTypes = {
     signature: { label: 'Signature', width: 150, height: 40 },
     initial: { label: 'Initials', width: 60, height: 30 },
     date: { label: 'Date', width: 100, height: 25 },
+    name: { label: 'Full Name', width: 180, height: 28 },
     text: { label: 'Text', width: 150, height: 25 }
 };
 
@@ -647,6 +675,8 @@ async function openFieldEditor(templateId, templateName) {
     selectedFieldType = null;
     currentPage = 1;
     fieldIdCounter = 0;
+    pdfScale = 1.0;
+    userSetScale = false;
     clearFieldTypeSelection();
 
     document.getElementById('fieldEditorModal').classList.add('active');
@@ -669,8 +699,26 @@ async function openFieldEditor(templateId, templateName) {
         console.error('Error loading template fields:', error);
     }
 
-    // Load PDF
+    // Load PDF — after render, convert percentage fields to pixels
     await loadPdf(templateId);
+
+    // Convert stored percentage values to current canvas pixels
+    const canvas = document.getElementById('pdfCanvas');
+    if (canvas && canvas.width) {
+        placedFields.forEach(f => {
+            // Use _percent values if available (legacy data), otherwise assume x/y are already percentages
+            const xPct = parseFloat(f.x_percent ?? f.x);
+            const yPct = parseFloat(f.y_percent ?? f.y);
+            const wPct = parseFloat(f.width_percent ?? f.width);
+            const hPct = parseFloat(f.height_percent ?? f.height);
+            f.x = (xPct / 100) * canvas.width;
+            f.y = (yPct / 100) * canvas.height;
+            f.width = (wPct / 100) * canvas.width;
+            f.height = (hPct / 100) * canvas.height;
+        });
+        renderPageFields();
+        renderFieldsList();
+    }
 }
 
 async function editTemplateFields(templateId, templateName) {
@@ -714,6 +762,20 @@ async function renderPage(pageNum) {
     if (!pdfDoc) return;
 
     const page = await pdfDoc.getPage(pageNum);
+
+    // Auto-fit: calculate scale to fit the preview panel width
+    if (!userSetScale) {
+        const panel = document.getElementById('pdfPreviewPanel');
+        const availableWidth = panel.clientWidth - 30; // subtract padding
+        const naturalViewport = page.getViewport({ scale: 1.0 });
+        const fitScale = availableWidth / naturalViewport.width;
+        if (fitScale > 0.3) {
+            pdfScale = Math.round(fitScale * 20) / 20; // round to nearest 0.05
+            pdfScale = Math.min(pdfScale, 2.0); // cap at 200%
+            updatePageNav();
+        }
+    }
+
     const viewport = page.getViewport({ scale: pdfScale });
 
     const canvas = document.getElementById('pdfCanvas');
@@ -968,9 +1030,27 @@ async function zoomPdf(delta) {
     const newScale = Math.max(0.5, Math.min(2.0, pdfScale + delta));
     if (newScale === pdfScale) return;
 
+    const canvas = document.getElementById('pdfCanvas');
+    const oldW = canvas.width;
+    const oldH = canvas.height;
+
+    userSetScale = true;
     pdfScale = newScale;
     updatePageNav();
     await renderPage(currentPage);
+
+    // Rescale field pixel positions to match new canvas size
+    const newW = canvas.width;
+    const newH = canvas.height;
+    if (oldW > 0 && oldH > 0) {
+        placedFields.forEach(f => {
+            f.x = f.x * newW / oldW;
+            f.y = f.y * newH / oldH;
+            f.width = f.width * newW / oldW;
+            f.height = f.height * newH / oldH;
+        });
+        renderPageFields();
+    }
 }
 
 async function saveTemplateFields() {
@@ -982,16 +1062,11 @@ async function saveTemplateFields() {
         const fieldsToSave = placedFields.map(f => ({
             type: f.type,
             page: f.page,
-            x: f.x,
-            y: f.y,
-            width: f.width,
-            height: f.height,
-            required: f.required,
-            // Store as percentages for Dropbox Sign API
-            x_percent: (f.x / canvas.width * 100).toFixed(2),
-            y_percent: (f.y / canvas.height * 100).toFixed(2),
-            width_percent: (f.width / canvas.width * 100).toFixed(2),
-            height_percent: (f.height / canvas.height * 100).toFixed(2)
+            x: parseFloat((f.x / canvas.width * 100).toFixed(2)),
+            y: parseFloat((f.y / canvas.height * 100).toFixed(2)),
+            width: parseFloat((f.width / canvas.width * 100).toFixed(2)),
+            height: parseFloat((f.height / canvas.height * 100).toFixed(2)),
+            required: f.required
         }));
 
         const response = await fetch(`/hr/api/esignature/templates/${currentTemplateId}/fields`, {

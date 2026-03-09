@@ -407,7 +407,7 @@
 
             <div style="background: var(--bg-tertiary); padding: 15px; border-radius: 6px; margin-bottom: 15px;">
                 <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
-                    <i class="bi bi-info-circle"></i> An email will be sent to the employee at <strong id="esignEmployeeEmail">-</strong> with a link to sign the document via Dropbox Sign.
+                    <i class="bi bi-info-circle"></i> An email will be sent to <strong id="esignEmployeeEmail">-</strong> with a secure link to review and sign the document electronically.
                 </p>
             </div>
 
@@ -976,6 +976,10 @@ function renderSignatureRequests(requests) {
                                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                                     ${req.status === 'sent' || req.status === 'viewed' ? `
                                         <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;"
+                                                onclick="copySigningLink(${req.id})" title="Copy signing link">
+                                            <i class="bi bi-link-45deg"></i> Copy Link
+                                        </button>
+                                        <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;"
                                                 onclick="sendReminder(${req.id})">
                                             <i class="bi bi-bell"></i> Remind
                                         </button>
@@ -1200,6 +1204,25 @@ async function checkSignatureStatus(requestId) {
     } catch (error) {
         console.error('Error checking status:', error);
         showAlert('Error refreshing status', 'error');
+    }
+}
+
+async function copySigningLink(requestId) {
+    try {
+        const response = await fetch(`/hr/api/esignature/requests/${requestId}/signing-url`, {
+            credentials: 'include'
+        });
+        if (response.ok) {
+            const data = await response.json();
+            await navigator.clipboard.writeText(data.signing_url);
+            showAlert('Signing link copied to clipboard', 'success');
+        } else {
+            const err = await response.json();
+            showAlert('Error: ' + (err.detail || 'Could not get signing link'), 'error');
+        }
+    } catch (error) {
+        console.error('Error copying signing link:', error);
+        showAlert('Error copying signing link', 'error');
     }
 }
 

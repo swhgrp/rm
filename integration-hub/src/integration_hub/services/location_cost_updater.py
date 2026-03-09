@@ -215,8 +215,10 @@ class LocationCostUpdaterService:
         # Use aggregated quantity if multiple invoice lines map to same vendor item
         invoice_qty = aggregated_quantity if aggregated_quantity is not None else float(item.quantity or 0)
 
-        # Use vendor item's pack_to_primary_factor for conversion
-        cf = float(vendor_item.pack_to_primary_factor or 1.0)
+        # UOM-aware cost calculation: use parsed unit to determine correct factor
+        from integration_hub.services.uom_normalizer import get_effective_conversion_factor
+        parsed_uom = getattr(item, 'unit_of_measure', None)
+        cf = get_effective_conversion_factor(vendor_item, parsed_uom)
         if cf == 0:
             return {'skipped': True, 'reason': 'zero_conversion_factor'}
 

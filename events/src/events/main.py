@@ -85,7 +85,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.DEBUG else [settings.APP_URL],
+    allow_origins=[settings.APP_URL],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

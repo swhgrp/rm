@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
+import logging
 
 from accounting.db.database import get_db
 from accounting.models.payment import Payment, CheckBatch, ACHBatch, PaymentStatus
@@ -19,6 +20,8 @@ from accounting.schemas.payment import (
 )
 from accounting.services.payment_service import PaymentService
 from accounting.api.auth import require_auth
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -314,7 +317,8 @@ def print_checks(
             filename=f"checks_{batch_id}.pdf"
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to print checks for batch {batch_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate check PDF")
 
 
 @router.get("/check-batches/{batch_id}/preview")
@@ -385,7 +389,8 @@ def generate_ach_file(
             filename=f"ach_{batch_id}.txt"
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Failed to generate ACH file for batch {batch_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to generate ACH file")
 
 
 # ============================================================================

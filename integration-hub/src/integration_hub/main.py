@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from typing import Optional, List
+import json
 import os
 import logging
 from pathlib import Path
@@ -50,6 +51,8 @@ Base.metadata.create_all(bind=engine)
 # Get environment variables for API URLs
 INVENTORY_API_URL = os.getenv("INVENTORY_API_URL", "http://inventory-app:8000/api")
 ACCOUNTING_API_URL = os.getenv("ACCOUNTING_API_URL", "http://accounting-app:8000/api")
+_HUB_API_KEY = os.getenv("HUB_INTERNAL_API_KEY", "")
+_ACCT_HEADERS = {"X-Hub-API-Key": _HUB_API_KEY} if _HUB_API_KEY else {}
 
 # Database connection strings for cross-database queries (dblink)
 INVENTORY_DATABASE_URL = os.getenv("INVENTORY_DATABASE_URL")
@@ -261,8 +264,8 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
 
-    # Get invoice items
-    items = db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).all()
+    # Get invoice items (ordered by ID to preserve line item sequence)
+    items = db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).order_by(HubInvoiceItem.id).all()
 
     # Get locations from inventory database for location dropdown
     from sqlalchemy import create_engine, text
@@ -322,7 +325,7 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
                 for account_number in item_gl_accounts:
                     try:
                         url = f"{accounting_api_url}/accounts/"
-                        response = client.get(url, params={"search": str(account_number)})
+                        response = client.get(url, params={"search": str(account_number)}, headers=_ACCT_HEADERS)
                         if response.status_code == 200:
                             accounts = response.json()
                             for acct in accounts:
@@ -374,6 +377,14 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
         logger = logging.getLogger(__name__)
         logger.error(f"Error fetching vendor item info: {str(e)}")
 
+    # Parse review reasons from JSON for template display (deduplicated)
+    review_reasons = []
+    if invoice.review_reason:
+        try:
+            review_reasons = list(dict.fromkeys(json.loads(invoice.review_reason)))
+        except (json.JSONDecodeError, TypeError):
+            review_reasons = []
+
     return templates.TemplateResponse("invoice_detail.html", {
         "request": request,
         "invoice": invoice,
@@ -381,7 +392,8 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
         "locations": locations,
         "vendors": vendors,
         "gl_names": gl_names,
-        "vendor_item_info": vendor_item_info
+        "vendor_item_info": vendor_item_info,
+        "review_reasons": review_reasons
     })
 
 
@@ -1922,7 +1934,7 @@ async def unmapped_items(request: Request, db: Session = Depends(get_db)):
     try:
         async with httpx.AsyncClient() as client:
             # ACCOUNTING_API_URL already includes /api, so just append /accounts/
-            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000})
+            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000}, headers=_ACCT_HEADERS)
             if response.status_code == 200:
                 gl_accounts = response.json()
             else:
@@ -2059,7 +2071,7 @@ async def mapped_items(request: Request, db: Session = Depends(get_db)):
     gl_accounts_map = {}
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000})
+            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000}, headers=_ACCT_HEADERS)
             if response.status_code == 200:
                 gl_accounts = response.json()
                 # Create a map of account number to account name for quick lookup
@@ -2195,7 +2207,7 @@ async def expense_items(request: Request, db: Session = Depends(get_db)):
     gl_accounts_map = {}
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000})
+            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000}, headers=_ACCT_HEADERS)
             if response.status_code == 200:
                 gl_accounts = response.json()
                 for account in gl_accounts:
@@ -2603,9 +2615,10 @@ async def map_item(
             if vendor_item.units_per_case:
                 item.pack_size = int(vendor_item.units_per_case)
 
-            # Sync vendor item case_cost from invoice price using pack_to_primary_factor
+            # Sync vendor item case_cost from invoice price (UOM-aware)
             if item.unit_price:
-                cf = float(vendor_item.pack_to_primary_factor or 1.0)
+                from integration_hub.services.uom_normalizer import get_effective_conversion_factor
+                cf = get_effective_conversion_factor(vendor_item, item.unit_of_measure)
                 if cf > 0:
                     cost_per_primary = float(item.unit_price) / cf
                     units_per_case = float(vendor_item.units_per_case or 1)
@@ -2922,7 +2935,7 @@ async def list_category_mappings(request: Request, db: Session = Depends(get_db)
     gl_accounts = []
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000})
+            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000}, headers=_ACCT_HEADERS)
             if response.status_code == 200:
                 gl_accounts = response.json()
             else:
@@ -3007,7 +3020,7 @@ async def get_category_mapping(category: str, db: Session = Depends(get_db)):
     account_lookup = {}
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000})
+            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000}, headers=_ACCT_HEADERS)
             if response.status_code == 200:
                 gl_accounts = response.json()
                 account_lookup = {str(acc['account_number']): acc['account_name'] for acc in gl_accounts}
@@ -3231,6 +3244,8 @@ async def approve_invoice_review(invoice_id: int, db: Session = Depends(get_db))
     invoice.needs_review = False
     invoice.review_reason = None
     invoice.approved_at = datetime.now(timezone.utc)
+    # Reset status from 'needs_review' to 'mapping' so update_invoice_status() will re-evaluate
+    invoice.status = 'mapping'
     db.commit()
 
     # Re-evaluate status (may transition to 'ready' or stay at 'mapping')
@@ -3729,7 +3744,7 @@ async def vendor_item_detail_page(request: Request, id: int = Query(..., descrip
     try:
         import httpx
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000})
+            response = await client.get(f"{ACCOUNTING_API_URL}/accounts/", params={"is_active": True, "limit": 1000}, headers=_ACCT_HEADERS)
             if response.status_code == 200:
                 gl_accounts = response.json()
     except Exception as e:

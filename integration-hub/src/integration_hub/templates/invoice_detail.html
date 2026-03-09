@@ -95,6 +95,8 @@
                                 <span class="badge bg-warning">Partially Sent</span>
                                 {% elif invoice.status == 'duplicate' %}
                                 <span class="badge bg-dark">Duplicate</span>
+                                {% elif invoice.status == 'needs_review' %}
+                                <span class="badge bg-warning text-dark">Needs Review</span>
                                 {% elif invoice.status == 'error' %}
                                 <span class="badge badge-error">Error</span>
                                 {% endif %}
@@ -176,6 +178,26 @@
                         <i class="bi bi-arrow-repeat"></i> Retry Accounting Only
                     </button>
                     {% endif %}
+                    {% elif invoice.status == 'needs_review' %}
+                    <div class="alert alert-warning mt-2 mb-2 py-2 px-3">
+                        <small><strong>Review Required:</strong></small>
+                        <ul class="mb-0 mt-1 ps-3" style="font-size: 12px;">
+                        {% for reason in review_reasons %}
+                            {% if reason.startswith('total_mismatch:') %}
+                            <li>Line items total doesn't match invoice total ({{ reason.split(':')[1] }} off)</li>
+                            {% elif reason.startswith('item_anomaly:') %}
+                            <li>Item flagged: {{ reason.split(':')[1] }}</li>
+                            {% elif reason.startswith('low_confidence:') %}
+                            <li>Low-confidence mappings ({{ reason.split(':')[1] }})</li>
+                            {% else %}
+                            <li>{{ reason }}</li>
+                            {% endif %}
+                        {% endfor %}
+                        </ul>
+                    </div>
+                    <button class="btn btn-success btn-sm w-100" onclick="approveReview()">
+                        <i class="bi bi-check-circle"></i> Approve & Clear Review
+                    </button>
                     {% elif invoice.status in ['pending', 'mapping'] and not invoice.is_statement %}
                     {# Show recalculate button for stuck invoices #}
                     <button class="btn btn-outline-secondary btn-sm w-100" onclick="recalculateStatus()">
@@ -280,7 +302,8 @@
                                 <input type="number" class="form-control form-control-sm edit-input"
                                        value="{{ item.quantity }}" style="display: none; width: 70px;" step="0.001" min="0">
                             </td>
-                            <td>
+                            <td class="editable-cell" data-field="unit_of_measure">
+                                <span class="display-value">
                                 {% if item.unit_of_measure %}
                                     {{ item.unit_of_measure }}
                                 {% elif vi_info.get('purchase_unit_abbr') %}
@@ -288,6 +311,9 @@
                                 {% else %}
                                     <span class="text-muted">-</span>
                                 {% endif %}
+                                </span>
+                                <input type="text" class="form-control form-control-sm edit-input"
+                                       value="{{ item.unit_of_measure or '' }}" style="display: none; width: 70px;">
                             </td>
                             <td>
                                 {% if vi_info.get('size_display') %}
@@ -450,20 +476,56 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-3">
-                    <label class="form-label">Description <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="add_item_description" required>
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Item Code</label>
-                        <input type="text" class="form-control" id="add_item_code">
+                <!-- Search Mode (default) -->
+                <div id="addItemSearchMode">
+                    <div class="mb-3">
+                        <label class="form-label">Search Vendor Items</label>
+                        <input type="text" class="form-control" id="vendorItemSearch" placeholder="Search by name or SKU..." oninput="debouncedVendorSearch()">
+                        <div id="vendorSearchSpinner" class="text-center py-2" style="display:none;">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            <small class="text-muted ms-1">Searching...</small>
+                        </div>
+                        <div id="vendorSearchResults" class="border rounded mt-1" style="max-height: 200px; overflow-y: auto; display: none;"></div>
                     </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">Unit of Measure</label>
-                        <input type="text" class="form-control" id="add_item_uom" placeholder="e.g., EA, CS, LB">
+                    <!-- Selected item display -->
+                    <div id="selectedVendorItem" class="alert alert-success py-2 mb-3" style="display: none;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong id="selectedItemName"></strong><br>
+                                <small class="text-muted" id="selectedItemDetails"></small>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="clearSelectedVendorItem()">
+                                <i class="bi bi-x"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="text-end mb-2">
+                        <a href="#" class="small text-muted" onclick="toggleManualEntry(true); return false;">Or enter manually</a>
                     </div>
                 </div>
+
+                <!-- Manual Entry Mode (hidden by default) -->
+                <div id="addItemManualMode" style="display: none;">
+                    <div class="mb-3">
+                        <label class="form-label">Description <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="add_item_description">
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Item Code</label>
+                            <input type="text" class="form-control" id="add_item_code">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Unit of Measure</label>
+                            <input type="text" class="form-control" id="add_item_uom" placeholder="e.g., EA, CS, LB">
+                        </div>
+                    </div>
+                    <div class="text-end mb-2">
+                        <a href="#" class="small text-muted" onclick="toggleManualEntry(false); return false;">Back to search</a>
+                    </div>
+                </div>
+
+                <!-- Shared fields (always visible) -->
                 <div class="row">
                     <div class="col-md-4 mb-3">
                         <label class="form-label">Quantity <span class="text-danger">*</span></label>
@@ -554,8 +616,13 @@ function showEditModal() {
     modal.show();
 }
 
+// Vendor item search state
+let vendorSearchTimeout = null;
+let vendorSearchResults = [];
+let addItemManualMode = false;
+
 function showAddItemModal() {
-    // Reset form
+    // Reset all fields
     document.getElementById('add_item_description').value = '';
     document.getElementById('add_item_code').value = '';
     document.getElementById('add_item_uom').value = '';
@@ -564,8 +631,122 @@ function showAddItemModal() {
     document.getElementById('add_item_pack_size').value = '';
     document.getElementById('add_item_total').value = '$0.00';
 
+    // Reset search state
+    document.getElementById('vendorItemSearch').value = '';
+    document.getElementById('vendorSearchResults').style.display = 'none';
+    document.getElementById('vendorSearchResults').innerHTML = '';
+    document.getElementById('selectedVendorItem').style.display = 'none';
+    document.getElementById('vendorItemSearch').style.display = '';
+    vendorSearchResults = [];
+
+    // Default to search mode
+    toggleManualEntry(false);
+
     const modal = new bootstrap.Modal(document.getElementById('addItemModal'));
     modal.show();
+}
+
+function debouncedVendorSearch() {
+    if (vendorSearchTimeout) clearTimeout(vendorSearchTimeout);
+    vendorSearchTimeout = setTimeout(searchVendorItems, 300);
+}
+
+async function searchVendorItems() {
+    const query = document.getElementById('vendorItemSearch').value.trim();
+    const resultsDiv = document.getElementById('vendorSearchResults');
+    const spinner = document.getElementById('vendorSearchSpinner');
+
+    if (!query || query.length < 2) {
+        resultsDiv.style.display = 'none';
+        return;
+    }
+
+    spinner.style.display = '';
+
+    try {
+        const vendorId = {{ invoice.vendor_id or 'null' }};
+        let url = `/hub/api/v1/vendor-items/?search=${encodeURIComponent(query)}&page_size=20&status=active`;
+        if (vendorId) url += `&vendor_id=${vendorId}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+        spinner.style.display = 'none';
+
+        const items = data.items || data || [];
+        vendorSearchResults = items.slice(0, 20);
+
+        if (vendorSearchResults.length === 0) {
+            resultsDiv.innerHTML = '<div class="p-2 text-muted small">No matching items found</div>';
+            resultsDiv.style.display = '';
+            return;
+        }
+
+        resultsDiv.innerHTML = vendorSearchResults.map((item, idx) => {
+            const name = (item.vendor_product_name || '').replace(/</g, '&lt;');
+            const sku = (item.vendor_sku || '').replace(/</g, '&lt;');
+            const cat = (item.category || '').replace(/</g, '&lt;');
+            const uom = (item.purchase_unit_abbr || '').toUpperCase();
+            return `<div class="d-flex justify-content-between align-items-center p-2 border-bottom" style="cursor:pointer;" onclick="selectVendorItem(${idx})">
+                <div>
+                    <strong>${name}</strong><br>
+                    <small class="text-muted">${sku ? 'SKU: ' + sku + ' &middot; ' : ''}${cat}${uom ? ' &middot; ' + uom : ''}</small>
+                </div>
+                <i class="bi bi-plus-circle text-primary"></i>
+            </div>`;
+        }).join('');
+        resultsDiv.style.display = '';
+    } catch (error) {
+        spinner.style.display = 'none';
+        resultsDiv.innerHTML = `<div class="p-2 text-danger small">Error: ${error.message}</div>`;
+        resultsDiv.style.display = '';
+    }
+}
+
+function selectVendorItem(idx) {
+    const item = vendorSearchResults[idx];
+    if (!item) return;
+
+    // Fill hidden form fields
+    document.getElementById('add_item_description').value = item.vendor_product_name || '';
+    document.getElementById('add_item_code').value = item.vendor_sku || '';
+    document.getElementById('add_item_uom').value = (item.purchase_unit_abbr || '').toUpperCase();
+    document.getElementById('add_item_pack_size').value = item.units_per_case ? Math.round(item.units_per_case) : '';
+
+    // Show selected item, hide search
+    const uom = (item.purchase_unit_abbr || '').toUpperCase();
+    document.getElementById('selectedItemName').textContent = item.vendor_product_name || '';
+    document.getElementById('selectedItemDetails').textContent =
+        (item.vendor_sku ? 'SKU: ' + item.vendor_sku : '') +
+        (item.category ? ' \u00b7 ' + item.category : '') +
+        (uom ? ' \u00b7 ' + uom : '');
+    document.getElementById('selectedVendorItem').style.display = '';
+    document.getElementById('vendorSearchResults').style.display = 'none';
+    document.getElementById('vendorItemSearch').style.display = 'none';
+    document.getElementById('vendorSearchSpinner').style.display = 'none';
+
+    // Focus on quantity for faster entry
+    document.getElementById('add_item_qty').focus();
+}
+
+function clearSelectedVendorItem() {
+    document.getElementById('selectedVendorItem').style.display = 'none';
+    document.getElementById('vendorItemSearch').style.display = '';
+    document.getElementById('vendorItemSearch').value = '';
+    document.getElementById('vendorSearchResults').style.display = 'none';
+    document.getElementById('add_item_description').value = '';
+    document.getElementById('add_item_code').value = '';
+    document.getElementById('add_item_uom').value = '';
+    document.getElementById('add_item_pack_size').value = '';
+    document.getElementById('vendorItemSearch').focus();
+}
+
+function toggleManualEntry(manual) {
+    addItemManualMode = manual;
+    document.getElementById('addItemSearchMode').style.display = manual ? 'none' : '';
+    document.getElementById('addItemManualMode').style.display = manual ? '' : 'none';
+    if (manual) {
+        document.getElementById('add_item_description').focus();
+    }
 }
 
 // Update total when qty or price changes
@@ -589,7 +770,11 @@ document.addEventListener('DOMContentLoaded', function() {
 async function addItem() {
     const description = document.getElementById('add_item_description').value.trim();
     if (!description) {
-        await showAlert('Description is required', 'Validation Error');
+        if (addItemManualMode) {
+            await showAlert('Description is required', 'Validation Error');
+        } else {
+            await showAlert('Please search and select a vendor item, or switch to manual entry', 'Validation Error');
+        }
         return;
     }
 
@@ -946,6 +1131,28 @@ async function recalculateStatus() {
             button.disabled = false;
             button.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Recalculate Status';
         }
+    }
+}
+
+async function approveReview() {
+    if (!await showConfirm('Approve this invoice and clear the review flags?\n\nThis will re-evaluate the invoice status.')) return;
+    const button = document.querySelector('button[onclick="approveReview()"]');
+    if (button) { button.disabled = true; button.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Approving...'; }
+    try {
+        const response = await fetch(`/hub/api/invoices/{{ invoice.id }}/approve-review`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'}
+        });
+        const result = await response.json();
+        if (response.ok && result.success) {
+            await showAlert(`Review approved. New status: ${result.status}`, 'Success');
+            location.reload();
+        } else {
+            await showAlert(`Error: ${result.detail || result.message || 'Unknown error'}`, 'Error');
+            if (button) { button.disabled = false; button.innerHTML = '<i class="bi bi-check-circle"></i> Approve & Clear Review'; }
+        }
+    } catch (error) {
+        await showAlert(`Error: ${error.message}`, 'Error');
+        if (button) { button.disabled = false; button.innerHTML = '<i class="bi bi-check-circle"></i> Approve & Clear Review'; }
     }
 }
 

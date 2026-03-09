@@ -189,6 +189,8 @@
                                 <span class="badge badge-sent">Sent</span>
                                 {% elif invoice.status == 'duplicate' %}
                                 <span class="badge bg-dark">Duplicate</span>
+                                {% elif invoice.status == 'needs_review' %}
+                                <span class="badge bg-warning text-dark">Needs Review</span>
                                 {% elif invoice.status == 'error' %}
                                 <span class="badge badge-error">Error</span>
                                 {% else %}
@@ -401,7 +403,7 @@ function filterTable() {
         // Tab filtering logic - match by actual status
         let matchesTab = true;
         if (currentTabFilter === 'pending') {
-            matchesTab = (status === 'pending' || status === 'pending_csv' || status === 'mapping');
+            matchesTab = (status === 'pending' || status === 'pending_csv' || status === 'mapping' || status === 'needs_review');
         } else if (currentTabFilter === 'ready') {
             matchesTab = (status === 'ready');
         } else if (currentTabFilter === 'sent') {
@@ -506,7 +508,7 @@ function changePage(direction) {
         // Tab filtering logic - match by actual status
         let matchesTab = true;
         if (currentTabFilter === 'pending') {
-            matchesTab = (status === 'pending' || status === 'pending_csv' || status === 'mapping');
+            matchesTab = (status === 'pending' || status === 'pending_csv' || status === 'mapping' || status === 'needs_review');
         } else if (currentTabFilter === 'ready') {
             matchesTab = (status === 'ready');
         } else if (currentTabFilter === 'sent') {

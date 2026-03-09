@@ -1073,8 +1073,10 @@ class AutoMapperService:
             unit_price = float(invoice_item.unit_price)
             invoice_date = invoice_item.invoice.invoice_date if invoice_item.invoice else None
 
-            # Use vendor item's pack_to_primary_factor for cost calculation
-            cf = float(vendor_item.pack_to_primary_factor or 1.0)
+            # UOM-aware cost calculation: use parsed unit to determine correct factor
+            from integration_hub.services.uom_normalizer import get_effective_conversion_factor
+            parsed_uom = getattr(invoice_item, 'unit_of_measure', None)
+            cf = get_effective_conversion_factor(vendor_item, parsed_uom)
             if cf > 0:
                 cost_per_primary = unit_price / cf
                 units_per_case = float(vendor_item.units_per_case or 1)

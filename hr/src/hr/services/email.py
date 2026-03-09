@@ -98,31 +98,31 @@ class EmailService:
                 logger.info(f"Content: {text_content or html_content[:200]}...")
                 return False
 
-            # Create message
-            message = MIMEMultipart('alternative')
-            message['Subject'] = subject
-            message['From'] = f"{config['from_name']} <{config['from_email']}>"
-            message['To'] = to_email
-
-            # Add plain text version
-            if text_content:
-                text_part = MIMEText(text_content, 'plain')
-                message.attach(text_part)
-
-            # Add HTML version
-            html_part = MIMEText(html_content, 'html')
-            message.attach(html_part)
-
-            # Collect all attachment paths (support both single and multiple)
+            # Collect all attachment paths
             all_attachments = []
             if attachment_path:
                 all_attachments.append(attachment_path)
             if attachment_paths:
                 all_attachments.extend(attachment_paths)
+            # Filter to existing files
+            all_attachments = [p for p in all_attachments if p and os.path.exists(p)]
 
-            # Add attachments if provided
-            for att_path in all_attachments:
-                if att_path and os.path.exists(att_path):
+            # Use 'mixed' when there are attachments, 'alternative' otherwise
+            if all_attachments:
+                message = MIMEMultipart('mixed')
+                message['Subject'] = subject
+                message['From'] = f"{config['from_name']} <{config['from_email']}>"
+                message['To'] = to_email
+
+                # Nest text/html alternatives inside a sub-part
+                alt_part = MIMEMultipart('alternative')
+                if text_content:
+                    alt_part.attach(MIMEText(text_content, 'plain'))
+                alt_part.attach(MIMEText(html_content, 'html'))
+                message.attach(alt_part)
+
+                # Add attachments
+                for att_path in all_attachments:
                     with open(att_path, 'rb') as f:
                         part = MIMEBase('application', 'octet-stream')
                         part.set_payload(f.read())
@@ -132,6 +132,14 @@ class EmailService:
                             f'attachment; filename={os.path.basename(att_path)}'
                         )
                         message.attach(part)
+            else:
+                message = MIMEMultipart('alternative')
+                message['Subject'] = subject
+                message['From'] = f"{config['from_name']} <{config['from_email']}>"
+                message['To'] = to_email
+                if text_content:
+                    message.attach(MIMEText(text_content, 'plain'))
+                message.attach(MIMEText(html_content, 'html'))
 
             # Connect to SMTP server
             if config['use_tls']:
@@ -306,6 +314,7 @@ Employee Number: {emp_number}
 Name: {name}
 Email: {employee_data.get('email', 'N/A')}
 Phone: {employee_data.get('phone_number') or 'Not provided'}
+Location(s): {employee_data.get('locations', 'None assigned')}
 
 EMPLOYMENT DETAILS
 -------------------
@@ -349,6 +358,133 @@ Date/Time: {datetime.now().strftime('%B %d, %Y at %I:%M %p')}
             text_content=text_content,
             attachment_path=attachment_path
         )
+
+    @staticmethod
+    def send_signature_request_email(
+        to_email: str,
+        signer_name: str,
+        document_title: str,
+        signing_url: str,
+        expires_in_days: int = 7,
+        custom_message: Optional[str] = None
+    ) -> bool:
+        """Send e-signature request email with signing link."""
+        config = EmailService.get_smtp_config()
+
+        subject = f"Signature Required: {document_title}"
+
+        greeting = f"Hi {signer_name.split()[0] if signer_name else 'there'},"
+        custom_section = f"\n{custom_message}\n" if custom_message else ""
+
+        text_content = f"""{greeting}
+{custom_section}
+You have a document that requires your electronic signature:
+
+Document: {document_title}
+
+Please click the link below to review and sign the document:
+{signing_url}
+
+This link will expire in {expires_in_days} days.
+
+If you have any questions, please contact HR.
+
+Thank you,
+SW Hospitality Group HR
+"""
+
+        html_content = f"""<html><body>
+<p>{greeting}</p>
+{f'<p>{custom_message}</p>' if custom_message else ''}
+<p>You have a document that requires your electronic signature:</p>
+<p><strong>Document:</strong> {document_title}</p>
+<p><a href="{signing_url}" style="display:inline-block;padding:12px 24px;background-color:#455A64;color:#ffffff;text-decoration:none;border-radius:4px;font-weight:bold;">Review & Sign Document</a></p>
+<p style="color:#666;font-size:12px;">Or copy this link: {signing_url}</p>
+<p style="color:#999;font-size:11px;">This link will expire in {expires_in_days} days.</p>
+<p>Thank you,<br>SW Hospitality Group HR</p>
+</body></html>"""
+
+        return EmailService.send_email(
+            to_email=to_email,
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content
+        )
+
+    @staticmethod
+    def send_signature_completed_email(
+        creator_email: str,
+        signer_name: str,
+        document_title: str,
+        employee_id: int,
+        signer_email: Optional[str] = None,
+        signed_pdf_path: Optional[str] = None
+    ) -> bool:
+        """Send notification to HR admin and a signed copy to the signer."""
+        config = EmailService.get_smtp_config()
+
+        subject = f"Document Signed: {document_title}"
+
+        # HR notification — includes link to employee record
+        hr_text = f"""Document Signed Successfully
+
+{signer_name} has signed the following document:
+
+Document: {document_title}
+
+You can view the signed document in the employee's record:
+https://rm.swhgrp.com/portal/hr/employees/{employee_id}
+
+---
+SW Hospitality Group HR System
+"""
+
+        hr_html = hr_text.replace('\n', '<br>')
+        hr_html = f"<html><body><pre>{hr_html}</pre></body></html>"
+
+        hr_recipient = config.get('hr_recipient', 'hr@swhgrp.com')
+        recipients = [hr_recipient]
+        if creator_email and creator_email != hr_recipient:
+            recipients.append(creator_email)
+
+        success = True
+        for recipient in recipients:
+            if not EmailService.send_email(
+                to_email=recipient,
+                subject=subject,
+                html_content=hr_html,
+                text_content=hr_text
+            ):
+                success = False
+
+        # Signer copy — no internal links, attach signed PDF
+        if signer_email:
+            signer_text = f"""Hi {signer_name.split()[0] if signer_name else 'there'},
+
+Your signed document is attached for your records.
+
+Document: {document_title}
+
+Thank you,
+SW Hospitality Group HR
+"""
+            signer_html = f"""<html><body>
+<p>Hi {signer_name.split()[0] if signer_name else 'there'},</p>
+<p>Your signed document is attached for your records.</p>
+<p><strong>Document:</strong> {document_title}</p>
+<p>Thank you,<br>SW Hospitality Group HR</p>
+</body></html>"""
+
+            if not EmailService.send_email(
+                to_email=signer_email,
+                subject=f"Your Signed Document: {document_title}",
+                html_content=signer_html,
+                text_content=signer_text,
+                attachment_path=signed_pdf_path
+            ):
+                success = False
+
+        return success
 
 
 # Convenience functions

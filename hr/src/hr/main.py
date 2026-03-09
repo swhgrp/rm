@@ -27,6 +27,54 @@ app = FastAPI(
 )
 
 
+@app.middleware("http")
+async def portal_session_cookie_middleware(request: Request, call_next):
+    """If Portal cookie auth created a new HR session, set the hr_session cookie on the response."""
+    response = await call_next(request)
+    new_session = getattr(request.state, "new_hr_session", None)
+    if new_session:
+        response.set_cookie(
+            key="hr_session",
+            value=new_session,
+            httponly=True,
+            max_age=1800,
+            samesite="lax"
+        )
+    return response
+
+
+# ========== Scheduled Tasks ==========
+_scheduler = None
+
+@app.on_event("startup")
+async def startup_scheduler():
+    global _scheduler
+    from apscheduler.schedulers.asyncio import AsyncIOScheduler
+    from apscheduler.triggers.cron import CronTrigger
+
+    _scheduler = AsyncIOScheduler()
+
+    # E-signature reminder: run daily at 9:00 AM ET
+    from hr.services.esign_reminder import check_unsigned_requests
+    _scheduler.add_job(
+        check_unsigned_requests,
+        trigger=CronTrigger(hour=9, minute=0, timezone="America/New_York"),
+        id="esign_reminders",
+        max_instances=1,
+        replace_existing=True
+    )
+
+    _scheduler.start()
+    import logging
+    logging.getLogger(__name__).info("HR scheduler started — e-sign reminders daily at 9:00 AM ET")
+
+@app.on_event("shutdown")
+async def shutdown_scheduler():
+    global _scheduler
+    if _scheduler:
+        _scheduler.shutdown(wait=False)
+
+
 # Include API routers
 app.include_router(auth.router)
 app.include_router(users.router)
@@ -231,6 +279,13 @@ async def roles_page(request: Request, user: User = Depends(require_admin)):
 async def esignature_templates_page(request: Request, user: User = Depends(require_login)):
     """E-Signature Templates management page (protected)"""
     return templates.TemplateResponse("esignature_templates.html", {"request": request, "current_user": user})
+
+
+@app.get("/sign/{token}", response_class=HTMLResponse)
+async def signing_page_shortcut(token: str, request: Request, db: Session = Depends(get_db)):
+    """Public signing page — shortcut URL (no auth required)"""
+    from hr.api.api_v1.endpoints.esignature import signing_page
+    return signing_page(token, request, db)
 
 
 @app.get("/forms/corrective-action/{employee_id}", response_class=HTMLResponse)

@@ -54,8 +54,47 @@ def _try_bearer_auth(request: Request, db: Session) -> Optional[User]:
     return user
 
 
+def _try_portal_cookie_auth(request: Request, db: Session) -> Optional[User]:
+    """Try to authenticate via the portal_session cookie (Portal JWT).
+    This allows HR sessions to survive HR container restarts as long as
+    the user is still logged into the Portal."""
+    from sqlalchemy.orm import joinedload
+    from jose import jwt, JWTError
+    import os
+
+    portal_token = request.cookies.get("portal_session")
+    if not portal_token:
+        return None
+
+    portal_secret = os.getenv("PORTAL_SECRET_KEY")
+    if not portal_secret:
+        return None
+
+    try:
+        payload = jwt.decode(portal_token, portal_secret, algorithms=["HS256"])
+        username = payload.get("sub")
+        if not username:
+            return None
+    except JWTError:
+        return None
+
+    user = db.query(User).options(
+        joinedload(User.assigned_locations)
+    ).filter(User.username == username, User.is_active == True).first()
+
+    if user:
+        # Auto-create an HR session so subsequent requests don't need to decode JWT again
+        from hr.core.security import generate_session_token
+        new_session = generate_session_token()
+        active_sessions[new_session] = user.id
+        # Store on request state so middleware/response can set the cookie
+        request.state.new_hr_session = new_session
+
+    return user
+
+
 def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optional[User]:
-    """Get current logged-in user from Bearer token or session cookie, with location assignments eagerly loaded."""
+    """Get current logged-in user from Bearer token, session cookie, or Portal cookie, with location assignments eagerly loaded."""
     from sqlalchemy.orm import joinedload
 
     # Try Bearer token first (for mobile app)
@@ -66,16 +105,17 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optiona
     # Fall back to session cookie (web)
     session_token = request.cookies.get("hr_session")
 
-    if not session_token:
-        return None
+    if session_token:
+        user_id = active_sessions.get(session_token)
+        if user_id:
+            user = db.query(User).options(
+                joinedload(User.assigned_locations)
+            ).filter(User.id == user_id, User.is_active == True).first()
+            if user:
+                return user
 
-    user_id = active_sessions.get(session_token)
-    if not user_id:
-        return None
-
-    user = db.query(User).options(
-        joinedload(User.assigned_locations)
-    ).filter(User.id == user_id, User.is_active == True).first()
+    # Fall back to Portal session cookie (SSO — survives HR restarts)
+    user = _try_portal_cookie_auth(request, db)
     return user
 
 

@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** March 5, 2026
+**Last Updated:** March 8, 2026
 **Status:** ~98% Complete - All 10 Systems Production Ready ✅
-**Latest:** Mobile app bearer auth, catering contract PDF, CalDAV calendar item sync, GL learning enhancements, count session reports (Mar 5, 2026) ✅
+**Latest:** Self-hosted e-signatures, mobile app (iOS + Android KMP planned), infrastructure docs (Mar 8, 2026) ✅
 
 ---
 
@@ -31,7 +31,14 @@
 
 The SW Hospitality Group Restaurant Management System is a comprehensive microservices platform handling all aspects of restaurant operations including inventory management, human resources, accounting, event planning, and third-party integrations.
 
-### Key Statistics (Verified Mar 5, 2026)
+### Infrastructure
+- **Production Server:** Linode Ubuntu instance
+- **Development:** Separate Ubuntu workstation (SSH to Linode)
+- **iOS Builds:** Mac with Xcode (secondary machine)
+- **Repository:** `/opt/restaurant-system/` on Linode server
+- **Mobile App Repo:** `/opt/SWHospitality/` on Linode server (separate repo, built on Mac)
+
+### Key Statistics (Verified Mar 8, 2026)
 - **10 microservices** running in production (including Maintenance & Food Safety)
 - **490+ Python files** across all systems
 - **170+ HTML templates** for user interfaces
@@ -301,6 +308,7 @@ restaurant-system/
 - **Nginx = Traffic Router** (routes to microservices)
 - **Each Service = Independent** (validates JWT, has own database)
 - **No Traffic Through Portal** (direct Nginx → Service routing)
+- **Mobile App** — Uses `POST /api/mobile/login` for bearer token, then calls service APIs directly with `Authorization: Bearer <token>`
 
 ---
 
@@ -355,7 +363,8 @@ restaurant-system/
 - ✅ `POST /api/mobile/login` — Returns JWT as bearer token in JSON body
 - ✅ `POST /api/mobile/refresh` — Refreshes bearer token using existing token
 - ✅ Bearer token auth added across all services (Events, HR, Accounting, Food Safety)
-- ✅ iOS app (SwiftUI, iOS 17+) at separate repo
+- ✅ **iOS app** (SwiftUI, iOS 17+) — Auth, biometric login, full Inventory module (counts, items, waste, transfers, orders)
+- 🔄 **Android app** (planned) — Kotlin Multiplatform (KMP) with shared business logic + Jetpack Compose UI
 
 **Missing (~5%):**
 - ⚠️ `/debug` endpoint has no authentication - security risk
@@ -829,7 +838,7 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 - ❌ Calendar integration - NOT IMPLEMENTED
 - ❌ Contacts management - NOT IMPLEMENTED
 - ❌ Tasks/To-do lists - NOT IMPLEMENTED
-- ❌ Mobile apps - NOT AVAILABLE (WebDAV works on mobile, no native app)
+- 🔄 Mobile app — iOS app has Inventory module; Files integration not yet added
 - ❌ Comments - NOT IMPLEMENTED
 
 **Access:**
@@ -1395,7 +1404,7 @@ docker compose exec inventory-db psql -U inventory_user -d inventory_db -c "\l+"
 ### Long-Term (Next Quarter) 🔵
 - [ ] Advanced analytics dashboard
 - [ ] AI/ML features (forecasting, recommendations)
-- [ ] Mobile apps (if needed)
+- [x] ✅ Mobile apps — iOS app built (SwiftUI), Android planned (Kotlin Multiplatform)
 - [x] ✅ Multi-location support (already implemented in Inventory, Accounting, HR, Events)
 - [ ] Advanced workflow automation
 - [ ] Blockchain audit trail (if required)
@@ -1494,6 +1503,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 
 ### Phase 3: Scale (Q2 2026)
 - ✅ Multi-location support (already implemented in Inventory, Accounting, HR, Events)
+- 🔄 Mobile apps — iOS (SwiftUI) Inventory module complete, Android (KMP) planned
 - Advanced third-party integrations (POS, payment processors)
 - Enhanced BI and analytics dashboards
 - Demand forecasting tools

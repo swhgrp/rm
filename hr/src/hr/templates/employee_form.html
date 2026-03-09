@@ -124,7 +124,7 @@
 <!-- Alert Container -->
 <div id="alertContainer"></div>
 
-<form id="employeeForm">
+<form id="employeeForm" novalidate>
     <!-- Section 1: Personal Information -->
     <div class="card" style="margin-bottom: 20px;">
         <div class="card-header">
@@ -175,7 +175,7 @@
             <!-- Date of Birth -->
             <div class="form-group">
                 <label for="date_of_birth">Date of Birth <span style="color: #E53935;">*</span></label>
-                <input type="date" id="date_of_birth" name="date_of_birth" required
+                <input type="date" id="date_of_birth" name="date_of_birth" {% if not employee %}required{% endif %}
                        value="{{ employee.date_of_birth if employee and employee.date_of_birth else '' }}">
             </div>
         </div>
@@ -198,7 +198,7 @@
             <!-- Phone Number -->
             <div class="form-group">
                 <label for="phone_number">Phone Number <span style="color: #E53935;">*</span></label>
-                <input type="tel" id="phone_number" name="phone_number" required
+                <input type="tel" id="phone_number" name="phone_number" {% if not employee %}required{% endif %}
                        value="{{ employee.phone_number if employee and employee.phone_number else '' }}"
                        placeholder="(555) 123-4567">
             </div>
@@ -206,21 +206,21 @@
             <!-- Address -->
             <div class="form-group" style="grid-column: span 2;">
                 <label for="street_address">Street Address <span style="color: #E53935;">*</span></label>
-                <input type="text" id="street_address" name="street_address" required
+                <input type="text" id="street_address" name="street_address" {% if not employee %}required{% endif %}
                        value="{{ employee.street_address if employee and employee.street_address else '' }}">
             </div>
 
             <!-- City -->
             <div class="form-group">
                 <label for="city">City <span style="color: #E53935;">*</span></label>
-                <input type="text" id="city" name="city" required
+                <input type="text" id="city" name="city" {% if not employee %}required{% endif %}
                        value="{{ employee.city if employee and employee.city else '' }}">
             </div>
 
             <!-- State -->
             <div class="form-group">
                 <label for="state">State <span style="color: #E53935;">*</span></label>
-                <select id="state" name="state" required>
+                <select id="state" name="state" {% if not employee %}required{% endif %}>
                     <option value="">Select State</option>
                     <option value="AL" {% if employee and employee.state == 'AL' %}selected{% endif %}>Alabama</option>
                     <option value="AK" {% if employee and employee.state == 'AK' %}selected{% endif %}>Alaska</option>
@@ -278,7 +278,7 @@
             <!-- Zip Code -->
             <div class="form-group">
                 <label for="zip_code">Zip Code <span style="color: #E53935;">*</span></label>
-                <input type="text" id="zip_code" name="zip_code" required
+                <input type="text" id="zip_code" name="zip_code" {% if not employee %}required{% endif %}
                        value="{{ employee.zip_code if employee and employee.zip_code else '' }}"
                        placeholder="12345">
             </div>
@@ -356,7 +356,7 @@
             <!-- Position -->
             <div class="form-group">
                 <label for="position_id">Position <span style="color: #E53935;">*</span></label>
-                <select id="position_id" name="position_id" required>
+                <select id="position_id" name="position_id" {% if not employee %}required{% endif %}>
                     <option value="">Select Position</option>
                 </select>
             </div>
@@ -560,6 +560,26 @@
 const isEditMode = {{ 'true' if employee else 'false' }};
 const employeeId = {{ employee.id if employee else 'null' }};
 const employeePositionId = {{ employee.position_id if employee and employee.position_id else 'null' }};
+
+// Auto-format phone number fields as (XXX) XXX-XXXX
+function formatPhoneInput(input) {
+    let digits = input.value.replace(/\D/g, '');
+    if (digits.length > 10) digits = digits.substring(0, 10);
+    if (digits.length >= 7) {
+        input.value = `(${digits.substring(0, 3)}) ${digits.substring(3, 6)}-${digits.substring(6)}`;
+    } else if (digits.length >= 4) {
+        input.value = `(${digits.substring(0, 3)}) ${digits.substring(3)}`;
+    } else if (digits.length > 0) {
+        input.value = `(${digits}`;
+    }
+}
+
+document.querySelectorAll('input[type="tel"]').forEach(input => {
+    // Format on load if value exists
+    if (input.value) formatPhoneInput(input);
+    // Format as user types
+    input.addEventListener('input', () => formatPhoneInput(input));
+});
 
 // Load positions and populate dropdown
 async function loadPositions() {
@@ -829,9 +849,42 @@ async function uploadRequiredDocuments(employeeId) {
     }
 }
 
+// Form validation
+function validateForm() {
+    const missing = [];
+    const form = document.getElementById('employeeForm');
+    const requiredFields = form.querySelectorAll('[required]');
+
+    requiredFields.forEach(field => {
+        // Skip fields in hidden sections (like termination fields when not terminated)
+        if (field.closest('[style*="display: none"]') || field.closest('[style*="display:none"]')) return;
+        // Skip hidden file inputs (required docs section is only for new employees)
+        if (field.type === 'file' && field.closest('.card') && field.closest('.card').style.display === 'none') return;
+
+        if (!field.value || field.value.trim() === '') {
+            const label = field.closest('.form-group')?.querySelector('label');
+            const name = label ? label.textContent.replace('*', '').trim() : field.name;
+            missing.push(name);
+            field.style.borderColor = '#E53935';
+        } else {
+            field.style.borderColor = '';
+        }
+    });
+
+    if (missing.length > 0) {
+        showAlert('Please fill in the following required fields: ' + missing.join(', '), 'danger');
+        // Scroll to alert
+        document.getElementById('alertContainer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return false;
+    }
+    return true;
+}
+
 // Form submission
 document.getElementById('employeeForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+
+    if (!validateForm()) return;
 
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = true;

@@ -324,6 +324,8 @@ def update_employee(
     if was_terminated:
         try:
             from hr.services.email import send_termination_notification
+            # Get location names for the employee
+            location_names = [loc.name for loc in db_employee.assigned_locations] if db_employee.assigned_locations else []
             employee_dict = {
                 'employee_number': db_employee.employee_number,
                 'first_name': db_employee.first_name,
@@ -335,7 +337,8 @@ def update_employee(
                 'termination_type': db_employee.termination_type,
                 'termination_reason': db_employee.termination_reason,
                 'final_decision_date': str(db_employee.final_decision_date) if db_employee.final_decision_date else None,
-                'authorized_by': db_employee.authorized_by
+                'authorized_by': db_employee.authorized_by,
+                'locations': ', '.join(location_names) if location_names else 'None assigned'
             }
             processed_by_info = f"{current_user.full_name} ({current_user.email})"
             send_termination_notification(employee_dict, processed_by_info)

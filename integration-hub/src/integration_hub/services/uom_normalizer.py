@@ -120,6 +120,90 @@ def normalize_uom_string(raw_uom: Optional[str]) -> Optional[str]:
     return None
 
 
+# UOM categories for conversion factor logic
+CASE_UOMS = {'CS', 'CASE', 'CA', 'CAS', 'CSE'}
+PRIMARY_UNIT_GROUPS = {
+    'lb': {'LB', 'LBS', 'POUND', 'POUNDS'},
+    'ea': {'EA', 'EACH', 'PC', 'PIECE', 'PCS', 'UNIT'},
+    'oz': {'OZ', 'OUNCE', 'OUNCES'},
+    'gal': {'GAL', 'GALLON', 'GL'},
+    'kg': {'KG', 'KILOGRAM'},
+    'g': {'G', 'GRAM', 'GRAMS'},
+    'L': {'L', 'LITER', 'LITRE'},
+}
+
+
+def get_effective_conversion_factor(vendor_item, parsed_uom: Optional[str]) -> float:
+    """
+    Calculate the correct conversion factor based on the parsed invoice UOM.
+
+    The invoice unit_price may be per-case, per-bag, or per-pound depending on
+    what the Unit column says. This function returns the right divisor to get
+    cost_per_primary_unit.
+
+    Logic:
+    - CS/CASE/CA: price is per case → divide by pack_to_primary_factor
+    - Normalizes to same unit as vendor item's primary (BO→ea, BTL→ea, LBS→lb):
+      price is per primary unit → divide by 1
+    - BAG/BX/PK/etc (sub-unit): price is per sub-unit → divide by size_quantity
+
+    Example: Onions, vendor item has units_per_case=10, size_quantity=5, pack_to_primary=50
+    - CS at $46.50 → factor=50 → $0.93/lb
+    - BAG at $4.65 → factor=5 → $0.93/lb
+    - LB at $0.93  → factor=1 → $0.93/lb
+
+    Example: Wine 750ml, vendor item has units_per_case=12, purchase_unit_abbr=ea
+    - CA at $81.00 → factor=12 → $6.75/bottle
+    - BO at $15.60 → normalized to "ea" matches primary "ea" → factor=1 → $15.60/bottle
+    """
+    cf = float(vendor_item.pack_to_primary_factor or 1.0)
+    if cf <= 0:
+        return 1.0
+
+    parsed = (parsed_uom or '').strip().upper()
+    primary = (getattr(vendor_item, 'purchase_unit_abbr', '') or '').strip().upper()
+
+    # No parsed UOM or it's a case → full case factor (default behavior)
+    if not parsed or parsed in CASE_UOMS:
+        return cf
+
+    # Normalize both sides using the alias map to catch BO→ea, BTL→ea, LBS→lb, etc.
+    normalized_parsed = normalize_uom_string(parsed)
+    normalized_primary = normalize_uom_string(primary) if primary else primary.lower()
+
+    # If both normalize to the same standard abbreviation, it's a primary unit match
+    # e.g., BO→"ea" and EA→"ea", or LBS→"lb" and LB→"lb"
+    if normalized_parsed and normalized_primary and normalized_parsed == normalized_primary:
+        return 1.0
+
+    # Direct match (fallback for UOMs not in alias map)
+    if parsed == primary:
+        return 1.0
+
+    # Check alias groups (fallback for UOMs not in alias map)
+    for canonical, aliases in PRIMARY_UNIT_GROUPS.items():
+        if parsed in aliases and primary in aliases:
+            return 1.0
+
+    # Otherwise it's a sub-unit (BAG, BX, PK, JUG, etc.)
+    # Use size_quantity as the factor (primary units per sub-unit)
+    # e.g., one BAG of "10x5 LB" onions = 5 lbs → factor=5
+    size_qty = float(getattr(vendor_item, 'size_quantity', 0) or 0)
+    if size_qty > 0:
+        logger.info(
+            f"UOM-aware factor: parsed='{parsed}' (→{normalized_parsed}), primary='{primary}' (→{normalized_primary}), "
+            f"using size_quantity={size_qty} instead of pack_to_primary={cf}"
+        )
+        return size_qty
+
+    # Can't determine sub-unit size; fall back to full case factor
+    logger.warning(
+        f"UOM-aware factor: parsed='{parsed}' (→{normalized_parsed}) is not CS or primary='{primary}' (→{normalized_primary}), "
+        f"but no size_quantity on vendor item — falling back to pack_to_primary={cf}"
+    )
+    return cf
+
+
 def resolve_uom_id(raw_uom: str, db: Session) -> Optional[int]:
     """
     Resolve a parsed invoice UOM string to a units_of_measure.id.

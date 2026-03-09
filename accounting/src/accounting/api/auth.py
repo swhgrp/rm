@@ -98,9 +98,22 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> Optiona
     return user
 
 
+def _try_hub_api_key(request: Request, db: Session) -> Optional[User]:
+    """Allow internal Hub service calls via X-Hub-API-Key header."""
+    api_key = request.headers.get("X-Hub-API-Key")
+    if not api_key or api_key != HUB_INTERNAL_API_KEY:
+        return None
+    # Return first admin user as the service identity
+    user = db.query(User).filter(User.is_active == True, User.is_admin == True).first()
+    return user
+
+
 def require_auth(request: Request, db: Session = Depends(get_db)) -> User:
     """Require authentication - raise exception if not logged in"""
     user = get_current_user(request, db)
+    if not user:
+        # Try Hub internal API key as fallback for service-to-service calls
+        user = _try_hub_api_key(request, db)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

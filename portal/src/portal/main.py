@@ -81,7 +81,7 @@ async def session_refresh_middleware(request: Request, call_next):
                     max_age=SESSION_EXPIRE_MINUTES * 60,
                     path="/",  # Make cookie available for all paths
                     samesite="lax",
-                    secure=False  # Disable secure flag (nginx handles HTTPS termination)
+                    secure=True
                 )
 
                 logger.info(f"Session refreshed for user {user.username} (had {int(time_until_expiry)} seconds remaining)")
@@ -572,7 +572,7 @@ async def login(
         path="/",  # Make cookie available for all paths
         domain=None,  # Let browser set domain automatically
         samesite="lax",
-        secure=False  # Disable secure flag (nginx handles HTTPS termination)
+        secure=True
     )
 
     return response
@@ -982,7 +982,7 @@ async def keepalive(request: Request, response: Response, db: Session = Depends(
         max_age=SESSION_EXPIRE_MINUTES * 60,
         path="/",
         samesite="lax",
-        secure=False
+        secure=True
     )
 
     logger.info(f"Session keepalive for user {user.username} (had {remaining_seconds}s remaining, refreshed to {SESSION_EXPIRE_MINUTES * 60}s)")

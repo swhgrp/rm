@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from accounting.db.database import get_db
+from accounting.api.auth import require_auth
 from accounting.models.account import Account, AccountType
+from accounting.models.user import User
 from pydantic import BaseModel, Field
 from datetime import datetime
 
@@ -58,7 +60,8 @@ def list_accounts(
     search: Optional[str] = Query(None, description="Search by account number or name"),
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
 ):
     """
     List all accounts with optional filters
@@ -82,7 +85,7 @@ def list_accounts(
 
 
 @router.get("/{account_id}", response_model=AccountResponse)
-def get_account(account_id: int, db: Session = Depends(get_db)):
+def get_account(account_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_auth)):
     """
     Get a specific account by ID
     """
@@ -93,7 +96,7 @@ def get_account(account_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/number/{account_number}", response_model=AccountResponse)
-def get_account_by_number(account_number: str, db: Session = Depends(get_db)):
+def get_account_by_number(account_number: str, db: Session = Depends(get_db), current_user: User = Depends(require_auth)):
     """
     Get a specific account by account number
     """
@@ -104,7 +107,7 @@ def get_account_by_number(account_number: str, db: Session = Depends(get_db)):
 
 
 @router.post("/", response_model=AccountResponse, status_code=201)
-def create_account(account: AccountCreate, db: Session = Depends(get_db)):
+def create_account(account: AccountCreate, db: Session = Depends(get_db), current_user: User = Depends(require_auth)):
     """
     Create a new account
     """
@@ -141,7 +144,7 @@ def create_account(account: AccountCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{account_id}", response_model=AccountResponse)
-def update_account(account_id: int, account: AccountUpdate, db: Session = Depends(get_db)):
+def update_account(account_id: int, account: AccountUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_auth)):
     """
     Update an existing account
     """
@@ -191,7 +194,7 @@ def update_account(account_id: int, account: AccountUpdate, db: Session = Depend
 
 
 @router.delete("/{account_id}")
-def deactivate_account(account_id: int, db: Session = Depends(get_db)):
+def deactivate_account(account_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_auth)):
     """
     Deactivate an account (soft delete)
     """

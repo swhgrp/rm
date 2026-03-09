@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if sig_request %}Sign: {{ sig_request.document_title }}{% else %}E-Signature{% endif %} — SW Hospitality Group</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: #455A64;
+            color: #fff;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .header h1 { font-size: 18px; font-weight: 600; }
+        .header .subtitle { font-size: 13px; opacity: 0.8; }
+
+        .error-container {
+            max-width: 500px; margin: 80px auto; padding: 40px;
+            background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); text-align: center;
+        }
+        .error-container .icon { font-size: 48px; margin-bottom: 16px; }
+        .error-container h2 { margin-bottom: 12px; color: #d32f2f; }
+        .error-container p { color: #666; }
+
+        .success-container {
+            max-width: 500px; margin: 80px auto; padding: 40px;
+            background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            text-align: center; display: none;
+        }
+        .success-container.active { display: block; }
+        .success-container .icon { font-size: 48px; margin-bottom: 16px; color: #2e7d32; }
+        .success-container h2 { margin-bottom: 12px; color: #2e7d32; }
+
+        .main-container { display: flex; height: calc(100vh - 60px); }
+
+        .pdf-panel { flex: 1; overflow-y: auto; padding: 20px; background: #e0e0e0; position: relative; }
+        .pdf-zoom-controls {
+            position: sticky; top: 0; z-index: 20;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 8px; margin-bottom: 12px;
+            background: rgba(255,255,255,0.95); border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+        }
+        .pdf-zoom-controls button {
+            padding: 6px 12px; border: 1px solid #ccc; background: #fff;
+            border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: 600;
+        }
+        .pdf-zoom-controls button:hover { background: #f0f0f0; }
+        .pdf-zoom-controls span { font-size: 13px; color: #555; min-width: 50px; text-align: center; }
+        .pdf-page-container {
+            position: relative; margin: 0 auto 20px;
+            background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .pdf-page-container canvas { display: block; width: 100%; height: auto; }
+
+        /* Field overlays on the PDF */
+        .sig-field-overlay {
+            position: absolute;
+            border: 2px dashed #1976d2;
+            background: rgba(25, 118, 210, 0.1);
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 600;
+            color: #1976d2;
+            transition: all 0.2s;
+            user-select: none;
+            z-index: 10;
+        }
+        .sig-field-overlay:hover:not(.filled) {
+            background: rgba(25, 118, 210, 0.2);
+            transform: scale(1.02);
+        }
+        .sig-field-overlay.filled {
+            border-style: solid;
+            border-color: #2e7d32;
+            background: rgba(46, 125, 50, 0.06);
+            color: #2e7d32;
+            cursor: default;
+        }
+        .sig-field-overlay.filled .field-checkmark {
+            position: absolute; top: -8px; right: -8px;
+            width: 18px; height: 18px; border-radius: 50%;
+            background: #2e7d32; color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: bold;
+        }
+        .sig-field-overlay.needs-input {
+            border-color: #d32f2f;
+            animation: pulse-border 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse-border {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(211,47,47,0.3); }
+            50% { box-shadow: 0 0 0 4px rgba(211,47,47,0.1); }
+        }
+        .sig-field-overlay .field-label { pointer-events: none; text-align: center; padding: 2px; }
+        .sig-field-overlay .filled-content {
+            width: 100%; height: 100%;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        .sig-field-overlay .filled-content img {
+            max-width: 100%; max-height: 100%; object-fit: contain;
+        }
+        .sig-field-overlay .filled-content .name-text {
+            font-family: 'Georgia', serif; font-size: 13px; color: #000; font-weight: normal;
+        }
+        .sig-field-overlay .filled-content .date-text {
+            font-size: 12px; color: #000; font-weight: normal;
+        }
+
+        /* Type colors for unfilled */
+        .sig-field-overlay.type-signature:not(.filled) { border-color: #1565C0; color: #1565C0; background: rgba(21,101,192,0.1); }
+        .sig-field-overlay.type-initial:not(.filled) { border-color: #6A1B9A; color: #6A1B9A; background: rgba(106,27,154,0.1); }
+        .sig-field-overlay.type-date:not(.filled) { border-color: #E65100; color: #E65100; background: rgba(230,81,0,0.1); }
+        .sig-field-overlay.type-name:not(.filled) { border-color: #00838F; color: #00838F; background: rgba(0,131,143,0.1); }
+        .sig-field-overlay.type-text:not(.filled) { border-color: #4E342E; color: #4E342E; background: rgba(78,52,46,0.1); }
+
+        /* Right panel */
+        .signing-panel {
+            width: 360px; background: #fff; border-left: 1px solid #ddd;
+            display: flex; flex-direction: column; overflow-y: auto;
+        }
+        .panel-section { padding: 20px; border-bottom: 1px solid #eee; }
+        .panel-section h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #455A64; }
+
+        .doc-info { font-size: 13px; color: #666; }
+        .doc-info .doc-title { font-weight: 600; color: #333; margin-bottom: 4px; }
+
+        .sig-canvas-container {
+            border: 2px solid #ccc; border-radius: 6px;
+            background: #fafafa; position: relative;
+        }
+        .sig-canvas-container canvas {
+            display: block; width: 100%; height: 120px;
+            cursor: crosshair; touch-action: none;
+        }
+        .sig-canvas-placeholder {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: #bbb; font-size: 14px; pointer-events: none;
+        }
+        .sig-canvas-container.has-signature .sig-canvas-placeholder { display: none; }
+
+        .sig-actions { display: flex; gap: 8px; margin-top: 8px; }
+        .sig-actions button {
+            padding: 6px 14px; border: 1px solid #ccc;
+            background: #fff; border-radius: 4px; cursor: pointer; font-size: 12px;
+        }
+        .sig-actions button:hover { background: #f5f5f5; }
+
+        .name-input {
+            width: 100%; padding: 10px 12px;
+            border: 2px solid #ccc; border-radius: 6px;
+            font-size: 16px; font-family: 'Georgia', serif;
+        }
+        .name-input:focus { outline: none; border-color: #1976d2; }
+
+        /* Instructions callout */
+        .instructions {
+            background: #E3F2FD; border: 1px solid #90CAF9; border-radius: 6px;
+            padding: 12px; font-size: 13px; color: #1565C0; line-height: 1.5;
+        }
+        .instructions strong { display: block; margin-bottom: 4px; }
+        .instructions ol { margin: 0; padding-left: 20px; }
+        .instructions li { margin-bottom: 2px; }
+
+        /* Field checklist */
+        .field-checklist { list-style: none; padding: 0; margin: 0; }
+        .field-checklist li {
+            padding: 8px 0; border-bottom: 1px solid #f0f0f0;
+            font-size: 13px; display: flex; align-items: center; gap: 8px;
+            cursor: pointer;
+        }
+        .field-checklist li:last-child { border-bottom: none; }
+        .field-checklist li:hover { color: #1976d2; }
+        .field-checklist .check-icon {
+            width: 20px; height: 20px; border-radius: 50%;
+            border: 2px solid #ccc; display: flex; align-items: center; justify-content: center;
+            font-size: 12px; flex-shrink: 0;
+        }
+        .field-checklist li.done .check-icon {
+            border-color: #2e7d32; background: #2e7d32; color: #fff;
+        }
+        .field-checklist li:not(.done) .check-icon { color: transparent; }
+
+        .consent-row { display: flex; align-items: flex-start; gap: 10px; }
+        .consent-row input[type="checkbox"] { margin-top: 3px; width: 18px; height: 18px; cursor: pointer; }
+        .consent-row label { font-size: 13px; color: #555; cursor: pointer; line-height: 1.4; }
+
+        .submit-btn {
+            width: 100%; padding: 14px; background: #1976d2; color: #fff;
+            border: none; border-radius: 6px; font-size: 16px; font-weight: 600;
+            cursor: pointer; transition: background 0.2s;
+        }
+        .submit-btn:hover { background: #1565C0; }
+        .submit-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+        .alert { padding: 12px 16px; border-radius: 6px; font-size: 13px; margin: 10px 20px; }
+        .alert-error { background: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+
+        .progress-bar-wrap {
+            background: #e0e0e0; border-radius: 4px; height: 8px; margin-top: 8px; overflow: hidden;
+        }
+        .progress-bar-fill {
+            height: 100%; background: #2e7d32; border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        .progress-text { font-size: 12px; color: #888; margin-top: 6px; }
+        .progress-text.complete { color: #2e7d32; font-weight: 600; }
+
+        @media (max-width: 768px) {
+            .main-container { flex-direction: column; height: auto; }
+            .pdf-panel { max-height: 50vh; }
+            .signing-panel { width: 100%; border-left: none; border-top: 1px solid #ddd; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div>
+        <h1>SW Hospitality Group</h1>
+        <div class="subtitle">Electronic Signature</div>
+    </div>
+</div>
+
+{% if error %}
+<div class="error-container">
+    <div class="icon">&#9888;</div>
+    <h2>Unable to Sign</h2>
+    <p>{{ error }}</p>
+</div>
+
+{% elif sig_request %}
+<div id="signingInterface" class="main-container">
+    <div class="pdf-panel" id="pdfPanel">
+        <div class="pdf-zoom-controls">
+            <button onclick="zoomPdf(-0.15)" title="Zoom out">&#8722;</button>
+            <span id="zoomLevel">100%</span>
+            <button onclick="zoomPdf(0.15)" title="Zoom in">&#43;</button>
+            <button onclick="zoomPdf(0)" title="Fit to width" style="font-size:12px;">Fit</button>
+        </div>
+        <div id="pdfPagesContainer"></div>
+    </div>
+
+    <div class="signing-panel">
+        <div class="panel-section">
+            <h3>Document</h3>
+            <div class="doc-info">
+                <div class="doc-title">{{ sig_request.document_title }}</div>
+                <div>To: {{ sig_request.signer_name }} ({{ sig_request.signer_email }})</div>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div class="instructions">
+                <strong>How to sign:</strong>
+                <ol>
+                    <li>Type your full name below</li>
+                    <li>Draw your signature below</li>
+                    <li>Click each highlighted field on the document to apply</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <h3>1. Your Full Name</h3>
+            <input type="text" id="typedName" class="name-input"
+                   placeholder="Type your full name"
+                   value="{{ sig_request.signer_name }}">
+        </div>
+
+        <div class="panel-section">
+            <h3>2. Your Signature</h3>
+            <div class="sig-canvas-container" id="sigCanvasContainer">
+                <canvas id="signatureCanvas"></canvas>
+                <div class="sig-canvas-placeholder">Draw your signature here</div>
+            </div>
+            <div class="sig-actions">
+                <button type="button" onclick="clearSignature()">Clear</button>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <h3>3. Click Each Field</h3>
+            <ul id="fieldChecklist" class="field-checklist"></ul>
+            <div class="progress-bar-wrap"><div id="progressBar" class="progress-bar-fill" style="width:0%"></div></div>
+            <div id="progressText" class="progress-text">0 of 0 fields completed</div>
+        </div>
+
+        <div class="panel-section">
+            <div class="consent-row">
+                <input type="checkbox" id="agreeTerms">
+                <label for="agreeTerms">
+                    I agree that my electronic signature is the legal equivalent of my manual signature
+                    on this document. I consent to be legally bound by this document.
+                </label>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div id="submitError" class="alert alert-error" style="display:none; margin:0 0 12px;"></div>
+            <button type="button" id="submitBtn" class="submit-btn" onclick="submitSignature()" disabled>
+                Sign Document
+            </button>
+        </div>
+    </div>
+</div>
+
+<div id="successContainer" class="success-container">
+    <div class="icon">&#10004;</div>
+    <h2>Document Signed Successfully</h2>
+    <p>Thank you! Your signed document has been submitted. A copy will be kept on file.</p>
+    <p style="margin-top: 16px; color: #888; font-size: 13px;">You may close this window.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+    const pdfUrl = '/hr/api/esignature/sign/{{ token }}/pdf';
+    const signatureFields = {{ fields | tojson }};
+    const token = '{{ token }}';
+
+    let pdfDoc = null;
+    let renderedPages = [];
+    let currentZoomScale = null;  // null = auto-fit
+    let baseScale = 1.0;  // auto-fit scale
+    let renderGeneration = 0;  // guard against concurrent renders
+
+    // Track which fields have been individually acknowledged
+    const fieldState = {};  // fieldIndex -> { filled: bool, element: DOM }
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // ========== Signature Canvas ==========
+    const sigCanvas = document.getElementById('signatureCanvas');
+    const sigCtx = sigCanvas.getContext('2d');
+    let isDrawing = false;
+    let hasSignature = false;
+
+    function initSignatureCanvas() {
+        const container = document.getElementById('sigCanvasContainer');
+        const rect = container.getBoundingClientRect();
+        sigCanvas.width = rect.width;
+        sigCanvas.height = 120;
+        sigCtx.strokeStyle = '#000';
+        sigCtx.lineWidth = 2;
+        sigCtx.lineCap = 'round';
+        sigCtx.lineJoin = 'round';
+
+        sigCanvas.addEventListener('mousedown', startDraw);
+        sigCanvas.addEventListener('mousemove', draw);
+        sigCanvas.addEventListener('mouseup', endDraw);
+        sigCanvas.addEventListener('mouseleave', endDraw);
+
+        sigCanvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDraw(e.touches[0]); });
+        sigCanvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e.touches[0]); });
+        sigCanvas.addEventListener('touchend', (e) => { e.preventDefault(); endDraw(); });
+    }
+
+    function getCanvasPos(e) {
+        const rect = sigCanvas.getBoundingClientRect();
+        return {
+            x: (e.clientX - rect.left) * (sigCanvas.width / rect.width),
+            y: (e.clientY - rect.top) * (sigCanvas.height / rect.height)
+        };
+    }
+
+    function startDraw(e) {
+        isDrawing = true;
+        const pos = getCanvasPos(e);
+        sigCtx.beginPath();
+        sigCtx.moveTo(pos.x, pos.y);
+    }
+
+    function draw(e) {
+        if (!isDrawing) return;
+        const pos = getCanvasPos(e);
+        sigCtx.lineTo(pos.x, pos.y);
+        sigCtx.stroke();
+        if (!hasSignature) {
+            hasSignature = true;
+            document.getElementById('sigCanvasContainer').classList.add('has-signature');
+        }
+    }
+
+    function endDraw() { isDrawing = false; }
+
+    function clearSignature() {
+        sigCtx.clearRect(0, 0, sigCanvas.width, sigCanvas.height);
+        hasSignature = false;
+        document.getElementById('sigCanvasContainer').classList.remove('has-signature');
+        // Unfill all signature/initial fields since the signature changed
+        signatureFields.forEach((f, idx) => {
+            const ftype = f.field_type || f.type || 'signature';
+            if ((ftype === 'signature' || ftype === 'initial') && fieldState[idx]) {
+                unfillField(idx);
+            }
+        });
+        updateProgress();
+    }
+
+    // ========== PDF Rendering ==========
+    async function loadPdf() {
+        try {
+            pdfDoc = await pdfjsLib.getDocument(pdfUrl).promise;
+            await renderAllPages();
+        } catch (err) {
+            console.error('Error loading PDF:', err);
+            document.getElementById('pdfPagesContainer').innerHTML =
+                '<p style="color:red;padding:20px;">Error loading document. Please try refreshing.</p>';
+        }
+    }
+
+    async function renderAllPages() {
+        const thisGeneration = ++renderGeneration;
+        const container = document.getElementById('pdfPagesContainer');
+        container.innerHTML = '';
+        renderedPages = [];
+        // Reset field state elements (but keep filled status)
+        Object.keys(fieldState).forEach(k => { fieldState[k].element = null; });
+
+        // Calculate baseScale once from the first page (consistent for all pages)
+        const panel = document.getElementById('pdfPanel');
+        const availableWidth = panel.clientWidth - 40;
+        if (!currentZoomScale) {
+            const firstPage = await pdfDoc.getPage(1);
+            if (thisGeneration !== renderGeneration) return;
+            const nv = firstPage.getViewport({ scale: 1.0 });
+            baseScale = Math.min(availableWidth / nv.width, 2.0);
+        }
+        const scale = currentZoomScale || baseScale;
+
+        for (let pageNum = 1; pageNum <= pdfDoc.numPages; pageNum++) {
+            const page = await pdfDoc.getPage(pageNum);
+            if (thisGeneration !== renderGeneration) return; // superseded by newer render
+
+            const viewport = page.getViewport({ scale });
+
+            const pageContainer = document.createElement('div');
+            pageContainer.className = 'pdf-page-container';
+            pageContainer.style.width = viewport.width + 'px';
+            pageContainer.style.height = viewport.height + 'px';
+            pageContainer.dataset.pageNum = pageNum;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+            if (thisGeneration !== renderGeneration) return; // superseded by newer render
+
+            pageContainer.appendChild(canvas);
+            container.appendChild(pageContainer);
+            renderedPages.push({ pageNum, container: pageContainer, viewport });
+
+            overlayFieldsOnPage(pageNum, pageContainer, viewport);
+        }
+        buildFieldChecklist();
+        updateProgress();
+        updateZoomDisplay();
+    }
+
+    async function zoomPdf(delta) {
+        if (!pdfDoc) return;
+        if (delta === 0) {
+            // Reset to fit
+            currentZoomScale = null;
+        } else {
+            const current = currentZoomScale || baseScale;
+            currentZoomScale = Math.max(0.5, Math.min(3.0, current + delta));
+        }
+        await renderAllPages();
+    }
+
+    function updateZoomDisplay() {
+        const scale = currentZoomScale || baseScale;
+        document.getElementById('zoomLevel').textContent = Math.round(scale * 100) + '%';
+    }
+
+    function overlayFieldsOnPage(pageNum, container, viewport) {
+        const containerWidth = viewport.width;
+        const containerHeight = viewport.height;
+
+        signatureFields.forEach((field, idx) => {
+            if (field.page !== pageNum) return;
+
+            const ftype = field.field_type || field.type || 'signature';
+            const div = document.createElement('div');
+            div.className = `sig-field-overlay type-${ftype}`;
+            div.dataset.fieldIndex = idx;
+
+            // Use percentage values (x_percent/y_percent) if available, fall back to x/y
+            const xPct = parseFloat(field.x_percent ?? field.x);
+            const yPct = parseFloat(field.y_percent ?? field.y);
+            const wPct = parseFloat(field.width_percent ?? field.width);
+            const hPct = parseFloat(field.height_percent ?? field.height);
+            const x = (xPct / 100) * containerWidth;
+            const y = (yPct / 100) * containerHeight;
+            const w = (wPct / 100) * containerWidth;
+            const h = (hPct / 100) * containerHeight;
+
+            div.style.left = x + 'px';
+            div.style.top = y + 'px';
+            div.style.width = w + 'px';
+            div.style.height = h + 'px';
+
+            const labels = {
+                signature: 'Click to sign',
+                initial: 'Click for initials',
+                date: 'Click to date',
+                name: 'Click to fill name',
+                text: 'Click to fill'
+            };
+            div.innerHTML = `<span class="field-label">${labels[ftype] || 'Click to fill'}</span>`;
+
+            div.addEventListener('click', () => handleFieldClick(idx, div));
+
+            container.appendChild(div);
+
+            // Store reference (preserve filled state across re-renders)
+            const wasFilled = fieldState[idx]?.filled || false;
+            fieldState[idx] = { filled: wasFilled, element: div };
+
+            // Restore filled appearance if re-rendering after zoom
+            if (wasFilled) {
+                div.classList.add('filled');
+                if (ftype === 'signature' || ftype === 'initial') {
+                    const sigDataUrl = sigCanvas.toDataURL('image/png');
+                    div.innerHTML = `<div class="filled-content"><img src="${sigDataUrl}" alt="Signature"></div><div class="field-checkmark">&#10003;</div>`;
+                } else if (ftype === 'name') {
+                    const name = document.getElementById('typedName').value.trim();
+                    div.innerHTML = `<div class="filled-content"><span class="name-text">${escapeHtml(name)}</span></div><div class="field-checkmark">&#10003;</div>`;
+                } else if (ftype === 'date') {
+                    const dateStr = new Date().toLocaleDateString('en-US');
+                    div.innerHTML = `<div class="filled-content"><span class="date-text">${dateStr}</span></div><div class="field-checkmark">&#10003;</div>`;
+                }
+            }
+        });
+    }
+
+    // ========== Field Click Handling ==========
+    function handleFieldClick(idx, div) {
+        if (fieldState[idx].filled) return; // Already done
+
+        const field = signatureFields[idx];
+        const ftype = field.field_type || field.type || 'signature';
+        const name = document.getElementById('typedName').value.trim();
+
+        if (ftype === 'signature' || ftype === 'initial') {
+            if (!hasSignature) {
+                // Highlight the signature canvas
+                const canvasSection = document.getElementById('sigCanvasContainer');
+                canvasSection.style.borderColor = '#d32f2f';
+                canvasSection.scrollIntoView({ behavior: 'smooth' });
+                setTimeout(() => { canvasSection.style.borderColor = '#ccc'; }, 2000);
+                return;
+            }
+            // Apply signature image to this field
+            const sigDataUrl = sigCanvas.toDataURL('image/png');
+            div.innerHTML = `<div class="filled-content"><img src="${sigDataUrl}" alt="Signature"></div><div class="field-checkmark">&#10003;</div>`;
+            markFieldFilled(idx, div);
+
+        } else if (ftype === 'name') {
+            if (!name) {
+                const nameInput = document.getElementById('typedName');
+                nameInput.style.borderColor = '#d32f2f';
+                nameInput.focus();
+                nameInput.scrollIntoView({ behavior: 'smooth' });
+                setTimeout(() => { nameInput.style.borderColor = '#ccc'; }, 2000);
+                return;
+            }
+            div.innerHTML = `<div class="filled-content"><span class="name-text">${escapeHtml(name)}</span></div><div class="field-checkmark">&#10003;</div>`;
+            markFieldFilled(idx, div);
+
+        } else if (ftype === 'date') {
+            const dateStr = new Date().toLocaleDateString('en-US');
+            div.innerHTML = `<div class="filled-content"><span class="date-text">${dateStr}</span></div><div class="field-checkmark">&#10003;</div>`;
+            markFieldFilled(idx, div);
+
+        } else if (ftype === 'text') {
+            const val = prompt('Enter value for this field:');
+            if (val && val.trim()) {
+                div.innerHTML = `<div class="filled-content"><span class="date-text">${escapeHtml(val.trim())}</span></div><div class="field-checkmark">&#10003;</div>`;
+                markFieldFilled(idx, div);
+            }
+        }
+    }
+
+    function markFieldFilled(idx, div) {
+        fieldState[idx].filled = true;
+        div.classList.add('filled');
+        updateProgress();
+    }
+
+    function unfillField(idx) {
+        const state = fieldState[idx];
+        if (!state) return;
+        state.filled = false;
+        const div = state.element;
+        div.classList.remove('filled');
+        const field = signatureFields[idx];
+        const ftype = field.field_type || field.type || 'signature';
+        const labels = {
+            signature: 'Click to sign',
+            initial: 'Click for initials',
+            date: 'Click to date',
+            name: 'Click to fill name',
+            text: 'Click to fill'
+        };
+        div.innerHTML = `<span class="field-label">${labels[ftype] || 'Click to fill'}</span>`;
+    }
+
+    function escapeHtml(str) {
+        const d = document.createElement('div');
+        d.textContent = str;
+        return d.innerHTML;
+    }
+
+    // ========== Checklist & Progress ==========
+    function buildFieldChecklist() {
+        const list = document.getElementById('fieldChecklist');
+        list.innerHTML = '';
+
+        const typeLabels = {
+            signature: 'Signature',
+            initial: 'Initials',
+            date: 'Date',
+            name: 'Full Name',
+            text: 'Text Field'
+        };
+
+        signatureFields.forEach((field, idx) => {
+            const ftype = field.field_type || field.type || 'signature';
+            const li = document.createElement('li');
+            li.id = `checklist-${idx}`;
+            li.innerHTML = `<span class="check-icon">&#10003;</span> <span>${typeLabels[ftype] || ftype} — Page ${field.page}</span>`;
+            li.addEventListener('click', () => scrollToField(idx));
+            list.appendChild(li);
+        });
+    }
+
+    function scrollToField(idx) {
+        const div = fieldState[idx]?.element;
+        if (div) {
+            div.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (!fieldState[idx].filled) {
+                div.classList.add('needs-input');
+                setTimeout(() => div.classList.remove('needs-input'), 2000);
+            }
+        }
+    }
+
+    function updateProgress() {
+        const total = signatureFields.length;
+        let filled = 0;
+        signatureFields.forEach((f, idx) => {
+            const li = document.getElementById(`checklist-${idx}`);
+            if (fieldState[idx]?.filled) {
+                filled++;
+                if (li) li.classList.add('done');
+            } else {
+                if (li) li.classList.remove('done');
+            }
+        });
+
+        const pct = total > 0 ? Math.round((filled / total) * 100) : 0;
+        document.getElementById('progressBar').style.width = pct + '%';
+        const pt = document.getElementById('progressText');
+        pt.textContent = `${filled} of ${total} fields completed`;
+        pt.className = filled >= total ? 'progress-text complete' : 'progress-text';
+
+        updateSubmitState();
+    }
+
+    function updateSubmitState() {
+        const name = document.getElementById('typedName').value.trim();
+        const agreed = document.getElementById('agreeTerms').checked;
+        const allFilled = signatureFields.every((f, idx) => fieldState[idx]?.filled);
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = !(name && hasSignature && agreed && allFilled);
+    }
+
+    document.getElementById('typedName').addEventListener('input', () => {
+        // If name changed, unfill all name fields so they must re-acknowledge
+        const name = document.getElementById('typedName').value.trim();
+        signatureFields.forEach((f, idx) => {
+            const ftype = f.field_type || f.type || 'signature';
+            if (ftype === 'name' && fieldState[idx]?.filled) {
+                unfillField(idx);
+            }
+        });
+        updateProgress();
+    });
+    document.getElementById('agreeTerms').addEventListener('change', updateSubmitState);
+
+    // ========== Submit ==========
+    async function submitSignature() {
+        const btn = document.getElementById('submitBtn');
+        const errorDiv = document.getElementById('submitError');
+        errorDiv.style.display = 'none';
+        btn.disabled = true;
+        btn.textContent = 'Submitting...';
+
+        const signatureImage = sigCanvas.toDataURL('image/png');
+        const typedName = document.getElementById('typedName').value.trim();
+
+        try {
+            const response = await fetch(`/hr/api/esignature/sign/${token}/submit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    signature_image: signatureImage,
+                    typed_name: typedName,
+                    field_values: {},
+                    agreed_to_terms: true
+                })
+            });
+
+            const data = await response.json();
+            if (response.ok && data.success) {
+                document.getElementById('signingInterface').style.display = 'none';
+                document.getElementById('successContainer').classList.add('active');
+            } else {
+                errorDiv.textContent = data.detail || data.message || 'An error occurred. Please try again.';
+                errorDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = 'Sign Document';
+            }
+        } catch (err) {
+            errorDiv.textContent = 'Network error. Please check your connection and try again.';
+            errorDiv.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = 'Sign Document';
+        }
+    }
+
+    // ========== Init ==========
+    window.addEventListener('load', () => {
+        initSignatureCanvas();
+        loadPdf();
+    });
+
+    window.addEventListener('resize', () => {
+        if (!hasSignature) {
+            const container = document.getElementById('sigCanvasContainer');
+            const rect = container.getBoundingClientRect();
+            sigCanvas.width = rect.width;
+            sigCanvas.height = 120;
+            sigCtx.strokeStyle = '#000';
+            sigCtx.lineWidth = 2;
+            sigCtx.lineCap = 'round';
+            sigCtx.lineJoin = 'round';
+        }
+    });
+</script>
+
+{% endif %}
+</body>
+</html>
