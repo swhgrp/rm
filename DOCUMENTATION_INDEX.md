@@ -71,14 +71,12 @@ For all systems status, see the [Feature Completion Reference](#feature-completi
 - [docs/testing/banking_test_summary.md](docs/testing/banking_test_summary.md) - Banking test results
 - [docs/testing/DASHBOARD_TEST_RESULTS.md](docs/testing/DASHBOARD_TEST_RESULTS.md) - Dashboard test results
 
-### Security
-- [SECURITY_AUDIT_REPORT.md](SECURITY_AUDIT_REPORT.md) - Security audit findings
-- [SECURITY_REMEDIATION_PLAN.md](SECURITY_REMEDIATION_PLAN.md) - Remediation tracking
+### Security & Tasks
+- [SECURITY.md](SECURITY.md) - Security audit findings + remediation tracker (consolidated)
+- [TODO.md](TODO.md) - Active task tracking
 
 ### Development History
 - [docs/development-history.md](docs/development-history.md) - Archived session log
-- [CHANGELOG.md](CHANGELOG.md) - System changelog
-- [TODO.md](TODO.md) - Active task tracking
 
 ---
 
