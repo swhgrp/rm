@@ -120,6 +120,7 @@ class User(Base):
     can_access_files = Column(Boolean, default=True)
     can_access_websites = Column(Boolean, default=True)
     can_access_mail = Column(Boolean, default=False)
+    can_access_cookbook = Column(Boolean, default=False)
     can_access_maintenance = Column(Boolean, default=True)
     can_access_food_safety = Column(Boolean, default=True)
     accounting_role_id = Column(Integer, nullable=True)
@@ -427,6 +428,16 @@ async def home(request: Request, db: Session = Depends(get_db)):
             "url": "/portal/food-safety/",
             "icon": "🛡️",
             "system_key": "food_safety"
+        })
+
+    # Cookbook AI
+    if getattr(user, 'can_access_cookbook', False) or user.is_admin:
+        systems.append({
+            "name": "Cookbook AI",
+            "description": "AI-powered cookbook reference and recipe creation",
+            "url": "/cookbook/",
+            "icon": "📖",
+            "system_key": "cookbook"
         })
 
     # Websites - always show for admins
@@ -786,6 +797,8 @@ async def update_user_permissions(
             user.can_access_websites = form_data.get("can_access_websites") == "on"
         if hasattr(user, 'can_access_mail'):
             user.can_access_mail = form_data.get("can_access_mail") == "on"
+        if hasattr(user, 'can_access_cookbook'):
+            user.can_access_cookbook = form_data.get("can_access_cookbook") == "on"
     else:
         # Admins get full access to everything
         user.can_access_portal = True
@@ -799,6 +812,8 @@ async def update_user_permissions(
             user.can_access_websites = True
         if hasattr(user, 'can_access_mail'):
             user.can_access_mail = True
+        if hasattr(user, 'can_access_cookbook'):
+            user.can_access_cookbook = True
 
     # Update accounting role if provided
     accounting_role = form_data.get("accounting_role_id")
@@ -919,6 +934,8 @@ async def generate_system_token(
         raise HTTPException(status_code=403, detail="No access to Files system")
     elif system == "websites" and not getattr(user, 'can_access_websites', False) and not user.is_admin:
         raise HTTPException(status_code=403, detail="No access to Websites system")
+    elif system == "cookbook" and not getattr(user, 'can_access_cookbook', False) and not user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Cookbook AI system")
 
     # Create SSO token for system authentication (30 minutes to match session timeout)
     token_data = {
@@ -1543,6 +1560,68 @@ async def food_safety_reports(request: Request, current_user: User = Depends(get
     if not getattr(current_user, 'can_access_food_safety', False) and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="No access to Food Safety system")
     return templates.TemplateResponse("food-safety/reports.html", {"request": request, "user": current_user})
+
+
+# Cookbook AI Routes
+@app.get("/cookbook/", response_class=HTMLResponse)
+@app.get("/cookbook", response_class=HTMLResponse)
+async def cookbook_dashboard(request: Request, current_user: User = Depends(get_current_user)):
+    """Display cookbook dashboard"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/cookbook/", status_code=303)
+    if not getattr(current_user, 'can_access_cookbook', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Cookbook AI system")
+    return templates.TemplateResponse("cookbook/dashboard.html", {"request": request, "user": current_user})
+
+
+@app.get("/cookbook/lookup", response_class=HTMLResponse)
+async def cookbook_lookup(request: Request, current_user: User = Depends(get_current_user)):
+    """Recipe Lookup page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/cookbook/lookup", status_code=303)
+    if not getattr(current_user, 'can_access_cookbook', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Cookbook AI system")
+    return templates.TemplateResponse("cookbook/lookup.html", {"request": request, "user": current_user})
+
+
+@app.get("/cookbook/creator", response_class=HTMLResponse)
+async def cookbook_creator(request: Request, current_user: User = Depends(get_current_user)):
+    """Recipe Creator page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/cookbook/creator", status_code=303)
+    if not getattr(current_user, 'can_access_cookbook', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Cookbook AI system")
+    return templates.TemplateResponse("cookbook/creator.html", {"request": request, "user": current_user})
+
+
+@app.get("/cookbook/library", response_class=HTMLResponse)
+async def cookbook_library(request: Request, current_user: User = Depends(get_current_user)):
+    """Recipe Library page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/cookbook/library", status_code=303)
+    if not getattr(current_user, 'can_access_cookbook', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Cookbook AI system")
+    return templates.TemplateResponse("cookbook/library.html", {"request": request, "user": current_user})
+
+
+@app.get("/cookbook/library/{recipe_id}", response_class=HTMLResponse)
+async def cookbook_recipe_detail(request: Request, recipe_id: int, current_user: User = Depends(get_current_user)):
+    """Recipe detail page"""
+    if not current_user:
+        return RedirectResponse(url=f"/portal/login?redirect=/portal/cookbook/library/{recipe_id}", status_code=303)
+    if not getattr(current_user, 'can_access_cookbook', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Cookbook AI system")
+    return templates.TemplateResponse("cookbook/recipe_detail.html", {"request": request, "user": current_user, "recipe_id": recipe_id})
+
+
+@app.get("/cookbook/books", response_class=HTMLResponse)
+async def cookbook_books(request: Request, current_user: User = Depends(get_current_user)):
+    """Book management page"""
+    if not current_user:
+        return RedirectResponse(url="/portal/login?redirect=/portal/cookbook/books", status_code=303)
+    if not getattr(current_user, 'can_access_cookbook', False) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="No access to Cookbook AI system")
+    return templates.TemplateResponse("cookbook/books.html", {"request": request, "user": current_user})
 
 
 # Monitoring Dashboard Routes

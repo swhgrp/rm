@@ -1,0 +1,147 @@
+{% extends "cookbook/base.html" %}
+{% block title %}Recipe Lookup - Cookbook AI{% endblock %}
+{% block nav_lookup %}active{% endblock %}
+
+{% block extra_styles %}
+.chat-container { max-width: 800px; }
+.chat-messages { min-height: 200px; max-height: 600px; overflow-y: auto; margin-bottom: 15px; }
+.chat-msg { padding: 15px; border-radius: 8px; margin-bottom: 10px; }
+.chat-msg.user { background: var(--accent-primary); color: white; margin-left: 60px; }
+.chat-msg.assistant { background: var(--bg-secondary); border: 1px solid var(--border-primary); margin-right: 60px; }
+.chat-msg .msg-meta { font-size: 12px; opacity: 0.7; margin-top: 8px; }
+.chat-msg.assistant .msg-content { white-space: pre-wrap; line-height: 1.6; }
+.chat-msg.assistant .msg-content strong { font-weight: 600; }
+.chat-input-row { display: flex; gap: 10px; }
+.chat-input-row input { flex: 1; }
+.books-filter { margin-bottom: 15px; }
+.books-filter label { font-size: 13px; color: var(--text-muted); margin-bottom: 5px; display: block; }
+.book-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.book-chip { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 4px; font-size: 13px; border: 1px solid var(--border-primary); cursor: pointer; transition: all 0.2s; background: var(--bg-secondary); }
+.book-chip.selected { background: var(--accent-primary); color: white; border-color: var(--accent-primary); }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Recipe Lookup</h2>
+</div>
+
+<div class="chat-container">
+    <div class="card books-filter">
+        <label><i class="bi bi-funnel"></i> Filter by books (optional — leave empty to search all)</label>
+        <div class="book-chips" id="bookChips">
+            <span class="text-muted" style="font-size:13px;">Loading books...</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="chat-messages" id="chatMessages">
+            <div class="empty-state">
+                <i class="bi bi-chat-dots"></i>
+                <p>Ask a question about your cookbooks</p>
+                <p style="font-size:13px;">e.g. "How do I make beef bourguignon?" or "What does Julia Child say about braising?"</p>
+            </div>
+        </div>
+
+        <div class="chat-input-row">
+            <input type="text" id="questionInput" class="form-control" placeholder="Ask a question about your cookbooks..." onkeydown="if(event.key==='Enter') askQuestion()">
+            <button class="btn btn-primary" id="askBtn" onclick="askQuestion()"><i class="bi bi-send"></i> Ask</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let selectedBookIds = [];
+let firstMessage = true;
+
+async function loadBooks() {
+    try {
+        const res = await fetch('/cookbook/api/books');
+        const books = await res.json();
+        const container = document.getElementById('bookChips');
+        const ready = books.filter(b => b.status === 'ready');
+        if (!ready.length) {
+            container.innerHTML = '<span class="text-muted" style="font-size:13px;">No processed books available</span>';
+            return;
+        }
+        container.innerHTML = ready.map(b =>
+            `<span class="book-chip" data-id="${b.id}" onclick="toggleBook(this, ${b.id})">${b.title}</span>`
+        ).join('');
+    } catch (e) { console.error(e); }
+}
+
+function toggleBook(el, id) {
+    el.classList.toggle('selected');
+    if (selectedBookIds.includes(id)) {
+        selectedBookIds = selectedBookIds.filter(x => x !== id);
+    } else {
+        selectedBookIds.push(id);
+    }
+}
+
+async function askQuestion() {
+    const input = document.getElementById('questionInput');
+    const question = input.value.trim();
+    if (!question) return;
+
+    const msgs = document.getElementById('chatMessages');
+    if (firstMessage) { msgs.innerHTML = ''; firstMessage = false; }
+
+    // Add user message
+    msgs.innerHTML += `<div class="chat-msg user">${escapeHtml(question)}</div>`;
+    input.value = '';
+    msgs.scrollTop = msgs.scrollHeight;
+
+    // Show loading
+    const loadingId = 'loading-' + Date.now();
+    msgs.innerHTML += `<div class="chat-msg assistant" id="${loadingId}"><div class="loading-spinner"></div> Searching cookbooks and generating response...</div>`;
+    msgs.scrollTop = msgs.scrollHeight;
+
+    document.getElementById('askBtn').disabled = true;
+
+    try {
+        const res = await fetch('/cookbook/api/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                question: question,
+                book_ids: selectedBookIds.length ? selectedBookIds : null,
+            }),
+        });
+        const data = await res.json();
+        const loadingEl = document.getElementById(loadingId);
+
+        if (res.ok) {
+            const booksRef = data.books_referenced?.length ? `<div class="msg-meta">Sources: ${data.books_referenced.join(', ')} | ${data.chunks_used} chunks used | ${data.tokens_used} tokens</div>` : '';
+            loadingEl.innerHTML = `<div class="msg-content">${formatResponse(data.response)}</div>${booksRef}`;
+        } else {
+            loadingEl.innerHTML = `<span style="color:var(--error);">${data.detail || 'Error processing query'}</span>`;
+        }
+    } catch (e) {
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) loadingEl.innerHTML = `<span style="color:var(--error);">Network error: ${e.message}</span>`;
+    }
+
+    document.getElementById('askBtn').disabled = false;
+    msgs.scrollTop = msgs.scrollHeight;
+}
+
+function escapeHtml(text) {
+    const d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+}
+
+function formatResponse(text) {
+    // Basic markdown-like formatting
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/`(.*?)`/g, '<code style="background:var(--bg-tertiary);padding:2px 4px;border-radius:3px;">$1</code>')
+        .replace(/\n/g, '<br>');
+}
+
+loadBooks();
+</script>
+{% endblock %}

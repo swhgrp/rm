@@ -52,9 +52,10 @@ DATABASES=(
     "events-db:events_user:events_db"
     "hub-db:hub_user:integration_hub_db"
     "websites-db:websites_user:websites_db"
+    "cookbook-db:cookbook_user:cookbook_db"
 )
 
-# Standalone databases (not in main docker-compose)
+# Standalone databases (using docker exec directly)
 STANDALONE_DATABASES=(
     "maintenance-postgres:maintenance:maintenance"
     "food-safety-postgres:food_safety:food_safety"

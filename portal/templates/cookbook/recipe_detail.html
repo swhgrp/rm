@@ -1,0 +1,91 @@
+{% extends "cookbook/base.html" %}
+{% block title %}Recipe Detail - Cookbook AI{% endblock %}
+{% block nav_library %}active{% endblock %}
+
+{% block extra_styles %}
+.recipe-detail { max-width: 800px; }
+.recipe-detail h1 { font-size: 24px; color: var(--accent-primary); margin-bottom: 5px; }
+.recipe-meta { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap; }
+.recipe-meta .meta-item { display: flex; align-items: center; gap: 4px; }
+.recipe-section { margin-bottom: 25px; }
+.recipe-section h2 { font-size: 15px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid var(--border-primary); }
+.recipe-section .section-body { white-space: pre-wrap; line-height: 1.7; font-size: 15px; }
+.recipe-actions { display: flex; gap: 10px; margin-bottom: 20px; }
+@media print {
+    .sidebar, .mobile-menu-toggle, .top-navbar, footer, .recipe-actions, .mobile-overlay { display: none !important; }
+    .main-wrapper { margin-left: 0 !important; }
+    .content-area { padding: 0 !important; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="recipe-detail" id="recipeContainer">
+    <div style="text-align:center;padding:40px;"><div class="loading-spinner"></div><p style="margin-top:10px;color:var(--text-muted);">Loading recipe...</p></div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const recipeId = '{{ recipe_id }}';
+
+async function loadRecipe() {
+    try {
+        const res = await fetch(`/cookbook/api/recipes/${recipeId}`);
+        if (!res.ok) {
+            document.getElementById('recipeContainer').innerHTML = '<div class="empty-state"><i class="bi bi-exclamation-circle"></i><p>Recipe not found</p><a href="/portal/cookbook/library" class="btn btn-outline" style="margin-top:10px;">Back to Library</a></div>';
+            return;
+        }
+        const r = await res.json();
+        renderRecipe(r);
+    } catch (e) {
+        document.getElementById('recipeContainer').innerHTML = '<div class="empty-state"><p>Error loading recipe</p></div>';
+    }
+}
+
+function renderRecipe(r) {
+    const tags = [];
+    if (r.cuisine_style) tags.push(`<span class="meta-item"><i class="bi bi-globe"></i> ${r.cuisine_style}</span>`);
+    if (r.cooking_method) tags.push(`<span class="meta-item"><i class="bi bi-fire"></i> ${r.cooking_method}</span>`);
+    if (r.created_at) tags.push(`<span class="meta-item"><i class="bi bi-calendar"></i> ${new Date(r.created_at).toLocaleDateString()}</span>`);
+    if (r.books_referenced?.length) tags.push(`<span class="meta-item"><i class="bi bi-book"></i> ${r.books_referenced.join(', ')}</span>`);
+
+    const sections = [
+        { title: 'Description', content: r.description, icon: 'bi-info-circle' },
+        { title: 'Ingredients', content: r.ingredients, icon: 'bi-list-check' },
+        { title: 'Instructions', content: r.instructions, icon: 'bi-list-ol' },
+        { title: 'Technique Notes', content: r.technique_notes, icon: 'bi-lightbulb' },
+        { title: 'Wine / Beverage Pairing', content: r.wine_pairing, icon: 'bi-cup-straw' },
+    ].filter(s => s.content);
+
+    document.getElementById('recipeContainer').innerHTML = `
+        <div class="recipe-actions">
+            <a href="/portal/cookbook/library" class="btn btn-outline"><i class="bi bi-arrow-left"></i> Back</a>
+            <button class="btn btn-outline" onclick="window.print()"><i class="bi bi-printer"></i> Print</button>
+            <button class="btn btn-danger" onclick="deleteRecipe(${r.id}, '${r.title.replace(/'/g, "\\'")}')"><i class="bi bi-trash"></i> Delete</button>
+        </div>
+        <h1>${r.title}</h1>
+        <div class="recipe-meta">${tags.join('')}</div>
+        ${sections.map(s => `
+            <div class="recipe-section">
+                <h2><i class="bi ${s.icon}"></i> ${s.title}</h2>
+                <div class="section-body">${s.content}</div>
+            </div>
+        `).join('')}
+    `;
+}
+
+async function deleteRecipe(id, title) {
+    const ok = await showConfirm(`Delete "${title}"?`, 'Delete Recipe');
+    if (!ok) return;
+    try {
+        const res = await fetch(`/cookbook/api/recipes/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            showSuccess('Recipe deleted');
+            setTimeout(() => window.location = '/portal/cookbook/library', 1000);
+        } else { showError('Delete failed'); }
+    } catch (e) { showError('Delete failed'); }
+}
+
+loadRecipe();
+</script>
+{% endblock %}

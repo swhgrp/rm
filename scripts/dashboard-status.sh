@@ -73,7 +73,7 @@ echo '  },'
 # Services
 echo '  "services": {'
 
-SERVICES=("portal-app" "inventory-app" "hr-app" "accounting-app" "events-app" "integration-hub" "files-app" "websites-app" "maintenance-service" "food-safety-service")
+SERVICES=("portal-app" "inventory-app" "hr-app" "accounting-app" "events-app" "integration-hub" "files-app" "websites-app" "maintenance-service" "food-safety-service" "cookbook-app")
 SERVICE_COUNT=0
 TOTAL_SERVICES=${#SERVICES[@]}
 
@@ -115,7 +115,7 @@ echo '  },'
 # Databases with connection counts
 echo '  "databases": {'
 
-DBS=("inventory-db" "accounting-db" "hr-db" "events-db" "hub-db" "websites-db" "maintenance-postgres" "food-safety-postgres")
+DBS=("inventory-db" "accounting-db" "hr-db" "events-db" "hub-db" "websites-db" "maintenance-postgres" "food-safety-postgres" "cookbook-db")
 DB_COUNT=0
 TOTAL_DBS=${#DBS[@]}
 
@@ -158,6 +158,10 @@ for db in "${DBS[@]}"; do
                 SIZE=$(docker exec $db psql -U food_safety -d food_safety -t -c "SELECT pg_size_pretty(pg_database_size('food_safety'));" 2>/dev/null | xargs || echo "unknown")
                 CONNECTIONS=$(docker exec $db psql -U food_safety -d food_safety -t -c "SELECT count(*) FROM pg_stat_activity WHERE datname='food_safety';" 2>/dev/null | xargs || echo 0)
                 ;;
+            "cookbook-db")
+                SIZE=$(docker exec $db psql -U cookbook_user -d cookbook_db -t -c "SELECT pg_size_pretty(pg_database_size('cookbook_db'));" 2>/dev/null | xargs || echo "unknown")
+                CONNECTIONS=$(docker exec $db psql -U cookbook_user -d cookbook_db -t -c "SELECT count(*) FROM pg_stat_activity WHERE datname='cookbook_db';" 2>/dev/null | xargs || echo 0)
+                ;;
         esac
     else
         STATUS="down"
@@ -183,7 +187,7 @@ echo '  },'
 echo '  "backup_details": {'
 
 BACKUP_DIR="/opt/restaurant-system/backups"
-DB_NAMES=("inventory_db" "accounting_db" "hr_db" "events_db" "integration_hub_db" "websites_db" "maintenance" "food_safety")
+DB_NAMES=("inventory_db" "accounting_db" "hr_db" "events_db" "integration_hub_db" "websites_db" "maintenance" "food_safety" "cookbook_db")
 DETAIL_COUNT=0
 TOTAL_DETAILS=${#DB_NAMES[@]}
 
@@ -252,7 +256,8 @@ echo '  "network": {'
 NETWORK_EXISTS=$(docker network ls --format '{{.Name}}' | grep -c "^restaurant-network$")
 if [ "$NETWORK_EXISTS" -eq 1 ]; then
     NETWORK_STATUS="connected"
-    CONTAINER_COUNT=$(docker network inspect restaurant-network --format='{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null | wc -w)
+    # Count only restaurant-system containers (exclude music-streamer and other non-system containers)
+    CONTAINER_COUNT=$(docker network inspect restaurant-network --format='{{range .Containers}}{{.Name}} {{end}}' 2>/dev/null | tr ' ' '\n' | grep -cvE '^(music-streamer|$)')
 
     # Test network connectivity - can portal reach a database?
     if docker exec portal-app ping -c 1 -W 2 hr-db > /dev/null 2>&1; then

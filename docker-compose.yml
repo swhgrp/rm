@@ -370,6 +370,163 @@ services:
     restart: unless-stopped
     networks:
     - restaurant-network
+  maintenance-postgres:
+    image: postgres:15-alpine
+    container_name: maintenance-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: maintenance
+      POSTGRES_PASSWORD: maintenance
+      POSTGRES_DB: maintenance
+      TZ: America/New_York
+    volumes:
+    - maintenance_postgres_data:/var/lib/postgresql/data
+    networks:
+    - restaurant-network
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U maintenance
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  maintenance-service:
+    build: ./maintenance
+    container_name: maintenance-service
+    restart: unless-stopped
+    ports:
+    - 8006:8000
+    environment:
+    - DATABASE_URL=postgresql+asyncpg://maintenance:maintenance@maintenance-postgres:5432/maintenance
+    - DATABASE_URL_SYNC=postgresql://maintenance:maintenance@maintenance-postgres:5432/maintenance
+    - DEBUG=false
+    - SERVICE_NAME=maintenance-service
+    - PYTHONPATH=/app/src
+    - TZ=America/New_York
+    depends_on:
+      maintenance-postgres:
+        condition: service_healthy
+    networks:
+    - restaurant-network
+    volumes:
+    - ./maintenance/src:/app/src:ro
+    - maintenance_uploads:/app/uploads/maintenance
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  food-safety-postgres:
+    image: postgres:15-alpine
+    container_name: food-safety-postgres
+    restart: unless-stopped
+    ports:
+    - 5440:5432
+    environment:
+      POSTGRES_USER: food_safety
+      POSTGRES_PASSWORD: food_safety_password
+      POSTGRES_DB: food_safety
+      TZ: America/New_York
+    volumes:
+    - food_safety_postgres_data:/var/lib/postgresql/data
+    networks:
+    - restaurant-network
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U food_safety
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  food-safety-service:
+    build: ./food-safety
+    container_name: food-safety-service
+    restart: unless-stopped
+    ports:
+    - 8007:8000
+    environment:
+    - DATABASE_URL=postgresql+asyncpg://food_safety:food_safety_password@food-safety-postgres:5432/food_safety
+    - DATABASE_URL_SYNC=postgresql://food_safety:food_safety_password@food-safety-postgres:5432/food_safety
+    - DEBUG=false
+    - SERVICE_NAME=food-safety-service
+    - PYTHONPATH=/app
+    - HR_SERVICE_URL=http://hr-app:8000
+    - INVENTORY_SERVICE_URL=http://inventory-app:8000
+    - PORTAL_SERVICE_URL=http://portal-app:8000
+    - MAINTENANCE_SERVICE_URL=http://maintenance-service:8000
+    - PORTAL_SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
+    - TZ=America/New_York
+    volumes:
+    - incident_uploads:/app/uploads/incidents
+    depends_on:
+      food-safety-postgres:
+        condition: service_healthy
+    networks:
+    - restaurant-network
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  cookbook-db:
+    image: postgres:15-alpine
+    container_name: cookbook-db
+    restart: unless-stopped
+    ports:
+    - 5441:5432
+    environment:
+      POSTGRES_USER: cookbook_user
+      POSTGRES_PASSWORD: cookbook_pass
+      POSTGRES_DB: cookbook_db
+      TZ: America/New_York
+    volumes:
+    - cookbook_data:/var/lib/postgresql/data
+    networks:
+    - restaurant-network
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U cookbook_user -d cookbook_db
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  cookbook-app:
+    build: ./cookbook
+    container_name: cookbook-app
+    restart: unless-stopped
+    ports:
+    - 8008:8000
+    env_file:
+    - ./cookbook/.env
+    environment:
+    - PORTAL_SECRET_KEY=dwwaF6T2qYQQeFWQFk2FLA22bqrnMAtLAMdzkDn4Ne8=
+    - TZ=America/New_York
+    depends_on:
+      cookbook-db:
+        condition: service_healthy
+    networks:
+    - restaurant-network
+    volumes:
+    - ./cookbook/src:/app/src
+    - cookbook_uploads:/app/uploads
+    - cookbook_chroma:/app/chroma_data
+    healthcheck:
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://localhost:8000/health')
+      interval: 30s
+      timeout: 10s
+      retries: 3
   nginx:
     image: nginx:alpine
     container_name: nginx-proxy
@@ -394,6 +551,9 @@ services:
     - files-app
     - onlyoffice
     - websites-app
+    - maintenance-service
+    - food-safety-service
+    - cookbook-app
     restart: unless-stopped
     networks:
     - restaurant-network
@@ -437,6 +597,24 @@ volumes:
     name: restaurant-onlyoffice_logs
   websites_data:
     name: restaurant-websites_data
+  maintenance_postgres_data:
+    external: true
+    name: maintenance_maintenance_postgres_data
+  maintenance_uploads:
+    external: true
+    name: maintenance_maintenance_uploads
+  food_safety_postgres_data:
+    external: true
+    name: food-safety_food_safety_postgres_data
+  incident_uploads:
+    external: true
+    name: food-safety_incident_uploads
+  cookbook_data:
+    name: restaurant-cookbook_data
+  cookbook_uploads:
+    name: restaurant-cookbook_uploads
+  cookbook_chroma:
+    name: restaurant-cookbook_chroma
 networks:
   restaurant-network:
     name: restaurant-network

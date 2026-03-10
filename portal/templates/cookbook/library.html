@@ -1,0 +1,117 @@
+{% extends "cookbook/base.html" %}
+{% block title %}Recipe Library - Cookbook AI{% endblock %}
+{% block nav_library %}active{% endblock %}
+
+{% block extra_styles %}
+.filters-row { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
+.filters-row select { max-width: 200px; }
+.recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
+.recipe-card { background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 8px; padding: 20px; transition: all 0.2s; cursor: pointer; }
+.recipe-card:hover { border-color: var(--accent-primary); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.recipe-card h3 { font-size: 16px; margin-bottom: 8px; color: var(--accent-primary); }
+.recipe-card .recipe-desc { font-size: 13px; color: var(--text-secondary); margin-bottom: 10px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.5; }
+.recipe-card .recipe-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.recipe-card .recipe-tags .tag { font-size: 11px; padding: 2px 8px; border-radius: 3px; background: var(--bg-tertiary); color: var(--text-muted); }
+.recipe-card .recipe-date { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Recipe Library</h2>
+</div>
+
+<div class="search-bar">
+    <i class="bi bi-search"></i>
+    <input type="text" id="searchInput" placeholder="Search recipes..." oninput="filterRecipes()">
+</div>
+
+<div class="filters-row">
+    <select class="form-control" id="cuisineFilter" onchange="filterRecipes()">
+        <option value="">All Cuisines</option>
+    </select>
+    <select class="form-control" id="methodFilter" onchange="filterRecipes()">
+        <option value="">All Methods</option>
+    </select>
+</div>
+
+<div class="recipe-grid" id="recipeGrid">
+    <div class="empty-state" style="grid-column: 1 / -1;">
+        <div class="loading-spinner"></div>
+        <p style="margin-top: 10px;">Loading recipes...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let allRecipes = [];
+
+async function loadRecipes() {
+    try {
+        const [recipesRes, filtersRes] = await Promise.all([
+            fetch('/cookbook/api/recipes'),
+            fetch('/cookbook/api/recipes/filters'),
+        ]);
+        allRecipes = await recipesRes.json();
+        const filters = await filtersRes.json();
+
+        // Populate filter dropdowns
+        const cuisineSelect = document.getElementById('cuisineFilter');
+        filters.cuisine_styles.forEach(s => {
+            cuisineSelect.innerHTML += `<option value="${s}">${s}</option>`;
+        });
+        const methodSelect = document.getElementById('methodFilter');
+        filters.cooking_methods.forEach(m => {
+            methodSelect.innerHTML += `<option value="${m}">${m}</option>`;
+        });
+
+        renderRecipes(allRecipes);
+    } catch (e) {
+        document.getElementById('recipeGrid').innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><i class="bi bi-exclamation-circle"></i><p>Error loading recipes</p></div>';
+    }
+}
+
+function filterRecipes() {
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const cuisine = document.getElementById('cuisineFilter').value;
+    const method = document.getElementById('methodFilter').value;
+
+    let filtered = allRecipes;
+    if (search) {
+        filtered = filtered.filter(r =>
+            (r.title || '').toLowerCase().includes(search) ||
+            (r.primary_ingredients || '').toLowerCase().includes(search) ||
+            (r.description || '').toLowerCase().includes(search)
+        );
+    }
+    if (cuisine) filtered = filtered.filter(r => r.cuisine_style === cuisine);
+    if (method) filtered = filtered.filter(r => r.cooking_method === method);
+
+    renderRecipes(filtered);
+}
+
+function renderRecipes(recipes) {
+    const grid = document.getElementById('recipeGrid');
+    if (!recipes.length) {
+        grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><i class="bi bi-journal-x"></i><p>No recipes found</p></div>';
+        return;
+    }
+
+    grid.innerHTML = recipes.map(r => {
+        const tags = [];
+        if (r.cuisine_style) tags.push(r.cuisine_style);
+        if (r.cooking_method) tags.push(r.cooking_method);
+        const date = r.created_at ? new Date(r.created_at).toLocaleDateString() : '';
+
+        return `<div class="recipe-card" onclick="window.location='/portal/cookbook/library/${r.id}'">
+            <h3>${r.title}</h3>
+            <div class="recipe-desc">${r.description || r.primary_ingredients || ''}</div>
+            <div class="recipe-tags">${tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
+            <div class="recipe-date">${date}</div>
+        </div>`;
+    }).join('');
+}
+
+loadRecipes();
+</script>
+{% endblock %}

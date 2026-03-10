@@ -319,6 +319,7 @@
                         <th style="text-align: center;">Files</th>
                         <th style="text-align: center;">Websites</th>
                         <th style="text-align: center;">Mail</th>
+                        <th style="text-align: center;">Cookbook</th>
                         <th style="text-align: center;">Actions</th>
                     </tr>
                 </thead>
@@ -407,6 +408,14 @@
                                 <input type="checkbox"
                                        name="can_access_mail"
                                        {% if u.is_admin or u.can_access_mail %}checked{% endif %}
+                                       {% if u.is_admin %}disabled{% endif %}>
+                            </div>
+                        </td>
+                        <td style="text-align: center;">
+                            <div class="checkbox-group">
+                                <input type="checkbox"
+                                       name="can_access_cookbook"
+                                       {% if u.is_admin or u.can_access_cookbook %}checked{% endif %}
                                        {% if u.is_admin %}disabled{% endif %}>
                             </div>
                         </td>

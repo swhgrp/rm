@@ -1,0 +1,181 @@
+{% extends "cookbook/base.html" %}
+{% block title %}Create Recipe - Cookbook AI{% endblock %}
+{% block nav_creator %}active{% endblock %}
+
+{% block extra_styles %}
+.creator-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 900px) { .creator-layout { grid-template-columns: 1fr; } }
+.result-panel { display: none; }
+.result-panel.active { display: block; }
+.recipe-result h3 { font-size: 20px; margin-bottom: 10px; color: var(--accent-primary); }
+.recipe-result .recipe-section { margin-bottom: 15px; }
+.recipe-result .recipe-section h4 { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+.recipe-result .recipe-section .section-content { white-space: pre-wrap; line-height: 1.6; }
+.book-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.book-chip { display: inline-block; padding: 5px 12px; border-radius: 16px; font-size: 13px; cursor: pointer; border: 1px solid var(--border-secondary); background: var(--bg-tertiary); color: var(--text-primary); transition: all 0.2s; user-select: none; }
+.book-chip:hover { border-color: var(--accent-primary); background: var(--info-bg); }
+.book-chip.selected { background: var(--accent-primary); color: white; border-color: var(--accent-primary); }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Recipe Creator</h2>
+</div>
+
+<div class="creator-layout">
+    <div class="card">
+        <h3 style="margin-bottom: 15px; font-size: 16px;">Recipe Parameters</h3>
+        <div class="form-group">
+            <label>Primary Ingredients *</label>
+            <input type="text" id="ingredients" class="form-control" placeholder="e.g. chicken thighs, lemon, herbs">
+        </div>
+        <div class="form-group">
+            <label>Cuisine Style</label>
+            <select id="cuisineStyle" class="form-control">
+                <option value="">Select or type below...</option>
+                <option>French</option><option>Italian</option><option>Japanese</option>
+                <option>Mexican</option><option>Thai</option><option>Indian</option>
+                <option>Mediterranean</option><option>American</option><option>Chinese</option>
+                <option>Korean</option><option>Spanish</option><option>Middle Eastern</option>
+            </select>
+            <input type="text" id="cuisineCustom" class="form-control" placeholder="Or type a custom cuisine..." style="margin-top: 5px;">
+        </div>
+        <div class="form-group">
+            <label>Cooking Method</label>
+            <select id="cookingMethod" class="form-control">
+                <option value="">Select...</option>
+                <option>Braise</option><option>Roast</option><option>Saut&eacute;</option>
+                <option>Grill</option><option>Steam</option><option>Fry</option>
+                <option>Poach</option><option>Bake</option><option>Smoke</option>
+                <option>Stew</option><option>Sous Vide</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Reference Books (optional)</label>
+            <div class="book-chips" id="creatorBookChips" style="margin-top: 5px;">
+                <span class="text-muted" style="font-size:13px;">Loading...</span>
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Dietary Notes / Restrictions</label>
+            <textarea id="dietaryNotes" class="form-control" placeholder="e.g. gluten-free, dairy-free, low-sodium..." rows="2"></textarea>
+        </div>
+        <button class="btn btn-primary" id="createBtn" onclick="createRecipe()">
+            <i class="bi bi-magic"></i> Generate Recipe
+        </button>
+        <div id="createProgress" style="margin-top: 10px; display: none;">
+            <div class="loading-spinner"></div> Generating recipe... This may take a moment.
+        </div>
+    </div>
+
+    <div class="card result-panel" id="resultPanel">
+        <div class="recipe-result" id="recipeResult"></div>
+        <div style="margin-top: 15px; display: flex; gap: 10px;">
+            <a id="viewRecipeLink" href="#" class="btn btn-success" style="display:none;"><i class="bi bi-eye"></i> View in Library</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let creatorSelectedBooks = [];
+
+async function loadBooks() {
+    try {
+        const res = await fetch('/cookbook/api/books');
+        const books = await res.json();
+        const container = document.getElementById('creatorBookChips');
+        const ready = books.filter(b => b.status === 'ready');
+        if (!ready.length) {
+            container.innerHTML = '<span class="text-muted" style="font-size:13px;">No processed books</span>';
+            return;
+        }
+        container.innerHTML = ready.map(b =>
+            `<span class="book-chip" data-id="${b.id}" onclick="toggleCreatorBook(this, ${b.id})">${b.title}</span>`
+        ).join('');
+    } catch (e) { console.error(e); }
+}
+
+function toggleCreatorBook(el, id) {
+    el.classList.toggle('selected');
+    if (creatorSelectedBooks.includes(id)) {
+        creatorSelectedBooks = creatorSelectedBooks.filter(x => x !== id);
+    } else {
+        creatorSelectedBooks.push(id);
+    }
+}
+
+async function createRecipe() {
+    const ingredients = document.getElementById('ingredients').value.trim();
+    if (!ingredients) { showError('Primary ingredients are required'); return; }
+
+    const cuisine = document.getElementById('cuisineCustom').value.trim() || document.getElementById('cuisineStyle').value;
+    const method = document.getElementById('cookingMethod').value;
+    const dietary = document.getElementById('dietaryNotes').value.trim();
+
+    document.getElementById('createBtn').disabled = true;
+    document.getElementById('createProgress').style.display = 'block';
+
+    try {
+        const res = await fetch('/cookbook/api/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                primary_ingredients: ingredients,
+                cuisine_style: cuisine || 'Any',
+                cooking_method: method || 'Any',
+                book_ids: creatorSelectedBooks.length ? creatorSelectedBooks : null,
+                dietary_notes: dietary,
+            }),
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            showRecipeResult(data);
+            showSuccess('Recipe created and saved!');
+        } else {
+            showError(data.detail || 'Failed to create recipe');
+        }
+    } catch (e) {
+        showError('Network error: ' + e.message);
+    }
+
+    document.getElementById('createBtn').disabled = false;
+    document.getElementById('createProgress').style.display = 'none';
+}
+
+function showRecipeResult(data) {
+    const panel = document.getElementById('resultPanel');
+    const result = document.getElementById('recipeResult');
+    panel.classList.add('active');
+
+    const sections = [
+        { label: 'Description', content: data.description },
+        { label: 'Ingredients', content: data.ingredients },
+        { label: 'Instructions', content: data.instructions },
+        { label: 'Technique Notes', content: data.technique_notes },
+        { label: 'Wine / Beverage Pairing', content: data.wine_pairing },
+    ].filter(s => s.content);
+
+    result.innerHTML = `
+        <h3>${data.title}</h3>
+        ${data.books_referenced?.length ? `<div style="font-size:13px;color:var(--text-muted);margin-bottom:15px;">References: ${data.books_referenced.join(', ')}</div>` : ''}
+        ${sections.map(s => `<div class="recipe-section"><h4>${s.label}</h4><div class="section-content">${formatText(s.content)}</div></div>`).join('')}
+    `;
+
+    if (data.recipe_id) {
+        const link = document.getElementById('viewRecipeLink');
+        link.href = `/portal/cookbook/library/${data.recipe_id}`;
+        link.style.display = 'inline-flex';
+    }
+}
+
+function formatText(text) {
+    if (!text) return '';
+    return text.replace(/\n/g, '<br>');
+}
+
+loadBooks();
+</script>
+{% endblock %}

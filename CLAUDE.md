@@ -3,9 +3,9 @@
 ## Project Overview
 Microservices-based restaurant management platform for SW Hospitality Group.
 - **Production URL:** https://rm.swhgrp.com
-- **Architecture:** 10 FastAPI microservices behind Nginx reverse proxy, each with its own PostgreSQL database
+- **Architecture:** 11 FastAPI microservices behind Nginx reverse proxy, each with its own PostgreSQL database
 - **Portal:** Central auth + UI at `/portal/`, serves templates from each service's template directory
-- **Last Updated:** March 8, 2026
+- **Last Updated:** March 9, 2026
 
 ## Infrastructure & Development Environment
 - **Production Server:** Linode Ubuntu instance at `/opt/restaurant-system/`
@@ -27,6 +27,7 @@ restaurant-system/
 ├── maintenance/     # Equipment tracking, work orders, PM scheduling
 ├── food-safety/     # Food safety compliance
 ├── files/           # File management service
+├── cookbook/         # AI-powered cookbook reference and recipe creation (RAG)
 ├── websites/        # Website management
 ├── docs/            # Documentation and archived development history
 ```
@@ -35,7 +36,8 @@ restaurant-system/
 - **Backend:** FastAPI (Python 3.11), async SQLAlchemy with asyncpg (maintenance, food-safety), sync SQLAlchemy (most others)
 - **Database:** PostgreSQL 15, one DB per service, Alembic migrations
 - **Frontend:** Jinja2 templates, Bootstrap Icons, vanilla JS (no frameworks)
-- **Infrastructure:** Docker Compose (root compose for most services, separate compose for maintenance and food-safety), Nginx reverse proxy
+- **AI/ML:** Anthropic Claude API (cookbook), sentence-transformers embeddings, ChromaDB vector store
+- **Infrastructure:** Docker Compose (root compose for all services), Nginx reverse proxy
 - **Auth:** JWT tokens in HTTP-only cookies, portal-based SSO
 
 ## Key Patterns
@@ -69,12 +71,9 @@ restaurant-system/
 - Table action buttons use `.actions-wrap` div with `inline-flex` for alignment
 
 ### Docker
-- **Root `docker-compose.yml`** manages 20 containers: Portal, Inventory, HR, Accounting, Events, Hub, Files, Websites, CalDAV, OnlyOffice, Nginx, Certbot, and their databases/Redis
-- **Separate compose files**: `maintenance/docker-compose.yml` (2 containers) and `food-safety/docker-compose.yml` (2 containers)
+- **Root `docker-compose.yml`** manages all 26 containers: Portal, Inventory, HR, Accounting, Events, Hub, Files, Websites, Maintenance, Food Safety, Cookbook, CalDAV, OnlyOffice, Nginx, Certbot, and their databases/Redis
 - Source mounts: only maintenance uses `:ro`; most services have read-write mounts
-- Rebuild root services: `docker compose up -d --build {service}` (from repo root)
-- Rebuild maintenance: `cd maintenance && docker compose up -d --build`
-- Rebuild food-safety: `cd food-safety && docker compose up -d --build`
+- Rebuild any service: `docker compose up -d --build {service}` (from repo root)
 
 ### Authentication Flow (SSO)
 1. User → rm.swhgrp.com → Nginx routes to `/portal/`
@@ -87,20 +86,18 @@ restaurant-system/
 
 ## Common Commands
 ```bash
-# Rebuild a root service (inventory, accounting, hr, events, hub, portal, files, websites)
+# Rebuild any service
 docker compose up -d --build inventory-app
-
-# Rebuild maintenance or food-safety (separate compose files)
-cd maintenance && docker compose up -d --build
-cd food-safety && docker compose up -d --build
+docker compose up -d --build maintenance-service
+docker compose up -d --build food-safety-service
 
 # Check service logs
 docker compose logs --tail=50 inventory-app
-cd maintenance && docker compose logs --tail=50 maintenance-service
+docker compose logs --tail=50 maintenance-service
 
 # Run Alembic migration
 docker compose exec inventory-app alembic upgrade head
-cd maintenance && docker compose exec maintenance-service alembic upgrade head
+docker compose exec maintenance-service alembic upgrade head
 
 # Test an API endpoint
 curl -s http://localhost:{port}/endpoint | python3 -m json.tool
@@ -121,6 +118,7 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 | Integration Hub | 8000 | 8005 |
 | Maintenance | 8000 | 8006 |
 | Food Safety | 8000 | 8007 |
+| Cookbook AI | 8000 | 8008 |
 | Files | 8000 | via nginx |
 | Websites | 8000 | via nginx |
 
@@ -152,6 +150,22 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 - Pattern: `_try_bearer_auth()` decodes Portal JWT with `PORTAL_SECRET_KEY`, looks up user by username
 - **iOS status**: Auth complete, Inventory module complete (counts, items, waste, transfers, orders), other modules stubbed
 - **Bundle ID**: `com.swhgrp.manager`
+
+### Cookbook AI System (Mar 2026)
+- **RAG-based cookbook reference**: Upload PDF cookbooks → extract text → chunk → embed → query with Claude AI
+- **Port 8008**, managed in root `docker-compose.yml` (cookbook-app + cookbook-db containers)
+- **Stack**: FastAPI, PostgreSQL (metadata), ChromaDB (vector store), sentence-transformers (local embeddings), Anthropic Claude API
+- **PDF processing pipeline**: pdfplumber text extraction → OCR fallback (pytesseract) → word-level chunking (500 words, 50 overlap) → sentence-transformers embedding → ChromaDB storage
+- **Embedding model**: `sentence-transformers/all-MiniLM-L6-v2` — runs locally on CPU, ~6GB RAM for large books
+- **Portal UI**: Templates at `portal/templates/cookbook/` — dashboard, lookup, creator, library, books management
+- **Pages**: Dashboard (`/portal/cookbook/`), Recipe Lookup, Recipe Creator, Recipe Library, Book Management
+- **SSO**: `GET /cookbook/api/auth/sso-login?token=...` validates Portal JWT, sets `portal_session` cookie, redirects to portal cookbook page
+- **Auth**: Cookie-based (reads `portal_session`), Bearer token, JIT user provisioning from Portal JWT
+- **Access control**: `can_access_cookbook` column on portal users table (default false), manageable from User Management page
+- **API endpoints**: `/api/books/upload` (POST), `/api/books` (GET), `/api/query` (POST, recipe lookup), `/api/create` (POST, recipe creator), `/api/recipes` (GET/POST), `/api/queries` (GET)
+- **Data persistence**: 3 Docker volumes — `cookbook_data` (DB), `cookbook_uploads` (PDFs), `cookbook_chroma` (vectors)
+- **Upload limit**: 200MB (nginx 250m, client-side + server-side validation)
+- **Background processing**: PDF upload triggers threaded processing; UI polls `/api/books/{id}/status` every 3s
 
 ### Catering Contract PDF (Mar 2026)
 - **Template**: `events/src/events/templates/pdf/catering_contract_template.html` — standalone WeasyPrint template
@@ -270,13 +284,13 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 - **Hub invoice line items**: Add (`POST /api/invoices/{id}/items`), delete, recalculate totals/status endpoints
 
 ### Maintenance System (Jan 2026)
-- **Separate docker-compose** at `maintenance/docker-compose.yml` (port 8006)
+- **Port 8006**, managed in root `docker-compose.yml`
 - **Async SQLAlchemy** with `asyncpg`, pool_pre_ping, pool_recycle
 - **Features**: Equipment CRUD with QR codes, work orders, PM schedules, vendor management, dashboard with alerts
 - **Portal UI**: Dashboard, equipment list, work orders, schedules at `/portal/maintenance/`
 
 ### Food Safety System (Jan 2026)
-- **Separate docker-compose** at `food-safety/docker-compose.yml` (port 8007)
+- **Port 8007**, managed in root `docker-compose.yml`
 - **Async SQLAlchemy** with `asyncpg`
 - **Features**: Temperature logging, daily checklists, incidents, health inspections, HACCP plans, reports with CSV/PDF export
 - **Portal UI**: All pages at `/portal/food-safety/`
@@ -315,5 +329,5 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 - Customer invoice PDFs can include area/location logos for branding
 - **Git permissions**: `.git/` is owned by root; use `docker run --rm -v /opt/restaurant-system:/repo -w /repo alpine/git <command>` for git operations
 - **Development history**: Archived session log at `docs/development-history.md`
-- **Databases**: 7 PostgreSQL DBs — inventory_db, accounting_db, hr_db (shared by Portal), events_db, hub_db, maintenance_db, food_safety_db
+- **Databases**: 8 PostgreSQL DBs — inventory_db, accounting_db, hr_db (shared by Portal), events_db, hub_db, maintenance_db, food_safety_db, cookbook_db
 - **Backups**: Automated daily at 2:00 AM, 7-day retention in `/opt/restaurant-system/backups/`

@@ -1,0 +1,91 @@
+{% extends "cookbook/base.html" %}
+{% block title %}Dashboard - Cookbook AI{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+
+{% block extra_styles %}
+.stat-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+.stat-card { background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 8px; padding: 20px; text-align: center; }
+.stat-card .stat-value { font-size: 32px; font-weight: 700; color: var(--accent-primary); }
+.stat-card .stat-label { font-size: 13px; color: var(--text-muted); margin-top: 5px; }
+.quick-actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+.quick-action { background: var(--bg-secondary); border: 1px solid var(--border-primary); border-radius: 8px; padding: 25px; display: flex; align-items: center; gap: 15px; cursor: pointer; transition: all 0.2s; text-decoration: none; color: var(--text-primary); }
+.quick-action:hover { border-color: var(--accent-primary); box-shadow: var(--shadow-md); transform: translateY(-2px); }
+.quick-action i { font-size: 28px; color: var(--accent-primary); flex-shrink: 0; }
+.quick-action .qa-text h3 { font-size: 16px; margin-bottom: 4px; }
+.quick-action .qa-text p { font-size: 13px; color: var(--text-muted); margin: 0; }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Cookbook AI Dashboard</h2>
+</div>
+
+<div class="stat-cards" id="statsContainer">
+    <div class="stat-card"><div class="stat-value" id="bookCount">-</div><div class="stat-label">Books Uploaded</div></div>
+    <div class="stat-card"><div class="stat-value" id="recipeCount">-</div><div class="stat-label">Saved Recipes</div></div>
+    <div class="stat-card"><div class="stat-value" id="chunkCount">-</div><div class="stat-label">Knowledge Chunks</div></div>
+    <div class="stat-card"><div class="stat-value" id="queryCount">-</div><div class="stat-label">Queries Made</div></div>
+</div>
+
+<h3 style="margin-bottom: 15px; font-size: 16px; color: var(--text-secondary);">Quick Actions</h3>
+<div class="quick-actions">
+    <a href="/portal/cookbook/lookup" class="quick-action">
+        <i class="bi bi-chat-dots"></i>
+        <div class="qa-text">
+            <h3>Recipe Lookup</h3>
+            <p>Ask questions about your cookbooks</p>
+        </div>
+    </a>
+    <a href="/portal/cookbook/creator" class="quick-action">
+        <i class="bi bi-magic"></i>
+        <div class="qa-text">
+            <h3>Create Recipe</h3>
+            <p>Generate new recipes from cookbook knowledge</p>
+        </div>
+    </a>
+    <a href="/portal/cookbook/library" class="quick-action">
+        <i class="bi bi-collection"></i>
+        <div class="qa-text">
+            <h3>Recipe Library</h3>
+            <p>Browse all saved and generated recipes</p>
+        </div>
+    </a>
+    <a href="/portal/cookbook/books" class="quick-action">
+        <i class="bi bi-journal-plus"></i>
+        <div class="qa-text">
+            <h3>Manage Books</h3>
+            <p>Upload and manage your cookbook PDFs</p>
+        </div>
+    </a>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+async function loadStats() {
+    try {
+        const [healthRes, recipesRes, queriesRes] = await Promise.all([
+            fetch('/cookbook/health'),
+            fetch('/cookbook/api/recipes'),
+            fetch('/cookbook/api/queries'),
+        ]);
+        if (healthRes.ok) {
+            const h = await healthRes.json();
+            document.getElementById('bookCount').textContent = h.book_count || 0;
+            document.getElementById('chunkCount').textContent = h.chroma_documents || 0;
+        }
+        if (recipesRes.ok) {
+            const r = await recipesRes.json();
+            document.getElementById('recipeCount').textContent = r.length || 0;
+        }
+        if (queriesRes.ok) {
+            const q = await queriesRes.json();
+            document.getElementById('queryCount').textContent = q.length || 0;
+        }
+    } catch (e) {
+        console.error('Error loading stats:', e);
+    }
+}
+loadStats();
+</script>
+{% endblock %}

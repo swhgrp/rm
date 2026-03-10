@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** March 8, 2026
-**Status:** ~98% Complete - All 10 Systems Production Ready ✅
-**Latest:** Self-hosted e-signatures, mobile app (iOS + Android KMP planned), infrastructure docs (Mar 8, 2026) ✅
+**Last Updated:** March 9, 2026
+**Status:** ~98% Complete - All 11 Systems Production Ready ✅
+**Latest:** Cookbook AI system (RAG-based recipe reference + creator), self-hosted e-signatures, mobile app (Mar 9, 2026) ✅
 
 ---
 
@@ -39,7 +39,7 @@ The SW Hospitality Group Restaurant Management System is a comprehensive microse
 - **Mobile App Repo:** `/opt/SWHospitality/` on Linode server (separate repo, built on Mac)
 
 ### Key Statistics (Verified Mar 8, 2026)
-- **10 microservices** running in production (including Maintenance & Food Safety)
+- **11 microservices** running in production (including Maintenance, Food Safety & Cookbook AI)
 - **490+ Python files** across all systems
 - **170+ HTML templates** for user interfaces
 - **160+ database models** with full relationships
@@ -272,6 +272,7 @@ restaurant-system/
 ├────────────────────────────────────┤
 │ Redis 7       - Caching            │
 │ Websites :8000 - CMS               │
+│ Cookbook :8000  - AI/RAG (ChromaDB) │
 └────────────────────────────────────┘
 ```
 
@@ -1052,6 +1053,60 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 
 ---
 
+### 11. Cookbook AI System ✅ **Production Ready (NEW - Mar 2026)** 🌟
+**RAG-based cookbook reference and AI recipe creation tool powered by Claude**
+
+- **URL:** https://rm.swhgrp.com/portal/cookbook/
+- **API:** https://rm.swhgrp.com/cookbook/
+- **Database:** cookbook_db (PostgreSQL 15) + ChromaDB (vector store)
+- **Technology:** FastAPI, SQLAlchemy, ChromaDB, sentence-transformers, Anthropic Claude API
+- **Status:** Production ready with full feature set ✅
+
+**PDF Cookbook Management:**
+- ✅ Upload PDF cookbooks (up to 200MB)
+- ✅ Automatic text extraction via pdfplumber with OCR fallback (pytesseract)
+- ✅ Word-level chunking with configurable size/overlap
+- ✅ Local embedding generation (sentence-transformers/all-MiniLM-L6-v2)
+- ✅ Vector storage in ChromaDB for semantic search
+- ✅ Background processing with real-time status polling
+- ✅ Book deletion with cascade (DB chunks + ChromaDB vectors + PDF file)
+
+**Recipe Lookup (RAG):**
+- ✅ Natural language questions about uploaded cookbooks
+- ✅ Semantic search across all books or filtered by specific books
+- ✅ Claude AI generates answers with cookbook references and page numbers
+- ✅ Query history tracking
+
+**Recipe Creator:**
+- ✅ AI-generated recipes based on ingredients, cuisine, cooking method
+- ✅ Optional cookbook knowledge base reference for authentic techniques
+- ✅ Dietary notes/restrictions support
+- ✅ Auto-saved to recipe library with full metadata
+
+**Recipe Library:**
+- ✅ Browse all saved and generated recipes
+- ✅ Filter by cuisine, cooking method, book reference
+- ✅ Individual recipe detail pages
+
+**Access Control:**
+- ✅ `can_access_cookbook` permission on portal users table
+- ✅ Manageable from User Management page
+- ✅ Portal SSO authentication with JIT user provisioning
+
+**API Endpoints:**
+- `/cookbook/health` - Health check with book/chunk counts
+- `/cookbook/api/books/upload` - Upload PDF cookbook
+- `/cookbook/api/books` - List books
+- `/cookbook/api/query` - Recipe lookup (RAG query)
+- `/cookbook/api/create` - Recipe creator
+- `/cookbook/api/recipes` - Recipe library CRUD
+
+**Access:**
+- Portal UI: https://rm.swhgrp.com/portal/cookbook/
+- API Docs: https://rm.swhgrp.com/cookbook/docs
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -1527,7 +1582,7 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 ## 🎉 Acknowledgments
 
 **Built with:**
-- **FastAPI** - Modern async framework for ALL 10 systems (Portal, HR, Inventory, Accounting, Integration Hub, Events, Files, Websites, Maintenance, Food Safety)
+- **FastAPI** - Modern async framework for ALL 11 systems (Portal, HR, Inventory, Accounting, Integration Hub, Events, Files, Websites, Maintenance, Food Safety, Cookbook AI)
 - PostgreSQL 15 - Reliable database system
 - **SQLAlchemy** - ORM for all systems
 - Redis 7 - Caching and task queues
@@ -1560,10 +1615,11 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 | Websites | ✅ Production | 7 | 18 | 11+ | **~90%** | Block-based page builder, menu management |
 | Maintenance | ✅ Production | 16 | 5 | 10 | **100%** 🌟 | Equipment, work orders, PM schedules |
 | Food Safety | ✅ Production | 29 | 5 | 18 | **100%** 🌟 | Incidents, document uploads, user permissions |
+| Cookbook AI | ✅ Production | 12 | 7 | 5 | **100%** 🌟 | RAG cookbook search, AI recipe creation, PDF upload |
 
-**Total:** 495+ Python files, 175+ templates, 160+ database models (verified Mar 5, 2026)
+**Total:** 510+ Python files, 180+ templates, 165+ database models (verified Mar 9, 2026)
 
-**Overall Status:** ~98% Complete - All 10 Systems Production Ready ✅
+**Overall Status:** ~98% Complete - All 11 Systems Production Ready ✅
 
 **Active Issues (Mar 5, 2026):**
 - ⚠️ **Portal:** `/debug` endpoint has no authentication
@@ -1575,11 +1631,12 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 - ✅ ~~Accounting System: Wrong framework documented~~ - RESOLVED (Nov 11, 2025)
 - ✅ ~~Integration Hub: Major feature misrepresentation~~ - RESOLVED (Oct 31, 2025)
 - ✅ **Websites CMS added** - Full restaurant website management (Dec 8, 2025)
+- ✅ **Cookbook AI added** - RAG-based cookbook reference, AI recipe creation, PDF upload & processing (Mar 9, 2026)
 
 ---
 
-**Version:** 4.2
-**Last Updated:** March 8, 2026
+**Version:** 4.3
+**Last Updated:** March 9, 2026
 **Maintained By:** SW Hospitality Group Development Team
 
 **For developer reference, see [CLAUDE.md](./CLAUDE.md)**
