@@ -142,6 +142,7 @@ def get_share_status(db: Session, resource_type: str, resource_id: int) -> dict:
 @router.get("/folders")
 async def list_folders(
     parent_id: Optional[int] = None,
+    owner_only: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -152,6 +153,9 @@ async def list_folders(
         query = query.filter(Folder.parent_id == parent_id)
     else:
         query = query.filter(Folder.parent_id.is_(None))
+
+    if owner_only:
+        query = query.filter(Folder.owner_id == current_user.id)
 
     # Exclude root folder (path="/") from listings - it's an internal construct
     query = query.filter(Folder.path != "/")
@@ -1173,11 +1177,12 @@ async def copy_file(
 
 @router.get("/search")
 async def search_files(
-    query: str = Query(..., min_length=1),
+    query: str = Query(""),
     file_type: Optional[str] = Query(None),
     date_range: Optional[str] = Query(None),
     size_range: Optional[str] = Query(None),
     owner_filter: Optional[str] = Query(None),
+    folder_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -1185,29 +1190,53 @@ async def search_files(
     from datetime import datetime, timedelta
     from sqlalchemy import or_, and_
 
-    # Build base query for folders
-    folders_query = db.query(Folder).filter(
-        or_(
-            Folder.owner_id == current_user.id,
-            Folder.id.in_(
-                db.query(folder_permissions.c.folder_id).filter(
-                    folder_permissions.c.user_id == current_user.id
-                )
-            )
-        )
-    )
+    if folder_id:
+        # Scoped search within a specific folder — verify access first
+        folder = db.query(Folder).filter(Folder.id == folder_id).first()
+        if not folder or not has_folder_permission(db, current_user, folder, "read"):
+            return {"query": query, "folders": [], "files": [], "total": 0}
 
-    # Build base query for files
-    files_query = db.query(FileMetadata).join(Folder).filter(
-        or_(
-            FileMetadata.owner_id == current_user.id,
-            Folder.id.in_(
-                db.query(folder_permissions.c.folder_id).filter(
-                    folder_permissions.c.user_id == current_user.id
-                )
+        # Get all descendant folder IDs for recursive search
+        descendant_ids = [folder_id]
+        to_check = [folder_id]
+        while to_check:
+            children = db.query(Folder.id).filter(Folder.parent_id.in_(to_check)).all()
+            child_ids = [c.id for c in children]
+            descendant_ids.extend(child_ids)
+            to_check = child_ids
+
+        folders_query = db.query(Folder).filter(Folder.parent_id.in_(descendant_ids))
+        files_query = db.query(FileMetadata).filter(FileMetadata.folder_id.in_(descendant_ids))
+    else:
+        # Global search — use permission-based filtering
+        # Get all folder IDs the user can access (owned, shared, or permitted)
+        shared_folder_ids = db.query(InternalShare.folder_id).filter(
+            InternalShare.shared_with_user_id == current_user.id,
+            InternalShare.is_active == True,
+            InternalShare.folder_id.isnot(None)
+        ).all()
+        shared_ids = [s.folder_id for s in shared_folder_ids]
+
+        permitted_folder_ids = db.query(folder_permissions.c.folder_id).filter(
+            folder_permissions.c.user_id == current_user.id
+        ).all()
+        permitted_ids = [p.folder_id for p in permitted_folder_ids]
+
+        accessible_ids = list(set(shared_ids + permitted_ids))
+
+        folders_query = db.query(Folder).filter(
+            or_(
+                Folder.owner_id == current_user.id,
+                Folder.id.in_(accessible_ids)
             )
         )
-    )
+
+        files_query = db.query(FileMetadata).join(Folder).filter(
+            or_(
+                FileMetadata.owner_id == current_user.id,
+                Folder.id.in_(accessible_ids)
+            )
+        )
 
     # Apply search query
     if query:

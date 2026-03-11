@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Price Quote - {{ event.title }}</title>
+    <style>
+        @page {
+            size: letter;
+            margin: 1in 1in 0.75in 1in;
+            @bottom-center {
+                content: counter(page);
+                font-family: 'Times New Roman', 'Georgia', serif;
+                font-size: 10pt;
+                color: #333;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Times New Roman', 'Georgia', serif;
+            font-size: 11pt;
+            line-height: 1.5;
+            color: #222;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .header .venue-name {
+            font-size: 16pt;
+            font-weight: bold;
+        }
+
+        .header .venue-address {
+            font-size: 11pt;
+            color: #444;
+        }
+
+        .quote-date {
+            margin-bottom: 16px;
+        }
+
+        .quote-title {
+            text-align: center;
+            font-size: 14pt;
+            font-weight: bold;
+            text-decoration: underline;
+            margin-bottom: 16px;
+        }
+
+        .quote-notice {
+            border: 2px solid #555;
+            padding: 10px 14px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 10pt;
+            color: #444;
+            background-color: #f9f9f9;
+        }
+
+        .info-table {
+            width: 100%;
+            margin-bottom: 20px;
+            border-collapse: collapse;
+        }
+
+        .info-table td {
+            padding: 4px 8px;
+            vertical-align: top;
+        }
+
+        .info-table .label {
+            font-weight: bold;
+            width: 140px;
+            color: #333;
+        }
+
+        .menu-section {
+            margin-bottom: 14px;
+        }
+
+        .menu-section-title {
+            font-weight: bold;
+            font-size: 11pt;
+            margin-bottom: 4px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 2px;
+        }
+
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8px;
+        }
+
+        .items-table th {
+            text-align: left;
+            font-weight: bold;
+            font-size: 10pt;
+            padding: 4px 8px;
+            border-bottom: 1px solid #999;
+            color: #333;
+        }
+
+        .items-table th.right {
+            text-align: right;
+        }
+
+        .items-table td {
+            padding: 3px 8px;
+            font-size: 10.5pt;
+            border-bottom: 1px solid #eee;
+        }
+
+        .items-table td.right {
+            text-align: right;
+        }
+
+        .beverage-section {
+            margin-top: 14px;
+            margin-bottom: 14px;
+        }
+
+        .beverage-section-title {
+            font-weight: bold;
+            font-size: 11pt;
+            margin-bottom: 4px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 2px;
+        }
+
+        .financial-summary {
+            margin-top: 20px;
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+
+        .financial-table {
+            width: 340px;
+            margin-left: auto;
+            border-collapse: collapse;
+        }
+
+        .financial-table td {
+            padding: 4px 10px;
+        }
+
+        .financial-table td.right {
+            text-align: right;
+        }
+
+        .financial-table .total-row td {
+            font-weight: bold;
+            font-size: 12pt;
+            border-top: 2px solid #333;
+            padding-top: 6px;
+        }
+
+        .terms-section {
+            margin-top: 24px;
+            page-break-inside: avoid;
+        }
+
+        .terms-title {
+            font-weight: bold;
+            font-size: 11pt;
+            margin-bottom: 6px;
+        }
+
+        .terms-list {
+            margin-left: 20px;
+            font-size: 10pt;
+            color: #444;
+        }
+
+        .terms-list li {
+            margin-bottom: 4px;
+        }
+
+        .footer-notice {
+            margin-top: 30px;
+            padding-top: 12px;
+            border-top: 1px solid #ccc;
+            font-size: 9.5pt;
+            color: #666;
+            text-align: center;
+        }
+
+        .contact-section {
+            margin-top: 20px;
+            page-break-inside: avoid;
+        }
+
+        .contact-title {
+            font-weight: bold;
+            font-size: 11pt;
+            margin-bottom: 4px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        {% if venue_logo %}
+        <img src="{{ venue_logo }}" style="max-height: 80px; max-width: 200px; margin-bottom: 8px;">
+        {% endif %}
+        {% if venue %}
+        <div class="venue-name">{{ venue.name }}</div>
+        {% if venue.address %}
+        <div class="venue-address">{{ venue.address }}</div>
+        {% endif %}
+        {% else %}
+        <div class="venue-name">SW Hospitality Group</div>
+        {% endif %}
+    </div>
+
+    <div class="quote-title">Price Quote</div>
+
+    <div class="quote-notice">
+        This document is a price quote only and does not constitute a contract or binding agreement.
+        Prices are estimates based on current availability and are subject to change.
+        A formal catering contract must be signed by both parties before services are confirmed.
+    </div>
+
+    <!-- Event & Client Info -->
+    <table class="info-table">
+        <tr>
+            <td class="label">Quote Date:</td>
+            <td>{{ quote_date }}</td>
+            <td class="label">Valid Through:</td>
+            <td>{{ valid_through }}</td>
+        </tr>
+        <tr>
+            <td class="label">Prepared For:</td>
+            <td>{{ client.name if client else 'TBD' }}{% if client and client.org %} ({{ client.org }}){% endif %}</td>
+            <td class="label">Event Date:</td>
+            <td>{{ event_date }}</td>
+        </tr>
+        <tr>
+            <td class="label">Event:</td>
+            <td>{{ event.title }}</td>
+            <td class="label">Event Time:</td>
+            <td>{{ event_times or 'TBD' }}</td>
+        </tr>
+        <tr>
+            <td class="label">Venue:</td>
+            <td>{{ venue.name if venue else 'TBD' }}</td>
+            {% if event.guest_count %}
+            <td class="label">Est. Guests:</td>
+            <td>{{ event.guest_count }}</td>
+            {% else %}
+            <td></td><td></td>
+            {% endif %}
+        </tr>
+    </table>
+
+    <!-- Menu & Pricing -->
+    {% if event.menu_json and event.menu_json.sections %}
+        {% for section in event.menu_json.sections %}
+        {% if section['items'] %}
+        <div class="menu-section">
+            <div class="menu-section-title">{{ section.name or section.type|default('Items')|capitalize }}{% if event.menu_json.service_style %} — {{ event.menu_json.service_style|replace('_', ' ')|title }}{% endif %}</div>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th class="right">Qty</th>
+                        <th class="right">Price</th>
+                        <th class="right">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in section['items'] %}
+                    {% set item_price = item.price if item.price else 0 %}
+                    {% set item_qty = item.quantity if item.quantity else 1 %}
+                    <tr>
+                        <td>{{ item.name }}{% if item.description %} <span style="font-size: 9pt; color: #666;">— {{ item.description }}</span>{% endif %}</td>
+                        <td class="right">{{ item_qty }}</td>
+                        <td class="right">${{ "%.2f"|format(item_price|float) }}</td>
+                        <td class="right">${{ "%.2f"|format(item_price|float * item_qty|float) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+        {% endfor %}
+    {% else %}
+        <div class="menu-section">
+            <div class="menu-section-title">Menu</div>
+            <p style="color: #666; font-style: italic;">Menu details to be confirmed.</p>
+        </div>
+    {% endif %}
+
+    <!-- Beverage Section -->
+    {% set has_bar = event.menu_json and event.menu_json.bar_type and event.menu_json.bar_type not in ['', 'none', 'no_bar', 'non_alcoholic'] %}
+    {% if has_bar or (event.menu_json and event.menu_json.beverage_details) %}
+    <div class="beverage-section">
+        <div class="beverage-section-title">Beverage Service</div>
+        {% if has_bar %}
+        <p>{{ event.menu_json.bar_type|replace('_', ' ')|title }} Bar{% if event.menu_json.bar_hours %} ({{ event.menu_json.bar_hours }}){% endif %}</p>
+        {% endif %}
+        {% if event.menu_json.beverage_details %}
+        <p>{{ event.menu_json.beverage_details }}</p>
+        {% endif %}
+        <p style="font-size: 10pt; color: #555; margin-top: 4px;">
+            Beverage charges will be based on consumption and billed separately at the conclusion of the event.
+        </p>
+    </div>
+    {% endif %}
+
+    <!-- Financial Summary -->
+    {% if has_financials %}
+    <div class="financial-summary">
+        <table class="financial-table">
+            <tr>
+                <td>Food &amp; Beverage Subtotal:</td>
+                <td class="right">${{ "%.2f"|format(food_subtotal) }}</td>
+            </tr>
+            {% if service_charge > 0 %}
+            <tr>
+                <td>Service Fee ({{ "%.1f"|format(service_rate_pct)|replace('.0', '') }}%):</td>
+                <td class="right">${{ "%.2f"|format(service_charge) }}</td>
+            </tr>
+            {% endif %}
+            {% if tax > 0 %}
+            <tr>
+                <td>Sales Tax ({{ "%.1f"|format(tax_rate_pct)|replace('.0', '') }}%):</td>
+                <td class="right">${{ "%.2f"|format(tax) }}</td>
+            </tr>
+            {% endif %}
+            <tr class="total-row">
+                <td>Estimated Total:</td>
+                <td class="right">${{ "%.2f"|format(total) }}</td>
+            </tr>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- Terms & Conditions -->
+    <div class="terms-section">
+        <div class="terms-title">Terms &amp; Conditions</div>
+        <ol class="terms-list">
+            <li>This price quote is valid for 30 days from the date above and is subject to availability.</li>
+            <li>Prices are estimates and may be adjusted based on final guest count, menu changes, or market pricing for seasonal items.</li>
+            <li>A {{ "%.1f"|format(service_rate_pct)|replace('.0', '') }}% service fee and {{ "%.1f"|format(tax_rate_pct)|replace('.0', '') }}% sales tax will be applied to all food and beverage charges.</li>
+            <li>A signed catering contract and a non-refundable deposit of 50% of the estimated total are required to confirm the event.</li>
+            <li>Final guaranteed guest count must be provided no later than seven (7) days prior to the event date.</li>
+            <li>Additional services or menu changes requested after contract signing may result in price adjustments.</li>
+            <li>Beverage charges, if applicable, will be based on actual consumption and billed at the conclusion of the event.</li>
+        </ol>
+    </div>
+
+    <!-- Contact -->
+    <div class="contact-section">
+        <div class="contact-title">Questions?</div>
+        <p>
+            To proceed with booking or to discuss any changes to this quote, please contact us at
+            {% if venue %}{{ venue.name }}{% else %}SW Hospitality Group{% endif %}{% if venue and venue.phone %}, {{ venue.phone }}{% endif %}{% if venue and venue.email %}, {{ venue.email }}{% endif %}.
+        </p>
+    </div>
+
+    <!-- Footer Disclaimer -->
+    <div class="footer-notice">
+        This price quote is provided for informational purposes only and does not represent a commitment or obligation by either party.
+        All prices are subject to change until a formal catering contract has been executed.
+        &copy; {{ now.year }} {{ venue.name if venue else 'SW Hospitality Group' }}
+    </div>
+</body>
+</html>

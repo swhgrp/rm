@@ -24,8 +24,10 @@ def _extract_text_pdfplumber(file_path: str) -> List[Tuple[int, str]]:
     with pdfplumber.open(file_path) as pdf:
         for i, page in enumerate(pdf.pages, start=1):
             text = page.extract_text()
-            if text and text.strip():
-                pages.append((i, text.strip()))
+            if text:
+                text = text.replace("\x00", "").strip()
+            if text:
+                pages.append((i, text))
     return pages
 
 
@@ -42,8 +44,10 @@ def _extract_text_ocr(file_path: str) -> List[Tuple[int, str]]:
     images = convert_from_path(file_path, dpi=300)
     for i, img in enumerate(images, start=1):
         text = pytesseract.image_to_string(img)
-        if text and text.strip():
-            pages.append((i, text.strip()))
+        if text:
+            text = text.replace("\x00", "").strip()
+        if text:
+            pages.append((i, text))
     return pages
 
 
@@ -62,6 +66,7 @@ def _chunk_text(
             chunk_words = words[start:end]
             content = " ".join(chunk_words)
 
+            content = content.replace("\x00", "")
             if len(content.strip()) > 20:  # Skip tiny fragments
                 chunks.append(
                     {

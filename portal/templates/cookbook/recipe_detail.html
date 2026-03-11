@@ -5,12 +5,17 @@
 {% block extra_styles %}
 .recipe-detail { max-width: 800px; }
 .recipe-detail h1 { font-size: 24px; color: var(--accent-primary); margin-bottom: 5px; }
-.recipe-meta { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; display: flex; gap: 15px; flex-wrap: wrap; }
-.recipe-meta .meta-item { display: flex; align-items: center; gap: 4px; }
+.recipe-meta-bar { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; font-size: 13px; color: var(--text-muted); }
+.recipe-meta-bar .meta-item { display: flex; align-items: center; gap: 4px; }
+.recipe-meta-bar .meta-item i { font-size: 14px; }
 .recipe-section { margin-bottom: 25px; }
-.recipe-section h2 { font-size: 15px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid var(--border-primary); }
+.recipe-section h2 { font-size: 14px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; padding-bottom: 5px; border-bottom: 1px solid var(--border-primary); }
 .recipe-section .section-body { white-space: pre-wrap; line-height: 1.7; font-size: 15px; }
 .recipe-actions { display: flex; gap: 10px; margin-bottom: 20px; }
+.ingredients-table { width: 100%; font-size: 14px; border-collapse: collapse; }
+.ingredients-table th { background: var(--accent-primary); color: white; padding: 8px 12px; text-align: left; font-weight: 600; font-size: 12px; }
+.ingredients-table td { padding: 6px 12px; border-bottom: 1px solid var(--border-primary); }
+.ingredients-table tr:hover { background: var(--bg-tertiary); }
 @media print {
     .sidebar, .mobile-menu-toggle, .top-navbar, footer, .recipe-actions, .mobile-overlay { display: none !important; }
     .main-wrapper { margin-left: 0 !important; }
@@ -42,20 +47,42 @@ async function loadRecipe() {
     }
 }
 
-function renderRecipe(r) {
-    const tags = [];
-    if (r.cuisine_style) tags.push(`<span class="meta-item"><i class="bi bi-globe"></i> ${r.cuisine_style}</span>`);
-    if (r.cooking_method) tags.push(`<span class="meta-item"><i class="bi bi-fire"></i> ${r.cooking_method}</span>`);
-    if (r.created_at) tags.push(`<span class="meta-item"><i class="bi bi-calendar"></i> ${new Date(r.created_at).toLocaleDateString()}</span>`);
-    if (r.books_referenced?.length) tags.push(`<span class="meta-item"><i class="bi bi-book"></i> ${r.books_referenced.join(', ')}</span>`);
+function capitalize(str) {
+    if (!str) return '';
+    return str.charAt(0).toUpperCase() + str.slice(1);
+}
 
-    const sections = [
-        { title: 'Description', content: r.description, icon: 'bi-info-circle' },
-        { title: 'Ingredients', content: r.ingredients, icon: 'bi-list-check' },
-        { title: 'Instructions', content: r.instructions, icon: 'bi-list-ol' },
-        { title: 'Technique Notes', content: r.technique_notes, icon: 'bi-lightbulb' },
-        { title: 'Wine / Beverage Pairing', content: r.wine_pairing, icon: 'bi-cup-straw' },
-    ].filter(s => s.content);
+function renderRecipe(r) {
+    // Meta bar
+    const meta = [];
+    if (r.category) meta.push(`<span class="meta-item"><i class="bi bi-tag"></i> ${capitalize(r.category)}</span>`);
+    if (r.cuisine_style) meta.push(`<span class="meta-item"><i class="bi bi-globe"></i> ${r.cuisine_style}</span>`);
+    if (r.cooking_method) meta.push(`<span class="meta-item"><i class="bi bi-fire"></i> ${r.cooking_method}</span>`);
+    if (r.yield_quantity && r.yield_unit) meta.push(`<span class="meta-item"><i class="bi bi-pie-chart"></i> ${r.yield_quantity} ${r.yield_unit}</span>`);
+    if (r.prep_time_minutes) meta.push(`<span class="meta-item"><i class="bi bi-clock"></i> Prep: ${r.prep_time_minutes} min</span>`);
+    if (r.cook_time_minutes) meta.push(`<span class="meta-item"><i class="bi bi-stopwatch"></i> Cook: ${r.cook_time_minutes} min</span>`);
+    if (r.created_at) meta.push(`<span class="meta-item"><i class="bi bi-calendar"></i> ${new Date(r.created_at).toLocaleDateString()}</span>`);
+
+    // Ingredients — structured table if available, fallback to text
+    let ingredientsHtml = '';
+    if (r.ingredients_json && r.ingredients_json.length) {
+        ingredientsHtml = `
+            <table class="ingredients-table">
+                <thead><tr><th>Qty</th><th>Unit</th><th>Ingredient</th><th>Preparation</th></tr></thead>
+                <tbody>
+                    ${r.ingredients_json.map(i => `
+                        <tr>
+                            <td>${i.quantity || ''}</td>
+                            <td>${i.unit || ''}</td>
+                            <td>${i.item || ''}</td>
+                            <td>${i.preparation || ''}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>`;
+    } else if (r.ingredients) {
+        ingredientsHtml = `<div class="section-body">${r.ingredients}</div>`;
+    }
 
     document.getElementById('recipeContainer').innerHTML = `
         <div class="recipe-actions">
@@ -64,13 +91,37 @@ function renderRecipe(r) {
             <button class="btn btn-danger" onclick="deleteRecipe(${r.id}, '${r.title.replace(/'/g, "\\'")}')"><i class="bi bi-trash"></i> Delete</button>
         </div>
         <h1>${r.title}</h1>
-        <div class="recipe-meta">${tags.join('')}</div>
-        ${sections.map(s => `
-            <div class="recipe-section">
-                <h2><i class="bi ${s.icon}"></i> ${s.title}</h2>
-                <div class="section-body">${s.content}</div>
-            </div>
-        `).join('')}
+        <div class="recipe-meta-bar">${meta.join('')}</div>
+        ${r.books_referenced?.length ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:15px;"><i class="bi bi-book"></i> References: ${r.books_referenced.join(', ')}</div>` : ''}
+
+        ${r.description ? `
+        <div class="recipe-section">
+            <h2><i class="bi bi-info-circle"></i> Description</h2>
+            <div class="section-body">${r.description}</div>
+        </div>` : ''}
+
+        <div class="recipe-section">
+            <h2><i class="bi bi-list-check"></i> Ingredients</h2>
+            ${ingredientsHtml}
+        </div>
+
+        ${r.instructions ? `
+        <div class="recipe-section">
+            <h2><i class="bi bi-list-ol"></i> Instructions</h2>
+            <div class="section-body">${r.instructions}</div>
+        </div>` : ''}
+
+        ${r.technique_notes ? `
+        <div class="recipe-section">
+            <h2><i class="bi bi-lightbulb"></i> Technique Notes</h2>
+            <div class="section-body">${r.technique_notes}</div>
+        </div>` : ''}
+
+        ${r.wine_pairing ? `
+        <div class="recipe-section">
+            <h2><i class="bi bi-cup-straw"></i> Wine / Beverage Pairing</h2>
+            <div class="section-body">${r.wine_pairing}</div>
+        </div>` : ''}
     `;
 }
 

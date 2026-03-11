@@ -153,6 +153,70 @@ async def generate_contract_pdf(
         )
 
 
+@router.get("/events/{event_id}/quote-pdf")
+async def generate_quote_pdf(
+    event_id: UUID,
+    download: bool = True,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_auth)
+):
+    """Generate Price Quote PDF for an event"""
+    if not check_permission(current_user, "read", "document"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to generate documents"
+        )
+
+    from sqlalchemy.orm import joinedload
+
+    event = db.query(Event).options(
+        joinedload(Event.client),
+        joinedload(Event.venue)
+    ).filter(Event.id == event_id).first()
+
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found"
+        )
+
+    try:
+        pdf_bytes = pdf_service.generate_price_quote_pdf(
+            event=event,
+            client=event.client,
+            venue=event.venue
+        )
+
+        try:
+            document = Document(
+                event_id=event_id,
+                doc_type=DocumentType.QUOTE,
+                storage_url=f"generated/quote_{event_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            )
+            db.add(document)
+            db.commit()
+        except Exception:
+            db.rollback()
+
+        filename = f"Quote_{event.title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}.pdf"
+
+        headers = {
+            'Content-Disposition': f'{"attachment" if download else "inline"}; filename="{filename}"'
+        }
+
+        return Response(
+            content=pdf_bytes,
+            media_type='application/pdf',
+            headers=headers
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate PDF: {str(e)}"
+        )
+
+
 @router.get("/events/{event_id}/summary-pdf")
 async def generate_event_summary_pdf(
     event_id: UUID,

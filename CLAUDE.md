@@ -5,7 +5,7 @@ Microservices-based restaurant management platform for SW Hospitality Group.
 - **Production URL:** https://rm.swhgrp.com
 - **Architecture:** 11 FastAPI microservices behind Nginx reverse proxy, each with its own PostgreSQL database
 - **Portal:** Central auth + UI at `/portal/`, serves templates from each service's template directory
-- **Last Updated:** March 9, 2026
+- **Last Updated:** March 11, 2026
 
 ## Infrastructure & Development Environment
 - **Production Server:** Linode Ubuntu instance at `/opt/restaurant-system/`
@@ -154,9 +154,10 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 ### Cookbook AI System (Mar 2026)
 - **RAG-based cookbook reference**: Upload PDF cookbooks → extract text → chunk → embed → query with Claude AI
 - **Port 8008**, managed in root `docker-compose.yml` (cookbook-app + cookbook-db containers)
-- **Stack**: FastAPI, PostgreSQL (metadata), ChromaDB (vector store), sentence-transformers (local embeddings), Anthropic Claude API
-- **PDF processing pipeline**: pdfplumber text extraction → OCR fallback (pytesseract) → word-level chunking (500 words, 50 overlap) → sentence-transformers embedding → ChromaDB storage
-- **Embedding model**: `sentence-transformers/all-MiniLM-L6-v2` — runs locally on CPU, ~6GB RAM for large books
+- **Stack**: FastAPI, PostgreSQL (metadata), ChromaDB (vector store), transformers/PyTorch (local embeddings), Anthropic Claude API
+- **PDF processing pipeline**: pdfplumber text extraction → OCR fallback (pytesseract) → NUL character stripping → word-level chunking (500 words, 50 overlap) → embedding → ChromaDB storage
+- **Embedding model**: `sentence-transformers/all-MiniLM-L6-v2` via HuggingFace `transformers` + CPU-only PyTorch (mean pooling) — runs locally, ~2GB RAM
+- **Recipe format**: Structured output matching inventory recipe system — category, yield, prep/cook time, ingredients table (qty/unit/item/preparation), numbered instructions
 - **Portal UI**: Templates at `portal/templates/cookbook/` — dashboard, lookup, creator, library, books management
 - **Pages**: Dashboard (`/portal/cookbook/`), Recipe Lookup, Recipe Creator, Recipe Library, Book Management
 - **SSO**: `GET /cookbook/api/auth/sso-login?token=...` validates Portal JWT, sets `portal_session` cookie, redirects to portal cookbook page
@@ -176,6 +177,17 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 - **Beverage guard**: Only shows beverage section when `bar_type` is set and not empty/none/no_bar
 - **Menu rendering**: Item names only (no descriptions), total food cost line, per-section display
 - **Legal clauses**: 16 sections including Force Majeure, Cancellation (30%), FL/Palm Beach law
+
+### Price Quote PDF (Mar 2026)
+- **Template**: `events/src/events/templates/pdf/price_quote_template.html` — standalone WeasyPrint template
+- **Endpoint**: `GET /api/documents/events/{event_id}/quote-pdf`
+- **Service**: `pdf_service.py` → `generate_price_quote_pdf()` — simpler than contract, focused on pricing
+- **Button**: Added to event detail page admin actions
+
+### Files System Improvements (Mar 2026)
+- **Owner-only folder filter**: `GET /api/folders?owner_only=true` — filters folders by current user
+- **Search improvements**: Empty query returns all files, better file type and date range filtering
+- **UI enhancements**: Improved filemanager template with better search and folder navigation
 
 ### Calendar Item CalDAV Sync (Mar 2026)
 - `sync_calendar_item_to_caldav()` / `remove_calendar_item_from_caldav()` in `caldav_sync_service.py`

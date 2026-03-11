@@ -1470,8 +1470,8 @@
 
         async function loadMyFiles() {
             try {
-                // Load both folders and files for root level
-                const foldersResponse = await fetch(`/files/api/files/folders?_=${Date.now()}`);
+                // Load both folders and files for root level (only user's own folders)
+                const foldersResponse = await fetch(`/files/api/files/folders?owner_only=true&_=${Date.now()}`);
                 const foldersData = await foldersResponse.json();
 
                 const filesResponse = await fetch(`/files/api/files/files/root?_=${Date.now()}`);
@@ -2280,33 +2280,41 @@
             folderTree.innerHTML = '<p class="text-muted">Loading folders...</p>';
 
             try {
-                const response = await fetch('/files/api/files/folders');
-                const data = await response.json();
-
                 let html = `
-                    <div class="folder-tree-item p-2 rounded" style="cursor: pointer;"
-                         onclick="selectMoveTarget(null, 'Root')"
-                         onmouseover="this.style.backgroundColor='#21262d'"
-                         onmouseout="this.style.backgroundColor='transparent'">
-                        <i class="bi bi-house-door"></i> Root
+                    <div class="folder-tree-item p-2 rounded d-flex align-items-center" style="cursor: pointer;"
+                         onclick="selectMoveTarget('root', 'Root', event)">
+                        <i class="bi bi-house-door me-1"></i> Root
                     </div>
                 `;
 
-                function buildTree(folders, level = 0) {
-                    folders.forEach(folder => {
-                        const indent = '&nbsp;'.repeat(level * 4);
+                async function buildTree(parentId, level) {
+                    const url = parentId
+                        ? `/files/api/files/folders?parent_id=${parentId}`
+                        : '/files/api/files/folders';
+                    const response = await fetch(url);
+                    const data = await response.json();
+
+                    for (const folder of data.folders) {
+                        const indent = level * 20;
+                        const escapedName = folder.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
                         html += `
-                            <div class="folder-tree-item p-2 rounded" style="cursor: pointer;"
-                                 onclick="selectMoveTarget(${folder.id}, '${folder.name}')"
-                                 onmouseover="this.style.backgroundColor='#21262d'"
-                                 onmouseout="this.style.backgroundColor='transparent'">
-                                ${indent}<i class="bi bi-folder"></i> ${folder.name}
+                            <div class="folder-tree-item p-2 rounded d-flex align-items-center"
+                                 style="cursor: pointer; padding-left: ${indent + 8}px !important;"
+                                 data-folder-id="${folder.id}">
+                                <span class="folder-toggle me-1" onclick="toggleSubfolders(${folder.id}, ${level + 1}, this, event)"
+                                      style="cursor: pointer; width: 16px; display: inline-block; text-align: center;">
+                                    <i class="bi bi-chevron-right" style="font-size: 0.7rem;"></i>
+                                </span>
+                                <span onclick="selectMoveTarget(${folder.id}, '${escapedName}', event)" style="flex: 1;">
+                                    <i class="bi bi-folder"></i> ${folder.name}
+                                </span>
                             </div>
                         `;
-                    });
+                        // Do NOT recurse here - subfolders load on demand
+                    }
                 }
 
-                buildTree(data.folders);
+                await buildTree(null, 0);
                 folderTree.innerHTML = html;
             } catch (error) {
                 console.error('Error loading folder tree:', error);
@@ -2314,22 +2322,99 @@
             }
         }
 
-        function selectMoveTarget(folderId, folderName) {
-            document.getElementById('moveTargetFolderId').value = folderId || '';
+        async function toggleSubfolders(folderId, level, toggleEl, event) {
+            event.stopPropagation();
+            const parentItem = toggleEl.closest('.folder-tree-item');
+            const icon = toggleEl.querySelector('i');
+            const containerId = `subfolders-${folderId}`;
+            const existing = document.getElementById(containerId);
+
+            if (existing) {
+                // Toggle visibility
+                if (existing.style.display === 'none') {
+                    existing.style.display = '';
+                    icon.className = 'bi bi-chevron-down';
+                    icon.style.fontSize = '0.7rem';
+                } else {
+                    existing.style.display = 'none';
+                    icon.className = 'bi bi-chevron-right';
+                    icon.style.fontSize = '0.7rem';
+                }
+                return;
+            }
+
+            // Load subfolders
+            icon.className = 'bi bi-arrow-clockwise';
+            icon.style.fontSize = '0.7rem';
+            try {
+                const response = await fetch(`/files/api/files/folders?parent_id=${folderId}`);
+                const data = await response.json();
+
+                const container = document.createElement('div');
+                container.id = containerId;
+
+                if (data.folders.length === 0) {
+                    // No subfolders - remove the toggle arrow
+                    toggleEl.innerHTML = '<span style="width: 16px; display: inline-block;"></span>';
+                    return;
+                }
+
+                for (const folder of data.folders) {
+                    const indent = level * 20;
+                    const escapedName = folder.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    const item = document.createElement('div');
+                    item.className = 'folder-tree-item p-2 rounded d-flex align-items-center';
+                    item.style.cssText = `cursor: pointer; padding-left: ${indent + 8}px !important;`;
+                    item.dataset.folderId = folder.id;
+                    item.innerHTML = `
+                        <span class="folder-toggle me-1" onclick="toggleSubfolders(${folder.id}, ${level + 1}, this, event)"
+                              style="cursor: pointer; width: 16px; display: inline-block; text-align: center;">
+                            <i class="bi bi-chevron-right" style="font-size: 0.7rem;"></i>
+                        </span>
+                        <span onclick="selectMoveTarget(${folder.id}, '${escapedName}', event)" style="flex: 1;">
+                            <i class="bi bi-folder"></i> ${folder.name}
+                        </span>
+                    `;
+                    container.appendChild(item);
+                }
+
+                parentItem.after(container);
+                icon.className = 'bi bi-chevron-down';
+                icon.style.fontSize = '0.7rem';
+            } catch (error) {
+                console.error('Error loading subfolders:', error);
+                icon.className = 'bi bi-chevron-right';
+                icon.style.fontSize = '0.7rem';
+            }
+        }
+
+        function selectMoveTarget(folderId, folderName, event) {
+            event.stopPropagation();
+            document.getElementById('moveTargetFolderId').value = folderId;
             // Highlight selected
-            document.querySelectorAll('.folder-tree-item').forEach(item => {
+            document.querySelectorAll('#folderTree .folder-tree-item').forEach(item => {
                 item.style.backgroundColor = 'transparent';
             });
-            event.target.closest('.folder-tree-item').style.backgroundColor = 'var(--bg-tertiary)';
+            // Also clear highlights in subfolder containers
+            document.querySelectorAll('[id^="subfolders-"] .folder-tree-item').forEach(item => {
+                item.style.backgroundColor = 'transparent';
+            });
+            const treeItem = event.target.closest('.folder-tree-item');
+            if (treeItem) {
+                treeItem.style.backgroundColor = 'var(--bg-tertiary)';
+            }
         }
 
         async function performMove() {
-            const targetFolderId = document.getElementById('moveTargetFolderId').value;
+            const rawTargetId = document.getElementById('moveTargetFolderId').value;
 
-            if (targetFolderId === '') {
+            if (rawTargetId === '') {
                 showWarning('Please select a destination folder');
                 return;
             }
+
+            const isRoot = rawTargetId === 'root';
+            const targetFolderId = isRoot ? null : rawTargetId;
 
             // Check if this is a bulk move
             if (window.bulkMoveItems && window.bulkMoveItems.length > 0) {
@@ -2342,9 +2427,8 @@
                             ? `/files/api/files/folders/${item.id}/move`
                             : `/files/api/files/files/${item.id}/move`;
 
-                        const params = targetFolderId
-                            ? `?target_${item.type === 'folder' ? 'parent' : 'folder'}_id=${targetFolderId}`
-                            : '';
+                        const paramName = item.type === 'folder' ? 'target_parent_id' : 'target_folder_id';
+                        const params = targetFolderId ? `?${paramName}=${targetFolderId}` : '';
 
                         const response = await fetch(endpoint + params, {
                             method: 'POST'
@@ -2384,9 +2468,8 @@
                 ? `/files/api/files/folders/${resourceId}/move`
                 : `/files/api/files/files/${resourceId}/move`;
 
-            const params = targetFolderId
-                ? `?target_${resourceType === 'folder' ? 'parent' : 'folder'}_id=${targetFolderId}`
-                : '';
+            const paramName = resourceType === 'folder' ? 'target_parent_id' : 'target_folder_id';
+            const params = targetFolderId ? `?${paramName}=${targetFolderId}` : '';
 
             try {
                 const response = await fetch(endpoint + params, {
@@ -3561,8 +3644,12 @@
                 if (dateRange) params.append('date_range', dateRange);
                 if (sizeRange) params.append('size_range', sizeRange);
                 if (ownerFilter) params.append('owner_filter', ownerFilter);
+                if (currentFolderId) params.append('folder_id', currentFolderId);
 
                 const response = await fetch(`/files/api/files/search?${params.toString()}`);
+                if (!response.ok) {
+                    throw new Error(`Server returned ${response.status}`);
+                }
                 const data = await response.json();
 
                 displaySearchResults(data);
@@ -3681,8 +3768,18 @@
             const searchInput = document.getElementById('searchInput');
             const query = searchInput.value.trim();
 
-            if (query.length >= 2) {
+            // Check if any filter is active
+            const fileType = document.getElementById('filterFileType').value;
+            const dateRange = document.getElementById('filterDateRange').value;
+            const sizeRange = document.getElementById('filterSizeRange').value;
+            const ownerFilter = document.getElementById('filterOwner').value;
+            const hasFilters = fileType || dateRange || sizeRange || ownerFilter;
+
+            if (query.length >= 2 || hasFilters) {
                 performSearch(query);
+            } else if (isSearchMode) {
+                // No query and no filters — return to normal view
+                clearSearch();
             }
         }
 
@@ -3737,8 +3834,12 @@
                 } else if (filterType === 'large') {
                     params.append('size_range', 'large');
                 }
+                if (currentFolderId) params.append('folder_id', currentFolderId);
 
                 const response = await fetch(`/files/api/files/search?${params.toString()}`);
+                if (!response.ok) {
+                    throw new Error(`Server returned ${response.status}`);
+                }
                 const data = await response.json();
 
                 const title = filterType === 'recent' ? 'Recent Files (Last 7 Days)' : 'Large Files (> 10 MB)';

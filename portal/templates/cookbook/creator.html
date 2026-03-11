@@ -7,10 +7,17 @@
 @media (max-width: 900px) { .creator-layout { grid-template-columns: 1fr; } }
 .result-panel { display: none; }
 .result-panel.active { display: block; }
-.recipe-result h3 { font-size: 20px; margin-bottom: 10px; color: var(--accent-primary); }
-.recipe-result .recipe-section { margin-bottom: 15px; }
-.recipe-result .recipe-section h4 { font-size: 14px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
-.recipe-result .recipe-section .section-content { white-space: pre-wrap; line-height: 1.6; }
+.recipe-result h3 { font-size: 20px; margin-bottom: 5px; color: var(--accent-primary); }
+.recipe-meta-bar { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 15px; font-size: 13px; color: var(--text-muted); }
+.recipe-meta-bar .meta-item { display: flex; align-items: center; gap: 4px; }
+.recipe-meta-bar .meta-item i { font-size: 14px; }
+.recipe-section { margin-bottom: 18px; }
+.recipe-section h4 { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; padding-bottom: 4px; border-bottom: 1px solid var(--border-primary); }
+.recipe-section .section-content { line-height: 1.7; font-size: 14px; }
+.ingredients-table { width: 100%; font-size: 13px; border-collapse: collapse; }
+.ingredients-table th { background: var(--accent-primary); color: white; padding: 6px 10px; text-align: left; font-weight: 600; font-size: 12px; }
+.ingredients-table td { padding: 5px 10px; border-bottom: 1px solid var(--border-primary); }
+.ingredients-table tr:hover { background: var(--bg-tertiary); }
 .book-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .book-chip { display: inline-block; padding: 5px 12px; border-radius: 16px; font-size: 13px; cursor: pointer; border: 1px solid var(--border-secondary); background: var(--bg-tertiary); color: var(--text-primary); transition: all 0.2s; user-select: none; }
 .book-chip:hover { border-color: var(--accent-primary); background: var(--info-bg); }
@@ -57,8 +64,8 @@
             </div>
         </div>
         <div class="form-group">
-            <label>Dietary Notes / Restrictions</label>
-            <textarea id="dietaryNotes" class="form-control" placeholder="e.g. gluten-free, dairy-free, low-sodium..." rows="2"></textarea>
+            <label>Additional Instructions</label>
+            <textarea id="dietaryNotes" class="form-control" placeholder="e.g. gluten-free, make it spicy, substitute chicken for pork, scale for 50 guests..." rows="2"></textarea>
         </div>
         <button class="btn btn-primary" id="createBtn" onclick="createRecipe()">
             <i class="bi bi-magic"></i> Generate Recipe
@@ -150,18 +157,60 @@ function showRecipeResult(data) {
     const result = document.getElementById('recipeResult');
     panel.classList.add('active');
 
-    const sections = [
-        { label: 'Description', content: data.description },
-        { label: 'Ingredients', content: data.ingredients },
-        { label: 'Instructions', content: data.instructions },
-        { label: 'Technique Notes', content: data.technique_notes },
-        { label: 'Wine / Beverage Pairing', content: data.wine_pairing },
-    ].filter(s => s.content);
+    // Meta bar
+    const meta = [];
+    if (data.category) meta.push(`<span class="meta-item"><i class="bi bi-tag"></i> ${capitalize(data.category)}</span>`);
+    if (data.yield_quantity && data.yield_unit) meta.push(`<span class="meta-item"><i class="bi bi-pie-chart"></i> ${data.yield_quantity} ${data.yield_unit}</span>`);
+    if (data.prep_time_minutes) meta.push(`<span class="meta-item"><i class="bi bi-clock"></i> Prep: ${data.prep_time_minutes} min</span>`);
+    if (data.cook_time_minutes) meta.push(`<span class="meta-item"><i class="bi bi-fire"></i> Cook: ${data.cook_time_minutes} min</span>`);
 
+    // Ingredients table
+    let ingredientsHtml = '';
+    if (data.ingredients_json && data.ingredients_json.length) {
+        ingredientsHtml = `
+            <table class="ingredients-table">
+                <thead><tr><th>Qty</th><th>Unit</th><th>Ingredient</th><th>Preparation</th></tr></thead>
+                <tbody>
+                    ${data.ingredients_json.map(i => `
+                        <tr>
+                            <td>${i.quantity || ''}</td>
+                            <td>${i.unit || ''}</td>
+                            <td>${i.item || ''}</td>
+                            <td>${i.preparation || ''}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>`;
+    } else if (data.ingredients) {
+        ingredientsHtml = `<div class="section-content">${formatText(data.ingredients)}</div>`;
+    }
+
+    // Instructions
+    let instructionsHtml = '';
+    if (data.instructions) {
+        instructionsHtml = `<div class="section-content">${formatText(data.instructions)}</div>`;
+    }
+
+    // Build full result
     result.innerHTML = `
         <h3>${data.title}</h3>
-        ${data.books_referenced?.length ? `<div style="font-size:13px;color:var(--text-muted);margin-bottom:15px;">References: ${data.books_referenced.join(', ')}</div>` : ''}
-        ${sections.map(s => `<div class="recipe-section"><h4>${s.label}</h4><div class="section-content">${formatText(s.content)}</div></div>`).join('')}
+        <div class="recipe-meta-bar">${meta.join('')}</div>
+        ${data.books_referenced?.length ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:15px;"><i class="bi bi-book"></i> ${data.books_referenced.join(', ')}</div>` : ''}
+
+        ${data.description ? `<div class="recipe-section"><h4><i class="bi bi-info-circle"></i> Description</h4><div class="section-content">${data.description}</div></div>` : ''}
+
+        <div class="recipe-section">
+            <h4><i class="bi bi-list-check"></i> Ingredients</h4>
+            ${ingredientsHtml}
+        </div>
+
+        <div class="recipe-section">
+            <h4><i class="bi bi-list-ol"></i> Instructions</h4>
+            ${instructionsHtml}
+        </div>
+
+        ${data.technique_notes ? `<div class="recipe-section"><h4><i class="bi bi-lightbulb"></i> Technique Notes</h4><div class="section-content">${formatText(data.technique_notes)}</div></div>` : ''}
+        ${data.wine_pairing ? `<div class="recipe-section"><h4><i class="bi bi-cup-straw"></i> Wine / Beverage Pairing</h4><div class="section-content">${formatText(data.wine_pairing)}</div></div>` : ''}
     `;
 
     if (data.recipe_id) {
@@ -174,6 +223,10 @@ function showRecipeResult(data) {
 function formatText(text) {
     if (!text) return '';
     return text.replace(/\n/g, '<br>');
+}
+
+function capitalize(str) {
+    return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
 loadBooks();

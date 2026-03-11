@@ -13,6 +13,9 @@
 .recipe-card .recipe-tags { display: flex; gap: 6px; flex-wrap: wrap; }
 .recipe-card .recipe-tags .tag { font-size: 11px; padding: 2px 8px; border-radius: 3px; background: var(--bg-tertiary); color: var(--text-muted); }
 .recipe-card .recipe-date { font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+.recipe-card .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+.recipe-card .delete-btn { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 4px 8px; border-radius: 4px; font-size: 14px; }
+.recipe-card .delete-btn:hover { color: #dc3545; background: rgba(220, 53, 69, 0.1); }
 {% endblock %}
 
 {% block content %}
@@ -107,9 +110,25 @@ function renderRecipes(recipes) {
             <h3>${r.title}</h3>
             <div class="recipe-desc">${r.description || r.primary_ingredients || ''}</div>
             <div class="recipe-tags">${tags.map(t => `<span class="tag">${t}</span>`).join('')}</div>
-            <div class="recipe-date">${date}</div>
+            <div class="card-footer">
+                <span class="recipe-date">${date}</span>
+                <button class="delete-btn" onclick="event.stopPropagation(); deleteRecipe(${r.id}, '${r.title.replace(/'/g, "\\'")}')" title="Delete recipe"><i class="bi bi-trash"></i></button>
+            </div>
         </div>`;
     }).join('');
+}
+
+async function deleteRecipe(id, title) {
+    const ok = await showConfirm(`Delete "${title}"?`, 'Delete Recipe');
+    if (!ok) return;
+    try {
+        const res = await fetch(`/cookbook/api/recipes/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            allRecipes = allRecipes.filter(r => r.id !== id);
+            filterRecipes();
+            showSuccess('Recipe deleted');
+        } else { showError('Delete failed'); }
+    } catch (e) { showError('Delete failed'); }
 }
 
 loadRecipes();

@@ -11,6 +11,7 @@ class DocumentType(str, enum.Enum):
     BEO = "beo"
     CONTRACT = "contract"
     SUMMARY = "summary"
+    QUOTE = "quote"
     INVOICE = "invoice"
     OTHER = "other"
 

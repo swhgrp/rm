@@ -142,11 +142,29 @@ def create_recipe(
     if "error" in recipe_data:
         raise HTTPException(status_code=500, detail=recipe_data["error"])
 
+    # Build ingredients text from structured list for backwards compat
+    ingredients_list = recipe_data.get("ingredients", [])
+    if isinstance(ingredients_list, list):
+        ingredients_text = "\n".join(
+            f"- {i.get('quantity', '')} {i.get('unit', '')} {i.get('item', '')}"
+            + (f", {i['preparation']}" if i.get('preparation') else "")
+            for i in ingredients_list
+        )
+    else:
+        ingredients_text = str(ingredients_list)
+        ingredients_list = []
+
     # Save to DB
     recipe = Recipe(
         title=recipe_data.get("title", "Untitled Recipe"),
+        category=recipe_data.get("category", "other"),
         description=recipe_data.get("description", ""),
-        ingredients=recipe_data.get("ingredients", ""),
+        yield_quantity=str(recipe_data.get("yield_quantity", "")),
+        yield_unit=recipe_data.get("yield_unit", ""),
+        prep_time_minutes=recipe_data.get("prep_time_minutes"),
+        cook_time_minutes=recipe_data.get("cook_time_minutes"),
+        ingredients=ingredients_text,
+        ingredients_json=ingredients_list,
         instructions=recipe_data.get("instructions", ""),
         technique_notes=recipe_data.get("technique_notes", ""),
         wine_pairing=recipe_data.get("wine_pairing", ""),
@@ -174,8 +192,14 @@ def create_recipe(
     return {
         "recipe_id": recipe.id,
         "title": recipe.title,
+        "category": recipe.category,
         "description": recipe.description,
+        "yield_quantity": recipe.yield_quantity,
+        "yield_unit": recipe.yield_unit,
+        "prep_time_minutes": recipe.prep_time_minutes,
+        "cook_time_minutes": recipe.cook_time_minutes,
         "ingredients": recipe.ingredients,
+        "ingredients_json": recipe.ingredients_json,
         "instructions": recipe.instructions,
         "technique_notes": recipe.technique_notes,
         "wine_pairing": recipe.wine_pairing,

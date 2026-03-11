@@ -14,6 +14,9 @@
 <button class="btn btn-primary-custom" onclick="downloadContract()">
     <i class="bi bi-file-earmark-text"></i> Download Contract
 </button>
+<button class="btn btn-secondary-custom" onclick="downloadQuote()">
+    <i class="bi bi-receipt"></i> Download Quote
+</button>
 <button class="btn btn-success" style="background-color: #238636; border: 1px solid #2ea043; color: white;" onclick="saveEvent()">
     <i class="bi bi-save"></i> Save Changes
 </button>
@@ -871,6 +874,9 @@
             </button>
             <button class="btn btn-primary-custom" onclick="downloadContract()">
                 <i class="bi bi-file-earmark-text"></i> Download Contract
+            </button>
+            <button class="btn btn-secondary-custom" onclick="downloadQuote()">
+                <i class="bi bi-receipt"></i> Download Quote
             </button>
             <button class="btn btn-secondary-custom" onclick="downloadSummary()">
                 <i class="bi bi-download"></i> Download Summary
@@ -2139,6 +2145,10 @@
 
     function downloadContract() {
         window.open(`/events/api/documents/events/${currentEventId}/contract-pdf`, '_blank');
+    }
+
+    function downloadQuote() {
+        window.open(`/events/api/documents/events/${currentEventId}/quote-pdf`, '_blank');
     }
 
     function downloadSummary() {

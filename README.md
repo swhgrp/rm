@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** March 9, 2026
+**Last Updated:** March 11, 2026
 **Status:** ~98% Complete - All 11 Systems Production Ready ✅
-**Latest:** Cookbook AI system (RAG-based recipe reference + creator), self-hosted e-signatures, mobile app (Mar 9, 2026) ✅
+**Latest:** Cookbook AI structured recipes, event price quotes, file manager improvements (Mar 11, 2026) ✅
 
 ---
 
@@ -1059,7 +1059,7 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 - **URL:** https://rm.swhgrp.com/portal/cookbook/
 - **API:** https://rm.swhgrp.com/cookbook/
 - **Database:** cookbook_db (PostgreSQL 15) + ChromaDB (vector store)
-- **Technology:** FastAPI, SQLAlchemy, ChromaDB, sentence-transformers, Anthropic Claude API
+- **Technology:** FastAPI, SQLAlchemy, ChromaDB, HuggingFace transformers (CPU PyTorch), Anthropic Claude API
 - **Status:** Production ready with full feature set ✅
 
 **PDF Cookbook Management:**
@@ -1080,13 +1080,15 @@ Email → PDF Extract → AI Parse → Bulk Map (by description) → Auto-Send �
 **Recipe Creator:**
 - ✅ AI-generated recipes based on ingredients, cuisine, cooking method
 - ✅ Optional cookbook knowledge base reference for authentic techniques
-- ✅ Dietary notes/restrictions support
+- ✅ Structured output matching inventory recipe format (category, yield, prep/cook time, ingredients table, numbered instructions)
+- ✅ Additional instructions field for dietary notes, scaling, substitutions
 - ✅ Auto-saved to recipe library with full metadata
 
 **Recipe Library:**
 - ✅ Browse all saved and generated recipes
 - ✅ Filter by cuisine, cooking method, book reference
-- ✅ Individual recipe detail pages
+- ✅ Individual recipe detail pages with structured layout
+- ✅ Delete recipes from library list and detail view
 
 **Access Control:**
 - ✅ `can_access_cookbook` permission on portal users table
@@ -1632,11 +1634,14 @@ This software is proprietary and confidential. Unauthorized copying, distributio
 - ✅ ~~Integration Hub: Major feature misrepresentation~~ - RESOLVED (Oct 31, 2025)
 - ✅ **Websites CMS added** - Full restaurant website management (Dec 8, 2025)
 - ✅ **Cookbook AI added** - RAG-based cookbook reference, AI recipe creation, PDF upload & processing (Mar 9, 2026)
+- ✅ **Cookbook structured recipes** - Inventory-format recipe output, delete from library, embedding fix (Mar 11, 2026)
+- ✅ **Event price quotes** - Price Quote PDF generation from events (Mar 11, 2026)
+- ✅ **File manager improvements** - Owner-only folders, search enhancements (Mar 11, 2026)
 
 ---
 
-**Version:** 4.3
-**Last Updated:** March 9, 2026
+**Version:** 4.4
+**Last Updated:** March 11, 2026
 **Maintained By:** SW Hospitality Group Development Team
 
 **For developer reference, see [CLAUDE.md](./CLAUDE.md)**

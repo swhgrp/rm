@@ -187,6 +187,86 @@ class PDFService:
             logger.error(f"Failed to generate catering contract PDF: {e}")
             raise
 
+    def generate_price_quote_pdf(
+        self,
+        event: Any,
+        client: Any,
+        venue: Any = None,
+        output_path: str = None
+    ) -> bytes:
+        """Generate Price Quote PDF"""
+        try:
+            from datetime import timedelta
+
+            event_date = ""
+            event_times = ""
+            if event.start_at:
+                dt = _to_et(event.start_at) if event.start_at.tzinfo else event.start_at
+                event_date = dt.strftime('%B %-d, %Y') if dt else ""
+                start_time = dt.strftime('%-I:%M %p') if dt else ""
+                if event.end_at:
+                    end_dt = _to_et(event.end_at) if event.end_at.tzinfo else event.end_at
+                    end_time = end_dt.strftime('%-I:%M %p') if end_dt else ""
+                    event_times = f"{start_time} to {end_time}"
+                else:
+                    event_times = start_time
+
+            # Calculate financials (same logic as contract)
+            fin = event.financials_json or {}
+            menu = event.menu_json or {}
+            menu_subtotal = 0
+            if menu.get('sections'):
+                for section in menu['sections']:
+                    for item in section.get('items', []):
+                        price = item.get('price') or 0
+                        qty = float(item.get('quantity') or 1)
+                        menu_subtotal += price * qty
+
+            subtotal = fin.get('subtotal') or menu_subtotal
+            tax_rate = fin.get('tax_rate') or 0.065
+            service_rate = fin.get('service_rate') or 0.21
+            apply_tax = fin.get('apply_tax', True)
+            apply_service = fin.get('apply_service_charge', True)
+            service_charge = fin.get('service_charge') or (subtotal * service_rate if apply_service else 0)
+            tax = fin.get('tax') or ((subtotal + service_charge) * tax_rate if apply_tax else 0)
+            total = fin.get('total') or (subtotal + service_charge + tax)
+
+            now = datetime.now(_ET)
+            variables = {
+                'event': event,
+                'client': client,
+                'venue': venue,
+                'venue_logo': self._get_venue_logo_data_uri(venue),
+                'now': now,
+                'quote_date': now.strftime('%B %-d, %Y'),
+                'valid_through': (now + timedelta(days=30)).strftime('%B %-d, %Y'),
+                'event_date': event_date or 'TBD',
+                'event_times': event_times,
+                'food_subtotal': subtotal,
+                'service_charge': service_charge,
+                'service_rate_pct': service_rate * 100,
+                'tax': tax,
+                'tax_rate_pct': tax_rate * 100,
+                'total': total,
+                'has_financials': subtotal > 0,
+            }
+
+            template = self.jinja_env.get_template('price_quote_template.html')
+            html_content = template.render(**variables)
+            pdf_bytes = HTML(string=html_content).write_pdf()
+
+            if output_path:
+                os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                with open(output_path, 'wb') as f:
+                    f.write(pdf_bytes)
+                logger.info(f"Price quote PDF saved to: {output_path}")
+
+            return pdf_bytes
+
+        except Exception as e:
+            logger.error(f"Failed to generate price quote PDF: {e}")
+            raise
+
     def generate_event_summary_pdf(
         self,
         event: Any,
