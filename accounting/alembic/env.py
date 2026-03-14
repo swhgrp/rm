@@ -16,6 +16,7 @@ from accounting.models.fiscal_period import FiscalPeriod
 from accounting.models.account_balance import AccountBalance
 from accounting.models.sync_log import InventorySyncLog
 from accounting.models.cogs import COGSTransaction
+from accounting.gl_review.models import GLAnomalyFlag, GLAccountBaseline
 
 # this is the Alembic Config object
 config = context.config

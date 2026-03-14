@@ -39,6 +39,7 @@ from accounting.api.settings import router as settings_router
 from accounting.api.safe import router as safe_router
 from accounting.api.email import router as email_router
 from accounting.api.recurring_invoices import router as recurring_invoices_router
+from accounting.gl_review.router import router as gl_review_router
 from accounting.models.user import User
 # Import all models to ensure they are registered
 import accounting.models  # noqa
@@ -113,6 +114,7 @@ app.include_router(settings_router, prefix="/api/settings", tags=["Settings"])
 app.include_router(safe_router)
 app.include_router(email_router, prefix="/api/email", tags=["Email"])
 app.include_router(recurring_invoices_router, prefix="/api/recurring-invoices", tags=["Recurring Invoices"])
+app.include_router(gl_review_router)
 
 
 # Startup and shutdown events for background scheduler
@@ -238,6 +240,15 @@ async def account_detail_page(
         "request": request,
         "current_user": user,
         "account_id": account_id
+    })
+
+
+@app.get("/gl-review", response_class=HTMLResponse)
+async def gl_review_page(request: Request, user: User = Depends(require_auth)):
+    """GL Anomaly Review page"""
+    return templates.TemplateResponse("gl_review.html", {
+        "request": request,
+        "current_user": user
     })
 
 

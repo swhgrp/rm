@@ -663,17 +663,12 @@ class InvoiceParser:
 
         location_name = location_name.strip()
 
-        # Get inventory database connection string from environment
-        import os
-        from sqlalchemy import create_engine, text
-
-        inventory_db_url = os.getenv('INVENTORY_DATABASE_URL')
-        if not inventory_db_url:
-            logger.warning("INVENTORY_DATABASE_URL not set, cannot match location")
-            return None
+        # Get inventory database connection
+        from sqlalchemy import text
+        from integration_hub.db.database import get_inventory_engine
 
         try:
-            engine = create_engine(inventory_db_url)
+            engine = get_inventory_engine()
             with engine.connect() as conn:
                 # 1. Exact match (case insensitive)
                 result = conn.execute(
@@ -839,8 +834,8 @@ class InvoiceParser:
 
         Returns dict with fix stats.
         """
-        import os
-        from sqlalchemy import create_engine, text
+        from sqlalchemy import text
+        from integration_hub.db.database import get_inventory_engine
 
         fixes = []
 
@@ -879,22 +874,20 @@ class InvoiceParser:
             inv_items = []
 
             # Source 1: Inventory database
-            inventory_db_url = os.getenv('INVENTORY_DATABASE_URL')
-            if inventory_db_url:
-                try:
-                    engine = create_engine(inventory_db_url)
-                    base_vendor = vendor_name
-                    for suffix in ['Inc.', 'Inc', 'LLC', 'L.L.C.', 'Corp.', 'Corporation', 'Co.', 'Company']:
-                        base_vendor = base_vendor.replace(suffix, '')
-                    base_vendor = base_vendor.replace(',', '').strip()
+            try:
+                engine = get_inventory_engine()
+                base_vendor = vendor_name
+                for suffix in ['Inc.', 'Inc', 'LLC', 'L.L.C.', 'Corp.', 'Corporation', 'Co.', 'Company']:
+                    base_vendor = base_vendor.replace(suffix, '')
+                base_vendor = base_vendor.replace(',', '').strip()
 
-                    with engine.connect() as inv_conn:
-                        inv_items = inv_conn.execute(text("""
-                            SELECT vi.vendor_sku, vi.vendor_product_name
-                            FROM vendor_items vi
-                            JOIN vendors v ON v.id = vi.vendor_id
-                            WHERE v.name ILIKE :vendor_pattern AND vi.is_active = true
-                        """), {"vendor_pattern": f"%{base_vendor}%"}).fetchall()
+                with engine.connect() as inv_conn:
+                    inv_items = inv_conn.execute(text("""
+                        SELECT vi.vendor_sku, vi.vendor_product_name
+                        FROM vendor_items vi
+                        JOIN vendors v ON v.id = vi.vendor_id
+                        WHERE v.name ILIKE :vendor_pattern AND vi.is_active = true
+                    """), {"vendor_pattern": f"%{base_vendor}%"}).fetchall()
                 except Exception as e:
                     logger.warning(f"Could not query inventory DB for description matching: {e}")
 

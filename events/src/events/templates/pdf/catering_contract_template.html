@@ -295,7 +295,7 @@
 
                 {% if has_financials %}
                 <div style="margin-top: 10px;">
-                    <strong>Total Food Cost - ${{ "%.2f"|format(food_subtotal) }}</strong> – Not including sales tax and service fee
+                    <strong>Subtotal - ${{ "%.2f"|format(food_subtotal) }}</strong> – Not including sales tax and service fee
                 </div>
                 {% endif %}
 
@@ -313,6 +313,15 @@
                         Any and all purchases from the beverage service will be run as a tab and paid at the
                         end of the event by the Client or their representative.
                     </div>
+                </div>
+                {% endif %}
+
+                {% if event.menu_json and event.menu_json.equipment_items and event.menu_json.equipment_items|length > 0 %}
+                <div class="menu-section" style="margin-top: 10px;">
+                    <div class="menu-section-title">Equipment &amp; Rentals:</div>
+                    {% for item in event.menu_json.equipment_items %}
+                    <div class="menu-item">{{ item.name }}{% if item.quantity %} ({{ item.quantity }}){% endif %}</div>
+                    {% endfor %}
                 </div>
                 {% endif %}
 

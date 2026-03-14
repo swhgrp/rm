@@ -1,0 +1,1046 @@
+{% extends "base.html" %}
+{% block title %}GL Review - Restaurant Accounting{% endblock %}
+{% block nav_gl_review %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    .summary-cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .summary-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        padding: 1.25rem;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .summary-card .label {
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        margin-bottom: 0.25rem;
+    }
+
+    .summary-card .value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-primary);
+    }
+
+    .summary-card .value.critical { color: var(--error); }
+    .summary-card .value.warning { color: var(--warning); }
+    .summary-card .value.info { color: var(--info); }
+    .summary-card .value.success { color: var(--success); }
+
+    .summary-card .subtext {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+    }
+
+    .filters {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+        align-items: flex-end;
+        background: var(--bg-secondary);
+        padding: 1rem;
+        border-radius: 6px;
+        border: 1px solid var(--border-primary);
+    }
+
+    .filter-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+
+    .filter-group label {
+        font-weight: 500;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+
+    .filter-group select,
+    .filter-group input {
+        padding: 0.4rem 0.5rem;
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        font-size: 0.9rem;
+    }
+
+    .flags-table {
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-primary);
+    }
+
+    .flags-table table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .flags-table th {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        font-weight: 600;
+        padding: 12px 14px;
+        font-size: 0.875rem;
+        text-align: left;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    .flags-table td {
+        padding: 12px 14px;
+        font-size: 0.9rem;
+        border-bottom: 1px solid var(--border-primary);
+        vertical-align: top;
+    }
+
+    .flags-table tbody tr {
+        cursor: pointer;
+        transition: background 0.15s;
+    }
+
+    .flags-table tbody tr:hover {
+        background: #CFD8DC !important;
+    }
+
+    .flags-table tbody tr.row-critical {
+        border-left: 4px solid var(--error);
+    }
+
+    .flags-table tbody tr.row-warning {
+        border-left: 4px solid var(--warning);
+    }
+
+    .flags-table tbody tr.row-info {
+        border-left: 4px solid var(--info);
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+    }
+
+    .severity-critical { background: var(--error); color: white; }
+    .severity-warning { background: var(--warning); color: white; }
+    .severity-info { background: var(--info); color: white; }
+
+    .status-open { background: #455A64; color: white; }
+    .status-reviewed { background: var(--success); color: white; }
+    .status-dismissed { background: #78909C; color: white; }
+    .status-escalated { background: #C62828; color: white; }
+
+    .flag-type-badge {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-primary);
+        padding: 0.15rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-family: monospace;
+    }
+
+    .actions-wrap {
+        display: inline-flex;
+        gap: 0.35rem;
+    }
+
+    .btn-xs {
+        padding: 0.2rem 0.5rem;
+        font-size: 0.78rem;
+        border-radius: 4px;
+    }
+
+    .pagination-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border-primary);
+    }
+
+    .pagination-controls .page-info {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .pagination-controls .page-buttons {
+        display: flex;
+        gap: 0.35rem;
+    }
+
+    .pagination-controls button {
+        padding: 0.3rem 0.7rem;
+        border: 1px solid var(--border-primary);
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.85rem;
+    }
+
+    .pagination-controls button:hover:not(:disabled) {
+        background: var(--bg-tertiary);
+    }
+
+    .pagination-controls button:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+
+    .pagination-controls button.active {
+        background: var(--accent-primary);
+        color: white;
+        border-color: var(--accent-primary);
+    }
+
+    /* Detail modal */
+    .flag-detail-grid {
+        display: grid;
+        grid-template-columns: 140px 1fr;
+        gap: 0.5rem 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .flag-detail-grid .label {
+        font-weight: 600;
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+    }
+
+    .flag-detail-grid .value {
+        color: var(--text-primary);
+        font-size: 0.9rem;
+    }
+
+    .ai-reasoning-box {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-primary);
+        border-radius: 6px;
+        padding: 1rem;
+        margin-top: 0.5rem;
+        font-size: 0.9rem;
+        line-height: 1.6;
+        white-space: pre-wrap;
+    }
+
+    .review-form {
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-primary);
+    }
+
+    .review-form textarea {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid var(--border-primary);
+        border-radius: 4px;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        resize: vertical;
+        font-size: 0.9rem;
+    }
+
+    .review-form .review-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+    }
+
+    /* Run panel */
+    .run-panel {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-primary);
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+        box-shadow: var(--shadow-sm);
+    }
+
+    .run-panel h3 {
+        margin: 0 0 1rem 0;
+        font-size: 1rem;
+        color: var(--text-primary);
+    }
+
+    .run-panel .run-form {
+        display: flex;
+        gap: 1rem;
+        align-items: flex-end;
+        flex-wrap: wrap;
+    }
+
+    .bulk-bar {
+        display: none;
+        background: var(--accent-primary);
+        color: white;
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        margin-bottom: 1rem;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .bulk-bar.show {
+        display: flex;
+    }
+
+    .bulk-bar .selected-count {
+        font-weight: 600;
+    }
+
+    .top-types-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .top-types-list li {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.4rem 0;
+        font-size: 0.85rem;
+        border-bottom: 1px solid var(--border-primary);
+    }
+
+    .top-types-list li:last-child {
+        border-bottom: none;
+    }
+
+    #message {
+        padding: 1rem;
+        border-radius: 4px;
+        margin-bottom: 1rem;
+        display: none;
+    }
+
+    #message.show { display: block; }
+    #message.success { background: var(--success); color: white; }
+    #message.error { background: var(--error); color: white; }
+
+    @media (max-width: 991.98px) {
+        .summary-cards { grid-template-columns: repeat(2, 1fr); }
+        .filters { flex-direction: column; align-items: stretch; }
+        .run-panel .run-form { flex-direction: column; }
+        .flags-table { overflow-x: auto; }
+        .flags-table table { min-width: 700px; }
+    }
+
+    @media (max-width: 575.98px) {
+        .summary-cards { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-shield-check"></i> GL Anomaly Review</h1>
+</div>
+
+<div id="message"></div>
+
+<!-- Summary Cards -->
+<div class="summary-cards" id="summaryCards">
+    <div class="summary-card">
+        <div class="label">Critical</div>
+        <div class="value critical" id="sumCritical">-</div>
+    </div>
+    <div class="summary-card">
+        <div class="label">Warnings</div>
+        <div class="value warning" id="sumWarning">-</div>
+    </div>
+    <div class="summary-card">
+        <div class="label">Info</div>
+        <div class="value info" id="sumInfo">-</div>
+    </div>
+    <div class="summary-card">
+        <div class="label">This Month</div>
+        <div class="value" id="sumThisMonth">-</div>
+        <div class="subtext" id="sumTrend"></div>
+    </div>
+    <div class="summary-card">
+        <div class="label">Last Run</div>
+        <div class="value" id="sumLastRun" style="font-size: 1rem;">-</div>
+    </div>
+</div>
+
+<!-- Run Panel -->
+<div class="run-panel">
+    <h3><i class="bi bi-play-circle"></i> Run Detection</h3>
+    <div class="run-form">
+        <div class="filter-group">
+            <label for="runArea">Location</label>
+            <select id="runArea"></select>
+        </div>
+        <div class="filter-group">
+            <label for="runFrom">From</label>
+            <input type="date" id="runFrom">
+        </div>
+        <div class="filter-group">
+            <label for="runTo">To</label>
+            <input type="date" id="runTo">
+        </div>
+        <div class="filter-group">
+            <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;">
+                <input type="checkbox" id="runAI" checked style="width: auto;"> Use AI Analysis
+            </label>
+        </div>
+        <button class="btn btn-primary" id="runBtn" onclick="triggerRun()">
+            <i class="bi bi-play-fill"></i> Run Now
+        </button>
+        <button class="btn btn-secondary" id="rebuildBtn" onclick="rebuildBaselines()">
+            <i class="bi bi-arrow-clockwise"></i> Rebuild Baselines
+        </button>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+    <div class="filter-group">
+        <label for="filterArea">Location</label>
+        <select id="filterArea" onchange="onAreaChange()"></select>
+    </div>
+    <div class="filter-group">
+        <label for="filterStatus">Status</label>
+        <select id="filterStatus" onchange="loadFlags()">
+            <option value="">Open</option>
+            <option value="reviewed">Reviewed</option>
+            <option value="dismissed">Dismissed</option>
+            <option value="escalated">Escalated</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label for="filterSeverity">Severity</label>
+        <select id="filterSeverity" onchange="loadFlags()">
+            <option value="">All</option>
+            <option value="critical">Critical</option>
+            <option value="warning">Warning</option>
+            <option value="info">Info</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label for="filterType">Type</label>
+        <select id="filterType" onchange="loadFlags()">
+            <option value="">All Types</option>
+            <option value="UNBALANCED_ENTRY">Unbalanced Entry</option>
+            <option value="DUPLICATE_ENTRY">Duplicate Entry</option>
+            <option value="WRONG_NORMAL_BALANCE">Wrong Normal Balance</option>
+            <option value="MISSING_DESCRIPTION">Missing Description</option>
+            <option value="ROUND_NUMBER_ANOMALY">Round Number</option>
+            <option value="OUT_OF_HOURS_POSTING">Out of Hours</option>
+            <option value="STATISTICAL_OUTLIER">Statistical Outlier</option>
+            <option value="NEGATIVE_BALANCE">Negative Balance</option>
+            <option value="FOOD_COST_SPIKE">Food Cost Spike</option>
+        </select>
+    </div>
+    <div class="filter-group">
+        <label for="filterPeriodFrom">Period From</label>
+        <input type="date" id="filterPeriodFrom" onchange="loadFlags()">
+    </div>
+    <div class="filter-group">
+        <label for="filterPeriodTo">Period To</label>
+        <input type="date" id="filterPeriodTo" onchange="loadFlags()">
+    </div>
+</div>
+
+<!-- Bulk Actions Bar -->
+<div class="bulk-bar" id="bulkBar">
+    <span><span class="selected-count" id="selectedCount">0</span> selected</span>
+    <button class="btn btn-success btn-xs" onclick="bulkReview('reviewed')"><i class="bi bi-check-lg"></i> Mark Reviewed</button>
+    <button class="btn btn-secondary btn-xs" onclick="bulkReview('dismissed')"><i class="bi bi-x-lg"></i> Dismiss</button>
+    <button class="btn btn-danger btn-xs" onclick="bulkReview('escalated')"><i class="bi bi-exclamation-triangle"></i> Escalate</button>
+    <button class="btn btn-xs" style="margin-left: auto; background: transparent; color: white; border: 1px solid rgba(255,255,255,0.3);" onclick="clearSelection()">Clear</button>
+</div>
+
+<!-- Flags Table -->
+<div class="flags-table">
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 30px;"><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
+                <th>Severity</th>
+                <th>Type</th>
+                <th>Title</th>
+                <th>Value</th>
+                <th>Period</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="flagsBody">
+            <tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">Select a location to view flags</td></tr>
+        </tbody>
+    </table>
+    <div class="pagination-controls" id="paginationControls" style="display: none;">
+        <div class="page-info" id="pageInfo"></div>
+        <div class="page-buttons" id="pageButtons"></div>
+    </div>
+</div>
+
+<!-- Flag Detail Modal -->
+<div class="modal fade" id="flagDetailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content" style="background: var(--bg-secondary); border: 1px solid var(--border-primary);">
+            <div class="modal-header" style="border-color: var(--border-primary);">
+                <h5 class="modal-title" id="flagModalTitle">Flag Detail</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="flagModalBody">
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let currentPage = 1;
+    let perPage = 50;
+    let selectedIds = new Set();
+    let areas = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadAreas();
+
+        // Default run dates: last 30 days
+        const today = new Date();
+        const thirtyAgo = new Date(today);
+        thirtyAgo.setDate(today.getDate() - 30);
+        document.getElementById('runTo').value = formatDateInput(today);
+        document.getElementById('runFrom').value = formatDateInput(thirtyAgo);
+    });
+
+    function formatDateInput(d) {
+        return d.toISOString().split('T')[0];
+    }
+
+    function formatDate(dateStr) {
+        if (!dateStr) return '-';
+        return new Date(dateStr).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+    }
+
+    function formatCurrency(val) {
+        if (val === null || val === undefined) return '-';
+        const num = parseFloat(val);
+        if (isNaN(num)) return '-';
+        return '$' + Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatDateTime(dtStr) {
+        if (!dtStr) return '-';
+        return new Date(dtStr).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function showMessage(text, type) {
+        const msg = document.getElementById('message');
+        msg.textContent = text;
+        msg.className = `show ${type}`;
+        setTimeout(() => msg.className = '', 5000);
+    }
+
+    // --- Areas ---
+    async function loadAreas() {
+        try {
+            const r = await fetch('/accounting/api/areas/');
+            if (r.ok) {
+                areas = await r.json();
+                populateAreaDropdowns();
+                if (areas.length > 0) {
+                    onAreaChange();
+                }
+            }
+        } catch (e) {
+            console.error('Failed to load areas', e);
+        }
+    }
+
+    function populateAreaDropdowns() {
+        const filterSel = document.getElementById('filterArea');
+        const runSel = document.getElementById('runArea');
+        filterSel.innerHTML = '';
+        runSel.innerHTML = '';
+        areas.forEach(a => {
+            filterSel.innerHTML += `<option value="${a.id}">${a.name}</option>`;
+            runSel.innerHTML += `<option value="${a.id}">${a.name}</option>`;
+        });
+    }
+
+    function onAreaChange() {
+        currentPage = 1;
+        loadFlags();
+        loadSummary();
+    }
+
+    // --- Summary ---
+    async function loadSummary() {
+        const areaId = document.getElementById('filterArea').value;
+        if (!areaId) return;
+
+        try {
+            const r = await fetch(`/accounting/api/gl-review/summary/${areaId}`);
+            if (r.ok) {
+                const data = await r.json();
+                document.getElementById('sumCritical').textContent = data.open_flags.critical || 0;
+                document.getElementById('sumWarning').textContent = data.open_flags.warning || 0;
+                document.getElementById('sumInfo').textContent = data.open_flags.info || 0;
+                document.getElementById('sumThisMonth').textContent = data.this_month_count;
+
+                const diff = data.this_month_count - data.last_month_count;
+                const trend = document.getElementById('sumTrend');
+                if (diff > 0) {
+                    trend.textContent = `+${diff} vs last month`;
+                    trend.style.color = 'var(--error)';
+                } else if (diff < 0) {
+                    trend.textContent = `${diff} vs last month`;
+                    trend.style.color = 'var(--success)';
+                } else {
+                    trend.textContent = 'Same as last month';
+                    trend.style.color = 'var(--text-muted)';
+                }
+
+                document.getElementById('sumLastRun').textContent = data.last_run_date ? formatDateTime(data.last_run_date) : 'Never';
+            }
+        } catch (e) {
+            console.error('Failed to load summary', e);
+        }
+    }
+
+    // --- Flags ---
+    async function loadFlags() {
+        const areaId = document.getElementById('filterArea').value;
+        if (!areaId) return;
+
+        const status = document.getElementById('filterStatus').value || 'open';
+        const severity = document.getElementById('filterSeverity').value;
+        const flagType = document.getElementById('filterType').value;
+        const periodFrom = document.getElementById('filterPeriodFrom').value;
+        const periodTo = document.getElementById('filterPeriodTo').value;
+
+        let url = `/accounting/api/gl-review/flags?area_id=${areaId}&status=${status}&page=${currentPage}&per_page=${perPage}`;
+        if (severity) url += `&severity=${severity}`;
+        if (flagType) url += `&flag_type=${flagType}`;
+        if (periodFrom) url += `&period_from=${periodFrom}`;
+        if (periodTo) url += `&period_to=${periodTo}`;
+
+        const tbody = document.getElementById('flagsBody');
+        tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem;">Loading...</td></tr>';
+
+        try {
+            const r = await fetch(url);
+            if (r.ok) {
+                const data = await r.json();
+                renderFlags(data);
+            } else {
+                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--error);">Failed to load flags</td></tr>';
+            }
+        } catch (e) {
+            console.error('Error loading flags', e);
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--error);">Error loading flags</td></tr>';
+        }
+    }
+
+    function renderFlags(data) {
+        const tbody = document.getElementById('flagsBody');
+        selectedIds.clear();
+        updateBulkBar();
+        document.getElementById('selectAll').checked = false;
+
+        if (!data.items || data.items.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 2rem; color: var(--text-muted);">No flags found</td></tr>';
+            document.getElementById('paginationControls').style.display = 'none';
+            return;
+        }
+
+        tbody.innerHTML = data.items.map(flag => `
+            <tr class="row-${flag.severity}" onclick="showFlagDetail(${flag.id})">
+                <td onclick="event.stopPropagation()">
+                    <input type="checkbox" value="${flag.id}" onchange="toggleSelect(this)">
+                </td>
+                <td><span class="badge severity-${flag.severity}">${flag.severity}</span></td>
+                <td><span class="flag-type-badge">${formatFlagType(flag.flag_type)}</span></td>
+                <td>${escapeHtml(flag.title)}</td>
+                <td style="font-family: monospace; white-space: nowrap;">${formatCurrency(flag.flagged_value)}</td>
+                <td style="white-space: nowrap;">${formatDate(flag.period_date)}</td>
+                <td><span class="badge status-${flag.status}">${flag.status}</span></td>
+                <td onclick="event.stopPropagation()">
+                    <div class="actions-wrap">
+                        ${flag.status === 'open' ? `
+                            <button class="btn btn-success btn-xs" onclick="quickReview(${flag.id}, 'reviewed')" title="Mark Reviewed"><i class="bi bi-check-lg"></i></button>
+                            <button class="btn btn-secondary btn-xs" onclick="quickReview(${flag.id}, 'dismissed')" title="Dismiss"><i class="bi bi-x-lg"></i></button>
+                            <button class="btn btn-danger btn-xs" onclick="quickReview(${flag.id}, 'escalated')" title="Escalate"><i class="bi bi-exclamation-triangle"></i></button>
+                        ` : ''}
+                    </div>
+                </td>
+            </tr>
+        `).join('');
+
+        // Pagination
+        const pc = document.getElementById('paginationControls');
+        if (data.pages > 1) {
+            pc.style.display = 'flex';
+            document.getElementById('pageInfo').textContent =
+                `Showing ${(data.page - 1) * data.per_page + 1}–${Math.min(data.page * data.per_page, data.total)} of ${data.total}`;
+
+            let btns = '';
+            btns += `<button ${data.page <= 1 ? 'disabled' : ''} onclick="goToPage(${data.page - 1})">‹</button>`;
+            for (let p = 1; p <= data.pages; p++) {
+                if (data.pages > 7 && Math.abs(p - data.page) > 2 && p !== 1 && p !== data.pages) {
+                    if (p === 2 || p === data.pages - 1) btns += `<button disabled>…</button>`;
+                    continue;
+                }
+                btns += `<button class="${p === data.page ? 'active' : ''}" onclick="goToPage(${p})">${p}</button>`;
+            }
+            btns += `<button ${data.page >= data.pages ? 'disabled' : ''} onclick="goToPage(${data.page + 1})">›</button>`;
+            document.getElementById('pageButtons').innerHTML = btns;
+        } else {
+            pc.style.display = data.total > 0 ? 'flex' : 'none';
+            if (data.total > 0) {
+                document.getElementById('pageInfo').textContent = `${data.total} flag${data.total !== 1 ? 's' : ''}`;
+                document.getElementById('pageButtons').innerHTML = '';
+            }
+        }
+    }
+
+    function goToPage(page) {
+        currentPage = page;
+        loadFlags();
+    }
+
+    // --- Flag Detail ---
+    async function showFlagDetail(id) {
+        try {
+            const r = await fetch(`/accounting/api/gl-review/flags/${id}`);
+            if (!r.ok) return;
+            const flag = await r.json();
+
+            document.getElementById('flagModalTitle').textContent = `Flag #${flag.id} — ${formatFlagType(flag.flag_type)}`;
+
+            let html = `
+                <div class="flag-detail-grid">
+                    <div class="label">Severity</div>
+                    <div class="value"><span class="badge severity-${flag.severity}">${flag.severity}</span></div>
+
+                    <div class="label">Status</div>
+                    <div class="value"><span class="badge status-${flag.status}">${flag.status}</span></div>
+
+                    <div class="label">Type</div>
+                    <div class="value"><span class="flag-type-badge">${flag.flag_type}</span></div>
+
+                    <div class="label">Title</div>
+                    <div class="value">${escapeHtml(flag.title)}</div>
+
+                    ${flag.flagged_value !== null ? `
+                        <div class="label">Flagged Value</div>
+                        <div class="value" style="font-family: monospace;">${formatCurrency(flag.flagged_value)}</div>
+                    ` : ''}
+
+                    ${flag.expected_range_low !== null && flag.expected_range_high !== null ? `
+                        <div class="label">Expected Range</div>
+                        <div class="value" style="font-family: monospace;">${formatCurrency(flag.expected_range_low)} — ${formatCurrency(flag.expected_range_high)}</div>
+                    ` : ''}
+
+                    <div class="label">Period</div>
+                    <div class="value">${formatDate(flag.period_date)}</div>
+
+                    ${flag.journal_entry_id ? `
+                        <div class="label">Journal Entry</div>
+                        <div class="value"><a href="/accounting/journal-entries?highlight=${flag.journal_entry_id}" target="_blank">Entry #${flag.journal_entry_id}</a></div>
+                    ` : ''}
+
+                    ${flag.account_id ? `
+                        <div class="label">Account</div>
+                        <div class="value">Account #${flag.account_id}</div>
+                    ` : ''}
+
+                    <div class="label">Created</div>
+                    <div class="value">${formatDateTime(flag.created_at)}</div>
+                </div>
+            `;
+
+            if (flag.detail) {
+                html += `<h6 style="margin-top: 1rem; color: var(--text-secondary);">Detail</h6>
+                    <div class="ai-reasoning-box">${escapeHtml(flag.detail)}</div>`;
+            }
+
+            if (flag.ai_reasoning) {
+                html += `<h6 style="margin-top: 1rem; color: var(--text-secondary);"><i class="bi bi-robot"></i> AI Analysis
+                    ${flag.ai_confidence ? `<span class="badge severity-${flag.ai_confidence === 'high' ? 'info' : flag.ai_confidence === 'medium' ? 'warning' : 'info'}" style="margin-left: 0.5rem;">${flag.ai_confidence} confidence</span>` : ''}
+                </h6>
+                <div class="ai-reasoning-box">${escapeHtml(flag.ai_reasoning)}</div>`;
+            }
+
+            if (flag.reviewed_by) {
+                html += `
+                    <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid var(--border-primary);">
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">
+                            Reviewed by User #${flag.reviewed_by} on ${formatDateTime(flag.reviewed_at)}
+                        </div>
+                        ${flag.review_note ? `<div style="margin-top: 0.25rem; font-style: italic;">"${escapeHtml(flag.review_note)}"</div>` : ''}
+                    </div>`;
+            }
+
+            if (flag.status === 'open') {
+                html += `
+                    <div class="review-form">
+                        <label for="modalReviewNote" style="font-weight: 600; font-size: 0.875rem;">Review Note</label>
+                        <textarea id="modalReviewNote" rows="2" placeholder="Optional note..."></textarea>
+                        <div class="review-actions">
+                            <button class="btn btn-success btn-xs" onclick="reviewFromModal(${flag.id}, 'reviewed')"><i class="bi bi-check-lg"></i> Mark Reviewed</button>
+                            <button class="btn btn-secondary btn-xs" onclick="reviewFromModal(${flag.id}, 'dismissed')"><i class="bi bi-x-lg"></i> Dismiss</button>
+                            <button class="btn btn-danger btn-xs" onclick="reviewFromModal(${flag.id}, 'escalated')"><i class="bi bi-exclamation-triangle"></i> Escalate</button>
+                        </div>
+                    </div>`;
+            }
+
+            document.getElementById('flagModalBody').innerHTML = html;
+            const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('flagDetailModal'));
+            modal.show();
+        } catch (e) {
+            console.error('Failed to load flag detail', e);
+        }
+    }
+
+    // --- Review Actions ---
+    async function quickReview(id, status) {
+        try {
+            const r = await fetch(`/accounting/api/gl-review/flags/${id}/review`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: status })
+            });
+            if (r.ok) {
+                showMessage(`Flag ${status}`, 'success');
+                loadFlags();
+                loadSummary();
+            } else {
+                showMessage('Failed to update flag', 'error');
+            }
+        } catch (e) {
+            showMessage('Error updating flag', 'error');
+        }
+    }
+
+    async function reviewFromModal(id, status) {
+        const note = document.getElementById('modalReviewNote').value;
+        try {
+            const r = await fetch(`/accounting/api/gl-review/flags/${id}/review`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: status, review_note: note || null })
+            });
+            if (r.ok) {
+                bootstrap.Modal.getOrCreateInstance(document.getElementById('flagDetailModal')).hide();
+                showMessage(`Flag ${status}`, 'success');
+                loadFlags();
+                loadSummary();
+            } else {
+                showMessage('Failed to update flag', 'error');
+            }
+        } catch (e) {
+            showMessage('Error updating flag', 'error');
+        }
+    }
+
+    // --- Bulk Actions ---
+    function toggleSelect(cb) {
+        if (cb.checked) {
+            selectedIds.add(parseInt(cb.value));
+        } else {
+            selectedIds.delete(parseInt(cb.value));
+        }
+        updateBulkBar();
+    }
+
+    function toggleSelectAll(cb) {
+        const boxes = document.querySelectorAll('#flagsBody input[type="checkbox"]');
+        boxes.forEach(b => {
+            b.checked = cb.checked;
+            if (cb.checked) selectedIds.add(parseInt(b.value));
+            else selectedIds.delete(parseInt(b.value));
+        });
+        updateBulkBar();
+    }
+
+    function clearSelection() {
+        selectedIds.clear();
+        document.querySelectorAll('#flagsBody input[type="checkbox"]').forEach(b => b.checked = false);
+        document.getElementById('selectAll').checked = false;
+        updateBulkBar();
+    }
+
+    function updateBulkBar() {
+        const bar = document.getElementById('bulkBar');
+        document.getElementById('selectedCount').textContent = selectedIds.size;
+        bar.classList.toggle('show', selectedIds.size > 0);
+    }
+
+    async function bulkReview(status) {
+        if (selectedIds.size === 0) return;
+        try {
+            const r = await fetch('/accounting/api/gl-review/flags/bulk-review', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ flag_ids: Array.from(selectedIds), status: status })
+            });
+            if (r.ok) {
+                const data = await r.json();
+                showMessage(`${data.updated} flag(s) ${status}`, 'success');
+                clearSelection();
+                loadFlags();
+                loadSummary();
+            } else {
+                showMessage('Failed to update flags', 'error');
+            }
+        } catch (e) {
+            showMessage('Error updating flags', 'error');
+        }
+    }
+
+    // --- Run Detection ---
+    async function triggerRun() {
+        const areaId = document.getElementById('runArea').value;
+        const dateFrom = document.getElementById('runFrom').value;
+        const dateTo = document.getElementById('runTo').value;
+        const useAI = document.getElementById('runAI').checked;
+
+        if (!areaId || !dateFrom || !dateTo) {
+            showMessage('Please select location and date range', 'error');
+            return;
+        }
+
+        const btn = document.getElementById('runBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Running...';
+
+        try {
+            const r = await fetch('/accounting/api/gl-review/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ area_id: parseInt(areaId), date_from: dateFrom, date_to: dateTo, use_ai: useAI })
+            });
+            if (r.ok) {
+                const data = await r.json();
+                showMessage(`Detection run started (run_id: ${data.run_id.substring(0, 8)}...)`, 'success');
+
+                // Poll for results
+                setTimeout(() => pollRun(data.run_id), 2000);
+            } else {
+                const err = await r.json();
+                showMessage(err.detail || 'Failed to start run', 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-play-fill"></i> Run Now';
+            }
+        } catch (e) {
+            showMessage('Error starting run', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-play-fill"></i> Run Now';
+        }
+    }
+
+    let pollAttempts = 0;
+    const MAX_POLL_ATTEMPTS = 180; // ~6 minutes max (AI analysis can take a while with multiple batches)
+
+    const stepLabels = {
+        rules_engine: 'Analyzing entries...',
+        ai_analysis: 'AI analysis...',
+        saving: 'Saving results...',
+    };
+
+    async function pollRun(runId) {
+        pollAttempts++;
+        const btn = document.getElementById('runBtn');
+        const elapsed = pollAttempts * 2;
+        try {
+            const r = await fetch(`/accounting/api/gl-review/runs/${runId}`);
+            if (r.ok) {
+                const data = await r.json();
+                if (data.status === 'running') {
+                    const stepLabel = stepLabels[data.step] || 'Processing...';
+                    btn.innerHTML = `<i class="bi bi-hourglass-split"></i> ${stepLabel} ${elapsed}s`;
+                    if (pollAttempts < MAX_POLL_ATTEMPTS) {
+                        setTimeout(() => pollRun(runId), 2000);
+                        return;
+                    }
+                    showMessage('Run is taking longer than expected. Flags will appear when processing completes — try refreshing in a minute.', 'error');
+                } else {
+                    showMessage(`Run complete: ${data.total_flags} flags found`, 'success');
+                    document.getElementById('filterArea').value = data.area_id;
+                }
+                loadFlags();
+                loadSummary();
+            } else if (r.status === 500) {
+                showMessage('Detection run failed — check server logs', 'error');
+            } else if (r.status === 404) {
+                showMessage('Run not found', 'error');
+            }
+        } catch (e) {
+            console.error('Poll error', e);
+        }
+
+        pollAttempts = 0;
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-play-fill"></i> Run Now';
+    }
+
+    // --- Rebuild Baselines ---
+    async function rebuildBaselines() {
+        const areaId = document.getElementById('runArea').value;
+        if (!areaId) {
+            showMessage('Please select a location', 'error');
+            return;
+        }
+
+        const btn = document.getElementById('rebuildBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Rebuilding...';
+
+        try {
+            const r = await fetch(`/accounting/api/gl-review/baselines/${areaId}/rebuild`, {
+                method: 'POST'
+            });
+            if (r.ok) {
+                const data = await r.json();
+                showMessage(`Baselines rebuilt: ${data.accounts_processed} accounts processed`, 'success');
+            } else {
+                const err = await r.json();
+                showMessage(err.detail || 'Failed to rebuild baselines', 'error');
+            }
+        } catch (e) {
+            showMessage('Error rebuilding baselines', 'error');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Rebuild Baselines';
+        }
+    }
+
+    // --- Helpers ---
+    function formatFlagType(ft) {
+        return ft.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+</script>
+{% endblock %}

@@ -5,7 +5,7 @@ Microservices-based restaurant management platform for SW Hospitality Group.
 - **Production URL:** https://rm.swhgrp.com
 - **Architecture:** 11 FastAPI microservices behind Nginx reverse proxy, each with its own PostgreSQL database
 - **Portal:** Central auth + UI at `/portal/`, serves templates from each service's template directory
-- **Last Updated:** March 11, 2026
+- **Last Updated:** March 14, 2026
 
 ## Infrastructure & Development Environment
 - **Production Server:** Linode Ubuntu instance at `/opt/restaurant-system/`
@@ -36,7 +36,7 @@ restaurant-system/
 - **Backend:** FastAPI (Python 3.11), async SQLAlchemy with asyncpg (maintenance, food-safety), sync SQLAlchemy (most others)
 - **Database:** PostgreSQL 15, one DB per service, Alembic migrations
 - **Frontend:** Jinja2 templates, Bootstrap Icons, vanilla JS (no frameworks)
-- **AI/ML:** Anthropic Claude API (cookbook), sentence-transformers embeddings, ChromaDB vector store
+- **AI/ML:** Anthropic Claude API (cookbook, GL review), sentence-transformers embeddings, ChromaDB vector store
 - **Infrastructure:** Docker Compose (root compose for all services), Nginx reverse proxy
 - **Auth:** JWT tokens in HTTP-only cookies, portal-based SSO
 
@@ -183,6 +183,30 @@ docker run --rm -v /opt/restaurant-system:/repo -v /root/.ssh:/root/.ssh:ro -w /
 - **Endpoint**: `GET /api/documents/events/{event_id}/quote-pdf`
 - **Service**: `pdf_service.py` → `generate_price_quote_pdf()` — simpler than contract, focused on pricing
 - **Button**: Added to event detail page admin actions
+
+### Equipment & Rentals Line Items (Mar 2026)
+- **Structured equipment items**: Equipment & Rentals section on event menu tab converted from free-text to structured line items (name, quantity, price)
+- **Data storage**: `menu_json.equipment_items` array + `menu_json.equipment_notes` for additional notes
+- **Financial integration**: Equipment prices included in subtotal calculation alongside food items; service charge and tax apply to full total
+- **PDF output**: Quote PDF shows itemized equipment table (qty/price/total); Contract PDF lists equipment items under menu section
+- **Backward compat**: Old `menu_json.equipment` text field auto-migrates to `equipment_notes` on page load
+
+### GL Anomaly Review System (Mar 2026)
+- **Automated GL sweep**: Nightly job (3 AM) scans journal entries for anomalies using rules engine + Claude AI analysis
+- **Rules engine**: `gl_review/rules_engine.py` — pattern-based detection (amount thresholds, duplicate entries, unusual accounts, etc.)
+- **AI analyzer**: `gl_review/ai_analyzer.py` — Claude Sonnet analyzes flagged entries for reasoning/severity
+- **Models**: `GLAnomalyFlag` (flags with lifecycle: open → reviewed → dismissed → superseded) + `GLAccountBaseline` (statistical baselines)
+- **Monthly baseline rebuild**: 4 AM on 1st of month, recomputes statistical baselines per GL account
+- **API**: `gl_review/router.py` — flag CRUD, review/dismiss actions, 90-day retention cleanup
+- **UI**: `/portal/accounting/gl-review` page, nav link in accounting sidebar
+- **Migration**: `20260312_0001_add_gl_anomaly_tables.py`
+- **Config**: `GL_REVIEW_AI_MODEL` env var (default: `claude-sonnet-4-6`), requires `ANTHROPIC_API_KEY`
+
+### Integration Hub Connection Pooling (Mar 2026)
+- **Centralized engine management**: `get_inventory_engine()` in `db/database.py` — shared, pooled connection to Inventory DB
+- **Connection pooling**: Main hub engine: pool_size=10, max_overflow=20; Accounting engine: pool_size=3, max_overflow=5
+- **Refactored**: Eliminated 20+ inline `create_engine()` calls across `vendor_items.py`, `invoice_parser.py`, `location_cost_updater.py`, `main.py`
+- **All engines**: `pool_pre_ping=True`, `pool_recycle=300` for reliability
 
 ### Files System Improvements (Mar 2026)
 - **Owner-only folder filter**: `GET /api/folders?owner_only=true` — filters folders by current user

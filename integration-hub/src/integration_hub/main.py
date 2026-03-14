@@ -268,12 +268,11 @@ async def view_invoice(request: Request, invoice_id: int, db: Session = Depends(
     items = db.query(HubInvoiceItem).filter(HubInvoiceItem.invoice_id == invoice_id).order_by(HubInvoiceItem.id).all()
 
     # Get locations from inventory database for location dropdown
-    from sqlalchemy import create_engine, text
-    inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
-                                 'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+    from sqlalchemy import text
+    from integration_hub.db.database import get_inventory_engine
     locations = []
     try:
-        engine = create_engine(inventory_db_url)
+        engine = get_inventory_engine()
         with engine.connect() as conn:
             results = conn.execute(
                 text("SELECT id, name FROM locations WHERE is_active = true ORDER BY name")
@@ -403,7 +402,7 @@ def _process_upload_job(job_id: str):
     Updates job status as it progresses through parsing stages.
     """
     from integration_hub.services.invoice_parser import get_invoice_parser
-    from sqlalchemy import create_engine, text
+    from sqlalchemy import text
     from datetime import datetime, timezone
 
     db = SessionLocal()
@@ -459,11 +458,10 @@ def _process_upload_job(job_id: str):
         job.progress_percent = 90
         db.commit()
 
-        inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
-                                     'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+        from integration_hub.db.database import get_inventory_engine
         locations = []
         try:
-            inv_engine = create_engine(inventory_db_url)
+            inv_engine = get_inventory_engine()
             with inv_engine.connect() as conn:
                 results = conn.execute(
                     text("SELECT id, name FROM locations WHERE is_active = true ORDER BY name")
@@ -704,11 +702,10 @@ async def save_uploaded_invoice(
     # Get location name if location_id provided
     location_name = None
     if location_id_int:
-        from sqlalchemy import create_engine, text
-        inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
-                                     'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+        from sqlalchemy import text
+        from integration_hub.db.database import get_inventory_engine
         try:
-            engine = create_engine(inventory_db_url)
+            engine = get_inventory_engine()
             with engine.connect() as conn:
                 result = conn.execute(
                     text("SELECT name FROM locations WHERE id = :id"),
@@ -1167,11 +1164,10 @@ async def update_invoice(
                 invoice.location_id = int(data["location_id"])
                 # Look up location name from inventory database if not provided
                 if "location_name" not in data or not data["location_name"]:
-                    inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
-                                                 'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
                     try:
-                        from sqlalchemy import create_engine, text as sql_text
-                        engine = create_engine(inventory_db_url)
+                        from sqlalchemy import text as sql_text
+                        from integration_hub.db.database import get_inventory_engine
+                        engine = get_inventory_engine()
                         with engine.connect() as conn:
                             result = conn.execute(
                                 sql_text("SELECT name FROM locations WHERE id = :loc_id"),
@@ -3621,14 +3617,12 @@ async def vendor_items_page(
     containers = db.query(Container).filter(Container.is_active == True).order_by(Container.sort_order).all()
 
     # Fetch locations and master items from Inventory database directly (no auth needed)
-    from sqlalchemy import create_engine
-    inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
-                                 'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+    from integration_hub.db.database import get_inventory_engine
     locations = []
     master_items = []
     filter_master_item_name = None
     try:
-        inv_engine = create_engine(inventory_db_url)
+        inv_engine = get_inventory_engine()
         with inv_engine.connect() as conn:
             # Fetch locations
             results = conn.execute(
@@ -3719,13 +3713,12 @@ async def vendor_item_detail_page(request: Request, id: int = Query(..., descrip
     containers = [{"id": c.id, "name": c.name} for c in containers_query]
 
     # Fetch locations and master items from Inventory database
-    from sqlalchemy import create_engine, text as sql_text
-    inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
-                                 'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+    from sqlalchemy import text as sql_text
+    from integration_hub.db.database import get_inventory_engine
     locations = []
     master_items = []
     try:
-        inv_engine = create_engine(inventory_db_url)
+        inv_engine = get_inventory_engine()
         with inv_engine.connect() as conn:
             results = conn.execute(
                 sql_text("SELECT id, name FROM locations WHERE is_active = true ORDER BY name")

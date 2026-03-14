@@ -6,7 +6,9 @@ Uses APScheduler to run periodic tasks.
 """
 
 import logging
-from datetime import datetime, date, timedelta, time as time_type
+import os
+import uuid
+from datetime import datetime, date, timedelta, time as time_type, timezone
 from typing import Optional
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
@@ -262,6 +264,122 @@ async def catchup_missed_syncs():
         db.close()
 
 
+async def nightly_gl_sweep():
+    """
+    Nightly GL anomaly detection sweep.
+    Runs rules engine + AI analysis for each active area, covering the last 7 days.
+    """
+    from accounting.models.area import Area
+    from accounting.gl_review.models import GLAnomalyFlag, STATUS_OPEN, STATUS_SUPERSEDED, STATUS_DISMISSED, STATUS_REVIEWED
+    from accounting.gl_review.rules_engine import run_rules_engine
+    from accounting.gl_review.ai_analyzer import analyze_flags_with_ai
+    from accounting.gl_review.baselines import compute_baselines
+
+    logger.info("Starting nightly GL anomaly sweep...")
+    db: Session = SessionLocal()
+
+    try:
+        # Retention cleanup: delete closed flags older than 90 days
+        cutoff = datetime.now(timezone.utc) - timedelta(days=90)
+        deleted = (
+            db.query(GLAnomalyFlag)
+            .filter(
+                GLAnomalyFlag.status.in_([STATUS_DISMISSED, STATUS_REVIEWED, STATUS_SUPERSEDED]),
+                GLAnomalyFlag.created_at < cutoff,
+            )
+            .delete(synchronize_session='fetch')
+        )
+        if deleted:
+            db.commit()
+            logger.info(f"Retention cleanup: deleted {deleted} old closed flags")
+
+        areas = db.query(Area).filter(Area.is_active == True).all()
+        has_api_key = bool(os.environ.get("ANTHROPIC_API_KEY"))
+
+        for area in areas:
+            run_start = datetime.now(timezone.utc)
+            run_id = str(uuid.uuid4())
+            today = date.today()
+            date_from = today - timedelta(days=7)
+
+            try:
+                flags = run_rules_engine(db, area.id, date_from, today)
+
+                if has_api_key and flags:
+                    period_label = f"{date_from} to {today}"
+                    flags = analyze_flags_with_ai(flags, area.id, area.name, period_label)
+
+                for flag_dict in flags:
+                    flag = GLAnomalyFlag(
+                        area_id=area.id,
+                        journal_entry_id=flag_dict.get('journal_entry_id'),
+                        journal_entry_line_id=flag_dict.get('journal_entry_line_id'),
+                        account_id=flag_dict.get('account_id'),
+                        flag_type=flag_dict['flag_type'],
+                        severity=flag_dict['severity'],
+                        title=flag_dict['title'],
+                        detail=flag_dict.get('detail'),
+                        flagged_value=flag_dict.get('flagged_value'),
+                        expected_range_low=flag_dict.get('expected_range_low'),
+                        expected_range_high=flag_dict.get('expected_range_high'),
+                        period_date=flag_dict.get('period_date'),
+                        status=STATUS_OPEN,
+                        ai_reasoning=flag_dict.get('ai_reasoning'),
+                        ai_confidence=flag_dict.get('ai_confidence'),
+                        run_id=run_id,
+                    )
+                    db.add(flag)
+
+                db.commit()
+                elapsed = (datetime.now(timezone.utc) - run_start).total_seconds()
+                logger.info(
+                    f"GL sweep for {area.name} (area_id={area.id}): "
+                    f"run_id={run_id}, {len(flags)} flags, {elapsed:.1f}s"
+                )
+
+            except Exception:
+                db.rollback()
+                logger.exception(f"GL sweep failed for area {area.name} (area_id={area.id})")
+
+        logger.info("Nightly GL anomaly sweep completed")
+
+    except Exception:
+        logger.exception("Error in nightly GL sweep")
+    finally:
+        db.close()
+
+
+async def monthly_baseline_rebuild():
+    """
+    Monthly GL account baseline rebuild.
+    Recomputes statistical baselines for all active areas using 12 months of history.
+    """
+    from accounting.models.area import Area
+    from accounting.gl_review.baselines import compute_baselines
+
+    logger.info("Starting monthly GL baseline rebuild...")
+    db: Session = SessionLocal()
+
+    try:
+        areas = db.query(Area).filter(Area.is_active == True).all()
+        total_accounts = 0
+
+        for area in areas:
+            try:
+                count = compute_baselines(db, area.id, lookback_months=12)
+                total_accounts += count
+                logger.info(f"Baselines rebuilt for {area.name}: {count} accounts")
+            except Exception:
+                logger.exception(f"Baseline rebuild failed for area {area.name}")
+
+        logger.info(f"Monthly baseline rebuild completed: {total_accounts} total accounts across {len(areas)} areas")
+
+    except Exception:
+        logger.exception("Error in monthly baseline rebuild")
+    finally:
+        db.close()
+
+
 def start_scheduler():
     """
     Start the background scheduler with all periodic tasks.
@@ -296,11 +414,32 @@ def start_scheduler():
             replace_existing=True
         )
 
+        # Add nightly GL anomaly sweep - runs at 3 AM daily
+        scheduler.add_job(
+            nightly_gl_sweep,
+            trigger=CronTrigger(hour=3, minute=0),
+            id='nightly_gl_sweep',
+            name='Nightly GL anomaly detection sweep',
+            replace_existing=True,
+            max_instances=1
+        )
+
+        # Add monthly GL baseline rebuild - runs at 4 AM on the 1st of each month
+        scheduler.add_job(
+            monthly_baseline_rebuild,
+            trigger=CronTrigger(day=1, hour=4, minute=0),
+            id='monthly_baseline_rebuild',
+            name='Monthly GL account baseline rebuild',
+            replace_existing=True,
+            max_instances=1
+        )
+
         # Start the scheduler
         scheduler.start()
         logger.info("Background scheduler started successfully")
         logger.info("Auto-sync task will check every 10 minutes for locations due for sync")
         logger.info("Startup catchup task will run immediately to sync any missed days")
+        logger.info("GL sweep scheduled daily at 3:00 AM, baseline rebuild monthly at 4:00 AM on 1st")
         logger.info(f"Scheduler jobs: {scheduler.get_jobs()}")
 
     except Exception as e:

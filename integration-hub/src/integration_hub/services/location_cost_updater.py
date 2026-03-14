@@ -22,7 +22,7 @@ import os
 from decimal import Decimal
 from datetime import datetime
 from typing import Dict, List, Optional
-from sqlalchemy import create_engine, text, or_
+from sqlalchemy import text, or_
 from sqlalchemy.orm import Session
 
 from integration_hub.models.hub_vendor_item import HubVendorItem
@@ -83,13 +83,11 @@ class LocationCostUpdaterService:
 
     def __init__(self, db: Session):
         self.db = db
-        self.inventory_db_url = os.getenv('INVENTORY_DATABASE_URL')
-        if not self.inventory_db_url:
-            raise ValueError("INVENTORY_DATABASE_URL environment variable is required")
 
     def _get_inventory_engine(self):
-        """Get SQLAlchemy engine for Inventory database"""
-        return create_engine(self.inventory_db_url)
+        """Get shared SQLAlchemy engine for Inventory database"""
+        from integration_hub.db.database import get_inventory_engine
+        return get_inventory_engine()
 
     def update_costs_from_invoice(self, invoice_id: int) -> Dict:
         """
@@ -649,10 +647,8 @@ class LocationCostUpdaterService:
         logger.info(f"Fixing location costs for {len(master_item_costs)} master items")
 
         # Connect to inventory database
-        inventory_db_url = os.getenv("INVENTORY_DATABASE_URL")
-        if not inventory_db_url:
-            raise ValueError("INVENTORY_DATABASE_URL environment variable is required")
-        engine = create_engine(inventory_db_url)
+        from integration_hub.db.database import get_inventory_engine
+        engine = get_inventory_engine()
 
         with engine.connect() as conn:
             for master_item_id, cost_info in master_item_costs.items():

@@ -7,9 +7,9 @@
 **Complete microservices-based restaurant management platform**
 
 **Production URL:** https://rm.swhgrp.com
-**Last Updated:** March 11, 2026
+**Last Updated:** March 14, 2026
 **Status:** ~98% Complete - All 11 Systems Production Ready ✅
-**Latest:** Cookbook AI structured recipes, event price quotes, file manager improvements (Mar 11, 2026) ✅
+**Latest:** GL anomaly detection with AI, event equipment/rental pricing, Hub connection pooling (Mar 14, 2026) ✅
 
 ---
 
@@ -44,7 +44,7 @@ The SW Hospitality Group Restaurant Management System is a comprehensive microse
 - **170+ HTML templates** for user interfaces
 - **160+ database models** with full relationships
 - **850+ API endpoints** for system integration
-- **24 Docker containers** orchestrated via 3 Docker Compose files (root: 20, maintenance: 2, food-safety: 2)
+- **26 Docker containers** orchestrated via single root Docker Compose file
 - **~98% completion** - all 10 systems production ready
 
 ### Source of Truth Architecture
@@ -518,7 +518,7 @@ restaurant-system/
 - **Migrations:** Alembic (23 migrations)
 - **Files:** **119 Python files** (largest system!), 38+ templates, 250+ API endpoints
 - **API Docs:** OpenAPI/Swagger auto-generated
-- **Latest:** Plaid integration & scheduler service (Jan 5, 2026) 🌟
+- **Latest:** GL anomaly review with AI analysis (Mar 14, 2026) 🌟
 
 **Features:**
 
@@ -588,6 +588,13 @@ restaurant-system/
 - 🔄 Variance analysis (partial - 40%)
 - 🔄 Forecasting (minimal implementation - ~30%)
 
+**GL Review & Anomaly Detection (NEW Mar 2026):** 🌟
+- ✅ **Automated nightly GL sweep** — rules engine + Claude AI anomaly detection
+- ✅ **Statistical baselines** — monthly recompute per GL account
+- ✅ **Flag lifecycle** — open → reviewed → dismissed → superseded with 90-day retention
+- ✅ **AI reasoning** — Claude Sonnet analyzes flagged entries for severity and explanation
+- ✅ **GL Review UI** — dedicated page for reviewing and acting on anomaly flags
+
 **Other:**
 - ✅ COGS tracking
 - ✅ Sales analysis
@@ -608,7 +615,7 @@ restaurant-system/
 - **Database:** events_db (PostgreSQL 15)
 - **Technology:** FastAPI, SQLAlchemy, WeasyPrint (PDF), FullCalendar.js
 - **Files:** 55 Python files, 18 templates
-- **Latest:** Catering contracts, CalDAV calendar item sync, calendar search (Mar 5, 2026) 🌟
+- **Latest:** Equipment/rental line items with pricing, catering contracts, CalDAV sync (Mar 14, 2026) 🌟
 
 **✅ Portal SSO Integration Complete:**
 - ✅ JWT token validation from Portal
@@ -664,7 +671,8 @@ restaurant-system/
 
 **Document Generation:**
 - ✅ BEO (Banquet Event Order) PDF generation
-- ✅ **Catering Contract PDF** — formal legal contract with venue logos, menu, financials, legal clauses, signature blocks (NEW Mar 2026) 🌟
+- ✅ **Catering Contract PDF** — formal legal contract with venue logos, menu, financials, legal clauses, signature blocks (Mar 2026) 🌟
+- ✅ **Price Quote PDF** — itemized quote with equipment/rentals, menu pricing, terms (Mar 2026) 🌟
 - ✅ Event summary PDF
 - ✅ WeasyPrint rendering with venue logo embedding (base64 data URIs)
 - ✅ Download/email delivery
@@ -686,7 +694,7 @@ restaurant-system/
 - ✅ Tabbed event detail view
 
 **Partial/Missing:**
-- 🔄 Menu builder UI (JSON storage only, no UI - 40%)
+- ✅ **Menu builder UI** — sectioned menu items with pricing, equipment/rental line items (Mar 2026) 🌟
 - 🔄 Financial integration with Accounting (partial - 50%)
 - 🔄 Event packages pricing system (CRUD complete, needs UI polish - 80%)
 - ❌ S3 storage (currently local)

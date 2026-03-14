@@ -101,6 +101,8 @@ services:
     - PLAID_CLIENT_ID=68f5d6dad4bf02002290032a
     - PLAID_SECRET=00f91be32c85b9dba803c3cec36060
     - PLAID_ENV=production
+    - ANTHROPIC_API_KEY=${ACCOUNTING_ANTHROPIC_API_KEY}
+    - GL_REVIEW_AI_MODEL=claude-sonnet-4-6
     depends_on:
       accounting-db:
         condition: service_healthy

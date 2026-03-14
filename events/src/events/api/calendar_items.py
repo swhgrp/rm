@@ -10,6 +10,7 @@ from events.core.database import get_db
 from events.core.config import settings
 from events.core.deps import require_auth
 from events.models.user import User, UserLocation
+from events.models.client import Venue
 from events.models.calendar_item import CalendarItem, RecurrencePattern
 from events.schemas.calendar_item import (
     CalendarItemCreate,
@@ -32,15 +33,18 @@ def _sync_item_to_caldav(db: Session, item: CalendarItem, current_user: User):
         caldav_service = CalDAVSyncService()
 
         users_to_sync = []
-        if item.location_id:
-            # Sync to all active users assigned to this venue
-            assignments = db.query(UserLocation).filter(
-                UserLocation.venue_id == item.location_id
-            ).all()
-            for assignment in assignments:
-                user = db.query(User).filter(User.id == assignment.user_id).first()
-                if user and user.is_active:
-                    users_to_sync.append(user)
+        if item.location_id and item.location:
+            # Calendar items use the locations table, but UserLocation.venue_id
+            # references the venues table. Look up the matching venue by name.
+            venue = db.query(Venue).filter(Venue.name == item.location.name).first()
+            if venue:
+                assignments = db.query(UserLocation).filter(
+                    UserLocation.venue_id == venue.id
+                ).all()
+                for assignment in assignments:
+                    user = db.query(User).filter(User.id == assignment.user_id).first()
+                    if user and user.is_active:
+                        users_to_sync.append(user)
 
         # Fallback: if no location or no assignments, sync to creator only
         if not users_to_sync:
@@ -64,14 +68,16 @@ def _remove_item_from_caldav(db: Session, item: CalendarItem, current_user: User
         caldav_service = CalDAVSyncService()
 
         users_to_sync = []
-        if item.location_id:
-            assignments = db.query(UserLocation).filter(
-                UserLocation.venue_id == item.location_id
-            ).all()
-            for assignment in assignments:
-                user = db.query(User).filter(User.id == assignment.user_id).first()
-                if user and user.is_active:
-                    users_to_sync.append(user)
+        if item.location_id and item.location:
+            venue = db.query(Venue).filter(Venue.name == item.location.name).first()
+            if venue:
+                assignments = db.query(UserLocation).filter(
+                    UserLocation.venue_id == venue.id
+                ).all()
+                for assignment in assignments:
+                    user = db.query(User).filter(User.id == assignment.user_id).first()
+                    if user and user.is_active:
+                        users_to_sync.append(user)
 
         if not users_to_sync:
             users_to_sync.append(current_user)

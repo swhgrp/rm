@@ -167,12 +167,9 @@ def _get_inventory_uom_lookup():
     Values: (id, name, abbreviation) tuples.
     Used by sync and API response serialization.
     """
-    from sqlalchemy import text, create_engine
-    inventory_db_url = os.getenv(
-        'INVENTORY_DATABASE_URL',
-        'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
-    )
-    inv_engine = create_engine(inventory_db_url)
+    from sqlalchemy import text
+    from integration_hub.db.database import get_inventory_engine
+    inv_engine = get_inventory_engine()
     lookup = {}
     with inv_engine.connect() as conn:
         rows = conn.execute(
@@ -232,14 +229,11 @@ def sync_master_item_defaults(item, db) -> dict:
     if not item.inventory_master_item_id:
         return {"uom_synced": False, "uom_warning": None}
 
-    from sqlalchemy import text, create_engine
+    from sqlalchemy import text
+    from integration_hub.db.database import get_inventory_engine
 
     try:
-        inventory_db_url = os.getenv(
-            'INVENTORY_DATABASE_URL',
-            'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
-        )
-        inv_engine = create_engine(inventory_db_url)
+        inv_engine = get_inventory_engine()
 
         with inv_engine.connect() as conn:
             # Read current master item state
@@ -858,13 +852,11 @@ async def get_master_items_from_inventory():
     Direct database connection to Inventory for reliability.
     Must be defined before /{vendor_item_id} to avoid route conflict.
     """
-    from sqlalchemy import create_engine, text as sql_text
-
-    inventory_db_url = os.getenv('INVENTORY_DATABASE_URL',
-                                 'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db')
+    from sqlalchemy import text as sql_text
+    from integration_hub.db.database import get_inventory_engine
 
     try:
-        engine = create_engine(inventory_db_url)
+        engine = get_inventory_engine()
         with engine.connect() as conn:
             results = conn.execute(
                 sql_text("SELECT id, name, category FROM master_items WHERE is_active = true ORDER BY name LIMIT 2000")
@@ -980,12 +972,8 @@ async def check_category_conflicts(
             # Fetch master item's current category from Inventory
             master_item_category = None
             try:
-                from sqlalchemy import create_engine
-                inventory_db_url = os.getenv(
-                    'INVENTORY_DATABASE_URL',
-                    'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
-                )
-                inv_engine = create_engine(inventory_db_url)
+                from integration_hub.db.database import get_inventory_engine
+                inv_engine = get_inventory_engine()
                 with inv_engine.connect() as conn:
                     mi_result = conn.execute(
                         text("SELECT category FROM master_items WHERE id = :id"),
@@ -1037,7 +1025,8 @@ async def get_category_summary(
     - Master items linked to vendor items by category
     - Any mismatches between vendor item and master item categories
     """
-    from sqlalchemy import text, create_engine
+    from sqlalchemy import text
+    from integration_hub.db.database import get_inventory_engine
 
     # Get vendor item category distribution
     vi_query = text("""
@@ -1065,11 +1054,7 @@ async def get_category_summary(
     # Get master item category distribution from Inventory
     master_item_categories = []
     try:
-        inventory_db_url = os.getenv(
-            'INVENTORY_DATABASE_URL',
-            'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
-        )
-        inv_engine = create_engine(inventory_db_url)
+        inv_engine = get_inventory_engine()
         with inv_engine.connect() as conn:
             mi_results = conn.execute(text("""
                 SELECT
@@ -1112,7 +1097,8 @@ async def sync_all_master_item_categories(
     Use dry_run=true (default) to see what would change without making changes.
     Set dry_run=false to actually apply the changes.
     """
-    from sqlalchemy import text, create_engine
+    from sqlalchemy import text
+    from integration_hub.db.database import get_inventory_engine
 
     # Get vendor item categories for each master item (only where there's no conflict)
     category_query = text("""
@@ -1141,11 +1127,7 @@ async def sync_all_master_item_categories(
         results = db.execute(category_query).fetchall()
 
         # Get master item categories from Inventory for comparison
-        inventory_db_url = os.getenv(
-            'INVENTORY_DATABASE_URL',
-            'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
-        )
-        inv_engine = create_engine(inventory_db_url)
+        inv_engine = get_inventory_engine()
 
         updates = []
         already_correct = 0
@@ -1217,7 +1199,8 @@ async def sync_master_item_category(
 
     Use this after resolving category conflicts to set the correct category.
     """
-    from sqlalchemy import text, create_engine
+    from sqlalchemy import text
+    from integration_hub.db.database import get_inventory_engine
 
     # Verify the master item has vendor items with this category
     vendor_items = db.query(HubVendorItem).filter(
@@ -1234,11 +1217,7 @@ async def sync_master_item_category(
 
     # Update master item in Inventory
     try:
-        inventory_db_url = os.getenv(
-            'INVENTORY_DATABASE_URL',
-            'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
-        )
-        inv_engine = create_engine(inventory_db_url)
+        inv_engine = get_inventory_engine()
         with inv_engine.connect() as conn:
             # Get current category first
             current = conn.execute(
@@ -1503,18 +1482,15 @@ async def update_vendor_item(
     # Auto-create bottle conversion for volume items (used by item_detail.html UI)
     if "inventory_master_item_id" in update_data and item.inventory_master_item_id and item.size_quantity and item.size_unit_id:
         try:
-            from sqlalchemy import text, create_engine
+            from sqlalchemy import text
             from integration_hub.models.size_unit import SizeUnit
+            from integration_hub.db.database import get_inventory_engine
 
             size_unit = db.query(SizeUnit).filter(SizeUnit.id == item.size_unit_id).first()
             if size_unit and size_unit.conversion_to_inventory_unit and size_unit.measure_type == "volume":
                 fl_oz_amount = float(item.size_quantity) * float(size_unit.conversion_to_inventory_unit)
 
-                inventory_db_url = os.getenv(
-                    "INVENTORY_DATABASE_URL",
-                    "postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db"
-                )
-                inv_engine = create_engine(inventory_db_url)
+                inv_engine = get_inventory_engine()
                 with inv_engine.connect() as conn:
                     existing = conn.execute(
                         text("""SELECT id FROM item_unit_conversions
@@ -2126,13 +2102,8 @@ async def get_vendor_item_location_prices(
         # (API requires auth, so we use DB connection)
         location_names = {}
         try:
-            from sqlalchemy import create_engine
-            import os
-            inventory_db_url = os.getenv(
-                'INVENTORY_DATABASE_URL',
-                'postgresql://inventory_user:inventory_pass@inventory-db:5432/inventory_db'
-            )
-            inv_engine = create_engine(inventory_db_url)
+            from integration_hub.db.database import get_inventory_engine
+            inv_engine = get_inventory_engine()
             with inv_engine.connect() as conn:
                 loc_results = conn.execute(
                     text("SELECT id, name FROM locations WHERE is_active = true ORDER BY name")
@@ -2516,10 +2487,9 @@ async def get_vendor_item_invoice_history(
     # Build location name lookup from Inventory DB
     location_names = {}
     try:
-        inventory_db_url = os.getenv('INVENTORY_DATABASE_URL', '')
-        if inventory_db_url:
-            from sqlalchemy import create_engine
-            inv_engine = create_engine(inventory_db_url)
+        from integration_hub.db.database import get_inventory_engine
+        inv_engine = get_inventory_engine()
+        if inv_engine:
             with inv_engine.connect() as inv_conn:
                 loc_rows = inv_conn.execute(
                     text("SELECT id, name FROM locations WHERE is_active = true")

@@ -1020,7 +1020,7 @@ async function sendInvoice() {
 
         if (response.ok && result.success) {
             await showAlert('Invoice sent successfully!', 'Success');
-            location.reload();
+            window.location.href = '/hub/invoices';
         } else {
             // Handle both FastAPI HTTPException format (detail) and custom format (errors array)
             let errorMessage = 'Unknown error';

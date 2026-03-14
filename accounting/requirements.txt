@@ -22,3 +22,6 @@ rapidfuzz==3.5.2  # Fuzzy string matching for transaction matching
 
 # Background Tasks
 apscheduler==3.10.4  # Background task scheduling for auto-sync
+
+# AI
+anthropic>=0.39.0  # Claude API for GL anomaly analysis

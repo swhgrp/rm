@@ -299,6 +299,38 @@
         </div>
     {% endif %}
 
+    <!-- Equipment & Rentals Section -->
+    {% if event.menu_json and event.menu_json.equipment_items %}
+    {% set equip_items = event.menu_json.equipment_items %}
+    {% if equip_items|length > 0 %}
+    <div class="menu-section">
+        <div class="menu-section-title">Equipment &amp; Rentals</div>
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th class="right">Qty</th>
+                    <th class="right">Price</th>
+                    <th class="right">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in equip_items %}
+                {% set item_price = item.price if item.price else 0 %}
+                {% set item_qty = item.quantity if item.quantity else 1 %}
+                <tr>
+                    <td>{{ item.name }}</td>
+                    <td class="right">{{ item_qty }}</td>
+                    <td class="right">${{ "%.2f"|format(item_price|float) }}</td>
+                    <td class="right">${{ "%.2f"|format(item_price|float * item_qty|float) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+    {% endif %}
+
     <!-- Beverage Section -->
     {% set has_bar = event.menu_json and event.menu_json.bar_type and event.menu_json.bar_type not in ['', 'none', 'no_bar', 'non_alcoholic'] %}
     {% if has_bar or (event.menu_json and event.menu_json.beverage_details) %}
@@ -321,7 +353,7 @@
     <div class="financial-summary">
         <table class="financial-table">
             <tr>
-                <td>Food &amp; Beverage Subtotal:</td>
+                <td>Subtotal:</td>
                 <td class="right">${{ "%.2f"|format(food_subtotal) }}</td>
             </tr>
             {% if service_charge > 0 %}

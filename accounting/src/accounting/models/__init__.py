@@ -83,6 +83,7 @@ from accounting.models.pos import (
 )
 from accounting.models.system_setting import SystemSetting
 from accounting.models.safe_transaction import SafeTransaction
+from accounting.gl_review.models import GLAnomalyFlag, GLAccountBaseline
 
 __all__ = [
     "Area",
@@ -170,4 +171,6 @@ __all__ = [
     "POSCategoryGLMapping",
     "SystemSetting",
     "SafeTransaction",
+    "GLAnomalyFlag",
+    "GLAccountBaseline",
 ]

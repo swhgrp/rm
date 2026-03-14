@@ -643,9 +643,21 @@
 
             <!-- Equipment/Rentals -->
             <div class="info-card" style="margin-bottom: 10px; border-left-color: var(--text-muted);">
-                <div class="info-card-title"><i class="bi bi-box-seam"></i> Equipment & Rentals</div>
-                <div style="margin-top: 6px;">
-                    <textarea id="menuEquipment" class="form-control-custom" rows="2" placeholder="Chafing dishes, linens, china, tables, chairs, etc." style="width: 100%; padding: 8px 12px;"></textarea>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div class="info-card-title"><i class="bi bi-box-seam"></i> Equipment & Rentals</div>
+                    <button class="btn btn-sm btn-primary-custom" onclick="addEquipmentItem()">
+                        <i class="bi bi-plus"></i> Add Item
+                    </button>
+                </div>
+                <div id="equipmentItems">
+                    <!-- Equipment items will be added here dynamically -->
+                </div>
+                <div id="equipmentEmptyState" style="color: var(--text-muted); font-style: italic; text-align: center; padding: 10px;">
+                    No equipment items yet. Click "Add Item" to add rentals, linens, etc.
+                </div>
+                <div style="margin-top: 8px;">
+                    <label style="color: var(--text-muted); font-size: 12px; display: block; margin-bottom: 4px;">Equipment Notes</label>
+                    <textarea id="menuEquipmentNotes" class="form-control-custom" rows="2" placeholder="Additional equipment notes, special setup instructions, etc." style="width: 100%; padding: 8px 12px;"></textarea>
                 </div>
             </div>
 
@@ -1193,9 +1205,22 @@
             document.getElementById('menuSpecialRequests').value = menu.special_requests;
         }
 
-        // Equipment
-        if (menu.equipment) {
-            document.getElementById('menuEquipment').value = menu.equipment;
+        // Equipment Items
+        equipmentItemCounter = 0;
+        document.getElementById('equipmentItems').innerHTML = '';
+        const equipmentItems = menu.equipment_items || [];
+        if (equipmentItems.length > 0) {
+            document.getElementById('equipmentEmptyState').style.display = 'none';
+            equipmentItems.forEach(item => addEquipmentItem(item));
+        } else {
+            document.getElementById('equipmentEmptyState').style.display = 'block';
+        }
+
+        // Equipment Notes (also load legacy 'equipment' text field into notes for backward compat)
+        if (menu.equipment_notes) {
+            document.getElementById('menuEquipmentNotes').value = menu.equipment_notes;
+        } else if (menu.equipment) {
+            document.getElementById('menuEquipmentNotes').value = menu.equipment;
         }
 
         // Menu Sections
@@ -1363,6 +1388,46 @@
         }
     }
 
+    let equipmentItemCounter = 0;
+
+    function addEquipmentItem(data = null) {
+        document.getElementById('equipmentEmptyState').style.display = 'none';
+        const container = document.getElementById('equipmentItems');
+        const itemId = equipmentItemCounter++;
+
+        const html = `
+            <div class="equipment-item-row" id="equipItem${itemId}" style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px; padding: 8px; background: var(--bg-tertiary); border-radius: 4px;">
+                <div style="flex: 2;">
+                    <input type="text" class="form-control-custom equip-name" placeholder="Item (e.g., Dance Floor, Table Linens)" value="${data?.name || ''}" style="width: 100%; padding: 6px 10px;">
+                </div>
+                <div style="width: 100px;">
+                    <input type="text" class="form-control-custom equip-quantity" placeholder="Qty" value="${data?.quantity || ''}" style="width: 100%; padding: 6px 10px; font-size: 13px;">
+                </div>
+                <div style="width: 90px;">
+                    <div style="display: flex; align-items: center;">
+                        <span style="color: var(--text-muted); padding: 0 5px;">$</span>
+                        <input type="number" class="form-control-custom equip-price" placeholder="Price" value="${data?.price || ''}" step="0.01" min="0" style="width: 100%; padding: 6px 10px; font-size: 13px;">
+                    </div>
+                </div>
+                <button type="button" onclick="removeEquipmentItem(${itemId})" style="background: transparent; border: none; color: #d32f2f; cursor: pointer; padding: 6px;">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', html);
+    }
+
+    function removeEquipmentItem(itemId) {
+        const item = document.getElementById(`equipItem${itemId}`);
+        if (item) {
+            item.remove();
+            if (document.getElementById('equipmentItems').children.length === 0) {
+                document.getElementById('equipmentEmptyState').style.display = 'block';
+            }
+        }
+    }
+
     function collectMenuData() {
         const menu = {
             service_style: document.getElementById('menuServiceStyle').value,
@@ -1372,7 +1437,8 @@
             beverage_details: document.getElementById('menuBeverageDetails').value,
             dietary: [],
             special_requests: document.getElementById('menuSpecialRequests').value,
-            equipment: document.getElementById('menuEquipment').value,
+            equipment_items: [],
+            equipment_notes: document.getElementById('menuEquipmentNotes').value,
             sections: []
         };
 
@@ -1410,6 +1476,19 @@
             // Only add section if it has a type/name or items
             if (section.type || section.name || section.items.length > 0) {
                 menu.sections.push(section);
+            }
+        });
+
+        // Collect equipment items
+        const equipmentRows = document.querySelectorAll('.equipment-item-row');
+        equipmentRows.forEach(itemEl => {
+            const name = itemEl.querySelector('.equip-name').value.trim();
+            if (name) {
+                menu.equipment_items.push({
+                    name: name,
+                    quantity: itemEl.querySelector('.equip-quantity').value.trim(),
+                    price: itemEl.querySelector('.equip-price').value ? parseFloat(itemEl.querySelector('.equip-price').value) : null
+                });
             }
         });
 
@@ -1557,6 +1636,15 @@
             });
         });
 
+        // Include equipment/rental items
+        const equipmentItems = menu.equipment_items || [];
+        equipmentItems.forEach(item => {
+            if (item.price) {
+                const qty = parseFloat(item.quantity) || 1;
+                subtotal += item.price * qty;
+            }
+        });
+
         return subtotal;
     }
 
@@ -1587,6 +1675,25 @@
                 html += `</div>`;
             }
         });
+
+        // Equipment/rental items
+        const equipmentItems = (menu.equipment_items || []).filter(item => item.price);
+        if (equipmentItems.length > 0) {
+            html += `<div style="margin-bottom: 10px;">`;
+            html += `<div style="color: #8b949e; font-size: 12px; margin-bottom: 4px;">EQUIPMENT & RENTALS</div>`;
+
+            equipmentItems.forEach(item => {
+                const qty = parseFloat(item.quantity) || 1;
+                const lineTotal = item.price * qty;
+                const qtyDisplay = item.quantity ? ` × ${item.quantity}` : '';
+                html += `<div style="display: flex; justify-content: space-between; padding: 2px 0;">
+                    <span style="color: #c9d1d9;">${item.name}${qtyDisplay}</span>
+                    <span style="color: #c9d1d9;">${formatCurrency(lineTotal)}</span>
+                </div>`;
+            });
+
+            html += `</div>`;
+        }
 
         container.innerHTML = html || '<div style="color: #8b949e;">No priced items</div>';
     }
@@ -2140,19 +2247,19 @@
     }
 
     function downloadBEO() {
-        window.open(`/events/api/documents/events/${currentEventId}/beo-pdf`, '_blank');
+        window.open(`/events/api/documents/events/${currentEventId}/beo-pdf?download=false`, '_blank');
     }
 
     function downloadContract() {
-        window.open(`/events/api/documents/events/${currentEventId}/contract-pdf`, '_blank');
+        window.open(`/events/api/documents/events/${currentEventId}/contract-pdf?download=false`, '_blank');
     }
 
     function downloadQuote() {
-        window.open(`/events/api/documents/events/${currentEventId}/quote-pdf`, '_blank');
+        window.open(`/events/api/documents/events/${currentEventId}/quote-pdf?download=false`, '_blank');
     }
 
     function downloadSummary() {
-        window.open(`/events/api/documents/events/${currentEventId}/summary-pdf`, '_blank');
+        window.open(`/events/api/documents/events/${currentEventId}/summary-pdf?download=false`, '_blank');
     }
 
     function showSuccess(message) {

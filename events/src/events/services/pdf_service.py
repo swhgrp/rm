@@ -143,6 +143,12 @@ class PDFService:
                         qty = float(item.get('quantity') or 1)
                         menu_subtotal += price * qty
 
+            # Include equipment/rental items in subtotal
+            for item in menu.get('equipment_items', []):
+                price = item.get('price') or 0
+                qty = float(item.get('quantity') or 1)
+                menu_subtotal += price * qty
+
             subtotal = fin.get('subtotal') or menu_subtotal
             tax_rate = fin.get('tax_rate') or 0.065
             service_rate = fin.get('service_rate') or 0.21
@@ -221,6 +227,12 @@ class PDFService:
                         price = item.get('price') or 0
                         qty = float(item.get('quantity') or 1)
                         menu_subtotal += price * qty
+
+            # Include equipment/rental items in subtotal
+            for item in menu.get('equipment_items', []):
+                price = item.get('price') or 0
+                qty = float(item.get('quantity') or 1)
+                menu_subtotal += price * qty
 
             subtotal = fin.get('subtotal') or menu_subtotal
             tax_rate = fin.get('tax_rate') or 0.065

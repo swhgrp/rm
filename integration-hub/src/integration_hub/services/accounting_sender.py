@@ -45,7 +45,13 @@ class AccountingSenderService:
         self.accounting_db_url = os.getenv("ACCOUNTING_DATABASE_URL")
         if not self.accounting_db_url:
             raise ValueError("ACCOUNTING_DATABASE_URL environment variable is required")
-        self.accounting_engine = create_engine(self.accounting_db_url)
+        self.accounting_engine = create_engine(
+            self.accounting_db_url,
+            pool_size=3,
+            max_overflow=5,
+            pool_pre_ping=True,
+            pool_recycle=300,
+        )
 
         # Cache for account number -> ID mappings
         self._account_id_cache = {}
